@@ -25,4 +25,5 @@ jobs:
       - name: Docker push
         run: |
           VERSION="echo ${{  github.ref_name }} | sed 's/release\///g'"
-          make "TAG=$VERSION" PUBLISH=true "USERNAME=${{ github.actor }}" "PASSWORD=$GITHUB_TOKEN" docker-build
+          echo "Building and pushing docker image with tag $VERSION"
+          make "TAG=$VERSION" PUBLISH=true "USERNAME=${{ github.actor }}" "PASSWORD=${{ secrets.GITHUB_TOKEN }}" docker-build
