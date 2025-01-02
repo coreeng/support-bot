@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: ['release/v*']
+    tags: ['v*']
 
 jobs:
   check:
@@ -24,6 +24,5 @@ jobs:
         run: make check
       - name: Docker push
         run: |
-          VERSION="echo ${{  github.ref_name }} | sed 's/release\///g'"
-          echo "Building and pushing docker image with tag $VERSION"
-          make "TAG=$VERSION" PUBLISH=true "USERNAME=${{ github.actor }}" "PASSWORD=${{ secrets.GITHUB_TOKEN }}" docker-build
+          echo "Building and pushing docker image with tag '${{ github.ref_name }}"
+          make "TAG=${{ github.ref_name }}" PUBLISH=true "USERNAME=${{ github.actor }}" "PASSWORD=${{ secrets.GITHUB_TOKEN }}" docker-build
