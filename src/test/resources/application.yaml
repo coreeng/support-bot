@@ -1,0 +1,29 @@
+spring:
+  profiles:
+    active: test
+
+slack:
+  creds:
+    token: xoxb-token
+    socket-token: xapp-1-secret-token
+    signing-secret: signing-secret
+  ticket:
+    channel-id: CHANNELID
+    expected-initial-reaction: eyes
+    response-initial-reaction: ticket
+
+ticket:
+  tags:
+    - name: Tag A
+      code: tagA
+    - name: Tag B
+      code: tagB
+    - name: Tag C
+      code: tagC
+  impacts:
+    - name: Production Blocking
+      code: productionBlocking
+    - name: BAU Blocking
+      code: bauBlocking
+    - name: Abnormal Behaviour
+      code: abnormalBehaviour
