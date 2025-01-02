@@ -24,7 +24,17 @@ check:
 	./gradlew check
 
 TAG=latest
+PUBLISH=false
+# Specify next variables in case PUBLISH=true
+USERNAME=
+PASSWORD=
+.ONESHELL: docker-build
 .PHONY: docker-build
 docker-build:
-	./gradlew bootBuildImage "-DimageTag=$(TAG)"
+	@export password="$(PASSWORD)"
+	@export args="-DimageTag=$(TAG)"
+	@if [[ "$(PUBLISH)" == "true" ]]; then \
+		args+=" --publishImage -Dusername=$(USERNAME) -Dpassword=$${password}"; \
+	fi
+	@./gradlew bootBuildImage $${args}
 
