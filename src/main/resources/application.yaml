@@ -4,17 +4,20 @@ spring:
   application:
     name: support-bot
 
+server:
+  # We only use Jetty for the actuator for now, so limit its resources
+  jetty:
+    threads:
+      acceptors: 1
+      selectors: 1
+      min: 1
+      max: 4
+
 management:
-  endpoints:
-    access:
-      default: unrestricted
-    web:
-      exposure:
-        include: "health,info"
-  server:
-    port: 8081
-    ssl:
-      enabled: false
+  endpoint:
+    health:
+      probes:
+        enabled: true
 
 slack:
   creds:

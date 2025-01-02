@@ -36,7 +36,13 @@ repositories {
 val lombokVersion = "1.18.36"
 
 dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-web") {
+        // we need it just for the actuator, so pick Jetty instead of Tomcat since it's a bit more lightweight
+        exclude(group = "org.springframework.boot", module = "spring-boot-starter-tomcat")
+    }
+    implementation("org.springframework.boot:spring-boot-starter-jetty")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     annotationProcessor("org.springframework:spring-context-indexer")

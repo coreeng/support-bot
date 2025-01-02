@@ -3,8 +3,7 @@ package com.coreeng.supportbot.config;
 import com.slack.api.bolt.App;
 import com.slack.api.bolt.jakarta_socket_mode.SocketModeApp;
 import jakarta.annotation.PreDestroy;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +11,7 @@ import java.io.IOException;
 
 @Component
 @Profile("!test")
-public class SlackSocketController implements ApplicationRunner {
+public class SlackSocketController implements CommandLineRunner {
     private final SocketModeApp socketModeApp;
 
     public SlackSocketController(
@@ -26,8 +25,8 @@ public class SlackSocketController implements ApplicationRunner {
     }
 
     @Override
-    public void run(ApplicationArguments args) throws Exception {
-        socketModeApp.start();
+    public void run(String... args) throws Exception {
+        socketModeApp.startAsync();
     }
 
     @PreDestroy
