@@ -1,0 +1,43 @@
+spring:
+  main:
+    banner-mode: off
+  application:
+    name: support-bot
+
+management:
+  endpoints:
+    access:
+      default: unrestricted
+    web:
+      exposure:
+        include: "health,info"
+  server:
+    port: 8081
+    ssl:
+      enabled: false
+
+slack:
+  creds:
+    token: ${SLACK_TOKEN} # Token like: xoxb-abc-def
+    socket-token: ${SLACK_SOCKET_TOKEN} # Token like: xapp-1-abc-def-ghi
+    signing-secret: ${SLACK_SIGNING_SECRET} # Token like: 1234567890abcdef
+  ticket:
+    channel-id: C08664NB6TC # Channel ID like: C1234567890
+    expected-initial-reaction: eyes
+    response-initial-reaction: ticket
+
+ticket:
+  tags:
+    - name: Tag A
+      code: tagA
+    - name: Tag B
+      code: tagB
+    - name: Tag C
+      code: tagC
+  impacts:
+    - name: Production Blocking
+      code: productionBlocking
+    - name: BAU Blocking
+      code: bauBlocking
+    - name: Abnormal Behaviour
+      code: abnormalBehaviour

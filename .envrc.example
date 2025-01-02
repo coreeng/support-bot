@@ -1,0 +1,3 @@
+export SLACK_TOKEN=xoxb-abc-def
+export SLACK_SOCKET_TOKEN=xapp-1-abc-def-ghi
+export SLACK_SIGNING_SECRET=1234567890abcdef

@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<ruleset name="Custom Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>
+        Support-Bot PMD ruleset
+    </description>
+
+    <rule ref="category/java/bestpractices.xml">
+        <exclude name="UnitTestAssertionsShouldIncludeMessage"/>
+        <exclude name="JUnit5TestShouldBePackagePrivate"/>
+        <exclude name="UnitTestContainsTooManyAsserts"/>
+    </rule>
+    <rule ref="category/java/codestyle.xml">
+        <exclude name="AtLeastOneConstructor"/>
+        <exclude name="CommentDefaultAccessModifier"/>
+        <exclude name="LocalVariableCouldBeFinal"/>
+        <exclude name="MethodArgumentCouldBeFinal"/>
+        <exclude name="UseExplicitTypes"/>
+        <exclude name="OnlyOneReturn"/>
+        <exclude name="TooManyStaticImports"/>
+        <exclude name="ShortVariable"/>
+        <exclude name="ShortMethodName"/>
+    </rule>
+    <rule ref="category/java/codestyle.xml/FieldNamingConventions">
+        <properties>
+            <property name="publicConstantPattern" value="[a-z][a-zA-Z0-9]*" />
+            <property name="constantPattern" value="[a-z][a-zA-Z0-9]*" />
+            <property name="enumConstantPattern" value="[a-z][a-zA-Z0-9]*" />
+        </properties>
+    </rule>
+    <rule ref="category/java/codestyle.xml/LongVariable">
+        <properties>
+            <property name="minimum" value="25"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/bestpractices.xml/LooseCoupling">
+        <properties>
+            <property name="allowedTypes" value="java.util.Properties,com.google.common.collect.ImmutableList,com.google.common.collect.ImmutableSet,com.google.common.collect.ImmutableMap" />
+        </properties>
+    </rule>
+</ruleset>
