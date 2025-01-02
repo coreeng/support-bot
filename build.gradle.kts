@@ -71,5 +71,11 @@ tasks.withType<BootBuildImage> {
     val imageTag = System.getProperty("imageTag") ?: "latest"
     imageName = "ghcr.io/coreeng/support-bot:${imageTag}"
 
+    docker {
+        publishRegistry {
+            username = System.getProperty("username")
+            password = System.getProperty("password")
+        }
+    }
     setPullPolicy("IF_NOT_PRESENT")
 }
