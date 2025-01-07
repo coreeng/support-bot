@@ -25,7 +25,7 @@ slack:
     socket-token: ${SLACK_SOCKET_TOKEN} # Token like: xapp-1-abc-def-ghi
     signing-secret: ${SLACK_SIGNING_SECRET} # Token like: 1234567890abcdef
   ticket:
-    channel-id: C08664NB6TC # Channel ID like: C1234567890
+    channel-id: ${TICKET_CHANNEL_ID} # Channel ID like: C1234567890
     expected-initial-reaction: eyes
     response-initial-reaction: ticket
 
