@@ -37,7 +37,7 @@ public class SlackAppConfig {
      * no concurrency in message processing in socket mode.
      * This implementation sets the default concurrency value as number of threads for scheduled executor.
      */
-    private class ConcurrentExecutorServiceProvider implements ExecutorServiceProvider {
+    private static class ConcurrentExecutorServiceProvider implements ExecutorServiceProvider {
         @Override
         public ExecutorService createThreadPoolExecutor(String threadGroupName, int poolSize) {
             return Executors.newFixedThreadPool(poolSize, new DaemonThreadFactory(threadGroupName));
