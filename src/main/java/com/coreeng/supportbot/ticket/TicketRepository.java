@@ -5,7 +5,7 @@ import com.coreeng.supportbot.slack.MessageTs;
 import javax.annotation.Nullable;
 
 public interface TicketRepository {
-    void createQueryIfNotExists(MessageTs messageTs);
+    boolean createQueryIfNotExists(MessageTs messageTs);
     boolean queryExists(MessageTs messageTs);
 
     Ticket createTicketIfNotExists(Ticket ticket);

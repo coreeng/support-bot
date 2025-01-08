@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.slack.client.SlackMessage;
+import com.google.common.collect.ImmutableList;
 import com.slack.api.model.Attachment;
 import com.slack.api.model.block.LayoutBlock;
 
@@ -30,8 +31,8 @@ public record TicketCreatedMessage(
     }
 
     @Override
-    public List<LayoutBlock> renderBlocks() {
-        return asBlocks(
+    public ImmutableList<LayoutBlock> renderBlocks() {
+        return ImmutableList.of(
             section(s -> s.
                 text(markdownText(format("*Ticket Created*: `ID-%d`", ticketId.id())))
             )
@@ -39,7 +40,7 @@ public record TicketCreatedMessage(
     }
 
     @Override
-    public List<Attachment> renderAttachments() {
+    public ImmutableList<Attachment> renderAttachments() {
         // TODO: what timezone should be used?
         String title = status.renderMessage(dateFormatter.format(statusChangedDate.atOffset(ZoneOffset.UTC)));
         List<LayoutBlock> blocks = asBlocks(
@@ -70,7 +71,7 @@ public record TicketCreatedMessage(
                     .emoji(true))
             ))
         );
-        return List.of(Attachment.builder()
+        return ImmutableList.of(Attachment.builder()
             .fallback(title)
             .blocks(blocks)
             .color(status == TicketStatus.unresolved
