@@ -1,21 +1,22 @@
 package com.coreeng.supportbot.slack.client;
 
+import com.google.common.collect.ImmutableList;
 import com.slack.api.model.Attachment;
 import com.slack.api.model.block.LayoutBlock;
-
-import java.util.List;
 
 public interface SlackMessage {
     /**
      * @return Brief description of the message
      */
-    String getText();
-
-    default List<LayoutBlock> renderBlocks() {
-        return List.of();
+    default String getText() {
+        return "";
     }
 
-    default List<Attachment> renderAttachments() {
-        return List.of();
+    default ImmutableList<LayoutBlock> renderBlocks() {
+        return ImmutableList.of();
+    }
+
+    default ImmutableList<Attachment> renderAttachments() {
+        return ImmutableList.of();
     }
 }

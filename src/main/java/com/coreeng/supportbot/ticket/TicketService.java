@@ -43,10 +43,11 @@ public class TicketService {
         if (!isQueryEvent(e)) {
             return;
         }
-        ticketRepository.createQueryIfNotExists(e.messageTs());
-        log.atInfo()
-            .addArgument(e::messageTs)
-            .log("Query is created on message({})");
+        if (ticketRepository.createQueryIfNotExists(e.messageRef().actualThreadTs())) {
+            log.atInfo()
+                .addArgument(() -> e.messageRef().actualThreadTs())
+                .log("Query is created on message({})");
+        }
     }
 
     /**
@@ -65,15 +66,15 @@ public class TicketService {
             return;
         }
 
-        Ticket newTicket = ticketRepository.createTicketIfNotExists(Ticket.createNew(e.messageTs(), e.channelId()));
+        Ticket newTicket = ticketRepository.createTicketIfNotExists(Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
         log.atInfo()
-            .addArgument(e::messageTs)
+            .addArgument(() -> e.messageRef().actualThreadTs())
             .log("Ticket is created on reaction to message({})");
 
         addReactionToPostIfAbsent(
             slackTicketsProps.responseInitialReaction(),
-            e.messageTs(),
-            e.channelId()
+            e.messageRef().actualThreadTs(),
+            e.messageRef().channelId()
         );
 
         if (newTicket.createdMessageTs() == null) {
@@ -86,8 +87,8 @@ public class TicketService {
                     newTicket.statusHistory().getLast().timestamp(),
                     dateFormatter
                 ),
-                e.channelId(),
-                e.messageTs()
+                e.messageRef().channelId(),
+                e.messageRef().actualThreadTs()
             ));
             newTicket = ticketRepository.updateTicket(
                 newTicket.toBuilder()
@@ -99,7 +100,7 @@ public class TicketService {
                 .log("Ticket form is posted for query({})");
         } else {
             log.atInfo()
-                .addArgument(e::messageTs)
+                .addArgument(() -> e.messageRef().actualThreadTs())
                 .log("Ticket form is already posted to message({})");
         }
     }
@@ -267,7 +268,7 @@ public class TicketService {
     }
 
     private boolean isQueryEvent(SlackEvent event) {
-        return Objects.equals(slackTicketsProps.channelId(), event.channelId())
-            && event.threadTs() == null;
+        return Objects.equals(slackTicketsProps.channelId(), event.messageRef().channelId())
+            && !event.messageRef().isReply();
     }
 }

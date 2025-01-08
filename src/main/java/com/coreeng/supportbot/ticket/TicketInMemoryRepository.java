@@ -23,9 +23,9 @@ public class TicketInMemoryRepository implements TicketRepository {
     private final AtomicLong ticketIdSequence = new AtomicLong(1);
 
     @Override
-    public void createQueryIfNotExists(MessageTs messageTs) {
+    public boolean createQueryIfNotExists(MessageTs messageTs) {
         checkNotNull(messageTs);
-        queries.add(messageTs);
+        return queries.add(messageTs);
     }
 
     @Override
