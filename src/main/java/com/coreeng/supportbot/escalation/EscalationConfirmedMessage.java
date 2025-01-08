@@ -28,7 +28,7 @@ public record EscalationConfirmedMessage(
     }
 
     private String renderMessage() {
-        String str = """
+        return """
             Thank you for your submission
             This issue is now being tracked under:
             ID:\s""" +
@@ -39,6 +39,5 @@ public record EscalationConfirmedMessage(
             team.name() +
             "\n\nYou can now escalate the query to #" +
             team.code();
-        return str;
     }
 }
