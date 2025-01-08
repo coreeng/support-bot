@@ -1,18 +1,14 @@
 package com.coreeng.supportbot.slack.events;
 
-import com.coreeng.supportbot.slack.MessageTs;
-
-import javax.annotation.Nullable;
+import com.coreeng.supportbot.slack.MessageRef;
 
 public sealed interface SlackEvent
     permits ReactionAdded,
-            ReactionRemoved,
-            MessagePosted,
-            BotTagged {
+    ReactionRemoved,
+    MessagePosted,
+    BotTagged {
 
-    String channelId();
     String userId();
-    MessageTs messageTs();
-    @Nullable
-    MessageTs threadTs();
+
+    MessageRef messageRef();
 }

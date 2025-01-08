@@ -28,6 +28,8 @@ slack:
     channel-id: ${TICKET_CHANNEL_ID} # Channel ID like: C1234567890
     expected-initial-reaction: eyes
     response-initial-reaction: ticket
+  escalation:
+    channel-id: ${ESCALATION_CHANNEL_ID} # Channel ID like: C1234567890
 
 ticket:
   tags:
@@ -44,3 +46,19 @@ ticket:
       code: bauBlocking
     - name: Abnormal Behaviour
       code: abnormalBehaviour
+
+escalation:
+  topics:
+    - name: Topic A
+      code: topicA
+    - name: Topic B
+      code: topicB
+    - name: Topic C
+      code: topicC
+  teams:
+    - name: Team A
+      code: teamA
+    - name: Team B
+      code: teamB
+    - name: Team C
+      code: teamC

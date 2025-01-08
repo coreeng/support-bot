@@ -2,6 +2,7 @@ package com.coreeng.supportbot;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.TicketProps;
+import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
@@ -63,9 +64,11 @@ public class TicketServiceTests {
         ticketService.handleMessagePosted(new MessagePosted(
             "some message",
             userId,
-            slackTicketsProps.channelId(),
-            messageTs,
-            null
+            new MessageRef(
+                messageTs,
+                null,
+                slackTicketsProps.channelId()
+            )
         ));
 
         // then
@@ -78,9 +81,11 @@ public class TicketServiceTests {
         ticketService.handleMessagePosted(new MessagePosted(
             "some message",
             userId,
-            "some-random-channnel",
-            messageTs,
-            null
+            new MessageRef(
+                messageTs,
+                null,
+                "some-random-channnel"
+            )
         ));
 
         // then
@@ -93,9 +98,11 @@ public class TicketServiceTests {
         ticketService.handleMessagePosted(new MessagePosted(
             "some message",
             userId,
-            slackTicketsProps.channelId(),
-            messageTs,
-            MessageTs.of("thread-ts")
+            new MessageRef(
+                messageTs,
+                MessageTs.of("thread-ts"),
+                slackTicketsProps.channelId()
+            )
         ));
 
         // then
@@ -116,9 +123,11 @@ public class TicketServiceTests {
         ticketService.handleReactionAdded(new ReactionAdded(
             slackTicketsProps.expectedInitialReaction(),
             userId,
-            slackTicketsProps.channelId(),
-            messageTs,
-            null
+            new MessageRef(
+                messageTs,
+                null,
+                slackTicketsProps.channelId()
+            )
         ));
 
         // then
