@@ -4,6 +4,9 @@ spring:
   application:
     name: support-bot
 
+application:
+  timezone: GMT+02
+
 server:
   # We only use Jetty for the actuator for now, so limit its resources
   jetty:

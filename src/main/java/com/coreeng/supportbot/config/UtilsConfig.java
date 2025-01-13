@@ -1,16 +1,22 @@
 package com.coreeng.supportbot.config;
 
+import com.coreeng.supportbot.util.JsonMapper;
+import com.coreeng.supportbot.util.RelativeDateFormatter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.time.format.DateTimeFormatter;
+import java.time.ZoneId;
 
 @Configuration
 public class UtilsConfig {
-    public final static DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd MMM 'at' HH:mm");
+    @Bean
+    public RelativeDateFormatter dateFormatter(@Value("${application.timezone}") String timezone) {
+        return new RelativeDateFormatter(ZoneId.of(timezone));
+    }
 
     @Bean
-    public DateTimeFormatter dateFormat() {
-        return dateFormatter;
+    public JsonMapper jsonMapper() {
+        return new JsonMapper();
     }
 }

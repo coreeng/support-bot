@@ -15,4 +15,6 @@ public interface TicketRepository {
     @Nullable Ticket findTicketByQuery(MessageTs messageTs);
 
     Ticket insertStatusLog(Ticket ticket);
+
+    TicketsPage findTickets(TicketsQuery query);
 }

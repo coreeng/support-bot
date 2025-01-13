@@ -24,6 +24,10 @@ public class CommandMainService {
 
     public void handleCommand(BotTagged event) {
         if (!slackEscalationProps.channelId().equals(event.messageRef().channelId())) {
+            log.atInfo()
+                .addArgument(event::messageRef)
+                .addArgument(slackEscalationProps::channelId)
+                .log("Skipping command message: {}. Expected channelId: {}");
             return;
         }
 

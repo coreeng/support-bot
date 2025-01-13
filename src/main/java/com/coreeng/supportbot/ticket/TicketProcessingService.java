@@ -23,7 +23,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
-import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -31,12 +30,12 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class TicketService {
+public class TicketProcessingService {
     private final TicketRepository ticketRepository;
     private final SlackClient slackClient;
     private final SlackTicketsProps slackTicketsProps;
     private final TicketProps ticketProps;
-    private final DateTimeFormatter dateFormatter;
+    private final TicketCreatedMessageMapper createdMessageMapper;
 
 
     public void handleMessagePosted(MessagePosted e) {
@@ -81,12 +80,11 @@ public class TicketService {
             // It's not really idempotent, since it's not atomic (one thing can succeed while the other one fail)
             // In the worst case, multiple forms will be posted, which is not a big issue
             ChatPostMessageResponse postMessageResponse = slackClient.postMessage(new SlackPostMessageRequest(
-                new TicketCreatedMessage(
+                createdMessageMapper.renderMessage(new TicketCreatedMessage(
                     newTicket.id(),
                     newTicket.status(),
-                    newTicket.statusHistory().getLast().timestamp(),
-                    dateFormatter
-                ),
+                    newTicket.statusHistory().getLast().timestamp()
+                )),
                 e.messageRef().channelId(),
                 e.messageRef().actualThreadTs()
             ));
@@ -114,9 +112,9 @@ public class TicketService {
             return;
         }
 
-        TicketStatus nextStatus = TicketStatus.unresolved == ticket.status()
-            ? TicketStatus.resolved
-            : TicketStatus.unresolved;
+        TicketStatus nextStatus = TicketStatus.opened == ticket.status()
+            ? TicketStatus.closed
+            : TicketStatus.opened;
         Ticket updatedTicket = ticketRepository.updateTicket(
             ticket.toBuilder()
                 .status(nextStatus)
@@ -130,20 +128,20 @@ public class TicketService {
         onStatusUpdate(updatedTicket);
     }
 
-    public TicketSummaryView summaryView(TicketSummaryViewQuery query) {
-        Ticket ticket = ticketRepository.findTicketByQuery(query.queryTs());
+    public TicketSummaryView summaryView(TicketId id) {
+        Ticket ticket = ticketRepository.findTicketById(id);
         if (ticket == null) {
             throw new IllegalStateException("Ticket not found");
         }
         SlackGetMessageByTsRequest messageRequest = new SlackGetMessageByTsRequest(
-            query.channelId(),
-            query.queryTs()
+            ticket.channelId(),
+            ticket.queryTs()
         );
         Message queryMessage = slackClient.getMessageByTs(messageRequest);
         String permalink = slackClient.getPermalink(messageRequest);
         TicketSummaryView.QuerySummaryView querySummary = new TicketSummaryView.QuerySummaryView(
             ImmutableList.copyOf(queryMessage.getBlocks()),
-            new MessageTs(queryMessage.getTs()).getDate(),
+            new MessageTs(queryMessage.getTs()),
             queryMessage.getUser(),
             permalink
         );
@@ -184,19 +182,18 @@ public class TicketService {
     private Ticket onStatusUpdate(Ticket ticket) {
         Ticket updatedTicket = ticketRepository.insertStatusLog(ticket);
         slackClient.editMessage(new SlackEditMessageRequest(
-            new TicketCreatedMessage(
+            createdMessageMapper.renderMessage(new TicketCreatedMessage(
                 updatedTicket.id(),
                 updatedTicket.status(),
-                updatedTicket.statusHistory().getLast().timestamp(),
-                dateFormatter
-            ),
+                updatedTicket.statusHistory().getLast().timestamp()
+            )),
             updatedTicket.channelId(),
             updatedTicket.createdMessageTs()
         ));
         log.atInfo()
             .addArgument(updatedTicket::queryTs)
             .log("Ticket form is updated for query({})");
-        if (updatedTicket.status() == TicketStatus.resolved) {
+        if (updatedTicket.status() == TicketStatus.closed) {
             addReactionToPostIfAbsent(
                 "white_check_mark",
                 updatedTicket.queryTs(),

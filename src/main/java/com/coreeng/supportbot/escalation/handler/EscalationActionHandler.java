@@ -1,6 +1,6 @@
 package com.coreeng.supportbot.escalation.handler;
 
-import com.coreeng.supportbot.escalation.EscalationAction;
+import com.coreeng.supportbot.escalation.EscalationOperation;
 import com.coreeng.supportbot.escalation.EscalationFormMapper;
 import com.coreeng.supportbot.escalation.EscalationService;
 import com.coreeng.supportbot.slack.MessageRef;
@@ -25,16 +25,16 @@ public class EscalationActionHandler implements SlackBlockActionHandler {
 
     @Override
     public Pattern getPattern() {
-        return EscalationAction.pattern;
+        return EscalationOperation.pattern;
     }
 
     @Override
     public void apply(BlockActionRequest req, ActionContext context) throws IOException, SlackApiException {
         for (BlockActionPayload.Action action : req.getPayload().getActions()) {
-            EscalationAction escalationAction = EscalationAction.valueOfOrNull(action.getActionId());
-            if (escalationAction != null) {
+            EscalationOperation escalationOperation = EscalationOperation.fromActionIdOrNull(action.getActionId());
+            if (escalationOperation != null) {
                 MessageRef messageRef = MessageRef.from(req.getPayload());
-                switch (escalationAction) {
+                switch (escalationOperation) {
                     case confirm -> escalationService.openEscalation(messageRef);
                     case changeTopic, changeTeam ->
                         escalationService.updateEscalation(escalationFormMapper.mapToRequest(action, messageRef));

@@ -11,6 +11,8 @@
         <exclude name="UnitTestAssertionsShouldIncludeMessage"/>
         <exclude name="JUnit5TestShouldBePackagePrivate"/>
         <exclude name="UnitTestContainsTooManyAsserts"/>
+        <!-- Gives a lot of false positives -->
+        <exclude name="NonExhaustiveSwitch"/>
     </rule>
     <rule ref="category/java/codestyle.xml">
         <exclude name="AtLeastOneConstructor"/>
