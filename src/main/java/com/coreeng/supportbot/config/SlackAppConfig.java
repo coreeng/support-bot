@@ -7,6 +7,8 @@ import com.slack.api.bolt.AppConfig;
 import com.slack.api.jakarta_socket_mode.impl.JakartaSocketModeClientTyrusImpl;
 import com.slack.api.util.thread.DaemonThreadFactory;
 import com.slack.api.util.thread.ExecutorServiceProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.Cache;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -28,8 +30,9 @@ public class SlackAppConfig {
     }
 
     @Bean
-    public SlackClient slackClient(App slackApp) {
-        return new SlackClientImpl(slackApp.client());
+    public SlackClient slackClient(App slackApp,
+                                   @Qualifier("messages-cache") Cache permalinkCache) {
+        return new SlackClientImpl(slackApp.client(), permalinkCache);
     }
 
     /**

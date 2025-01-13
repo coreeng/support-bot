@@ -66,9 +66,15 @@ public class SlackAppInit implements InitializingBean {
                                     .map(BlockActionPayload.Action::getActionId)
                                     .collect(toList())
                             )
-                            .addArgument(() -> req.getPayload().getChannel())
-                            .addArgument(() -> req.getPayload().getMessage().getTs())
-                            .addArgument(() -> req.getPayload().getMessage().getThreadTs())
+                            .addArgument(() -> req.getPayload().getChannel() != null
+                                ? req.getPayload().getChannel().getId()
+                                : null)
+                            .addArgument(() -> req.getPayload().getMessage() != null
+                                ? req.getPayload().getMessage().getTs()
+                                : null)
+                            .addArgument(() -> req.getPayload().getMessage() != null
+                                ? req.getPayload().getMessage().getThreadTs()
+                                : null)
                             .log("Error while handling blockAction(ids: {}, channel: {}, messageTs: {}, threadTs: {})");
                     }
                 });

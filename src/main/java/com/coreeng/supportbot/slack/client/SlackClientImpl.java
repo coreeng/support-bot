@@ -10,6 +10,7 @@ import com.slack.api.methods.request.conversations.ConversationsHistoryRequest;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
 import com.slack.api.methods.request.views.ViewsOpenRequest;
+import com.slack.api.methods.request.views.ViewsPublishRequest;
 import com.slack.api.methods.response.chat.ChatGetPermalinkResponse;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.chat.ChatUpdateResponse;
@@ -17,9 +18,13 @@ import com.slack.api.methods.response.conversations.ConversationsHistoryResponse
 import com.slack.api.methods.response.reactions.ReactionsAddResponse;
 import com.slack.api.methods.response.reactions.ReactionsRemoveResponse;
 import com.slack.api.methods.response.views.ViewsOpenResponse;
+import com.slack.api.methods.response.views.ViewsPublishResponse;
 import com.slack.api.model.ErrorResponseMetadata;
 import com.slack.api.model.Message;
 import com.slack.api.model.ResponseMetadata;
+import com.slack.api.model.view.View;
+import lombok.RequiredArgsConstructor;
+import org.springframework.cache.Cache;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -27,12 +32,10 @@ import java.util.function.Function;
 
 import static com.google.common.collect.Iterables.isEmpty;
 
+@RequiredArgsConstructor
 public class SlackClientImpl implements SlackClient {
     private final MethodsClient client;
-
-    public SlackClientImpl(MethodsClient client) {
-        this.client = client;
-    }
+    private final Cache cache;
 
     @Override
     public ReactionsAddResponse addReaction(ReactionsAddRequest request) {
@@ -77,17 +80,34 @@ public class SlackClientImpl implements SlackClient {
 
     @Override
     public String getPermalink(SlackGetMessageByTsRequest request) {
-        ChatGetPermalinkResponse response = doRequest(() -> client.chatGetPermalink(ChatGetPermalinkRequest.builder()
-            .channel(request.channelId())
-            .messageTs(request.ts().ts())
-            .build()), null);
-        return response.getPermalink();
+        return cache.get(request, () -> {
+            ChatGetPermalinkResponse response = doRequest(() -> client.chatGetPermalink(ChatGetPermalinkRequest.builder()
+                .channel(request.channelId())
+                .messageTs(request.ts().ts())
+                .build()), null);
+            return response.getPermalink();
+        });
     }
 
     @Override
     public ViewsOpenResponse viewsOpen(ViewsOpenRequest request) {
         return doRequest(
             () -> client.viewsOpen(request),
+            response -> errorDetailsOrEmpty(response.getResponseMetadata())
+        );
+    }
+
+    @Override
+    public ViewsPublishResponse updateHomeView(String userId, SlackView view) {
+        return doRequest(
+            () -> client.viewsPublish(ViewsPublishRequest.builder()
+                .userId(userId)
+                .view(View.builder()
+                    .type("home")
+                    .blocks(view.renderBlocks())
+                    .privateMetadata(view.privateMetadata())
+                    .build())
+                .build()),
             response -> errorDetailsOrEmpty(response.getResponseMetadata())
         );
     }

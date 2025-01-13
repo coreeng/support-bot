@@ -1,11 +1,11 @@
 package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.EnumerationValue;
+import com.coreeng.supportbot.slack.MessageTs;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.block.LayoutBlock;
 
 import javax.annotation.Nullable;
-import java.time.Instant;
 
 public record TicketSummaryView(
     TicketId ticketId,
@@ -37,7 +37,7 @@ public record TicketSummaryView(
 
     public record QuerySummaryView(
         ImmutableList<LayoutBlock> blocks,
-        Instant timestamp,
+        MessageTs messageTs,
         String senderId,
         String permalink
     ) {

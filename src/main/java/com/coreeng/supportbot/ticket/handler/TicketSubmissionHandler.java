@@ -2,7 +2,7 @@ package com.coreeng.supportbot.ticket.handler;
 
 import com.coreeng.supportbot.slack.SlackViewSubmitHandler;
 import com.coreeng.supportbot.ticket.TicketOperation;
-import com.coreeng.supportbot.ticket.TicketService;
+import com.coreeng.supportbot.ticket.TicketProcessingService;
 import com.coreeng.supportbot.ticket.TicketSubmission;
 import com.coreeng.supportbot.ticket.TicketSummaryViewMapper;
 import com.slack.api.app_backend.views.response.ViewSubmissionResponse;
@@ -18,12 +18,12 @@ import java.util.regex.Pattern;
 @Slf4j
 @RequiredArgsConstructor
 public class TicketSubmissionHandler implements SlackViewSubmitHandler {
-    private final TicketService ticketService;
+    private final TicketProcessingService ticketProcessingService;
     private final TicketSummaryViewMapper ticketSummaryViewMapper;
 
     @Override
     public Pattern getPattern() {
-        return TicketOperation.namePattern;
+        return Pattern.compile("^" + TicketOperation.summarySubmit.actionId() + "$");
     }
 
     @Override
@@ -31,7 +31,7 @@ public class TicketSubmissionHandler implements SlackViewSubmitHandler {
         TicketSubmission ticketSubmission = ticketSummaryViewMapper.extractSubmittedValues(
             request.getPayload().getView()
         );
-        ticketService.submit(ticketSubmission);
+        ticketProcessingService.submit(ticketSubmission);
         return new ViewSubmissionResponse();
     }
 }

@@ -8,7 +8,12 @@ import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
-import com.coreeng.supportbot.ticket.*;
+import com.coreeng.supportbot.ticket.Ticket;
+import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
+import com.coreeng.supportbot.ticket.TicketInMemoryRepository;
+import com.coreeng.supportbot.ticket.TicketProcessingService;
+import com.coreeng.supportbot.ticket.TicketRepository;
+import com.coreeng.supportbot.ticket.TicketStatus;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,20 +26,21 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
-import static com.coreeng.supportbot.config.UtilsConfig.dateFormatter;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class TicketServiceTests {
+public class TicketProcessingServiceTests {
     private static final MessageTs messageTs = MessageTs.of("some-message-ts");
     private static final String userId = "some-user-id";
 
-    private TicketService ticketService;
+    private TicketProcessingService ticketProcessingService;
     private TicketRepository ticketRepository;
     @Mock
     private SlackClient slackClient;
     private SlackTicketsProps slackTicketsProps;
+    @Mock
+    private TicketCreatedMessageMapper createdMessageMapper;
     private TicketProps ticketProps;
 
     @Captor
@@ -49,19 +55,19 @@ public class TicketServiceTests {
             "ticket"
         );
         ticketProps = new TicketProps(List.of(), List.of());
-        ticketService = new TicketService(
+        ticketProcessingService = new TicketProcessingService(
             ticketRepository,
             slackClient,
             slackTicketsProps,
             ticketProps,
-            dateFormatter
+            createdMessageMapper
         );
     }
 
     @Test
     public void shouldCreateQueryOnMessage() {
         // when
-        ticketService.handleMessagePosted(new MessagePosted(
+        ticketProcessingService.handleMessagePosted(new MessagePosted(
             "some message",
             userId,
             new MessageRef(
@@ -78,7 +84,7 @@ public class TicketServiceTests {
     @Test
     public void shouldIgnoreMessageToDifferentChannel() {
         // when
-        ticketService.handleMessagePosted(new MessagePosted(
+        ticketProcessingService.handleMessagePosted(new MessagePosted(
             "some message",
             userId,
             new MessageRef(
@@ -95,7 +101,7 @@ public class TicketServiceTests {
     @Test
     public void shouldIgnoreMessageInThreads() {
         // when
-        ticketService.handleMessagePosted(new MessagePosted(
+        ticketProcessingService.handleMessagePosted(new MessagePosted(
             "some message",
             userId,
             new MessageRef(
@@ -120,7 +126,7 @@ public class TicketServiceTests {
         when(slackClient.postMessage(postMessageCaptor.capture())).thenReturn(postMessageResp);
 
         // when
-        ticketService.handleReactionAdded(new ReactionAdded(
+        ticketProcessingService.handleReactionAdded(new ReactionAdded(
             slackTicketsProps.expectedInitialReaction(),
             userId,
             new MessageRef(
@@ -136,7 +142,7 @@ public class TicketServiceTests {
         Ticket ticket = ticketRepository.findTicketByQuery(messageTs);
         assertNotNull(ticket, "Ticket is created");
         assertNotNull(ticket.id());
-        assertEquals(TicketStatus.unresolved, ticket.status());
+        assertEquals(TicketStatus.opened, ticket.status());
         assertEquals(messageTs, ticket.queryTs());
 
         verify(slackClient, description("Reaction is added on the query")).addReaction(ReactionsAddRequest.builder()

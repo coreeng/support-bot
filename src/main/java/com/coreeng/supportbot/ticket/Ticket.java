@@ -30,15 +30,15 @@ public class Ticket {
         return Ticket.builder()
             .channelId(channelID)
             .queryTs(queryTs)
-            .status(TicketStatus.unresolved)
+            .status(TicketStatus.opened)
             .statusHistory(ImmutableList.of(new StatusLog(
-                TicketStatus.unresolved,
+                TicketStatus.opened,
                 Instant.now()
             )))
             .build();
     }
 
-    record StatusLog(
+    public record StatusLog(
         TicketStatus status,
         Instant timestamp
     ) {
