@@ -12,14 +12,14 @@ public enum TicketOperation {
 
     public static final Pattern namePattern = Pattern.compile("^ticket-.*$");
 
-    private final String publicName;
-    TicketOperation(String publicName) {
-        this.publicName = publicName;
+    private final String actionId;
+    TicketOperation(String actionId) {
+        this.actionId = actionId;
     }
 
-    public static TicketOperation fromStringOrNull(String name) {
+    public static TicketOperation fromActionIdOrNull(String name) {
         for (TicketOperation op : values()) {
-            if (op.publicName().equals(name)) {
+            if (op.actionId().equals(name)) {
                 return op;
             }
         }

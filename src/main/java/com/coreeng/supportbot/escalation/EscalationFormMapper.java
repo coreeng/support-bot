@@ -31,7 +31,7 @@ public class EscalationFormMapper {
                 .elements(List.of(
                     staticSelect(s -> s
                         .placeholder(plainText("Topic of query"))
-                        .actionId(EscalationAction.changeTopic.actionId())
+                        .actionId(EscalationOperation.changeTopic.actionId())
                         .options(
                             escalationProps.topics().stream().map(t -> OptionObject.builder()
                                 .text(plainText(t.name()))
@@ -42,7 +42,7 @@ public class EscalationFormMapper {
                     ),
                     staticSelect(s -> s
                         .placeholder(plainText("Escalate to"))
-                        .actionId(EscalationAction.changeTeam.actionId())
+                        .actionId(EscalationOperation.changeTeam.actionId())
                         .options(
                             escalationProps.teams().stream().map(t -> OptionObject.builder()
                                 .text(plainText(t.name()))
@@ -57,11 +57,11 @@ public class EscalationFormMapper {
     }
 
     public UpdateEscalationRequest mapToRequest(BlockActionPayload.Action action, MessageRef messageRef) {
-        EscalationAction escalationAction = EscalationAction.valueOfOrNull(action.getActionId());
-        if (escalationAction == null) {
+        EscalationOperation escalationOperation = EscalationOperation.fromActionIdOrNull(action.getActionId());
+        if (escalationOperation == null) {
             throw new IllegalArgumentException("Unknown escalation action: " + action.getActionId());
         }
-        return switch (escalationAction) {
+        return switch (escalationOperation) {
             case changeTopic -> new UpdateEscalationRequest(
                 messageRef,
                 findValue(action.getSelectedOption().getValue(), escalationProps.topics()),

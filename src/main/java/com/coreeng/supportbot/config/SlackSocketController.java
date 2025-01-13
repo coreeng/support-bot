@@ -20,7 +20,8 @@ public class SlackSocketController implements CommandLineRunner {
     ) throws IOException {
         this.socketModeApp = new SocketModeApp(
             slackCreds.socketToken(),
-            app
+            app,
+            10
         );
     }
 

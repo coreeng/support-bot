@@ -1,11 +1,11 @@
 package com.coreeng.supportbot.ticket;
 
-import com.coreeng.supportbot.EnumerationValue;
-import com.coreeng.supportbot.json.JsonMapper;
+import com.coreeng.supportbot.slack.RenderingUtils;
+import com.coreeng.supportbot.util.JsonMapper;
+import com.coreeng.supportbot.util.RelativeDateFormatter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.slack.api.model.block.LayoutBlock;
-import com.slack.api.model.block.composition.OptionObject;
 import com.slack.api.model.block.element.RichTextElement;
 import com.slack.api.model.block.element.RichTextSectionElement;
 import com.slack.api.model.view.View;
@@ -13,11 +13,10 @@ import com.slack.api.model.view.ViewState;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
+import static com.coreeng.supportbot.slack.RenderingUtils.toOptionObject;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
@@ -33,7 +32,17 @@ import static java.lang.String.format;
 @RequiredArgsConstructor
 public class TicketSummaryViewMapper {
     private final JsonMapper jsonMapper;
-    private final DateTimeFormatter dateFormatter;
+    private final RelativeDateFormatter dateFormatter;
+
+    public String createTriggerInput(TicketSummaryViewInput input) {
+        checkNotNull(input);
+        return jsonMapper.toJsonString(input);
+    }
+
+    public TicketSummaryViewInput parseTriggerInput(String input) {
+        checkNotNull(input);
+        return jsonMapper.fromJsonString(input, TicketSummaryViewInput.class);
+    }
 
     public View.ViewBuilder render(TicketSummaryView summaryView, View.ViewBuilder viewBuilder) {
         checkNotNull(summaryView);
@@ -43,7 +52,7 @@ public class TicketSummaryViewMapper {
         return viewBuilder
             .title(viewTitle(t -> t
                 .type("plain_text")
-                .text(format("Ticket ID-%d Summary", summaryView.ticketId().id()))))
+                .text(format("Ticket %s Summary", summaryView.ticketId().render()))))
             .submit(viewSubmit(s -> s
                 .type("plain_text")
                 .text("Apply Changes")
@@ -61,13 +70,12 @@ public class TicketSummaryViewMapper {
                         markdownText(t -> t
                             .verbatim(false)
                             .text(format("""
-                            Sent by <@%s> | %s | <%s|View Message>
-                            """,
-                            summaryView.query().senderId(),
-                            // TODO: what timezone?
-                            dateFormatter.format(summaryView.query().timestamp().atOffset(ZoneOffset.UTC)),
-                            summaryView.query().permalink()
-                        )))
+                                    Sent by <@%s> | %s | <%s|View Message>
+                                    """,
+                                summaryView.query().senderId(),
+                                dateFormatter.format(summaryView.query().messageTs().getDate()),
+                                summaryView.query().permalink()
+                            )))
                     )),
                     divider(),
                     header(h -> h.text(plainText("Status History"))),
@@ -84,8 +92,8 @@ public class TicketSummaryViewMapper {
                             .actionId(TicketField.status.actionId())
                             .initialOption(toOptionObject(summaryView.currentStatus()))
                             .options(List.of(
-                                toOptionObject(TicketStatus.unresolved),
-                                toOptionObject(TicketStatus.resolved)
+                                toOptionObject(TicketStatus.opened),
+                                toOptionObject(TicketStatus.closed)
                             ))
                         ))
                         .optional(false)),
@@ -99,10 +107,10 @@ public class TicketSummaryViewMapper {
                                 isEmpty(summaryView.currentTags())
                                     ? null
                                     : summaryView.currentTags().stream()
-                                    .map(this::toOptionObject)
+                                    .map(RenderingUtils::toOptionObject)
                                     .toList())
                             .options(summaryView.tags().stream()
-                                .map(this::toOptionObject)
+                                .map(RenderingUtils::toOptionObject)
                                 .toList())
                         ))),
                     input(i -> i
@@ -115,7 +123,7 @@ public class TicketSummaryViewMapper {
                                 ? toOptionObject(summaryView.currentImpact())
                                 : null)
                             .options(summaryView.impacts().stream()
-                                .map(this::toOptionObject)
+                                .map(RenderingUtils::toOptionObject)
                                 .toList())
                         )))
                 ))
@@ -128,18 +136,15 @@ public class TicketSummaryViewMapper {
         StringBuilder str = new StringBuilder();
         for (int i = 0; i < statusLogs.size(); i++) {
             Ticket.StatusLog item = statusLogs.get(i);
-            String circleEmoji = switch (item.status()) {
-                case unresolved -> "large_orange_circle";
-                case resolved -> "large_green_circle";
-            };
             elements.add(RichTextSectionElement.Emoji.builder()
-                .name(circleEmoji)
+                .name(item.status().emoji())
                 .build());
 
             str.setLength(0);
             str.append(" ");
-            // TODO: what timezone?
-            str.append(item.status().renderMessage(dateFormatter.format(item.timestamp().atOffset(ZoneOffset.UTC))));
+            str.append(item.status().label())
+                .append(": ")
+                .append(dateFormatter.format(item.timestamp()));
             str.append("\n");
             if (i < statusLogs.size() - 1) {
                 // padding as spaces is applied so that bar is nicely aligned with the circle emoji
@@ -182,29 +187,6 @@ public class TicketSummaryViewMapper {
         );
     }
 
-
-    private OptionObject toOptionObject(TicketStatus status) {
-        checkNotNull(status);
-        return OptionObject.builder()
-            .text(plainText(statusToLabel(status)))
-            .value(status.toString())
-            .build();
-    }
-
-    private OptionObject toOptionObject(EnumerationValue value) {
-        checkNotNull(value);
-        return OptionObject.builder()
-            .text(plainText(value.name()))
-            .value(value.code())
-            .build();
-    }
-
-    private String statusToLabel(TicketStatus status) {
-        return switch (status) {
-            case unresolved -> "Unresolved";
-            case resolved -> "Resolved";
-        };
-    }
 
     private record Metadata(
         long ticketId

@@ -21,7 +21,7 @@ public class EscalationConfirmMessage implements SlackMessage {
                 ),
                 actions(List.of(
                     button(b -> b
-                        .actionId(EscalationAction.confirm.actionId())
+                        .actionId(EscalationOperation.confirm.actionId())
                         .text(plainText("Confirm"))
                     )
                 ))

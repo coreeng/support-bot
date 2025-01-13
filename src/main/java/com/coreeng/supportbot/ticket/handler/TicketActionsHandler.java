@@ -19,8 +19,8 @@ import static com.slack.api.model.view.Views.view;
 @Slf4j
 @RequiredArgsConstructor
 public class TicketActionsHandler implements SlackBlockActionHandler {
-    private final TicketService ticketService;
-    private final TicketSummaryViewMapper ticketSummaryViewMapper;
+    private final TicketProcessingService ticketProcessingService;
+    private final TicketSummaryViewMapper summaryViewMapper;
     private final SlackClient slackClient;
 
     @Override
@@ -31,16 +31,17 @@ public class TicketActionsHandler implements SlackBlockActionHandler {
     @Override
     public void apply(BlockActionRequest req, ActionContext context) {
         for (BlockActionPayload.Action action : req.getPayload().getActions()) {
-            TicketOperation operation = TicketOperation.fromStringOrNull(action.getActionId());
+            TicketOperation operation = TicketOperation.fromActionIdOrNull(action.getActionId());
             switch (operation) {
-                case TicketOperation.toggle -> ticketService.toggleStatus(ToggleTicketAction.fromRaw(req));
+                case TicketOperation.toggle -> ticketProcessingService.toggleStatus(ToggleTicketAction.fromRaw(req));
                 case TicketOperation.summaryView -> {
-                    TicketSummaryView summary = ticketService.summaryView(TicketSummaryViewQuery.fromRaw(req));
+                    TicketSummaryViewInput input = summaryViewMapper.parseTriggerInput(action.getValue());
+                    TicketSummaryView summary = ticketProcessingService.summaryView(input.ticketId());
                     slackClient.viewsOpen(
                         ViewsOpenRequest.builder()
                             .triggerId(context.getTriggerId())
-                            .view(view(v -> ticketSummaryViewMapper.render(summary, v)
-                                .callbackId(TicketOperation.summarySubmit.publicName())
+                            .view(view(v -> summaryViewMapper.render(summary, v)
+                                .callbackId(TicketOperation.summarySubmit.actionId())
                                 .type("modal")
                                 .clearOnClose(true)
                             ))

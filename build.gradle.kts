@@ -42,15 +42,18 @@ dependencies {
     }
     implementation("org.springframework.boot:spring-boot-starter-jetty")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-cache")
 
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     annotationProcessor("org.springframework:spring-context-indexer")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
-    implementation("com.slack.api:bolt-jakarta-socket-mode:1.44.2")
+    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-guava")
+    implementation("com.slack.api:bolt-jakarta-socket-mode:1.45.0")
     compileOnly("jakarta.websocket:jakarta.websocket-client-api:2.2.0")
     implementation("org.glassfish.tyrus.bundles:tyrus-standalone-client:2.2.0")
     implementation("com.google.guava:guava:33.4.0-jre")
+    implementation("com.github.ben-manes.caffeine:caffeine")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

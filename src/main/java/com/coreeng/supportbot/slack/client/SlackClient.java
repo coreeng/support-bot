@@ -8,6 +8,7 @@ import com.slack.api.methods.response.chat.ChatUpdateResponse;
 import com.slack.api.methods.response.reactions.ReactionsAddResponse;
 import com.slack.api.methods.response.reactions.ReactionsRemoveResponse;
 import com.slack.api.methods.response.views.ViewsOpenResponse;
+import com.slack.api.methods.response.views.ViewsPublishResponse;
 import com.slack.api.model.Message;
 
 public interface SlackClient {
@@ -24,4 +25,6 @@ public interface SlackClient {
     String getPermalink(SlackGetMessageByTsRequest request);
 
     ViewsOpenResponse viewsOpen(ViewsOpenRequest request);
+
+    ViewsPublishResponse updateHomeView(String userId, SlackView view);
 }

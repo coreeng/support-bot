@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
+import com.coreeng.supportbot.EnumerationValue;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.google.common.collect.ImmutableList;
 import org.springframework.stereotype.Repository;
@@ -7,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import javax.annotation.Nullable;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,6 +16,10 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.Collections.reverseOrder;
+import static java.util.Comparator.comparing;
+import static java.util.stream.Collectors.toSet;
 
 @Repository
 public class TicketInMemoryRepository implements TicketRepository {
@@ -87,5 +93,50 @@ public class TicketInMemoryRepository implements TicketRepository {
             ticketsByQuery.put(ticket.queryTs(), newTicket);
             return newTicket;
         });
+    }
+
+    @Override
+    public TicketsPage findTickets(TicketsQuery query) {
+        checkNotNull(query);
+        checkArgument(query.page() >= 0);
+        checkArgument(query.pageSize() > 0);
+
+        Comparator<Ticket> order = switch (query.order()) {
+            case asc -> comparing(t -> t.queryTs().getDate());
+            case desc -> reverseOrder(comparing(t -> t.queryTs().getDate()));
+        };
+        ImmutableList<Ticket> queryResult = tickets.values().stream()
+            .filter(t -> filterTicket(t, query))
+            .sorted(order)
+            .collect(toImmutableList());
+        int fromIndex = query.page() * query.pageSize();
+        int toIndex = Math.min(queryResult.size(), (query.page() + 1) * query.pageSize());
+        return new TicketsPage(
+            queryResult.subList(fromIndex, toIndex),
+            query.page(),
+            queryResult.size() / query.pageSize() + 1,
+            queryResult.size()
+        );
+    }
+
+    private boolean filterTicket(Ticket ticket, TicketsQuery query) {
+        if (query.status() != null && !query.status().equals(ticket.status())) {
+            return false;
+        }
+        Instant date = ticket.queryTs().getDate();
+        if (query.dateFrom() != null && date.isBefore(date)) {
+            return false;
+        }
+        if (query.dateTo() != null && date.isAfter(date)) {
+            return false;
+        }
+        if (!query.tags().isEmpty()
+            && !ticket.tags().stream()
+            .map(EnumerationValue::code)
+            .collect(toSet()).containsAll(query.tags())) {
+            return false;
+        }
+        return query.impact() == null || ticket.impact() == null
+            || query.impact().equals(ticket.impact().code());
     }
 }
