@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.ticket;
 
-import com.coreeng.supportbot.EnumerationValue;
+import com.coreeng.supportbot.enums.Tag;
+import com.coreeng.supportbot.enums.TicketImpact;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.google.common.collect.ImmutableList;
 import lombok.Builder;
@@ -23,8 +24,9 @@ public class Ticket {
     @Builder.Default
     ImmutableList<StatusLog> statusHistory = ImmutableList.of();
     @Builder.Default
-    ImmutableList<EnumerationValue> tags = ImmutableList.of();
-    @Nullable EnumerationValue impact;
+    ImmutableList<Tag> tags = ImmutableList.of();
+    @Nullable
+    TicketImpact impact;
 
     public static Ticket createNew(MessageTs queryTs, String channelID) {
         return Ticket.builder()

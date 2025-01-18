@@ -8,7 +8,9 @@ public record ToggleTicketAction(
     MessageTs threadTs,
     MessageTs messageTs
 ) {
-    public static ToggleTicketAction fromRaw(BlockActionRequest req) {
+    public static ToggleTicketAction fromRaw(
+        BlockActionRequest req
+    ) {
         return new ToggleTicketAction(
             req.getPayload().getMessage().getChannel(),
             MessageTs.of(req.getPayload().getMessage().getThreadTs()),

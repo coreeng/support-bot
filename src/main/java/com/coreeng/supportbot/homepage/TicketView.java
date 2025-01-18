@@ -1,6 +1,6 @@
 package com.coreeng.supportbot.homepage;
 
-import com.coreeng.supportbot.EnumerationValue;
+import com.coreeng.supportbot.config.EnumerationValue;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import lombok.Builder;

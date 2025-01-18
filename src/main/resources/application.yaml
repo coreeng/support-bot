@@ -34,7 +34,17 @@ slack:
   escalation:
     channel-id: ${ESCALATION_CHANNEL_ID} # Channel ID like: C1234567890
 
-ticket:
+enums:
+  slackTeams:
+    - name: Team A
+      code: teamA
+      id: S08948NBMED
+    - name: Team B
+      code: teamB
+      id: S08948NBMED
+    - name: Team C
+      code: teamC
+      id: S08948NBMED
   tags:
     - name: Tag A
       code: tagA
@@ -49,19 +59,3 @@ ticket:
       code: bauBlocking
     - name: Abnormal Behaviour
       code: abnormalBehaviour
-
-escalation:
-  topics:
-    - name: Topic A
-      code: topicA
-    - name: Topic B
-      code: topicB
-    - name: Topic C
-      code: topicC
-  teams:
-    - name: Team A
-      code: teamA
-    - name: Team B
-      code: teamB
-    - name: Team C
-      code: teamC
