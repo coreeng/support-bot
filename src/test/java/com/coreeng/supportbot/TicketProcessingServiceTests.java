@@ -1,21 +1,22 @@
 package com.coreeng.supportbot;
 
+import com.coreeng.supportbot.config.EnumProps;
 import com.coreeng.supportbot.config.SlackTicketsProps;
-import com.coreeng.supportbot.config.TicketProps;
+import com.coreeng.supportbot.enums.EnumsService;
+import com.coreeng.supportbot.escalation.EscalationInMemoryRepository;
+import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
-import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.ticket.Ticket;
-import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
+import com.coreeng.supportbot.ticket.TicketCreatedMessage;
 import com.coreeng.supportbot.ticket.TicketInMemoryRepository;
 import com.coreeng.supportbot.ticket.TicketProcessingService;
 import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
-import com.slack.api.methods.request.reactions.ReactionsAddRequest;
-import com.slack.api.methods.response.chat.ChatPostMessageResponse;
+import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 
@@ -38,13 +40,14 @@ public class TicketProcessingServiceTests {
     private TicketRepository ticketRepository;
     @Mock
     private SlackClient slackClient;
+    @Mock
+    private TicketSlackService slackService;
     private SlackTicketsProps slackTicketsProps;
     @Mock
-    private TicketCreatedMessageMapper createdMessageMapper;
-    private TicketProps ticketProps;
+    private ApplicationEventPublisher publisher;
 
     @Captor
-    private ArgumentCaptor<SlackPostMessageRequest> postMessageCaptor;
+    private ArgumentCaptor<TicketCreatedMessage> createdMessageCaptor;
 
     @BeforeEach
     public void setUp() {
@@ -54,13 +57,16 @@ public class TicketProcessingServiceTests {
             "eyes",
             "ticket"
         );
-        ticketProps = new TicketProps(List.of(), List.of());
+        EscalationQueryService escalationQueryService = new EscalationQueryService(new EscalationInMemoryRepository());
+        EnumsService enumsService = new EnumsService(new EnumProps(List.of(), List.of(), List.of()));
         ticketProcessingService = new TicketProcessingService(
             ticketRepository,
             slackClient,
+            slackService,
             slackTicketsProps,
-            ticketProps,
-            createdMessageMapper
+            escalationQueryService,
+            enumsService, enumsService, enumsService,
+            publisher
         );
     }
 
@@ -118,22 +124,23 @@ public class TicketProcessingServiceTests {
     @Test
     public void shouldCreateTicketOnEyes() {
         // given
-        String postedMessageTs = "posted-message-ts";
+        MessageTs postedMessageTs = MessageTs.of("posted-message-ts");
 
-        ChatPostMessageResponse postMessageResp = new ChatPostMessageResponse();
-        postMessageResp.setOk(true);
-        postMessageResp.setTs(postedMessageTs);
-        when(slackClient.postMessage(postMessageCaptor.capture())).thenReturn(postMessageResp);
+        MessageRef threadRef = new MessageRef(
+            messageTs,
+            null,
+            slackTicketsProps.channelId()
+        );
+        MessageRef ticketFormRef = new MessageRef(
+            postedMessageTs, messageTs, slackTicketsProps.channelId()
+        );
+        when(slackService.postTicketForm(eq(threadRef), createdMessageCaptor.capture())).thenReturn(ticketFormRef);
 
         // when
         ticketProcessingService.handleReactionAdded(new ReactionAdded(
             slackTicketsProps.expectedInitialReaction(),
             userId,
-            new MessageRef(
-                messageTs,
-                null,
-                slackTicketsProps.channelId()
-            )
+            threadRef
         ));
 
         // then
@@ -145,12 +152,8 @@ public class TicketProcessingServiceTests {
         assertEquals(TicketStatus.opened, ticket.status());
         assertEquals(messageTs, ticket.queryTs());
 
-        verify(slackClient, description("Reaction is added on the query")).addReaction(ReactionsAddRequest.builder()
-            .name(slackTicketsProps.responseInitialReaction())
-            .channel(slackTicketsProps.channelId())
-            .timestamp(messageTs.ts())
-            .build());
-
-        verify(slackClient, description("Ticket form is posted")).postMessage(postMessageCaptor.capture());
+        verify(slackService, description("Post is tracked")).markPostTracked(threadRef);
+        verify(slackService, description("Ticket form is posted"))
+            .postTicketForm(eq(threadRef), createdMessageCaptor.capture());
     }
 }

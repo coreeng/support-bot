@@ -11,6 +11,7 @@ public record SlackEditMessageRequest(
     public ChatUpdateRequest toSlackRequest() {
         return ChatUpdateRequest.builder()
             .text(message.getText())
+            .parse("full")
             .blocks(message.renderBlocks())
             .attachments(message.renderAttachments())
             .channel(channel)

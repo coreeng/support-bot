@@ -1,6 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
-import com.coreeng.supportbot.EnumerationValue;
+import com.coreeng.supportbot.config.EnumerationValue;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.google.common.collect.ImmutableList;
 import org.springframework.stereotype.Repository;

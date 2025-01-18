@@ -6,6 +6,7 @@ import com.coreeng.supportbot.util.RelativeDateFormatter;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.Attachment;
 import com.slack.api.model.block.LayoutBlock;
+import com.slack.api.model.block.element.BlockElement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +25,7 @@ public class TicketCreatedMessageMapper {
     private final static String greenHex = "#00ff00";
 
     private final TicketSummaryViewMapper summaryViewMapper;
+    private final EscalateViewMapper escalateViewMapper;
     private final RelativeDateFormatter dateFormatter;
 
     public SlackMessage renderMessage(TicketCreatedMessage message) {
@@ -48,7 +50,8 @@ public class TicketCreatedMessageMapper {
 
     private ImmutableList<Attachment> renderAttachments(TicketCreatedMessage message) {
         String title = message.status().label() + ": " + dateFormatter.format(message.statusChangedDate());
-        List<LayoutBlock> blocks = asBlocks(
+        ImmutableList.Builder<LayoutBlock> blocks = ImmutableList.builder();
+        blocks.add(
             divider(),
             section(s -> s.text(plainText(title))),
             actions(List.of(
@@ -64,13 +67,26 @@ public class TicketCreatedMessageMapper {
                             ? "danger"
                             : "primary"
                     ))
-            )),
-            actions(List.of(
+            ))
+        );
+        ImmutableList.Builder<BlockElement> secondaryButtons = ImmutableList.builder();
+        secondaryButtons.add(
+            button(b -> b
+                .actionId(TicketOperation.summaryView.actionId())
+                .value(summaryViewMapper.createTriggerInput(new TicketSummaryViewInput(message.ticketId())))
+                .text(plainText("Full Summary")))
+        );
+        if (message.status() != TicketStatus.closed) {
+            secondaryButtons.add(
                 button(b -> b
-                    .actionId(TicketOperation.summaryView.actionId())
-                    .value(summaryViewMapper.createTriggerInput(new TicketSummaryViewInput(message.ticketId())))
-                    .text(plainText("Full Summary")))
-            )),
+                    .actionId(TicketOperation.escalate.actionId())
+                    .value(escalateViewMapper.createTriggerInput(new TicketEscalateInput(message.ticketId())))
+                    .text(plainText("Escalate"))
+                )
+            );
+        }
+        blocks.add(
+            actions(secondaryButtons.build()),
             context(List.of(
                 plainText(t -> t
                     .text(":pushpin: Options above supplied for Support engineers. Please ignore...")
@@ -79,7 +95,7 @@ public class TicketCreatedMessageMapper {
         );
         return ImmutableList.of(Attachment.builder()
             .fallback(title)
-            .blocks(blocks)
+            .blocks(blocks.build())
             .color(message.status() == TicketStatus.opened
                 ? greenHex
                 : redHex)

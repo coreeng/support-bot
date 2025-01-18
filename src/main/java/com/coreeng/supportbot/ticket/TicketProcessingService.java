@@ -1,48 +1,58 @@
 package com.coreeng.supportbot.ticket;
 
-import com.coreeng.supportbot.EnumerationValue;
 import com.coreeng.supportbot.config.SlackTicketsProps;
-import com.coreeng.supportbot.config.TicketProps;
+import com.coreeng.supportbot.enums.ImpactsRegistry;
+import com.coreeng.supportbot.enums.SlackTeamsRegistry;
+import com.coreeng.supportbot.enums.Tag;
+import com.coreeng.supportbot.enums.TagsRegistry;
+import com.coreeng.supportbot.enums.TicketImpact;
+import com.coreeng.supportbot.escalation.Escalation;
+import com.coreeng.supportbot.escalation.EscalationId;
+import com.coreeng.supportbot.escalation.EscalationQueryService;
+import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
-import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.client.SlackClient;
-import com.coreeng.supportbot.slack.client.SlackEditMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
+import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.slack.api.methods.request.reactions.ReactionsAddRequest;
-import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
-import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.model.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.Comparator.comparing;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class TicketProcessingService {
-    private final TicketRepository ticketRepository;
+    private final TicketRepository repository;
     private final SlackClient slackClient;
+    private final TicketSlackService slackService;
     private final SlackTicketsProps slackTicketsProps;
-    private final TicketProps ticketProps;
-    private final TicketCreatedMessageMapper createdMessageMapper;
+    private final EscalationQueryService escalationQueryService;
+    private final SlackTeamsRegistry slackTeamsRegistry;
+    private final ImpactsRegistry impactsRegistry;
+    private final TagsRegistry tagsRegistry;
+    private final ApplicationEventPublisher publisher;
 
 
     public void handleMessagePosted(MessagePosted e) {
         if (!isQueryEvent(e)) {
             return;
         }
-        if (ticketRepository.createQueryIfNotExists(e.messageRef().actualThreadTs())) {
+        if (repository.createQueryIfNotExists(e.messageRef().actualThreadTs())) {
             log.atInfo()
                 .addArgument(() -> e.messageRef().actualThreadTs())
                 .log("Query is created on message({})");
@@ -65,37 +75,29 @@ public class TicketProcessingService {
             return;
         }
 
-        Ticket newTicket = ticketRepository.createTicketIfNotExists(Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
+        Ticket newTicket = repository.createTicketIfNotExists(Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
         log.atInfo()
             .addArgument(() -> e.messageRef().actualThreadTs())
             .log("Ticket is created on reaction to message({})");
 
-        addReactionToPostIfAbsent(
-            slackTicketsProps.responseInitialReaction(),
-            e.messageRef().actualThreadTs(),
-            e.messageRef().channelId()
-        );
+        slackService.markPostTracked(new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
 
         if (newTicket.createdMessageTs() == null) {
             // It's not really idempotent, since it's not atomic (one thing can succeed while the other one fail)
             // In the worst case, multiple forms will be posted, which is not a big issue
-            ChatPostMessageResponse postMessageResponse = slackClient.postMessage(new SlackPostMessageRequest(
-                createdMessageMapper.renderMessage(new TicketCreatedMessage(
+            MessageRef postedMessageRef = slackService.postTicketForm(
+                new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()),
+                new TicketCreatedMessage(
                     newTicket.id(),
                     newTicket.status(),
                     newTicket.statusHistory().getLast().timestamp()
-                )),
-                e.messageRef().channelId(),
-                e.messageRef().actualThreadTs()
-            ));
-            newTicket = ticketRepository.updateTicket(
+                )
+            );
+            repository.updateTicket(
                 newTicket.toBuilder()
-                    .createdMessageTs(MessageTs.of(postMessageResponse.getTs()))
+                    .createdMessageTs(postedMessageRef.ts())
                     .build()
             );
-            log.atInfo()
-                .addArgument(newTicket::queryTs)
-                .log("Ticket form is posted for query({})");
         } else {
             log.atInfo()
                 .addArgument(() -> e.messageRef().actualThreadTs())
@@ -103,19 +105,27 @@ public class TicketProcessingService {
         }
     }
 
-    public void toggleStatus(ToggleTicketAction action) {
-        Ticket ticket = ticketRepository.findTicketByQuery(action.threadTs());
+    public ToggleResult toggleStatus(ToggleTicketAction action) {
+        Ticket ticket = repository.findTicketByQuery(action.threadTs());
         if (ticket == null) {
-            log.atWarn()
-                .addArgument(action::threadTs)
-                .log("Couldn't find ticket by queryTs({}) to toggle its status");
-            return;
+            throw new IllegalArgumentException("Ticket not found");
         }
 
         TicketStatus nextStatus = TicketStatus.opened == ticket.status()
             ? TicketStatus.closed
             : TicketStatus.opened;
-        Ticket updatedTicket = ticketRepository.updateTicket(
+
+        if (nextStatus == TicketStatus.closed) {
+            long unresolvedEscalations = escalationQueryService.countNotResolvedByTicketId(ticket.id());
+            if (unresolvedEscalations > 0) {
+                return new ToggleResult.RequiresConfirmation(
+                    ticket.id(),
+                    unresolvedEscalations
+                );
+            }
+        }
+
+        Ticket updatedTicket = repository.updateTicket(
             ticket.toBuilder()
                 .status(nextStatus)
                 .build()
@@ -126,10 +136,28 @@ public class TicketProcessingService {
             .log("Toggle ticket({}) status to {}");
 
         onStatusUpdate(updatedTicket);
+        return new ToggleResult.Success();
+    }
+
+    public void close(TicketId ticketId) {
+        Ticket ticket = repository.findTicketById(ticketId);
+        if (ticket == null) {
+            throw new IllegalArgumentException("Ticket not found");
+        }
+        if (ticket.status() == TicketStatus.closed) {
+            log.warn("Ticket {} is already closed", ticketId);
+            return;
+        }
+        ticket = repository.updateTicket(ticket.toBuilder()
+            .status(TicketStatus.closed)
+            .build());
+        log.info("Ticket {} is closed", ticketId);
+
+        onStatusUpdate(ticket);
     }
 
     public TicketSummaryView summaryView(TicketId id) {
-        Ticket ticket = ticketRepository.findTicketById(id);
+        Ticket ticket = repository.findTicketById(id);
         if (ticket == null) {
             throw new IllegalStateException("Ticket not found");
         }
@@ -145,26 +173,35 @@ public class TicketProcessingService {
             queryMessage.getUser(),
             permalink
         );
-        return TicketSummaryView.of(ticket, querySummary, ticketProps.tags(), ticketProps.impacts());
+        ImmutableList<TicketSummaryView.EscalationView> escalations = escalationQueryService
+            .listByTicketId(ticket.id()).stream()
+            .sorted(comparing(Escalation::openedAt))
+            .map(e -> {
+                String threadPermalink = slackClient.getPermalink(new SlackGetMessageByTsRequest(
+                    e.channelId(), e.threadTs()
+                ));
+                return TicketSummaryView.EscalationView.of(e, threadPermalink);
+            })
+            .collect(toImmutableList());
+        return TicketSummaryView.of(
+            ticket,
+            querySummary,
+            escalations,
+            tagsRegistry.listAllTags(),
+            impactsRegistry.listAllImpacts()
+        );
     }
 
     public Ticket submit(TicketSubmission submission) {
-        Ticket ticket = ticketRepository.findTicketById(submission.ticketId());
+        Ticket ticket = repository.findTicketById(submission.ticketId());
         if (ticket == null) {
             throw new IllegalStateException("Ticket not found");
         }
 
-        ImmutableSet<String> submittedTags = ImmutableSet.copyOf(submission.tags());
-        ImmutableList<EnumerationValue> newTags = ticketProps.tags().stream()
-            .filter(tag -> submittedTags.contains(tag.code()))
-            .collect(toImmutableList());
+        ImmutableList<Tag> newTags = tagsRegistry.listTagsByCodes(ImmutableSet.copyOf(submission.tags()));
+        TicketImpact newImpact = impactsRegistry.findImpactByCode(submission.impact());
 
-        EnumerationValue newImpact = ticketProps.impacts().stream()
-            .filter(impact -> Objects.equals(impact.code(), submission.impact()))
-            .findAny()
-            .orElse(null);
-
-        Ticket updatedTicket = ticketRepository.updateTicket(
+        Ticket updatedTicket = repository.updateTicket(
             ticket.toBuilder()
                 .status(submission.status())
                 .tags(newTags)
@@ -178,91 +215,80 @@ public class TicketProcessingService {
         return updatedTicket;
     }
 
+    public void escalate(EscalateRequest request) {
+        Ticket ticket = repository.findTicketById(request.ticketId());
+        if (ticket == null) {
+            log.atWarn()
+                .addArgument(request::teamId)
+                .log("Trying to escalate non-existing ticket: {}");
+            throw new IllegalArgumentException("Ticket doesn't exist");
+        }
+        if (ticket.status() == TicketStatus.closed) {
+            log.atWarn()
+                .addArgument(request::ticketId)
+                .log("Trying to escalate closed ticket: {}");
+            throw new IllegalArgumentException("Ticket is closed");
+        }
+
+        publisher.publishEvent(new TicketEscalated(
+            ticket,
+            request.teamId(),
+            request.threadPermalink(),
+            request.tags()
+        ));
+    }
+
+    public void postTicketEscalatedMessage(EscalationId escalationId) {
+        Escalation escalation = checkNotNull(
+            escalationQueryService.findById(escalationId),
+            "Escalation not found: {}", escalationId
+        );
+        Ticket ticket = checkNotNull(
+            repository.findTicketById(escalation.ticketId()),
+            "Ticket not found: {}", escalation.ticketId()
+        );
+        String escalationThreadPermalink = slackClient.getPermalink(new SlackGetMessageByTsRequest(
+            escalation.channelId(), escalation.threadTs()
+        ));
+        slackClient.postMessage(new SlackPostMessageRequest(
+            new TicketEscalatedMessage(
+                escalationThreadPermalink,
+                checkNotNull(slackTeamsRegistry.findSlackTeamById(escalation.teamId())).name()
+            ),
+            ticket.channelId(),
+            ticket.queryTs()
+        ));
+    }
+
     @NotNull
     private Ticket onStatusUpdate(Ticket ticket) {
-        Ticket updatedTicket = ticketRepository.insertStatusLog(ticket);
-        slackClient.editMessage(new SlackEditMessageRequest(
-            createdMessageMapper.renderMessage(new TicketCreatedMessage(
+        publisher.publishEvent(new TicketStatusChanged(
+            ticket.id(),
+            ticket.status()
+        ));
+        Ticket updatedTicket = repository.insertStatusLog(ticket);
+        slackService.editTicketForm(
+            new MessageRef(updatedTicket.createdMessageTs(), updatedTicket.channelId()),
+            new TicketCreatedMessage(
                 updatedTicket.id(),
                 updatedTicket.status(),
                 updatedTicket.statusHistory().getLast().timestamp()
-            )),
-            updatedTicket.channelId(),
-            updatedTicket.createdMessageTs()
-        ));
-        log.atInfo()
-            .addArgument(updatedTicket::queryTs)
-            .log("Ticket form is updated for query({})");
+            )
+        );
         if (updatedTicket.status() == TicketStatus.closed) {
-            addReactionToPostIfAbsent(
-                "white_check_mark",
+            slackService.markTicketClosed(new MessageRef(
                 updatedTicket.queryTs(),
                 updatedTicket.channelId()
-            );
+            ));
         } else {
-            removeReactionFromPostIfPresent(
-                "white_check_mark",
+            slackService.unmarkTicketClosed(new MessageRef(
                 updatedTicket.queryTs(),
                 updatedTicket.channelId()
-            );
+            ));
         }
         return updatedTicket;
     }
 
-    private void addReactionToPostIfAbsent(
-        String name,
-        MessageTs messageTs,
-        String channelId
-    ) {
-        try {
-            slackClient.addReaction(ReactionsAddRequest.builder()
-                .name(name)
-                .channel(channelId)
-                .timestamp(messageTs.ts())
-                .build());
-
-            log.atInfo()
-                .addArgument(name)
-                .addArgument(messageTs)
-                .log("Reaction({}) is posted to message({})");
-        } catch (SlackException exc) {
-            if (Objects.equals("already_added", exc.getError())) {
-                log.atInfo()
-                    .addArgument(messageTs)
-                    .log("Reaction is already posted by bot to message({})");
-            } else {
-                throw exc;
-            }
-        }
-    }
-
-    private void removeReactionFromPostIfPresent(
-        String name,
-        MessageTs messageTs,
-        String channelId
-    ) {
-        try {
-            slackClient.removeReaction(ReactionsRemoveRequest.builder()
-                .name(name)
-                .timestamp(messageTs.ts())
-                .channel(channelId)
-                .build());
-
-            log.atInfo()
-                .addArgument(name)
-                .addArgument(messageTs)
-                .log("Reaction({}) is removed from message({})");
-        } catch (SlackException e) {
-            if (Objects.equals("already_removed", e.getError())) {
-                log.atInfo()
-                    .addArgument(name)
-                    .addArgument(messageTs)
-                    .log("Reaction({}) is already absent from message({})");
-            } else {
-                throw e;
-            }
-        }
-    }
 
     private boolean isQueryEvent(SlackEvent event) {
         return Objects.equals(slackTicketsProps.channelId(), event.messageRef().channelId())

@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 public enum TicketOperation {
     toggle("ticket-toggle"),
     summaryView("ticket-summary-view"),
-    summarySubmit("ticket-summary-submit");
+    escalate("ticket-escalate");
 
     public static final Pattern namePattern = Pattern.compile("^ticket-.*$");
 

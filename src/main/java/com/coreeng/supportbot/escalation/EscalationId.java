@@ -1,11 +1,11 @@
 package com.coreeng.supportbot.escalation;
 
-import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonValue;
 
 public record EscalationId(
-    UUID id
+    @JsonValue long id
 ) {
-    public static EscalationId createNew() {
-        return new EscalationId(UUID.randomUUID());
+    public String render() {
+        return "ID-" + id;
     }
 }

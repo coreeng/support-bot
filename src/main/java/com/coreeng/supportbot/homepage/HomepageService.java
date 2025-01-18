@@ -36,7 +36,7 @@ public class HomepageService {
     private final SlackTicketsProps slackTicketsProps;
 
     public HomepageView getTicketsView(HomepageView.State state) {
-        TicketsPage page = ticketQueryService.findTickets(state.toTicketsQuery());
+        TicketsPage page = ticketQueryService.findByQuery(state.toTicketsQuery());
         Map<TicketId, String> permalinkByTicketId = collectPermalinks(page.tickets());
         return HomepageView.builder()
             .timestamp(Instant.now())

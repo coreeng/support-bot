@@ -85,6 +85,16 @@ public class TicketSummaryViewMapper {
                         )))
                     ),
                     divider(),
+                    header(h -> h.text(plainText("Escalations")))
+                ))
+                .addAll(
+                    isEmpty(summaryView.escalations())
+                        ? renderNoEscalations()
+                        : summaryView.escalations().stream()
+                        .flatMap(e -> renderEscalation(e).stream())
+                        .toList()
+                )
+                .addAll(asBlocks(
                     header(h -> h.text(plainText("Modify Ticket"))),
                     input(i -> i
                         .label(plainText("Change Status"))
@@ -131,7 +141,7 @@ public class TicketSummaryViewMapper {
             );
     }
 
-    private List<RichTextElement> renderStatusHistory(ImmutableList<Ticket.StatusLog> statusLogs) {
+    private ImmutableList<RichTextElement> renderStatusHistory(ImmutableList<Ticket.StatusLog> statusLogs) {
         ImmutableList.Builder<RichTextElement> elements = ImmutableList.builder();
         StringBuilder str = new StringBuilder();
         for (int i = 0; i < statusLogs.size(); i++) {
@@ -155,6 +165,36 @@ public class TicketSummaryViewMapper {
                 .build());
         }
         return elements.build();
+    }
+
+    private ImmutableList<LayoutBlock> renderEscalation(TicketSummaryView.EscalationView escalation) {
+        return ImmutableList.of(
+            section(s -> s
+                .text(markdownText(
+                    "<" + escalation.threadPermalink() + "|" + escalation.id().render() + ">"
+                ))
+                .fields(ImmutableList.of(
+                    plainText(t -> t
+                        .text("Status: " + escalation.status().label())
+                    ),
+                    markdownText(t -> t
+                        .text("Team: <!subteam^" + escalation.teamId() + ">")
+                    )
+                ))
+            ),
+            divider()
+        );
+    }
+
+    private ImmutableList<LayoutBlock> renderNoEscalations() {
+        return ImmutableList.of(
+            context(c -> c
+                .elements(ImmutableList.of(
+                    plainText("No escalations for this ticket")
+                ))
+            ),
+            divider()
+        );
     }
 
     public TicketSubmission extractSubmittedValues(View view) {
