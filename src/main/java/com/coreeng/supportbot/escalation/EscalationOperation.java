@@ -7,9 +7,7 @@ import java.util.regex.Pattern;
 
 @Getter
 public enum EscalationOperation {
-    confirm("escalation-confirm"),
-    changeTopic("escalation-topic"),
-    changeTeam("escalation-team");
+    resolve("escalation-resolve");
 
     public static final Pattern pattern = Pattern.compile("^escalation-.*$");
 

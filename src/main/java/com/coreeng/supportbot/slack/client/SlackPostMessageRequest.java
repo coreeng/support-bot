@@ -3,9 +3,12 @@ package com.coreeng.supportbot.slack.client;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.slack.api.methods.request.chat.ChatPostMessageRequest;
 
+import javax.annotation.Nullable;
+
 public record SlackPostMessageRequest(
     SlackMessage message,
     String channel,
+    @Nullable
     MessageTs threadTs
 ) {
     public ChatPostMessageRequest toSlackRequest() {
@@ -14,7 +17,7 @@ public record SlackPostMessageRequest(
             .blocks(message.renderBlocks())
             .attachments(message.renderAttachments())
             .channel(channel)
-            .threadTs(threadTs.ts())
+            .threadTs(threadTs != null ? threadTs.ts() : null)
             .build();
     }
 }

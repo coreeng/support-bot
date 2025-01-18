@@ -39,7 +39,7 @@
     </rule>
     <rule ref="category/java/bestpractices.xml/LooseCoupling">
         <properties>
-            <property name="allowedTypes" value="java.util.Properties,com.google.common.collect.ImmutableList,com.google.common.collect.ImmutableSet,com.google.common.collect.ImmutableMap" />
+            <property name="allowedTypes" value="java.util.Properties,com.google.common.collect.ImmutableList,com.google.common.collect.ImmutableSet,com.google.common.collect.ImmutableMap,com.google.common.collect.ImmutableCollection" />
         </properties>
     </rule>
 </ruleset>

@@ -1,6 +1,10 @@
 package com.coreeng.supportbot.ticket;
 
-import com.coreeng.supportbot.EnumerationValue;
+import com.coreeng.supportbot.enums.Tag;
+import com.coreeng.supportbot.enums.TicketImpact;
+import com.coreeng.supportbot.escalation.Escalation;
+import com.coreeng.supportbot.escalation.EscalationId;
+import com.coreeng.supportbot.escalation.EscalationStatus;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.block.LayoutBlock;
@@ -11,22 +15,25 @@ public record TicketSummaryView(
     TicketId ticketId,
     QuerySummaryView query,
     TicketStatus currentStatus,
+    ImmutableList<EscalationView> escalations,
     ImmutableList<Ticket.StatusLog> statusLogs,
-    ImmutableList<EnumerationValue> tags,
-    ImmutableList<EnumerationValue> currentTags,
-    ImmutableList<EnumerationValue> impacts,
-    @Nullable EnumerationValue currentImpact
+    ImmutableList<Tag> tags,
+    ImmutableList<Tag> currentTags,
+    ImmutableList<TicketImpact> impacts,
+    @Nullable TicketImpact currentImpact
 ) {
     public static TicketSummaryView of(
         Ticket ticket,
         QuerySummaryView query,
-        ImmutableList<EnumerationValue> tags,
-        ImmutableList<EnumerationValue> impacts
+        ImmutableList<EscalationView> escalationViews,
+        ImmutableList<Tag> tags,
+        ImmutableList<TicketImpact> impacts
     ) {
         return new TicketSummaryView(
             ticket.id(),
             query,
             ticket.status(),
+            escalationViews,
             ticket.statusHistory(),
             tags,
             ticket.tags(),
@@ -41,5 +48,24 @@ public record TicketSummaryView(
         String senderId,
         String permalink
     ) {
+    }
+
+    public record EscalationView(
+        EscalationId id,
+        String threadPermalink,
+        String teamId,
+        EscalationStatus status
+    ) {
+        public static EscalationView of(
+            Escalation escalation,
+            String threadPermalink
+        ) {
+            return new EscalationView(
+                escalation.id(),
+                threadPermalink,
+                escalation.teamId(),
+                escalation.status()
+            );
+        }
     }
 }

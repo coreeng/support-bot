@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.homepage;
 
-import com.coreeng.supportbot.config.TicketProps;
+import com.coreeng.supportbot.enums.ImpactsRegistry;
+import com.coreeng.supportbot.enums.TagsRegistry;
 import com.coreeng.supportbot.slack.RenderingUtils;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketsQuery;
@@ -27,7 +28,8 @@ import static com.slack.api.model.view.Views.*;
 @Component
 @RequiredArgsConstructor
 public class HomepageFilterMapper {
-    private final TicketProps ticketProps;
+    private final TagsRegistry tagsRegistry;
+    private final ImpactsRegistry impactsRegistry;
 
     public View.ViewBuilder render(HomepageView.State state, View.ViewBuilder view) {
         HomepageFilter filter = state.filter();
@@ -89,13 +91,12 @@ public class HomepageFilterMapper {
                         .initialOptions(
                             isEmpty(filter.tags())
                                 ? null
-                                : ticketProps.tags().stream()
-                                .filter(t -> filter.tags().contains(t.code()))
+                                : tagsRegistry.listTagsByCodes(filter.tags()).stream()
                                 .map(RenderingUtils::toOptionObject)
                                 .toList()
                         )
                         .options(
-                            ticketProps.tags().stream()
+                            tagsRegistry.listAllTags().stream()
                                 .map(RenderingUtils::toOptionObject)
                                 .toList()
                         )
@@ -109,13 +110,10 @@ public class HomepageFilterMapper {
                         .initialOption(
                             filter.impact() == null
                                 ? null
-                                : ticketProps.impacts().stream()
-                                .filter(impact -> impact.code().equals(filter.impact()))
-                                .map(RenderingUtils::toOptionObject)
-                                .findFirst().get()
+                                : toOptionObjectOrNull(impactsRegistry.findImpactByCode(filter.impact()))
                         )
                         .options(
-                            ticketProps.impacts().stream()
+                            impactsRegistry.listAllImpacts().stream()
                                 .map(RenderingUtils::toOptionObject)
                                 .toList()
                         )
