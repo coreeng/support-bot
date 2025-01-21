@@ -35,7 +35,6 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 
 // This class is purely for testing purposes.
