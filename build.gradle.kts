@@ -55,6 +55,11 @@ dependencies {
     implementation("com.google.guava:guava:33.4.0-jre")
     implementation("com.github.ben-manes.caffeine:caffeine")
 
+    implementation("io.fabric8:kubernetes-client:7.0.1")
+
+    implementation("com.google.cloud:spring-cloud-gcp-starter:5.10.0")
+    implementation("com.google.apis:google-api-services-cloudidentity:v1-rev20241208-2.0.0")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
