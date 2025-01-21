@@ -3,6 +3,12 @@ spring:
     banner-mode: off
   application:
     name: support-bot
+  cloud:
+    gcp:
+      core:
+        enabled: true
+      credentials:
+        scopes: ["https://www.googleapis.com/auth/cloud-identity.groups.readonly"]
 
 application:
   timezone: GMT+02
@@ -59,3 +65,8 @@ enums:
       code: bauBlocking
     - name: Abnormal Behaviour
       code: abnormalBehaviour
+
+platform-integration:
+  enabled: true
+  gcp:
+    app-name: Support Bot
