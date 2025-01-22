@@ -9,6 +9,7 @@ import com.slack.api.methods.request.chat.ChatGetPermalinkRequest;
 import com.slack.api.methods.request.conversations.ConversationsHistoryRequest;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
+import com.slack.api.methods.request.users.profile.UsersProfileGetRequest;
 import com.slack.api.methods.request.views.ViewsOpenRequest;
 import com.slack.api.methods.request.views.ViewsPublishRequest;
 import com.slack.api.methods.response.chat.ChatGetPermalinkResponse;
@@ -22,6 +23,7 @@ import com.slack.api.methods.response.views.ViewsPublishResponse;
 import com.slack.api.model.ErrorResponseMetadata;
 import com.slack.api.model.Message;
 import com.slack.api.model.ResponseMetadata;
+import com.slack.api.model.User;
 import com.slack.api.model.view.View;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
@@ -110,6 +112,16 @@ public class SlackClientImpl implements SlackClient {
                 .build()),
             response -> errorDetailsOrEmpty(response.getResponseMetadata())
         );
+    }
+
+    @Override
+    public User.Profile getUserById(String userId) {
+        return doRequest(
+            () -> client.usersProfileGet(UsersProfileGetRequest.builder()
+                .user(userId)
+                .build()),
+            null
+        ).getProfile();
     }
 
     private <V extends SlackApiTextResponse> V doRequest(

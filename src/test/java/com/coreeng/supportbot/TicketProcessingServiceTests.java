@@ -7,7 +7,6 @@ import com.coreeng.supportbot.escalation.EscalationInMemoryRepository;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
-import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.ticket.Ticket;
@@ -39,8 +38,6 @@ public class TicketProcessingServiceTests {
     private TicketProcessingService ticketProcessingService;
     private TicketRepository ticketRepository;
     @Mock
-    private SlackClient slackClient;
-    @Mock
     private TicketSlackService slackService;
     private SlackTicketsProps slackTicketsProps;
     @Mock
@@ -61,10 +58,9 @@ public class TicketProcessingServiceTests {
         EnumsService enumsService = new EnumsService(new EnumProps(List.of(), List.of(), List.of()));
         ticketProcessingService = new TicketProcessingService(
             ticketRepository,
-            slackClient,
             slackService,
-            slackTicketsProps,
             escalationQueryService,
+            slackTicketsProps,
             enumsService, enumsService, enumsService,
             publisher
         );

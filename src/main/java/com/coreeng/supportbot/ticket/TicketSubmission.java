@@ -1,11 +1,18 @@
 package com.coreeng.supportbot.ticket;
 
 import com.google.common.collect.ImmutableList;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.extern.jackson.Jacksonized;
 
-public record TicketSubmission(
-    TicketId ticketId,
-    TicketStatus status,
-    ImmutableList<String> tags,
-    String impact
-) {
+@Getter
+@Builder(toBuilder = true)
+@Jacksonized
+public class TicketSubmission {
+    private TicketId ticketId;
+    private TicketStatus status;
+    private String authorsTeam;
+    private ImmutableList<String> tags;
+    private String impact;
+    private boolean confirmed;
 }
