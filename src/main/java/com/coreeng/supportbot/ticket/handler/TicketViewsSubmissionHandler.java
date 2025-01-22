@@ -2,9 +2,10 @@ package com.coreeng.supportbot.ticket.handler;
 
 import com.coreeng.supportbot.slack.SlackViewSubmitHandler;
 import com.coreeng.supportbot.ticket.EscalateViewMapper;
-import com.coreeng.supportbot.ticket.TicketConfirmCloseMapper;
+import com.coreeng.supportbot.ticket.TicketConfirmSubmissionMapper;
 import com.coreeng.supportbot.ticket.TicketProcessingService;
 import com.coreeng.supportbot.ticket.TicketSubmission;
+import com.coreeng.supportbot.ticket.TicketSubmitResult;
 import com.coreeng.supportbot.ticket.TicketSummaryViewMapper;
 import com.coreeng.supportbot.ticket.TicketViewType;
 import com.slack.api.app_backend.views.response.ViewSubmissionResponse;
@@ -19,6 +20,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.regex.Pattern;
 
+import static com.slack.api.model.view.Views.view;
+
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -26,7 +29,7 @@ public class TicketViewsSubmissionHandler implements SlackViewSubmitHandler {
     private final TicketProcessingService ticketProcessingService;
     private final TicketSummaryViewMapper ticketSummaryViewMapper;
     private final EscalateViewMapper escalateViewMapper;
-    private final TicketConfirmCloseMapper confirmCloseMapper;
+    private final TicketConfirmSubmissionMapper confirmSubmissionMapper;
     private final ExecutorService executor;
 
     @Override
@@ -43,7 +46,29 @@ public class TicketViewsSubmissionHandler implements SlackViewSubmitHandler {
                 TicketSubmission ticketSubmission = ticketSummaryViewMapper.extractSubmittedValues(
                     request.getPayload().getView()
                 );
-                ticketProcessingService.submit(ticketSubmission);
+                TicketSubmitResult result = ticketProcessingService.submit(ticketSubmission);
+                switch (result) {
+                    case TicketSubmitResult.Success() -> {
+                        return new ViewSubmissionResponse();
+                    }
+                    case TicketSubmitResult.RequiresConfirmation c -> {
+                        return ViewSubmissionResponse.builder()
+                            .view(view(v -> confirmSubmissionMapper.render(c, v)
+                                .callbackId(TicketViewType.summaryConfirm.callbackId())
+                                .type("modal")
+                            ))
+                            .responseAction("update")
+                            .build();
+                    }
+                }
+            }
+            case summaryConfirm -> {
+                var submission = confirmSubmissionMapper.parseTriggerInput(request.getPayload().getView().getPrivateMetadata());
+                ticketProcessingService.submit(
+                    submission.toBuilder()
+                        .confirmed(true)
+                        .build()
+                );
                 return new ViewSubmissionResponse();
             }
             case escalate -> {
@@ -56,11 +81,6 @@ public class TicketViewsSubmissionHandler implements SlackViewSubmitHandler {
                         .build();
                 }
                 executor.submit(() -> ticketProcessingService.escalate(escalateRequest));
-                return new ViewSubmissionResponse();
-            }
-            case confirmClose -> {
-                var metadata = confirmCloseMapper.parseTriggerInput(request.getPayload().getView().getPrivateMetadata());
-                ticketProcessingService.close(metadata.ticketId());
                 return new ViewSubmissionResponse();
             }
             case null -> {

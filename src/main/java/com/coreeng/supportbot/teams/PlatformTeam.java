@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import java.util.Set;
 
 @Getter
-@EqualsAndHashCode
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @RequiredArgsConstructor
 public class PlatformTeam {
     @EqualsAndHashCode.Include

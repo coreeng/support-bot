@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.teams;
 
+import com.google.common.collect.ImmutableList;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,5 +63,17 @@ public class PlatformTeamsService {
             .addArgument(groupIdToUsers::size)
             .addArgument(usersByEmail::size)
             .log("Finished fetching teams info. Teams({}), Groups({}), Users({})");
+    }
+
+    public ImmutableList<PlatformTeam> listTeams() {
+        return ImmutableList.copyOf(teamByName.values());
+    }
+
+    public ImmutableList<PlatformTeam> listTeamsByUserEmail(String email) {
+        PlatformUser user = usersByEmail.get(email);
+        if (user == null) {
+            return ImmutableList.of();
+        }
+        return ImmutableList.copyOf(user.teams());
     }
 }

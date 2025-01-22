@@ -17,6 +17,7 @@ public record TicketSummaryView(
     TicketStatus currentStatus,
     ImmutableList<EscalationView> escalations,
     ImmutableList<Ticket.StatusLog> statusLogs,
+    TeamsInput teamsInput,
     ImmutableList<Tag> tags,
     ImmutableList<Tag> currentTags,
     ImmutableList<TicketImpact> impacts,
@@ -26,6 +27,7 @@ public record TicketSummaryView(
         Ticket ticket,
         QuerySummaryView query,
         ImmutableList<EscalationView> escalationViews,
+        TeamsInput teamsInput,
         ImmutableList<Tag> tags,
         ImmutableList<TicketImpact> impacts
     ) {
@@ -35,6 +37,7 @@ public record TicketSummaryView(
             ticket.status(),
             escalationViews,
             ticket.statusHistory(),
+            teamsInput,
             tags,
             ticket.tags(),
             impacts,
@@ -68,4 +71,11 @@ public record TicketSummaryView(
             );
         }
     }
+
+    public record TeamsInput(
+        @Nullable
+        String currentTeam,
+        ImmutableList<String> authorTeams,
+        ImmutableList<String> otherTeams
+    ) {}
 }

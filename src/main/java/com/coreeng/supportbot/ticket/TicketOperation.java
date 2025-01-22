@@ -6,7 +6,6 @@ import java.util.regex.Pattern;
 
 @Getter
 public enum TicketOperation {
-    toggle("ticket-toggle"),
     summaryView("ticket-summary-view"),
     escalate("ticket-escalate");
 

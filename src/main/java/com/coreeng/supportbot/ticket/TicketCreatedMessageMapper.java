@@ -53,21 +53,7 @@ public class TicketCreatedMessageMapper {
         ImmutableList.Builder<LayoutBlock> blocks = ImmutableList.builder();
         blocks.add(
             divider(),
-            section(s -> s.text(plainText(title))),
-            actions(List.of(
-                button(b -> b
-                    .actionId(TicketOperation.toggle.actionId())
-                    .text(plainText(
-                        message.status() == TicketStatus.opened
-                            ? "Close Ticket"
-                            : "Reopen Ticket"
-                    ))
-                    .style(
-                        message.status() == TicketStatus.opened
-                            ? "danger"
-                            : "primary"
-                    ))
-            ))
+            section(s -> s.text(plainText(title)))
         );
         ImmutableList.Builder<BlockElement> secondaryButtons = ImmutableList.builder();
         secondaryButtons.add(

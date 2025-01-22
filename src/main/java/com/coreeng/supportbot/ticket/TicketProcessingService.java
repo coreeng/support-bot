@@ -10,17 +10,12 @@ import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
-import com.coreeng.supportbot.slack.MessageTs;
-import com.coreeng.supportbot.slack.client.SlackClient;
-import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
-import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.slack.api.model.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -30,18 +25,15 @@ import org.springframework.stereotype.Service;
 import java.util.Objects;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.ImmutableList.toImmutableList;
-import static java.util.Comparator.comparing;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class TicketProcessingService {
     private final TicketRepository repository;
-    private final SlackClient slackClient;
     private final TicketSlackService slackService;
-    private final SlackTicketsProps slackTicketsProps;
     private final EscalationQueryService escalationQueryService;
+    private final SlackTicketsProps slackTicketsProps;
     private final SlackTeamsRegistry slackTeamsRegistry;
     private final ImpactsRegistry impactsRegistry;
     private final TagsRegistry tagsRegistry;
@@ -105,97 +97,22 @@ public class TicketProcessingService {
         }
     }
 
-    public ToggleResult toggleStatus(ToggleTicketAction action) {
-        Ticket ticket = repository.findTicketByQuery(action.threadTs());
-        if (ticket == null) {
-            throw new IllegalArgumentException("Ticket not found");
-        }
-
-        TicketStatus nextStatus = TicketStatus.opened == ticket.status()
-            ? TicketStatus.closed
-            : TicketStatus.opened;
-
-        if (nextStatus == TicketStatus.closed) {
-            long unresolvedEscalations = escalationQueryService.countNotResolvedByTicketId(ticket.id());
-            if (unresolvedEscalations > 0) {
-                return new ToggleResult.RequiresConfirmation(
-                    ticket.id(),
-                    unresolvedEscalations
-                );
-            }
-        }
-
-        Ticket updatedTicket = repository.updateTicket(
-            ticket.toBuilder()
-                .status(nextStatus)
-                .build()
-        );
-        log.atInfo()
-            .addArgument(updatedTicket::id)
-            .addArgument(updatedTicket::status)
-            .log("Toggle ticket({}) status to {}");
-
-        onStatusUpdate(updatedTicket);
-        return new ToggleResult.Success();
-    }
-
-    public void close(TicketId ticketId) {
-        Ticket ticket = repository.findTicketById(ticketId);
-        if (ticket == null) {
-            throw new IllegalArgumentException("Ticket not found");
-        }
-        if (ticket.status() == TicketStatus.closed) {
-            log.warn("Ticket {} is already closed", ticketId);
-            return;
-        }
-        ticket = repository.updateTicket(ticket.toBuilder()
-            .status(TicketStatus.closed)
-            .build());
-        log.info("Ticket {} is closed", ticketId);
-
-        onStatusUpdate(ticket);
-    }
-
-    public TicketSummaryView summaryView(TicketId id) {
-        Ticket ticket = repository.findTicketById(id);
-        if (ticket == null) {
-            throw new IllegalStateException("Ticket not found");
-        }
-        SlackGetMessageByTsRequest messageRequest = new SlackGetMessageByTsRequest(
-            ticket.channelId(),
-            ticket.queryTs()
-        );
-        Message queryMessage = slackClient.getMessageByTs(messageRequest);
-        String permalink = slackClient.getPermalink(messageRequest);
-        TicketSummaryView.QuerySummaryView querySummary = new TicketSummaryView.QuerySummaryView(
-            ImmutableList.copyOf(queryMessage.getBlocks()),
-            new MessageTs(queryMessage.getTs()),
-            queryMessage.getUser(),
-            permalink
-        );
-        ImmutableList<TicketSummaryView.EscalationView> escalations = escalationQueryService
-            .listByTicketId(ticket.id()).stream()
-            .sorted(comparing(Escalation::openedAt))
-            .map(e -> {
-                String threadPermalink = slackClient.getPermalink(new SlackGetMessageByTsRequest(
-                    e.channelId(), e.threadTs()
-                ));
-                return TicketSummaryView.EscalationView.of(e, threadPermalink);
-            })
-            .collect(toImmutableList());
-        return TicketSummaryView.of(
-            ticket,
-            querySummary,
-            escalations,
-            tagsRegistry.listAllTags(),
-            impactsRegistry.listAllImpacts()
-        );
-    }
-
-    public Ticket submit(TicketSubmission submission) {
+    public TicketSubmitResult submit(TicketSubmission submission) {
         Ticket ticket = repository.findTicketById(submission.ticketId());
         if (ticket == null) {
             throw new IllegalStateException("Ticket not found");
+        }
+
+        if (!submission.confirmed()
+            && ticket.status() != TicketStatus.closed
+            && submission.status() == TicketStatus.closed) {
+            long unresolvedEscalations = escalationQueryService.countNotResolvedByTicketId(ticket.id());
+            if (unresolvedEscalations > 0) {
+                return new TicketSubmitResult.RequiresConfirmation(
+                    submission,
+                    new TicketSubmitResult.ConfirmationCause(unresolvedEscalations)
+                );
+            }
         }
 
         ImmutableList<Tag> newTags = tagsRegistry.listTagsByCodes(ImmutableSet.copyOf(submission.tags()));
@@ -204,15 +121,16 @@ public class TicketProcessingService {
         Ticket updatedTicket = repository.updateTicket(
             ticket.toBuilder()
                 .status(submission.status())
+                .team(submission.authorsTeam())
                 .tags(newTags)
                 .impact(newImpact)
                 .build()
         );
 
         if (ticket.status() != updatedTicket.status()) {
-            updatedTicket = onStatusUpdate(updatedTicket);
+            onStatusUpdate(updatedTicket);
         }
-        return updatedTicket;
+        return new TicketSubmitResult.Success();
     }
 
     public void escalate(EscalateRequest request) {
@@ -247,17 +165,12 @@ public class TicketProcessingService {
             repository.findTicketById(escalation.ticketId()),
             "Ticket not found: {}", escalation.ticketId()
         );
-        String escalationThreadPermalink = slackClient.getPermalink(new SlackGetMessageByTsRequest(
-            escalation.channelId(), escalation.threadTs()
-        ));
-        slackClient.postMessage(new SlackPostMessageRequest(
-            new TicketEscalatedMessage(
-                escalationThreadPermalink,
-                checkNotNull(slackTeamsRegistry.findSlackTeamById(escalation.teamId())).name()
-            ),
-            ticket.channelId(),
-            ticket.queryTs()
-        ));
+        String slackTeamName = checkNotNull(slackTeamsRegistry.findSlackTeamById(escalation.teamId())).name();
+        slackService.postTicketEscalatedMessage(
+            new MessageRef(ticket.queryTs(), ticket.channelId()),
+            new MessageRef(escalation.threadTs(), escalation.channelId()),
+            slackTeamName
+        );
     }
 
     @NotNull

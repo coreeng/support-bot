@@ -10,14 +10,14 @@ import static com.slack.api.model.block.composition.BlockCompositions.markdownTe
 import static com.slack.api.model.view.Views.*;
 
 @Component
-public class TicketConfirmCloseMapper {
+public class TicketConfirmSubmissionMapper {
     private final JsonMapper jsonMapper;
 
-    public TicketConfirmCloseMapper(JsonMapper jsonMapper) {
+    public TicketConfirmSubmissionMapper(JsonMapper jsonMapper) {
         this.jsonMapper = jsonMapper;
     }
 
-    public View.ViewBuilder render(ToggleResult.RequiresConfirmation model, View.ViewBuilder view) {
+    public View.ViewBuilder render(TicketSubmitResult.RequiresConfirmation model, View.ViewBuilder view) {
         return view
             .title(viewTitle(t -> t
                 .type("plain_text")
@@ -31,28 +31,23 @@ public class TicketConfirmCloseMapper {
                 .type("plain_text")
                 .text("Cancel")
             ))
-            .privateMetadata(jsonMapper.toJsonString(new InputMetadata(model.ticketId())))
+            .privateMetadata(jsonMapper.toJsonString(model.submission()))
             .blocks(ImmutableList.of(
                 section(s -> s
                     .text(markdownText(t -> t
-                        .text(getMessage(model))
+                        .text(getMessage(model.cause()))
                     ))
                 )
             ));
     }
 
-    public InputMetadata parseTriggerInput(String privateMetadata) {
-        return jsonMapper.fromJsonString(privateMetadata, InputMetadata.class);
+    public TicketSubmission parseTriggerInput(String privateMetadata) {
+        return jsonMapper.fromJsonString(privateMetadata, TicketSubmission.class);
     }
 
-    private String getMessage(ToggleResult.RequiresConfirmation model) {
+    private String getMessage(TicketSubmitResult.ConfirmationCause model) {
         return "Ticket has `" + model.unresolvedEscalations() + "` unresolved escalations. "
             + "Closing the ticket will close all related escalations.\n"
             + "Are you sure?";
-    }
-
-    public record InputMetadata(
-        TicketId ticketId
-    ) {
     }
 }

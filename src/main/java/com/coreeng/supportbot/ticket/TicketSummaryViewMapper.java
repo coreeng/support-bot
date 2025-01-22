@@ -6,8 +6,11 @@ import com.coreeng.supportbot.util.RelativeDateFormatter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.slack.api.model.block.LayoutBlock;
+import com.slack.api.model.block.composition.OptionGroupObject;
+import com.slack.api.model.block.composition.OptionObject;
 import com.slack.api.model.block.element.RichTextElement;
 import com.slack.api.model.block.element.RichTextSectionElement;
+import com.slack.api.model.block.element.StaticSelectElement;
 import com.slack.api.model.view.View;
 import com.slack.api.model.view.ViewState;
 import lombok.RequiredArgsConstructor;
@@ -108,8 +111,13 @@ public class TicketSummaryViewMapper {
                         ))
                         .optional(false)),
                     input(i -> i
+                        .label(plainText("Select the Author's Team"))
+                        .optional(false)
+                        .element(renderTeamsInput(summaryView.teamsInput()))
+                    ),
+                    input(i -> i
                         .label(plainText("Select Tags"))
-                        .optional(true)
+                        .optional(false)
                         .hint(plainText("Select all applicable tags."))
                         .element(multiStaticSelect(s -> s
                             .actionId(TicketField.tags.actionId())
@@ -125,7 +133,7 @@ public class TicketSummaryViewMapper {
                         ))),
                     input(i -> i
                         .label(plainText("Change Impact"))
-                        .optional(true)
+                        .optional(false)
                         .element(staticSelect(s -> s
                             .actionId(TicketField.impact.actionId())
                             .placeholder(plainText("Not Evaluated"))
@@ -197,6 +205,44 @@ public class TicketSummaryViewMapper {
         );
     }
 
+    private StaticSelectElement renderTeamsInput(TicketSummaryView.TeamsInput teams) {
+        return staticSelect(s -> s
+            .actionId(TicketField.team.actionId())
+            .initialOption(
+                teams.currentTeam() != null
+                    ? OptionObject.builder()
+                    .text(plainText(teams.currentTeam()))
+                    .value(teams.currentTeam())
+                    .build()
+                    : null
+            )
+            .optionGroups(ImmutableList.of(
+                OptionGroupObject.builder()
+                    .label(plainText("Suggested teams"))
+                    .options(
+                        teams.authorTeams().stream()
+                            .map(t -> OptionObject.builder()
+                                .text(plainText(t))
+                                .value(t)
+                                .build())
+                            .collect(toImmutableList())
+                    )
+                    .build(),
+                OptionGroupObject.builder()
+                    .label(plainText("Others"))
+                    .options(
+                        teams.otherTeams().stream()
+                            .map(t -> OptionObject.builder()
+                                .text(plainText(t))
+                                .value(t)
+                                .build())
+                            .collect(toImmutableList())
+                    )
+                    .build()
+            ))
+        );
+    }
+
     public TicketSubmission extractSubmittedValues(View view) {
         checkNotNull(view);
 
@@ -209,22 +255,29 @@ public class TicketSummaryViewMapper {
                 Map.Entry::getValue
             ));
 
+        ViewState.Value teamValue = checkNotNull(passedValues.get(TicketField.team.actionId()));
         ViewState.Value statusValue = checkNotNull(passedValues.get(TicketField.status.actionId()));
         ViewState.Value tagsValue = passedValues.get(TicketField.tags.actionId());
         ViewState.Value impactValue = passedValues.get(TicketField.impact.actionId());
 
-        return new TicketSubmission(
-            new TicketId(metadata.ticketId()),
-            TicketStatus.valueOf(statusValue.getSelectedOption().getValue()),
-            tagsValue != null && !isEmpty(tagsValue.getSelectedOptions())
-                ? tagsValue.getSelectedOptions().stream()
-                .map(ViewState.SelectedOption::getValue)
-                .collect(toImmutableList())
-                : ImmutableList.of(),
-            impactValue != null && impactValue.getSelectedOption() != null
-                ? impactValue.getSelectedOption().getValue()
-                : null
-        );
+        return TicketSubmission.builder()
+            .ticketId(new TicketId(metadata.ticketId()))
+            .status(TicketStatus.valueOf(statusValue.getSelectedOption().getValue()))
+            .authorsTeam(teamValue.getSelectedOption().getValue())
+            .tags(
+                tagsValue != null && !isEmpty(tagsValue.getSelectedOptions())
+                    ? tagsValue.getSelectedOptions().stream()
+                    .map(ViewState.SelectedOption::getValue)
+                    .collect(toImmutableList())
+                    : ImmutableList.of()
+            )
+            .impact(
+                impactValue != null && impactValue.getSelectedOption() != null
+                    ? impactValue.getSelectedOption().getValue()
+                    : null
+            )
+            .confirmed(false)
+            .build();
     }
 
 
