@@ -10,8 +10,8 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public enum TicketViewType {
     summary("ticket-summary"),
-    escalate("ticket-escalate"),
-    confirmClose("ticket-confirm-close");
+    summaryConfirm("ticket-summary-confirm"),
+    escalate("ticket-escalate");
 
     public static final Pattern namePattern = Pattern.compile("^ticket-.*$");
 

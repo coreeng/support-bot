@@ -10,6 +10,7 @@ import com.slack.api.methods.response.reactions.ReactionsRemoveResponse;
 import com.slack.api.methods.response.views.ViewsOpenResponse;
 import com.slack.api.methods.response.views.ViewsPublishResponse;
 import com.slack.api.model.Message;
+import com.slack.api.model.User;
 
 public interface SlackClient {
     ReactionsAddResponse addReaction(ReactionsAddRequest request);
@@ -27,4 +28,6 @@ public interface SlackClient {
     ViewsOpenResponse viewsOpen(ViewsOpenRequest request);
 
     ViewsPublishResponse updateHomeView(String userId, SlackView view);
+
+    User.Profile getUserById(String userId);
 }

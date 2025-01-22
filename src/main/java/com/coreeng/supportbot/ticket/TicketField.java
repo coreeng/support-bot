@@ -3,7 +3,8 @@ package com.coreeng.supportbot.ticket;
 public enum TicketField {
     status("change-status"),
     tags("change-tags"),
-    impact("change-impact"),;
+    impact("change-impact"),
+    team("change-team");
 
     private final String actionId;
     TicketField(String actionId) {
