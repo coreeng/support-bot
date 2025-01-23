@@ -2,7 +2,7 @@ package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
-import com.coreeng.supportbot.enums.SlackTeamsRegistry;
+import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.enums.Tag;
 import com.coreeng.supportbot.enums.TagsRegistry;
 import com.coreeng.supportbot.enums.TicketImpact;
@@ -34,7 +34,7 @@ public class TicketProcessingService {
     private final TicketSlackService slackService;
     private final EscalationQueryService escalationQueryService;
     private final SlackTicketsProps slackTicketsProps;
-    private final SlackTeamsRegistry slackTeamsRegistry;
+    private final EscalationTeamsRegistry escalationTeamsRegistry;
     private final ImpactsRegistry impactsRegistry;
     private final TagsRegistry tagsRegistry;
     private final ApplicationEventPublisher publisher;
@@ -137,7 +137,7 @@ public class TicketProcessingService {
         Ticket ticket = repository.findTicketById(request.ticketId());
         if (ticket == null) {
             log.atWarn()
-                .addArgument(request::teamId)
+                .addArgument(request::team)
                 .log("Trying to escalate non-existing ticket: {}");
             throw new IllegalArgumentException("Ticket doesn't exist");
         }
@@ -150,7 +150,7 @@ public class TicketProcessingService {
 
         publisher.publishEvent(new TicketEscalated(
             ticket,
-            request.teamId(),
+            request.team(),
             request.threadPermalink(),
             request.tags()
         ));
@@ -165,7 +165,7 @@ public class TicketProcessingService {
             repository.findTicketById(escalation.ticketId()),
             "Ticket not found: {}", escalation.ticketId()
         );
-        String slackTeamName = checkNotNull(slackTeamsRegistry.findSlackTeamById(escalation.teamId())).name();
+        String slackTeamName = checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(escalation.team())).name();
         slackService.postTicketEscalatedMessage(
             new MessageRef(ticket.queryTs(), ticket.channelId()),
             new MessageRef(escalation.threadTs(), escalation.channelId()),

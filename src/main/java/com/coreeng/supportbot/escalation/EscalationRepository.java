@@ -2,6 +2,7 @@ package com.coreeng.supportbot.escalation;
 
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
+import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 
 import javax.annotation.Nullable;
@@ -19,4 +20,6 @@ public interface EscalationRepository {
     ImmutableList<Escalation> listByTicketId(TicketId ticketId);
 
     long countNotResolvedByTicketId(TicketId ticketId);
+
+    Page<Escalation> findByQuery(EscalationQuery query);
 }

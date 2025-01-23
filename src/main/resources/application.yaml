@@ -41,16 +41,16 @@ slack:
     channel-id: ${ESCALATION_CHANNEL_ID} # Channel ID like: C1234567890
 
 enums:
-  slackTeams:
-    - name: Team A
-      code: teamA
-      id: S08948NBMED
-    - name: Team B
-      code: teamB
-      id: S08948NBMED
-    - name: Team C
-      code: teamC
-      id: S08948NBMED
+  escalationTeams:
+    - name: wow
+      code: wow
+      slack-group-id: S08948NBMED
+    - name: infra-integration
+      code: infra-integration
+      slack-group-id: S08948NBMED
+    - name: connected-app
+      code: connected-app
+      slack-group-id: S08948NBMED
   tags:
     - name: Tag A
       code: tagA
