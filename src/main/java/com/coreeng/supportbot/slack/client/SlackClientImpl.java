@@ -83,6 +83,9 @@ public class SlackClientImpl implements SlackClient {
     @Override
     public String getPermalink(SlackGetMessageByTsRequest request) {
         return cache.get(request, () -> {
+            if (request.ts().mocked()) {
+                return "https://slack.com/" + request.channelId() + "/" + request.ts().ts();
+            }
             ChatGetPermalinkResponse response = doRequest(() -> client.chatGetPermalink(ChatGetPermalinkRequest.builder()
                 .channel(request.channelId())
                 .messageTs(request.ts().ts())

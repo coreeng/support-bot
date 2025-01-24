@@ -6,11 +6,22 @@ import java.time.Instant;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public record MessageTs(
-    String ts
+    String ts,
+    // TODO: delete me when no more mocking data is required
+    boolean mocked
 ) {
     public MessageTs {
         checkNotNull(ts);
     }
+
+    public MessageTs(String ts) {
+        this(ts, false);
+    }
+
+    public static MessageTs mocked(String ts) {
+        return new MessageTs(ts, true);
+    }
+
 
     public static MessageTs of(String ts) {
         return new MessageTs(ts);
