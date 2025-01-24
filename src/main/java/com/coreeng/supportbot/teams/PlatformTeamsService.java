@@ -9,6 +9,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,7 +34,7 @@ public class PlatformTeamsService {
     void init() {
         List<TeamsFetcher.TeamAndGroupTuple> teams = teamsFetcher.fetchTeams();
         validateEscalationTeamsMapping(teams);
-        for (var t: teams) {
+        for (var t : teams) {
             PlatformTeam team = teamByName.computeIfAbsent(t.name(), k -> new PlatformTeam(
                 t.name(),
                 new HashSet<>(),
@@ -100,5 +101,10 @@ public class PlatformTeamsService {
             return ImmutableList.of();
         }
         return ImmutableList.copyOf(user.teams());
+    }
+
+    @Nullable
+    public PlatformUser findUserByEmail(String email) {
+        return usersByEmail.get(email);
     }
 }

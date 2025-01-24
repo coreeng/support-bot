@@ -9,6 +9,7 @@ import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -16,12 +17,13 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
+@RequestMapping("/escalation")
 @RequiredArgsConstructor
 public class EscalationController {
     private final EscalationQueryService queryService;
     private final EscalationUIMapper mapper;
 
-    @GetMapping("/escalation")
+    @GetMapping
     public Page<EscalationUI> list(
         @RequestParam(defaultValue = "0") Long page,
         @RequestParam(defaultValue = "10") Long pageSize,
