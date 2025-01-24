@@ -84,7 +84,6 @@ public class MockDataGenerator implements ApplicationRunner {
         int ticketsToGenerateForDate = getNextTicketsToGenerateForDate(random, date);
         long totalTicketsGenerated = 0;
         while (date.isBefore(nowDate)) {
-            log.info("Generating tickets for date {}", date);
             if (ticketsGeneratedForDate >= ticketsToGenerateForDate) {
                 ticketsGeneratedForDate = 0;
                 ticketsToGenerateForDate = getNextTicketsToGenerateForDate(random, date);
