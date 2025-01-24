@@ -12,7 +12,7 @@ import javax.annotation.Nullable;
 public class EscalateRequest {
     private TicketId ticketId;
     private ImmutableList<Tag> tags;
-    private String teamId;
+    private String team;
     @Nullable
     private String threadPermalink;
 }

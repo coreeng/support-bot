@@ -13,7 +13,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 @Service
 @RequiredArgsConstructor
 public class EnumsService implements
-    SlackTeamsRegistry,
+    EscalationTeamsRegistry,
     TagsRegistry,
     ImpactsRegistry {
     private final EnumProps enumProps;
@@ -30,21 +30,21 @@ public class EnumsService implements
     }
 
     @Override
-    public ImmutableList<SlackTeam> listAllSlackTeams() {
-        return enumProps.slackTeams();
+    public ImmutableList<EscalationTeam> listAllEscalationTeams() {
+        return enumProps.escalationTeams();
     }
 
     @Nullable
     @Override
-    public SlackTeam findSlackTeamByCode(String code) {
-        return findByCode(code, enumProps.slackTeams());
+    public EscalationTeam findEscalationTeamByCode(String code) {
+        return findByCode(code, enumProps.escalationTeams());
     }
 
     @Nullable
     @Override
-    public SlackTeam findSlackTeamById(String id) {
-        return enumProps.slackTeams().stream()
-            .filter(t -> id.equals(t.id()))
+    public EscalationTeam findEscalationTeamByName(String id) {
+        return enumProps.escalationTeams().stream()
+            .filter(t -> id.equals(t.name()))
             .findAny()
             .orElse(null);
     }

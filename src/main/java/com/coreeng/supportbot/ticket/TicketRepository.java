@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.util.Page;
 
 import javax.annotation.Nullable;
 
@@ -13,8 +14,10 @@ public interface TicketRepository {
 
     @Nullable Ticket findTicketById(TicketId ticketId);
     @Nullable Ticket findTicketByQuery(MessageTs messageTs);
+    @Nullable DetailedTicket findDetailedById(TicketId id);
 
     Ticket insertStatusLog(Ticket ticket);
+    Page<Ticket> findTickets(TicketsQuery query);
 
-    TicketsPage findTickets(TicketsQuery query);
+    Page<DetailedTicket> findDetailedTickets(TicketsQuery query);
 }

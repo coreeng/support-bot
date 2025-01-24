@@ -25,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -48,13 +49,14 @@ public class TicketProcessingServiceTests {
 
     @BeforeEach
     public void setUp() {
-        ticketRepository = new TicketInMemoryRepository();
+        ZoneId timezone = ZoneId.of("UTC");
+        EscalationQueryService escalationQueryService = new EscalationQueryService(new EscalationInMemoryRepository(timezone));
+        ticketRepository = new TicketInMemoryRepository(escalationQueryService, timezone);
         slackTicketsProps = new SlackTicketsProps(
             "some-channel-id",
             "eyes",
             "ticket"
         );
-        EscalationQueryService escalationQueryService = new EscalationQueryService(new EscalationInMemoryRepository());
         EnumsService enumsService = new EnumsService(new EnumProps(List.of(), List.of(), List.of()));
         ticketProcessingService = new TicketProcessingService(
             ticketRepository,

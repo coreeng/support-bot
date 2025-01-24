@@ -1,6 +1,6 @@
 package com.coreeng.supportbot.config;
 
-import com.coreeng.supportbot.enums.SlackTeam;
+import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.Tag;
 import com.coreeng.supportbot.enums.TicketImpact;
 import com.google.common.collect.ImmutableList;
@@ -14,18 +14,18 @@ import static com.google.common.collect.Iterables.isEmpty;
 @ConfigurationProperties(prefix = "enums")
 @Getter
 public class EnumProps {
-    private final ImmutableList<SlackTeam> slackTeams;
+    private final ImmutableList<EscalationTeam> escalationTeams;
     private final ImmutableList<Tag> tags;
     private final ImmutableList<TicketImpact> impacts;
 
     public EnumProps(
-        List<SlackTeam> slackTeams,
+        List<EscalationTeam> escalationTeams,
         List<Tag> tags,
         List<TicketImpact> impacts
     ) {
-        this.slackTeams = isEmpty(slackTeams)
+        this.escalationTeams = isEmpty(escalationTeams)
             ? ImmutableList.of()
-            : ImmutableList.copyOf(slackTeams);
+            : ImmutableList.copyOf(escalationTeams);
         this.tags = isEmpty(tags)
             ? ImmutableList.of()
             : ImmutableList.copyOf(tags);

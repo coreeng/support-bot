@@ -25,7 +25,7 @@ public class TicketEventsHandler {
     public void onTicketEscalated(TicketEscalated event) {
         processingService.createEscalation(CreateEscalationRequest.builder()
             .ticket(event.ticket())
-            .teamId(event.teamId())
+            .team(event.team())
             .threadPermalink(event.threadPermalink())
             .tags(event.tags())
             .build());
