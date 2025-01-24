@@ -14,9 +14,9 @@ import java.time.LocalDate;
 @Builder
 public class HomepageView {
     private ImmutableList<TicketView> tickets;
-    private int page;
-    private int totalPages;
-    private int totalTickets;
+    private long page;
+    private long totalPages;
+    private long totalTickets;
     private String channelId;
 
     private Instant timestamp;
@@ -28,7 +28,7 @@ public class HomepageView {
     @EqualsAndHashCode
     @Jacksonized
     public static class State {
-        private int page;
+        private long page;
         private HomepageFilter filter;
 
         public static State getDefault() {
@@ -62,9 +62,12 @@ public class HomepageView {
                 .dateFrom(dateFrom)
                 .dateTo(dateTo)
                 .tags(filter.tags())
-                .impact(filter.impact())
+                .impacts(
+                    filter.impact() != null
+                        ? ImmutableList.of(filter.impact())
+                        : ImmutableList.of()
+                )
                 .build();
         }
-
     }
 }

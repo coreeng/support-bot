@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.teams;
 
 
+import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.gax.core.CredentialsProvider;
 import com.google.api.services.cloudidentity.v1.CloudIdentity;
@@ -32,10 +33,11 @@ import java.util.concurrent.Executors;
 public class PlatformTeamsConfig {
     private final GcpProps gcpProps;
     private final CredentialsProvider gcpCredsProvider;
+    private final EscalationTeamsRegistry escalationTeamsRegistry;
 
     @Bean
     public PlatformTeamsService platformTeamsService() throws IOException {
-        return new PlatformTeamsService(teamsFetcher(), usersFetcher());
+        return new PlatformTeamsService(teamsFetcher(), usersFetcher(), escalationTeamsRegistry);
     }
 
     @Bean

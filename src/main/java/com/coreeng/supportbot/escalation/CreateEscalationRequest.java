@@ -12,7 +12,7 @@ import javax.annotation.Nullable;
 @Builder(toBuilder = true)
 public class CreateEscalationRequest {
     private Ticket ticket;
-    private String teamId;
+    private String team;
     @Nullable
     private String threadPermalink;
     @Builder.Default

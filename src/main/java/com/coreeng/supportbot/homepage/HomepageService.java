@@ -7,7 +7,7 @@ import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketQueryService;
 import com.coreeng.supportbot.ticket.TicketStatus;
-import com.coreeng.supportbot.ticket.TicketsPage;
+import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +23,6 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Comparator.comparing;
 
 @Service
@@ -36,16 +35,15 @@ public class HomepageService {
     private final SlackTicketsProps slackTicketsProps;
 
     public HomepageView getTicketsView(HomepageView.State state) {
-        TicketsPage page = ticketQueryService.findByQuery(state.toTicketsQuery());
-        Map<TicketId, String> permalinkByTicketId = collectPermalinks(page.tickets());
+        Page<Ticket> page = ticketQueryService.findByQuery(state.toTicketsQuery());
+        Map<TicketId, String> permalinkByTicketId = collectPermalinks(page.content());
         return HomepageView.builder()
             .timestamp(Instant.now())
             .tickets(
-                page.tickets().stream()
-                    .map(t -> ticketToTicketView(t, permalinkByTicketId.get(t.id())))
-                    .collect(toImmutableList())
+                page.map(t -> ticketToTicketView(t, permalinkByTicketId.get(t.id())))
+                    .content()
             )
-            .totalTickets(page.totalTickets())
+            .totalTickets(page.totalElements())
             .totalPages(page.totalPages())
             .page(page.page())
             .channelId(slackTicketsProps.channelId())

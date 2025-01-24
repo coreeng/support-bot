@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.escalation;
 
 import com.coreeng.supportbot.config.SlackEscalationProps;
+import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
@@ -30,6 +31,7 @@ public class EscalationProcessingService {
     private final EscalationCreatedMessageMapper createdMessageMapper;
     private final SlackClient slackClient;
     private final TicketQueryService ticketQueryService;
+    private final EscalationTeamsRegistry escalationTeamsRegistry;
     private final ApplicationEventPublisher publisher;
 
     public Escalation createEscalation(CreateEscalationRequest request) {
@@ -42,7 +44,7 @@ public class EscalationProcessingService {
             Escalation.createNew(
                 request.ticket().id(),
                 threadRef,
-                request.teamId(),
+                request.team(),
                 request.tags()
             )
         );
@@ -62,6 +64,7 @@ public class EscalationProcessingService {
         ChatPostMessageResponse postedMessage = slackClient.postMessage(new SlackPostMessageRequest(
             createdMessageMapper.renderMessage(EscalationCreatedMessage.of(
                 escalation,
+                checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(escalation.team())).slackGroupId(),
                 queryPermalink
             )),
             slackEscalationProps.channelId(),
@@ -119,6 +122,7 @@ public class EscalationProcessingService {
         slackClient.editMessage(new SlackEditMessageRequest(
             createdMessageMapper.renderMessage(EscalationCreatedMessage.of(
                 updatedEscalation,
+                checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(updatedEscalation.team())).slackGroupId(),
                 ticketQueryPermalink
             )),
             updatedEscalation.channelId(),

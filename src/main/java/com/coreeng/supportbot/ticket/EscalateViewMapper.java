@@ -1,6 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
-import com.coreeng.supportbot.enums.SlackTeamsRegistry;
+import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.enums.Tag;
 import com.coreeng.supportbot.enums.TagsRegistry;
 import com.coreeng.supportbot.escalation.EscalationValidator;
@@ -33,7 +33,7 @@ public class EscalateViewMapper {
     private final JsonMapper jsonMapper;
     private final EscalationValidator escalationValidator;
     private final TagsRegistry tagsRegistry;
-    private final SlackTeamsRegistry slackTeamsRegistry;
+    private final EscalationTeamsRegistry escalationTeamsRegistry;
 
     public View.ViewBuilder render(TicketEscalateInput input, View.ViewBuilder view) {
         return view
@@ -73,7 +73,7 @@ public class EscalateViewMapper {
                 .blockId(Fields.team.actionId())
                 .element(staticSelect(s -> s
                     .actionId(Fields.team.actionId())
-                    .options(slackTeamsRegistry.listAllSlackTeams().stream()
+                    .options(escalationTeamsRegistry.listAllEscalationTeams().stream()
                         .map(RenderingUtils::toOptionObject)
                         .toList()
                     )
@@ -122,9 +122,9 @@ public class EscalateViewMapper {
         );
 
         ViewState.Value teamValue = checkNotNull(passedValues.get(Fields.team.actionId()));
-        String teamId = checkNotNull(slackTeamsRegistry.findSlackTeamByCode(
+        String team  = checkNotNull(escalationTeamsRegistry.findEscalationTeamByCode(
             teamValue.getSelectedOption().getValue()
-        )).id();
+        )).name();
 
         ViewState.Value threadPermalinkValue = passedValues.get(Fields.threadPermalink.actionId());
         String threadPermalink = threadPermalinkValue != null
@@ -134,7 +134,7 @@ public class EscalateViewMapper {
         return EscalateRequest.builder()
             .tags(tags)
             .ticketId(input.ticketId())
-            .teamId(teamId)
+            .team(team)
             .threadPermalink(threadPermalink)
             .build();
     }

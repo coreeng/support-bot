@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
+import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
 import com.coreeng.supportbot.enums.TagsRegistry;
 import com.coreeng.supportbot.escalation.Escalation;
@@ -15,6 +16,7 @@ import com.slack.api.model.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Comparator.comparing;
 
@@ -26,6 +28,7 @@ public class TicketSummaryService {
     private final EscalationQueryService escalationQueryService;
     private final TagsRegistry tagsRegistry;
     private final ImpactsRegistry impactsRegistry;
+    private final EscalationTeamsRegistry escalationTeamsRegistry;
     private final PlatformTeamsService platformTeamsService;
 
     public TicketSummaryView summaryView(TicketId id) {
@@ -54,7 +57,11 @@ public class TicketSummaryService {
                 String threadPermalink = slackClient.getPermalink(new SlackGetMessageByTsRequest(
                     e.channelId(), e.threadTs()
                 ));
-                return TicketSummaryView.EscalationView.of(e, threadPermalink);
+                return TicketSummaryView.EscalationView.of(
+                    e,
+                    threadPermalink,
+                    checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(e.team())).slackGroupId()
+                );
             })
             .collect(toImmutableList());
     }

@@ -29,12 +29,12 @@ public class Escalation {
     private Instant resolvedAt;
 
     @Nullable
-    private String teamId;
+    private String team;
 
     public static Escalation createNew(
         TicketId ticketId,
         @Nullable MessageRef threadRef,
-        @Nullable String teamId,
+        @Nullable String team,
         ImmutableList<Tag> tags
     ) {
         return Escalation.builder()
@@ -43,7 +43,7 @@ public class Escalation {
             .openedAt(Instant.now())
             .threadTs(threadRef != null ? threadRef.actualThreadTs() : null)
             .channelId(threadRef != null ? threadRef.channelId() : null)
-            .teamId(teamId)
+            .team(team)
             .tags(tags)
             .build();
     }

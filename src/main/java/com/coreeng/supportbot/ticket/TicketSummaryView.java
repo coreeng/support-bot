@@ -56,17 +56,18 @@ public record TicketSummaryView(
     public record EscalationView(
         EscalationId id,
         String threadPermalink,
-        String teamId,
+        String teamSlackGroupId,
         EscalationStatus status
     ) {
         public static EscalationView of(
             Escalation escalation,
-            String threadPermalink
+            String threadPermalink,
+            String teamSlackGroupId
         ) {
             return new EscalationView(
                 escalation.id(),
                 threadPermalink,
-                escalation.teamId(),
+                teamSlackGroupId,
                 escalation.status()
             );
         }

@@ -2,6 +2,7 @@ package com.coreeng.supportbot.escalation;
 
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
+import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -13,8 +14,12 @@ import javax.annotation.Nullable;
 public class EscalationQueryService {
     private final EscalationRepository repository;
 
-    public boolean existsByThreadTs(MessageTs threadTs) {
-        return repository.existsByThreadTs(threadTs);
+    public Page<Escalation> findByQuery(EscalationQuery query) {
+        return repository.findByQuery(query);
+    }
+
+    public ImmutableList<Escalation> listByTicketId(TicketId ticketId) {
+        return repository.listByTicketId(ticketId);
     }
 
     @Nullable
@@ -22,8 +27,8 @@ public class EscalationQueryService {
         return repository.findById(escalationId);
     }
 
-    public ImmutableList<Escalation> listByTicketId(TicketId ticketId) {
-        return repository.listByTicketId(ticketId);
+    public boolean existsByThreadTs(MessageTs threadTs) {
+        return repository.existsByThreadTs(threadTs);
     }
 
     public long countNotResolvedByTicketId(TicketId ticketId) {

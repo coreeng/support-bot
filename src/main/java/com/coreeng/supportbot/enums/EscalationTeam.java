@@ -2,9 +2,9 @@ package com.coreeng.supportbot.enums;
 
 import com.coreeng.supportbot.config.EnumerationValue;
 
-public record SlackTeam(
+public record EscalationTeam(
     String name,
     String code,
-    String id
+    String slackGroupId
 ) implements EnumerationValue {
 }

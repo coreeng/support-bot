@@ -14,9 +14,11 @@ import java.time.LocalDate;
 @Jacksonized
 public class TicketsQuery {
     @Builder.Default
-    private int page = 0;
+    private long page = 0;
     @Builder.Default
-    private int pageSize = 10;
+    private long pageSize = 10;
+    @Builder.Default
+    private ImmutableList<TicketId> ids = ImmutableList.of();
     @Nullable
     private TicketStatus status;
     // by timestamp
@@ -26,10 +28,14 @@ public class TicketsQuery {
     private LocalDate dateFrom;
     @Nullable
     private LocalDate dateTo;
+    @Nullable
+    private Boolean escalated;
     @Builder.Default
     private ImmutableList<String> tags = ImmutableList.of();
-    @Nullable
-    private String impact;
+    @Builder.Default
+    private ImmutableList<String> impacts = ImmutableList.of();
+    @Builder.Default
+    private ImmutableList<String> teams = ImmutableList.of();
 
     @Getter
     public enum Order implements UIOption {

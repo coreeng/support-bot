@@ -7,7 +7,7 @@ import javax.annotation.Nullable;
 
 public record TicketEscalated(
     Ticket ticket,
-    String teamId,
+    String team,
     @Nullable
     String threadPermalink,
     ImmutableList<Tag> tags

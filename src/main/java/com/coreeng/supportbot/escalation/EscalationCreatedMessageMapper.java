@@ -45,7 +45,7 @@ public class EscalationCreatedMessageMapper {
             .append("|ticket>: `")
             .append(message.escalationId().render())
             .append("`\nEscalated to: <!subteam^")
-            .append(message.teamId())
+            .append(message.slackTeamGroupId())
             .append(">");
         if (!isEmpty(message.tags())) {
             str.append("\nTags:\n");

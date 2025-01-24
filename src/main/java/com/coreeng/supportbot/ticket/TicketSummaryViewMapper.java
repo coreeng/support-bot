@@ -186,7 +186,7 @@ public class TicketSummaryViewMapper {
                         .text("Status: " + escalation.status().label())
                     ),
                     markdownText(t -> t
-                        .text("Team: <!subteam^" + escalation.teamId() + ">")
+                        .text("Team: <!subteam^" + escalation.teamSlackGroupId() + ">")
                     )
                 ))
             ),
