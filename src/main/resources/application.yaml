@@ -70,3 +70,6 @@ platform-integration:
   enabled: true
   gcp:
     app-name: Support Bot
+
+mock-data:
+  enabled: true

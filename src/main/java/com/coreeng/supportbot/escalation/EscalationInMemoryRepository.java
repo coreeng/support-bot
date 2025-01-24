@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.Collections.reverseOrder;
 import static java.util.Comparator.comparing;
 
 @Component
@@ -101,7 +102,7 @@ public class EscalationInMemoryRepository implements EscalationRepository {
 
         ImmutableList<Escalation> queryResult = escalations.values().stream()
             .filter(e -> filterEscalation(e, query))
-            .sorted(comparing(Escalation::openedAt))
+            .sorted(reverseOrder(comparing(Escalation::openedAt)))
             .collect(toImmutableList());
         long fromIndex = query.page() * query.pageSize();
         long toIndex = Math.min(queryResult.size(), (query.page() + 1) * query.pageSize());

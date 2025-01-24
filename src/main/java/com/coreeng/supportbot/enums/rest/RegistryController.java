@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 @RestController
@@ -19,7 +21,7 @@ public class RegistryController {
     private final TagsRegistry tagsRegistry;
 
     @GetMapping("/impact")
-    public ResponseEntity<ImmutableList<ImpactUI>> listImpacts() {
+    public ResponseEntity<List<ImpactUI>> listImpacts() {
         ImmutableList<ImpactUI> impacts = impactsRegistry.listAllImpacts().stream()
             .map(i -> new ImpactUI(
                 i.label(),
@@ -30,7 +32,7 @@ public class RegistryController {
     }
 
     @GetMapping("/tag")
-    public ResponseEntity<ImmutableList<TagUI>> listTags() {
+    public ResponseEntity<List<TagUI>> listTags() {
         ImmutableList<TagUI> tags = tagsRegistry.listAllTags().stream()
             .map(t -> new TagUI(
                 t.label(),
