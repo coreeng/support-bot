@@ -1,9 +1,7 @@
 package com.coreeng.supportbot.teams.rest;
 
-import com.coreeng.supportbot.teams.PlatformTeam;
 import com.coreeng.supportbot.teams.PlatformUser;
 import com.coreeng.supportbot.teams.Team;
-import com.coreeng.supportbot.teams.TeamType;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
