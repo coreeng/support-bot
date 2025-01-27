@@ -17,6 +17,7 @@ public class TicketsQuery {
     private long page = 0;
     @Builder.Default
     private long pageSize = 10;
+    private boolean unlimited;
     @Builder.Default
     private ImmutableList<TicketId> ids = ImmutableList.of();
     @Nullable
