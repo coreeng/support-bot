@@ -9,7 +9,6 @@ import lombok.Getter;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.jackson.Jacksonized;
 
-import java.io.IOException;
 import java.time.LocalDate;
 
 @Getter
