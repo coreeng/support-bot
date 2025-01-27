@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @RequiredArgsConstructor
-public class GcpUsersFetcher implements UsersFetcher {
+public class GcpUsersFetcher implements PlatformUsersFetcher {
     private final CloudIdentity cloudIdentity;
 
     @Override

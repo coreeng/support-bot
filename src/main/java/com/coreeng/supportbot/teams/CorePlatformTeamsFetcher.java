@@ -19,7 +19,7 @@ import java.util.concurrent.ExecutorService;
 
 @Slf4j
 @RequiredArgsConstructor
-public class CorePlatformTeamsFetcher implements TeamsFetcher {
+public class CorePlatformTeamsFetcher implements PlatformTeamsFetcher {
     private final static ImmutableList<String> roleBindingPostfixes = ImmutableList.of("-admin", "-admin-viewer", "-viewer");
 
     private final ExecutorService executor;

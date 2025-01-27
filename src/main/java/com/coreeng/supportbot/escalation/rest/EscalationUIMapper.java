@@ -4,6 +4,7 @@ import com.coreeng.supportbot.enums.Tag;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.teams.TeamType;
 import com.coreeng.supportbot.teams.rest.TeamUI;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -25,7 +26,7 @@ public class EscalationUIMapper {
             )))
             .openedAt(escalation.openedAt())
             .resolvedAt(escalation.resolvedAt())
-            .team(new TeamUI(escalation.team()))
+            .team(new TeamUI(escalation.team(), TeamType.tenant))
             .tags(
                 escalation.tags().stream()
                     .map(Tag::code)
