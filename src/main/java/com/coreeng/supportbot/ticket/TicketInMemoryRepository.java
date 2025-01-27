@@ -142,13 +142,23 @@ public class TicketInMemoryRepository implements TicketRepository {
             .sorted(order)
             .map(mapperFn)
             .collect(toImmutableList());
-        long fromIndex = query.page() * query.pageSize();
-        long toIndex = Math.min(queryResult.size(), (query.page() + 1) * query.pageSize());
+
+        ImmutableList<X> elements;
+        long page;
+        long totalPages;
+        if (query.unlimited()) {
+            elements = queryResult;
+            page = totalPages = 0;
+        } else {
+            long fromIndex = query.page() * query.pageSize();
+            long toIndex = Math.min(queryResult.size(), (query.page() + 1) * query.pageSize());
+            elements = queryResult.subList((int) fromIndex, (int) toIndex);
+            page = query.page();
+            totalPages = queryResult.size() / query.pageSize() + 1;
+        }
         return new Page<>(
-            queryResult.subList((int) fromIndex, (int) toIndex),
-            query.page(),
-            queryResult.size() / query.pageSize() + 1,
-            queryResult.size()
+            elements,
+            page, totalPages, queryResult.size()
         );
     }
 

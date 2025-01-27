@@ -20,6 +20,7 @@ public class JsonMapper {
         .setVisibility(PropertyAccessor.SETTER, JsonAutoDetect.Visibility.ANY)
         .setVisibility(PropertyAccessor.CREATOR, JsonAutoDetect.Visibility.ANY)
         .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+        .configure(SerializationFeature.FAIL_ON_UNWRAPPED_TYPE_IDENTIFIERS, false)
         .registerModule(new JavaTimeModule())
         .registerModule(new GuavaModule());
 

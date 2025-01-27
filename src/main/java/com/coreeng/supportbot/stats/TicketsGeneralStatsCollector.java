@@ -1,0 +1,70 @@
+package com.coreeng.supportbot.stats;
+
+import com.coreeng.supportbot.ticket.Ticket;
+import com.coreeng.supportbot.ticket.TicketRepository;
+import com.coreeng.supportbot.ticket.TicketStatus;
+import com.coreeng.supportbot.ticket.TicketsQuery;
+import com.coreeng.supportbot.util.Page;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+import java.time.Instant;
+
+@Component
+@RequiredArgsConstructor
+public class TicketsGeneralStatsCollector implements StatsCollector<StatsRequest.TicketGeneral> {
+    private final TicketRepository repository;
+
+    @Override
+    public StatsType getSupportedType() {
+        return StatsType.ticketGeneral;
+    }
+
+    @Override
+    public StatsResult calculateResults(StatsRequest.TicketGeneral request) {
+        Page<Ticket> tickets = repository.findTickets(TicketsQuery.builder()
+            .unlimited(true)
+            .dateFrom(request.from())
+            .dateTo(request.to())
+            .build());
+
+        double avgResolutionTime = tickets.content().stream()
+            .filter(t -> t.status() == TicketStatus.closed)
+            .mapToDouble(t -> Duration.between(
+                t.queryTs().getDate(),
+                t.statusHistory().getLast().timestamp()
+            ).getSeconds())
+            .average()
+            .orElse(0.0);
+
+        double avgResponseTime = tickets.content().stream()
+            .mapToDouble(t -> Duration.between(
+                t.queryTs().getDate(),
+                t.statusHistory().getFirst().timestamp()
+            ).getSeconds())
+            .average()
+            .orElse(0.0);
+
+        double largetActiveTicketSecs = tickets.content().stream()
+            .mapToDouble(t -> switch (t.status()) {
+                case closed -> Duration.between(
+                    t.statusHistory().getFirst().timestamp(),
+                    t.statusHistory().getLast().timestamp()
+                ).getSeconds();
+                case opened -> Duration.between(
+                    t.statusHistory().getFirst().timestamp(),
+                    Instant.now()
+                ).getSeconds();
+            })
+            .max()
+            .orElse(0.0);
+
+        return StatsResult.TicketGeneral.builder()
+            .request(request)
+            .avgResolutionTimeSecs(avgResolutionTime)
+            .avgResponseTimeSecs(avgResponseTime)
+            .largestActiveTicketSecs(largetActiveTicketSecs)
+            .build();
+    }
+}
