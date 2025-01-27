@@ -4,6 +4,7 @@ import com.coreeng.supportbot.enums.Tag;
 import com.coreeng.supportbot.escalation.rest.EscalationUIMapper;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.teams.TeamType;
 import com.coreeng.supportbot.teams.rest.TeamUI;
 import com.coreeng.supportbot.ticket.DetailedTicket;
 import com.google.common.collect.ImmutableList;
@@ -31,7 +32,7 @@ public class TicketUIMapper {
             .status(ticket.ticket().status())
             .team(
                 ticket.ticket().team() != null
-                    ? new TeamUI(ticket.ticket().team())
+                    ? new TeamUI(ticket.ticket().team(), TeamType.tenant)
                     : null
             )
             .impact(

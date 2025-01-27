@@ -71,5 +71,9 @@ platform-integration:
   gcp:
     app-name: Support Bot
 
+support-team:
+  name: Core Support
+  slack-group-id: S08948NBMED
+
 mock-data:
   enabled: true

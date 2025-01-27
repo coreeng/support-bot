@@ -2,7 +2,7 @@ package com.coreeng.supportbot.teams;
 
 import java.util.List;
 
-public interface TeamsFetcher {
+public interface PlatformTeamsFetcher {
     List<TeamAndGroupTuple> fetchTeams();
 
     record TeamAndGroupTuple(

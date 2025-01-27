@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.slack.client;
 
+import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
 import com.slack.api.methods.request.views.ViewsOpenRequest;
@@ -30,4 +31,6 @@ public interface SlackClient {
     ViewsPublishResponse updateHomeView(String userId, SlackView view);
 
     User.Profile getUserById(String userId);
+
+    ImmutableList<String> getGroupMembers(String groupId);
 }

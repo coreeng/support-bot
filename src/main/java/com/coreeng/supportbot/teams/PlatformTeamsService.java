@@ -22,8 +22,8 @@ import static java.util.stream.Collectors.joining;
 @RequiredArgsConstructor
 @Slf4j
 public class PlatformTeamsService {
-    private final TeamsFetcher teamsFetcher;
-    private final UsersFetcher usersFetcher;
+    private final PlatformTeamsFetcher teamsFetcher;
+    private final PlatformUsersFetcher usersFetcher;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
 
     private final Map<String, PlatformUser> usersByEmail = new HashMap<>();
@@ -32,7 +32,7 @@ public class PlatformTeamsService {
 
     @PostConstruct
     void init() {
-        List<TeamsFetcher.TeamAndGroupTuple> teams = teamsFetcher.fetchTeams();
+        List<PlatformTeamsFetcher.TeamAndGroupTuple> teams = teamsFetcher.fetchTeams();
         validateEscalationTeamsMapping(teams);
         for (var t : teams) {
             PlatformTeam team = teamByName.computeIfAbsent(t.name(), k -> new PlatformTeam(
@@ -51,9 +51,9 @@ public class PlatformTeamsService {
                 continue;
             }
 
-            List<UsersFetcher.Membership> memberships = usersFetcher.fetchMembershipsByGroupRef(t.groupRef());
+            List<PlatformUsersFetcher.Membership> memberships = usersFetcher.fetchMembershipsByGroupRef(t.groupRef());
             List<PlatformUser> users = new ArrayList<>();
-            for (UsersFetcher.Membership m : memberships) {
+            for (PlatformUsersFetcher.Membership m : memberships) {
                 PlatformUser user = usersByEmail.computeIfAbsent(m.email(), k -> new PlatformUser(
                     m.email(),
                     new HashSet<>()
@@ -75,9 +75,9 @@ public class PlatformTeamsService {
             .log("Finished fetching teams info. Teams({}), Groups({}), Users({})");
     }
 
-    private void validateEscalationTeamsMapping(List<TeamsFetcher.TeamAndGroupTuple> teams) {
+    private void validateEscalationTeamsMapping(List<PlatformTeamsFetcher.TeamAndGroupTuple> teams) {
         ImmutableSet<String> teamNames = teams.stream()
-            .map(TeamsFetcher.TeamAndGroupTuple::name)
+            .map(PlatformTeamsFetcher.TeamAndGroupTuple::name)
             .collect(toImmutableSet());
         ImmutableSet<String> escalationTeamNames = escalationTeamsRegistry.listAllEscalationTeams().stream()
             .map(EscalationTeam::name)

@@ -41,7 +41,7 @@ public class PlatformTeamsConfig {
     }
 
     @Bean
-    public TeamsFetcher teamsFetcher() {
+    public PlatformTeamsFetcher teamsFetcher() {
         return new CorePlatformTeamsFetcher(
             Executors.newVirtualThreadPerTaskExecutor(),
             k8sClient()
@@ -49,7 +49,7 @@ public class PlatformTeamsConfig {
     }
 
     @Bean
-    public UsersFetcher usersFetcher() throws IOException {
+    public PlatformUsersFetcher usersFetcher() throws IOException {
         return new GcpUsersFetcher(cloudIdentity());
     }
 
