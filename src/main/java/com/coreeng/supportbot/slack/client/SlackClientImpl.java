@@ -9,6 +9,7 @@ import com.slack.api.methods.request.chat.ChatGetPermalinkRequest;
 import com.slack.api.methods.request.conversations.ConversationsHistoryRequest;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
+import com.slack.api.methods.request.usergroups.users.UsergroupsUsersListRequest;
 import com.slack.api.methods.request.users.profile.UsersProfileGetRequest;
 import com.slack.api.methods.request.views.ViewsOpenRequest;
 import com.slack.api.methods.request.views.ViewsPublishRequest;
@@ -30,6 +31,7 @@ import org.springframework.cache.Cache;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.util.List;
 import java.util.function.Function;
 
 import static com.google.common.collect.Iterables.isEmpty;
@@ -125,6 +127,17 @@ public class SlackClientImpl implements SlackClient {
                 .build()),
             null
         ).getProfile();
+    }
+
+    @Override
+    public ImmutableList<String> getGroupMembers(String groupId) {
+        List<String> users = doRequest(
+            () -> client.usergroupsUsersList(UsergroupsUsersListRequest.builder()
+                .usergroup(groupId)
+                .build()),
+            null
+        ).getUsers();
+        return ImmutableList.copyOf(users);
     }
 
     private <V extends SlackApiTextResponse> V doRequest(

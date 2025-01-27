@@ -2,6 +2,9 @@ package com.coreeng.supportbot.teams.rest;
 
 import com.coreeng.supportbot.teams.PlatformTeamsService;
 import com.coreeng.supportbot.teams.PlatformUser;
+import com.coreeng.supportbot.teams.Team;
+import com.coreeng.supportbot.teams.TeamService;
+import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class UsersController {
     private final PlatformTeamsService platformTeamsService;
+    private final TeamService teamService;
     private final TeamUIMapper mapper;
 
     @GetMapping("/user")
@@ -22,6 +26,7 @@ public class UsersController {
         if (user == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(mapper.mapToUI(user));
+        ImmutableList<Team> teams = teamService.listTeamsByUserEmail(email);
+        return ResponseEntity.ok(mapper.mapToUI(user, teams));
     }
 }
