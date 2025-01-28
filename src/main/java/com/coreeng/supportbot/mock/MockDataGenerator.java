@@ -74,11 +74,10 @@ public class MockDataGenerator implements ApplicationRunner {
     private final ZoneId timezone;
 
     @Override
-    public void run(ApplicationArguments args) throws Exception {
+    public void run(ApplicationArguments args) {
         Random random = new Random();
         LocalDate nowDate = LocalDate.now();
-        LocalDate startDate = nowDate.minusWeeks(2);
-        LocalDate date = startDate;
+        LocalDate date = nowDate.minusWeeks(2);
 
         int ticketsGeneratedForDate = 0;
         int ticketsToGenerateForDate = getNextTicketsToGenerateForDate(random, date);
@@ -275,7 +274,7 @@ public class MockDataGenerator implements ApplicationRunner {
 
     private Set<Tag> generatePickedTags(Random random) {
         ImmutableList<Tag> tags = tagsRegistry.listAllTags();
-        int tagsAmount = random.nextInt(1, tags.size() + 1);
+        int tagsAmount = random.nextInt(1, 4);
         Set<Tag> pickedTags = new HashSet<>();
         if (tagsAmount == tags.size()) {
             pickedTags.addAll(tags);

@@ -42,22 +42,38 @@ slack:
 
 enums:
   escalationTeams:
-    - name: wow
-      code: wow
+    - name: core-networking
+      code: core-networking
       slack-group-id: S08948NBMED
-    - name: infra-integration
-      code: infra-integration
+    - name: core-aws
+      code: core-aws
       slack-group-id: S08948NBMED
-    - name: connected-app
-      code: connected-app
+    - name: core-platform
+      code: core-platform
+      slack-group-id: S08948NBMED
+    - name: core-managed-k8s
+      code: core-managed-k8s
+      slack-group-id: S08948NBMED
+    - name: core-observability
+      code: core-observability
       slack-group-id: S08948NBMED
   tags:
-    - name: Tag A
-      code: tagA
-    - name: Tag B
-      code: tagB
-    - name: Tag C
-      code: tagC
+    - name: Ingresses
+      code: ingresses
+    - name: Jenkins Pipelines
+      code: jenkins-pipelines
+    - name: Networking
+      code: networking
+    - name: Vault
+      code: vault
+    - name: Persistence/Brokers
+      code: persistence-brokers
+    - name: Observability
+      code: observability
+    - name: DNS
+      code: dns
+    - name: Osprey
+      code: osprey
   impacts:
     - name: Production Blocking
       code: productionBlocking
