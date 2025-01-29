@@ -83,12 +83,6 @@ public class MockDataGenerator implements ApplicationRunner {
         int ticketsToGenerateForDate = getNextTicketsToGenerateForDate(random, date);
         long totalTicketsGenerated = 0;
         while (date.isBefore(nowDate)) {
-            if (ticketsGeneratedForDate >= ticketsToGenerateForDate) {
-                ticketsGeneratedForDate = 0;
-                ticketsToGenerateForDate = getNextTicketsToGenerateForDate(random, date);
-                date = date.plusDays(1);
-            }
-
             TicketProgression progression = TicketProgression.pick(random);
             switch (progression) {
                 case queried -> generateQuery(random, date);
@@ -99,6 +93,12 @@ public class MockDataGenerator implements ApplicationRunner {
             }
             ticketsGeneratedForDate += 1;
             totalTicketsGenerated += 1;
+
+            if (ticketsGeneratedForDate >= ticketsToGenerateForDate) {
+                ticketsGeneratedForDate = 0;
+                ticketsToGenerateForDate = getNextTicketsToGenerateForDate(random, date);
+                date = date.plusDays(1);
+            }
         }
         log.atInfo()
             .addArgument(totalTicketsGenerated)
