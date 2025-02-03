@@ -12,18 +12,18 @@ slack:
     expected-initial-reaction: eyes
     response-initial-reaction: ticket
 
-ticket:
-  tags:
-    - name: Tag A
-      code: tagA
-    - name: Tag B
-      code: tagB
-    - name: Tag C
-      code: tagC
-  impacts:
-    - name: Production Blocking
-      code: productionBlocking
-    - name: BAU Blocking
-      code: bauBlocking
-    - name: Abnormal Behaviour
-      code: abnormalBehaviour
+#ticket:
+#  tags:
+#    - label: Tag A
+#      code: tagA
+#    - label: Tag B
+#      code: tagB
+#    - label: Tag C
+#      code: tagC
+#  impacts:
+#    - label: Production Blocking
+#      code: productionBlocking
+#    - label: BAU Blocking
+#      code: bauBlocking
+#    - label: Abnormal Behaviour
+#      code: abnormalBehaviour

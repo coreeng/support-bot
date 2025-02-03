@@ -11,6 +11,9 @@ import com.coreeng.supportbot.enums.TicketImpact;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationRepository;
 import com.coreeng.supportbot.escalation.EscalationStatus;
+import com.coreeng.supportbot.sentiment.SentimentRepository;
+import com.coreeng.supportbot.sentiment.TicketSentimentResults;
+import com.coreeng.supportbot.sentiment.client.Sentiment;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.teams.PlatformTeam;
@@ -67,6 +70,7 @@ public class MockDataGenerator implements ApplicationRunner {
     private final SlackEscalationProps escalationProps;
     private final TicketRepository ticketRepository;
     private final EscalationRepository escalationRepository;
+    private final SentimentRepository sentimentRepository;
     private final PlatformTeamsService platformTeamsService;
     private final ImpactsRegistry impactsRegistry;
     private final TagsRegistry tagsRegistry;
@@ -258,6 +262,8 @@ public class MockDataGenerator implements ApplicationRunner {
             .statusHistory(statusHistory)
             .build();
         ticketRepository.updateTicket(ticket);
+
+        generateSentimentForTicket(random, ticket);
     }
 
     private Escalation makeEscalationResolved(Random random, Escalation escalation) {
@@ -285,6 +291,33 @@ public class MockDataGenerator implements ApplicationRunner {
             }
         }
         return pickedTags;
+    }
+
+    private void generateSentimentForTicket(Random random, Ticket ticket) {
+        sentimentRepository.save(ticket.id(),
+            TicketSentimentResults.builder()
+                .ticketId(ticket.id())
+                .authorSentiment(generateSentiment(random))
+                .supportSentiment(random.nextDouble() > 0.2
+                    ? generateSentiment(random)
+                    : null)
+                .othersSentiment(random.nextDouble() > 0.5
+                    ? generateSentiment(random)
+                    : null)
+                .build()
+        );
+    }
+
+    private Sentiment generateSentiment(Random random) {
+        double positiveSentiment = random.nextDouble();
+        double neutralSentiment = random.nextDouble();
+        double negativeSentiment = random.nextDouble();
+        double sentimentSum = positiveSentiment + neutralSentiment + negativeSentiment;
+        return new Sentiment(
+            positiveSentiment / sentimentSum,
+            neutralSentiment / sentimentSum,
+            negativeSentiment / sentimentSum
+        );
     }
 
     private MessageTs generateMessageTsAt(Random random, LocalDate date) {

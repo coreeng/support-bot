@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.stats;
 
+import com.coreeng.supportbot.sentiment.TicketSentimentCountPerDate;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.google.common.collect.ImmutableList;
 import lombok.Getter;
@@ -9,20 +10,20 @@ import lombok.extern.jackson.Jacksonized;
 import java.time.LocalDate;
 
 @Getter
-@SuperBuilder(toBuilder = true)
+@SuperBuilder
 public class StatsResult {
     @Getter
-    @SuperBuilder(toBuilder = true)
+    @SuperBuilder
     @Jacksonized
     public static class TicketTimeline extends StatsResult {
         @JsonUnwrapped
         private StatsRequest.TicketTimeline request;
-        private ImmutableList<DatedValue> values;
+        private ImmutableList<DatedValue<Long>> values;
     }
 
 
     @Getter
-    @SuperBuilder(toBuilder = true)
+    @SuperBuilder
     @Jacksonized
     public static class TicketAmount extends StatsResult {
         @JsonUnwrapped
@@ -32,7 +33,7 @@ public class StatsResult {
 
 
     @Getter
-    @SuperBuilder(toBuilder = true)
+    @SuperBuilder
     @Jacksonized
     public static class TicketGeneral extends StatsResult {
         @JsonUnwrapped
@@ -42,9 +43,18 @@ public class StatsResult {
         private double largestActiveTicketSecs;
     }
 
-    public record DatedValue(
+    @Getter
+    @SuperBuilder
+    @Jacksonized
+    public static class TicketSentimentCounts extends StatsResult {
+        @JsonUnwrapped
+        private StatsRequest.TicketSentimentCounts request;
+        private ImmutableList<TicketSentimentCountPerDate> values;
+    }
+
+    public record DatedValue<T>(
         LocalDate date,
-        long value
+        T value
     ) {
     }
 
