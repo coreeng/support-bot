@@ -50,8 +50,8 @@ import static java.lang.Math.round;
 @Slf4j
 public class MockDataGenerator implements ApplicationRunner {
     private final static long secondsPerDay = 24 * 60 * 60;
-    private final static double avgTicketsPerDay = 5;
-    private final static double stdTicketsPerDay = 2;
+    private final static double avgTicketsPerDay = 35;
+    private final static double stdTicketsPerDay = 10;
     private final static int maxTicketsPerDay = 10;
     private final static double avgQueryResponseTimeSecs = 10 * 60;
     private final static double stdQueryResponseTimeSecs = 5 * 60;
