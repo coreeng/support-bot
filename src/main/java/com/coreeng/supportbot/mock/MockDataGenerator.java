@@ -52,7 +52,7 @@ public class MockDataGenerator implements ApplicationRunner {
     private final static long secondsPerDay = 24 * 60 * 60;
     private final static double avgTicketsPerDay = 35;
     private final static double stdTicketsPerDay = 10;
-    private final static int maxTicketsPerDay = 10;
+    private final static int maxTicketsPerDay = 50;
     private final static double avgQueryResponseTimeSecs = 10 * 60;
     private final static double stdQueryResponseTimeSecs = 5 * 60;
     private final static double avgTicketReopenedTimes = 0.5;
