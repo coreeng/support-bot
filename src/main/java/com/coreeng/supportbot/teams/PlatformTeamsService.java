@@ -104,6 +104,11 @@ public class PlatformTeamsService {
     }
 
     @Nullable
+    public PlatformTeam findTeamByName(String name) {
+        return teamByName.get(name);
+    }
+
+    @Nullable
     public PlatformUser findUserByEmail(String email) {
         return usersByEmail.get(email);
     }
