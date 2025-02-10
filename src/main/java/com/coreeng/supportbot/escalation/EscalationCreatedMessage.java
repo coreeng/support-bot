@@ -16,14 +16,15 @@ public record EscalationCreatedMessage(
     public static EscalationCreatedMessage of(
         Escalation escalation,
         String slackTeamGroupId,
-        String ticketQueryPermalink
+        String ticketQueryPermalink,
+        ImmutableList<Tag> tags
     ) {
         return new EscalationCreatedMessage(
             escalation.id(),
             slackTeamGroupId,
             escalation.status(),
             escalation.lastStatusChangedAt(),
-            escalation.tags(),
+            tags,
             ticketQueryPermalink
         );
     }

@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.escalation.rest;
 
-import com.coreeng.supportbot.enums.Tag;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
@@ -10,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 
 @Component
 @RequiredArgsConstructor
@@ -30,11 +28,7 @@ public class EscalationUIMapper {
             .openedAt(escalation.openedAt())
             .resolvedAt(escalation.resolvedAt())
             .team(teamUIMapper.mapToUI(checkNotNull(teamService.findTeamByName(escalation.team()))))
-            .tags(
-                escalation.tags().stream()
-                    .map(Tag::code)
-                    .collect(toImmutableList())
-            )
+            .tags(escalation.tags())
             .build();
     }
 }

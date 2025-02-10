@@ -42,7 +42,7 @@ public class TeamService {
         return switch (type) {
             case tenant -> mapPlatformTeams(platformTeamsService.listTeams());
             case l2Support -> escalationTeamsRegistry.listAllEscalationTeams().stream()
-                .map(t -> new Team(t.name(), ImmutableList.of(TeamType.l2Support)))
+                .map(t -> new Team(t.label(), ImmutableList.of(TeamType.l2Support)))
                 .collect(toImmutableList());
             case support -> ImmutableList.of(supportTeamService.getTeam());
         };

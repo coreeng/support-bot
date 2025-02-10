@@ -64,7 +64,7 @@ public class SentimentInMemoryRepository implements SentimentRepository {
 
         return tickets.content().stream()
             .collect(groupingBy(
-                t -> LocalDate.ofInstant(t.statusHistory().getLast().timestamp(), timezone)
+                t -> LocalDate.ofInstant(t.statusLog().getLast().date(), timezone)
             ))
             .entrySet().stream()
             .map(e -> countSentiments(e.getKey(), e.getValue()))

@@ -50,7 +50,7 @@ public class TicketsTimelineCollector implements StatsCollector<StatsRequest.Tic
         ZoneOffset offset = timezone.getRules().getOffset(Instant.now());
         return tickets.content().stream()
             .collect(groupingBy(
-                t -> t.statusHistory().getFirst().timestamp().atOffset(offset).toLocalDate(),
+                t -> t.statusLog().getFirst().date().atOffset(offset).toLocalDate(),
                 counting()
             )).entrySet().stream()
             .sorted(Map.Entry.comparingByKey())
@@ -64,7 +64,7 @@ public class TicketsTimelineCollector implements StatsCollector<StatsRequest.Tic
         return tickets.content().stream()
             .filter(t -> t.status() != TicketStatus.closed)
             .collect(groupingBy(
-                t -> t.statusHistory().getFirst().timestamp().atOffset(offset).toLocalDate(),
+                t -> t.statusLog().getFirst().date().atOffset(offset).toLocalDate(),
                 counting()
             )).entrySet().stream()
             .sorted(Map.Entry.comparingByKey())

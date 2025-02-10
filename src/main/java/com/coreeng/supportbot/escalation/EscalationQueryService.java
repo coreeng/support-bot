@@ -6,11 +6,13 @@ import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Nullable;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class EscalationQueryService {
     private final EscalationRepository repository;
 

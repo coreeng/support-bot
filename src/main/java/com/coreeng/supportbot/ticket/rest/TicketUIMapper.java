@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.ticket.rest;
 
-import com.coreeng.supportbot.enums.Tag;
 import com.coreeng.supportbot.escalation.rest.EscalationUIMapper;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
@@ -38,20 +37,12 @@ public class TicketUIMapper {
                     ? teamUIMapper.mapToUI(checkNotNull(teamService.findTeamByName(ticket.ticket().team())))
                     : null
             )
-            .impact(
-                ticket.ticket().impact() != null
-                    ? ticket.ticket().impact().code()
-                    : null
-            )
-            .tags(
-                ticket.ticket().tags().stream()
-                    .map(Tag::code)
-                    .collect(toImmutableList())
-            )
+            .impact(ticket.ticket().impact())
+            .tags(ticket.ticket().tags())
             .logs(
-                ticket.ticket().statusHistory().stream()
+                ticket.ticket().statusLog().stream()
                     .map(s -> new TicketUI.Log(
-                        s.timestamp(),
+                        s.date(),
                         switch (s.status()) {
                             case opened -> TicketUI.LogEvent.opened;
                             case closed -> TicketUI.LogEvent.closed;

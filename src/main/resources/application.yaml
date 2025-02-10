@@ -8,19 +8,18 @@ spring:
       core:
         enabled: true
       credentials:
-        scopes: ["https://www.googleapis.com/auth/cloud-identity.groups.readonly"]
+        scopes: [ "https://www.googleapis.com/auth/cloud-identity.groups.readonly" ]
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/postgres}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    hikari:
+      data-source-properties:
+        reWriteBatchedInserts: true
+
 
 application:
   timezone: GMT+02
-
-server:
-  # We only use Jetty for the actuator for now, so limit its resources
-  jetty:
-    threads:
-      acceptors: 1
-      selectors: 1
-      min: 1
-      max: 4
 
 management:
   endpoint:
@@ -42,44 +41,38 @@ slack:
 
 enums:
   escalationTeams:
-    - name: core-networking
-      code: core-networking
+    - label: wow
+      code: wow
       slack-group-id: S08948NBMED
-    - name: core-aws
-      code: core-aws
+    - label: infra-integration
+      code: infra-integration
       slack-group-id: S08948NBMED
-    - name: core-platform
-      code: core-platform
-      slack-group-id: S08948NBMED
-    - name: core-managed-k8s
-      code: core-managed-k8s
-      slack-group-id: S08948NBMED
-    - name: core-observability
-      code: core-observability
+    - label: connected-app
+      code: connected-app
       slack-group-id: S08948NBMED
   tags:
-    - name: Ingresses
+    - label: Ingresses
       code: ingresses
-    - name: Jenkins Pipelines
+    - label: Jenkins Pipelines
       code: jenkins-pipelines
-    - name: Networking
+    - label: Networking
       code: networking
-    - name: Vault
+    - label: Vault
       code: vault
-    - name: Persistence/Brokers
+    - label: Persistence/Brokers
       code: persistence-brokers
-    - name: Observability
+    - label: Observability
       code: observability
-    - name: DNS
+    - label: DNS
       code: dns
-    - name: Osprey
+    - label: Osprey
       code: osprey
   impacts:
-    - name: Production Blocking
+    - label: Production Blocking
       code: productionBlocking
-    - name: BAU Blocking
+    - label: BAU Blocking
       code: bauBlocking
-    - name: Abnormal Behaviour
+    - label: Abnormal Behaviour
       code: abnormalBehaviour
 
 platform-integration:

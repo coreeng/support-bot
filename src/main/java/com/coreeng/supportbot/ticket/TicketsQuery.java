@@ -22,8 +22,9 @@ public class TicketsQuery {
     private ImmutableList<TicketId> ids = ImmutableList.of();
     @Nullable
     private TicketStatus status;
-    // by timestamp
+    // by date
     @Builder.Default
+    @Nullable
     private Order order = Order.desc;
     @Nullable
     private LocalDate dateFrom;
