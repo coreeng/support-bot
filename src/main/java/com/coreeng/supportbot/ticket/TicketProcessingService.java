@@ -1,11 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
-import com.coreeng.supportbot.enums.ImpactsRegistry;
-import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
-import com.coreeng.supportbot.enums.Tag;
-import com.coreeng.supportbot.enums.TagsRegistry;
-import com.coreeng.supportbot.enums.TicketImpact;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
@@ -14,14 +9,13 @@ import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.Objects;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -34,9 +28,6 @@ public class TicketProcessingService {
     private final TicketSlackService slackService;
     private final EscalationQueryService escalationQueryService;
     private final SlackTicketsProps slackTicketsProps;
-    private final EscalationTeamsRegistry escalationTeamsRegistry;
-    private final ImpactsRegistry impactsRegistry;
-    private final TagsRegistry tagsRegistry;
     private final ApplicationEventPublisher publisher;
 
 
@@ -44,11 +35,10 @@ public class TicketProcessingService {
         if (!isQueryEvent(e)) {
             return;
         }
-        if (repository.createQueryIfNotExists(e.messageRef().actualThreadTs())) {
-            log.atInfo()
-                .addArgument(() -> e.messageRef().actualThreadTs())
-                .log("Query is created on message({})");
-        }
+        repository.createQueryIfNotExists(e.messageRef());
+        log.atInfo()
+            .addArgument(e::messageRef)
+            .log("Query is created on message({})");
     }
 
     /**
@@ -82,7 +72,7 @@ public class TicketProcessingService {
                 new TicketCreatedMessage(
                     newTicket.id(),
                     newTicket.status(),
-                    newTicket.statusHistory().getLast().timestamp()
+                    newTicket.statusLog().getLast().date()
                 )
             );
             repository.updateTicket(
@@ -100,7 +90,7 @@ public class TicketProcessingService {
     public TicketSubmitResult submit(TicketSubmission submission) {
         Ticket ticket = repository.findTicketById(submission.ticketId());
         if (ticket == null) {
-            throw new IllegalStateException("Ticket not found");
+            throw new IllegalStateException("Ticket not found: " + submission.ticketId());
         }
 
         if (!submission.confirmed()
@@ -115,15 +105,12 @@ public class TicketProcessingService {
             }
         }
 
-        ImmutableList<Tag> newTags = tagsRegistry.listTagsByCodes(ImmutableSet.copyOf(submission.tags()));
-        TicketImpact newImpact = impactsRegistry.findImpactByCode(submission.impact());
-
         Ticket updatedTicket = repository.updateTicket(
             ticket.toBuilder()
                 .status(submission.status())
                 .team(submission.authorsTeam())
-                .tags(newTags)
-                .impact(newImpact)
+                .tags(submission.tags())
+                .impact(submission.impact())
                 .build()
         );
 
@@ -137,7 +124,7 @@ public class TicketProcessingService {
         Ticket ticket = repository.findTicketById(request.ticketId());
         if (ticket == null) {
             log.atWarn()
-                .addArgument(request::team)
+                .addArgument(request::ticketId)
                 .log("Trying to escalate non-existing ticket: {}");
             throw new IllegalArgumentException("Ticket doesn't exist");
         }
@@ -165,11 +152,10 @@ public class TicketProcessingService {
             repository.findTicketById(escalation.ticketId()),
             "Ticket not found: {}", escalation.ticketId()
         );
-        String slackTeamName = checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(escalation.team())).name();
         slackService.postTicketEscalatedMessage(
             new MessageRef(ticket.queryTs(), ticket.channelId()),
             new MessageRef(escalation.threadTs(), escalation.channelId()),
-            slackTeamName
+            escalation.team()
         );
     }
 
@@ -179,13 +165,13 @@ public class TicketProcessingService {
             ticket.id(),
             ticket.status()
         ));
-        Ticket updatedTicket = repository.insertStatusLog(ticket);
+        Ticket updatedTicket = repository.insertStatusLog(ticket, Instant.now());
         slackService.editTicketForm(
             new MessageRef(updatedTicket.createdMessageTs(), updatedTicket.channelId()),
             new TicketCreatedMessage(
                 updatedTicket.id(),
                 updatedTicket.status(),
-                updatedTicket.statusHistory().getLast().timestamp()
+                updatedTicket.statusLog().getLast().date()
             )
         );
         if (updatedTicket.status() == TicketStatus.closed) {

@@ -162,7 +162,7 @@ public class TicketSummaryViewMapper {
             str.append(" ");
             str.append(item.status().label())
                 .append(": ")
-                .append(dateFormatter.format(item.timestamp()));
+                .append(dateFormatter.format(item.date()));
             str.append("\n");
             if (i < statusLogs.size() - 1) {
                 // padding as spaces is applied so that bar is nicely aligned with the circle emoji

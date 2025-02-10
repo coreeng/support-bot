@@ -136,7 +136,7 @@ public class TicketSlackServiceImpl implements TicketSlackService {
                 .addArgument(messageRef.ts())
                 .log("Reaction({}) is removed from message({})");
         } catch (SlackException e) {
-            if (Objects.equals("already_removed", e.getError())) {
+            if (Objects.equals("no_reaction", e.getError())) {
                 log.atInfo()
                     .addArgument(name)
                     .addArgument(messageRef.ts())

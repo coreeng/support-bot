@@ -17,3 +17,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+
+.db-data/

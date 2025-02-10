@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.escalation;
 
-import com.coreeng.supportbot.enums.Tag;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.google.common.collect.ImmutableList;
 import lombok.Builder;
@@ -16,5 +15,5 @@ public class CreateEscalationRequest {
     @Nullable
     private String threadPermalink;
     @Builder.Default
-    private ImmutableList<Tag> tags = ImmutableList.of();
+    private ImmutableList<String> tags = ImmutableList.of();
 }

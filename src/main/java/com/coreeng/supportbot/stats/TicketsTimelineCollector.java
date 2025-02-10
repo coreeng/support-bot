@@ -36,7 +36,7 @@ public class TicketsTimelineCollector implements StatsCollector<StatsRequest.Tic
             .dateFrom(request.from())
             .dateTo(request.to())
             .build());
-        ImmutableList<StatsResult.DatedValue> values = switch (request.metric()) {
+        ImmutableList<StatsResult.DatedValue<Long>> values = switch (request.metric()) {
             case opened -> countOpenedTickets(tickets);
             case active -> countActiveTickets(tickets);
         };
@@ -46,29 +46,29 @@ public class TicketsTimelineCollector implements StatsCollector<StatsRequest.Tic
             .build();
     }
 
-    private ImmutableList<StatsResult.DatedValue> countOpenedTickets(Page<Ticket> tickets) {
+    private ImmutableList<StatsResult.DatedValue<Long>> countOpenedTickets(Page<Ticket> tickets) {
         ZoneOffset offset = timezone.getRules().getOffset(Instant.now());
         return tickets.content().stream()
             .collect(groupingBy(
-                t -> t.statusHistory().getFirst().timestamp().atOffset(offset).toLocalDate(),
+                t -> t.statusLog().getFirst().date().atOffset(offset).toLocalDate(),
                 counting()
             )).entrySet().stream()
             .sorted(Map.Entry.comparingByKey())
-            .map(e -> new StatsResult.DatedValue(e.getKey(), e.getValue()))
+            .map(e -> new StatsResult.DatedValue<>(e.getKey(), e.getValue()))
             .collect(toImmutableList());
     }
 
     // TODO: not correct algorithm, need to fix it later
-    private ImmutableList<StatsResult.DatedValue> countActiveTickets(Page<Ticket> tickets) {
+    private ImmutableList<StatsResult.DatedValue<Long>> countActiveTickets(Page<Ticket> tickets) {
         ZoneOffset offset = timezone.getRules().getOffset(Instant.now());
         return tickets.content().stream()
             .filter(t -> t.status() != TicketStatus.closed)
             .collect(groupingBy(
-                t -> t.statusHistory().getFirst().timestamp().atOffset(offset).toLocalDate(),
+                t -> t.statusLog().getFirst().date().atOffset(offset).toLocalDate(),
                 counting()
             )).entrySet().stream()
             .sorted(Map.Entry.comparingByKey())
-            .map(e -> new StatsResult.DatedValue(e.getKey(), e.getValue()))
+            .map(e -> new StatsResult.DatedValue<>(e.getKey(), e.getValue()))
             .collect(toImmutableList());
     }
 }

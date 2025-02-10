@@ -1,7 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
-import com.coreeng.supportbot.enums.Tag;
 import com.coreeng.supportbot.enums.TagsRegistry;
 import com.coreeng.supportbot.escalation.EscalationValidator;
 import com.coreeng.supportbot.slack.RenderingUtils;
@@ -20,8 +19,8 @@ import java.util.List;
 import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.slack.api.model.block.Blocks.input;
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
 import static com.slack.api.model.block.element.BlockElements.*;
@@ -115,16 +114,14 @@ public class EscalateViewMapper {
             ));
 
         ViewState.Value tagsValue = checkNotNull(passedValues.get(Fields.tags.actionId()));
-        ImmutableList<Tag> tags = tagsRegistry.listTagsByCodes(
-            tagsValue.getSelectedOptions().stream()
-                .map(ViewState.SelectedOption::getValue)
-                .collect(toImmutableSet())
-        );
+        ImmutableList<String> tags = tagsValue.getSelectedOptions().stream()
+            .map(ViewState.SelectedOption::getValue)
+            .collect(toImmutableList());
 
         ViewState.Value teamValue = checkNotNull(passedValues.get(Fields.team.actionId()));
-        String team  = checkNotNull(escalationTeamsRegistry.findEscalationTeamByCode(
+        String team = checkNotNull(escalationTeamsRegistry.findEscalationTeamByCode(
             teamValue.getSelectedOption().getValue()
-        )).name();
+        )).label();
 
         ViewState.Value threadPermalinkValue = passedValues.get(Fields.threadPermalink.actionId());
         String threadPermalink = threadPermalinkValue != null

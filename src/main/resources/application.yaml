@@ -8,19 +8,18 @@ spring:
       core:
         enabled: true
       credentials:
-        scopes: ["https://www.googleapis.com/auth/cloud-identity.groups.readonly"]
+        scopes: [ "https://www.googleapis.com/auth/cloud-identity.groups.readonly" ]
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/postgres}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    hikari:
+      data-source-properties:
+        reWriteBatchedInserts: true
+
 
 application:
   timezone: GMT+02
-
-server:
-  # We only use Jetty for the actuator for now, so limit its resources
-  jetty:
-    threads:
-      acceptors: 1
-      selectors: 1
-      min: 1
-      max: 4
 
 management:
   endpoint:
@@ -42,28 +41,38 @@ slack:
 
 enums:
   escalationTeams:
-    - name: wow
+    - label: wow
       code: wow
       slack-group-id: S08948NBMED
-    - name: infra-integration
+    - label: infra-integration
       code: infra-integration
       slack-group-id: S08948NBMED
-    - name: connected-app
+    - label: connected-app
       code: connected-app
       slack-group-id: S08948NBMED
   tags:
-    - name: Tag A
-      code: tagA
-    - name: Tag B
-      code: tagB
-    - name: Tag C
-      code: tagC
+    - label: Ingresses
+      code: ingresses
+    - label: Jenkins Pipelines
+      code: jenkins-pipelines
+    - label: Networking
+      code: networking
+    - label: Vault
+      code: vault
+    - label: Persistence/Brokers
+      code: persistence-brokers
+    - label: Observability
+      code: observability
+    - label: DNS
+      code: dns
+    - label: Osprey
+      code: osprey
   impacts:
-    - name: Production Blocking
+    - label: Production Blocking
       code: productionBlocking
-    - name: BAU Blocking
+    - label: BAU Blocking
       code: bauBlocking
-    - name: Abnormal Behaviour
+    - label: Abnormal Behaviour
       code: abnormalBehaviour
 
 platform-integration:

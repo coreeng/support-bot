@@ -1,15 +1,19 @@
 SHELL := /bin/bash
 
+.PHONY: codegen
+codegen:
+	./gradlew jooqCodegen
+
 .PHONY: build
-build:
+build: codegen
 	./gradlew build
 
 .PHONY: build-continuously
-build-continuously:
+build-continuously: codegen
 	./gradlew build --continuously
 
 .PHONY: run
-run:
+run: codegen
 	./gradlew bootRun
 
 .PHONY: lint
@@ -17,7 +21,7 @@ lint:
 	./gradlew pmdMain pmdTest
 
 .PHONY: test
-test:
+test: codegen
 	./gradlew test
 
 # Run tests + all the other checks (like linting)
@@ -39,4 +43,13 @@ docker-build:
 		args+=" --publishImage -Dusername=$(USERNAME) -Dpassword=$${password}"; \
 	fi
 	@./gradlew bootBuildImage $${args}
+
+
+.PHONY: db-run
+db-run:
+	docker compose up db
+
+.PHONY: db-clean
+db-clean:
+	rm -rf ./db-data
 

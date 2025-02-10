@@ -31,7 +31,12 @@ public class CorePlatformTeamsFetcher implements PlatformTeamsFetcher {
         int futuresCount = 0;
         NamespaceList nses = k8sClient.namespaces().list();
         for (Namespace ns : nses.getItems()) {
+            // Tenant NS
             if (!ns.getMetadata().getAnnotations().containsKey("cecg.io/description")) {
+                continue;
+            }
+            // System tenant, ignore
+            if (ns.getMetadata().getLabels().containsKey("cecg-system.tree.hnc.x-k8s.io/depth")) {
                 continue;
             }
 

@@ -5,9 +5,9 @@ import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
 
 import javax.annotation.Nullable;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.chrono.ChronoLocalDate;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,7 +20,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Collections.reverseOrder;
 import static java.util.Comparator.comparing;
 
-@Component
 @RequiredArgsConstructor
 public class EscalationInMemoryRepository implements EscalationRepository {
     private final ZoneId timezone;
@@ -66,6 +65,19 @@ public class EscalationInMemoryRepository implements EscalationRepository {
             }
         }
         return escalations.get(escalation.id());
+    }
+
+    @Override
+    public Escalation markResolved(Escalation escalation, Instant at) {
+        checkNotNull(escalation);
+        checkNotNull(escalation.id());
+        checkArgument(escalation.status() != EscalationStatus.resolved);
+        checkArgument(escalation.resolvedAt() == null);
+
+        return update(escalation.toBuilder()
+            .resolvedAt(at)
+            .status(EscalationStatus.resolved)
+            .build());
     }
 
     @Nullable

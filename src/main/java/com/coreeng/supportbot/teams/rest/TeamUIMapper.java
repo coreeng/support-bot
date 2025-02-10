@@ -24,7 +24,7 @@ public class TeamUIMapper {
     public TeamUI mapToUI(Team team) {
         return new TeamUI(
             team.name(),
-            team.type()
+            team.types()
         );
     }
 }
