@@ -1,8 +1,6 @@
 package com.coreeng.supportbot;
 
-import com.coreeng.supportbot.config.EnumProps;
 import com.coreeng.supportbot.config.SlackTicketsProps;
-import com.coreeng.supportbot.enums.EnumsService;
 import com.coreeng.supportbot.escalation.EscalationInMemoryRepository;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
@@ -26,7 +24,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.ZoneId;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -57,13 +54,11 @@ public class TicketProcessingServiceTests {
             "eyes",
             "ticket"
         );
-        EnumsService enumsService = new EnumsService(new EnumProps(List.of(), List.of(), List.of()));
         ticketProcessingService = new TicketProcessingService(
             ticketRepository,
             slackService,
             escalationQueryService,
             slackTicketsProps,
-            enumsService, enumsService, enumsService,
             publisher
         );
     }
@@ -71,52 +66,55 @@ public class TicketProcessingServiceTests {
     @Test
     public void shouldCreateQueryOnMessage() {
         // when
+        MessageRef threadRef = new MessageRef(
+            messageTs,
+            null,
+            slackTicketsProps.channelId()
+        );
         ticketProcessingService.handleMessagePosted(new MessagePosted(
             "some message",
             userId,
-            new MessageRef(
-                messageTs,
-                null,
-                slackTicketsProps.channelId()
-            )
+            threadRef
         ));
 
         // then
-        assertTrue(ticketRepository.queryExists(messageTs), "Query is created");
+        assertTrue(ticketRepository.queryExists(threadRef), "Query is created");
     }
 
     @Test
     public void shouldIgnoreMessageToDifferentChannel() {
         // when
+        MessageRef threadRef = new MessageRef(
+            messageTs,
+            null,
+            "some-random-channnel"
+        );
         ticketProcessingService.handleMessagePosted(new MessagePosted(
             "some message",
             userId,
-            new MessageRef(
-                messageTs,
-                null,
-                "some-random-channnel"
-            )
+            threadRef
         ));
 
         // then
-        assertFalse(ticketRepository.queryExists(messageTs), "Event is ignored");
+        assertFalse(ticketRepository.queryExists(threadRef), "Event is ignored");
     }
 
     @Test
     public void shouldIgnoreMessageInThreads() {
         // when
+        MessageRef threadRef = new MessageRef(
+            messageTs,
+            MessageTs.of("thread-ts"),
+            slackTicketsProps.channelId()
+        );
         ticketProcessingService.handleMessagePosted(new MessagePosted(
             "some message",
             userId,
-            new MessageRef(
-                messageTs,
-                MessageTs.of("thread-ts"),
-                slackTicketsProps.channelId()
-            )
+            threadRef
         ));
 
         // then
-        assertFalse(ticketRepository.queryExists(messageTs), "Event is ignored");
+        assertFalse(ticketRepository.queryExists(threadRef), "Event is ignored");
     }
 
     @Test
@@ -142,9 +140,9 @@ public class TicketProcessingServiceTests {
         ));
 
         // then
-        assertTrue(ticketRepository.queryExists(messageTs), "Query is created");
+        assertTrue(ticketRepository.queryExists(threadRef), "Query is created");
 
-        Ticket ticket = ticketRepository.findTicketByQuery(messageTs);
+        Ticket ticket = ticketRepository.findTicketByQuery(threadRef);
         assertNotNull(ticket, "Ticket is created");
         assertNotNull(ticket.id());
         assertEquals(TicketStatus.opened, ticket.status());

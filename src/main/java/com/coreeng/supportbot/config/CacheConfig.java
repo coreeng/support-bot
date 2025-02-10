@@ -17,12 +17,24 @@ public class CacheConfig {
         return new CaffeineCacheManager();
     }
 
-    @Bean("messages-cache")
+    @Bean("permalink-cache")
     public Cache permalinkCache() {
         return new CaffeineCache(
-            "messages",
+            "permalink",
             Caffeine.newBuilder()
-                .expireAfterAccess(1, TimeUnit.HOURS)
+                .expireAfterAccess(1, TimeUnit.DAYS)
+                .maximumSize(10_000)
+                .recordStats()
+                .build()
+        );
+    }
+
+    @Bean("slack-user-cache")
+    public Cache slackUserCache() {
+        return new CaffeineCache(
+            "slack-user",
+            Caffeine.newBuilder()
+                .expireAfterAccess(1, TimeUnit.DAYS)
                 .maximumSize(10_000)
                 .recordStats()
                 .build()

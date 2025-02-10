@@ -80,7 +80,7 @@ public class PlatformTeamsService {
             .map(PlatformTeamsFetcher.TeamAndGroupTuple::name)
             .collect(toImmutableSet());
         ImmutableSet<String> escalationTeamNames = escalationTeamsRegistry.listAllEscalationTeams().stream()
-            .map(EscalationTeam::name)
+            .map(EscalationTeam::label)
             .collect(toImmutableSet());
         var setsDiff = Sets.difference(escalationTeamNames, teamNames);
         if (!setsDiff.isEmpty()) {
@@ -101,6 +101,11 @@ public class PlatformTeamsService {
             return ImmutableList.of();
         }
         return ImmutableList.copyOf(user.teams());
+    }
+
+    @Nullable
+    public PlatformTeam findTeamByName(String name) {
+        return teamByName.get(name);
     }
 
     @Nullable

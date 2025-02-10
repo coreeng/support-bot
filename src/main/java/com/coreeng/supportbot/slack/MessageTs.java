@@ -10,18 +10,19 @@ public record MessageTs(
     // TODO: delete me when no more mocking data is required
     boolean mocked
 ) {
+    private static final String mockedPrefix = "MOCKED_";
+
     public MessageTs {
         checkNotNull(ts);
     }
 
     public MessageTs(String ts) {
-        this(ts, false);
+        this(ts, ts.startsWith(mockedPrefix));
     }
 
     public static MessageTs mocked(String ts) {
         return new MessageTs(ts, true);
     }
-
 
     public static MessageTs of(String ts) {
         return new MessageTs(ts);
@@ -29,6 +30,13 @@ public record MessageTs(
 
     public static MessageTs ofOrNull(@Nullable String ts) {
         return ts != null ? of(ts) : null;
+    }
+
+    public String ts() {
+        if (mocked) {
+            return mockedPrefix + ts;
+        }
+        return ts;
     }
 
     public Instant getDate() {

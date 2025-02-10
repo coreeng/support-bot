@@ -2,7 +2,6 @@ package com.coreeng.supportbot.escalation;
 
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
-import com.coreeng.supportbot.enums.Tag;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import lombok.Builder;
@@ -22,7 +21,7 @@ public class Escalation {
     private EscalationStatus status;
     private TicketId ticketId;
     @Builder.Default
-    private ImmutableList<Tag> tags = ImmutableList.of();
+    private ImmutableList<String> tags = ImmutableList.of();
 
     private Instant openedAt;
     @Nullable
@@ -35,7 +34,7 @@ public class Escalation {
         TicketId ticketId,
         @Nullable MessageRef threadRef,
         @Nullable String team,
-        ImmutableList<Tag> tags
+        ImmutableList<String> tags
     ) {
         return Escalation.builder()
             .ticketId(ticketId)

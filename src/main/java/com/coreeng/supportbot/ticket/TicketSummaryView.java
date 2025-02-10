@@ -29,19 +29,21 @@ public record TicketSummaryView(
         ImmutableList<EscalationView> escalationViews,
         TeamsInput teamsInput,
         ImmutableList<Tag> tags,
-        ImmutableList<TicketImpact> impacts
+        ImmutableList<Tag> currentTags,
+        ImmutableList<TicketImpact> impacts,
+        @Nullable TicketImpact currentImpact
     ) {
         return new TicketSummaryView(
             ticket.id(),
             query,
             ticket.status(),
             escalationViews,
-            ticket.statusHistory(),
+            ticket.statusLog(),
             teamsInput,
             tags,
-            ticket.tags(),
+            currentTags,
             impacts,
-            ticket.impact()
+            currentImpact
         );
     }
 

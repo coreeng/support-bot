@@ -6,9 +6,11 @@ import com.coreeng.supportbot.ticket.TicketEscalated;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketStatusChanged;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class TicketEventsHandler {
@@ -23,11 +25,18 @@ public class TicketEventsHandler {
 
     @EventListener
     public void onTicketEscalated(TicketEscalated event) {
-        processingService.createEscalation(CreateEscalationRequest.builder()
-            .ticket(event.ticket())
-            .team(event.team())
-            .threadPermalink(event.threadPermalink())
-            .tags(event.tags())
-            .build());
+        try {
+            processingService.createEscalation(CreateEscalationRequest.builder()
+                .ticket(event.ticket())
+                .team(event.team())
+                .threadPermalink(event.threadPermalink())
+                .tags(event.tags())
+                .build());
+        } catch (Exception e) {
+            log.atError()
+                .addArgument(() -> event.ticket().id())
+                .setCause(e)
+                .log("Couldn't create escalation for ticket({})");
+        }
     }
 }

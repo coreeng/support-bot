@@ -33,7 +33,7 @@ public class TicketsGeneralStatsCollector implements StatsCollector<StatsRequest
             .filter(t -> t.status() == TicketStatus.closed)
             .mapToDouble(t -> Duration.between(
                 t.queryTs().getDate(),
-                t.statusHistory().getLast().timestamp()
+                t.statusLog().getLast().date()
             ).getSeconds())
             .average()
             .orElse(0.0);
@@ -41,7 +41,7 @@ public class TicketsGeneralStatsCollector implements StatsCollector<StatsRequest
         double avgResponseTime = tickets.content().stream()
             .mapToDouble(t -> Duration.between(
                 t.queryTs().getDate(),
-                t.statusHistory().getFirst().timestamp()
+                t.statusLog().getFirst().date()
             ).getSeconds())
             .average()
             .orElse(0.0);
@@ -49,11 +49,11 @@ public class TicketsGeneralStatsCollector implements StatsCollector<StatsRequest
         double largetActiveTicketSecs = tickets.content().stream()
             .mapToDouble(t -> switch (t.status()) {
                 case closed -> Duration.between(
-                    t.statusHistory().getFirst().timestamp(),
-                    t.statusHistory().getLast().timestamp()
+                    t.statusLog().getFirst().date(),
+                    t.statusLog().getLast().date()
                 ).getSeconds();
                 case opened -> Duration.between(
-                    t.statusHistory().getFirst().timestamp(),
+                    t.statusLog().getFirst().date(),
                     Instant.now()
                 ).getSeconds();
             })

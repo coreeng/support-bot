@@ -2,6 +2,7 @@ package com.coreeng.supportbot.escalation;
 
 import com.coreeng.supportbot.config.SlackEscalationProps;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
+import com.coreeng.supportbot.enums.TagsRegistry;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
@@ -32,6 +33,7 @@ public class EscalationProcessingService {
     private final SlackClient slackClient;
     private final TicketQueryService ticketQueryService;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
+    private final TagsRegistry tagsRegistry;
     private final ApplicationEventPublisher publisher;
 
     public Escalation createEscalation(CreateEscalationRequest request) {
@@ -65,7 +67,8 @@ public class EscalationProcessingService {
             createdMessageMapper.renderMessage(EscalationCreatedMessage.of(
                 escalation,
                 checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(escalation.team())).slackGroupId(),
-                queryPermalink
+                queryPermalink,
+                tagsRegistry.listTagsByCodes(escalation.tags())
             )),
             slackEscalationProps.channelId(),
             threadRef != null ? threadRef.actualThreadTs() : null
@@ -107,12 +110,7 @@ public class EscalationProcessingService {
     }
 
     private void resolve(Escalation escalation) {
-        Escalation updatedEscalation = repository.update(
-            escalation.toBuilder()
-                .status(EscalationStatus.resolved)
-                .resolvedAt(Instant.now())
-                .build()
-        );
+        Escalation updatedEscalation = repository.markResolved(escalation, Instant.now());
 
         Ticket ticket = checkNotNull(ticketQueryService.findById(updatedEscalation.ticketId()));
         String ticketQueryPermalink = slackClient.getPermalink(new SlackGetMessageByTsRequest(
@@ -123,7 +121,8 @@ public class EscalationProcessingService {
             createdMessageMapper.renderMessage(EscalationCreatedMessage.of(
                 updatedEscalation,
                 checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(updatedEscalation.team())).slackGroupId(),
-                ticketQueryPermalink
+                ticketQueryPermalink,
+                tagsRegistry.listTagsByCodes(escalation.tags())
             )),
             updatedEscalation.channelId(),
             updatedEscalation.createdMessageTs()

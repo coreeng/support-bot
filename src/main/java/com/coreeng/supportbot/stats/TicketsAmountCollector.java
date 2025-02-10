@@ -32,9 +32,7 @@ public class TicketsAmountCollector implements StatsCollector<StatsRequest.Ticke
             .dateTo(request.to())
             .build());
         Function<Ticket, String> groupByKeyMapper = switch (request.groupBy()) {
-            case impact -> t -> t.impact() != null
-                ? t.impact().code()
-                : null;
+            case impact -> Ticket::impact;
             case status -> t -> t.status().name();
         };
         ImmutableList<StatsResult.CategorisedValue> values = tickets.content().stream()

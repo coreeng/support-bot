@@ -31,8 +31,9 @@ public class SlackAppConfig {
 
     @Bean
     public SlackClient slackClient(App slackApp,
-                                   @Qualifier("messages-cache") Cache permalinkCache) {
-        return new SlackClientImpl(slackApp.client(), permalinkCache);
+                                   @Qualifier("permalink-cache") Cache permalinkCache,
+                                   @Qualifier("slack-user-cache") Cache userCache) {
+        return new SlackClientImpl(slackApp.client(), permalinkCache, userCache);
     }
 
     /**

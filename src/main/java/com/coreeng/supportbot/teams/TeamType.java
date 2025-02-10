@@ -2,5 +2,6 @@ package com.coreeng.supportbot.teams;
 
 public enum TeamType {
     tenant,
-    support
+    support,
+    l2Support
 }

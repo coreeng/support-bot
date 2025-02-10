@@ -1,10 +1,18 @@
+import org.flywaydb.gradle.task.AbstractFlywayTask
+import org.jooq.codegen.gradle.CodegenTask
 import org.springframework.boot.gradle.tasks.bundling.BootBuildImage
+import org.testcontainers.containers.PostgreSQLContainer
+import java.time.Instant
 
 plugins {
     java
     pmd
+
     id("org.springframework.boot") version "3.4.1"
     id("io.spring.dependency-management") version "1.1.7"
+
+    id("org.flywaydb.flyway") version "11.3.0"
+    id("org.jooq.jooq-codegen-gradle") version "3.19.18"
 }
 
 group = "com.coreeng"
@@ -37,7 +45,6 @@ val lombokVersion = "1.18.36"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web") {
-        // we need it just for the actuator, so pick Jetty instead of Tomcat since it's a bit more lightweight
         exclude(group = "org.springframework.boot", module = "spring-boot-starter-tomcat")
     }
     implementation("org.springframework.boot:spring-boot-starter-jetty")
@@ -45,6 +52,18 @@ dependencies {
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.3")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-cache")
+
+    implementation("org.springframework.boot:spring-boot-starter-jdbc")
+    runtimeOnly("org.postgresql:postgresql")
+    implementation("org.flywaydb:flyway-database-postgresql")
+    implementation("org.flywaydb:flyway-core")
+    implementation("org.jooq:jooq:3.19.18")
+    implementation("org.jooq:jooq-meta:3.19.18")
+    implementation("org.jooq:jooq-codegen:3.19.18")
+
+    jooqCodegen("org.postgresql:postgresql:42.7.5")
+    jooqCodegen("org.testcontainers:postgresql:1.20.4")
+    jooqCodegen("org.jooq:jooq-codegen:3.19.18")
 
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
@@ -94,4 +113,88 @@ tasks.withType<BootBuildImage> {
         }
     }
     setPullPolicy("IF_NOT_PRESENT")
+}
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.flywaydb:flyway-database-postgresql:11.3.0")
+        classpath("org.postgresql:postgresql:42.7.5")
+        classpath("org.testcontainers:postgresql:1.20.4")
+        classpath("org.jooq:jooq-codegen:3.19.18")
+    }
+}
+
+val postgresService = project.gradle.sharedServices.registerIfAbsent("postgresContainer", PostgresService::class.java) {}
+
+flyway {
+    locations = arrayOf("filesystem:./src/main/resources/db/migration")
+}
+tasks.withType<AbstractFlywayTask> {
+    usesService(postgresService)
+    inputs.dir("src/main/resources/db/migration")
+    doFirst {
+        val container = postgresService.get().container
+        url = container.jdbcUrl
+        user = container.username
+        password = container.password
+    }
+}
+
+jooq {
+    configuration {
+        generator {
+            database {
+                name = "org.jooq.meta.postgres.PostgresDatabase"
+                includes = ".*"
+                excludes = "flyway_schema_history"
+                inputSchema = "public"
+
+                forcedTypes {
+                    forcedType {
+                        includeTypes = "timestamptz"
+                        userType = Instant::class.java.canonicalName
+                    }
+                }
+            }
+            target {
+                packageName = "com.coreeng.supportbot.dbschema"
+            }
+        }
+    }
+}
+tasks.withType<CodegenTask> {
+    usesService(postgresService)
+    dependsOn("flywayMigrate")
+    doFirst {
+        val container = postgresService.get().container
+        jooq {
+            configuration {
+                jdbc {
+                    driver = "org.postgresql.Driver"
+                    url = container.jdbcUrl
+                    user = container.username
+                    password = container.password
+                }
+            }
+        }
+    }
+}
+tasks.withType(JavaCompile::class.java) {
+    dependsOn(tasks.withType(CodegenTask::class.java))
+}
+
+abstract class PostgresService: BuildService<BuildServiceParameters.None>, AutoCloseable {
+    val container = PostgreSQLContainer("postgres:17.2-alpine").apply {
+        withDatabaseName("postgres")
+        withUsername("postgres")
+        withPassword("postgres")
+        start()
+    }
+
+    override fun close() {
+        container.stop()
+    }
 }

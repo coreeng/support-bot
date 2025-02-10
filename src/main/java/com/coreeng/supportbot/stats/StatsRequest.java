@@ -64,7 +64,17 @@ public class StatsRequest {
         }
     }
 
+    @Getter
+    @SuperBuilder(toBuilder = true)
+    @Jacksonized
+    public static class TicketSentimentCounts extends StatsRequest{
+        {
+            type = StatsType.ticketSentimentsCount;
+        }
+    }
+
     public static class TypeIdResolver extends TypeIdResolverBase {
+
         @Override
         public JavaType typeFromId(DatabindContext context, String id) {
             StatsType type = StatsType.fromLabelOrNull(id);
@@ -72,6 +82,7 @@ public class StatsRequest {
                 case ticketTimeline -> TicketTimeline.class;
                 case ticketsAmount -> TicketAmount.class;
                 case ticketGeneral -> TicketGeneral.class;
+                case ticketSentimentsCount -> TicketSentimentCounts.class;
                 case null -> throw new IllegalArgumentException("Unknown type-id: " + id);
             };
             return context.constructType(subClass);
@@ -89,10 +100,10 @@ public class StatsRequest {
         public String idFromValueAndType(Object value, Class<?> suggestedType) {
             return idFromValue(value);
         }
-
         @Override
         public JsonTypeInfo.Id getMechanism() {
             return null;
         }
+
     }
 }

@@ -1,13 +1,11 @@
 package com.coreeng.supportbot.ticket;
 
-import com.coreeng.supportbot.config.EnumerationValue;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
-import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.stereotype.Repository;
 
 import javax.annotation.Nullable;
 import java.time.Instant;
@@ -16,6 +14,7 @@ import java.time.ZonedDateTime;
 import java.time.chrono.ChronoLocalDate;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,29 +26,27 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Collections.reverseOrder;
 import static java.util.Comparator.comparing;
-import static java.util.stream.Collectors.toSet;
 
-@Repository
 @RequiredArgsConstructor
 public class TicketInMemoryRepository implements TicketRepository {
     private final EscalationQueryService escalationQueryService;
     private final ZoneId timezone;
 
-    private final Set<MessageTs> queries = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<MessageRef> queries = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<TicketId, Ticket> tickets = new ConcurrentHashMap<>();
-    private final Map<MessageTs, Ticket> ticketsByQuery = new ConcurrentHashMap<>();
+    private final Map<MessageRef, Ticket> ticketsByQuery = new ConcurrentHashMap<>();
     private final AtomicLong ticketIdSequence = new AtomicLong(1);
 
     @Override
-    public boolean createQueryIfNotExists(MessageTs messageTs) {
-        checkNotNull(messageTs);
-        return queries.add(messageTs);
+    public void createQueryIfNotExists(MessageRef queryRef) {
+        checkNotNull(queryRef);
+        queries.add(queryRef);
     }
 
     @Override
-    public boolean queryExists(MessageTs messageTs) {
-        checkNotNull(messageTs);
-        return queries.contains(messageTs);
+    public boolean queryExists(MessageRef queryRef) {
+        checkNotNull(queryRef);
+        return queries.contains(queryRef);
     }
 
     @Override
@@ -57,10 +54,11 @@ public class TicketInMemoryRepository implements TicketRepository {
         checkNotNull(ticket);
         checkArgument(ticket.id() == null);
 
-        return ticketsByQuery.computeIfAbsent(ticket.queryTs(), queryTs -> {
+        MessageRef queryRef = ticket.queryRef();
+        return ticketsByQuery.computeIfAbsent(queryRef, queryTs -> {
             long nextId = ticketIdSequence.getAndIncrement();
             Ticket newTicket = ticket.withId(new TicketId(nextId));
-            createQueryIfNotExists(ticket.queryTs());
+            createQueryIfNotExists(queryRef);
             tickets.put(newTicket.id(), newTicket);
             return newTicket;
         });
@@ -71,7 +69,7 @@ public class TicketInMemoryRepository implements TicketRepository {
         checkNotNull(updatedTicket);
         checkNotNull(updatedTicket.id());
 
-        return ticketsByQuery.computeIfPresent(updatedTicket.queryTs(), (key, t) -> {
+        return ticketsByQuery.computeIfPresent(updatedTicket.queryRef(), (key, t) -> {
             tickets.put(updatedTicket.id(), updatedTicket);
             return updatedTicket;
         });
@@ -86,9 +84,9 @@ public class TicketInMemoryRepository implements TicketRepository {
 
     @Nullable
     @Override
-    public Ticket findTicketByQuery(MessageTs messageTs) {
-        checkNotNull(messageTs);
-        return ticketsByQuery.get(messageTs);
+    public Ticket findTicketByQuery(MessageRef queryRef) {
+        checkNotNull(queryRef);
+        return ticketsByQuery.get(queryRef);
     }
 
     @Nullable
@@ -102,17 +100,17 @@ public class TicketInMemoryRepository implements TicketRepository {
     }
 
     @Override
-    public Ticket insertStatusLog(Ticket ticket) {
+    public Ticket insertStatusLog(Ticket ticket, Instant at) {
         return tickets.computeIfPresent(ticket.id(), (id, t) -> {
             Ticket newTicket = t.toBuilder()
-                .statusHistory(
-                    ImmutableList.<Ticket.StatusLog>builderWithExpectedSize(t.statusHistory().size() + 1)
-                        .addAll(t.statusHistory())
-                        .add(new Ticket.StatusLog(t.status(), Instant.now()))
+                .statusLog(
+                    ImmutableList.<Ticket.StatusLog>builderWithExpectedSize(t.statusLog().size() + 1)
+                        .addAll(t.statusLog())
+                        .add(new Ticket.StatusLog(t.status(), at))
                         .build()
                 )
                 .build();
-            ticketsByQuery.put(ticket.queryTs(), newTicket);
+            ticketsByQuery.put(ticket.queryRef(), newTicket);
             return newTicket;
         });
     }
@@ -136,6 +134,7 @@ public class TicketInMemoryRepository implements TicketRepository {
         Comparator<Ticket> order = switch (query.order()) {
             case asc -> comparing(t -> t.queryTs().getDate());
             case desc -> reverseOrder(comparing(t -> t.queryTs().getDate()));
+            case null -> comparing(t -> 0);
         };
         ImmutableList<X> queryResult = tickets.values().stream()
             .filter(t -> filterTicket(t, query))
@@ -194,16 +193,14 @@ public class TicketInMemoryRepository implements TicketRepository {
             }
         }
         if (!query.tags().isEmpty()
-            && !ticket.tags().stream()
-            .map(EnumerationValue::code)
-            .collect(toSet()).containsAll(query.tags())) {
+            && !new HashSet<>(ticket.tags()).containsAll(query.tags())) {
             return false;
         }
         if (!query.impacts().isEmpty()) {
             if (ticket.impact() == null) {
                 return false;
             }
-            if (!query.impacts().contains(ticket.impact().code())) {
+            if (!query.impacts().contains(ticket.impact())) {
                 return false;
             }
         }

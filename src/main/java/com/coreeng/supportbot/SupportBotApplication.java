@@ -8,6 +8,8 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 @ConfigurationPropertiesScan("com.coreeng.supportbot.config")
 public class SupportBotApplication {
     public static void main(String[] args) {
+        System.setProperty("org.jooq.no-logo", "true");
+        System.setProperty("org.jooq.no-tips", "true");
         SpringApplication.run(SupportBotApplication.class, args);
     }
 }

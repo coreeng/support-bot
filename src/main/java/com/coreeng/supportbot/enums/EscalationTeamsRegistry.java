@@ -9,5 +9,5 @@ public interface EscalationTeamsRegistry {
     @Nullable
     EscalationTeam findEscalationTeamByCode(String code);
     @Nullable
-    EscalationTeam findEscalationTeamByName(String team);
+    EscalationTeam findEscalationTeamByName(String teamName);
 }

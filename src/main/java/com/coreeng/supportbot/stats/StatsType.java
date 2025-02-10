@@ -9,7 +9,8 @@ import lombok.RequiredArgsConstructor;
 public enum StatsType {
     ticketTimeline("ticket-timeline"),
     ticketsAmount("ticket-amount"),
-    ticketGeneral("ticket-general");
+    ticketGeneral("ticket-general"),
+    ticketSentimentsCount("ticket-sentiments-count");
 
     @JsonValue
     private final String label;

@@ -1,7 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
-import com.coreeng.supportbot.enums.Tag;
-import com.coreeng.supportbot.enums.TicketImpact;
+import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.google.common.collect.ImmutableList;
 import lombok.Builder;
@@ -24,27 +23,31 @@ public class Ticket {
     @Nullable
     String team;
     @Builder.Default
-    ImmutableList<StatusLog> statusHistory = ImmutableList.of();
+    ImmutableList<StatusLog> statusLog = ImmutableList.of();
     @Builder.Default
-    ImmutableList<Tag> tags = ImmutableList.of();
+    ImmutableList<String> tags = ImmutableList.of();
     @Nullable
-    TicketImpact impact;
+    String impact;
 
     public static Ticket createNew(MessageTs queryTs, String channelID) {
         return Ticket.builder()
             .channelId(channelID)
             .queryTs(queryTs)
             .status(TicketStatus.opened)
-            .statusHistory(ImmutableList.of(new StatusLog(
+            .statusLog(ImmutableList.of(new StatusLog(
                 TicketStatus.opened,
                 Instant.now()
             )))
             .build();
     }
 
+    public MessageRef queryRef() {
+        return new MessageRef(queryTs, channelId);
+    }
+
     public record StatusLog(
         TicketStatus status,
-        Instant timestamp
+        Instant date
     ) {
     }
 }

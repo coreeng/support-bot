@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.homepage;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.enums.ImpactsRegistry;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.ticket.Ticket;
@@ -33,6 +34,7 @@ public class HomepageService {
     private final ExecutorService executor;
     private final SlackClient slackClient;
     private final SlackTicketsProps slackTicketsProps;
+    private final ImpactsRegistry impactsRegistry;
 
     public HomepageView getTicketsView(HomepageView.State state) {
         Page<Ticket> page = ticketQueryService.findByQuery(state.toTicketsQuery());
@@ -95,22 +97,22 @@ public class HomepageService {
         TicketView.TicketViewBuilder view = TicketView.builder()
             .id(t.id())
             .status(t.status())
-            .impact(t.impact())
+            .impact(impactsRegistry.findImpactByCode(t.impact()))
             .queryPermalink(permalink);
 
         if (t.status() == TicketStatus.closed) {
             view.closedAt(
-                t.statusHistory().stream()
+                t.statusLog().stream()
                     .filter(l -> l.status() == TicketStatus.closed)
-                    .max(comparing(Ticket.StatusLog::timestamp))
-                    .get().timestamp()
+                    .max(comparing(Ticket.StatusLog::date))
+                    .get().date()
             );
         }
         view.lastOpenedAt(
-            t.statusHistory().stream()
+            t.statusLog().stream()
                 .filter(l -> l.status() == TicketStatus.opened)
-                .max(comparing(Ticket.StatusLog::timestamp))
-                .get().timestamp()
+                .max(comparing(Ticket.StatusLog::date))
+                .get().date()
         );
 
         return view.build();

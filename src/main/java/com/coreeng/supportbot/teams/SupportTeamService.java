@@ -38,7 +38,7 @@ public class SupportTeamService {
     public Team getTeam() {
         return new Team(
             supportTeamProps.name(),
-            TeamType.support
+            ImmutableList.of(TeamType.support)
         );
 
     }

@@ -7,6 +7,7 @@ import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.SlackApiTextResponse;
 import com.slack.api.methods.request.chat.ChatGetPermalinkRequest;
 import com.slack.api.methods.request.conversations.ConversationsHistoryRequest;
+import com.slack.api.methods.request.conversations.ConversationsRepliesRequest;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
 import com.slack.api.methods.request.usergroups.users.UsergroupsUsersListRequest;
@@ -17,6 +18,7 @@ import com.slack.api.methods.response.chat.ChatGetPermalinkResponse;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.chat.ChatUpdateResponse;
 import com.slack.api.methods.response.conversations.ConversationsHistoryResponse;
+import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
 import com.slack.api.methods.response.reactions.ReactionsAddResponse;
 import com.slack.api.methods.response.reactions.ReactionsRemoveResponse;
 import com.slack.api.methods.response.views.ViewsOpenResponse;
@@ -39,7 +41,8 @@ import static com.google.common.collect.Iterables.isEmpty;
 @RequiredArgsConstructor
 public class SlackClientImpl implements SlackClient {
     private final MethodsClient client;
-    private final Cache cache;
+    private final Cache permalinkCache;
+    private final Cache userProfileCache;
 
     @Override
     public ReactionsAddResponse addReaction(ReactionsAddRequest request) {
@@ -84,7 +87,7 @@ public class SlackClientImpl implements SlackClient {
 
     @Override
     public String getPermalink(SlackGetMessageByTsRequest request) {
-        return cache.get(request, () -> {
+        return permalinkCache.get(request, () -> {
             if (request.ts().mocked()) {
                 return "https://slack.com/" + request.channelId() + "/" + request.ts().ts();
             }
@@ -94,6 +97,14 @@ public class SlackClientImpl implements SlackClient {
                 .build()), null);
             return response.getPermalink();
         });
+    }
+
+    @Override
+    public ConversationsRepliesResponse getThreadPage(ConversationsRepliesRequest request) {
+        return doRequest(
+            () -> client.conversationsReplies(request),
+            response -> errorDetailsOrEmpty(response.getResponseMetadata())
+        );
     }
 
     @Override
@@ -121,12 +132,12 @@ public class SlackClientImpl implements SlackClient {
 
     @Override
     public User.Profile getUserById(String userId) {
-        return doRequest(
+        return userProfileCache.get(userId, () -> doRequest(
             () -> client.usersProfileGet(UsersProfileGetRequest.builder()
                 .user(userId)
                 .build()),
             null
-        ).getProfile();
+        ).getProfile());
     }
 
     @Override

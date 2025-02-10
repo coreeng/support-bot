@@ -2,7 +2,9 @@ package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
+import com.coreeng.supportbot.enums.Tag;
 import com.coreeng.supportbot.enums.TagsRegistry;
+import com.coreeng.supportbot.enums.TicketImpact;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageTs;
@@ -34,18 +36,28 @@ public class TicketSummaryService {
     public TicketSummaryView summaryView(TicketId id) {
         Ticket ticket = repository.findTicketById(id);
         if (ticket == null) {
-            throw new IllegalStateException("Ticket not found");
+            throw new IllegalStateException("Ticket not found: " + id);
         }
         TicketSummaryView.QuerySummaryView querySummary = getQuerySummaryView(ticket);
         ImmutableList<TicketSummaryView.EscalationView> escalations = getEscalationViews(ticket);
         TicketSummaryView.TeamsInput teamsInput = getTeamsInputView(ticket);
+        ImmutableList<Tag> allTags = tagsRegistry.listAllTags();
+        ImmutableList<TicketImpact> allImpacts = impactsRegistry.listAllImpacts();
         return TicketSummaryView.of(
             ticket,
             querySummary,
             escalations,
             teamsInput,
-            tagsRegistry.listAllTags(),
-            impactsRegistry.listAllImpacts()
+            allTags,
+            allTags.stream()
+                .filter(t -> ticket.tags().contains(t.code()))
+                .collect(toImmutableList()),
+            allImpacts,
+            ticket.impact() != null
+                ? allImpacts.stream()
+                    .filter(i -> ticket.impact().contains(i.code()))
+                    .findAny().orElse(null)
+                : null
         );
     }
 

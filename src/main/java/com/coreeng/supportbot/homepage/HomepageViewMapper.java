@@ -111,7 +111,7 @@ public class HomepageViewMapper {
             section(s -> {
                     ImmutableList.Builder<TextObject> fields = ImmutableList.builder();
                     fields.add(
-                        markdownText(format("*Impact*: %s", ticket.impact() == null ? "Not Evaluated" : ticket.impact().name())),
+                        markdownText(format("*Impact*: %s", ticket.impact() == null ? "Not Evaluated" : ticket.impact().label())),
                         // empty field so that UI is aligned this way:
                         // impact
                         // lastOpened ----- closed
