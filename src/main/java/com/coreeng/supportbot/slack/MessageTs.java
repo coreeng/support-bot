@@ -17,7 +17,7 @@ public record MessageTs(
     }
 
     public MessageTs(String ts) {
-        this(ts, ts.startsWith(mockedPrefix));
+        this(ts.replaceFirst("^" + mockedPrefix, ""), ts.startsWith(mockedPrefix));
     }
 
     public static MessageTs mocked(String ts) {
