@@ -289,10 +289,20 @@ public class JdbcTicketRepository implements TicketRepository {
             ))
             .collect(toImmutableList());
 
-        long ticketsTotal = checkNotNull(
-            createFindQuery(query, ImmutableList.of(bigCount()))
-                .fetchOne(0, Long.class)
-        );
+        long ticketsTotal;
+        if (query.unlimited()) {
+            ticketsTotal = tickets.size();
+        } else {
+            ticketsTotal = checkNotNull(
+                createFindQuery(
+                    query.toBuilder()
+                        .order(null)
+                        .unlimited(true)
+                        .build(),
+                    ImmutableList.of(bigCount())
+                ).fetchOne(0, Long.class)
+            );
+        }
         return new Page<>(
             content,
             query.page(),
