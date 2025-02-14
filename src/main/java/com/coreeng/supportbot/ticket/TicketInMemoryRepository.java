@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -75,6 +76,19 @@ public class TicketInMemoryRepository implements TicketRepository {
         });
     }
 
+    @Override
+    public boolean touchTicketById(TicketId id, Instant timestamp) {
+        checkNotNull(id);
+
+        return tickets.computeIfPresent(id, (key, t) -> {
+            Ticket touchedTicket = t.toBuilder()
+                .lastInteractedAt(timestamp)
+                .build();
+            ticketsByQuery.put(t.queryRef(), touchedTicket);
+            return touchedTicket;
+        }) != null;
+    }
+
     @Nullable
     @Override
     public Ticket findTicketById(TicketId ticketId) {
@@ -116,12 +130,12 @@ public class TicketInMemoryRepository implements TicketRepository {
     }
 
     @Override
-    public Page<Ticket> findTickets(TicketsQuery query) {
+    public Page<Ticket> listTickets(TicketsQuery query) {
         return findTicketsAndMap(query, Function.identity());
     }
 
     @Override
-    public Page<DetailedTicket> findDetailedTickets(TicketsQuery query) {
+    public Page<DetailedTicket> listDetailedTickets(TicketsQuery query) {
         return findTicketsAndMap(query, this::mapToDetailed);
     }
 
@@ -213,5 +227,23 @@ public class TicketInMemoryRepository implements TicketRepository {
             }
         }
         return true;
+    }
+
+    @Override
+    public ImmutableList<TicketId> listStaleTicketIds(Instant checkAt, Duration timeToStale) {
+        Instant stalenessThreshold = checkAt.minus(timeToStale);
+        return tickets.values().stream()
+            .filter(t -> t.status() == TicketStatus.opened && t.lastInteractedAt().isBefore(stalenessThreshold))
+            .map(Ticket::id)
+            .collect(toImmutableList());
+    }
+
+    @Override
+    public ImmutableList<TicketId> listStaleTicketIdsToRemindOf(Instant checkAt, Duration reminderInterval) {
+        Instant reminderThreshold = checkAt.minus(reminderInterval);
+        return tickets.values().stream()
+            .filter(t -> t.status() == TicketStatus.stale && t.lastInteractedAt().isBefore(reminderThreshold))
+            .map(Ticket::id)
+            .collect(toImmutableList());
     }
 }

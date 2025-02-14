@@ -37,6 +37,6 @@ public class TicketUI {
         LogEvent event
     ) {}
     public enum LogEvent {
-        opened, closed
+        opened, stale, closed
     }
 }

@@ -16,6 +16,7 @@ import com.slack.api.model.view.ViewState;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -101,14 +102,7 @@ public class TicketSummaryViewMapper {
                     header(h -> h.text(plainText("Modify Ticket"))),
                     input(i -> i
                         .label(plainText("Change Status"))
-                        .element(staticSelect(s -> s
-                            .actionId(TicketField.status.actionId())
-                            .initialOption(toOptionObject(summaryView.currentStatus()))
-                            .options(List.of(
-                                toOptionObject(TicketStatus.opened),
-                                toOptionObject(TicketStatus.closed)
-                            ))
-                        ))
+                        .element(statusPicker(summaryView))
                         .optional(false)),
                     input(i -> i
                         .label(plainText("Select the Author's Team"))
@@ -147,6 +141,22 @@ public class TicketSummaryViewMapper {
                 ))
                 .build()
             );
+    }
+
+    private StaticSelectElement statusPicker(TicketSummaryView summaryView) {
+        List<OptionObject> statusOptions = summaryView.currentStatus() == TicketStatus.stale
+            ? Arrays.stream(TicketStatus.values())
+            .map(RenderingUtils::toOptionObject)
+            .toList()
+            : Arrays.stream(TicketStatus.values())
+            .filter(status -> !status.equals(TicketStatus.stale))
+            .map(RenderingUtils::toOptionObject)
+            .toList();
+        return staticSelect(s -> s
+            .actionId(TicketField.status.actionId())
+            .initialOption(toOptionObject(summaryView.currentStatus()))
+            .options(statusOptions)
+        );
     }
 
     private ImmutableList<RichTextElement> renderStatusHistory(ImmutableList<Ticket.StatusLog> statusLogs) {

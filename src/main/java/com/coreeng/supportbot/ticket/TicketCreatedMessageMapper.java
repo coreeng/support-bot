@@ -22,6 +22,7 @@ import static java.lang.String.format;
 @RequiredArgsConstructor
 public class TicketCreatedMessageMapper {
     private final static String redHex = "#ff000d";
+    private final static String purpleHex = "#b200ed";
     private final static String greenHex = "#00ff00";
 
     private final TicketSummaryViewMapper summaryViewMapper;
@@ -82,9 +83,11 @@ public class TicketCreatedMessageMapper {
         return ImmutableList.of(Attachment.builder()
             .fallback(title)
             .blocks(blocks.build())
-            .color(message.status() == TicketStatus.opened
-                ? greenHex
-                : redHex)
+            .color(switch (message.status()) {
+                case opened -> greenHex;
+                case stale -> purpleHex;
+                case closed -> redHex;
+            })
             .build());
     }
 }

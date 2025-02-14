@@ -41,7 +41,7 @@ create table if not exists ticket
     constraint ticket_query_id_fk foreign key (query_id) references query (id),
     constraint ticket_impact_fk foreign key (impact_code) references impact (code)
 );
-create index ticket_query_id_idx on ticket (query_id);
+create unique index ticket_query_id_idx on ticket (query_id);
 
 create table if not exists ticket_to_tag
 (
