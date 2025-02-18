@@ -21,6 +21,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Nullable;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -72,7 +73,15 @@ public class JdbcTicketRepository implements TicketRepository {
         checkArgument(ticket.id() == null);
 
         long queryId = getQueryIdOrCreate(ticket.queryRef());
-        Long ticketId = dsl.insertInto(TICKET, TICKET.QUERY_ID, TICKET.CREATED_MESSAGE_TS, TICKET.STATUS, TICKET.TEAM, TICKET.IMPACT_CODE)
+        Long ticketId = dsl.insertInto(
+                TICKET,
+                TICKET.QUERY_ID,
+                TICKET.CREATED_MESSAGE_TS,
+                TICKET.STATUS,
+                TICKET.TEAM,
+                TICKET.IMPACT_CODE,
+                TICKET.LAST_INTERACTED_AT
+            )
             .values(
                 queryId,
                 ticket.createdMessageTs() != null
@@ -80,12 +89,18 @@ public class JdbcTicketRepository implements TicketRepository {
                     : null,
                 com.coreeng.supportbot.dbschema.enums.TicketStatus.lookupLiteral(ticket.status().name()),
                 ticket.team(),
-                ticket.impact()
+                ticket.impact(),
+                ticket.lastInteractedAt()
             )
+            .onConflictDoNothing()
             .returning(TICKET.ID)
-            .fetchSingle(TICKET.ID);
+            .fetchOne(TICKET.ID);
 
-        Ticket updatedTicket = ticket.withId(new TicketId(checkNotNull(ticketId)));
+        if (ticketId == null) {
+            return findTicketByQuery(ticket.queryRef());
+        }
+
+        Ticket updatedTicket = ticket.withId(new TicketId(ticketId));
 
         updateTicketTags(updatedTicket);
 
@@ -112,6 +127,7 @@ public class JdbcTicketRepository implements TicketRepository {
             .set(TICKET.STATUS, com.coreeng.supportbot.dbschema.enums.TicketStatus.lookupLiteral(ticket.status().name()))
             .set(TICKET.TEAM, ticket.team())
             .set(TICKET.IMPACT_CODE, ticket.impact())
+            .set(TICKET.LAST_INTERACTED_AT, ticket.lastInteractedAt())
             .where(TICKET.ID.eq(ticket.id().id()))
             .execute();
         if (updatedTickets == 0) {
@@ -124,6 +140,16 @@ public class JdbcTicketRepository implements TicketRepository {
         updateTicketTags(ticket);
 
         return ticket;
+    }
+
+    @Override
+    public boolean touchTicketById(TicketId id, Instant timestamp) {
+        checkNotNull(id);
+        checkNotNull(timestamp);
+        return dsl.update(TICKET)
+            .set(TICKET.LAST_INTERACTED_AT, timestamp)
+            .where(TICKET.ID.eq(id.id()))
+            .execute() > 0;
     }
 
     private void updateTicketTags(Ticket ticket) {
@@ -217,7 +243,7 @@ public class JdbcTicketRepository implements TicketRepository {
 
     @Transactional(readOnly = true)
     @Override
-    public Page<Ticket> findTickets(TicketsQuery query) {
+    public Page<Ticket> listTickets(TicketsQuery query) {
         checkNotNull(query);
         checkArgument(query.page() >= 0);
         checkArgument(query.pageSize() > 0);
@@ -260,7 +286,7 @@ public class JdbcTicketRepository implements TicketRepository {
 
     @Transactional(readOnly = true)
     @Override
-    public Page<DetailedTicket> findDetailedTickets(TicketsQuery query) {
+    public Page<DetailedTicket> listDetailedTickets(TicketsQuery query) {
         checkNotNull(query);
         checkArgument(query.page() >= 0);
         checkArgument(query.pageSize() > 0);
@@ -309,6 +335,34 @@ public class JdbcTicketRepository implements TicketRepository {
             ticketsTotal / query.pageSize() + 1,
             ticketsTotal
         );
+    }
+
+    @Override
+    public ImmutableList<TicketId> listStaleTicketIds(Instant checkAt, Duration timeToStale) {
+        Instant stalenessThreshold = checkAt.minus(timeToStale);
+        try (var stream = dsl.select(TICKET.ID)
+            .from(TICKET)
+            .where(TICKET.STATUS.eq(com.coreeng.supportbot.dbschema.enums.TicketStatus.opened).and(
+                TICKET.LAST_INTERACTED_AT.lt(stalenessThreshold))
+            )
+            .stream()) {
+            return stream.map(r -> new TicketId(r.get(TICKET.ID)))
+                .collect(toImmutableList());
+        }
+    }
+
+    @Override
+    public ImmutableList<TicketId> listStaleTicketIdsToRemindOf(Instant checkAt, Duration reminderInterval) {
+        Instant reminderThreshold = checkAt.minus(reminderInterval);
+        try (var stream = dsl.select(TICKET.ID)
+            .from(TICKET)
+            .where(TICKET.STATUS.eq(com.coreeng.supportbot.dbschema.enums.TicketStatus.stale).and(
+                TICKET.LAST_INTERACTED_AT.lt(reminderThreshold))
+            )
+            .stream()) {
+            return stream.map(r -> new TicketId(r.get(TICKET.ID)))
+                .collect(toImmutableList());
+        }
     }
 
     private SelectLimitPercentAfterOffsetStep<Record> createFindQuery(

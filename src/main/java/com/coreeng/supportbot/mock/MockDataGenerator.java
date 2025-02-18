@@ -87,7 +87,7 @@ public class MockDataGenerator implements ApplicationRunner {
     @Transactional
     @Override
     public void run(ApplicationArguments args) {
-        Page<Ticket> existingTickets = ticketRepository.findTickets(TicketsQuery.builder()
+        Page<Ticket> existingTickets = ticketRepository.listTickets(TicketsQuery.builder()
             .build());
         if (existingTickets.totalElements() > 0) {
             log.atWarn()
@@ -203,6 +203,7 @@ public class MockDataGenerator implements ApplicationRunner {
                     .collect(toImmutableList())
             )
             .impact(impacts.get(impactI).code())
+            .lastInteractedAt(ticket.statusLog().getLast().date())
             .build();
         return ticketRepository.updateTicket(updatedTicket);
     }
@@ -277,6 +278,7 @@ public class MockDataGenerator implements ApplicationRunner {
         ticket = ticketRepository.updateTicket(
             ticket.toBuilder()
                 .status(TicketStatus.closed)
+                .lastInteractedAt(closeDate)
                 .build()
         );
         ticket = ticketRepository.insertStatusLog(

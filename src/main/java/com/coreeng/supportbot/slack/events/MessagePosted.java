@@ -24,7 +24,7 @@ public record MessagePosted(
             event.getEvent().getUser(),
             new MessageRef(
                 MessageTs.of(event.getEvent().getTs()),
-                null,
+                MessageTs.ofOrNull(event.getEvent().getThreadTs()),
                 event.getEvent().getChannel()
             )
         );

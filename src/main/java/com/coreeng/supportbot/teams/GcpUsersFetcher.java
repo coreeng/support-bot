@@ -1,12 +1,16 @@
 package com.coreeng.supportbot.teams;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.cloudidentity.v1.CloudIdentity;
+import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @RequiredArgsConstructor
 public class GcpUsersFetcher implements PlatformUsersFetcher {
     private final CloudIdentity cloudIdentity;
@@ -14,12 +18,23 @@ public class GcpUsersFetcher implements PlatformUsersFetcher {
     @Override
     public List<Membership> fetchMembershipsByGroupRef(String groupRef) {
         List<Membership> result = new ArrayList<>();
+        String groupId;
         try {
             var lookupResp = cloudIdentity.groups().lookup()
                 .setGroupKeyId(groupRef)
                 .execute();
-            String groupId = lookupResp.getName();
+            groupId = lookupResp.getName();
+        } catch (GoogleJsonResponseException e) {
+            if (e.getStatusCode() == 403) {
+                log.warn("Group is not found or not accessible: {}", groupRef);
+                return ImmutableList.of();
+            }
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
+        try {
             var membershipResp = cloudIdentity.groups().memberships()
                 .searchTransitiveMemberships(groupId)
                 .execute();

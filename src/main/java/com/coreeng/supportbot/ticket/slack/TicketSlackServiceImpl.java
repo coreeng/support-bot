@@ -8,12 +8,15 @@ import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackEditMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
+import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.ticket.TicketCreatedMessage;
 import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
 import com.coreeng.supportbot.ticket.TicketEscalatedMessage;
+import com.coreeng.supportbot.ticket.TicketWentStaleMessage;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
+import com.slack.api.model.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,6 +29,7 @@ import java.util.Objects;
 public class TicketSlackServiceImpl implements TicketSlackService {
     private final SlackClient slackClient;
     private final SlackTicketsProps slackTicketsProps;
+    private final SupportTeamService supportTeamService;
     private final TicketCreatedMessageMapper createdMessageMapper;
 
     @Override
@@ -70,6 +74,13 @@ public class TicketSlackServiceImpl implements TicketSlackService {
 
     @Override
     public void editTicketForm(MessageRef threadRef, TicketCreatedMessage message) {
+        if (threadRef.ts().mocked()) {
+            log.atInfo()
+                .addArgument(threadRef::ts)
+                .log("Pretending to edit ticket form, because it's mocked: {}");
+            return;
+        }
+
         slackClient.editMessage(new SlackEditMessageRequest(
             createdMessageMapper.renderMessage(message),
             threadRef.channelId(),
@@ -93,10 +104,37 @@ public class TicketSlackServiceImpl implements TicketSlackService {
         ));
     }
 
+    @Override
+    public void warnStaleness(MessageRef queryRef) {
+        if (queryRef.ts().mocked()) {
+            log.atInfo()
+                .addArgument(queryRef::ts)
+                .log("Pretending to mark ticket as stale, because it's mocked: {}");
+            return;
+        }
+
+        Message queryMessage = slackClient.getMessageByTs(SlackGetMessageByTsRequest.of(queryRef));
+        slackClient.postMessage(new SlackPostMessageRequest(
+            new TicketWentStaleMessage(
+                queryMessage.getUser(),
+                supportTeamService.getSlackGroupId()
+            ),
+            queryRef.channelId(),
+            queryRef.ts()
+        ));
+    }
+
     private void addReactionToPostIfPresent(
         String name,
         MessageRef messageRef
     ) {
+        if (messageRef.ts().mocked()) {
+            log.atInfo()
+                .addArgument(name)
+                .addArgument(messageRef::ts)
+                .log("Pretending to add reaction({}) to message, because it's mocked: {}");
+            return;
+        }
         try {
             slackClient.addReaction(ReactionsAddRequest.builder()
                 .name(name)
@@ -109,7 +147,7 @@ public class TicketSlackServiceImpl implements TicketSlackService {
                 .addArgument(messageRef.ts())
                 .log("Reaction({}) is posted to message({})");
         } catch (SlackException exc) {
-            if (Objects.equals("already_added", exc.getError())) {
+            if (Objects.equals("already_reacted", exc.getError())) {
                 log.atInfo()
                     .addArgument(messageRef.ts())
                     .log("Reaction is already posted by bot to message({})");
@@ -124,6 +162,13 @@ public class TicketSlackServiceImpl implements TicketSlackService {
         String name,
         MessageRef messageRef
     ) {
+        if (messageRef.ts().mocked()) {
+            log.atInfo()
+                .addArgument(name)
+                .addArgument(messageRef::ts)
+                .log("Pretending to remove reaction({}) from message, because it's mocked: {}");
+            return;
+        }
         try {
             slackClient.removeReaction(ReactionsRemoveRequest.builder()
                 .name(name)

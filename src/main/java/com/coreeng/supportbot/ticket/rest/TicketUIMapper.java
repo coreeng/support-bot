@@ -45,6 +45,7 @@ public class TicketUIMapper {
                         s.date(),
                         switch (s.status()) {
                             case opened -> TicketUI.LogEvent.opened;
+                            case stale ->  TicketUI.LogEvent.stale;
                             case closed -> TicketUI.LogEvent.closed;
                         }
                     ))

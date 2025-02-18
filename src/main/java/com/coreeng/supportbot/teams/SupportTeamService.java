@@ -43,6 +43,10 @@ public class SupportTeamService {
 
     }
 
+    public String getSlackGroupId() {
+        return  supportTeamProps.slackGroupId();
+    }
+
     public boolean isMemberBeUserEmail(String email) {
         return emailToUserSlackId.containsKey(email);
     }

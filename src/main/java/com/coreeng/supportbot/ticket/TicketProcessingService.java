@@ -32,13 +32,34 @@ public class TicketProcessingService {
 
 
     public void handleMessagePosted(MessagePosted e) {
-        if (!isQueryEvent(e)) {
+        if (isQueryEvent(e)) {
+            repository.createQueryIfNotExists(e.messageRef());
+            log.atInfo()
+                .addArgument(e::messageRef)
+                .log("Query is created on message({})");
             return;
         }
-        repository.createQueryIfNotExists(e.messageRef());
-        log.atInfo()
-            .addArgument(e::messageRef)
-            .log("Query is created on message({})");
+
+        MessageRef queryRef = e.messageRef().toThreadRef();
+        Ticket ticket = repository.findTicketByQuery(queryRef);
+        if (ticket == null) {
+            log.atDebug()
+                .addArgument(queryRef::ts)
+                .log("No ticket for query({}). Ignoring posted message.");
+            return;
+        }
+
+        if (ticket.status() == TicketStatus.stale) {
+            Ticket updatedTicket = repository.updateTicket(
+                ticket.toBuilder()
+                    .status(TicketStatus.opened)
+                    .lastInteractedAt(Instant.now())
+                    .build()
+            );
+            onStatusUpdate(updatedTicket);
+        } else {
+            repository.touchTicketById(ticket.id(), Instant.now());
+        }
     }
 
     /**
@@ -78,6 +99,7 @@ public class TicketProcessingService {
             repository.updateTicket(
                 newTicket.toBuilder()
                     .createdMessageTs(postedMessageRef.ts())
+                    .lastInteractedAt(Instant.now())
                     .build()
             );
         } else {
@@ -111,6 +133,7 @@ public class TicketProcessingService {
                 .team(submission.authorsTeam())
                 .tags(submission.tags())
                 .impact(submission.impact())
+                .lastInteractedAt(Instant.now())
                 .build()
         );
 
@@ -152,11 +175,61 @@ public class TicketProcessingService {
             repository.findTicketById(escalation.ticketId()),
             "Ticket not found: {}", escalation.ticketId()
         );
+        if (ticket.status() == TicketStatus.stale) {
+            ticket = repository.updateTicket(ticket.toBuilder()
+                .status(TicketStatus.opened)
+                .lastInteractedAt(Instant.now())
+                .build());
+            onStatusUpdate(ticket);
+        }
+
         slackService.postTicketEscalatedMessage(
             new MessageRef(ticket.queryTs(), ticket.channelId()),
             new MessageRef(escalation.threadTs(), escalation.channelId()),
             escalation.team()
         );
+    }
+
+    public void markAsStale(TicketId ticketId) {
+        Ticket ticket = repository.findTicketById(ticketId);
+        if (ticket == null) {
+            log.warn("Ticket with id {} not found", ticketId);
+            return;
+        }
+        if (ticket.status() != TicketStatus.opened) {
+            log.atWarn()
+                .addArgument(ticket::id)
+                .log("Ticket({}) can't be marked stale, because it's not open anymore.");
+            return;
+        }
+
+        log.info("Marking ticket {} as stale", ticketId);
+        slackService.warnStaleness(ticket.queryRef());
+        Ticket updatedTicket = repository.updateTicket(
+            ticket.toBuilder()
+                .status(TicketStatus.stale)
+                .lastInteractedAt(Instant.now())
+                .build()
+        );
+        onStatusUpdate(updatedTicket);
+    }
+
+    public void remindOfStaleTicket(TicketId ticketId) {
+        Ticket ticket = repository.findTicketById(ticketId);
+        if (ticket == null) {
+            log.warn("Ticket with id {} not found", ticketId);
+            return;
+        }
+        if (ticket.status() != TicketStatus.stale) {
+            log.atWarn()
+                .addArgument(ticket::id)
+                .log("Ticket({}) is not stale, skipping remind");
+            return;
+        }
+
+        log.info("Reminding of stale ticket {}", ticketId);
+        slackService.warnStaleness(ticket.queryRef());
+        repository.touchTicketById(ticketId, Instant.now());
     }
 
     @NotNull
