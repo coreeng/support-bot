@@ -31,7 +31,7 @@ public class TicketsTimelineCollector implements StatsCollector<StatsRequest.Tic
 
     @Override
     public StatsResult calculateResults(StatsRequest.TicketTimeline request) {
-        Page<Ticket> tickets = repository.findTickets(TicketsQuery.builder()
+        Page<Ticket> tickets = repository.listTickets(TicketsQuery.builder()
             .unlimited(true)
             .dateFrom(request.from())
             .dateTo(request.to())

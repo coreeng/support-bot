@@ -20,11 +20,11 @@ public class TicketQueryService {
     private final EscalationQueryService escalationQueryService;
 
     public Page<Ticket> findByQuery(TicketsQuery query) {
-        return repository.findTickets(query);
+        return repository.listTickets(query);
     }
 
     public Page<DetailedTicket> findDetailedTicketByQuery(TicketsQuery query) {
-        return repository.findDetailedTickets(query);
+        return repository.listDetailedTickets(query);
     }
 
     @Nullable

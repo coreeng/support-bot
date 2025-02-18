@@ -23,7 +23,7 @@ public class TicketsGeneralStatsCollector implements StatsCollector<StatsRequest
 
     @Override
     public StatsResult calculateResults(StatsRequest.TicketGeneral request) {
-        Page<Ticket> tickets = repository.findTickets(TicketsQuery.builder()
+        Page<Ticket> tickets = repository.listTickets(TicketsQuery.builder()
             .unlimited(true)
             .dateFrom(request.from())
             .dateTo(request.to())
@@ -46,13 +46,13 @@ public class TicketsGeneralStatsCollector implements StatsCollector<StatsRequest
             .average()
             .orElse(0.0);
 
-        double largetActiveTicketSecs = tickets.content().stream()
+        double largestActiveTicketSecs = tickets.content().stream()
             .mapToDouble(t -> switch (t.status()) {
                 case closed -> Duration.between(
                     t.statusLog().getFirst().date(),
                     t.statusLog().getLast().date()
                 ).getSeconds();
-                case opened -> Duration.between(
+                case opened, stale -> Duration.between(
                     t.statusLog().getFirst().date(),
                     Instant.now()
                 ).getSeconds();
@@ -64,7 +64,7 @@ public class TicketsGeneralStatsCollector implements StatsCollector<StatsRequest
             .request(request)
             .avgResolutionTimeSecs(avgResolutionTime)
             .avgResponseTimeSecs(avgResponseTime)
-            .largestActiveTicketSecs(largetActiveTicketSecs)
+            .largestActiveTicketSecs(largestActiveTicketSecs)
             .build();
     }
 }

@@ -26,7 +26,7 @@ public class TicketsAmountCollector implements StatsCollector<StatsRequest.Ticke
 
     @Override
     public StatsResult calculateResults(StatsRequest.TicketAmount request) {
-        Page<Ticket> tickets = repository.findTickets(TicketsQuery.builder()
+        Page<Ticket> tickets = repository.listTickets(TicketsQuery.builder()
             .unlimited(true)
             .dateFrom(request.from())
             .dateTo(request.to())

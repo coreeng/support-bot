@@ -61,6 +61,12 @@ public record MessageRef(
         return null;
     }
 
+    public MessageRef toThreadRef() {
+        return isReply()
+            ? new MessageRef(threadTs, channelId)
+            : this;
+    }
+
     public MessageTs actualThreadTs() {
         return threadTs != null ? threadTs : ts;
     }

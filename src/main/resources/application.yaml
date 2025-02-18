@@ -39,6 +39,13 @@ slack:
   escalation:
     channel-id: ${ESCALATION_CHANNEL_ID} # Channel ID like: C1234567890
 
+ticket:
+  staleness-check-job:
+    find-stale-cron: 0 0 9 * * 1-5
+    time-to-stale: 3d
+    remind-about-stale-cron: 0 10 9 * * 1-5
+    stale-reminder-interval: 1d
+
 enums:
   escalationTeams:
     - label: wow
@@ -85,4 +92,4 @@ support-team:
   slack-group-id: S08948NBMED
 
 mock-data:
-  enabled: true
+  enabled: false

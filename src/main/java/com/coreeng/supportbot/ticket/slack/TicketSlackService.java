@@ -11,4 +11,6 @@ public interface TicketSlackService {
     MessageRef postTicketForm(MessageRef threadRef, TicketCreatedMessage message);
     void editTicketForm(MessageRef threadRef, TicketCreatedMessage message);
     void postTicketEscalatedMessage(MessageRef queryRef, MessageRef escalationThreadRef, String slackTeamName);
+
+    void warnStaleness(MessageRef queryRef);
 }

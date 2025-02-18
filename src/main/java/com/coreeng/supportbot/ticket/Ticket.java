@@ -4,30 +4,31 @@ import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.google.common.collect.ImmutableList;
 import lombok.Builder;
-import lombok.Value;
+import lombok.Getter;
 import lombok.With;
 
 import javax.annotation.Nullable;
 import java.time.Instant;
 
-@Value
+@Getter
 @Builder(toBuilder = true)
 public class Ticket {
     @With
     @Nullable
-    TicketId id;
-    String channelId;
-    MessageTs queryTs;
-    MessageTs createdMessageTs;
-    TicketStatus status;
+    private TicketId id;
+    private String channelId;
+    private MessageTs queryTs;
+    private MessageTs createdMessageTs;
+    private TicketStatus status;
     @Nullable
-    String team;
+    private String team;
     @Builder.Default
-    ImmutableList<StatusLog> statusLog = ImmutableList.of();
+    private ImmutableList<StatusLog> statusLog = ImmutableList.of();
     @Builder.Default
     ImmutableList<String> tags = ImmutableList.of();
     @Nullable
-    String impact;
+    private String impact;
+    private Instant lastInteractedAt;
 
     public static Ticket createNew(MessageTs queryTs, String channelID) {
         return Ticket.builder()
@@ -38,6 +39,7 @@ public class Ticket {
                 TicketStatus.opened,
                 Instant.now()
             )))
+            .lastInteractedAt(Instant.now())
             .build();
     }
 

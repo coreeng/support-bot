@@ -6,6 +6,7 @@ import lombok.Getter;
 @Getter
 public enum TicketStatus implements UIOption {
     opened("Opened", "large_orange_circle"),
+    stale("Stale", "large_purple_circle"),
     closed("Closed", "large_green_circle");
 
     private final String label;
