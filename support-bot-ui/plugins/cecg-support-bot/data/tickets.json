@@ -1,0 +1,1937 @@
+[
+    {
+      "id": "b0971b58-ebdf-4270-a25b-9d933437f287",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-13T00:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-13T00:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Node resource exhaustion due to rogue processes\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-13T02:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-13T04:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-13T06:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "Azure",
+          "label": "Platform"
+        },
+        {
+          "value": "pre-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "479c7779-35f1-4c9f-955c-1f89187c8b2c",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-02T16:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-02T16:13:07.483+00:00",
+          "comment": "Support: You’re hitting quota limits on API calls. Can you review your service usage metrics?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-02T18:13:07.483+00:00",
+          "comment": "Dev: Found the issue; one of our scripts was making excessive calls. Adjusted the script to reduce the frequency, and it’s working now."
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "Azure",
+          "label": "Platform"
+        },
+        {
+          "value": "pre-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "c494169b-ceca-43ba-9d3b-aa4571ffee2a",
+      "channelId": "Core Support",
+      "queryTs": "2025-01-02T20:13:07.483+00:00",
+      "status": "unresolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-02T20:13:07.483+00:00",
+          "comment": "Support: The cloud provider is experiencing API downtime. Monitor their status page for updates."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-02T22:13:07.483+00:00",
+          "comment": "Dev: Saw the downtime was resolved. Redeployments are working again."
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "Azure",
+          "label": "Platform"
+        },
+        {
+          "value": "dev",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "be8cb799-2e7e-4d42-bc57-2d4a91717398",
+      "channelId": "Core Support",
+      "queryTs": "2024-12-31T07:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-31T07:13:07.483+00:00",
+          "comment": "Support: Your service account lacks `roles/storage.objectAdmin` permissions. Can you grant this role and retry?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2024-12-31T09:13:07.483+00:00",
+          "comment": "Dev: Added the permissions, and the error is gone. Thanks for catching that!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "pre-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "350e3983-cb2a-44bc-8fce-a738dfc17927",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-12T08:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T08:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Node resource exhaustion due to rogue processes\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T10:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T12:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-12T14:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "test",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "76819936-7483-4729-8a8b-8c9f12b3b705",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-11T14:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-11T14:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Pod image pull failures due to expired credentials\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-11T16:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-11T18:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-11T20:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "On-Prem",
+          "label": "Platform"
+        },
+        {
+          "value": "dev-analytics",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "a74a0d74-10fa-408c-ae94-722664e0dab8",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-12T14:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T14:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"DNS resolution issues for internal services\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T16:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T18:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-12T20:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "Azure",
+          "label": "Platform"
+        },
+        {
+          "value": "test",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "393c76ec-c4e8-4e41-8bc4-56c7f8031b2f",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-04T22:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-04T22:13:07.483+00:00",
+          "comment": "Support: You’re hitting quota limits on API calls. Can you review your service usage metrics?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-05T00:13:07.483+00:00",
+          "comment": "Dev: Found the issue; one of our scripts was making excessive calls. Adjusted the script to reduce the frequency, and it’s working now."
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "On-Prem",
+          "label": "Platform"
+        },
+        {
+          "value": "dev-analytics",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "a0430a7c-7d24-4321-8429-66396d699c96",
+      "channelId": "Core Support",
+      "queryTs": "2025-01-09T05:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-09T05:13:07.483+00:00",
+          "comment": "Support: The pod logs indicate a secret is missing. Can you confirm that the secret `app-credentials` exists in the namespace?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-09T07:13:07.483+00:00",
+          "comment": "Dev: I checked, and it seems the secret was deleted accidentally. Recreated it and the issue is resolved."
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "On-Prem",
+          "label": "Platform"
+        },
+        {
+          "value": "production",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "c0157aa4-6aec-4df2-af4f-2fd25e4fa256",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-11T18:13:07.483+00:00",
+      "status": "unresolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-11T18:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"DNS resolution issues for internal services\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-11T20:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-11T22:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T00:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, but the issue persists. Continuing to debug."
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "pre-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "bc2e1728-d0a5-498e-867d-4cc12a705429",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-07T16:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-07T16:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Load balancer health checks failing intermittently\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-07T18:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-07T20:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-07T22:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "On-Prem",
+          "label": "Platform"
+        },
+        {
+          "value": "shadow-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "9218f81e-7613-405e-a886-3da588d8b96a",
+      "channelId": "Core Support",
+      "queryTs": "2025-01-05T02:13:07.483+00:00",
+      "status": "unresolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T02:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"DNS resolution issues for internal services\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T04:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T06:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T08:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, but the issue persists. Continuing to debug."
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "GCP",
+          "label": "Platform"
+        },
+        {
+          "value": "dev-analytics",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "04a9ab37-1dd8-4935-bb31-9ddb1009560b",
+      "channelId": "Application Support",
+      "queryTs": "2024-12-31T20:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-31T20:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"DNS resolution issues for internal services\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-31T22:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-01T00:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-01T02:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "On-Prem",
+          "label": "Platform"
+        },
+        {
+          "value": "shadow-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "02dc07c2-74b2-4037-8cde-20786270da0d",
+      "channelId": "Application Support",
+      "queryTs": "2024-12-31T16:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-31T16:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Node resource exhaustion due to rogue processes\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-31T18:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-31T20:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2024-12-31T22:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "GCP",
+          "label": "Platform"
+        },
+        {
+          "value": "dev",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "2322f056-2b66-45f3-bb27-a2ed5967e4aa",
+      "channelId": "Core Support",
+      "queryTs": "2025-01-05T09:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T09:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Load balancer health checks failing intermittently\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T11:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T13:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-05T15:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "GCP",
+          "label": "Platform"
+        },
+        {
+          "value": "dev-analytics",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "d4533d4e-3108-4ceb-89ca-c1fc7238797f",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-03T10:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-03T10:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"DNS resolution issues for internal services\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-03T12:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-03T14:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-03T16:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "dev-analytics",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "672bed90-03e1-4d5f-b894-c30c1cfcb6c9",
+      "channelId": "Core Support",
+      "queryTs": "2025-01-12T15:13:07.483+00:00",
+      "status": "unresolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T15:13:07.483+00:00",
+          "comment": "Support: The pod logs indicate a secret is missing. Can you confirm that the secret `app-credentials` exists in the namespace?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T17:13:07.483+00:00",
+          "comment": "Dev: I checked, and it seems the secret was deleted accidentally. Recreated it and the issue is resolved."
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "dev",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "57e3f62b-bb24-488c-a84b-ad4aa2e7217b",
+      "channelId": "Core Support",
+      "queryTs": "2025-01-02T16:13:07.483+00:00",
+      "status": "unresolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-02T16:13:07.483+00:00",
+          "comment": "Support: Node logs show disk pressure. Try deleting unused volumes to free up space."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-02T18:13:07.483+00:00",
+          "comment": "Dev: Cleared the space, but the issue persists. Could the volume configuration itself be incorrect?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-02T20:13:07.483+00:00",
+          "comment": "Support: Checked the volume config; the access mode is incompatible. Updated it to `ReadWriteOnce`, and it’s working now."
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "dev",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "7fe4448b-523f-49d8-bdc5-bdd123f0d13f",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-12T07:13:07.483+00:00",
+      "status": "unresolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T07:13:07.483+00:00",
+          "comment": "Support: Your service account lacks `roles/storage.objectAdmin` permissions. Can you grant this role and retry?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T09:13:07.483+00:00",
+          "comment": "Dev: Added the permissions, and the error is gone. Thanks for catching that!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "pre-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "a711b8fa-f400-47dd-826b-ef7b24d3e799",
+      "channelId": "Cloud Support",
+      "queryTs": "2024-12-30T20:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-30T20:13:07.483+00:00",
+          "comment": "Support: Your service account lacks `roles/storage.objectAdmin` permissions. Can you grant this role and retry?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2024-12-30T22:13:07.483+00:00",
+          "comment": "Dev: Added the permissions, and the error is gone. Thanks for catching that!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "Azure",
+          "label": "Platform"
+        },
+        {
+          "value": "test",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "ca7666d1-ce42-4273-93a0-aec0c16538e1",
+      "channelId": "Core Support",
+      "queryTs": "2025-01-12T06:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T06:13:07.483+00:00",
+          "comment": "Support: Node logs show disk pressure. Try deleting unused volumes to free up space."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T08:13:07.483+00:00",
+          "comment": "Dev: Cleared the space, but the issue persists. Could the volume configuration itself be incorrect?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-12T10:13:07.483+00:00",
+          "comment": "Support: Checked the volume config; the access mode is incompatible. Updated it to `ReadWriteOnce`, and it’s working now."
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "shadow-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "d5ce5afa-8c82-44ff-b86f-cc6fd5533f47",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-02T23:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-02T23:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Node resource exhaustion due to rogue processes\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-03T01:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-03T03:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-03T05:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "dev",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "2c7d0982-0191-4aad-9a1b-71ebc0304d1e",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-08T02:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-08T02:13:07.483+00:00",
+          "comment": "Support: Node logs show disk pressure. Try deleting unused volumes to free up space."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-08T04:13:07.483+00:00",
+          "comment": "Dev: Cleared the space, but the issue persists. Could the volume configuration itself be incorrect?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-08T06:13:07.483+00:00",
+          "comment": "Support: Checked the volume config; the access mode is incompatible. Updated it to `ReadWriteOnce`, and it’s working now."
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "GCP",
+          "label": "Platform"
+        },
+        {
+          "value": "dev",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "c14f32b6-9c91-4fda-8f5a-2cc5115afa91",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-02T14:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-02T14:13:07.483+00:00",
+          "comment": "Support: Your service account lacks `roles/storage.objectAdmin` permissions. Can you grant this role and retry?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-02T16:13:07.483+00:00",
+          "comment": "Dev: Added the permissions, and the error is gone. Thanks for catching that!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "dev",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "a09229b4-4de9-4dac-a7ed-dbf04f34257b",
+      "channelId": "Core Support",
+      "queryTs": "2024-12-31T18:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-31T18:13:07.483+00:00",
+          "comment": "Support: You’re hitting quota limits on API calls. Can you review your service usage metrics?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2024-12-31T20:13:07.483+00:00",
+          "comment": "Dev: Found the issue; one of our scripts was making excessive calls. Adjusted the script to reduce the frequency, and it’s working now."
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "test",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "67218488-46ff-47b2-976e-7bd071ecbfee",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-04T05:13:07.483+00:00",
+      "status": "unresolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-04T05:13:07.483+00:00",
+          "comment": "Support: The pod logs indicate a secret is missing. Can you confirm that the secret `app-credentials` exists in the namespace?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-04T07:13:07.483+00:00",
+          "comment": "Dev: I checked, and it seems the secret was deleted accidentally. Recreated it and the issue is resolved."
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "GCP",
+          "label": "Platform"
+        },
+        {
+          "value": "pre-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "c30b1859-f26a-47c0-9ab9-921413b37d8d",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-04T17:13:07.483+00:00",
+      "status": "unresolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-04T17:13:07.483+00:00",
+          "comment": "Support: You’re hitting quota limits on API calls. Can you review your service usage metrics?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-04T19:13:07.483+00:00",
+          "comment": "Dev: Found the issue; one of our scripts was making excessive calls. Adjusted the script to reduce the frequency, and it’s working now."
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "GCP",
+          "label": "Platform"
+        },
+        {
+          "value": "dev-analytics",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "5e4042cf-66b8-47e2-9a5b-94a9a5c3a0fb",
+      "channelId": "Application Support",
+      "queryTs": "2024-12-31T18:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-31T18:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Load balancer health checks failing intermittently\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-31T20:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-31T22:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-01T00:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "GCP",
+          "label": "Platform"
+        },
+        {
+          "value": "dev",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "cb1c1d12-064b-4c29-9b25-f175986edb28",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-05T08:13:07.483+00:00",
+      "status": "unresolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T08:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Load balancer health checks failing intermittently\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T10:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T12:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T14:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, but the issue persists. Continuing to debug."
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "GCP",
+          "label": "Platform"
+        },
+        {
+          "value": "shadow-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "9795abfc-e761-4580-88df-c39c7179aaf8",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-01T09:13:07.483+00:00",
+      "status": "unresolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-01T09:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"DNS resolution issues for internal services\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-01T11:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-01T13:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-01T15:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, but the issue persists. Continuing to debug."
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "Azure",
+          "label": "Platform"
+        },
+        {
+          "value": "production",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "6e76eb6d-b9e3-465a-a32b-e2a76ca0402c",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-11T15:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-11T15:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"DNS resolution issues for internal services\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-11T17:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-11T19:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-11T21:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "test",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "22e842bd-1d22-4ca5-9196-4534316a481a",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-07T09:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-07T09:13:07.483+00:00",
+          "comment": "Support: The pod logs indicate a secret is missing. Can you confirm that the secret `app-credentials` exists in the namespace?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-07T11:13:07.483+00:00",
+          "comment": "Dev: I checked, and it seems the secret was deleted accidentally. Recreated it and the issue is resolved."
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "On-Prem",
+          "label": "Platform"
+        },
+        {
+          "value": "shadow-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "b6d917a8-8990-4f64-8a6c-944018090b61",
+      "channelId": "Core Support",
+      "queryTs": "2025-01-01T12:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-01T12:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Node resource exhaustion due to rogue processes\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-01T14:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-01T16:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-01T18:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "test",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "cce033bc-45ef-4f09-95a3-a4d8af57be9e",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-07T01:13:07.483+00:00",
+      "status": "unresolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-07T01:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Node resource exhaustion due to rogue processes\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-07T03:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-07T05:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-07T07:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, but the issue persists. Continuing to debug."
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "dev-analytics",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "10f53953-56e1-4815-b442-c1e7b85bcc33",
+      "channelId": "Core Support",
+      "queryTs": "2025-01-02T15:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-02T15:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Load balancer health checks failing intermittently\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-02T17:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-02T19:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-02T21:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "On-Prem",
+          "label": "Platform"
+        },
+        {
+          "value": "dev",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "447a1f35-63f3-41b9-b9d5-b113a5783a41",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-05T16:13:07.483+00:00",
+      "status": "unresolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T16:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Pod image pull failures due to expired credentials\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T18:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T20:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-05T22:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, but the issue persists. Continuing to debug."
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "production",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "2fa235a5-366d-4bd6-842e-56b0ad43b814",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-09T21:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-09T21:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Node resource exhaustion due to rogue processes\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-09T23:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-10T01:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-10T03:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "Azure",
+          "label": "Platform"
+        },
+        {
+          "value": "production",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "ac79dbe1-379e-4559-a402-258408bd7dcb",
+      "channelId": "Application Support",
+      "queryTs": "2024-12-31T06:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-31T06:13:07.483+00:00",
+          "comment": "Support: You’re hitting quota limits on API calls. Can you review your service usage metrics?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2024-12-31T08:13:07.483+00:00",
+          "comment": "Dev: Found the issue; one of our scripts was making excessive calls. Adjusted the script to reduce the frequency, and it’s working now."
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "production",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "3148b315-8cf6-426e-a1d4-66835398df80",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-12T01:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T01:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"DNS resolution issues for internal services\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T03:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T05:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-12T07:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "GCP",
+          "label": "Platform"
+        },
+        {
+          "value": "production",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "d6870917-8c03-4596-9563-e05d50b38880",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-08T06:13:07.483+00:00",
+      "status": "unresolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-08T06:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Cluster autoscaler stuck scaling down unnecessarily\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-08T08:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-08T10:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-08T12:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, but the issue persists. Continuing to debug."
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "test",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "9db39794-09ef-452c-9b67-1fcb4a640303",
+      "channelId": "Application Support",
+      "queryTs": "2024-12-31T10:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-31T10:13:07.483+00:00",
+          "comment": "Support: The pod logs indicate a secret is missing. Can you confirm that the secret `app-credentials` exists in the namespace?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2024-12-31T12:13:07.483+00:00",
+          "comment": "Dev: I checked, and it seems the secret was deleted accidentally. Recreated it and the issue is resolved."
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "Azure",
+          "label": "Platform"
+        },
+        {
+          "value": "dev-analytics",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "6be30f14-c61d-490d-a659-0a33c5a25b04",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-03T05:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-03T05:13:07.483+00:00",
+          "comment": "Support: The pod logs indicate a secret is missing. Can you confirm that the secret `app-credentials` exists in the namespace?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-03T07:13:07.483+00:00",
+          "comment": "Dev: I checked, and it seems the secret was deleted accidentally. Recreated it and the issue is resolved."
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "On-Prem",
+          "label": "Platform"
+        },
+        {
+          "value": "shadow-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "a2b4299a-d9bd-4490-bc03-e2281d6ac6e7",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-11T18:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-11T18:13:07.483+00:00",
+          "comment": "Support: Node logs show disk pressure. Try deleting unused volumes to free up space."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-11T20:13:07.483+00:00",
+          "comment": "Dev: Cleared the space, but the issue persists. Could the volume configuration itself be incorrect?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-11T22:13:07.483+00:00",
+          "comment": "Support: Checked the volume config; the access mode is incompatible. Updated it to `ReadWriteOnce`, and it’s working now."
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "Azure",
+          "label": "Platform"
+        },
+        {
+          "value": "dev",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    },
+    {
+      "id": "9ec95621-1dee-4cdc-8aa1-c83b2e5d5a46",
+      "channelId": "Core Support",
+      "queryTs": "2024-12-30T21:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-30T21:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Load balancer health checks failing intermittently\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-30T23:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2024-12-31T01:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2024-12-31T03:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "shadow-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "be6e0ddb-de5f-42f1-b3dd-01c2144d04ea",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-08T09:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-08T09:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Load balancer health checks failing intermittently\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-08T11:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-08T13:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-08T15:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "GCP",
+          "label": "Platform"
+        },
+        {
+          "value": "test",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "0e66fb20-7d10-409c-a97a-59868ef067bd",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-11T08:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-11T08:13:07.483+00:00",
+          "comment": "Support: The pod logs indicate a secret is missing. Can you confirm that the secret `app-credentials` exists in the namespace?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-11T10:13:07.483+00:00",
+          "comment": "Dev: I checked, and it seems the secret was deleted accidentally. Recreated it and the issue is resolved."
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "On-Prem",
+          "label": "Platform"
+        },
+        {
+          "value": "shadow-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "8674c198-220b-4817-b9f9-279a83d9afbe",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-04T03:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-04T03:13:07.483+00:00",
+          "comment": "Support: Node logs show disk pressure. Try deleting unused volumes to free up space."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-04T05:13:07.483+00:00",
+          "comment": "Dev: Cleared the space, but the issue persists. Could the volume configuration itself be incorrect?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-04T07:13:07.483+00:00",
+          "comment": "Support: Checked the volume config; the access mode is incompatible. Updated it to `ReadWriteOnce`, and it’s working now."
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "Azure",
+          "label": "Platform"
+        },
+        {
+          "value": "pre-prod",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "074abf52-7c71-441d-b4ef-9944f54f0efa",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-12T15:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-12T15:13:07.483+00:00",
+          "comment": "Support: The cloud provider is experiencing API downtime. Monitor their status page for updates."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-12T17:13:07.483+00:00",
+          "comment": "Dev: Saw the downtime was resolved. Redeployments are working again."
+        }
+      ],
+      "tags": [
+        {
+          "value": "schedule-service",
+          "label": "App"
+        },
+        {
+          "value": "GCP",
+          "label": "Platform"
+        },
+        {
+          "value": "test",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking BAU"
+    },
+    {
+      "id": "882c5d7f-5fba-434b-abad-27c7a0c9f1b9",
+      "channelId": "Cloud Support",
+      "queryTs": "2025-01-13T15:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-13T15:13:07.483+00:00",
+          "comment": "Support: Initial investigation suggests this is related to \"Pod image pull failures due to expired credentials\". Please provide additional logs for a deeper analysis."
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-13T17:13:07.483+00:00",
+          "comment": "Dev: Here are the logs. The issue seems intermittent. Can you suggest any configuration changes?"
+        },
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-13T19:13:07.483+00:00",
+          "comment": "Support: Consider increasing the timeout values or adding retries. Let us know the outcome."
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-13T21:13:07.483+00:00",
+          "comment": "Dev: Applied the changes, and the issue is resolved. Thanks for the help!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "tv-service",
+          "label": "App"
+        },
+        {
+          "value": "AWS",
+          "label": "Platform"
+        },
+        {
+          "value": "dev-analytics",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Abnormal Behaviour"
+    },
+    {
+      "id": "df04224c-87bc-4508-b359-d610f03a738f",
+      "channelId": "Application Support",
+      "queryTs": "2025-01-02T03:13:07.483+00:00",
+      "status": "resolved",
+      "statusHistory": [
+        {
+          "status": "unresolved",
+          "timestamp": "2025-01-02T03:13:07.483+00:00",
+          "comment": "Support: Your service account lacks `roles/storage.objectAdmin` permissions. Can you grant this role and retry?"
+        },
+        {
+          "status": "resolved",
+          "timestamp": "2025-01-02T05:13:07.483+00:00",
+          "comment": "Dev: Added the permissions, and the error is gone. Thanks for catching that!"
+        }
+      ],
+      "tags": [
+        {
+          "value": "native-app-analytics",
+          "label": "App"
+        },
+        {
+          "value": "GCP",
+          "label": "Platform"
+        },
+        {
+          "value": "test",
+          "label": "Environment"
+        }
+      ],
+      "impact": "Breaking Prod"
+    }
+  ]
