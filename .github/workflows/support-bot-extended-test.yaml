@@ -1,0 +1,27 @@
+name: support-bot Extended Test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 22 * * *'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  get-latest-version:
+    uses: coreeng/p2p/.github/workflows/p2p-get-latest-image-extended-test.yaml@p2p-v2-test
+    with:
+      image-name: support-bot-ui
+
+  extendedtests:
+    needs: [get-latest-version]
+    uses: coreeng/p2p/.github/workflows/p2p-workflow-extended-test.yaml@p2p-v2-test
+    secrets:
+      env_vars: ${{ secrets.env_vars }}
+    with:
+      app-name: support-bot
+      version: ${{ needs.get-latest-version.outputs.version }}
+      version-prefix: v
+      working-directory: ./
