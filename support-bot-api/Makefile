@@ -30,6 +30,7 @@ check:
 	./gradlew check
 
 TAG=latest
+IMAGE_NAME=ghcr.io/coreeng/support-bot
 PUBLISH=false
 # Specify next variables in case PUBLISH=true
 USERNAME=
@@ -38,7 +39,7 @@ PASSWORD=
 .PHONY: docker-build
 docker-build:
 	@export password="$(PASSWORD)"
-	@export args="-DimageTag=$(TAG)"
+	@export args="-DimageName=$(IMAGE_NAME):$(TAG)"
 	@if [[ "$(PUBLISH)" == "true" ]]; then \
 		args+=" --publishImage -Dusername=$(USERNAME) -Dpassword=$${password}"; \
 	fi

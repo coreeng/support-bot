@@ -10,7 +10,8 @@ P2P_IMAGE_NAMES := support-bot-api support-bot-ui
 
 .PHONY: lint
 lint:
-	docker run --rm -i docker.io/hadolint/hadolint < support-bot-api/Dockerfile
+	docker pull postgres:17.2-alpine
+	cd support-bot-api; ./gradlew pmdMain pmdTest
 	docker run --rm -i docker.io/hadolint/hadolint < support-bot-ui/Dockerfile
 
 
@@ -22,7 +23,8 @@ run-app:
 
 .PHONY: build-app
 build-app:
-	docker buildx build $(p2p_image_cache) --tag "$(call p2p_image_tag,support-bot-api)" ./support-bot-api
+	docker pull postgres:17.2-alpine
+	cd support-bot-api; ./gradlew jooqCodegen build test bootBuildImage -DimageName=$(call p2p_image_tag,support-bot-api)
 	docker buildx build $(p2p_image_cache) --tag "$(call p2p_image_tag,support-bot-ui)" ./support-bot-ui
 	docker image push "$(call p2p_image_tag,support-bot-api)"
 	docker image push "$(call p2p_image_tag,support-bot-ui)"
