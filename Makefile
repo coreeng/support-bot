@@ -1,5 +1,10 @@
-# Include P2P Makefile
-include Makefile.p2p
+# Set tenant and app name
+P2P_TENANT_NAME ?= support-bot
+P2P_APP_NAME ?= support-bot
+
+# Download and include p2p makefile
+$(shell curl -fsSL "https://raw.githubusercontent.com/coreeng/p2p/p2p-v2-test/p2p.mk" -o ".p2p.mk")
+include .p2p.mk
 
 P2P_IMAGE_NAMES := support-bot-api support-bot-ui
 
