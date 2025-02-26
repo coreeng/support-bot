@@ -3,7 +3,8 @@ import { Table, TableColumn } from '@backstage/core-components';
 import { Ticket } from '../../models/ticket';
 import { TicketDetail } from '../TicketDetail/ticket-detail';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Team, cleanTeamName } from '../../models/team';
+import { cleanTeamName, Team } from '../../models/team';
+import { DateTime } from 'luxon';
 
 type TicketTableComponentProps = {
   tickets: Ticket[];
@@ -11,9 +12,19 @@ type TicketTableComponentProps = {
   filters: {
     status?: string;
     team?: string;
-  }
+  };
   maxShown?: number;
   onFilterChange?: (filters: { status?: string; team?: string }) => void;
+};
+
+type TicketRow = {
+  id: string,
+  thread: string,
+  creationTeam: string,
+  dateCreated: DateTime,
+  status: 'Opened' | 'Closed',
+  impact: string,
+  escalationCount: number,
 };
 
 export const TicketTableComponent = ({ tickets, teams, filters, maxShown, onFilterChange }: TicketTableComponentProps) => {
@@ -30,19 +41,18 @@ export const TicketTableComponent = ({ tickets, teams, filters, maxShown, onFilt
   };
 
   const defaultTeamFilter = filters.team ? [filters.team] : teamLookup.values;
-  const defaultStatusFilter = filters.status ? filters.status : '';
 
   const ticketId = new URLSearchParams(location.search).get('ticketId');
   const selectedTicket = ticketId ? tickets.find(ticket => ticket.id === ticketId) : null;
 
-  const handleRowClick = (ticket: Ticket) => {
+  const handleRowClick = (ticket: TicketRow) => {
     navigate(`?ticketId=${ticket.id}`);
   }
   const handleCloseModal = () => {
     navigate(location.pathname);
   }
 
-  const columns: TableColumn[] = [
+  const columns: TableColumn<TicketRow>[] = [
     { title: 'Ticket ID', field: 'id', highlight: true, width: 'auto' },
     { title: 'Thread', field: 'thread', filtering: false, render: (rowData) => <a href={rowData.thread}>{rowData.thread}</a> },
     { 
@@ -65,9 +75,6 @@ export const TicketTableComponent = ({ tickets, teams, filters, maxShown, onFilt
     { title: 'Status', field: 'status', lookup: statusLookup, width: '70px',  },
     { title: 'Impact', field: 'impact', width: '100px' },
     { title: '# escalations', field: 'escalationCount', type: 'numeric', filtering: false },
-    // { title: 'Cloud Provider', field: 'cloudProvider', lookup: cloudLookup, width: 'auto' },
-    // { title: 'Environment', field: 'environment', lookup: environmentLookup, width: 'auto' },
-    // { title: 'App', field: 'app', lookup: appLookup },
   ];
 
   const data = tickets.map(ticket => {
@@ -79,21 +86,20 @@ export const TicketTableComponent = ({ tickets, teams, filters, maxShown, onFilt
       status: ticket.status == 'opened' ? 'Open' : 'Closed',
       impact: ticket.impact,
       escalationCount: ticket.escalations.length,
-    };
+    } as TicketRow;
   });
 
-  const rowStyle = (data, index, level) => {
-    const isOpen = data.status === 'open';
+  const rowStyle = (data: TicketRow, _index: number, _level: number): React.CSSProperties => {
+    const isOpen = data.status === 'Opened';
     const isBreakingProd = data.impact === 'productionBreaking';
     const requiresUrgentAttention = isOpen && isBreakingProd;
     return {
-      backgroundColor: requiresUrgentAttention ? 'red' : null,
+      backgroundColor: requiresUrgentAttention ? 'red' : undefined,
     };
   };
 
   const eligibleData = data.filter(row => {
-    const hasCorrectStatus = filters.status ? row.status === filters.status : true;
-    let isEligible = hasCorrectStatus
+    let isEligible = filters.status ? row.status === filters.status : true;
     if (isEligible && filters.team && filters.team.length) {
       isEligible = filters.team.includes(row.creationTeam);
     }
@@ -107,7 +113,7 @@ export const TicketTableComponent = ({ tickets, teams, filters, maxShown, onFilt
         options={{ search: true, paging: true, pageSize: maxShown || 20, filtering: true, rowStyle }}
         columns={columns}
         data={eligibleData}
-        onRowClick={(event, rowData) => handleRowClick(rowData)}
+        onRowClick={(_event, rowData) => handleRowClick(rowData!!)}
         onFilterChange={(filters) => {
           const statusFilter =  filters.find(filter => filter.column.field === 'status');
           const teamFilter = filters.find(filter => filter.column.field === 'creationTeam');

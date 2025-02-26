@@ -18,7 +18,7 @@ export class Escalation {
   id: string;
   ticketId: string;
   threadLink: string;
-  dateCreated: DateTime;
+  openedAt: DateTime;
   resolvedAt: DateTime;
   team: Team;
   tags: string[];
@@ -28,7 +28,7 @@ export class Escalation {
     id,
     ticketId,
     threadLink,
-    dateCreated,
+    openedAt,
     resolvedAt,
     team,
     tags,
@@ -36,16 +36,16 @@ export class Escalation {
     id: string;
     ticketId: string;
     threadLink: string;
-    dateCreated: DateTime;
-    resolvedAt: DateTime;
+    openedAt: DateTime | string;
+    resolvedAt: DateTime | string;
     team: Team;
     tags: string[];
   }) {
     this.id = id;
     this.ticketId = ticketId;
     this.threadLink = threadLink;
-    this.dateCreated = dateCreated;
-    this.resolvedAt = resolvedAt;
+    this.openedAt = typeof openedAt == 'string' ? DateTime.fromISO(openedAt) : openedAt;
+    this.resolvedAt = typeof resolvedAt == 'string' ? DateTime.fromISO(resolvedAt) : resolvedAt;
     this.team = team;
     this.tags = tags;
     this.isOpen = !resolvedAt;

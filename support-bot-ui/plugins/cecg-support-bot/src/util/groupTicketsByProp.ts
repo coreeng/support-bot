@@ -1,5 +1,5 @@
 // groupTicketsByProp.ts
-import { Ticket } from '../src/models/ticket';
+import {Ticket} from '../models/ticket';
 
 /** 
  * Groups tickets by a string property (e.g., 'impact', 'client', etc.)
@@ -16,9 +16,7 @@ export function groupTicketsByProp(tickets: Ticket[], prop: keyof Ticket) {
   }
 
   // Turn that map into an array sorted by descending count
-  const result = Object.entries(counts)
+  return Object.entries(counts)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
-
-  return result;
 }

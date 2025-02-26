@@ -2,15 +2,13 @@ import React from 'react';
 import { Content } from '@backstage/core-components';
 import { Grid, Typography } from '@material-ui/core';
 import { Ticket } from '../../models/ticket';
-import { Team } from '../../models/team';
-import { UserWithTeams } from '../../models/user';
+import { User } from '../../models/user';
 import { QuickAccessComponent } from '../../components/QuickAccess/QuickAccessComponent';
 import { Escalation } from '../../models/escalation';
 
 type HomePageProps = {
     tickets: Ticket[];
-    teams: Team[];
-    user: UserWithTeams;
+    user: User;
     escalations: Escalation[];
 };
 
@@ -31,7 +29,7 @@ export const HomePage = (props: HomePageProps) => {
           </Grid>
         </Grid>
 
-        {props.user.teams.map(team => {
+        {props.user.teams && props.user.teams.map(team => {
           let teamTickets = props.tickets.filter(t => t.team?.name === team.name)
           for (let ticket of teamTickets) {
             ticket.escalations = props.escalations.filter(e => `${e.ticketId}` === ticket.id);

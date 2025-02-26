@@ -93,6 +93,7 @@ export function aggregateActiveTickets(tickets: Ticket[]): { day: string; count:
 }
 
 // Example aggregator #1: "Tickets Opened" by day
+// @ts-ignore
 function aggregateTicketsOpened(tickets: Ticket[]) {
     const now = DateTime.now();
     let result: { day: string; count: number }[] = [];
@@ -118,7 +119,7 @@ function aggregateTicketsOpened(tickets: Ticket[]) {
 function aggregateTicketsByTeam(tickets: Ticket[], teams: Team[], metric: 'opened' | 'active'): ChartData[] {
   if (!tickets || tickets.length === 0) return [];
 
-  // Get earliest ticket date
+  // Get the earliest ticket date
   const earliestDay = tickets.reduce((earliest, ticket) => {
     return ticket.dateCreated < earliest ? ticket.dateCreated : earliest;
   }, tickets[0].dateCreated).startOf('day');
@@ -130,7 +131,7 @@ function aggregateTicketsByTeam(tickets: Ticket[], teams: Team[], metric: 'opene
   // Create empty dataset template
   const data: ChartData[] = Array.from({ length: daysBetween + 1 }, (_, i) => ({
     day: i === 0 ? 'Today' : `-${i}d`,
-    teams: teams.sort((a, b) => a.name > b.name).reduce((acc, team) => {
+    teams: teams.sort((a, b) => a.name.localeCompare(b.name)).reduce((acc, team) => {
       acc[cleanTeamName(team.name)] = 0;
       return acc;
     }, {} as { [teamName: string]: number })
@@ -149,8 +150,6 @@ function aggregateTicketsByTeam(tickets: Ticket[], teams: Team[], metric: 'opene
       const dayStart = now.minus({ days: i }).startOf('day');
       const dayEnd = now.minus({ days: i }).endOf('day');
 
-      const dayLabel = data[daysBetween - i].day; // Find the correct day slot
-      
       // Count tickets based on selected metric
       const isRelevant = metric === 'opened'
         ? ticket.dateCreated >= dayStart && ticket.dateCreated <= dayEnd

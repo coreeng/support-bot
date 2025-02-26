@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import { Ticket } from "../../models/ticket";
 import { InfoCard } from '@backstage/core-components';
-import { FormControl, Grid, InputLabel, makeStyles, MenuItem, Select, Typography } from '@material-ui/core';
+import { Grid, makeStyles, Typography } from '@material-ui/core';
 import { TimeSeriesChart } from "../../components/TimeSeriesChart/TimeSeriesChart";
 import { CategoryChart } from "../../components/CategoryChart/CategoryChart";
 import { Team } from "../../models/team";
@@ -19,6 +19,7 @@ export interface ChartDatum {
     openTickets: number;
 }
 
+// @ts-ignore
 const useStyles = makeStyles(theme => ({
   filterContainer: {
     marginBottom: theme.spacing(4), // Adds vertical spacing around the filter container
@@ -30,14 +31,14 @@ const useStyles = makeStyles(theme => ({
 }));
 
 export const HealthAndStatsPage = (props: HealthAndStatsPageProps) => {
-    const classes = useStyles();
-    const firstContactResolution = 61; // 61%
-    const repeatIssueRate = 16; // 16%
+    // const classes = useStyles();
+    // const firstContactResolution = 61; // 61%
+    // const repeatIssueRate = 16; // 16%
     const averageResponseTime = '1h 9m';
     const averageResolveTime = '4h 25m';
     const largestActiveTicketTime = '5d 6h';
 
-    const [selectedTeam, setSelectedTeam] = useState<string>("All");
+    // const [selectedTeam, setSelectedTeam] = useState<string>("All");
     
 
     return (
