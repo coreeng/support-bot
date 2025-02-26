@@ -1,7 +1,6 @@
 import React from 'react';
 import { Table, TableColumn } from '@backstage/core-components';
 import { Ticket } from '../../models/ticket';
-import { DateTime } from 'luxon';
 import { TicketDetail } from '../TicketDetail/ticket-detail';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -9,7 +8,7 @@ type TicketTableComponentProps = {
   tickets: Ticket[];
 };
 
-export const   QuickAccessTable = ({ tickets }: TicketTableComponentProps) => {
+export const QuickAccessTable = ({ tickets }: TicketTableComponentProps) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -23,7 +22,7 @@ export const   QuickAccessTable = ({ tickets }: TicketTableComponentProps) => {
     navigate(location.pathname);
   }
 
-  const columns: TableColumn[] = [
+  const columns: TableColumn<any>[] = [
     { title: 'Ticket ID', field: 'id', highlight: true, width: 'auto' },
     { title: 'Thread', field: 'thread', filtering: false,
       render: rowData => <a href={rowData.thread}>{rowData.thread}</a> },
@@ -52,12 +51,12 @@ export const   QuickAccessTable = ({ tickets }: TicketTableComponentProps) => {
     };
   });
 
-  const rowStyle = (data, index, level) => {
+  const rowStyle = (data: any, _index: number, _level: number): React.CSSProperties => {
     const isOpen = data.status === 'unresolved' || data.status === 'escalated';
     const isBreakingProd = data.impact === 'Breaking Prod';
     const requiresUrgentAttention = isOpen && isBreakingProd;
     return {
-      backgroundColor: requiresUrgentAttention ? 'red' : null,
+      backgroundColor: requiresUrgentAttention ? 'red' : undefined,
     };
   };
 
@@ -70,7 +69,7 @@ export const   QuickAccessTable = ({ tickets }: TicketTableComponentProps) => {
         options={{ search: false, paging: true, pageSize: maxPageSize, filtering: false, rowStyle }}
         columns={columns}
         data={data}
-        onRowClick={(event, rowData) => handleRowClick(rowData)}
+        onRowClick={(_event, rowData) => handleRowClick(rowData)}
       />
       <TicketDetail
         open={!!selectedTicket}

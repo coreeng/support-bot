@@ -1,6 +1,4 @@
-import { HttpAuthService } from '@backstage/backend-plugin-api';
 import { InputError } from '@backstage/errors';
-import { z } from 'zod';
 import express from 'express';
 import Router from 'express-promise-router';
 import { TicketsService } from './services/TicketsService/types';
@@ -41,7 +39,7 @@ export async function createRouter({
     res.json(await ticketService.getUserTeams({ email }));
   });
 
-  router.get('/stats', async (req, res) => {
+  router.get('/stats', async (_req, res) => {
     // console.log(`GET /stats::::::: WHOOPITY!!!`);
     // const from = req.body[0]["from"] as string;
     // const to = req.body[0]["to"] as string;

@@ -10,7 +10,7 @@ import {
   MenuItem,
 } from '@material-ui/core';
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer } from 'recharts';
-import { groupTicketsByProp } from '../../../util/groupTicketsByProp';
+import { groupTicketsByProp } from '../../util/groupTicketsByProp';
 
 type CategoryChartProps = {
   tickets: Ticket[];
