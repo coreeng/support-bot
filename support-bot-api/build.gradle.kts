@@ -103,9 +103,7 @@ tasks.withType<Test> {
 }
 
 tasks.withType<BootBuildImage> {
-    val imageTag = System.getProperty("imageTag") ?: "latest"
-    imageName = "ghcr.io/coreeng/support-bot:${imageTag}"
-
+    imageName = System.getProperty("imageName") ?: "support-bot:latest"
     docker {
         publishRegistry {
             username = System.getProperty("username")
