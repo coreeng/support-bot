@@ -1,9 +1,22 @@
 import React, { useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer } from "recharts";
 import { DateTime } from "luxon";
-import { SentimentSummary } from "../../models/sentiment-summary";
+import {SentimentSummary, SentimentSummaryValue} from "../../models/sentiment-summary";
 import { InfoCard } from "@backstage/core-components";
 import { FormControl, MenuItem, Select, Typography } from "@material-ui/core";
+
+type SentimentPerDay = {
+    date: DateTime;
+    author_negative: number,
+    author_neutral: number,
+    author_positive: number,
+    support_negative: number,
+    support_neutral: number,
+    support_positive: number,
+    others_negative: number,
+    others_neutral: number,
+    others_positive: number,
+}
 
 const aggregateDailyValues = (data: SentimentSummary, previousDays: number) => {
     const dateRelevantData = data.values.filter((value) => {
@@ -29,8 +42,8 @@ const aggregateDailyValues = (data: SentimentSummary, previousDays: number) => {
         support: { negative: 0, neutral: 0, positive: 0 },
         others: { negative: 0, neutral: 0, positive: 0 }
     });
-    
-    const chartData = [
+
+    return [
         {
             name: "author",
             negative: formattedData.author.negative,
@@ -50,15 +63,18 @@ const aggregateDailyValues = (data: SentimentSummary, previousDays: number) => {
             positive: formattedData.others.positive
         }
     ];
-    return chartData;
 }
 
-const aggregateAllValues = (data: SentimentSummary) => {
-    const groupedData = data.values.reduce((acc, value) => {
-        const dateKey = DateTime.fromISO(value.date).toFormat("yyyy-MM-dd");
+const aggregateAllValues = (data: SentimentSummary): SentimentPerDay[] => {
+    type GroupedSentiment = {
+       [key: string]: SentimentPerDay
+    }
+    const groupedData = data.values.reduce((acc: GroupedSentiment, value: SentimentSummaryValue): GroupedSentiment => {
+        const date = DateTime.fromISO(value.date);
+        const dateKey = date.toFormat("yyyy-MM-dd");
         if (!acc[dateKey]) {
             acc[dateKey] = {
-                date: dateKey,
+                date: date,
                 author_negative: 0,
                 author_neutral: 0,
                 author_positive: 0,
@@ -81,8 +97,7 @@ const aggregateAllValues = (data: SentimentSummary) => {
         acc[dateKey].others_positive += value.othersSentiments.positives;
         return acc;
     }, {});
-    const chartData = Object.values(groupedData).sort((a, b) => a.date.localeCompare(b.date));
-    return chartData;
+    return Object.values(groupedData).sort((a, b) => a.date.toMillis() - b.date.toMillis());
 }
 
 
