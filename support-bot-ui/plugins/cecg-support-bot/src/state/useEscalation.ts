@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { supportBotApiRef } from '../api/SupportBotApi';
 import { useApi } from '@backstage/core-plugin-api';
 import { Escalation } from '../models/escalation';
+import {wrapError} from "../util/errors";
 
 export const useEscalations = () => {
   const ticketApi = useApi(supportBotApiRef);
   const [escalations, setEscalations] = useState<Escalation[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -17,7 +18,7 @@ export const useEscalations = () => {
         const data = await ticketApi.getEscalations();
         setEscalations(data);
       } catch (err) {
-        setError(err.message || 'Failed to fetch escalations');
+        setError(wrapError(err, 'Failed to fetch escalations'));
       } finally {
         setLoading(false);
       }

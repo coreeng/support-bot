@@ -3,8 +3,7 @@ import {
   createBackendPlugin,
 } from '@backstage/backend-plugin-api';
 import { createRouter } from './router';
-import { catalogServiceRef } from '@backstage/plugin-catalog-node/alpha';
-import { createTicketsService } from './services/TicketsService/createTicketsService';
+import { createTicketsService } from './services/TicketsService';
 
 /**
  * slackbotApiPlugin backend plugin
@@ -30,8 +29,8 @@ export const slackbotApiPlugin = createBackendPlugin({
         // todo: remove below. For dev purposes only.
         const routes = [...new Set(router.stack
                                     .filter(layer => layer.route)
-                                    .map(layer => layer.route.path))];
-        
+                                    .map(layer => layer.route!!.path))];
+
         for (let endpoint of routes) {
           httpRouter.addAuthPolicy({
             path: endpoint,

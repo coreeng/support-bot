@@ -4,7 +4,7 @@ import { TicketTableComponent } from './TicketTableComponent';
 
 describe('ExampleFetchComponent', () => {
   it('renders the user table', async () => {
-    render(<TicketTableComponent />);
+    render(<TicketTableComponent tickets={[]} filters={{}} teams={[]} />);
 
     // Wait for the table to render
     const table = await screen.findByRole('table');
