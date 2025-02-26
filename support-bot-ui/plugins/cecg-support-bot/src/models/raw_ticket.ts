@@ -7,7 +7,7 @@ export interface RawQuery {
   
 export interface RawTeam {
     name: string;
-    type: string; // Could be "tenant" or other types
+    types: string[]; // Could be "tenant" or other types
 }
   
 export interface RawLog {
@@ -22,7 +22,7 @@ export interface RawEscalation {
 export interface RawTicket {
     id: number;
     query: RawQuery;
-    status: string; // Example: "opened" | "closed"
+    status: string; // Example: "opened" | "closed" | "stale"
     escalated: boolean;
     team: RawTeam | null; // Can be null
     impact: string | null; // Can be null, example: "productionBlocking" | "bauBlocking" | "abnormalBehaviour"

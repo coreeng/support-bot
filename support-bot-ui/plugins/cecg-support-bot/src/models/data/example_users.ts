@@ -11,16 +11,3 @@ export const supportEngineers: User[] = [
     { name: "Nathan" },
     { name: "Ilia" },
 ];
-
-export const secondLineSupport: User[] = [
-    { name: "Kostas" },
-    { name: "Tiago" },
-    { name: "Paul" },
-];
-
-export const leadership: User[] = [
-    { name: "Joseph" },
-    { name: "Alberto" },
-    { name: "Chris" },
-    { name: "Jordan" },
-];
