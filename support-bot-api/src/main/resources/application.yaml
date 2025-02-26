@@ -91,5 +91,9 @@ support-team:
   name: Core Support
   slack-group-id: S08948NBMED
 
+ai:
+  sentiment-analysis:
+    enabled: false
+
 mock-data:
   enabled: false
