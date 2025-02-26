@@ -73,7 +73,7 @@ export class Ticket {
       id: raw.id.toString(),
       thread: raw.query.link,
       escalated: raw.escalated,
-      team: raw.team ? { name: raw.team.name, type: raw.team.type as TeamType } : undefined,
+      team: raw.team ? { name: raw.team.name, types: raw.team.types as TeamType[] } : undefined,
       dateCreated: DateTime.fromISO(raw.query.date),
       status: raw.status as TicketStatus,
       logs: raw.logs.map(log => ({ event: log.event as TicketStatus, timestamp: DateTime.fromISO(log.date) })),

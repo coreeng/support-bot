@@ -11,11 +11,12 @@ export async function createTicketsService({
 
   return {
     async listTickets(): Promise<{ items: object[] }> {
+      // TODO: do normal paging
       try {
           let allTickets: object[] = [];
           let currentPage = 0; // api pagination is zero-based for some reason
           let totalPages = 1;
-          
+
           while (currentPage < totalPages) {
             const url = `http://localhost:8080/ticket?page=${currentPage}&pageSize=10`;
             const response = await fetch(url);
@@ -70,7 +71,7 @@ export async function createTicketsService({
           let allEscalations: object[] = [];
           let currentPage = 0; // api pagination is zero-based for some reason
           let totalPages = 1;
-          
+
           while (currentPage < totalPages) {
             const url = `http://localhost:8080/escalation?page=${currentPage}&pageSize=10`;
             const response = await fetch(url);
@@ -121,6 +122,7 @@ export async function createTicketsService({
     },
 
     async getStats(): Promise<object> {
+      // TODO: parameterize me
       try {
         const response = await fetch(`http://localhost:8080/stats`, {
           method: 'POST',
@@ -131,7 +133,7 @@ export async function createTicketsService({
             {
               "type": "ticket-sentiments-count",
               "from": "2025-01-13",
-              "to": "2025-02-03"
+              "to": "2025-02-19"
             }
           ])
         });
@@ -464,7 +466,7 @@ export async function createTicketsService({
         // }
         // const data = await response.json();
         // return data;
-        
+
       // } catch (error) {
       //   logger.error(`Failed to fetch user team data: ${error}`);
       //   throw error;

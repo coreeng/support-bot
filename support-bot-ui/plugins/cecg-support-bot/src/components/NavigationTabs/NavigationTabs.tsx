@@ -16,10 +16,10 @@ export const getCurrentTab = (pathname: string): string => {
     return match ? match.value : 'home';
 };
 
-export const NavigationTabs = ({ currentTab, isLeadershipUser }: { currentTab: string, isLeadershipUser: boolean }) => (
+export const NavigationTabs = ({ currentTab, isSupport }: { currentTab: string, isSupport: boolean }) => (
   <Tabs value={currentTab}>
     {tabs.filter(t => {
-      if (t.value === 'healthAndStats' && !isLeadershipUser) {
+      if (t.value === 'healthAndStats' && !isSupport) {
         return false;
       }
       return true;

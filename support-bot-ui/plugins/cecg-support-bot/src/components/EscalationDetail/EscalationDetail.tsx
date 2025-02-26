@@ -7,7 +7,6 @@ import {
   Button,
   Typography,
   Divider,
-  Box,
   Chip,
 } from '@material-ui/core';
 import { Escalation } from '../../models/escalation';
@@ -33,7 +32,7 @@ export const EscalationDetail = ({ open, escalation, ticket, onClose }: TicketMo
           <strong>Ticket Team</strong> {ticket?.team?.name}
         </Typography>
         <Typography variant="body1">
-          <strong>Time:</strong> {escalation.dateCreated.toLocaleString()}
+          <strong>Time:</strong> {escalation.openedAt.toLocaleString()}
         </Typography>
 
         <Divider style={{ margin: '1em 0' }} />

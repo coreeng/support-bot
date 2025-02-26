@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Header, HeaderLabel } from '@backstage/core-components';
 import { MenuItem, FormControl, Select, InputLabel } from '@material-ui/core';
 import { User } from '../../models/user';
-import { tenantUsers, supportEngineers } from '../../models/data/example_users';
+import { tenantUsers } from '../../models/data/example_users';
 
 type AppHeaderProps = {
   currentUser: User;
