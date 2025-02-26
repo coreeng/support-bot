@@ -10,7 +10,6 @@ import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -22,7 +21,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.stream.Collectors.groupingBy;
 
-@Repository
 @RequiredArgsConstructor
 public class SentimentInMemoryRepository implements SentimentRepository {
     private final TicketQueryService ticketQueryService;

@@ -167,7 +167,7 @@ public class JdbcEscalationRepository implements EscalationRepository {
             dsl.select(bigCount())
                 .from(ESCALATION)
                 .where(ESCALATION.TICKET_ID.eq(ticketId.id())
-                    .and(ESCALATION.STATUS.eq(com.coreeng.supportbot.dbschema.enums.EscalationStatus.resolved)))
+                    .and(ESCALATION.STATUS.ne(com.coreeng.supportbot.dbschema.enums.EscalationStatus.resolved)))
                 .fetchOne(0, Long.class)
         );
     }
