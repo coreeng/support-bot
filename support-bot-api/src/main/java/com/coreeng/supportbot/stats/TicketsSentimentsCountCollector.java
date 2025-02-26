@@ -4,10 +4,12 @@ import com.coreeng.supportbot.sentiment.SentimentRepository;
 import com.coreeng.supportbot.sentiment.TicketSentimentCountPerDate;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty("ai.sentiment-analysis.enabled")
 public class TicketsSentimentsCountCollector implements StatsCollector<StatsRequest.TicketSentimentCounts> {
     private final SentimentRepository sentimentRepository;
 

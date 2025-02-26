@@ -17,7 +17,6 @@ import com.slack.api.methods.request.conversations.ConversationsRepliesRequest;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
 import com.slack.api.model.User;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 
 import javax.annotation.Nullable;
 import java.util.Objects;
@@ -26,7 +25,6 @@ import static com.coreeng.supportbot.ticket.TicketStatus.closed;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 
-@Service
 @RequiredArgsConstructor
 public class SentimentService {
     private final TicketQueryService ticketQueryService;
