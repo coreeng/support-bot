@@ -22,8 +22,8 @@ run-app:
 
 .PHONY: build-app
 build-app:
-	docker build --tag "$(call p2p_image_tag,support-bot-api)" ./support-bot-api
-	docker build --tag "$(call p2p_image_tag,support-bot-ui)" ./support-bot-ui
+	docker buildx build $(p2p_image_cache) --tag "$(call p2p_image_tag,support-bot-api)" ./support-bot-api
+	docker buildx build $(p2p_image_cache) --tag "$(call p2p_image_tag,support-bot-ui)" ./support-bot-ui
 	docker image push "$(call p2p_image_tag,support-bot-api)"
 	docker image push "$(call p2p_image_tag,support-bot-ui)"
 
