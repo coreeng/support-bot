@@ -1,11 +1,14 @@
-import { createApiRef, DiscoveryApi, IdentityApi } from '@backstage/core-plugin-api';
+import {
+  createApiRef,
+  DiscoveryApi,
+  IdentityApi,
+} from '@backstage/core-plugin-api';
 import { Ticket } from '../models/ticket';
-import { RawTicketResponse, RawTicket } from '../models/raw_ticket';
+import { RawTicket, RawTicketResponse } from '../models/raw_ticket';
 import { Team } from '../models/team';
-import { User, UserWithTeams } from '../models/user';
 import { Escalation } from '../models/escalation';
-import { DateTime } from 'luxon';
 import { SentimentSummary } from '../models/sentiment-summary';
+import { User } from '../models/user';
 
 export const supportBotApiRef = createApiRef<SupportBotApi>({
   id: 'plugin.cecg.slackbot-api',
@@ -32,8 +35,7 @@ export class SupportBotApi {
       throw new Error(`Failed to fetch tickets: ${response.statusText}`);
     }
     const responseJson = await response.json() as RawTicketResponse;
-    const tickets = responseJson.items.map(item => Ticket.fromRawApi(item));
-    return tickets;
+    return responseJson.items.map(item => Ticket.fromRawApi(item));
   }
 
   async getTicket(id: string): Promise<Ticket> {
@@ -56,8 +58,7 @@ export class SupportBotApi {
         Authorization: `Bearer ${token}`,
       },
     });
-    const responseJson = await response.json() as Team[];
-    return responseJson;
+    return (await response.json()) as Team[];
   }
 
   async getEscalations(): Promise<Escalation[]> {
@@ -68,16 +69,11 @@ export class SupportBotApi {
         Authorization: `Bearer ${token}`,
       },
     });
-    const responseJson = await response.json() as { items: Escalation[] };
-    return responseJson.items.map(i => {
-      let e = new Escalation(i);
-      e.dateCreated = DateTime.fromISO(i["openedAt"]);
-      e.resolvedAt = DateTime.fromISO(i["resolvedAt"]);
-      return e;
-    });
+    const responseJson = await response.json() as { items: any[] };
+    return responseJson.items.map(i => new Escalation(i));
   }
 
-  async getUserTeams(email_address: string): Promise<UserWithTeams> {
+  async getUser(email_address: string): Promise<User> {
     const url = `${await this.discoveryApi.getBaseUrl('slackbot-api')}/user?email=${email_address}`;
     const { token } = await this.identityApi.getCredentials();
     const response = await fetch(url, {
@@ -97,7 +93,6 @@ export class SupportBotApi {
         Authorization: `Bearer ${token}`,
       }
     });
-    const responseJson = await response.json();
-    return responseJson;
+    return await response.json();
   }
 }

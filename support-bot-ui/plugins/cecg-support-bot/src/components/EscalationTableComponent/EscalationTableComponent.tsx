@@ -22,16 +22,22 @@ type EscalationTableComponentProps = {
   onFilterChange?: (filters: { status?: string; team?: string }) => void;
 };
 
-export const EscalationTableComponent = ({ escalations, tickets, teams, filters, onFilterChange }: EscalationTableComponentProps) => {
+type EscalationRow = {
+  id: string,
+  ticketId: string,
+  thread: string,
+  assignedTeam: string,
+  dateCreated: string | null,
+  dateResolved: string | null,
+  isOpen: string,
+  tags: string,
+}
+
+export const EscalationTableComponent = ({ escalations, tickets }: EscalationTableComponentProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const ticketsLink = useRouteRef(ticketRouteRef);
 
-  const teamLookup: {[key: string]: string} = teams.sort((a, b) => a.name.localeCompare(b.name)).reduce((acc: {[key: string]: string}, team: Team) => {
-    if (!team || !team.name) return acc;
-    acc[team.name] = cleanTeamName(team.name);
-    return acc;
-  }, {} as {[key: string]: string});
   const statusLookup: {[key: string]: string} = {
     Open: 'Open',
     Closed: 'Closed'
@@ -45,72 +51,80 @@ export const EscalationTableComponent = ({ escalations, tickets, teams, filters,
   console.log(`Selected Escalation: `, selectedEscalation, typeof selectedEscalation?.id);
   console.log(`Selected Escalation Ticket: `, selectedEscalationTicket);
 
-  const handleRowClick = (ticket: Ticket) => {
-    navigate(`?escalationId=${ticket.id}`);
+  const handleRowClick = (escalation: EscalationRow | undefined) => {
+    if (escalation) {
+      navigate(`?escalationId=${escalation.id}`);
+    }
   }
   const handleCloseModal = () => {
     navigate(location.pathname);
   }
 
-  const columns: TableColumn[] = [
+  const columns: TableColumn<any>[] = [
     { title: 'Escalation ID', field: 'id', highlight: true, width: 'auto', grouping: false, type: 'numeric' },
     { title: 'Ticket ID', field: 'ticketId', width: 'auto', type: 'numeric',
-        render: (rowData, type) => (
-          type == "row"
-          ? (<a href={`${ticketsLink()}?ticketId=${rowData.ticketId}`}>{rowData.ticketId}</a>)
-          : (<span>{rowData} <em>({escalations.filter(e => e.ticketId == rowData).length} escalations)</em></span>)
-        )
+        render: (rowData: EscalationRow | string, type) => {
+          const ticketId =
+            typeof rowData == 'string' ? rowData : rowData.ticketId;
+          return type == "row"
+              ? (<a href={`${ticketsLink()}?ticketId=${ticketId}`}>{ticketId}</a>)
+              : (<span>{ticketId} <em>({escalations.filter(e => e.ticketId == ticketId).length} escalations)</em></span>)
+        }
     },
     { title: 'Thread', field: 'thread', width: 'auto', filtering: false, render: (rowData) => <a href={rowData.thread}>{rowData.thread}</a> },
     { title: 'Date Created', field: 'dateCreated', type: 'datetime', width: 'auto'},
     { title: 'Escalation Team',
       field: 'assignedTeam',
-      lookup: teamLookup,
       width: 'auto',
       defaultGroupOrder: 0,
-      render: (rowData, type) => {
+      render: (rowData: EscalationRow | string, type): any => {
+        const teamName = typeof rowData === 'string'
+            ? rowData
+            : rowData.assignedTeam;
+        const teamNameToDisplay = cleanTeamName(teamName);
         return type === 'group'
-          ? (<span>{cleanTeamName(rowData)} <em>({escalations.filter(e => cleanTeamName(e.team.name) === rowData).length} escalations, {escalations.filter(e => cleanTeamName(e.team.name) === rowData && e.isOpen).length} open)</em></span>)
-          : cleanTeamName(rowData.assignedTeam);
+          ? (<span>{teamNameToDisplay} <em>({escalations.filter(e => e.team.name === teamName).length} escalations, {escalations.filter(e => e.team.name === teamName && e.isOpen).length} open)</em></span>)
+          : teamNameToDisplay;
       },
     },
     { title: 'Status', field: 'isOpen', lookup: statusLookup, width: '70px' }
   ];
 
   const data = escalations.map(escalation => {
+    console.log(`Escalation row: `, escalation);
     return {
       id: escalation.id,
       ticketId: escalation.ticketId,
       thread: escalation.threadLink,
       assignedTeam: escalation.team.name,
-      dateCreated: escalation.dateCreated.toRelative({ locale: 'en' }),
+      dateCreated: escalation.openedAt.toRelative({ locale: 'en' }),
       dateResolved: escalation.resolvedAt ? escalation.resolvedAt.toRelative({ locale: 'en' }) : 'Unresolved',
       isOpen: escalation.isOpen ? "Open" : "Closed",
       tags: escalation.tags.join(", "),
-    };
+    } as EscalationRow;
   });
 
-  const rowStyle = (data, index, level) => {
+  const rowStyle = (data: any, _index: number, _level: number): React.CSSProperties => {
     const isOpen = data.status === 'unresolved' || data.status === 'escalated';
     const isBreakingProd = data.impact === 'Breaking Prod';
     const requiresUrgentAttention = isOpen && isBreakingProd;
     return {
-      backgroundColor: requiresUrgentAttention ? 'red' : null,
+      backgroundColor: requiresUrgentAttention ? 'red' : undefined,
     };
   };
 
-  const eligibleData = data.filter(row => {
+  const eligibleData = data.filter(_ => {
     return true;
   });
 
   return (
     <>
-      <Table
+      <Table<EscalationRow>
         title="Support Ticket Escalations"
         options={{ search: true, paging: true, pageSize: 20, filtering: true, rowStyle, grouping: true }}
         columns={columns}
         data={eligibleData}
-        onRowClick={(event, rowData) => handleRowClick(rowData)}
+        onRowClick={(_, rowData) => handleRowClick(rowData)}
       />
       <EscalationDetail
         open={!!selectedEscalation}

@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { supportBotApiRef } from '../api/SupportBotApi';
 import { useApi } from '@backstage/core-plugin-api';
 import { Team } from '../models/team';
+import {wrapError} from "../util/errors";
 
 export const useTeams = () => {
   const ticketApi = useApi(supportBotApiRef);
   const [teams, setTeams] = useState<Team[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -17,7 +18,7 @@ export const useTeams = () => {
         const data = await ticketApi.getTeams();
         setTeams(data);
       } catch (err) {
-        setError(err.message || 'Failed to fetch teams');
+        setError(wrapError(err, 'Failed to fetch teams'));
       } finally {
         setLoading(false);
       }
