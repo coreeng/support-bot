@@ -95,29 +95,37 @@ deploy-extended-test:
 
 .PHONY: deploy-%
 deploy-%:
+	helm repo add bitnami https://charts.bitnami.com/bitnami
+	helm upgrade --install support-bot-db bitnami/postgresql -n "$(p2p_namespace)" \
+		--set global.postgresql.auth.postgresPassword=rootpassword \
+		--set global.postgresql.auth.username=supportbot \
+		--set global.postgresql.auth.password=supportbotpassword \
+		--set global.postgresql.auth.database=supportbot \
+	  --set primary.pdb.create=false
 	helm repo add coreeng https://coreeng.github.io/core-platform-assets
-	helm upgrade --install "support-bot-api" coreeng/app -n $(p2p_namespace) \
+	helm upgrade --install "support-bot-api" coreeng/app -n "$(p2p_namespace)" \
 		--set appName="support-bot-api" \
 		--set appUrlSuffix="$(p2p_app_url_suffix)" \
-		--set registry=$(p2p_registry) \
+		--set registry="$(p2p_registry)" \
 		--set tag="$(p2p_version)" \
-		--set tenantName=$(p2p_tenant_name) \
+		--set tenantName="$(p2p_tenant_name)" \
 		--set image="support-bot-api" \
 		--set ingress.enabled=true \
 		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
-		--set port=9898 \
-		--set service.environmentVariables.FOO="bar"
-	helm upgrade --install "support-bot-ui" coreeng/app -n $(p2p_namespace) \
+		--set port=8080 \
+		--set environmentVariables.DB_URL="jdbc:postgresql://support-bot-db-postgresql.$(p2p_namespace).svc.cluster.local:5432/supportbot" \
+		--set environmentVariables.DB_USERNAME="supportbot" \
+		--set environmentVariables.DB_PASSWORD="supportbotpassword"
+	helm upgrade --install "support-bot-ui" coreeng/app -n "$(p2p_namespace)" \
 		--set appName="support-bot-ui" \
 		--set appUrlSuffix="$(p2p_app_url_suffix)" \
-		--set registry=$(p2p_registry) \
+		--set registry="$(p2p_registry)" \
 		--set tag="$(p2p_version)" \
-		--set tenantName=$(p2p_tenant_name) \
+		--set tenantName="$(p2p_tenant_name)" \
 		--set image="support-bot-ui" \
 		--set ingress.enabled=true \
 		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
-		--set port=9898 \
-		--set service.environmentVariables.FOO="bar"
+		--set port=7007
 
 
 
