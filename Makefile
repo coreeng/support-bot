@@ -113,7 +113,7 @@ deploy-%:
 		--set ingress.enabled=true \
 		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
 		--set port=8080 \
-		--set environmentVariables.DB_URL="jdbc:postgresql://support-bot-db-postgresql.default.svc.cluster.local:5432/supportbot" \
+		--set environmentVariables.DB_URL="jdbc:postgresql://support-bot-db-postgresql.$(p2p_namespace).svc.cluster.local:5432/supportbot" \
 		--set environmentVariables.DB_USERNAME="supportbot" \
 		--set environmentVariables.DB_PASSWORD="supportbotpassword"
 	helm upgrade --install "support-bot-ui" coreeng/app -n "$(p2p_namespace)" \
