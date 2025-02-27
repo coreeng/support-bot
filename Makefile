@@ -100,7 +100,8 @@ deploy-%:
 		--set global.postgresql.auth.postgresPassword=rootpassword \
 		--set global.postgresql.auth.username=supportbot \
 		--set global.postgresql.auth.password=supportbotpassword \
-		--set global.postgresql.auth.database=supportbot
+		--set global.postgresql.auth.database=supportbot \
+	  --set primary.pdb.create=false
 	helm repo add coreeng https://coreeng.github.io/core-platform-assets
 	helm upgrade --install "support-bot-api" coreeng/app -n "$(p2p_namespace)" \
 		--set appName="support-bot-api" \
