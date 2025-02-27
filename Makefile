@@ -96,18 +96,18 @@ deploy-extended-test:
 .PHONY: deploy-%
 deploy-%:
 	helm repo add bitnami https://charts.bitnami.com/bitnami
-	helm upgrade --install support-bot-db bitnami/postgresql -n $(p2p_namespace) \
+	helm upgrade --install support-bot-db bitnami/postgresql -n "$(p2p_namespace)" \
 		--set global.postgresql.auth.postgresPassword=rootpassword \
 		--set global.postgresql.auth.username=supportbot \
 		--set global.postgresql.auth.password=supportbotpassword \
 		--set global.postgresql.auth.database=supportbot
 	helm repo add coreeng https://coreeng.github.io/core-platform-assets
-	helm upgrade --install "support-bot-api" coreeng/app -n $(p2p_namespace) \
+	helm upgrade --install "support-bot-api" coreeng/app -n "$(p2p_namespace)" \
 		--set appName="support-bot-api" \
 		--set appUrlSuffix="$(p2p_app_url_suffix)" \
-		--set registry=$(p2p_registry) \
+		--set registry="$(p2p_registry)" \
 		--set tag="$(p2p_version)" \
-		--set tenantName=$(p2p_tenant_name) \
+		--set tenantName="$(p2p_tenant_name)" \
 		--set image="support-bot-api" \
 		--set ingress.enabled=true \
 		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
@@ -115,17 +115,17 @@ deploy-%:
 		--set environmentVariables.DB_URL="jdbc:postgresql://suppport-bot-db-postgresql.default.svc.cluster.local:5432/postgres" \
 		--set environmentVariables.DB_USERNAME="supportbot" \
 		--set environmentVariables.DB_PASSWORD="supportbotpassword"
-	helm upgrade --install "support-bot-ui" coreeng/app -n $(p2p_namespace) \
+	helm upgrade --install "support-bot-ui" coreeng/app -n "$(p2p_namespace)" \
 		--set appName="support-bot-ui" \
 		--set appUrlSuffix="$(p2p_app_url_suffix)" \
-		--set registry=$(p2p_registry) \
+		--set registry="$(p2p_registry)" \
 		--set tag="$(p2p_version)" \
-		--set tenantName=$(p2p_tenant_name) \
+		--set tenantName="$(p2p_tenant_name)" \
 		--set image="support-bot-ui" \
 		--set ingress.enabled=true \
 		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
 		--set port=9898 \
-		--set service.environmentVariables.FOO="bar"
+		--set environmentVariables.FOO="bar"
 
 
 
