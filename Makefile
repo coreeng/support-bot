@@ -125,7 +125,7 @@ deploy-%:
 		--set image="support-bot-ui" \
 		--set ingress.enabled=true \
 		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
-		--set port=7007 \
+		--set port=7007
 
 
 
