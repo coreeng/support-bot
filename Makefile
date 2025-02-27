@@ -115,7 +115,13 @@ deploy-%:
 		--set port=8080 \
 		--set environmentVariables.DB_URL="jdbc:postgresql://support-bot-db-postgresql.$(p2p_namespace).svc.cluster.local:5432/supportbot" \
 		--set environmentVariables.DB_USERNAME="supportbot" \
-		--set environmentVariables.DB_PASSWORD="supportbotpassword"
+		--set environmentVariables.DB_PASSWORD="supportbotpassword" \
+		--set environmentVariables.SLACK_TOKEN="$${SUPPORT_BOT_SLACK_TOKEN}" \
+		--set environmentVariables.SLACK_SOCKET_TOKEN="$${SUPPORT_BOT_SLACK_SOCKET_TOKEN}" \
+		--set environmentVariables.SLACK_SIGNING_SECRET="$${SUPPORT_BOT_SLACK_SIGNING_SECRET}" \
+		--set environmentVariables.SLACK_TICKET_CHANNEL_ID="$${SUPPORT_BOT_SLACK_TICKET_CHANNEL_ID}" \
+		--set environmentVariables.SLACK_ESCALATION_CHANNEL_ID="$${SUPPORT_BOT_SLACK_ESCALATION_CHANNEL_ID}" \
+		--set serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account="support-bot-ca@$(PROJECT_ID).iam.gserviceaccount.com"
 	helm upgrade --install "support-bot-ui" coreeng/app -n "$(p2p_namespace)" \
 		--set appName="support-bot-ui" \
 		--set appUrlSuffix="$(p2p_app_url_suffix)" \

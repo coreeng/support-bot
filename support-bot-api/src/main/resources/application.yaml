@@ -17,7 +17,6 @@ spring:
       data-source-properties:
         reWriteBatchedInserts: true
 
-
 application:
   timezone: GMT+02
 
@@ -33,11 +32,11 @@ slack:
     socket-token: ${SLACK_SOCKET_TOKEN} # Token like: xapp-1-abc-def-ghi
     signing-secret: ${SLACK_SIGNING_SECRET} # Token like: 1234567890abcdef
   ticket:
-    channel-id: ${TICKET_CHANNEL_ID} # Channel ID like: C1234567890
+    channel-id: ${SLACK_TICKET_CHANNEL_ID} # Channel ID like: C1234567890
     expected-initial-reaction: eyes
     response-initial-reaction: ticket
   escalation:
-    channel-id: ${ESCALATION_CHANNEL_ID} # Channel ID like: C1234567890
+    channel-id: ${SLACK_ESCALATION_CHANNEL_ID} # Channel ID like: C1234567890
 
 ticket:
   staleness-check-job:
@@ -48,39 +47,39 @@ ticket:
 
 enums:
   escalationTeams:
-    - label: wow
-      code: wow
-      slack-group-id: S08948NBMED
-    - label: infra-integration
-      code: infra-integration
-      slack-group-id: S08948NBMED
-    - label: connected-app
-      code: connected-app
-      slack-group-id: S08948NBMED
+  - label: wow
+    code: wow
+    slack-group-id: S08948NBMED
+  - label: infra-integration
+    code: infra-integration
+    slack-group-id: S08948NBMED
+  - label: connected-app
+    code: connected-app
+    slack-group-id: S08948NBMED
   tags:
-    - label: Ingresses
-      code: ingresses
-    - label: Jenkins Pipelines
-      code: jenkins-pipelines
-    - label: Networking
-      code: networking
-    - label: Vault
-      code: vault
-    - label: Persistence/Brokers
-      code: persistence-brokers
-    - label: Observability
-      code: observability
-    - label: DNS
-      code: dns
-    - label: Osprey
-      code: osprey
+  - label: Ingresses
+    code: ingresses
+  - label: Jenkins Pipelines
+    code: jenkins-pipelines
+  - label: Networking
+    code: networking
+  - label: Vault
+    code: vault
+  - label: Persistence/Brokers
+    code: persistence-brokers
+  - label: Observability
+    code: observability
+  - label: DNS
+    code: dns
+  - label: Osprey
+    code: osprey
   impacts:
-    - label: Production Blocking
-      code: productionBlocking
-    - label: BAU Blocking
-      code: bauBlocking
-    - label: Abnormal Behaviour
-      code: abnormalBehaviour
+  - label: Production Blocking
+    code: productionBlocking
+  - label: BAU Blocking
+    code: bauBlocking
+  - label: Abnormal Behaviour
+    code: abnormalBehaviour
 
 platform-integration:
   enabled: true
