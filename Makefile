@@ -112,7 +112,6 @@ deploy-%:
 		--set ingress.enabled=true \
 		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
 		--set port=9898 \
-		--set environmentVariables.FOO="bar"
 		--set environmentVariables.DB_URL="jdbc:postgresql://suppport-bot-db-postgresql.default.svc.cluster.local:5432/postgres" \
 		--set environmentVariables.DB_USERNAME="supportbot" \
 		--set environmentVariables.DB_PASSWORD="supportbotpassword"
