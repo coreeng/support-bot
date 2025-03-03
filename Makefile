@@ -120,8 +120,6 @@ deploy-%:
 		--set service.port="8080" \
 		--set metrics.enabled="true" \
 		--set metrics.port="8081" \
-		--set livenessProbe="{}" \
-		--set readinessProbe="{}" \
 		--set ingress.enabled=true \
 		--set ingress.annotations.external-dns\\.alpha\\.kubernetes\\.io/hostname="support-bot-api$(p2p_app_url_suffix)$(INTERNAL_SERVICES_DOMAIN)" \
 		--set ingress.annotations.external-dns\\.alpha\\.kubernetes\\.io/target="$(INTERNAL_SERVICES_DOMAIN)" \
