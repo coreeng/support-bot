@@ -96,6 +96,7 @@ deploy-extended-test:
 .PHONY: deploy-%
 deploy-%:
 	helm repo add bitnami https://charts.bitnami.com/bitnami
+	helm repo add coreeng https://coreeng.github.io/core-platform-assets
 	helm upgrade --install support-bot-db bitnami/postgresql -n "$(p2p_namespace)" \
 		--set global.postgresql.auth.postgresPassword=rootpassword \
 		--set global.postgresql.auth.username=supportbot \
@@ -127,7 +128,6 @@ deploy-%:
 		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
 		--set service.Account.name="support-bot-api" \
 		--set serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account="support-bot-ca@$(PROJECT_ID).iam.gserviceaccount.com"
-	helm repo add coreeng https://coreeng.github.io/core-platform-assets
 	helm upgrade --install "support-bot-ui" coreeng/app -n "$(p2p_namespace)" \
 		--set appName="support-bot-ui" \
 		--set appUrlSuffix="$(p2p_app_url_suffix)" \
