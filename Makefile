@@ -120,11 +120,11 @@ deploy-%:
 		--set metrics.enabled="true" \
 		--set metrics.port="8081" \
 		--set ingress.enabled=true \
-		--set ingress.annotations."external-dns.alpha.kubernetes.io/hostname"="support-bot-api$(p2p_app_url_suffix)$(INTERNAL_SERVICES_DOMAIN)" \
-		--set ingress.annotations."external-dns.alpha.kubernetes.io/target"="$(INTERNAL_SERVICES_DOMAIN)" \
+		--set ingress.annotations.external-dns\\.alpha\\.kubernetes\\.io/hostname="support-bot-api$(p2p_app_url_suffix)$(INTERNAL_SERVICES_DOMAIN)" \
+		--set ingress.annotations.external-dns\\.alpha\\.kubernetes\\.io/target="$(INTERNAL_SERVICES_DOMAIN)" \
 		--set ingress.hosts[0].host="support-bot-api$(p2p_app_url_suffix)$(INTERNAL_SERVICES_DOMAIN)" \
 		--set ingress.hosts[0].paths[0].path="/" \
-		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific"
+		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
 		--set service.Account.name="support-bot-api" \
 		--set serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account="support-bot-ca@$(PROJECT_ID).iam.gserviceaccount.com"
 	helm repo add coreeng https://coreeng.github.io/core-platform-assets
