@@ -1,0 +1,7 @@
+apiVersion: v2
+description: Core Platform Application
+icon: https://helm.sh/img/helm.svg
+name: app-chart
+type: application
+version: 1.0.0
+appVersion: "latest"

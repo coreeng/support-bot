@@ -102,26 +102,32 @@ deploy-%:
 		--set global.postgresql.auth.password=supportbotpassword \
 		--set global.postgresql.auth.database=supportbot \
 	  --set primary.pdb.create=false
-	helm repo add coreeng https://coreeng.github.io/core-platform-assets
-	helm upgrade --install "support-bot-api" coreeng/app -n "$(p2p_namespace)" \
+	helm upgrade --install "support-bot-api" helm-charts/app-chart -n "$(p2p_namespace)" \
 		--set appName="support-bot-api" \
-		--set appUrlSuffix="$(p2p_app_url_suffix)" \
-		--set registry="$(p2p_registry)" \
-		--set tag="$(p2p_version)" \
 		--set tenantName="$(p2p_tenant_name)" \
-		--set image="support-bot-api" \
+		--set image.registry="$(p2p_registry)" \
+		--set image.repository="support-bot-api" \
+		--set image.tag="$(p2p_version)" \
+		--set envVarsMap.DB_URL="jdbc:postgresql://support-bot-db-postgresql.$(p2p_namespace).svc.cluster.local:5432/supportbot" \
+		--set envVarsMap.DB_USERNAME="supportbot" \
+		--set envVarsMap.DB_PASSWORD="supportbotpassword" \
+		--set envVarsMap.SLACK_TOKEN="$${SUPPORT_BOT_SLACK_TOKEN}" \
+		--set envVarsMap.SLACK_SOCKET_TOKEN="$${SUPPORT_BOT_SLACK_SOCKET_TOKEN}" \
+		--set envVarsMap.SLACK_SIGNING_SECRET="$${SUPPORT_BOT_SLACK_SIGNING_SECRET}" \
+		--set envVarsMap.SLACK_TICKET_CHANNEL_ID="$${SUPPORT_BOT_SLACK_TICKET_CHANNEL_ID}" \
+		--set envVarsMap.SLACK_ESCALATION_CHANNEL_ID="$${SUPPORT_BOT_SLACK_ESCALATION_CHANNEL_ID}" \
+		--set service.port="8080" \
+		--set metrics.enabled="true" \
+		--set metrics.port="8081" \
 		--set ingress.enabled=true \
-		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
-		--set port=8080 \
-		--set environmentVariables.DB_URL="jdbc:postgresql://support-bot-db-postgresql.$(p2p_namespace).svc.cluster.local:5432/supportbot" \
-		--set environmentVariables.DB_USERNAME="supportbot" \
-		--set environmentVariables.DB_PASSWORD="supportbotpassword" \
-		--set environmentVariables.SLACK_TOKEN="$${SUPPORT_BOT_SLACK_TOKEN}" \
-		--set environmentVariables.SLACK_SOCKET_TOKEN="$${SUPPORT_BOT_SLACK_SOCKET_TOKEN}" \
-		--set environmentVariables.SLACK_SIGNING_SECRET="$${SUPPORT_BOT_SLACK_SIGNING_SECRET}" \
-		--set environmentVariables.SLACK_TICKET_CHANNEL_ID="$${SUPPORT_BOT_SLACK_TICKET_CHANNEL_ID}" \
-		--set environmentVariables.SLACK_ESCALATION_CHANNEL_ID="$${SUPPORT_BOT_SLACK_ESCALATION_CHANNEL_ID}" \
+		--set ingress.annotations."external-dns.alpha.kubernetes.io/hostname"="support-bot-api$(p2p_app_url_suffix)$(INTERNAL_SERVICES_DOMAIN)" \
+		--set ingress.annotations."external-dns.alpha.kubernetes.io/target"="$(INTERNAL_SERVICES_DOMAIN)" \
+		--set ingress.hosts[0].host="support-bot-api$(p2p_app_url_suffix)$(INTERNAL_SERVICES_DOMAIN)" \
+		--set ingress.hosts[0].paths[0].path="/" \
+		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific"
+		--set service.Account.name="support-bot-api" \
 		--set serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account="support-bot-ca@$(PROJECT_ID).iam.gserviceaccount.com"
+	helm repo add coreeng https://coreeng.github.io/core-platform-assets
 	helm upgrade --install "support-bot-ui" coreeng/app -n "$(p2p_namespace)" \
 		--set appName="support-bot-ui" \
 		--set appUrlSuffix="$(p2p_app_url_suffix)" \
@@ -132,8 +138,6 @@ deploy-%:
 		--set ingress.enabled=true \
 		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
 		--set port=7007
-
-
 
 .PHONY: run-api-app
 run-api-app: ## Run api app
