@@ -102,11 +102,10 @@ deploy-%:
 		--set global.postgresql.auth.password=supportbotpassword \
 		--set global.postgresql.auth.database=supportbot \
 	  --set primary.pdb.create=false
-	helm upgrade --install "support-bot-api" helm-charts/app-chart -n "$(p2p_namespace)" \
-		--set appName="support-bot-api" \
+	helm upgrade --install "support-bot-api" helm-charts/app -n "$(p2p_namespace)" \
+		--set nameOverride="support-bot-api" \
 		--set tenantName="$(p2p_tenant_name)" \
-		--set image.registry="$(p2p_registry)" \
-		--set image.repository="support-bot-api" \
+		--set image.repository="$(p2p_registry)/support-bot-api" \
 		--set image.tag="$(p2p_version)" \
 		--set envVarsMap.DB_URL="jdbc:postgresql://support-bot-db-postgresql.$(p2p_namespace).svc.cluster.local:5432/supportbot" \
 		--set envVarsMap.DB_USERNAME="supportbot" \
@@ -120,9 +119,6 @@ deploy-%:
 		--set metrics.enabled="true" \
 		--set metrics.port="8081" \
 		--set ingress.enabled=true \
-		--set ingress.annotations.external-dns\\.alpha\\.kubernetes\\.io/hostname="support-bot-api$(p2p_app_url_suffix)$(INTERNAL_SERVICES_DOMAIN)" \
-		--set ingress.annotations.external-dns\\.alpha\\.kubernetes\\.io/target="$(INTERNAL_SERVICES_DOMAIN)" \
-		--set ingress.hosts[0].host="support-bot-api$(p2p_app_url_suffix)$(INTERNAL_SERVICES_DOMAIN)" \
 		--set ingress.hosts[0].paths[0].path="/" \
 		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
 		--set service.Account.name="support-bot-api" \
