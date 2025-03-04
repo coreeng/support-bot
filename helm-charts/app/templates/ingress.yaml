@@ -1,4 +1,5 @@
 {{- $fqdn := (include "app.fqdn" .) }}
+{{- $domain := (include "app.domain" .) }}
 {{- if .Values.ingress.enabled -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -7,8 +8,8 @@ metadata:
   labels:
     {{- include "app.labels" . | nindent 4 }}
   annotations:
-    external-dns.alpha.kubernetes.io/hostname: {{ include "app.fqdn" . }}
-    external-dns.alpha.kubernetes.io/target: {{ include "app.domain" . }}
+    external-dns.alpha.kubernetes.io/hostname: {{ $fqdn }}
+    external-dns.alpha.kubernetes.io/target: {{ $domain }}
   {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
   {{- end }}
