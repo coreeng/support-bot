@@ -1,26 +1,26 @@
-{{- $endpoint := printf "https://%s" .Values.appName }}
-{{- if eq .Values.extended.endpoint "ingress" }}
-  {{- $endpoint = printf "https://%s%s.%s" .Values.appName .Values.appUrlSuffix .Values.domain }}
+{{- $endpoint := printf "http://%s" (include "app.fullname" .) }}
+{{- if eq .Values.tests.extended.endpoint "ingress" }}
+  {{- $endpoint = printf "https://%s" ( include "app.fqdn" .) }}
 {{- end}}
 ---
 apiVersion: k6.io/v1alpha1
 kind: TestRun
 metadata:
-  name: "{{ .Values.appName }}-extended-test"
+  name: "{{ include "app.fullname" . }}-extended-test"
   annotations:
     "helm.sh/hook": test
 spec:
-  parallelism: {{ .Values.extended.parallelism }}
+  parallelism: {{ .Values.tests.extended.parallelism }}
   script:
     localFile: ./load-testing/hello.js
   ports:
     - containerPort: 5656
   runner:
-    image: "{{ .Values.registry }}/{{ .Values.extended.image }}:{{ .Values.tag }}"
+    image: "{{ .Values.tests.extended.image }}:{{ .Values.image.tag }}"
     metadata:
       labels:
         app.kubernetes.io/name: k6
-    resources: {{ .Values.extended.resources | toJson }}
+    resources: {{ .Values.tests.extended.resources | toJson }}
     env:
       - name: SERVICE_ENDPOINT
         value: {{ $endpoint }}
@@ -36,13 +36,13 @@ spec:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "{{ .Values.appName }}-extended-test-validate"
+  name: "{{ include "app.fullname" . }}-extended-test-validate"
   annotations:
     "helm.sh/hook": test
 spec:
   containers:
     - name: prometheus
-      image: "{{ .Values.registry }}/{{ .Values.extended.image }}:{{ .Values.tag }}"
+      image: "{{ .Values.tests.extended.image }}:{{ .Values.image.tag }}"
       env:
         - name: NAMESPACE
           value: {{ .Release.Namespace }}

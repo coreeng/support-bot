@@ -1,0 +1,21 @@
+{{- $fqdn := (include "app.fqdn" .) }}
+{{- $domain := (include "app.domain" .) }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "app.fullname" . }}-functional-test"
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+  - name: functional-tests
+    image: "{{ .Values.tests.functional.image }}:{{ .Values.image.tag }}"
+    # resources: {{ .Values.tests.functional.resources | toJson }}
+    env:
+    - name: SERVICE_ENDPOINT
+      value: "http://{{ include "app.fullname" . }}"
+    {{- if .Values.ingress.enabled }}
+    - name: INGRESS_ENDPOINT
+      value: "https://{{ $fqdn }}"
+    {{- end }}
+  restartPolicy: Never
