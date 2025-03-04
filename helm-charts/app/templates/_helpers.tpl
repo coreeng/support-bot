@@ -6,7 +6,7 @@ Expand the name of the chart.
 {{- end }}
 
 {{- define "app.fqdn" }}
-{{- printf "%s%s.%s" (include "app.name" .) .Values.ingress.appUrlSuffix .Values.ingress.domain | trunc 63 | trimSuffix "-" }}
+{{- printf "%s%s.%s" .Values.nameOverride .Values.ingress.appUrlSuffix .Values.ingress.domain | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{- define "app.domain" }}
