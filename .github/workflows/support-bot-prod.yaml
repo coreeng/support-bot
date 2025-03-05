@@ -2,8 +2,8 @@ name: support-bot Prod
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '30 5 * * 1-5'
+#  schedule:
+#    - cron: '30 5 * * 1-5'
 
 permissions:
   packages: write
