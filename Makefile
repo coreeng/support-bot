@@ -105,6 +105,7 @@ deploy-%:
 	helm repo add core-platform-assets https://coreeng.github.io/core-platform-assets
 	helm upgrade --install "support-bot-api" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
 		--set nameOverride="support-bot-api" \
+		--set tenantName="$(p2p_tenant_name)" \
 		--set image.repository="$(p2p_registry)/support-bot-api" \
 		--set image.tag="$(p2p_version)" \
 		--set envVarsMap.DB_URL="jdbc:postgresql://support-bot-db-postgresql.$(p2p_namespace).svc.cluster.local:5432/supportbot" \
@@ -127,6 +128,7 @@ deploy-%:
 		--set serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account="support-bot-ca@$(PROJECT_ID).iam.gserviceaccount.com"
 	helm upgrade --install "support-bot-ui" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
 		--set nameOverride="support-bot-ui" \
+		--set tenantName="$(p2p_tenant_name)" \
 		--set image.repository="$(p2p_registry)/support-bot-ui" \
 		--set image.tag="$(p2p_version)" \
 		--set ingress.enabled=true \
