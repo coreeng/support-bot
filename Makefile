@@ -143,8 +143,8 @@ deploy-%:
 
 .PHONY: publish-api-prod
 publish-api-prod: ## Publish api docker image
-	@echo "WARNING: $@ not implemented"
-	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/support-bot-api:$(p2p_version)" "docker-archive:foo.tar"
+	@echo "Publish docker image to ghcr.io :"
+	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/support-bot-api:$(p2p_version)" "docker://ghcr.io/coreeng/support-bot:$(p2p_version)"
 
 .PHONY: publish-ui-prod
 publish-ui-prod: ## Publish ui frontend plugin
