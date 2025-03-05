@@ -102,7 +102,8 @@ deploy-%:
 		--set global.postgresql.auth.password=supportbotpassword \
 		--set global.postgresql.auth.database=supportbot \
 	  --set primary.pdb.create=false
-	helm upgrade --install "support-bot-api" helm-charts/app -n "$(p2p_namespace)" \
+	helm repo add core-platform-assets https://coreeng.github.io/core-platform-assets
+	helm upgrade --install "support-bot-api" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
 		--set nameOverride="support-bot-api" \
 		--set tenantName="$(p2p_tenant_name)" \
 		--set image.repository="$(p2p_registry)/support-bot-api" \
@@ -125,8 +126,7 @@ deploy-%:
 		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
 		--set serviceAccount.name="support-bot-api" \
 		--set serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account="support-bot-ca@$(PROJECT_ID).iam.gserviceaccount.com"
-	helm repo add coreeng https://coreeng.github.io/core-platform-assets
-	helm upgrade --install "support-bot-ui" coreeng/app -n "$(p2p_namespace)" \
+	helm upgrade --install "support-bot-ui" core-platform-assets/app -n "$(p2p_namespace)" \
 		--set appName="support-bot-ui" \
 		--set appUrlSuffix="$(p2p_app_url_suffix)" \
 		--set registry="$(p2p_registry)" \
