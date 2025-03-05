@@ -137,8 +137,6 @@ deploy-%:
 		--set ingress.hosts[0].paths[0].path="/" \
 		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
 		--set serviceAccount.name="support-bot-ui" \
-		--set metrics.enabled="true" \
-		--set metrics.port="8081" \
 		--set service.port="7007"
 
 .PHONY: run-api-app
