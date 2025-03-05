@@ -14,7 +14,7 @@ p2p-functional:    build-functional    push-functional    deploy-functional    r
 p2p-nft:           build-nft           push-nft           deploy-nft           run-nft
 p2p-integration:   build-integration   push-integration   deploy-integration   run-integration
 p2p-extended-test: build-extended-test push-extended-test deploy-extended-test run-extended-test
-p2p-prod:                                                 deploy-prod          publish-prod
+p2p-prod:          publish-prod                           deploy-prod
 
 
 
@@ -101,7 +101,7 @@ deploy-%:
 		--set global.postgresql.auth.username=supportbot \
 		--set global.postgresql.auth.password=supportbotpassword \
 		--set global.postgresql.auth.database=supportbot \
-	  --set primary.pdb.create=false
+		--set primary.pdb.create=false
 	helm repo add core-platform-assets https://coreeng.github.io/core-platform-assets
 	helm upgrade --install "support-bot-api" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
 		--set nameOverride="support-bot-api" \
