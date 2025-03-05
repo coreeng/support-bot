@@ -14,7 +14,7 @@ p2p-functional:    build-functional    push-functional    deploy-functional    r
 p2p-nft:           build-nft           push-nft           deploy-nft           run-nft
 p2p-integration:   build-integration   push-integration   deploy-integration   run-integration
 p2p-extended-test: build-extended-test push-extended-test deploy-extended-test run-extended-test
-p2p-prod:                                                 deploy-prod
+p2p-prod:                                                 deploy-prod          publish-prod
 
 
 
@@ -138,6 +138,22 @@ deploy-%:
 		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
 		--set serviceAccount.name="support-bot-ui" \
 		--set service.port="7007"
+
+
+
+.PHONY: publish-api-prod
+publish-api-prod: ## Publish api docker image
+	@echo "WARNING: $@ not implemented"
+	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/support-bot-api:$(p2p_version)" "docker-archive:foo.tar"
+
+.PHONY: publish-ui-prod
+publish-ui-prod: ## Publish ui frontend plugin
+	@echo "WARNING: $@ not implemented"
+
+.PHONY: publish-prod
+publish-prod: publish-api-prod publish-ui-prod ## Publish api & ui artifacts
+
+
 
 .PHONY: run-api-app
 run-api-app: ## Run api app
