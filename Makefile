@@ -144,6 +144,7 @@ deploy-%:
 .PHONY: publish-api-prod
 publish-api-prod: ## Publish api docker image
 	@echo "Publish docker image to ghcr.io :"
+	echo "$(GITHUB_TOKEN)" | skopeo login --username "$(GITHUB_ACTOR)" --password-stdin ghcr.io
 	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/support-bot-api:$(p2p_version)" "docker://ghcr.io/coreeng/support-bot:$(p2p_version)"
 
 .PHONY: publish-ui-prod
