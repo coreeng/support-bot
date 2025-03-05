@@ -126,16 +126,18 @@ deploy-%:
 		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
 		--set serviceAccount.name="support-bot-api" \
 		--set serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account="support-bot-ca@$(PROJECT_ID).iam.gserviceaccount.com"
-	helm upgrade --install "support-bot-ui" core-platform-assets/app -n "$(p2p_namespace)" \
-		--set appName="support-bot-ui" \
-		--set appUrlSuffix="$(p2p_app_url_suffix)" \
-		--set registry="$(p2p_registry)" \
-		--set tag="$(p2p_version)" \
+	helm upgrade --install "support-bot-ui" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
+		--set nameOverride="support-bot-ui" \
 		--set tenantName="$(p2p_tenant_name)" \
-		--set image="support-bot-ui" \
+		--set image.repository="$(p2p_registry)/support-bot-ui" \
+		--set image.tag="$(p2p_version)" \
 		--set ingress.enabled=true \
+		--set ingress.appUrlSuffix="$(p2p_app_url_suffix)" \
 		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
-		--set port=7007
+		--set ingress.hosts[0].paths[0].path="/" \
+		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
+		--set serviceAccount.name="support-bot-ui" \
+		--set service.port="7007"
 
 .PHONY: run-api-app
 run-api-app: ## Run api app
