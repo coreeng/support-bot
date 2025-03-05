@@ -152,7 +152,6 @@ publish-ui-prod: ## Publish ui frontend plugin
 
 .PHONY: publish-prod
 publish-prod: publish-api-prod publish-ui-prod ## Publish api & ui artifacts
-	@echo "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
 
 
