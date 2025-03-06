@@ -8,15 +8,34 @@ P2P_IMAGE_NAMES := support-bot-api support-bot-ui
 $(shell curl -fsSL "https://raw.githubusercontent.com/coreeng/p2p/v1/p2p.mk" -o ".p2p.mk")
 include .p2p.mk
 
-# Define required p2p targets
-p2p-build:         build-app           push-app
-p2p-functional:    build-functional    push-functional    deploy-functional    run-functional
-p2p-nft:           build-nft           push-nft           deploy-nft           run-nft
-p2p-integration:   build-integration   push-integration   deploy-integration   run-integration
-p2p-extended-test: build-extended-test push-extended-test deploy-extended-test run-extended-test
-p2p-prod:          publish-prod                           deploy-prod
+##@ General
+
+# The help target prints out all targets with their descriptions organized
+# beneath their categories. The categories are represented by '##@' and the
+# target descriptions by '##'. The awk commands is responsible for reading the
+# entire set of makefiles included in this invocation, looking for lines of the
+# file as xyz: ## something, and then pretty-format the target and help. Then,
+# if there's a line with ##@ something, that gets pretty-printed as a category.
+# More info on the usage of ANSI control characters for terminal formatting:
+# https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_parameters
+# More info on the awk command:
+# http://linuxcommand.org/lc3_adv_awk.php
+
+.PHONY: help
+help: ## Display this help.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+%?:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 
+##@ High level p2p targets
+p2p-build:         build-app           push-app                                                  ## Build support-bot
+p2p-functional:    build-functional    push-functional    deploy-functional    run-functional    ## p2p functional tests
+p2p-nft:           build-nft           push-nft           deploy-nft           run-nft           ## p2p nft tests
+p2p-integration:   build-integration   push-integration   deploy-integration   run-integration   ## p2p integration tests
+p2p-extended-test: build-extended-test push-extended-test deploy-extended-test run-extended-test ## p2p extended tests
+p2p-prod:          publish-prod                           deploy-prod                            ## p2p release to production
+
+
+##@ Lint targets
 
 .PHONY: lint-api-app
 lint-api-app: ## Lint api app
@@ -31,11 +50,12 @@ lint-ui-app: ## Lint ui app
 lint: lint-api-app lint-ui-app ## Lint api & ui app
 
 
+##@ Build targets
 
 .PHONY: build-api-app
 build-api-app: lint-api-app ## Build api app
 	docker pull postgres:17.2-alpine
-	cd support-bot-api; ./gradlew jooqCodegen build test bootBuildImage -DimageName=$(call p2p_image_tag,support-bot-api)
+	cd support-bot-api; ./gradlew jooqCodegen build test bootBuildImage -DimageName=$(call p2p_image_tag,support-bot-api) -x functional:compileJava -x functional:processResources -x functional:classes -x functional:jar -x functional:assemble -x functional:compileTestJava -x functional:processTestResources -x functional:testClasses -x functional:test
 
 .PHONY: build-ui-app
 build-ui-app: lint-ui-app ## Build ui app
@@ -44,7 +64,32 @@ build-ui-app: lint-ui-app ## Build ui app
 .PHONY: build-app
 build-app: build-api-app build-ui-app ## Build api & ui apps
 
+.PHONY: build-api-functional
+build-api-functional: ## Build api functional test docker image
+	cd support-bot-api; docker buildx build $(p2p_image_cache) --tag "$(call p2p_image_tag,support-bot-api)" --file functional/Dockerfile .
 
+.PHONY: build-ui-functional
+build-ui-functional: ## Build ui functional test frontend plugin
+	@echo "WARNING: $@ not implemented"
+
+.PHONY: build-functional
+build-functional: build-api-functional build-ui-functional ## Build functional tests
+	@echo "WARNING: $@ WIP"
+
+.phony: build-nft
+build-nft:
+	@echo "warning: $@ not implemented"
+
+.phony: build-integration
+build-integration:
+	@echo "warning: $@ not implemented"
+
+.PHONY: build-extended-test
+build-extended-test:
+	@echo "WARNING: $@ not implemented"
+
+
+##@ Push targets
 
 .PHONY: push-api-app
 push-api-app: ## Push api app
@@ -57,33 +102,50 @@ push-ui-app: ## Push ui app
 .PHONY: push-app ## Push api & ui apps
 push-app: push-api-app push-ui-app
 
-.PHONY: push-%
-push-%:
+
+.PHONY: push-api-functional
+push-api-functional: ## Push api functional test docker image
+	docker image push "$(call p2p_image_tag,support-bot-api)"
+
+.PHONY: push-ui-functional
+push-ui-functional: ## Push ui functional test frontend plugin
+	@echo "WARNING: $@ not implemented"
+
+.PHONY: push-functional
+push-functional: push-api-functional push-ui-functional ## Push functional tests images
+	@echo "WARNING: $@ WIP"
+
+
+.PHONY: push-api-nft
+push-api-nft: ## Push api nft test docker image
+	@echo "WARNING: $@ not implemented"
+
+.PHONY: push-ui-nft
+push-ui-nft: ## Push ui nft test frontend plugin
+	@echo "WARNING: $@ not implemented"
+
+.PHONY: push-nft
+push-nft: push-api-nft push-ui-nft ## Push nft tests images
 	@echo "WARNING: $@ not implemented"
 
 
-
-.PHONY: build-functional
-build-functional:
+.PHONY: push-api-integration
+push-api-integration: ## Push api integration test docker image
 	@echo "WARNING: $@ not implemented"
 
-.PHONY: build-nft
-build-nft:
+.PHONY: push-ui-integration
+push-ui-integration: ## Push ui integration test frontend plugin
 	@echo "WARNING: $@ not implemented"
 
-.PHONY: build-integration
-build-integration:
+.PHONY: push-integration
+push-integration: push-api-integration push-ui-integration ## Push integration tests images
 	@echo "WARNING: $@ not implemented"
 
-.PHONY: build-extended-test
-build-extended-test:
-	@echo "WARNING: $@ not implemented"
+##@ Deploy targets
 
-
-
-.PHONY: deploy-functional
-deploy-functional:
-	@echo "WARNING: $@ not implemented"
+# .PHONY: deploy-functional
+# deploy-functional:
+# 	@echo "WARNING: $@ not implemented"
 
 .PHONY: deploy-nft
 deploy-nft:
@@ -94,7 +156,7 @@ deploy-extended-test:
 	@echo "WARNING: $@ not implemented"
 
 .PHONY: deploy-%
-deploy-%:
+deploy-%: ## Deploy mathing target `deploy-%`
 	helm repo add bitnami https://charts.bitnami.com/bitnami
 	helm upgrade --install support-bot-db bitnami/postgresql -n "$(p2p_namespace)" \
 		--set global.postgresql.auth.postgresPassword=rootpassword \
@@ -140,6 +202,7 @@ deploy-%:
 		--set service.port="7007"
 
 
+##@ Publish targets
 
 .PHONY: publish-api-prod
 publish-api-prod: ## Publish api docker image
@@ -155,6 +218,7 @@ publish-ui-prod: ## Publish ui frontend plugin
 publish-prod: publish-api-prod publish-ui-prod ## Publish api & ui artifacts
 
 
+##@ Run targets
 
 .PHONY: run-api-app
 run-api-app: ## Run api app
@@ -168,9 +232,19 @@ run-ui-app: ## Run ui app
 run-app:
 	@echo "WARNING: $@ not implemented"
 
-.PHONY: run-functional
-run-functional:
+
+.PHONY: run-api-functional
+run-api-functional: ## run api functional test
+	cd support-bot-api; bash scripts/helm-test.sh functional "$(p2p_namespace)" "support-bot-api" true
+
+.PHONY: run-ui-functional
+run-ui-functional: ## run ui functional test
 	@echo "WARNING: $@ not implemented"
+
+.PHONY: run-functional
+run-functional: run-api-functional run-ui-functional ## Run functional tests
+	@echo "WARNING: $@ WIP"
+
 
 .PHONY: run-nft
 run-nft:
