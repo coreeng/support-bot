@@ -40,7 +40,6 @@ export async function createRouter({
   });
 
   router.get('/stats', async (_req, res) => {
-    // console.log(`GET /stats::::::: WHOOPITY!!!`);
     // const from = req.body[0]["from"] as string;
     // const to = req.body[0]["to"] as string;
     res.json(await ticketService.getStats());
