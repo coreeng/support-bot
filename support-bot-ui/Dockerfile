@@ -53,10 +53,10 @@ RUN mkdir packages/backend/dist/skeleton packages/backend/dist/bundle \
     && tar xzf packages/backend/dist/skeleton.tar.gz -C packages/backend/dist/skeleton \
     && tar xzf packages/backend/dist/bundle.tar.gz -C packages/backend/dist/bundle
 
-# Version, lint, build & pack coreeng@support-bot plugin (TODO: fix lint errors and remove || true)
+# Version, lint, build & pack coreeng@support-bot plugin
 ARG P2P_VERSION
 RUN npm version ${P2P_VERSION} --prefix plugins/support-bot --no-git-tag-version --no-workspaces-update && \
-    yarn --cwd plugins/support-bot lint || true && \
+    yarn --cwd plugins/support-bot lint && \
     yarn --cwd plugins/support-bot build && \
     yarn --cwd plugins/support-bot pack --filename ../../coreeng-support-bot.tgz
 
