@@ -36,7 +36,7 @@ import { AppRouter, FlatRoutes } from '@backstage/core-app-api';
 import { CatalogGraphPage } from '@backstage/plugin-catalog-graph';
 import { RequirePermission } from '@backstage/plugin-permission-react';
 import { catalogEntityCreatePermission } from '@backstage/plugin-catalog-common/alpha';
-import { CecgSupportBotPage } from 'backstage-plugin-cecg-support-bot';
+import { CecgSupportBotPage } from '@coreeng/support-bot';
 
 const app = createApp({
   apis,
