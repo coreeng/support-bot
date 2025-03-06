@@ -34,7 +34,7 @@ export const TicketsPage = (props: TicketsPageProps) => {
         const urlFilters = [];
         if (newFilters.team) urlFilters.push(`team=${encodeURIComponent(newFilters.team)}`);
         if (newFilters.status) urlFilters.push(`status=${encodeURIComponent(newFilters.status)}`);
-        if (urlFilters.length) navigate(location.pathname + `?${urlFilters.join('&')}`);
+        if (urlFilters.length) navigate(`${location.pathname}?${urlFilters.join('&')}`);
     };
 
     let visibleTickets = props.tickets;

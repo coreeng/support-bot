@@ -47,10 +47,6 @@ export const EscalationTableComponent = ({ escalations, tickets }: EscalationTab
   const selectedEscalation = escalationId ? escalations.find(escalation => escalation.id.toString() === escalationId) : null;
   const selectedEscalationTicket = selectedEscalation ? tickets.find(ticket => ticket.id === selectedEscalation.ticketId.toString()) : null;
 
-  console.log(`Escalation Id: `, escalationId, typeof escalationId);
-  console.log(`Selected Escalation: `, selectedEscalation, typeof selectedEscalation?.id);
-  console.log(`Selected Escalation Ticket: `, selectedEscalationTicket);
-
   const handleRowClick = (escalation: EscalationRow | undefined) => {
     if (escalation) {
       navigate(`?escalationId=${escalation.id}`);
@@ -65,10 +61,10 @@ export const EscalationTableComponent = ({ escalations, tickets }: EscalationTab
     { title: 'Ticket ID', field: 'ticketId', width: 'auto', type: 'numeric',
         render: (rowData: EscalationRow | string, type) => {
           const ticketId =
-            typeof rowData == 'string' ? rowData : rowData.ticketId;
-          return type == "row"
+            typeof rowData === 'string' ? rowData : rowData.ticketId;
+          return type === "row"
               ? (<a href={`${ticketsLink()}?ticketId=${ticketId}`}>{ticketId}</a>)
-              : (<span>{ticketId} <em>({escalations.filter(e => e.ticketId == ticketId).length} escalations)</em></span>)
+              : (<span>{ticketId} <em>({escalations.filter(e => e.ticketId === ticketId).length} escalations)</em></span>)
         }
     },
     { title: 'Thread', field: 'thread', width: 'auto', filtering: false, render: (rowData) => <a href={rowData.thread}>{rowData.thread}</a> },
@@ -91,7 +87,6 @@ export const EscalationTableComponent = ({ escalations, tickets }: EscalationTab
   ];
 
   const data = escalations.map(escalation => {
-    console.log(`Escalation row: `, escalation);
     return {
       id: escalation.id,
       ticketId: escalation.ticketId,
@@ -104,9 +99,9 @@ export const EscalationTableComponent = ({ escalations, tickets }: EscalationTab
     } as EscalationRow;
   });
 
-  const rowStyle = (data: any, _index: number, _level: number): React.CSSProperties => {
-    const isOpen = data.status === 'unresolved' || data.status === 'escalated';
-    const isBreakingProd = data.impact === 'Breaking Prod';
+  const rowStyle = (row: any, _index: number, _level: number): React.CSSProperties => {
+    const isOpen = row.status === 'unresolved' || row.status === 'escalated';
+    const isBreakingProd = row.impact === 'Breaking Prod';
     const requiresUrgentAttention = isOpen && isBreakingProd;
     return {
       backgroundColor: requiresUrgentAttention ? 'red' : undefined,
