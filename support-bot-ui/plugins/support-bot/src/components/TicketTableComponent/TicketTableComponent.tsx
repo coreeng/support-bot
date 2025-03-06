@@ -83,15 +83,15 @@ export const TicketTableComponent = ({ tickets, teams, filters, maxShown, onFilt
       thread: ticket.thread,
       creationTeam: ticket.team?.name,
       dateCreated: ticket.dateCreated, // Assuming queryTs is a Luxon DateTime
-      status: ticket.status == 'opened' ? 'Open' : 'Closed',
+      status: ticket.status === 'opened' ? 'Open' : 'Closed',
       impact: ticket.impact,
       escalationCount: ticket.escalations.length,
     } as TicketRow;
   });
 
-  const rowStyle = (data: TicketRow, _index: number, _level: number): React.CSSProperties => {
-    const isOpen = data.status === 'Opened';
-    const isBreakingProd = data.impact === 'productionBreaking';
+  const rowStyle = (row: TicketRow, _index: number, _level: number): React.CSSProperties => {
+    const isOpen = row.status === 'Opened';
+    const isBreakingProd = row.impact === 'productionBreaking';
     const requiresUrgentAttention = isOpen && isBreakingProd;
     return {
       backgroundColor: requiresUrgentAttention ? 'red' : undefined,
@@ -114,10 +114,10 @@ export const TicketTableComponent = ({ tickets, teams, filters, maxShown, onFilt
         columns={columns}
         data={eligibleData}
         onRowClick={(_event, rowData) => handleRowClick(rowData!!)}
-        onFilterChange={(filters) => {
-          const statusFilter =  filters.find(filter => filter.column.field === 'status');
-          const teamFilter = filters.find(filter => filter.column.field === 'creationTeam');
-          let updatedFilters: {team?: string, status?: string} = {};
+        onFilterChange={(newFilter) => {
+          const statusFilter =  newFilter.find(filter => filter.column.field === 'status');
+          const teamFilter = newFilter.find(filter => filter.column.field === 'creationTeam');
+          const updatedFilters: {team?: string, status?: string} = {};
           if (statusFilter) updatedFilters.status = statusFilter.value;
           if (teamFilter) updatedFilters.team = teamFilter.value;
           if (statusFilter || teamFilter) onFilterChange?.(updatedFilters);

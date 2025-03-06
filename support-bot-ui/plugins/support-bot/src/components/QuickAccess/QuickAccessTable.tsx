@@ -51,9 +51,9 @@ export const QuickAccessTable = ({ tickets }: TicketTableComponentProps) => {
     };
   });
 
-  const rowStyle = (data: any, _index: number, _level: number): React.CSSProperties => {
-    const isOpen = data.status === 'unresolved' || data.status === 'escalated';
-    const isBreakingProd = data.impact === 'Breaking Prod';
+  const rowStyle = (row: any, _index: number, _level: number): React.CSSProperties => {
+    const isOpen = row.status === 'unresolved' || row.status === 'escalated';
+    const isBreakingProd = row.impact === 'Breaking Prod';
     const requiresUrgentAttention = isOpen && isBreakingProd;
     return {
       backgroundColor: requiresUrgentAttention ? 'red' : undefined,

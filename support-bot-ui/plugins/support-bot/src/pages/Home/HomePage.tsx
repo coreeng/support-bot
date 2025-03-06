@@ -30,15 +30,15 @@ export const HomePage = (props: HomePageProps) => {
         </Grid>
 
         {props.user.teams && props.user.teams.map(team => {
-          let teamTickets = props.tickets.filter(t => t.team?.name === team.name)
-          for (let ticket of teamTickets) {
+          const teamTickets = props.tickets.filter(t => t.team?.name === team.name)
+          for (const ticket of teamTickets) {
             ticket.escalations = props.escalations.filter(e => `${e.ticketId}` === ticket.id);
           }
           return teamTickets.length > 0 ? (
             <QuickAccessComponent team={team} tickets={teamTickets} key={team.name}/>
           ) : (
             <>
-              <hr></hr>
+              <hr/>
               <Typography key={team.name} variant="h6" color="textSecondary">
                 No tickets for team {team.name} 😊 <em>(...yet)</em>
               </Typography>
