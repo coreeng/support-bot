@@ -5837,6 +5837,35 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@coreeng/support-bot@workspace:^, @coreeng/support-bot@workspace:plugins/support-bot":
+  version: 0.0.0-use.local
+  resolution: "@coreeng/support-bot@workspace:plugins/support-bot"
+  dependencies:
+    "@backstage/cli": "npm:^0.29.4"
+    "@backstage/core-app-api": "npm:^1.15.3"
+    "@backstage/core-components": "npm:^0.16.2"
+    "@backstage/core-plugin-api": "npm:^1.10.2"
+    "@backstage/dev-utils": "npm:^1.1.5"
+    "@backstage/test-utils": "npm:^1.7.3"
+    "@backstage/theme": "npm:^0.6.3"
+    "@material-ui/core": "npm:^4.9.13"
+    "@material-ui/icons": "npm:^4.9.1"
+    "@material-ui/lab": "npm:^4.0.0-alpha.61"
+    "@testing-library/jest-dom": "npm:^6.0.0"
+    "@testing-library/react": "npm:^14.0.0"
+    "@testing-library/user-event": "npm:^14.0.0"
+    "@types/luxon": "npm:^3"
+    luxon: "npm:^3.5.0"
+    msw: "npm:^1.0.0"
+    react: "npm:^16.13.1 || ^17.0.0 || ^18.0.0"
+    react-use: "npm:^17.2.4"
+    recharts: "npm:^2.15.0"
+  peerDependencies:
+    react: ^16.13.1 || ^17.0.0 || ^18.0.0
+    react-router-dom: "*"
+  languageName: unknown
+  linkType: soft
+
 "@cspotcode/source-map-support@npm:^0.8.0":
   version: 0.8.1
   resolution: "@cspotcode/source-map-support@npm:0.8.1"
@@ -14178,6 +14207,7 @@ __metadata:
     "@backstage/plugin-user-settings": "npm:^0.8.17"
     "@backstage/test-utils": "npm:^1.7.3"
     "@backstage/theme": "npm:^0.6.3"
+    "@coreeng/support-bot": "workspace:^"
     "@material-ui/core": "npm:^4.12.2"
     "@material-ui/icons": "npm:^4.9.1"
     "@playwright/test": "npm:^1.32.3"
@@ -14186,7 +14216,6 @@ __metadata:
     "@testing-library/react": "npm:^14.0.0"
     "@testing-library/user-event": "npm:^14.0.0"
     "@types/react-dom": "npm:*"
-    backstage-plugin-cecg-support-bot: "npm:^0.1.0"
     cross-env: "npm:^7.0.0"
     react: "npm:^18.0.2"
     react-dom: "npm:^18.0.2"
@@ -14857,34 +14886,6 @@ __metadata:
   checksum: 10c0/a9e825a6a38a6d1c4a94476eabc13d6127dfaafb0967baf104affbb67806ae26abbb58dab8d572d2cd21ef06634ff57c3ad48dff14b904e18de1474cc2f22bf3
   languageName: node
   linkType: hard
-
-"backstage-plugin-cecg-support-bot@npm:^0.1.0, backstage-plugin-cecg-support-bot@workspace:plugins/cecg-support-bot":
-  version: 0.0.0-use.local
-  resolution: "backstage-plugin-cecg-support-bot@workspace:plugins/cecg-support-bot"
-  dependencies:
-    "@backstage/cli": "npm:^0.29.4"
-    "@backstage/core-app-api": "npm:^1.15.3"
-    "@backstage/core-components": "npm:^0.16.2"
-    "@backstage/core-plugin-api": "npm:^1.10.2"
-    "@backstage/dev-utils": "npm:^1.1.5"
-    "@backstage/test-utils": "npm:^1.7.3"
-    "@backstage/theme": "npm:^0.6.3"
-    "@material-ui/core": "npm:^4.9.13"
-    "@material-ui/icons": "npm:^4.9.1"
-    "@material-ui/lab": "npm:^4.0.0-alpha.61"
-    "@testing-library/jest-dom": "npm:^6.0.0"
-    "@testing-library/react": "npm:^14.0.0"
-    "@testing-library/user-event": "npm:^14.0.0"
-    "@types/luxon": "npm:^3"
-    luxon: "npm:^3.5.0"
-    msw: "npm:^1.0.0"
-    react: "npm:^16.13.1 || ^17.0.0 || ^18.0.0"
-    react-use: "npm:^17.2.4"
-    recharts: "npm:^2.15.0"
-  peerDependencies:
-    react: ^16.13.1 || ^17.0.0 || ^18.0.0
-  languageName: unknown
-  linkType: soft
 
 "bail@npm:^2.0.0":
   version: 2.0.2
