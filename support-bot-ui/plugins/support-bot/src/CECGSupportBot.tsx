@@ -30,9 +30,7 @@ export const CECGSupportBot = () => {
       setLoadingUserTeams(true);
       setUserTeamsError(null);
       try {
-        console.log(`Fetching teams for user: ${currentUser.name}`);
         const data = await ticketApi.getUser(currentUser.name);
-        console.log(`Fetched teams: `, data.teams);
         setCurrentUser(prev => ({ ...prev, teams: data.teams }));
       } catch (err) {
         if (err instanceof Error) {
@@ -51,10 +49,10 @@ export const CECGSupportBot = () => {
   const { escalations, loading: escalationsLoading, error: escalationsError } = useEscalations();
   const { teams, loading: teamsLoading, error: teamsError } = useTeams();
 
-  let possibleLoading = [loadingUserTeams, ticketsLoading, teamsLoading, escalationsLoading];
-  let possibleErrors = [userTeamsError, ticketsError, teamsError, escalationsError];
+  const possibleLoading = [loadingUserTeams, ticketsLoading, teamsLoading, escalationsLoading];
+  const possibleErrors = [userTeamsError, ticketsError, teamsError, escalationsError];
 
-  let { stats: stats, loading: statsLoading, error: statsError } = useStats();
+  const { stats: stats, loading: statsLoading, error: statsError } = useStats();
   if (isSupport) {
     possibleLoading.push(statsLoading);
     possibleErrors.push(statsError);
@@ -63,16 +61,6 @@ export const CECGSupportBot = () => {
   const anyLoading = possibleLoading.some(e => e);
   const anyError = possibleErrors.some(e => !!e);
   
-  console.log(`Current User: `, currentUser);
-  console.log(`Tickets: `);
-  console.table(tickets);
-  console.log(`Escalations: `);
-  console.table(escalations);
-  console.log(`Teams: `, teams);
-  console.table(teams);
-  console.log(`Stats: `);
-  console.table(stats);
-
   if (anyLoading) {
     return (
       <Page themeId="tool">

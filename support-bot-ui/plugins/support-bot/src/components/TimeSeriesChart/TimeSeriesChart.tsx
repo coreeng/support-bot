@@ -41,7 +41,7 @@ function findEarliestTicket(tickets: Ticket[]): Ticket {
 
 function getTicketResolvedTime(ticket: Ticket): DateTime {
   // Look in statusHistory for the first time status = 'resolved'
-  const resolvedEvent = ticket.logs.find(t => t.event == "closed");
+  const resolvedEvent = ticket.logs.find(t => t.event === "closed");
   if (resolvedEvent) {
     return resolvedEvent.timestamp;
   }
@@ -49,14 +49,6 @@ function getTicketResolvedTime(ticket: Ticket): DateTime {
   // If not resolved, treat it as open indefinitely
   // You can pick a large future date or just use DateTime.now()
   return DateTime.now(); // ~1e16 ms in the future
-}
-
-function wasTicketOpenOnDay(ticket: Ticket, dayStart: DateTime, dayEnd: DateTime): boolean {
-  const openTime = ticket.dateCreated;           // The moment it was opened
-  const resolvedTime = getTicketResolvedTime(ticket); // The moment it first resolved (or far future)
-  // Overlap check:
-  // openTime <= dayEnd  AND  resolvedTime > dayStart
-  return openTime <= dayEnd && resolvedTime > dayStart;
 }
 
 export function aggregateActiveTickets(tickets: Ticket[]): { day: string; count: number }[] {
@@ -76,6 +68,13 @@ export function aggregateActiveTickets(tickets: Ticket[]): { day: string; count:
   const data: { day: string; count: number }[] = [];
 
   // 3. For each day from earliest to today...
+  function wasTicketOpenOnDay(ticket: Ticket, dayStart: DateTime, dayEnd: DateTime): boolean {
+    const openTime = ticket.dateCreated;           // The moment it was opened
+    const resolvedTime = getTicketResolvedTime(ticket); // The moment it first resolved (or far future)
+    // Overlap check:
+    // openTime <= dayEnd  AND  resolvedTime > dayStart
+    return openTime <= dayEnd && resolvedTime > dayStart;
+  }
   for (let i = daysBetween; i >= 0; i--) {
     const label = i === 0 ? 'Today' : `-${i}d`;
     const dayStart = now.minus({ days: i }).startOf('day');
@@ -96,9 +95,8 @@ export function aggregateActiveTickets(tickets: Ticket[]): { day: string; count:
 // @ts-ignore
 function aggregateTicketsOpened(tickets: Ticket[]) {
     const now = DateTime.now();
-    let result: { day: string; count: number }[] = [];
-    let earliest = findEarliestTicket(tickets).dateCreated;
-    earliest = earliest.startOf('day');
+    const result: { day: string; count: number }[] = [];
+    const earliest = findEarliestTicket(tickets).dateCreated.startOf('day');
     const today = DateTime.now().startOf('day');
     const daysBetween = Math.floor(today.diff(earliest, 'days').days);
     for (let i = daysBetween; i >= 0; i--) {
@@ -170,7 +168,6 @@ type MultiMetricChartProps = {
 };
 
 export function TimeSeriesChart({ tickets, teams }: MultiMetricChartProps) {
-  console.log(`TimeSeriesChart Tickets: `, tickets);
   const [metric, setMetric] = useState<'opened' | 'active'>('opened');
   
   const chartData = aggregateTicketsByTeam(tickets, teams, metric);

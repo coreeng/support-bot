@@ -44,8 +44,8 @@ export class Escalation {
     this.id = id;
     this.ticketId = ticketId;
     this.threadLink = threadLink;
-    this.openedAt = typeof openedAt == 'string' ? DateTime.fromISO(openedAt) : openedAt;
-    this.resolvedAt = typeof resolvedAt == 'string' ? DateTime.fromISO(resolvedAt) : resolvedAt;
+    this.openedAt = typeof openedAt === 'string' ? DateTime.fromISO(openedAt) : openedAt;
+    this.resolvedAt = typeof resolvedAt === 'string' ? DateTime.fromISO(resolvedAt) : resolvedAt;
     this.team = team;
     this.tags = tags;
     this.isOpen = !resolvedAt;
