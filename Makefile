@@ -39,7 +39,7 @@ build-api-app: lint-api-app ## Build api app
 
 .PHONY: build-ui-app
 build-ui-app: lint-ui-app ## Build ui app
-	docker buildx build $(p2p_image_cache) --tag "$(call p2p_image_tag,support-bot-ui)" ./support-bot-ui
+	docker buildx build $(p2p_image_cache) --tag "$(call p2p_image_tag,support-bot-ui)" --build-arg P2P_VERSION="$(p2p_version)" ./support-bot-ui
 
 .PHONY: build-app
 build-app: build-api-app build-ui-app ## Build api & ui apps
