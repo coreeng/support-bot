@@ -53,6 +53,13 @@ RUN mkdir packages/backend/dist/skeleton packages/backend/dist/bundle \
     && tar xzf packages/backend/dist/skeleton.tar.gz -C packages/backend/dist/skeleton \
     && tar xzf packages/backend/dist/bundle.tar.gz -C packages/backend/dist/bundle
 
+# Version, lint, build & pack coreeng@support-bot plugin (TODO: fix lint errors and remove || true)
+ARG P2P_VERSION
+RUN npm version ${P2P_VERSION} --prefix plugins/support-bot --no-git-tag-version --no-workspaces-update && \
+    yarn --cwd plugins/support-bot lint || true && \
+    yarn --cwd plugins/support-bot build && \
+    yarn --cwd plugins/support-bot pack --filename ../../coreeng-support-bot.tgz
+
 # Stage 3 - Build the actual backend image and install production dependencies
 FROM node:22-bookworm-slim
 
@@ -101,6 +108,9 @@ RUN --mount=type=cache,target=/home/node/.cache/yarn,sharing=locked,uid=1000,gid
 
 # Copy the built packages from the build stage
 COPY --from=build --chown=node:node /app/packages/backend/dist/bundle/ ./
+
+# Copy the plugin package from the build stage
+COPY --from=build --chown=node:node /app/coreeng-support-bot.tgz ./
 
 # Copy any other files that we need at runtime
 COPY --chown=node:node app-config*.yaml ./
