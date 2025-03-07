@@ -131,13 +131,16 @@ flyway {
     locations = arrayOf("filesystem:./src/main/resources/db/migration")
 }
 tasks.withType<AbstractFlywayTask> {
-    usesService(postgresService)
+    val dockerBuild = System.getProperty("docker") ?: "false"
+    if (dockerBuild != "true") {
+        usesService(postgresService)
+    }
     inputs.dir("src/main/resources/db/migration")
     doFirst {
-        val container = postgresService.get().container
-        url = container.jdbcUrl
-        user = container.username
-        password = container.password
+        val container = if (dockerBuild != "true") { postgresService.get().container } else null
+        url = container?.jdbcUrl ?: "jdbc:postgresql://localhost:5432/flywaydb"
+        user = container?.username ?: "postgres"
+        password = container?.password ?: "fly"
     }
 }
 
@@ -164,17 +167,20 @@ jooq {
     }
 }
 tasks.withType<CodegenTask> {
-    usesService(postgresService)
+    val dockerBuild = System.getProperty("docker") ?: "false"
+    if (dockerBuild != "true") {
+        usesService(postgresService)
+    }
     dependsOn("flywayMigrate")
     doFirst {
-        val container = postgresService.get().container
+        val container = if (dockerBuild != "true") { postgresService.get().container } else null
         jooq {
             configuration {
                 jdbc {
                     driver = "org.postgresql.Driver"
-                    url = container.jdbcUrl
-                    user = container.username
-                    password = container.password
+                    url = container?.jdbcUrl ?: "jdbc:postgresql://localhost:5432/flywaydb"
+                    user = container?.username ?: "postgres"
+                    password = container?.password ?: "fly"
                 }
             }
         }
