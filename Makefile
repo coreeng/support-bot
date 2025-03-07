@@ -54,18 +54,18 @@ lint: lint-api-app lint-ui-app ## Lint api & ui app
 
 .PHONY: build-api-app
 build-api-app: lint-api-app ## Build api app
-	cd support-bot-api; docker buildx build $(p2p_image_cache) --tag "$(call p2p_image_tag,support-bot-api)" --file service/Dockerfile .
+	cd support-bot-api; docker buildx build $(call p2p_image_cache,support-bot-api) --tag "$(call p2p_image_tag,support-bot-api)" --file service/Dockerfile .
 
 .PHONY: build-ui-app
 build-ui-app: lint-ui-app ## Build ui app
-	docker buildx build $(p2p_image_cache) --tag "$(call p2p_image_tag,support-bot-ui)" --build-arg P2P_VERSION="$(p2p_version)" ./support-bot-ui
+	docker buildx build $(call p2p_image_cache,support-bot-ui) --tag "$(call p2p_image_tag,support-bot-ui)" --build-arg P2P_VERSION="$(p2p_version)" ./support-bot-ui
 
 .PHONY: build-app
 build-app: build-api-app build-ui-app ## Build api & ui apps
 
 .PHONY: build-api-functional
 build-api-functional: ## Build api functional test docker image
-	cd support-bot-api; docker buildx build $(p2p_image_cache) --tag "$(call p2p_image_tag,support-bot-api)" --file functional/Dockerfile .
+	cd support-bot-api; docker buildx build $(call p2p_image_cache,support-bot-api-functional) --tag "$(call p2p_image_tag,support-bot-api)" --file functional/Dockerfile .
 
 .PHONY: build-ui-functional
 build-ui-functional: ## Build ui functional test frontend plugin
