@@ -40,10 +40,11 @@ p2p-prod:          publish-prod                           deploy-prod           
 .PHONY: lint-api-app
 lint-api-app: ## Lint api app
 	docker pull postgres:17.2-alpine
-	cd support-bot-api; ./gradlew pmdMain pmdTest
+	cd support-bot-api; ./gradlew :service:check
 
 .PHONY: lint-ui-app
 lint-ui-app: ## Lint ui app
+	docker run --rm -i docker.io/hadolint/hadolint < support-bot-api/Dockerfile
 	docker run --rm -i docker.io/hadolint/hadolint < support-bot-ui/Dockerfile
 
 .PHONY: lint
@@ -54,8 +55,7 @@ lint: lint-api-app lint-ui-app ## Lint api & ui app
 
 .PHONY: build-api-app
 build-api-app: lint-api-app ## Build api app
-	docker pull postgres:17.2-alpine
-	cd support-bot-api; ./gradlew :service:jooqCodegen :service:build :service:test :service:bootBuildImage -DimageName=$(call p2p_image_tag,support-bot-api)
+	cd support-bot-api; docker buildx build $(p2p_image_cache) --tag "$(call p2p_image_tag,support-bot-api)" --file service/Dockerfile .
 
 .PHONY: build-ui-app
 build-ui-app: lint-ui-app ## Build ui app
