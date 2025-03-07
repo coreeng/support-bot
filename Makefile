@@ -44,7 +44,6 @@ lint-api-app: ## Lint api app
 
 .PHONY: lint-ui-app
 lint-ui-app: ## Lint ui app
-	docker run --rm -i docker.io/hadolint/hadolint < support-bot-api/service/Dockerfile
 	docker run --rm -i docker.io/hadolint/hadolint < support-bot-ui/Dockerfile
 
 .PHONY: lint
