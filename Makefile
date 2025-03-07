@@ -55,7 +55,7 @@ lint: lint-api-app lint-ui-app ## Lint api & ui app
 .PHONY: build-api-app
 build-api-app: lint-api-app ## Build api app
 	docker pull postgres:17.2-alpine
-	cd support-bot-api; ./gradlew jooqCodegen build test bootBuildImage -DimageName=$(call p2p_image_tag,support-bot-api) -x functional:compileJava -x functional:processResources -x functional:classes -x functional:jar -x functional:assemble -x functional:compileTestJava -x functional:processTestResources -x functional:testClasses -x functional:test
+	cd support-bot-api; ./gradlew :service:jooqCodegen :service:build :service:test :service:bootBuildImage -DimageName=$(call p2p_image_tag,support-bot-api)
 
 .PHONY: build-ui-app
 build-ui-app: lint-ui-app ## Build ui app
