@@ -16,7 +16,7 @@ RUN service postgresql start && sleep 6 && \
   su postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE flywaydb TO postgres;\"" && \
   gradle -Ddocker=true :service:jooqCodegen :service:build --no-daemon
 
-CMD ["java", "-jar", "service.jar"]
+CMD ["gradle"]
 
 ## Final stage
 FROM registry.access.redhat.com/ubi8/openjdk-21:1.21
