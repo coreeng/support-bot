@@ -143,10 +143,6 @@ push-integration: push-api-integration push-ui-integration ## Push integration t
 
 ##@ Deploy targets
 
-# .PHONY: deploy-functional
-# deploy-functional:
-# 	@echo "WARNING: $@ not implemented"
-
 .PHONY: deploy-nft
 deploy-nft:
 	@echo "WARNING: $@ not implemented"
