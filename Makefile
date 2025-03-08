@@ -204,22 +204,6 @@ deploy-%: ## Deploy mathing target `deploy-%`
 		--set service.port="7007"
 
 
-##@ Publish targets
-
-.PHONY: publish-api-prod
-publish-api-prod: ## Publish api docker image
-	@echo "Publish docker image to ghcr.io :"
-	echo "$(GITHUB_TOKEN)" | skopeo login --username "$(GITHUB_ACTOR)" --password-stdin ghcr.io
-	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/"$(p2p_app_name):$(p2p_version)" "docker://ghcr.io/coreeng/support-bot:$(p2p_version)"
-
-.PHONY: publish-ui-prod
-publish-ui-prod: ## Publish ui frontend plugin
-	@echo "WARNING: $@ not implemented"
-
-.PHONY: publish-prod
-publish-prod: publish-api-prod publish-ui-prod ## Publish api & ui artifacts
-
-
 ##@ Run targets
 
 .PHONY: run-api-app
@@ -259,3 +243,39 @@ run-integration:
 .PHONY: run-extended-test
 run-extended-test:
 	@echo "WARNING: $@ not implemented"
+
+
+##@ Publish targets
+
+.PHONY: publish-api-prod
+publish-api-prod: ## Publish api container image
+	@printf "Login to ghcr.io... "
+	@echo "$(GITHUB_TOKEN)" | skopeo login --username "$(or $(GITHUB_ACTOR),anonymous)" --password-stdin ghcr.io
+	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/$(p2p_app_name):$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name):$(p2p_version)"
+
+.PHONY: publish-ui-prod
+publish-ui-prod: ## Publish ui npm package
+	@npm set "//npm.pkg.github.com/:_authToken=$(GITHUB_TOKEN)"
+	@npm set "@coreeng:registry=https://npm.pkg.github.com/"
+	docker create --name plugin-container "$(p2p_registry)/$(p2p_app_name)-ui:$(p2p_version)"
+	docker cp plugin-container:/app/coreeng-$(p2p_app_name).tgz ./coreeng-$(p2p_app_name).tgz
+	docker rm plugin-container
+	@published_shasum=`npm view @coreeng/$(p2p_app_name)@$(p2p_version) dist.shasum 2>/dev/null || echo none` ; \
+	if [ "$$published_shasum" = "none" ] ; then \
+		echo "Publishing npm package $(p2p_version)" ; \
+		npm publish coreeng-$(p2p_app_name).tgz ; \
+	else \
+		local_shasum=`shasum coreeng-$(p2p_app_name).tgz | awk '{print $$1}'` ; \
+		if [ "$$published_shasum" = "$$local_shasum" ] ; then \
+			echo "Publishing npm package $(p2p_version) skipped as it already exists with same shasum" ; \
+		else \
+			echo "Publishing npm package $(p2p_version) failed as it already exists with a different shasum" ; \
+			exit 1 ; \
+		fi ; \
+	fi
+	@printf "Login to ghcr.io... "
+	@echo "$(GITHUB_TOKEN)" | skopeo login --username "$(or $(GITHUB_ACTOR),anonymous)" --password-stdin ghcr.io
+	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/$(p2p_app_name):$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name)-ui:$(p2p_version)"
+
+.PHONY: publish-prod
+publish-prod: publish-api-prod publish-ui-prod ## Publish api & ui artifacts
