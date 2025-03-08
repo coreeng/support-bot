@@ -39,8 +39,8 @@ p2p-prod:          publish-prod                           deploy-prod           
 
 .PHONY: lint-api-app
 lint-api-app: ## Lint api app
-	docker pull postgres:17.2-alpine
-	cd support-bot-api; ./gradlew :service:check
+	docker run --rm -i docker.io/hadolint/hadolint < support-bot-api/Dockerfile
+	docker run --rm -i docker.io/hadolint/hadolint < support-bot-api/functional/Dockerfile
 
 .PHONY: lint-ui-app
 lint-ui-app: ## Lint ui app
