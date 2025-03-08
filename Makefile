@@ -190,7 +190,7 @@ deploy-%: ## Deploy mathing target `deploy-%`
 		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
 		--set ingress.hosts[0].paths[0].path="/" \
 		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
-		--set serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account="support-bot-ca@$(PROJECT_ID).iam.gserviceaccount.com"
+		--set serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account="$(p2p_tenant_name)-ca@$(PROJECT_ID).iam.gserviceaccount.com"
 	helm upgrade --install "$(p2p_app_name)-ui" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
 		--set nameOverride="$(p2p_app_name)-ui" \
 		--set tenantName="$(p2p_tenant_name)" \
@@ -212,7 +212,7 @@ run-api-app: ## Run api app
 
 .PHONY: run-ui-app
 run-ui-app: ## Run ui app
-	docker run --rm -P --name "$(p2p_app_name)-ui" "$(call p2p_image_tag,support-bot-ui)"
+	docker run --rm -P --name "$(p2p_app_name)-ui" "$(call p2p_image_tag,$(p2p_app_name)-ui)"
 
 .PHONY: run-app ## Run api & ui apps
 run-app:
@@ -221,7 +221,7 @@ run-app:
 
 .PHONY: run-api-functional
 run-api-functional: ## run api functional test
-	cd support-bot-api; bash scripts/helm-test.sh functional "$(p2p_namespace)" "support-bot-api" true
+	cd support-bot-api; bash scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" true
 
 .PHONY: run-ui-functional
 run-ui-functional: ## run ui functional test
