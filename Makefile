@@ -54,7 +54,7 @@ lint: lint-api-app lint-ui-app ## Lint api & ui app
 
 .PHONY: build-api-app
 build-api-app: lint-api-app ## Build api app
-	cd support-bot-api; docker buildx build $(call p2p_image_cache,support-bot-api) --tag "$(call p2p_image_tag,support-bot-api)" --file service/Dockerfile .
+	docker buildx build $(call p2p_image_cache,support-bot-api) --tag "$(call p2p_image_tag,support-bot-api)" ./support-bot-api
 
 .PHONY: build-ui-app
 build-ui-app: lint-ui-app ## Build ui app
