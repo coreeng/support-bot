@@ -9,7 +9,7 @@ resources:
     memory: 1024Mi
 
 livenessProbe:
-  failureThreshold: 3
+  failureThreshold: 6
   httpGet:
     port: 8081
     path: /health
@@ -17,7 +17,7 @@ livenessProbe:
   successThreshold: 1
   timeoutSeconds: 1
 readinessProbe:
-  failureThreshold: 3
+  failureThreshold: 6
   httpGet:
     port: 8081
     path: /health

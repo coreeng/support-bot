@@ -24,6 +24,7 @@ RUN service postgresql start && sleep 6 && \
 FROM registry.access.redhat.com/ubi8/openjdk-21:1.21
 WORKDIR /
 COPY --from=build /build/service/build/libs/service-*.jar /service.jar
+COPY service/src/main/resources/application.yaml /application.yaml
 
 CMD ["java", "-jar", "service.jar"]
 
