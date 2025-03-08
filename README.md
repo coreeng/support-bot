@@ -13,7 +13,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: support-bot-api-rbac
+  name: support-bot-rbac
 rules:
 - apiGroups:
   - ""
@@ -33,52 +33,52 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: support-bot-api-rbac-binding-extended
+  name: support-bot-rbac-binding-extended
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: support-bot-api-rbac
+  name: support-bot-rbac
 subjects:
 - kind: ServiceAccount
-  name: support-bot-api
+  name: support-bot
   namespace: support-bot-extended
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: support-bot-api-rbac-binding-functional
+  name: support-bot-rbac-binding-functional
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: support-bot-api-rbac
+  name: support-bot-rbac
 subjects:
 - kind: ServiceAccount
-  name: support-bot-api
+  name: support-bot
   namespace: support-bot-functional
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: support-bot-api-rbac-binding-integration
+  name: support-bot-rbac-binding-integration
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: support-bot-api-rbac
+  name: support-bot-rbac
 subjects:
 - kind: ServiceAccount
-  name: support-bot-api
+  name: support-bot
   namespace: support-bot-integration
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: support-bot-api-rbac-binding-nft
+  name: support-bot-rbac-binding-nft
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: support-bot-api-rbac
+  name: support-bot-rbac
 subjects:
 - kind: ServiceAccount
-  name: support-bot-api
+  name: support-bot
   namespace: support-bot-nft
 ```
