@@ -2,7 +2,7 @@
 P2P_TENANT_NAME ?= support-bot
 P2P_APP_NAME ?= support-bot
 
-P2P_IMAGE_NAMES := support-bot-api support-bot-ui
+P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui
 
 # Download and include p2p makefile
 $(shell curl -fsSL "https://raw.githubusercontent.com/coreeng/p2p/v1/p2p.mk" -o ".p2p.mk")
@@ -46,26 +46,28 @@ lint-api-app: ## Lint api app
 lint-ui-app: ## Lint ui app
 	docker run --rm -i docker.io/hadolint/hadolint < support-bot-ui/Dockerfile
 
-.PHONY: lint
-lint: lint-api-app lint-ui-app ## Lint api & ui app
+.PHONY: lint-app
+lint-app: lint-api-app lint-ui-app ## Lint api & ui app
 
 
 ##@ Build targets
 
 .PHONY: build-api-app
 build-api-app: lint-api-app ## Build api app
-	docker buildx build $(call p2p_image_cache,support-bot-api) --tag "$(call p2p_image_tag,support-bot-api)" ./support-bot-api
+	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --build-arg P2P_VERSION="$(p2p_version)" support-bot-api
 
 .PHONY: build-ui-app
 build-ui-app: lint-ui-app ## Build ui app
-	docker buildx build $(call p2p_image_cache,support-bot-ui) --tag "$(call p2p_image_tag,support-bot-ui)" --build-arg P2P_VERSION="$(p2p_version)" ./support-bot-ui
+	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" --build-arg P2P_VERSION="$(p2p_version)" support-bot-ui
 
 .PHONY: build-app
 build-app: build-api-app build-ui-app ## Build api & ui apps
 
+
+
 .PHONY: build-api-functional
 build-api-functional: ## Build api functional test docker image
-	cd support-bot-api; docker buildx build $(call p2p_image_cache,support-bot-api-functional) --tag "$(call p2p_image_tag,support-bot-api)" --file functional/Dockerfile .
+	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --file functional/Dockerfile support-bot-api
 
 .PHONY: build-ui-functional
 build-ui-functional: ## Build ui functional test frontend plugin
@@ -73,7 +75,6 @@ build-ui-functional: ## Build ui functional test frontend plugin
 
 .PHONY: build-functional
 build-functional: build-api-functional build-ui-functional ## Build functional tests
-	@echo "WARNING: $@ WIP"
 
 .phony: build-nft
 build-nft:
@@ -92,19 +93,18 @@ build-extended-test:
 
 .PHONY: push-api-app
 push-api-app: ## Push api app
-	docker image push "$(call p2p_image_tag,support-bot-api)"
+	docker image push "$(p2p_image_tag)"
 
 .PHONY: push-ui-app
 push-ui-app: ## Push ui app
-	docker image push "$(call p2p_image_tag,support-bot-ui)"
+	docker image push "$(call p2p_image_tag,$(p2p_app_name)-ui)"
 
 .PHONY: push-app ## Push api & ui apps
 push-app: push-api-app push-ui-app
 
-
 .PHONY: push-api-functional
 push-api-functional: ## Push api functional test docker image
-	docker image push "$(call p2p_image_tag,support-bot-api)"
+	docker image push "$(p2p_image_tag)"
 
 .PHONY: push-ui-functional
 push-ui-functional: ## Push ui functional test frontend plugin
@@ -112,8 +112,6 @@ push-ui-functional: ## Push ui functional test frontend plugin
 
 .PHONY: push-functional
 push-functional: push-api-functional push-ui-functional ## Push functional tests images
-	@echo "WARNING: $@ WIP"
-
 
 .PHONY: push-api-nft
 push-api-nft: ## Push api nft test docker image
@@ -126,7 +124,6 @@ push-ui-nft: ## Push ui nft test frontend plugin
 .PHONY: push-nft
 push-nft: push-api-nft push-ui-nft ## Push nft tests images
 	@echo "WARNING: $@ not implemented"
-
 
 .PHONY: push-api-integration
 push-api-integration: ## Push api integration test docker image
@@ -153,19 +150,19 @@ deploy-extended-test:
 .PHONY: deploy-%
 deploy-%: ## Deploy mathing target `deploy-%`
 	helm repo add bitnami https://charts.bitnami.com/bitnami
-	helm upgrade --install support-bot-db bitnami/postgresql -n "$(p2p_namespace)" \
+	helm upgrade --install "$(p2p_app_name)-db" bitnami/postgresql -n "$(p2p_namespace)" \
 		--set global.postgresql.auth.postgresPassword=rootpassword \
 		--set global.postgresql.auth.username=supportbot \
 		--set global.postgresql.auth.password=supportbotpassword \
 		--set global.postgresql.auth.database=supportbot \
 		--set primary.pdb.create=false
 	helm repo add core-platform-assets https://coreeng.github.io/core-platform-assets
-	helm upgrade --install "support-bot-api" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
-		--set nameOverride="support-bot-api" \
+	helm upgrade --install "$(p2p_app_name)" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
+		--set nameOverride="$(p2p_app_name)" \
 		--set tenantName="$(p2p_tenant_name)" \
-		--set image.repository="$(p2p_registry)/support-bot-api" \
+		--set image.repository="$(p2p_registry)/$(p2p_app_name)" \
 		--set image.tag="$(p2p_version)" \
-		--set envVarsMap.DB_URL="jdbc:postgresql://support-bot-db-postgresql.$(p2p_namespace).svc.cluster.local:5432/supportbot" \
+		--set envVarsMap.DB_URL="jdbc:postgresql://$(p2p_app_name)-db-postgresql.$(p2p_namespace).svc.cluster.local:5432/supportbot" \
 		--set envVarsMap.DB_USERNAME="supportbot" \
 		--set envVarsMap.DB_PASSWORD="supportbotpassword" \
 		--set envVarsMap.SLACK_TOKEN="$${SUPPORT_BOT_SLACK_TOKEN}" \
@@ -181,19 +178,17 @@ deploy-%: ## Deploy mathing target `deploy-%`
 		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
 		--set ingress.hosts[0].paths[0].path="/" \
 		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
-		--set serviceAccount.name="support-bot-api" \
 		--set serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account="support-bot-ca@$(PROJECT_ID).iam.gserviceaccount.com"
-	helm upgrade --install "support-bot-ui" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
-		--set nameOverride="support-bot-ui" \
+	helm upgrade --install "$(p2p_app_name)-ui" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
+		--set nameOverride="$(p2p_app_name)-ui" \
 		--set tenantName="$(p2p_tenant_name)" \
-		--set image.repository="$(p2p_registry)/support-bot-ui" \
+		--set image.repository="$(p2p_registry)/$(p2p_app_name)-ui" \
 		--set image.tag="$(p2p_version)" \
 		--set ingress.enabled=true \
 		--set ingress.appUrlSuffix="$(p2p_app_url_suffix)" \
 		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
 		--set ingress.hosts[0].paths[0].path="/" \
 		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
-		--set serviceAccount.name="support-bot-ui" \
 		--set service.port="7007"
 
 
@@ -203,7 +198,7 @@ deploy-%: ## Deploy mathing target `deploy-%`
 publish-api-prod: ## Publish api docker image
 	@echo "Publish docker image to ghcr.io :"
 	echo "$(GITHUB_TOKEN)" | skopeo login --username "$(GITHUB_ACTOR)" --password-stdin ghcr.io
-	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/support-bot-api:$(p2p_version)" "docker://ghcr.io/coreeng/support-bot:$(p2p_version)"
+	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/"$(p2p_app_name):$(p2p_version)" "docker://ghcr.io/coreeng/support-bot:$(p2p_version)"
 
 .PHONY: publish-ui-prod
 publish-ui-prod: ## Publish ui frontend plugin
@@ -217,11 +212,11 @@ publish-prod: publish-api-prod publish-ui-prod ## Publish api & ui artifacts
 
 .PHONY: run-api-app
 run-api-app: ## Run api app
-	docker run --rm -P --name "$(p2p_app_name)" "$(call p2p_image_tag,support-bot-api)"
+	docker run --rm -P --name "$(p2p_app_name)" "$(p2p_image_tag)"
 
 .PHONY: run-ui-app
 run-ui-app: ## Run ui app
-	docker run --rm -P --name "$(p2p_app_name)" "$(call p2p_image_tag,support-bot-ui)"
+	docker run --rm -P --name "$(p2p_app_name)-ui" "$(call p2p_image_tag,support-bot-ui)"
 
 .PHONY: run-app ## Run api & ui apps
 run-app:
