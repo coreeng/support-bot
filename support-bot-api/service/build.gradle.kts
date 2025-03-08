@@ -16,7 +16,7 @@ plugins {
 }
 
 group = "com.coreeng"
-version = "0.0.1-SNAPSHOT"
+version = project.findProperty("version")?.toString() ?: "0.0.1-SNAPSHOT"
 
 java {
     toolchain {
