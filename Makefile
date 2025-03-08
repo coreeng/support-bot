@@ -137,6 +137,18 @@ push-ui-integration: ## Push ui integration test frontend plugin
 push-integration: push-api-integration push-ui-integration ## Push integration tests images
 	@echo "WARNING: $@ not implemented"
 
+.PHONY: push-api-extended-test
+push-api-extended-test: ## Push api extended-test test docker image
+	@echo "WARNING: $@ not implemented"
+
+.PHONY: push-ui-extended-test
+push-ui-extended-test: ## Push ui extended-test test frontend plugin
+	@echo "WARNING: $@ not implemented"
+
+.PHONY: push-extended-test
+push-extended-test: push-api-extended-test push-ui-extended-test ## Push extended-test tests images
+	@echo "WARNING: $@ not implemented"
+
 ##@ Deploy targets
 
 .PHONY: deploy-nft
