@@ -1,7 +1,8 @@
 ## Build stage
 FROM gradle:jdk21 AS build
 
-RUN apt-get update && apt-get install -y postgresql postgresql-contrib
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql postgresql-contrib
 
 WORKDIR /build
 
@@ -10,6 +11,7 @@ RUN sed -i 's/peer/trust/' '/etc/postgresql/16/main/pg_hba.conf' && \
 
 COPY . /build
 
+# hadolint ignore=DL3001
 RUN service postgresql start && sleep 6 && \
   su postgres -c "psql -c \"CREATE DATABASE flywaydb;\"" && \
   su postgres -c "psql -c \"ALTER USER postgres WITH PASSWORD 'fly';\"" && \
