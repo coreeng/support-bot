@@ -67,7 +67,7 @@ build-app: build-api-app build-ui-app ## Build api & ui apps
 
 .PHONY: build-api-functional
 build-api-functional: ## Build api functional test docker image
-	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --file functional/Dockerfile support-bot-api
+	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --file support-bot-api/functional/Dockerfile support-bot-api
 
 .PHONY: build-ui-functional
 build-ui-functional: ## Build ui functional test frontend plugin
