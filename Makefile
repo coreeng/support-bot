@@ -39,12 +39,12 @@ p2p-prod:          publish-prod                           deploy-prod           
 
 .PHONY: lint-api-app
 lint-api-app: ## Lint api app
-	docker run --rm -i docker.io/hadolint/hadolint < support-bot-api/Dockerfile
-	docker run --rm -i docker.io/hadolint/hadolint < support-bot-api/functional/Dockerfile
+	docker run --rm -i docker.io/hadolint/hadolint < api/Dockerfile
+	docker run --rm -i docker.io/hadolint/hadolint < api/functional/Dockerfile
 
 .PHONY: lint-ui-app
 lint-ui-app: ## Lint ui app
-	docker run --rm -i docker.io/hadolint/hadolint < support-bot-ui/Dockerfile
+	docker run --rm -i docker.io/hadolint/hadolint < ui/Dockerfile
 
 .PHONY: lint-app
 lint-app: lint-api-app lint-ui-app ## Lint api & ui app
@@ -54,11 +54,11 @@ lint-app: lint-api-app lint-ui-app ## Lint api & ui app
 
 .PHONY: build-api-app
 build-api-app: lint-api-app ## Build api app
-	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --build-arg P2P_VERSION="$(p2p_version)" support-bot-api
+	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --build-arg P2P_VERSION="$(p2p_version)" api
 
 .PHONY: build-ui-app
 build-ui-app: lint-ui-app ## Build ui app
-	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" --build-arg P2P_VERSION="$(p2p_version)" support-bot-ui
+	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" --build-arg P2P_VERSION="$(p2p_version)" ui
 
 .PHONY: build-app
 build-app: build-api-app build-ui-app ## Build api & ui apps
@@ -67,7 +67,7 @@ build-app: build-api-app build-ui-app ## Build api & ui apps
 
 .PHONY: build-api-functional
 build-api-functional: ## Build api functional test docker image
-	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --file support-bot-api/functional/Dockerfile support-bot-api
+	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --file api/functional/Dockerfile api
 
 .PHONY: build-ui-functional
 build-ui-functional: ## Build ui functional test frontend plugin
@@ -170,7 +170,7 @@ deploy-%: ## Deploy mathing target `deploy-%`
 		--set primary.pdb.create=false
 	helm repo add core-platform-assets https://coreeng.github.io/core-platform-assets
 	helm upgrade --install "$(p2p_app_name)" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
-		-f support-bot-api/helm-values.yaml \
+		-f api/helm-values.yaml \
 		--set nameOverride="$(p2p_app_name)" \
 		--set tenantName="$(p2p_tenant_name)" \
 		--set image.repository="$(p2p_registry)/$(p2p_app_name)" \
@@ -187,7 +187,7 @@ deploy-%: ## Deploy mathing target `deploy-%`
 		--set envVarsMap.SLACK_TICKET_CHANNEL_ID="$${SUPPORT_BOT_SLACK_TICKET_CHANNEL_ID}" \
 		--set envVarsMap.SLACK_ESCALATION_CHANNEL_ID="$${SUPPORT_BOT_SLACK_ESCALATION_CHANNEL_ID}"
 	helm upgrade --install "$(p2p_app_name)-ui" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
-		-f support-bot-ui/helm-values.yaml \
+		-f ui/helm-values.yaml \
 		--set nameOverride="$(p2p_app_name)-ui" \
 		--set tenantName="$(p2p_tenant_name)" \
 		--set image.repository="$(p2p_registry)/$(p2p_app_name)-ui" \
@@ -213,7 +213,7 @@ run-app:
 
 .PHONY: run-api-functional
 run-api-functional: ## run api functional test
-	cd support-bot-api; bash scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" true
+	cd api; bash scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" true
 
 .PHONY: run-ui-functional
 run-ui-functional: ## run ui functional test
