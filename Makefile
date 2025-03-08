@@ -170,10 +170,14 @@ deploy-%: ## Deploy mathing target `deploy-%`
 		--set primary.pdb.create=false
 	helm repo add core-platform-assets https://coreeng.github.io/core-platform-assets
 	helm upgrade --install "$(p2p_app_name)" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
+		-f support-bot-api/helm-values.yaml \
 		--set nameOverride="$(p2p_app_name)" \
 		--set tenantName="$(p2p_tenant_name)" \
 		--set image.repository="$(p2p_registry)/$(p2p_app_name)" \
 		--set image.tag="$(p2p_version)" \
+		--set ingress.appUrlSuffix="$(p2p_app_url_suffix)" \
+		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
+		--set serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account="$(p2p_tenant_name)-ca@$(PROJECT_ID).iam.gserviceaccount.com" \
 		--set envVarsMap.DB_URL="jdbc:postgresql://$(p2p_app_name)-db-postgresql.$(p2p_namespace).svc.cluster.local:5432/supportbot" \
 		--set envVarsMap.DB_USERNAME="supportbot" \
 		--set envVarsMap.DB_PASSWORD="supportbotpassword" \
@@ -181,27 +185,15 @@ deploy-%: ## Deploy mathing target `deploy-%`
 		--set envVarsMap.SLACK_SOCKET_TOKEN="$${SUPPORT_BOT_SLACK_SOCKET_TOKEN}" \
 		--set envVarsMap.SLACK_SIGNING_SECRET="$${SUPPORT_BOT_SLACK_SIGNING_SECRET}" \
 		--set envVarsMap.SLACK_TICKET_CHANNEL_ID="$${SUPPORT_BOT_SLACK_TICKET_CHANNEL_ID}" \
-		--set envVarsMap.SLACK_ESCALATION_CHANNEL_ID="$${SUPPORT_BOT_SLACK_ESCALATION_CHANNEL_ID}" \
-		--set service.port="8080" \
-		--set metrics.enabled="true" \
-		--set metrics.port="8081" \
-		--set ingress.enabled=true \
-		--set ingress.appUrlSuffix="$(p2p_app_url_suffix)" \
-		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
-		--set ingress.hosts[0].paths[0].path="/" \
-		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
-		--set serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account="$(p2p_tenant_name)-ca@$(PROJECT_ID).iam.gserviceaccount.com"
+		--set envVarsMap.SLACK_ESCALATION_CHANNEL_ID="$${SUPPORT_BOT_SLACK_ESCALATION_CHANNEL_ID}"
 	helm upgrade --install "$(p2p_app_name)-ui" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
+		-f support-bot-ui/helm-values.yaml \
 		--set nameOverride="$(p2p_app_name)-ui" \
 		--set tenantName="$(p2p_tenant_name)" \
 		--set image.repository="$(p2p_registry)/$(p2p_app_name)-ui" \
 		--set image.tag="$(p2p_version)" \
-		--set ingress.enabled=true \
 		--set ingress.appUrlSuffix="$(p2p_app_url_suffix)" \
-		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
-		--set ingress.hosts[0].paths[0].path="/" \
-		--set ingress.hosts[0].paths[0].pathType="ImplementationSpecific" \
-		--set service.port="7007"
+		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)"
 
 
 ##@ Run targets
