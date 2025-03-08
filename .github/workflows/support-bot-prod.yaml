@@ -14,7 +14,7 @@ jobs:
   get-latest-version:
     uses: coreeng/p2p/.github/workflows/p2p-get-latest-image-prod.yaml@v1
     with:
-      image-name: support-bot-ui
+      image-name: support-bot
 
   prod:
     needs: [get-latest-version]
