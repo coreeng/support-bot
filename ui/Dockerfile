@@ -55,7 +55,7 @@ RUN mkdir packages/backend/dist/skeleton packages/backend/dist/bundle \
 
 # Version, lint, build & pack coreeng@support-bot plugin
 ARG P2P_VERSION
-RUN npm version ${P2P_VERSION} --prefix plugins/support-bot --no-git-tag-version --no-workspaces-update && \
+RUN npm version "${P2P_VERSION}" --prefix plugins/support-bot --no-git-tag-version --no-workspaces-update && \
     yarn --cwd plugins/support-bot lint && \
     yarn --cwd plugins/support-bot build && \
     yarn --cwd plugins/support-bot pack --filename ../../coreeng-support-bot.tgz
@@ -121,7 +121,7 @@ COPY --chown=node:node examples ./examples
 # This switches many Node.js dependencies to production mode.
 ENV NODE_ENV=production
 
-# This disables node snapshot for Node 20 to work with the Scaffolder
+# This disables node snapshot for Node 22 to work with the Scaffolder
 ENV NODE_OPTIONS="--no-node-snapshot"
 
 CMD ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.production.yaml"]

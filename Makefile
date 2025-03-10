@@ -265,9 +265,6 @@ publish-ui-prod: ## Publish ui npm package
 			exit 1 ; \
 		fi ; \
 	fi
-	@printf "Login to ghcr.io... "
-	@echo "$(GITHUB_TOKEN)" | skopeo login --username "$(or $(GITHUB_ACTOR),anonymous)" --password-stdin ghcr.io
-	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/$(p2p_app_name):$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name)-ui:$(p2p_version)"
 
 .PHONY: publish-prod
 publish-prod: publish-api-prod publish-ui-prod ## Publish api & ui artifacts
