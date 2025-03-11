@@ -36,7 +36,14 @@ import { AppRouter, FlatRoutes } from '@backstage/core-app-api';
 import { CatalogGraphPage } from '@backstage/plugin-catalog-graph';
 import { RequirePermission } from '@backstage/plugin-permission-react';
 import { catalogEntityCreatePermission } from '@backstage/plugin-catalog-common/alpha';
+
 import { CecgSupportBotPage } from '@coreeng/support-bot';
+
+import CecgIcon from '@material-ui/icons/Flare';
+import DarkIcon from '@material-ui/icons/Brightness2';
+import LightIcon from '@material-ui/icons/WbSunny';
+import { UnifiedThemeProvider, themes as builtinThemes } from '@backstage/theme';
+import { cecgTheme } from './theme/cecg';
 
 const app = createApp({
   apis,
@@ -60,11 +67,34 @@ const app = createApp({
   components: {
     SignInPage: props => <SignInPage {...props} auto providers={['guest']} />,
   },
+  themes: [
+    {
+      id: 'cecg',
+      title: 'CECG Theme',
+      variant: 'dark',
+      icon: <CecgIcon />,
+      Provider: ({ children }) => <UnifiedThemeProvider theme={cecgTheme} children={children} />,
+    },
+    {
+      id: 'light',
+      title: 'Light Theme',
+      variant: 'light',
+      icon: <LightIcon />,
+      Provider: ({ children }) => <UnifiedThemeProvider theme={builtinThemes.light} children={children} />,
+    },
+    {
+      id: 'dark',
+      title: 'Dark Theme',
+      variant: 'dark',
+      icon: <DarkIcon />,
+      Provider: ({ children }) => <UnifiedThemeProvider theme={builtinThemes.dark} children={children} />,
+    },
+  ]
 });
 
 const routes = (
   <FlatRoutes>
-    <Route path="/" element={<Navigate to="catalog" />} />
+    <Route path="/" element={<Navigate to="cecg-support-bot" />} />
     <Route path="/catalog" element={<CatalogIndexPage />} />
     <Route
       path="/catalog/:namespace/:kind/:name"

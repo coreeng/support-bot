@@ -11,7 +11,6 @@ backend:
 
 
 # no auth & permission setup for now
-#    # Local example data, replace this with your production config, these are intended for demo use only.
 auth:
   providers:
     guest:
