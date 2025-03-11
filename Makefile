@@ -168,6 +168,7 @@ deploy-%: ## Deploy mathing target `deploy-%`
 		--set global.postgresql.auth.password=supportbotpassword \
 		--set global.postgresql.auth.database=supportbot \
 		--set primary.pdb.create=false
+		--atomic
 	helm repo add core-platform-assets https://coreeng.github.io/core-platform-assets
 	helm upgrade --install "$(p2p_app_name)" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
 		-f api/helm-values.yaml \
@@ -186,6 +187,7 @@ deploy-%: ## Deploy mathing target `deploy-%`
 		--set envVarsMap.SLACK_SIGNING_SECRET="$${SUPPORT_BOT_SLACK_SIGNING_SECRET}" \
 		--set envVarsMap.SLACK_TICKET_CHANNEL_ID="$${SUPPORT_BOT_SLACK_TICKET_CHANNEL_ID}" \
 		--set envVarsMap.SLACK_ESCALATION_CHANNEL_ID="$${SUPPORT_BOT_SLACK_ESCALATION_CHANNEL_ID}"
+		--atomic
 	helm upgrade --install "$(p2p_app_name)-ui" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
 		-f ui/helm-values.yaml \
 		--set nameOverride="$(p2p_app_name)-ui" \
@@ -193,18 +195,27 @@ deploy-%: ## Deploy mathing target `deploy-%`
 		--set image.repository="$(p2p_registry)/$(p2p_app_name)-ui" \
 		--set image.tag="$(p2p_version)" \
 		--set ingress.appUrlSuffix="$(p2p_app_url_suffix)" \
-		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)"
+		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
+		--set envVarsMap.SUPPORT_BOT_API_URL="http://$(p2p_app_name):8080" \
+		--atomic
 
 
 ##@ Run targets
 
 .PHONY: run-api-app
 run-api-app: ## Run api app
-	docker run --rm -P --name "$(p2p_app_name)" "$(p2p_image_tag)"
+	@docker network inspect "$(p2p_app_name)" >/dev/null 2>&1 || docker network create "$(p2p_app_name)" >/dev/null
+	docker run --rm --network "$(p2p_app_name)" --name "$(p2p_app_name)" \
+		-p 8080:8080 \
+		"$(p2p_image_tag)"
 
 .PHONY: run-ui-app
 run-ui-app: ## Run ui app
-	docker run --rm -P --name "$(p2p_app_name)-ui" "$(call p2p_image_tag,$(p2p_app_name)-ui)"
+	@docker network inspect "$(p2p_app_name)" >/dev/null 2>&1 || docker network create "$(p2p_app_name)" >/dev/null
+	docker run --rm --network "$(p2p_app_name)" --name "$(p2p_app_name)-ui" \
+		-p 7007:7007 \
+		-e SUPPORT_BOT_API_URL='http://$(p2p_app_name):8080' \
+		"$(call p2p_image_tag,$(p2p_app_name)-ui)"
 
 .PHONY: run-app ## Run api & ui apps
 run-app:
