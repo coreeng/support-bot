@@ -1,6 +1,9 @@
 # macOS
 .DS_Store
 
+# npm package
+coreeng-support-bot.tgz
+
 # Logs
 logs
 *.log
