@@ -6,24 +6,12 @@ management:
       base-path: /
       exposure:
         include: health, prometheus
-  endpoint:
-    status.enabled: true
-    shutdown.enabled: false
   metrics:
     distribution:
       percentiles-histogram:
         http:
           server:
             requests: true
-  graphite:
-    metrics:
-      export:
-        enabled: false
-
-server:
-  shutdown: GRACEFUL
-  grace-period: 30s
-  drainingMs: 0
 
 spring:
   main:
@@ -117,3 +105,7 @@ ai:
 
 mock-data:
   enabled: false
+
+rbac:
+  enabled: true
+

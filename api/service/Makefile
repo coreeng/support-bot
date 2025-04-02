@@ -2,32 +2,32 @@ SHELL := /bin/bash
 
 .PHONY: codegen
 codegen:
-	./gradlew jooqCodegen
+	../gradlew jooqCodegen
 
 .PHONY: build
 build: codegen
-	./gradlew build
+	../gradlew build
 
 .PHONY: build-continuously
 build-continuously: codegen
-	./gradlew build --continuously
+	../gradlew build --continuously
 
 .PHONY: run
 run: codegen
-	./gradlew bootRun
+	../gradlew bootRun
 
 .PHONY: lint
 lint:
-	./gradlew pmdMain pmdTest
+	../gradlew pmdMain pmdTest
 
 .PHONY: test
 test: codegen
-	./gradlew test
+	../gradlew test
 
 # Run tests + all the other checks (like linting)
 .PHONY: check
 check:
-	./gradlew check
+	../gradlew check
 
 TAG=latest
 IMAGE_NAME=ghcr.io/coreeng/support-bot
@@ -43,7 +43,7 @@ docker-build:
 	@if [[ "$(PUBLISH)" == "true" ]]; then \
 		args+=" --publishImage -Dusername=$(USERNAME) -Dpassword=$${password}"; \
 	fi
-	@./gradlew bootBuildImage $${args}
+	@../gradlew bootBuildImage $${args}
 
 
 .PHONY: db-run

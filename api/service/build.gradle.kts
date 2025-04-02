@@ -2,7 +2,12 @@ import org.flywaydb.gradle.task.AbstractFlywayTask
 import org.jooq.codegen.gradle.CodegenTask
 import org.springframework.boot.gradle.tasks.bundling.BootBuildImage
 import org.testcontainers.containers.PostgreSQLContainer
+import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy
+import org.testcontainers.containers.wait.strategy.Wait
+import org.testcontainers.containers.wait.strategy.WaitAllStrategy
+import java.time.Duration
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 plugins {
     java
@@ -27,7 +32,7 @@ java {
 pmd {
     isIgnoreFailures = false
     isConsoleOutput = true
-    ruleSetFiles("$rootDir/pmd-ruleset.xml")
+    ruleSetFiles("${project.path}/pmd-ruleset.xml")
     toolVersion = "7.9.0"
 }
 
@@ -125,7 +130,8 @@ buildscript {
     }
 }
 
-val postgresService = project.gradle.sharedServices.registerIfAbsent("postgresContainer", PostgresService::class.java) {}
+val postgresService =
+    project.gradle.sharedServices.registerIfAbsent("postgresContainer", PostgresService::class.java) {}
 
 flyway {
     locations = arrayOf("filesystem:./src/main/resources/db/migration")
@@ -137,7 +143,9 @@ tasks.withType<AbstractFlywayTask> {
     }
     inputs.dir("src/main/resources/db/migration")
     doFirst {
-        val container = if (dockerBuild != "true") { postgresService.get().container } else null
+        val container = if (dockerBuild != "true") {
+            postgresService.get().container
+        } else null
         url = container?.jdbcUrl ?: "jdbc:postgresql://localhost:5432/flywaydb"
         user = container?.username ?: "postgres"
         password = container?.password ?: "fly"
@@ -173,7 +181,9 @@ tasks.withType<CodegenTask> {
     }
     dependsOn("flywayMigrate")
     doFirst {
-        val container = if (dockerBuild != "true") { postgresService.get().container } else null
+        val container = if (dockerBuild != "true") {
+            postgresService.get().container
+        } else null
         jooq {
             configuration {
                 jdbc {
@@ -190,11 +200,21 @@ tasks.withType(JavaCompile::class.java) {
     dependsOn(tasks.withType(CodegenTask::class.java))
 }
 
-abstract class PostgresService: BuildService<BuildServiceParameters.None>, AutoCloseable {
+abstract class PostgresService : BuildService<BuildServiceParameters.None>, AutoCloseable {
     val container = PostgreSQLContainer("postgres:17.2-alpine").apply {
         withDatabaseName("postgres")
         withUsername("postgres")
         withPassword("postgres")
+        setWaitStrategy(
+            WaitAllStrategy()
+                .withStrategy(
+                    LogMessageWaitStrategy()
+                        .withRegEx(".*database system is ready to accept connections.*\\s")
+                        .withTimes(2)
+                        .withStartupTimeout(Duration.of(60, ChronoUnit.SECONDS))
+                )
+                .withStrategy(Wait.forListeningPort())
+        )
         start()
     }
 
