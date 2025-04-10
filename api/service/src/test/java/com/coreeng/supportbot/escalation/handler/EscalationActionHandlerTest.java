@@ -75,7 +75,6 @@ class EscalationActionHandlerTest {
             .build();
 
         when(request.getPayload()).thenReturn(payload);
-        when(context.getRequestUserId()).thenReturn(userId);
         when(rbacService.isSupportBySlackId(userId)).thenReturn(false);
         
         // when

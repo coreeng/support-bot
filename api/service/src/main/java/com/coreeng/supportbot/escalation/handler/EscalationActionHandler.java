@@ -45,7 +45,7 @@ public class EscalationActionHandler implements SlackBlockActionHandler {
                 .message(new RbacRestrictionMessage())
                 .channel(payload.getChannel().getId())
                 .threadTs(MessageTs.ofOrNull(payload.getMessage().getThreadTs()))
-                .userId(context.getRequestUserId())
+                .userId(userId)
                 .build()
             );
             return;

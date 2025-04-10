@@ -33,7 +33,7 @@ public class SupportTeamService {
             members = reloadUsersInfo(teamUsers);
             log.atInfo()
                 .addArgument(members::size)
-                .log("Updated support team members ot {} entries");
+                .log("Updated support team members to {} entries");
         }
     }
 
