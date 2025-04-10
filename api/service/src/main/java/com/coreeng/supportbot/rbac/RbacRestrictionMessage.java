@@ -6,8 +6,7 @@ import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.SectionBlock;
 import com.slack.api.model.block.composition.MarkdownTextObject;
 
-public class RbacRestrictionMessage implements SlackMessage {
-
+public record RbacRestrictionMessage() implements SlackMessage {
     @Override
     public String getText() {
         return "Access Restricted - This action is only available to support team members.";

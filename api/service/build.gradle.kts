@@ -32,7 +32,7 @@ java {
 pmd {
     isIgnoreFailures = false
     isConsoleOutput = true
-    ruleSetFiles("${project.path}/pmd-ruleset.xml")
+    ruleSetFiles("${project.projectDir.absolutePath}/pmd-ruleset.xml")
     toolVersion = "7.9.0"
 }
 
@@ -195,9 +195,6 @@ tasks.withType<CodegenTask> {
             }
         }
     }
-}
-tasks.withType(JavaCompile::class.java) {
-    dependsOn(tasks.withType(CodegenTask::class.java))
 }
 
 abstract class PostgresService : BuildService<BuildServiceParameters.None>, AutoCloseable {
