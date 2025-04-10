@@ -197,6 +197,10 @@ tasks.withType<CodegenTask> {
     }
 }
 
+tasks.withType<JavaCompile> {
+    mustRunAfter("jooqCodegen")
+}
+
 abstract class PostgresService : BuildService<BuildServiceParameters.None>, AutoCloseable {
     val container = PostgreSQLContainer("postgres:17.2-alpine").apply {
         withDatabaseName("postgres")
