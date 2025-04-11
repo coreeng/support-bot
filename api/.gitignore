@@ -19,7 +19,5 @@ out/
 .vscode/
 
 
-.db-data/
-
 service/build/
 service/db-data/

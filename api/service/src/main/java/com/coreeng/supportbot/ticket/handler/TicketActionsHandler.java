@@ -1,8 +1,12 @@
 package com.coreeng.supportbot.ticket.handler;
 
+import com.coreeng.supportbot.rbac.RbacService;
+import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackBlockActionHandler;
 import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.coreeng.supportbot.ticket.EscalateViewMapper;
+import com.coreeng.supportbot.rbac.RbacRestrictionMessage;
 import com.coreeng.supportbot.ticket.TicketEscalateInput;
 import com.coreeng.supportbot.ticket.TicketOperation;
 import com.coreeng.supportbot.ticket.TicketSummaryService;
@@ -30,6 +34,7 @@ public class TicketActionsHandler implements SlackBlockActionHandler {
     private final EscalateViewMapper escalateViewMapper;
     private final SlackClient slackClient;
     private final TicketSummaryService ticketSummaryService;
+    private final RbacService rbacService;
 
     @Override
     public Pattern getPattern() {
@@ -38,7 +43,22 @@ public class TicketActionsHandler implements SlackBlockActionHandler {
 
     @Override
     public void apply(BlockActionRequest req, ActionContext context) {
-        for (BlockActionPayload.Action action : req.getPayload().getActions()) {
+        BlockActionPayload payload = req.getPayload();
+        if (!rbacService.isSupportBySlackId(context.getRequestUserId())) {
+            log.atInfo()
+                .addArgument(context::getRequestUserId)
+                .log("Rejecting escalation request. User({}) is not a support team member");
+            slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
+                .message(new RbacRestrictionMessage())
+                .channel(payload.getChannel().getId())
+                .threadTs(MessageTs.ofOrNull(payload.getMessage().getThreadTs()))
+                .userId(context.getRequestUserId())
+                .build()
+            );
+            return;
+        }
+
+        for (BlockActionPayload.Action action : payload.getActions()) {
             TicketOperation operation = TicketOperation.fromActionIdOrNull(action.getActionId());
             switch (operation) {
                 case summaryView -> openSummaryView(context, action);

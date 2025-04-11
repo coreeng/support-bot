@@ -21,7 +21,7 @@ public class TeamService {
     public ImmutableList<Team> listTeamsByUserEmail(String email) {
         ImmutableList<PlatformTeam> platformTeams = platformTeamsService.listTeamsByUserEmail(email);
         ImmutableList<Team> teams = mapPlatformTeams(platformTeams);
-        if (supportTeamService.isMemberBeUserEmail(email)) {
+        if (supportTeamService.isMemberByUserEmail(email)) {
             return ImmutableList.<Team>builder()
                 .addAll(teams)
                 .add(supportTeamService.getTeam())
