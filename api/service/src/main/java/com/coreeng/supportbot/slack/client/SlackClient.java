@@ -5,6 +5,7 @@ import com.slack.api.methods.request.conversations.ConversationsRepliesRequest;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
 import com.slack.api.methods.request.views.ViewsOpenRequest;
+import com.slack.api.methods.response.chat.ChatPostEphemeralResponse;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.chat.ChatUpdateResponse;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
@@ -21,6 +22,8 @@ public interface SlackClient {
     ReactionsRemoveResponse removeReaction(ReactionsRemoveRequest request);
 
     ChatPostMessageResponse postMessage(SlackPostMessageRequest request);
+
+    ChatPostEphemeralResponse postEphemeralMessage(SlackPostEphemeralMessageRequest request);
 
     ChatUpdateResponse editMessage(SlackEditMessageRequest request);
 

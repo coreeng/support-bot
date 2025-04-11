@@ -42,4 +42,8 @@
             <property name="allowedTypes" value="java.util.Properties,com.google.common.collect.ImmutableList,com.google.common.collect.ImmutableSet,com.google.common.collect.ImmutableMap,com.google.common.collect.ImmutableCollection" />
         </properties>
     </rule>
-</ruleset>
+    <rule ref="category/java/codestyle.xml/MethodNamingConventions">
+        <properties>
+            <property name="junit5TestPattern" value="[a-z][_a-zA-Z0-9]*" />
+        </properties>
+    </rule></ruleset>
