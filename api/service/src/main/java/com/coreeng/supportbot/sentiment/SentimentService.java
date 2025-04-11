@@ -70,7 +70,7 @@ public class SentimentService {
             .filter(m -> m.getBotId() == null)
             .map(m -> {
                 String email = userIdToEmail.get(m.getUser());
-                String team = supportTeamService.isMemberBeUserEmail(email)
+                String team = supportTeamService.isMemberByUserEmail(email)
                     ? supportTeam.name()
                     : ticket.team();
                 return Message.builder()
