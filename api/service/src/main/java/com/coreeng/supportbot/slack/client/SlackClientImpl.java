@@ -28,15 +28,19 @@ import com.slack.api.model.Message;
 import com.slack.api.model.ResponseMetadata;
 import com.slack.api.model.User;
 import com.slack.api.model.view.View;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.cache.Cache;
 
 import javax.annotation.Nullable;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.function.Function;
 
 import static com.google.common.collect.Iterables.isEmpty;
+import com.slack.api.methods.response.chat.ChatPostEphemeralResponse;
 
 @RequiredArgsConstructor
 public class SlackClientImpl implements SlackClient {
@@ -62,6 +66,14 @@ public class SlackClientImpl implements SlackClient {
                 .addAll(errorDetailsOrEmpty(response.getResponseMetadata()))
                 .addAll(response.getErrors())
                 .build()
+        );
+    }
+
+    @Override
+    public ChatPostEphemeralResponse postEphemeralMessage(SlackPostEphemeralMessageRequest request) {
+        return doRequest(
+            () -> client.chatPostEphemeral(request.toSlackRequest()),
+            response -> ImmutableList.of(response.getError())
         );
     }
 

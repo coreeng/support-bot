@@ -9,9 +9,9 @@ import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -29,7 +29,6 @@ public class TicketProcessingService {
     private final EscalationQueryService escalationQueryService;
     private final SlackTicketsProps slackTicketsProps;
     private final ApplicationEventPublisher publisher;
-
 
     public void handleMessagePosted(MessagePosted e) {
         if (isQueryEvent(e)) {
