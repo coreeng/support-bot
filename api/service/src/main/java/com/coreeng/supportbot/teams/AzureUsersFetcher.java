@@ -10,7 +10,7 @@ import java.util.List;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Requires Azure permissions: GroupMember.Read.All
+ * Requires Azure permissions: GroupMember.Read.All, User.Read.All
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -19,7 +19,11 @@ public class AzureUsersFetcher implements PlatformUsersFetcher {
 
     @Override
     public List<Membership> fetchMembershipsByGroupRef(String groupRef) {
-        UserCollectionResponse response = graphClient.groups().byGroupId(groupRef).transitiveMembers().graphUser().get();
+        UserCollectionResponse response = graphClient.groups().byGroupId(groupRef)
+            .transitiveMembers().graphUser().get(req -> {
+                requireNonNull(req.queryParameters);
+                req.queryParameters.select = new String[]{"mail", "accountEnabled", "deletedDateTime"};
+            });
         requireNonNull(response);
         requireNonNull(response.getValue());
         return response.getValue().stream()

@@ -19,12 +19,13 @@ spring:
   application:
     name: support-bot
   cloud:
-    azure:
-      profile:
-        tenant-id: ${AZURE_TENANT_ID}
-      credential:
-        client-id: ${AZURE_CLIENT_ID}
-        client-secret: ${AZURE_CLIENT_SECRET}
+# Uncomment in case you require Azure integration
+#     azure:
+#       profile:
+#         tenant-id: ${AZURE_TENANT_ID}
+#       credential:
+#         client-id: ${AZURE_CLIENT_ID}
+#         client-secret: ${AZURE_CLIENT_SECRET}
     gcp:
       core:
         enabled: true

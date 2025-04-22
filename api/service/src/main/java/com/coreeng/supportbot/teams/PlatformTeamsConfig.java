@@ -70,10 +70,7 @@ public class PlatformTeamsConfig {
     @Bean
     @ConditionalOnProperty("platform-integration.azure.enabled")
     public PlatformUsersFetcher azureUsersFetcher(TokenCredential credential) {
-        GraphServiceClient client = new GraphServiceClient(
-            credential,
-            "GroupMember.Read.All"
-        );
+        GraphServiceClient client = new GraphServiceClient(credential, "https://graph.microsoft.com/.default");
         return new AzureUsersFetcher(client);
     }
 

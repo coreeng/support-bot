@@ -88,7 +88,7 @@ dependencies {
     implementation("com.google.apis:google-api-services-cloudidentity:v1-rev20241208-2.0.0")
 
     implementation("com.microsoft.graph:microsoft-graph:6.36.0")
-    implementation("com.azure.spring:spring-cloud-azure-starter-active-directory:5.22.0")
+    implementation("com.azure.spring:spring-cloud-azure-starter:5.22.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
