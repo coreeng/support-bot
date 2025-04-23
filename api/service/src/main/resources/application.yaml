@@ -94,6 +94,22 @@ platform-integration:
   enabled: true
   gcp:
     app-name: Support Bot
+  teams-scraping:
+    core-platform:
+      enabled: true
+    k8s-generic:
+      enabled: false
+      config:
+        apiVersion: v1
+        kind: Namespace
+        filter:
+          name-regexp: null
+          label-selector: "root.tree.hnc.x-k8s.io/depth"
+        teamName:
+          pointer: /metadata/name
+        groupRef:
+          pointer: /metadata/uid
+
 
 support-team:
   name: Core Support
