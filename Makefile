@@ -167,7 +167,7 @@ deploy-%: ## Deploy mathing target `deploy-%`
 		--set global.postgresql.auth.username=supportbot \
 		--set global.postgresql.auth.password=supportbotpassword \
 		--set global.postgresql.auth.database=supportbot \
-		--set primary.pdb.create=false
+		--set primary.pdb.create=false \
 		--atomic
 	helm repo add core-platform-assets https://coreeng.github.io/core-platform-assets
 	helm upgrade --install "$(p2p_app_name)" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
@@ -186,7 +186,7 @@ deploy-%: ## Deploy mathing target `deploy-%`
 		--set envVarsMap.SLACK_SOCKET_TOKEN="$${SUPPORT_BOT_SLACK_SOCKET_TOKEN}" \
 		--set envVarsMap.SLACK_SIGNING_SECRET="$${SUPPORT_BOT_SLACK_SIGNING_SECRET}" \
 		--set envVarsMap.SLACK_TICKET_CHANNEL_ID="$${SUPPORT_BOT_SLACK_TICKET_CHANNEL_ID}" \
-		--set envVarsMap.SLACK_ESCALATION_CHANNEL_ID="$${SUPPORT_BOT_SLACK_ESCALATION_CHANNEL_ID}"
+		--set envVarsMap.SLACK_ESCALATION_CHANNEL_ID="$${SUPPORT_BOT_SLACK_ESCALATION_CHANNEL_ID}" \
 		--atomic
 	helm upgrade --install "$(p2p_app_name)-ui" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
 		-f ui/helm-values.yaml \
