@@ -2,6 +2,7 @@ package com.coreeng.supportbot.teams;
 
 
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
+import com.coreeng.supportbot.util.JsonMapper;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.gax.core.CredentialsProvider;
 import com.google.api.services.cloudidentity.v1.CloudIdentity;
@@ -28,7 +29,10 @@ import java.util.concurrent.Executors;
     name = {"enabled"},
     prefix = "platform-integration"
 )
-@EnableConfigurationProperties(PlatformTeamsConfig.GcpProps.class)
+@EnableConfigurationProperties({
+    PlatformTeamsConfig.GcpProps.class,
+    GenericPlatformTeamsFetcher.Config.class
+})
 @RequiredArgsConstructor
 public class PlatformTeamsConfig {
     private final GcpProps gcpProps;
@@ -36,16 +40,23 @@ public class PlatformTeamsConfig {
     private final EscalationTeamsRegistry escalationTeamsRegistry;
 
     @Bean
-    public PlatformTeamsService platformTeamsService() throws IOException {
-        return new PlatformTeamsService(teamsFetcher(), usersFetcher(), escalationTeamsRegistry);
+    public PlatformTeamsService platformTeamsService(PlatformTeamsFetcher teamsFetcher) throws IOException {
+        return new PlatformTeamsService(teamsFetcher, usersFetcher(), escalationTeamsRegistry);
     }
 
     @Bean
-    public PlatformTeamsFetcher teamsFetcher() {
+    @ConditionalOnProperty("platform-integration.teams-scraping.core-platform.enabled")
+    public PlatformTeamsFetcher corePlatformTeamsFetcher() {
         return new CorePlatformTeamsFetcher(
             Executors.newVirtualThreadPerTaskExecutor(),
             k8sClient()
         );
+    }
+
+    @Bean
+    @ConditionalOnProperty("platform-integration.teams-scraping.k8s-generic.enabled")
+    public PlatformTeamsFetcher k8sGenericTeamsFetcher(GenericPlatformTeamsFetcher.Config config, JsonMapper jsonMapper) {
+        return new GenericPlatformTeamsFetcher(config, k8sClient(), jsonMapper);
     }
 
     @Bean

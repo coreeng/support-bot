@@ -1,5 +1,20 @@
 package com.coreeng.supportbot.ticket.handler;
 
+import java.util.concurrent.ExecutorService;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.ticket.EscalateViewMapper;
 import com.coreeng.supportbot.ticket.TicketConfirmSubmissionMapper;
@@ -10,16 +25,6 @@ import com.slack.api.app_backend.views.response.ViewSubmissionResponse;
 import com.slack.api.bolt.context.builtin.ViewSubmissionContext;
 import com.slack.api.bolt.request.builtin.ViewSubmissionRequest;
 import com.slack.api.model.view.View;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.concurrent.ExecutorService;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TicketViewsSubmissionHandlerTest {
