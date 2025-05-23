@@ -1,12 +1,14 @@
 package com.coreeng.supportbot.teams;
 
 
+import com.azure.core.credential.TokenCredential;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.util.JsonMapper;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.gax.core.CredentialsProvider;
 import com.google.api.services.cloudidentity.v1.CloudIdentity;
 import com.google.auth.http.HttpCredentialsAdapter;
+import com.microsoft.graph.serviceclient.GraphServiceClient;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
@@ -40,8 +42,8 @@ public class PlatformTeamsConfig {
     private final EscalationTeamsRegistry escalationTeamsRegistry;
 
     @Bean
-    public PlatformTeamsService platformTeamsService(PlatformTeamsFetcher teamsFetcher) throws IOException {
-        return new PlatformTeamsService(teamsFetcher, usersFetcher(), escalationTeamsRegistry);
+    public PlatformTeamsService platformTeamsService(PlatformTeamsFetcher teamsFetcher, PlatformUsersFetcher usersFetcher) {
+        return new PlatformTeamsService(teamsFetcher, usersFetcher, escalationTeamsRegistry);
     }
 
     @Bean
@@ -60,8 +62,16 @@ public class PlatformTeamsConfig {
     }
 
     @Bean
-    public PlatformUsersFetcher usersFetcher() throws IOException {
+    @ConditionalOnProperty("platform-integration.gcp.enabled")
+    public PlatformUsersFetcher gcpUsersFetcher() throws IOException {
         return new GcpUsersFetcher(cloudIdentity());
+    }
+
+    @Bean
+    @ConditionalOnProperty("platform-integration.azure.enabled")
+    public PlatformUsersFetcher azureUsersFetcher(TokenCredential credential) {
+        GraphServiceClient client = new GraphServiceClient(credential, "https://graph.microsoft.com/.default");
+        return new AzureUsersFetcher(client);
     }
 
     @Bean
