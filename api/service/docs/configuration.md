@@ -68,8 +68,8 @@ slack:
     signing-secret: ${SLACK_SIGNING_SECRET} # Token like: 1234567890abcdef
   ticket:
     channel-id: ${SLACK_TICKET_CHANNEL_ID} # Channel ID (C1234567890) where tenants post queries
-    expected-initial-reaction: eyes # Reaction to trigger ticket creation
-    response-initial-reaction: ticket # Reaction posted when ticket is created
+    expected-initial-reaction: eyes # Reaction to trigger ticket creation -- emoji name needs to already exist in slack
+    response-initial-reaction: ticket # Reaction posted when ticket is created -- emoji name needs to already exist in slack
   escalation:
     channel-id: ${SLACK_ESCALATION_CHANNEL_ID} # Channel ID (C1234567890) where escalations are posted
 
@@ -82,11 +82,11 @@ ticket:
 
 enums:
   escalationTeams: # Platform teams for query escalation
-    - label: wow # UI label
+    - label: wow # Label showed on the UI
       code: wow # Team ID. have to be unique
       slack-group-id: S08948NBMED # Slack group ID that will be tagged on escalations
   tags: # Ticket tags
-    - label: Ingresses # UI Label
+    - label: Ingresses # Label showed on the UI
       code: ingresses # Tag ID
     - label: Networking
       code: networking
@@ -97,7 +97,7 @@ enums:
     - label: DNS
       code: dns
   impacts: # Ticket impacts
-    - label: Production Blocking # UI Label
+    - label: Production Blocking # Label showed on the UI
       code: productionBlocking # Impact ID
     - label: BAU Blocking
       code: bauBlocking
@@ -129,8 +129,8 @@ platform-integration: # Whether to enable platform integration to automatically 
 
 
 support-team:
-  name: Core Support # UI Label
-  slack-group-id: S08948NBMED # Slack group ID with people on duty
+  name: Core Support # Label showed on the UI
+  slack-group-id: S08948NBMED # Slack group ID with people on support-duty
 
 ai: # AI powered features
   sentiment-analysis: # Analyze tenant and support sentiment per ticket
@@ -195,7 +195,7 @@ If you use Core Platform integration, these are the expected roles:
 - Namespaces: read
 - RoleBindings: read in all tenant namespaces
 
-You configure generic kubernetes scraper, the required roles will depend on the configuration you provide.
+If you configure a generic kubernetes scraper, the required roles will depend on the configuration you provide.
 
 ## Google Cloud
 You will need GCP integration in case you manage your organization members using Google Groups.
