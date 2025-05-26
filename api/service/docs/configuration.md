@@ -112,7 +112,7 @@ platform-integration: # Whether to enable platform integration to automatically 
   azure:
     enabled: false
   teams-scraping: # team-name <-> cloud group id scrapper configuration
-    core-platform: # Scraper specific to Core Platform
+    core-platform: # Scraper specific to CECG's Core Platform
       enabled: true
     k8s-generic: # A generic scraper that might be used in any K8S environment
       enabled: false
