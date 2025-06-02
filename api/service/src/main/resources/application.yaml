@@ -19,6 +19,13 @@ spring:
   application:
     name: support-bot
   cloud:
+# Uncomment in case you require Azure integration
+#     azure:
+#       profile:
+#         tenant-id: ${AZURE_TENANT_ID}
+#       credential:
+#         client-id: ${AZURE_CLIENT_ID}
+#         client-secret: ${AZURE_CLIENT_SECRET}
     gcp:
       core:
         enabled: true
@@ -93,7 +100,10 @@ enums:
 platform-integration:
   enabled: true
   gcp:
+    enabled: true
     app-name: Support Bot
+  azure:
+    enabled: false
   teams-scraping:
     core-platform:
       enabled: true
@@ -109,7 +119,6 @@ platform-integration:
           pointer: /metadata/name
         groupRef:
           pointer: /metadata/uid
-
 
 support-team:
   name: Core Support
