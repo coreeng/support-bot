@@ -122,9 +122,9 @@ platform-integration: # Whether to enable platform integration to automatically 
         filter:
           name-regexp: null
           label-selector: "root.tree.hnc.x-k8s.io/depth"
-        teamName: # Use a namespace name as a team name
+        teamName: # Will use the namespace name from /metadata/name as a team name
           pointer: /metadata/name
-        groupRef: # Use object UID as a group ref. Supposed to be changed to a real configuration.
+        groupRef: # Will use the namespace uid from /metadata/uid as a group reference. Supposed to be changed to a real configuration.
           pointer: /metadata/uid
 
 
