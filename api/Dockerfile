@@ -22,10 +22,9 @@ RUN service postgresql start && sleep 6 && \
 
 ## Final stage
 FROM registry.access.redhat.com/ubi8/openjdk-21:1.21
-WORKDIR /
-COPY --from=build /build/service/build/libs/service-*.jar /service.jar
-COPY service/src/main/resources/application.yaml /application.yaml
+WORKDIR /app
+COPY --from=build /build/service/build/libs/service-*.jar /app/service.jar
 
-CMD ["java", "-jar", "service.jar"]
+CMD ["java", "-jar", "/app/service.jar"]
 
 EXPOSE 8080 8081
