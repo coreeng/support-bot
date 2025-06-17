@@ -1,0 +1,33 @@
+mocks:
+  slack:
+    port: 8000
+    serverUrl: "https://cecg.slack.com/"
+    team: "CECG"
+    teamId: T0123456789
+    userId: U0123456789
+    botId: B0123456789
+    supportGroupId: S08948NBMED
+    supportMembers:
+      - userId: U0123456781
+        name:
+        email:
+      - userId: U0123456782
+        name:
+        email:
+      - userId: U0123456783
+        name:
+        email:
+  kubernetes:
+    port: 8001
+  azure:
+    port: 8002
+  gcp:
+    port: 8003
+
+tenants:
+  - name: tenant-a
+    groupRef: group-ref-a
+  - name: tenant-b
+    groupRef: group-ref-b
+  - name: tenant-c
+    groupRef: group-ref-c

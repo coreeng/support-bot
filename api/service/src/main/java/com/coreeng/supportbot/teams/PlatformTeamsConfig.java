@@ -8,12 +8,16 @@ import com.google.api.client.googleapis.util.Utils;
 import com.google.api.gax.core.CredentialsProvider;
 import com.google.api.services.cloudidentity.v1.CloudIdentity;
 import com.google.auth.http.HttpCredentialsAdapter;
+import com.microsoft.graph.core.authentication.AzureIdentityAuthenticationProvider;
 import com.microsoft.graph.serviceclient.GraphServiceClient;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import io.fabric8.kubernetes.client.http.HttpClient;
 import lombok.RequiredArgsConstructor;
+import okhttp3.OkHttpClient;
+import org.apache.logging.log4j.util.Strings;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -63,25 +67,33 @@ public class PlatformTeamsConfig {
 
     @Bean
     @ConditionalOnProperty("platform-integration.gcp.enabled")
-    public PlatformUsersFetcher gcpUsersFetcher() throws IOException {
-        return new GcpUsersFetcher(cloudIdentity());
+    public PlatformUsersFetcher gcpUsersFetcher(
+    ) throws IOException {
+        var cloundIdentityBuilder = new CloudIdentity.Builder(
+            Utils.getDefaultTransport(),
+            Utils.getDefaultJsonFactory(),
+            new HttpCredentialsAdapter(gcpCredsProvider.getCredentials())
+        ).setApplicationName(gcpProps.appName());
+        if (Strings.isNotEmpty(gcpProps.client().baseUrl())) {
+            cloundIdentityBuilder.setRootUrl(gcpProps.client().baseUrl());
+        }
+        return new GcpUsersFetcher(cloundIdentityBuilder.build());
     }
 
     @Bean
     @ConditionalOnProperty("platform-integration.azure.enabled")
-    public PlatformUsersFetcher azureUsersFetcher(TokenCredential credential) {
-        GraphServiceClient client = new GraphServiceClient(credential, "https://graph.microsoft.com/.default");
+    public PlatformUsersFetcher azureUsersFetcher(
+        TokenCredential credential,
+        @Value("${platform-integration.azure.client.base-url}") String baseUrl
+    ) {
+        GraphServiceClient client = new GraphServiceClient(
+            credential,
+            "https://graph.microsoft.com/.default"
+        );
+        if (Strings.isNotEmpty(baseUrl)) {
+            client.getRequestAdapter().setBaseUrl(baseUrl);
+        }
         return new AzureUsersFetcher(client);
-    }
-
-    @Bean
-    public CloudIdentity cloudIdentity() throws IOException {
-        return new CloudIdentity.Builder(
-            Utils.getDefaultTransport(),
-            Utils.getDefaultJsonFactory(),
-            new HttpCredentialsAdapter(gcpCredsProvider.getCredentials())
-        ).setApplicationName(gcpProps.appName())
-            .build();
     }
 
     @Bean
@@ -103,7 +115,13 @@ public class PlatformTeamsConfig {
     @ConfigurationProperties("platform-integration.gcp")
     record GcpProps(
         String appName,
-        List<String> scopes
+        List<String> scopes,
+        ClientProps client
+    ) {
+    }
+
+    public record ClientProps(
+        String baseUrl
     ) {
     }
 }
