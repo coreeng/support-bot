@@ -43,6 +43,9 @@ application:
   timezone: GMT+02
 
 slack:
+  mode: socket # socket or http
+  client:
+    methods-base-url: ""
   creds:
     token: ${SLACK_TOKEN} # Token like: xoxb-abc-def
     socket-token: ${SLACK_SOCKET_TOKEN} # Token like: xapp-1-abc-def-ghi
@@ -102,8 +105,12 @@ platform-integration:
   gcp:
     enabled: true
     app-name: Support Bot
+    client:
+      base-url: ""
   azure:
     enabled: false
+    client:
+      base-url: ""
   teams-scraping:
     core-platform:
       enabled: true
