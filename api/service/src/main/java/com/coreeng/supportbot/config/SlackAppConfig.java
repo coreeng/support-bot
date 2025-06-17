@@ -7,12 +7,16 @@ import com.slack.api.bolt.AppConfig;
 import com.slack.api.jakarta_socket_mode.impl.JakartaSocketModeClientTyrusImpl;
 import com.slack.api.util.thread.DaemonThreadFactory;
 import com.slack.api.util.thread.ExecutorServiceProvider;
+import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.cache.Cache;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
+import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -21,12 +25,40 @@ import java.util.concurrent.ScheduledExecutorService;
 @Profile("!test")
 public class SlackAppConfig {
     @Bean
-    public App slackApp(SlackCredsProps slackCreds) {
+    public App slackApp(SlackProps slackProps) {
         AppConfig config = new AppConfig();
-        config.setSingleTeamBotToken(slackCreds.token());
-        config.setSigningSecret(slackCreds.signingSecret());
+        config.setSingleTeamBotToken(slackProps.creds().token());
+        config.setSigningSecret(slackProps.creds().signingSecret());
         config.setExecutorServiceProvider(new ConcurrentExecutorServiceProvider());
+        if (Strings.isNotBlank(slackProps.client().methodsBaseUrl())) {
+            config.getSlack().getConfig().setMethodsEndpointUrlPrefix(slackProps.client().methodsBaseUrl());
+        }
+        config.getSlack().getConfig().setPrettyResponseLoggingEnabled(true);
         return new App(config);
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+        value = "slack.mode",
+        havingValue = "http"
+    )
+    public ServletRegistrationBean<SlackHttpController> slackHttpController(App app) {
+        return new ServletRegistrationBean<>(
+            new SlackHttpController(app),
+            "/slack/events"
+        );
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+        value = "slack.mode",
+        havingValue = "socket"
+    )
+    public SlackSocketController slackSocketController(
+        App app,
+        SlackProps slackCreds
+    ) throws IOException {
+        return new SlackSocketController(app, slackCreds);
     }
 
     @Bean
