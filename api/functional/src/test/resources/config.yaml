@@ -6,17 +6,17 @@ mocks:
     teamId: T0123456789
     userId: U0123456789
     botId: B0123456789
-    supportGroupId: S08948NBMED
+    supportGroupId: S01234567ST
     supportMembers:
       - userId: U0123456781
-        name:
-        email:
+        name: Coby Ivona
+        email: coby.ivona@company.com
       - userId: U0123456782
-        name:
-        email:
+        name: Sana Chernobog
+        email: sana.chernobog@company.com
       - userId: U0123456783
-        name:
-        email:
+        name: Jean Kristijan
+        email: jean.kristijan@company.com
   kubernetes:
     port: 8001
   azure:
@@ -25,9 +25,27 @@ mocks:
     port: 8003
 
 tenants:
-  - name: tenant-a
-    groupRef: group-ref-a
-  - name: tenant-b
-    groupRef: group-ref-b
-  - name: tenant-c
-    groupRef: group-ref-c
+  - name: wow
+    groupRef: group-ref-wow
+    users:
+      - email: coby.ivona@company.com
+      - email: sana.chernobog@company.com
+  - name: infra-integration
+    groupRef: group-ref-infra-integration
+    users:
+      - email: jean.kristijan@company.com
+      - email: chandra.giustino@company.com
+  - name: connected-app
+    groupRef: group-ref-connected-app
+    users:
+      - email: chandra.giustino@company.com
+      - email: nazira.armel@company.com
+
+users:
+  # support members
+  - email: coby.ivona@company.com
+  - email: sana.chernobog@company.com
+  - email: jean.kristijan@company.com
+  # others
+  - email: chandra.giustino@company.com
+  - email: nazira.armel@company.com

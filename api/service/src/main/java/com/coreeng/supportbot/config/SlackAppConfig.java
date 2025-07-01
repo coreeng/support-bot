@@ -30,10 +30,11 @@ public class SlackAppConfig {
         config.setSingleTeamBotToken(slackProps.creds().token());
         config.setSigningSecret(slackProps.creds().signingSecret());
         config.setExecutorServiceProvider(new ConcurrentExecutorServiceProvider());
+        config.setRequestVerificationEnabled(slackProps.enableRequestVerification());
         if (Strings.isNotBlank(slackProps.client().methodsBaseUrl())) {
             config.getSlack().getConfig().setMethodsEndpointUrlPrefix(slackProps.client().methodsBaseUrl());
+            config.getSlack().getConfig().setPrettyResponseLoggingEnabled(true);
         }
-        config.getSlack().getConfig().setPrettyResponseLoggingEnabled(true);
         return new App(config);
     }
 
