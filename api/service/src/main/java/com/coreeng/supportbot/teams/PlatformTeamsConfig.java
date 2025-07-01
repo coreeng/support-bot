@@ -129,7 +129,7 @@ public class PlatformTeamsConfig {
         k8sClientBuilder.withHttpClientBuilderConsumer(b -> {
             // required for local runs.
             // for some reason, this client ignores the proxy if it's configured as http, but cluster url is https
-            if (config.getHttpProxy() != null) {
+            if (config.getHttpProxy() != null && Strings.isBlank(baseUrl)) {
                 URI httpProxy = URI.create(config.getHttpProxy());
                 b.proxyAddress(InetSocketAddress.createUnresolved(httpProxy.getHost(), httpProxy.getPort()))
                     .proxyType(HttpClient.ProxyType.HTTP);
