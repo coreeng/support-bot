@@ -3,6 +3,7 @@ package com.coreeng.supportbot;
 import com.coreeng.supportbot.wiremock.WiremockManager;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import org.junit.platform.engine.support.store.Namespace;
 import org.junit.platform.launcher.LauncherSession;
 import org.junit.platform.launcher.LauncherSessionListener;
 import org.junit.platform.launcher.TestExecutionListener;
@@ -11,6 +12,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Duration;
+
+import static io.restassured.RestAssured.given;
+import static org.awaitility.Awaitility.await;
 
 /**
  * This listener is picked up because it specified in resources/META-INF/services
@@ -24,27 +29,50 @@ public class WiremockSetupLauncherSessionListener implements LauncherSessionList
 
     @Override
     public void launcherSessionOpened(LauncherSession session) {
-        var config = readConfigurationFile();
-        wiremockManager = new WiremockManager(config);
-        wiremockManager.startAll();
+        try {
+            var config = readConfigurationFile();
+            wiremockManager = new WiremockManager(config);
+            wiremockManager.startAll();
 
-        session.getLauncher().registerTestExecutionListeners(new TestExecutionListener() {
-            @Override
-            public void testPlanExecutionStarted(TestPlan testPlan) {
-                logger.info("Test plan execution started");
-            }
+            waitForHealthyDeployment();
+        } catch (RuntimeException e) {
+            logger.error("Failed initialising tests", e);
+            throw e;
+        }
+        session.getStore().put(Namespace.GLOBAL, WiremockManager.class, wiremockManager);
 
-            @Override
-            public void testPlanExecutionFinished(TestPlan testPlan) {
-                logger.info("Test plan execution finished");
-            }
-        });
+
     }
 
     @Override
     public void launcherSessionClosed(LauncherSession session) {
         logger.info("Closing Wiremock servers for external services");
         wiremockManager.stopAll();
+    }
+
+    private void waitForHealthyDeployment() {
+        await()
+            .atMost(Duration.ofMinutes(5))
+            .pollInterval(Duration.ofSeconds(1))
+            .until(() -> {
+                wiremockManager.checkForUnmatchedRequests();
+                try {
+                    return given()
+                               .when()
+                               .get("http://localhost:8081/health")
+                               .then()
+                               .extract()
+                               .statusCode() == 200;
+                } catch (Exception e) {
+                    if (e.getMessage().contains("Connection refused")) {
+                        logger.info("Waiting for external services to be ready");
+                        return false;
+                    } else {
+                        logger.error("Failed to check external services health", e);
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
     }
 
     private Config readConfigurationFile() {
