@@ -9,13 +9,15 @@ import com.google.api.gax.core.CredentialsProvider;
 import com.google.api.services.cloudidentity.v1.CloudIdentity;
 import com.google.auth.http.HttpCredentialsAdapter;
 import com.microsoft.graph.core.authentication.AzureIdentityAuthenticationProvider;
+import com.microsoft.graph.core.requests.BaseGraphRequestAdapter;
+import com.microsoft.graph.core.requests.GraphClientFactory;
 import com.microsoft.graph.serviceclient.GraphServiceClient;
 import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import io.fabric8.kubernetes.client.http.HttpClient;
 import lombok.RequiredArgsConstructor;
-import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -52,17 +54,17 @@ public class PlatformTeamsConfig {
 
     @Bean
     @ConditionalOnProperty("platform-integration.teams-scraping.core-platform.enabled")
-    public PlatformTeamsFetcher corePlatformTeamsFetcher() {
+    public PlatformTeamsFetcher corePlatformTeamsFetcher(KubernetesClient kubernetesClient) {
         return new CorePlatformTeamsFetcher(
             Executors.newVirtualThreadPerTaskExecutor(),
-            k8sClient()
+            kubernetesClient
         );
     }
 
     @Bean
     @ConditionalOnProperty("platform-integration.teams-scraping.k8s-generic.enabled")
-    public PlatformTeamsFetcher k8sGenericTeamsFetcher(GenericPlatformTeamsFetcher.Config config, JsonMapper jsonMapper) {
-        return new GenericPlatformTeamsFetcher(config, k8sClient(), jsonMapper);
+    public PlatformTeamsFetcher k8sGenericTeamsFetcher(GenericPlatformTeamsFetcher.Config config, JsonMapper jsonMapper, KubernetesClient kubernetesClient) {
+        return new GenericPlatformTeamsFetcher(config, kubernetesClient, jsonMapper);
     }
 
     @Bean
@@ -86,9 +88,26 @@ public class PlatformTeamsConfig {
         TokenCredential credential,
         @Value("${platform-integration.azure.client.base-url}") String baseUrl
     ) {
-        GraphServiceClient client = new GraphServiceClient(
-            credential,
-            "https://graph.microsoft.com/.default"
+        String azureClientLogLevel = System.getenv("AZURE_CLIENT_LOG_LEVEL");
+        if (Strings.isBlank(azureClientLogLevel)) {
+            azureClientLogLevel = "NONE";
+        }
+        var client = new GraphServiceClient(
+            new BaseGraphRequestAdapter(
+                new AzureIdentityAuthenticationProvider(
+                    credential,
+                    new String[]{},
+                    "https://graph.microsoft.com/.default"
+                ),
+                null,
+                "v1.0",
+                GraphClientFactory.create(GraphServiceClient.getGraphClientOptions())
+                    .addInterceptor(
+                        new HttpLoggingInterceptor()
+                            .setLevel(HttpLoggingInterceptor.Level.valueOf(azureClientLogLevel))
+                    )
+                    .build()
+            )
         );
         if (Strings.isNotEmpty(baseUrl)) {
             client.getRequestAdapter().setBaseUrl(baseUrl);
@@ -97,9 +116,16 @@ public class PlatformTeamsConfig {
     }
 
     @Bean
-    public KubernetesClient k8sClient() {
+    public KubernetesClient k8sClient(
+        @Value("${platform-integration.kubernetes.base-url}") String baseUrl
+    ) {
         Config config = Config.autoConfigure(null);
-        KubernetesClientBuilder k8sClientBuilder = new KubernetesClientBuilder();
+        if (Strings.isNotEmpty(baseUrl)) {
+            config.setMasterUrl(baseUrl);
+        }
+
+        KubernetesClientBuilder k8sClientBuilder = new KubernetesClientBuilder()
+            .withConfig(config);
         k8sClientBuilder.withHttpClientBuilderConsumer(b -> {
             // required for local runs.
             // for some reason, this client ignores the proxy if it's configured as http, but cluster url is https

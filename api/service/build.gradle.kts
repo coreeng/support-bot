@@ -66,6 +66,9 @@ dependencies {
     implementation("org.jooq:jooq-meta:3.19.18")
     implementation("org.jooq:jooq-codegen:3.19.18")
 
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.microsoft.kiota:microsoft-kiota-http-okHttp:1.8.5")
+
     jooqCodegen("org.postgresql:postgresql:42.7.5")
     jooqCodegen("org.testcontainers:postgresql:1.20.4")
     jooqCodegen("org.jooq:jooq-codegen:3.19.18")
