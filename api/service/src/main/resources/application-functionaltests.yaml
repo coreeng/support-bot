@@ -50,6 +50,7 @@ platform-integration:
   enabled: true
   kubernetes:
     base-url: "http://localhost:8001"
+    disable-http-proxy: true
   gcp:
     enabled: false
     app-name: Support Bot
