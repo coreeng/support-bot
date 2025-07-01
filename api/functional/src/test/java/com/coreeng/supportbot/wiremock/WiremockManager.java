@@ -19,7 +19,7 @@ public class WiremockManager {
     public WiremockManager(Config config) {
         slackWiremock = new SlackWiremock(config.mocks().slack());
         kubernetesWiremock = new KubernetesWiremock(config.mocks().kubernetes(), config.tenants());
-        azureWiremock = new AzureWiremock();
+        azureWiremock = new AzureWiremock(config.mocks().azure(), config.tenants());
         gcpWiremock = new GcpWiremock();
     }
 
@@ -45,5 +45,12 @@ public class WiremockManager {
         azureWiremock.resetAll();
         gcpWiremock.resetAll();
         logger.info("All Wiremock servers reset");
+    }
+
+    public void checkForUnmatchedRequests() {
+        slackWiremock.checkForUnmatchedRequests();
+        kubernetesWiremock.checkForUnmatchedRequests();
+        azureWiremock.checkForUnmatchedRequests();
+        gcpWiremock.checkForUnmatchedRequests();
     }
 }

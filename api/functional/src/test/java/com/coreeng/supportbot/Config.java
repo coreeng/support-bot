@@ -4,7 +4,8 @@ import java.util.List;
 
 public record Config(
     Mocks mocks,
-    List<Tenant> tenants
+    List<Tenant> tenants,
+    List<User> users
 ) {
     public record Mocks(
         SlackMock slack,
@@ -42,6 +43,10 @@ public record Config(
 
     public record Tenant(
         String name,
-        String groupRef
+        String groupRef,
+        List<User> users
+    ) {}
+    public record User(
+        String email
     ) {}
 }

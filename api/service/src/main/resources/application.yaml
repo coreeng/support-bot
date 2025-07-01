@@ -44,6 +44,7 @@ application:
 
 slack:
   mode: socket # socket or http
+  enableRequestVerification: true
   client:
     methods-base-url: ""
   creds:
@@ -102,13 +103,15 @@ enums:
 
 platform-integration:
   enabled: true
+  kubernetes:
+    base-url: ""
   gcp:
-    enabled: true
+    enabled: false
     app-name: Support Bot
     client:
       base-url: ""
   azure:
-    enabled: false
+    enabled: true
     client:
       base-url: ""
   teams-scraping:
@@ -119,6 +122,7 @@ platform-integration:
       config:
         apiVersion: v1
         kind: Namespace
+        namespace: null
         filter:
           name-regexp: null
           label-selector: "root.tree.hnc.x-k8s.io/depth"
@@ -140,4 +144,3 @@ mock-data:
 
 rbac:
   enabled: true
-
