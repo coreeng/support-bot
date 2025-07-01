@@ -14,14 +14,6 @@ public class SupportBotSlackClient {
         given()
             .baseUri("http://localhost:8080/slack/events")
             .when()
-            .header(new Header(
-                "X-Slack-Request-Timestamp",
-                Long.toString(currentEpochSecond)
-            ))
-            .header(new Header(
-                "X-Slack-Signature",
-                "ble"
-            ))
             .contentType(ContentType.JSON)
             .body("""
                 {

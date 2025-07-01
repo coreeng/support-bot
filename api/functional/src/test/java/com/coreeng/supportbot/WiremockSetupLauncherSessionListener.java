@@ -40,8 +40,6 @@ public class WiremockSetupLauncherSessionListener implements LauncherSessionList
             throw e;
         }
         session.getStore().put(Namespace.GLOBAL, WiremockManager.class, wiremockManager);
-
-
     }
 
     @Override
@@ -65,7 +63,7 @@ public class WiremockSetupLauncherSessionListener implements LauncherSessionList
                                .statusCode() == 200;
                 } catch (Exception e) {
                     if (e.getMessage().contains("Connection refused")) {
-                        logger.info("Waiting for external services to be ready");
+                        logger.info("Waiting for support bot to be ready");
                         return false;
                     } else {
                         logger.error("Failed to check external services health", e);
