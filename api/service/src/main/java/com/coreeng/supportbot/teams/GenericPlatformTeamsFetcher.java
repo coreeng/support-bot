@@ -37,7 +37,7 @@ public class GenericPlatformTeamsFetcher implements PlatformTeamsFetcher {
             .withVersion(config.apiVersion())
             .withKind(config.kind())
             .withPlural(config.kind().toLowerCase() + "s")
-            .withNamespaced(config.namespace() != null)
+            .withNamespaced(Strings.isNotBlank(config.namespace()))
             .build();
         GenericKubernetesResourceList resourceList = k8sClient
             .genericKubernetesResources(context)
