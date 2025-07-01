@@ -67,6 +67,7 @@ platform-integration:
       config:
         apiVersion: core
         kind: Tenant
+        namespace: null
         filter:
           name-regexp: null
           label-selector: null
