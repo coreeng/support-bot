@@ -7,6 +7,7 @@ public interface TicketSlackService {
     void markPostTracked(MessageRef threadRef);
     void markTicketClosed(MessageRef threadRef);
     void unmarkTicketClosed(MessageRef threadRef);
+    void markTicketEscalated(MessageRef threadRef);
 
     MessageRef postTicketForm(MessageRef threadRef, TicketCreatedMessage message);
     void editTicketForm(MessageRef threadRef, TicketCreatedMessage message);

@@ -62,6 +62,12 @@ public class PlatformTeamsConfig {
     }
 
     @Bean
+    @ConditionalOnProperty("platform-integration.teams-scraping.static.enabled")
+    public PlatformTeamsFetcher localPlatformTeamsFetcher() {
+        return new StaticPlatformTeamsFetcher();
+    }
+
+    @Bean
     @ConditionalOnProperty("platform-integration.teams-scraping.k8s-generic.enabled")
     public PlatformTeamsFetcher k8sGenericTeamsFetcher(GenericPlatformTeamsFetcher.Config config, JsonMapper jsonMapper, KubernetesClient kubernetesClient) {
         return new GenericPlatformTeamsFetcher(config, kubernetesClient, jsonMapper);
@@ -113,6 +119,12 @@ public class PlatformTeamsConfig {
             client.getRequestAdapter().setBaseUrl(baseUrl);
         }
         return new AzureUsersFetcher(client);
+    }
+
+    @Bean
+    @ConditionalOnProperty("platform-integration.static-user.enabled")
+    public PlatformUsersFetcher staticUsersFetcher() {
+        return new StaticUsersFetcher();
     }
 
     @Bean
