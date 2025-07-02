@@ -55,6 +55,8 @@ slack:
     channel-id: ${SLACK_TICKET_CHANNEL_ID} # Channel ID like: C1234567890
     expected-initial-reaction: eyes
     response-initial-reaction: ticket
+    resolved-reaction: white_check_mark
+    escalated-reaction: rocket
   escalation:
     channel-id: ${SLACK_ESCALATION_CHANNEL_ID} # Channel ID like: C1234567890
 
@@ -104,19 +106,24 @@ enums:
 platform-integration:
   enabled: true
   kubernetes:
+    disable-http-proxy: false
     base-url: ""
   gcp:
     enabled: false
     app-name: Support Bot
     client:
       base-url: ""
-  azure:
+  static-user:
     enabled: true
+  azure:
+    enabled: false
     client:
       base-url: ""
   teams-scraping:
-    core-platform:
+    static:
       enabled: true
+    core-platform:
+      enabled: false
     k8s-generic:
       enabled: false
       config:
