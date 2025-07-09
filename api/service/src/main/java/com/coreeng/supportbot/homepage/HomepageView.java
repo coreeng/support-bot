@@ -62,6 +62,7 @@ public class HomepageView {
                 .dateFrom(dateFrom)
                 .dateTo(dateTo)
                 .tags(filter.tags())
+                .escalationTeam(filter.escalationTeam())
                 .impacts(
                     filter.impact() != null
                         ? ImmutableList.of(filter.impact())

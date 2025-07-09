@@ -32,6 +32,8 @@ public class TicketsQuery {
     private LocalDate dateTo;
     @Nullable
     private Boolean escalated;
+    @Nullable
+    private String escalationTeam;
     @Builder.Default
     private ImmutableList<String> tags = ImmutableList.of();
     @Builder.Default

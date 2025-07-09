@@ -26,6 +26,7 @@ class GenericPlatformTeamsFetcherTest {
         GenericPlatformTeamsFetcher.Config config = new GenericPlatformTeamsFetcher.Config(
             "v1",
             "Namespace",
+            "namespace",
             new GenericPlatformTeamsFetcher.Filter(null, null),
             new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/name"),
             new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/annotations/groupRef")
@@ -49,6 +50,7 @@ class GenericPlatformTeamsFetcherTest {
         GenericPlatformTeamsFetcher.Config config = new GenericPlatformTeamsFetcher.Config(
             "v1",
             "Namespace",
+            "namespace",
             new GenericPlatformTeamsFetcher.Filter(null, null),
             new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/missingName"),
             new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/annotations/groupRef")
@@ -66,6 +68,7 @@ class GenericPlatformTeamsFetcherTest {
         GenericPlatformTeamsFetcher.Config config = new GenericPlatformTeamsFetcher.Config(
             "v1",
             "Namespace",
+            "namespace",
             new GenericPlatformTeamsFetcher.Filter(null, null),
             new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/name"),
             new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/annotations/missingGroupRef")
@@ -82,6 +85,7 @@ class GenericPlatformTeamsFetcherTest {
         GenericPlatformTeamsFetcher.Config config = new GenericPlatformTeamsFetcher.Config(
             "v1",
             "Namespace",
+            "namespace",
             new GenericPlatformTeamsFetcher.Filter(null, null),
             new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/name"),
             new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/annotations/groupRef")
@@ -105,6 +109,7 @@ class GenericPlatformTeamsFetcherTest {
         GenericPlatformTeamsFetcher.Config config = new GenericPlatformTeamsFetcher.Config(
             "v1",
             "Namespace",
+            "namespace",
             new GenericPlatformTeamsFetcher.Filter(null, "team=true"),
             new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/name"),
             new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/annotations/groupRef")
@@ -129,6 +134,7 @@ class GenericPlatformTeamsFetcherTest {
         GenericPlatformTeamsFetcher.Config config = new GenericPlatformTeamsFetcher.Config(
             "v1",
             "Namespace",
+            "namespace",
             new GenericPlatformTeamsFetcher.Filter("^.*1$", null),
             new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/name"),
             new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/annotations/groupRef")
