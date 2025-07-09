@@ -16,6 +16,8 @@ public class EscalationQuery {
     private long pageSize = 10;
     @Builder.Default
     private ImmutableList<EscalationId> ids = ImmutableList.of();
+    @Builder.Default
+    private ImmutableList<TicketId> ticketIds = ImmutableList.of();
     private TicketId ticketId;
     private LocalDate dateFrom;
     private LocalDate dateTo;
