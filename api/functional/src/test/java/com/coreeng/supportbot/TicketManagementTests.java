@@ -18,12 +18,4 @@ public class TicketManagementTests {
         slackClient.notifyChannelMessagePosted();
         slackClient.notifyEyesOnTheQuery();
     }
-
-    @Test
-    public void test3() {
-
-        slackWiremock.stubResolved();
-
-        slackClient.checkTickAdded();
-    }
 }

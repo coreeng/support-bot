@@ -2,27 +2,29 @@ package com.coreeng.supportbot.homepage;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
+import com.coreeng.supportbot.escalation.Escalation;
+import com.coreeng.supportbot.escalation.EscalationQuery;
+import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
-import com.coreeng.supportbot.ticket.Ticket;
-import com.coreeng.supportbot.ticket.TicketId;
-import com.coreeng.supportbot.ticket.TicketQueryService;
-import com.coreeng.supportbot.ticket.TicketStatus;
+import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Comparator.comparing;
 
@@ -35,15 +37,36 @@ public class HomepageService {
     private final SlackClient slackClient;
     private final SlackTicketsProps slackTicketsProps;
     private final ImpactsRegistry impactsRegistry;
+    private final EscalationQueryService escalationQueryService;
 
     public HomepageView getTicketsView(HomepageView.State state) {
         Page<Ticket> page = ticketQueryService.findByQuery(state.toTicketsQuery());
+
+        ImmutableList<TicketId> ticketIds = page.content().stream()
+                .map(Ticket::id)
+                .collect(ImmutableList.toImmutableList());
+
+        Page<Escalation> byQuery = escalationQueryService.findByQuery(
+                EscalationQuery.builder()
+                        .ticketIds(ticketIds)
+                        .build());
+
+        Multimap<TicketId, Escalation> escalationsByTicketId =
+                Multimaps.index(byQuery.content(), Escalation::ticketId);
+
+        Stream<DetailedTicket> detailedTicketStream = getDetailedTicketStream(state, page, escalationsByTicketId);
+
+        ImmutableList<DetailedTicket> detailedTickets = detailedTicketStream.collect(ImmutableList.toImmutableList());
+
+
         Map<TicketId, String> permalinkByTicketId = collectPermalinks(page.content());
+
         return HomepageView.builder()
             .timestamp(Instant.now())
             .tickets(
-                page.map(t -> ticketToTicketView(t, permalinkByTicketId.get(t.id())))
-                    .content()
+                detailedTickets.stream()
+                    .map(dt -> ticketToTicketView(dt, permalinkByTicketId.get(dt.ticket().id())))
+                    .collect(ImmutableList.toImmutableList())
             )
             .totalTickets(page.totalElements())
             .totalPages(page.totalPages())
@@ -51,6 +74,25 @@ public class HomepageService {
             .channelId(slackTicketsProps.channelId())
             .state(state)
             .build();
+    }
+
+    private Stream<DetailedTicket> getDetailedTicketStream(HomepageView.State state, Page<Ticket> page, Multimap<TicketId, Escalation> escalationsByTicketId) {
+        Stream<DetailedTicket> detailedTicketStream = page.content().stream()
+                .map(ticket -> {
+                    ImmutableList<Escalation> escalations =
+                            ImmutableList.copyOf(escalationsByTicketId.get(ticket.id()));
+                    return new DetailedTicket(ticket, escalations);
+                });
+
+        // Filter if escalationTeam is present
+        if (state.filter().escalationTeam() != null) {
+            String team = state.filter().escalationTeam();
+            detailedTicketStream = detailedTicketStream
+                    .filter(dt -> dt.escalations().stream()
+                            .anyMatch(e -> team.equals(e.team()))
+                    );
+        }
+        return detailedTicketStream;
     }
 
     private Map<TicketId, String> collectPermalinks(ImmutableList<Ticket> tickets) {
@@ -93,23 +135,25 @@ public class HomepageService {
         return result;
     }
 
-    private TicketView ticketToTicketView(Ticket t, String permalink) {
+    private TicketView ticketToTicketView(DetailedTicket t, String permalink) {
+        Ticket ticket = t.ticket();
         TicketView.TicketViewBuilder view = TicketView.builder()
-            .id(t.id())
-            .status(t.status())
-            .impact(impactsRegistry.findImpactByCode(t.impact()))
+            .id(ticket.id())
+            .status(ticket.status())
+            .escalation(t.escalations())
+            .impact(impactsRegistry.findImpactByCode(ticket.impact()))
             .queryPermalink(permalink);
 
-        if (t.status() == TicketStatus.closed) {
+        if (ticket.status() == TicketStatus.closed) {
             view.closedAt(
-                t.statusLog().stream()
+                ticket.statusLog().stream()
                     .filter(l -> l.status() == TicketStatus.closed)
                     .max(comparing(Ticket.StatusLog::date))
                     .get().date()
             );
         }
         view.lastOpenedAt(
-            t.statusLog().stream()
+            ticket.statusLog().stream()
                 .filter(l -> l.status() == TicketStatus.opened)
                 .max(comparing(Ticket.StatusLog::date))
                 .get().date()

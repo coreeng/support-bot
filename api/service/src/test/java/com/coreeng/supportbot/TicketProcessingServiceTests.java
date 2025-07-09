@@ -52,7 +52,9 @@ public class TicketProcessingServiceTests {
         slackTicketsProps = new SlackTicketsProps(
             "some-channel-id",
             "eyes",
-            "ticket"
+            "ticket",
+            "white_check_mark",
+            "rocket"
         );
         ticketProcessingService = new TicketProcessingService(
             ticketRepository,
