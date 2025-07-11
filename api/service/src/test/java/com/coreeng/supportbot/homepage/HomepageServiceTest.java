@@ -109,7 +109,7 @@ class HomepageServiceTest {
     }
 
     @Test
-    public void shouldReturnExpectedTicketsWithMultipleEscalations() {
+    public void shouldReturnExpectedTicketsSomeWithMultipleEscalations() {
         // given
         HomepageView.State state = HomepageView.State.builder()
                 .filter(HomepageFilter.builder().build()).build();
@@ -153,6 +153,55 @@ class HomepageServiceTest {
         assertThat(ticketsView.tickets().get(0).escalations().size()).isEqualTo(2);
         assertThat(ticketsView.tickets().get(1).escalations().size()).isEqualTo(1);
     }
+
+    @Test
+    public void shouldReturnExpectedTicketsWithOneEscalationEach() {
+        // given
+        HomepageView.State state = HomepageView.State.builder()
+                .filter(HomepageFilter.builder().build()).build();
+
+        ImmutableList<Ticket> tickets = buildTickets(3);
+
+        Map<TicketId, Integer> escalationsMap = Map.of(
+                tickets.get(0).id(), 1,
+                tickets.get(1).id(), 1,
+                tickets.get(2).id(), 1
+        );
+
+        ImmutableList<Escalation> escalations = buildEscalationsFromMap(escalationsMap);
+
+        Page<Ticket> ticketPage = new Page<>(tickets, 1, 1, tickets.size());
+        Page<Escalation> escalationPage = new Page<>(escalations, 1, 1, escalations.size());
+
+        when(ticketQueryService.findByQuery(any())).thenReturn(ticketPage);
+        when(escalationQueryService.findByQuery(any())).thenReturn(escalationPage);
+        when(slackClient.getPermalink(any())).thenReturn("perma.link");
+        when(impactsRegistry.findImpactByCode(any())).thenReturn(new TicketImpact("Production Blocking", "productionBlocking"));
+
+        // when
+        HomepageView ticketsView = homepageService.getTicketsView(state);
+
+        // then
+        Map<TicketId, List<Escalation>> expectedEscalationsByTicketId =
+                escalations.stream().collect(Collectors.groupingBy(Escalation::ticketId));
+
+        for (TicketView ticket : ticketsView.tickets()) {
+            TicketId ticketId = ticket.id();
+            List<Escalation> expectedEscalation = expectedEscalationsByTicketId.getOrDefault(ticketId, List.of());
+            List<Escalation> actualEscalation = ticket.escalations();
+
+            assertThat(actualEscalation)
+                    .usingRecursiveAssertion()
+                    .isEqualTo(expectedEscalation);
+        }
+        assertThat(ticketsView).isNotNull();
+        assertThat(ticketsView.tickets().size()).isEqualTo(3);
+
+        assertThat(ticketsView.tickets().get(0).escalations().size()).isEqualTo(1);
+        assertThat(ticketsView.tickets().get(1).escalations().size()).isEqualTo(1);
+        assertThat(ticketsView.tickets().get(2).escalations().size()).isEqualTo(1);
+    }
+
 
     @Test
     public void shouldReturnExpectedTicketsWithNoEscalations() {
