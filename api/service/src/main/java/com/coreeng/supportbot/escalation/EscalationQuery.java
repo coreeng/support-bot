@@ -23,4 +23,5 @@ public class EscalationQuery {
     private LocalDate dateTo;
     private EscalationStatus status;
     private String team;
+    private boolean unlimited;
 }

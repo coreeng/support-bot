@@ -103,7 +103,7 @@ public class HomepageViewMapper {
             ticket.id().render()
         );
         Optional<SectionBlock> escalationSection =
-            Optional.ofNullable(ticket.escalation())
+            Optional.ofNullable(ticket.escalations())
                 .filter(escalations -> !escalations.isEmpty())
                 .map(escalations -> section(s -> {
                     ImmutableList<String> teams = escalations.stream()
