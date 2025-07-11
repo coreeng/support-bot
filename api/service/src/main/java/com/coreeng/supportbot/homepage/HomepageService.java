@@ -14,7 +14,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -23,9 +22,9 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Comparator.comparing;
 
 @Service
@@ -44,20 +43,18 @@ public class HomepageService {
 
         ImmutableList<TicketId> ticketIds = page.content().stream()
                 .map(Ticket::id)
-                .collect(ImmutableList.toImmutableList());
+                .collect(toImmutableList());
 
-        Page<Escalation> byQuery = escalationQueryService.findByQuery(
+        Page<Escalation> escalations = escalationQueryService.findByQuery(
                 EscalationQuery.builder()
                         .ticketIds(ticketIds)
+                        .unlimited(true)
                         .build());
 
         Multimap<TicketId, Escalation> escalationsByTicketId =
-                Multimaps.index(byQuery.content(), Escalation::ticketId);
+                Multimaps.index(escalations.content(), Escalation::ticketId);
 
-        Stream<DetailedTicket> detailedTicketStream = getDetailedTicketStream(state, page, escalationsByTicketId);
-
-        ImmutableList<DetailedTicket> detailedTickets = detailedTicketStream.collect(ImmutableList.toImmutableList());
-
+        ImmutableList<DetailedTicket> detailedTickets = getDetailedTickets(state, page, escalationsByTicketId);
 
         Map<TicketId, String> permalinkByTicketId = collectPermalinks(page.content());
 
@@ -66,7 +63,7 @@ public class HomepageService {
             .tickets(
                 detailedTickets.stream()
                     .map(dt -> ticketToTicketView(dt, permalinkByTicketId.get(dt.ticket().id())))
-                    .collect(ImmutableList.toImmutableList())
+                    .collect(toImmutableList())
             )
             .totalTickets(page.totalElements())
             .totalPages(page.totalPages())
@@ -76,23 +73,14 @@ public class HomepageService {
             .build();
     }
 
-    private Stream<DetailedTicket> getDetailedTicketStream(HomepageView.State state, Page<Ticket> page, Multimap<TicketId, Escalation> escalationsByTicketId) {
+    private ImmutableList<DetailedTicket> getDetailedTickets(HomepageView.State state, Page<Ticket> page, Multimap<TicketId, Escalation> escalationsByTicketId) {
         Stream<DetailedTicket> detailedTicketStream = page.content().stream()
                 .map(ticket -> {
                     ImmutableList<Escalation> escalations =
                             ImmutableList.copyOf(escalationsByTicketId.get(ticket.id()));
                     return new DetailedTicket(ticket, escalations);
                 });
-
-        // Filter if escalationTeam is present
-        if (state.filter().escalationTeam() != null) {
-            String team = state.filter().escalationTeam();
-            detailedTicketStream = detailedTicketStream
-                    .filter(dt -> dt.escalations().stream()
-                            .anyMatch(e -> team.equals(e.team()))
-                    );
-        }
-        return detailedTicketStream;
+        return detailedTicketStream.collect(toImmutableList());
     }
 
     private Map<TicketId, String> collectPermalinks(ImmutableList<Ticket> tickets) {
@@ -140,7 +128,7 @@ public class HomepageService {
         TicketView.TicketViewBuilder view = TicketView.builder()
             .id(ticket.id())
             .status(ticket.status())
-            .escalation(t.escalations())
+            .escalations(t.escalations())
             .impact(impactsRegistry.findImpactByCode(ticket.impact()))
             .queryPermalink(permalink);
 

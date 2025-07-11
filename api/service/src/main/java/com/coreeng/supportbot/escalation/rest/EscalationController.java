@@ -39,7 +39,7 @@ public class EscalationController {
                 .page(page)
                 .pageSize(pageSize)
                 .ids(ImmutableList.copyOf(ids))
-                .ticketId(ticketId)
+                .ticketIds(ImmutableList.of(ticketId))
                 .dateFrom(dateFrom)
                 .dateTo(dateTo)
                 .status(status)

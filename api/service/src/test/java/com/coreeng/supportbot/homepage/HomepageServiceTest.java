@@ -99,7 +99,7 @@ class HomepageServiceTest {
         assertThat(ticketsView).isNotNull();
         assertThat(ticketsView.tickets().size()).isEqualTo(1);
 
-        ImmutableList<Escalation> actualEscalation = ticketsView.tickets().get(0).escalation();
+        ImmutableList<Escalation> actualEscalation = ticketsView.tickets().get(0).escalations();
 
         assertThat(actualEscalation).isNotNull();
         assertThat(actualEscalation.size()).isEqualTo(1);
@@ -141,7 +141,7 @@ class HomepageServiceTest {
         for (TicketView ticket : ticketsView.tickets()) {
             TicketId ticketId = ticket.id();
             List<Escalation> expectedEscalation = expectedEscalationsByTicketId.getOrDefault(ticketId, List.of());
-            List<Escalation> actualEscalation = ticket.escalation();
+            List<Escalation> actualEscalation = ticket.escalations();
 
             assertThat(actualEscalation)
                     .usingRecursiveAssertion()
@@ -150,8 +150,8 @@ class HomepageServiceTest {
         assertThat(ticketsView).isNotNull();
         assertThat(ticketsView.tickets().size()).isEqualTo(2);
 
-        assertThat(ticketsView.tickets().get(0).escalation().size()).isEqualTo(2);
-        assertThat(ticketsView.tickets().get(1).escalation().size()).isEqualTo(1);
+        assertThat(ticketsView.tickets().get(0).escalations().size()).isEqualTo(2);
+        assertThat(ticketsView.tickets().get(1).escalations().size()).isEqualTo(1);
     }
 
     @Test
@@ -176,8 +176,8 @@ class HomepageServiceTest {
         assertThat(ticketsView).isNotNull();
         assertThat(ticketsView.tickets().size()).isEqualTo(2);
 
-        assertThat(ticketsView.tickets().get(0).escalation().size()).isEqualTo(0);
-        assertThat(ticketsView.tickets().get(1).escalation().size()).isEqualTo(0);
+        assertThat(ticketsView.tickets().get(0).escalations().size()).isEqualTo(0);
+        assertThat(ticketsView.tickets().get(1).escalations().size()).isEqualTo(0);
     }
 
     private ImmutableList<Ticket> buildTickets(int numberOfTickets) {

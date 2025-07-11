@@ -195,8 +195,8 @@ public class JdbcEscalationRepository implements EscalationRepository {
     public Page<Escalation> findByQuery(EscalationQuery query) {
         Condition condition = queryToCondition(query);
 
-        Long offset = query.page() * query.pageSize();
-        Long limit = query.pageSize();
+        Long offset = query.unlimited() ? null : query.page() * query.pageSize();
+        Long limit = query.unlimited() ? null : query.pageSize();
         ImmutableList<Escalation> content = listByCondition(condition, offset, limit);
 
         long totalEscalations = checkNotNull(
@@ -208,7 +208,7 @@ public class JdbcEscalationRepository implements EscalationRepository {
         return new Page<>(
             content,
             query.page(),
-            totalEscalations / query.pageSize() + 1,
+            (int) Math.ceil((double) totalEscalations / query.pageSize()), // Convert to double before dividing, then use Math.ceil to round up
             totalEscalations
         );
     }
@@ -221,8 +221,10 @@ public class JdbcEscalationRepository implements EscalationRepository {
                 .toArray(Long[]::new);
             condition = condition.and(ESCALATION.ID.eq(any(ids)));
         }
-        if (query.ticketId() != null) {
-            condition = condition.and(ESCALATION.TICKET_ID.eq(query.ticketId().id()));
+        if (query.ticketIds() != null && !query.ticketIds().isEmpty()) {
+            condition = condition.and(ESCALATION.TICKET_ID.in(
+                    query.ticketIds().stream().map(TicketId::id).collect(toImmutableList())
+            ));
         }
         if (query.dateFrom() != null) {
             Instant dateFrom = query.dateFrom().atStartOfDay(timezone).toInstant();
@@ -257,6 +259,10 @@ public class JdbcEscalationRepository implements EscalationRepository {
         }
         if (query.team() != null) {
             condition = condition.and(ESCALATION.TEAM.eq(query.team()));
+        }
+        if (query.ticketIds() != null && !query.ticketIds().isEmpty()) {
+            ImmutableList<Long> ticketIds = query.ticketIds().stream().map(TicketId::id).collect(toImmutableList());
+            condition = condition.and(ESCALATION.TICKET_ID.in(ticketIds));
         }
         return condition;
     }

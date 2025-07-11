@@ -22,7 +22,7 @@ public class TicketView {
     @Nullable
     private EnumerationValue impact;
     @Nullable
-    private ImmutableList<Escalation> escalation;
+    private ImmutableList<Escalation> escalations;
     @Nullable
     private Instant closedAt;
 }

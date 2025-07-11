@@ -6,6 +6,7 @@ import com.coreeng.supportbot.dbschema.tables.records.TicketLogRecord;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.util.Page;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
@@ -279,7 +280,7 @@ public class JdbcTicketRepository implements TicketRepository {
         return new Page<>(
             content,
             query.page(),
-            ticketsTotal / query.pageSize(),
+            (int) Math.ceil((double) ticketsTotal / query.pageSize()), // Convert to double before dividing, then use Math.ceil to round up
             ticketsTotal
         );
     }
@@ -458,6 +459,14 @@ public class JdbcTicketRepository implements TicketRepository {
                         )))
             ));
         }
+        if (!Strings.isNullOrEmpty(query.escalationTeam())) {
+            condition = condition.and(exists(
+                selectOne()
+                    .from(ESCALATION)
+                    .where(ESCALATION.TICKET_ID.eq(TICKET.ID)
+                        .and(ESCALATION.TEAM.eq(query.escalationTeam()))
+            )));
+        }
         return condition;
     }
 
@@ -507,7 +516,7 @@ public class JdbcTicketRepository implements TicketRepository {
             dsl.selectOne()
                 .from(ESCALATION)
                 .where(ESCALATION.TICKET_ID.eq(TICKET.ID)
-                    .and(ESCALATION.STATUS.eq(EscalationStatus.resolved)))
+                    .and(ESCALATION.STATUS.eq(EscalationStatus.opened)))
         );
     }
 

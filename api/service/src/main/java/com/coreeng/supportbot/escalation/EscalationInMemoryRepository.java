@@ -131,7 +131,8 @@ public class EscalationInMemoryRepository implements EscalationRepository {
             && !query.ids().contains(escalation.id())) {
             return false;
         }
-        if (query.ticketId() != null && !query.ticketId().equals(escalation.ticketId())) {
+        if (query.ticketIds() != null && !query.ticketIds().isEmpty()
+                && !query.ticketIds().contains(escalation.ticketId())) {
             return false;
         }
         ChronoLocalDate openedAt = ChronoLocalDate.from(escalation.openedAt().atZone(timezone));
