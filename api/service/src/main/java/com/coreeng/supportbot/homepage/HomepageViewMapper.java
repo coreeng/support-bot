@@ -28,6 +28,7 @@ import static com.slack.api.model.block.Blocks.*;
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
 import static com.slack.api.model.block.element.BlockElements.button;
+import static java.lang.String.*;
 import static java.lang.String.format;
 
 @Component
@@ -110,7 +111,7 @@ public class HomepageViewMapper {
                         .map(Escalation::team)
                         .collect(toImmutableList());
                     return s.fields(ImmutableList.of(
-                        markdownText(String.format("*Escalation*: %s :rocket:", String.join(", ", teams)))
+                        markdownText(format("*Escalation*: %s :rocket:", join(", ", teams)))
                     ));
                 }));
         List<LayoutBlock> blocks = new ArrayList<>(List.of(

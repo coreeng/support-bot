@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.configMap.name | default (printf "%s-config" (include "support-bot-integration-tests.fullname" .)) }}
+  labels:
+    {{- include "support-bot-integration-tests.labels" . | nindent 4 }}
+data:
+  integration-tests-deployed.yaml: |
+    {{- .Values.configMap.config | toYaml | nindent 4 }}
