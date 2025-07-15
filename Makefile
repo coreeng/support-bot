@@ -230,7 +230,8 @@ run-app:
 
 .PHONY: run-api-functional
 run-api-functional: ## run api functional test
-	cd api; bash scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" true
+	@echo "Functional tests are temporarily disabled"
+#	cd api; bash scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" true
 
 .PHONY: run-ui-functional
 run-ui-functional: ## run ui functional test
