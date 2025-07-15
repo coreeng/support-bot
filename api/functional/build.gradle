@@ -19,7 +19,7 @@ dependencies {
     testImplementation("org.wiremock:wiremock:3.13.+")
 
     // Avoiding vulnerability reports from wiremock
-    testImplementation("org.eclipse.jetty:jetty-server:12.0.+")
+    testImplementation("org.eclipse.jetty:jetty-server:11.0.+")
 
 //    testImplementation('io.cucumber:cucumber-java:7.23.+')
 //    testImplementation('io.cucumber:cucumber-junit:7.23.+')
