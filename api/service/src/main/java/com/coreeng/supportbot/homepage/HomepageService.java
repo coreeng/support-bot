@@ -54,7 +54,7 @@ public class HomepageService {
         Multimap<TicketId, Escalation> escalationsByTicketId =
                 Multimaps.index(escalations.content(), Escalation::ticketId);
 
-        ImmutableList<DetailedTicket> detailedTickets = getDetailedTickets(state, page, escalationsByTicketId);
+        ImmutableList<DetailedTicket> detailedTickets = getDetailedTickets(page, escalationsByTicketId);
 
         Map<TicketId, String> permalinkByTicketId = collectPermalinks(page.content());
 
@@ -73,7 +73,7 @@ public class HomepageService {
             .build();
     }
 
-    private ImmutableList<DetailedTicket> getDetailedTickets(HomepageView.State state, Page<Ticket> page, Multimap<TicketId, Escalation> escalationsByTicketId) {
+    private ImmutableList<DetailedTicket> getDetailedTickets(Page<Ticket> page, Multimap<TicketId, Escalation> escalationsByTicketId) {
         Stream<DetailedTicket> detailedTicketStream = page.content().stream()
                 .map(ticket -> {
                     ImmutableList<Escalation> escalations =

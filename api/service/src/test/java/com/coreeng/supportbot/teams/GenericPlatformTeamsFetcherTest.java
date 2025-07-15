@@ -7,6 +7,7 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.dsl.NonDeletingOperation;
 import io.fabric8.kubernetes.client.server.mock.EnableKubernetesMockClient;
 import io.fabric8.kubernetes.client.server.mock.KubernetesMockServer;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -23,15 +24,11 @@ class GenericPlatformTeamsFetcherTest {
     void shouldFetchTeamsSuccessfully() {
         // given
         k8sClient.resource(createMockNs("team1", "group1")).createOr(NonDeletingOperation::update);
-        GenericPlatformTeamsFetcher.Config config = new GenericPlatformTeamsFetcher.Config(
-            "v1",
-            "Namespace",
-            "namespace",
+        GenericPlatformTeamsFetcher fetcher = createGenericTeamsFetcher(
             new GenericPlatformTeamsFetcher.Filter(null, null),
-            new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/name"),
-            new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/annotations/groupRef")
+            "/metadata/name",
+            "/metadata/annotations/groupRef"
         );
-        GenericPlatformTeamsFetcher fetcher = new GenericPlatformTeamsFetcher(config, k8sClient, new JsonMapper());
 
         // when
         List<PlatformTeamsFetcher.TeamAndGroupTuple> result = fetcher.fetchTeams();
@@ -47,15 +44,7 @@ class GenericPlatformTeamsFetcherTest {
     void shouldThrowExceptionWhenTeamNameIsMissing() {
         // given
         k8sClient.resource(createMockNs("team1", "group1")).createOr(NonDeletingOperation::update);
-        GenericPlatformTeamsFetcher.Config config = new GenericPlatformTeamsFetcher.Config(
-            "v1",
-            "Namespace",
-            "namespace",
-            new GenericPlatformTeamsFetcher.Filter(null, null),
-            new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/missingName"),
-            new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/annotations/groupRef")
-        );
-        GenericPlatformTeamsFetcher fetcher = new GenericPlatformTeamsFetcher(config, k8sClient, new JsonMapper());
+        GenericPlatformTeamsFetcher fetcher = createGenericTeamsFetcher(new GenericPlatformTeamsFetcher.Filter(null, null), "/metadata/missingName", "/metadata/annotations/groupRef");
 
         // when & then
         assertThrows(GenericPlatformTeamsFetcher.PropertyExtractionException.class, fetcher::fetchTeams);
@@ -65,15 +54,7 @@ class GenericPlatformTeamsFetcherTest {
     void shouldThrowExceptionWhenGroupRefIsMissing() {
         // given
         k8sClient.resource(createMockNs("team1", "group1")).createOr(NonDeletingOperation::update);
-        GenericPlatformTeamsFetcher.Config config = new GenericPlatformTeamsFetcher.Config(
-            "v1",
-            "Namespace",
-            "namespace",
-            new GenericPlatformTeamsFetcher.Filter(null, null),
-            new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/name"),
-            new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/annotations/missingGroupRef")
-        );
-        GenericPlatformTeamsFetcher fetcher = new GenericPlatformTeamsFetcher(config, k8sClient, new JsonMapper());
+        GenericPlatformTeamsFetcher fetcher = createGenericTeamsFetcher(new GenericPlatformTeamsFetcher.Filter(null, null), "/metadata/name", "/metadata/annotations/missingGroupRef");
 
         // when & then
         assertThrows(GenericPlatformTeamsFetcher.PropertyExtractionException.class, fetcher::fetchTeams);
@@ -82,15 +63,7 @@ class GenericPlatformTeamsFetcherTest {
     @Test
     void shouldReturnEmptyListWhenNoResources() {
         // given
-        GenericPlatformTeamsFetcher.Config config = new GenericPlatformTeamsFetcher.Config(
-            "v1",
-            "Namespace",
-            "namespace",
-            new GenericPlatformTeamsFetcher.Filter(null, null),
-            new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/name"),
-            new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/annotations/groupRef")
-        );
-        GenericPlatformTeamsFetcher fetcher = new GenericPlatformTeamsFetcher(config, k8sClient, new JsonMapper());
+        GenericPlatformTeamsFetcher fetcher = createGenericTeamsFetcher(new GenericPlatformTeamsFetcher.Filter(null, null), "/metadata/name", "/metadata/annotations/groupRef");
 
         // when
         List<PlatformTeamsFetcher.TeamAndGroupTuple> result = fetcher.fetchTeams();
@@ -106,15 +79,7 @@ class GenericPlatformTeamsFetcherTest {
             .editMetadata().withLabels(Map.of("team", "true")).endMetadata()
             .build()).createOr(NonDeletingOperation::update);
         k8sClient.resource(createMockNs("team2", "group2")).createOr(NonDeletingOperation::update);
-        GenericPlatformTeamsFetcher.Config config = new GenericPlatformTeamsFetcher.Config(
-            "v1",
-            "Namespace",
-            "namespace",
-            new GenericPlatformTeamsFetcher.Filter(null, "team=true"),
-            new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/name"),
-            new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/annotations/groupRef")
-        );
-        GenericPlatformTeamsFetcher fetcher = new GenericPlatformTeamsFetcher(config, k8sClient, new JsonMapper());
+        GenericPlatformTeamsFetcher fetcher = createGenericTeamsFetcher(new GenericPlatformTeamsFetcher.Filter(null, "team=true"), "/metadata/name", "/metadata/annotations/groupRef");
 
         // when
         List<PlatformTeamsFetcher.TeamAndGroupTuple> result = fetcher.fetchTeams();
@@ -131,15 +96,7 @@ class GenericPlatformTeamsFetcherTest {
         // given
         k8sClient.resource(createMockNs("team1", "group1")).createOr(NonDeletingOperation::update);
         k8sClient.resource(createMockNs("team2", "group2")).createOr(NonDeletingOperation::update);
-        GenericPlatformTeamsFetcher.Config config = new GenericPlatformTeamsFetcher.Config(
-            "v1",
-            "Namespace",
-            "namespace",
-            new GenericPlatformTeamsFetcher.Filter("^.*1$", null),
-            new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/name"),
-            new GenericPlatformTeamsFetcher.PropertyPointer("/metadata/annotations/groupRef")
-        );
-        GenericPlatformTeamsFetcher fetcher = new GenericPlatformTeamsFetcher(config, k8sClient, new JsonMapper());
+        GenericPlatformTeamsFetcher fetcher = createGenericTeamsFetcher(new GenericPlatformTeamsFetcher.Filter("^.*1$", null), "/metadata/name", "/metadata/annotations/groupRef");
 
         // when
         List<PlatformTeamsFetcher.TeamAndGroupTuple> result = fetcher.fetchTeams();
@@ -158,5 +115,18 @@ class GenericPlatformTeamsFetcherTest {
             .withAnnotations(Map.of("groupRef", groupRef))
             .endMetadata()
             .build();
+    }
+
+    @NotNull
+    private GenericPlatformTeamsFetcher createGenericTeamsFetcher(GenericPlatformTeamsFetcher.Filter filter, String path, String path1) {
+        GenericPlatformTeamsFetcher.Config config = new GenericPlatformTeamsFetcher.Config(
+            "v1",
+            "Namespace",
+            "",
+            filter,
+            new GenericPlatformTeamsFetcher.PropertyPointer(path),
+            new GenericPlatformTeamsFetcher.PropertyPointer(path1)
+        );
+        return new GenericPlatformTeamsFetcher(config, k8sClient, new JsonMapper());
     }
 }

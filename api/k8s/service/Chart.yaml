@@ -1,0 +1,6 @@
+apiVersion: v2
+name: support-bot
+description: A Helm chart for Support Bot - Slack bot for managing support queries
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
