@@ -1,0 +1,14 @@
+helm:
+  releaseName: support-bot
+  chartPath: ../k8s/service
+namespace: support-bot-integration
+service:
+  deployment:
+    name: support-bot
+  image:
+    repository: support-bot
+    tag: latest
+portForwarding:
+  enabled: true
+  localPort: 8080
+  remotePort: 8080

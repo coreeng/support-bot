@@ -29,16 +29,18 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class HomepageServiceTest {
-    private final String CHANNEL_ID = "U0123";
-    private final ImmutableList<String> TAGS = ImmutableList.of("tag1", "tag2");
-    private final MessageTs MESSAGE_TS = MessageTs.of("123.456");
-    private final EscalationStatus ESCALATION_STATUS = EscalationStatus.opened;
+    private final String channelId = "U0123";
+    private final ImmutableList<String> tags = ImmutableList.of("tag1", "tag2");
+    private final MessageTs messageTs = MessageTs.of("123.456");
+    private final EscalationStatus escalationStatus = EscalationStatus.opened;
 
     HomepageService homepageService;
     ExecutorService executorService = Executors.newSingleThreadExecutor();
@@ -58,7 +60,7 @@ class HomepageServiceTest {
                 ticketQueryService,
                 executorService,
                 slackClient,
-                new SlackTicketsProps(CHANNEL_ID, "eyes", "ticket", "tick", "rocket"),
+                new SlackTicketsProps(channelId, "eyes", "ticket", "tick", "rocket"),
                 impactsRegistry,
                 escalationQueryService
         );
@@ -78,13 +80,13 @@ class HomepageServiceTest {
         ImmutableList<Ticket> tickets = buildTickets(1);
 
         Map<TicketId, Integer> escalationsMap = Map.of(
-                tickets.get(0).id(), 1
+            requireNonNull(tickets.getFirst().id()), 1
         );
 
         ImmutableList<Escalation> escalation = buildEscalationsFromMap(escalationsMap);
 
-        Page<Ticket> ticketPage = new Page<>(ImmutableList.of(tickets.get(0)), 1, 1, 1);
-        Page<Escalation> escalationPage = new Page<>(ImmutableList.of(escalation.get(0)), 1, 1, 1);
+        Page<Ticket> ticketPage = new Page<>(ImmutableList.of(tickets.getFirst()), 1, 1, 1);
+        Page<Escalation> escalationPage = new Page<>(ImmutableList.of(escalation.getFirst()), 1, 1, 1);
 
         when(ticketQueryService.findByQuery(any()))
                 .thenReturn(ticketPage);
@@ -99,13 +101,14 @@ class HomepageServiceTest {
         assertThat(ticketsView).isNotNull();
         assertThat(ticketsView.tickets().size()).isEqualTo(1);
 
-        ImmutableList<Escalation> actualEscalation = ticketsView.tickets().get(0).escalations();
+        ImmutableList<Escalation> actualEscalation = ticketsView.tickets().getFirst().escalations();
 
         assertThat(actualEscalation).isNotNull();
+        assertNotNull(actualEscalation);
         assertThat(actualEscalation.size()).isEqualTo(1);
-        assertThat(actualEscalation.get(0))
+        assertThat(actualEscalation.getFirst())
                 .usingRecursiveAssertion()
-                .isEqualTo(escalation.get(0));
+                .isEqualTo(escalation.getFirst());
     }
 
     @Test
@@ -117,8 +120,8 @@ class HomepageServiceTest {
         ImmutableList<Ticket> tickets = buildTickets(2);
 
         Map<TicketId, Integer> escalationsMap = Map.of(
-                tickets.get(0).id(), 2,
-                tickets.get(1).id(), 1
+            requireNonNull(tickets.get(0).id()), 2,
+            requireNonNull(tickets.get(1).id()), 1
         );
 
         ImmutableList<Escalation> escalations = buildEscalationsFromMap(escalationsMap);
@@ -135,12 +138,12 @@ class HomepageServiceTest {
         HomepageView ticketsView = homepageService.getTicketsView(state);
 
         // then
-        Map<TicketId, List<Escalation>> expectedEscalationsByTicketId =
+        Map<TicketId, List<Escalation>> expectedEscalationsMap =
                 escalations.stream().collect(Collectors.groupingBy(Escalation::ticketId));
 
         for (TicketView ticket : ticketsView.tickets()) {
             TicketId ticketId = ticket.id();
-            List<Escalation> expectedEscalation = expectedEscalationsByTicketId.getOrDefault(ticketId, List.of());
+            List<Escalation> expectedEscalation = expectedEscalationsMap.getOrDefault(ticketId, List.of());
             List<Escalation> actualEscalation = ticket.escalations();
 
             assertThat(actualEscalation)
@@ -150,8 +153,8 @@ class HomepageServiceTest {
         assertThat(ticketsView).isNotNull();
         assertThat(ticketsView.tickets().size()).isEqualTo(2);
 
-        assertThat(ticketsView.tickets().get(0).escalations().size()).isEqualTo(2);
-        assertThat(ticketsView.tickets().get(1).escalations().size()).isEqualTo(1);
+        assertThat(requireNonNull(ticketsView.tickets().get(0).escalations()).size()).isEqualTo(2);
+        assertThat(requireNonNull(ticketsView.tickets().get(1).escalations()).size()).isEqualTo(1);
     }
 
     @Test
@@ -163,9 +166,9 @@ class HomepageServiceTest {
         ImmutableList<Ticket> tickets = buildTickets(3);
 
         Map<TicketId, Integer> escalationsMap = Map.of(
-                tickets.get(0).id(), 1,
-                tickets.get(1).id(), 1,
-                tickets.get(2).id(), 1
+            requireNonNull(tickets.get(0).id()), 1,
+            requireNonNull(tickets.get(1).id()), 1,
+            requireNonNull(tickets.get(2).id()), 1
         );
 
         ImmutableList<Escalation> escalations = buildEscalationsFromMap(escalationsMap);
@@ -182,12 +185,12 @@ class HomepageServiceTest {
         HomepageView ticketsView = homepageService.getTicketsView(state);
 
         // then
-        Map<TicketId, List<Escalation>> expectedEscalationsByTicketId =
+        Map<TicketId, List<Escalation>> expectedEscalationsMap =
                 escalations.stream().collect(Collectors.groupingBy(Escalation::ticketId));
 
         for (TicketView ticket : ticketsView.tickets()) {
             TicketId ticketId = ticket.id();
-            List<Escalation> expectedEscalation = expectedEscalationsByTicketId.getOrDefault(ticketId, List.of());
+            List<Escalation> expectedEscalation = expectedEscalationsMap.getOrDefault(ticketId, List.of());
             List<Escalation> actualEscalation = ticket.escalations();
 
             assertThat(actualEscalation)
@@ -197,9 +200,9 @@ class HomepageServiceTest {
         assertThat(ticketsView).isNotNull();
         assertThat(ticketsView.tickets().size()).isEqualTo(3);
 
-        assertThat(ticketsView.tickets().get(0).escalations().size()).isEqualTo(1);
-        assertThat(ticketsView.tickets().get(1).escalations().size()).isEqualTo(1);
-        assertThat(ticketsView.tickets().get(2).escalations().size()).isEqualTo(1);
+        assertThat(requireNonNull(ticketsView.tickets().get(0).escalations()).size()).isEqualTo(1);
+        assertThat(requireNonNull(ticketsView.tickets().get(1).escalations()).size()).isEqualTo(1);
+        assertThat(requireNonNull(ticketsView.tickets().get(2).escalations()).size()).isEqualTo(1);
     }
 
 
@@ -225,22 +228,22 @@ class HomepageServiceTest {
         assertThat(ticketsView).isNotNull();
         assertThat(ticketsView.tickets().size()).isEqualTo(2);
 
-        assertThat(ticketsView.tickets().get(0).escalations().size()).isEqualTo(0);
-        assertThat(ticketsView.tickets().get(1).escalations().size()).isEqualTo(0);
+        assertThat(requireNonNull(ticketsView.tickets().get(0).escalations()).size()).isEqualTo(0);
+        assertThat(requireNonNull(ticketsView.tickets().get(1).escalations()).size()).isEqualTo(0);
     }
 
     private ImmutableList<Ticket> buildTickets(int numberOfTickets) {
         ImmutableList.Builder<Ticket> builder = ImmutableList.builder();
         for (int i = 1; i <= numberOfTickets; i++) {
             builder.add(Ticket.builder()
-                    .channelId(CHANNEL_ID)
-                    .createdMessageTs(MessageTs.of(MESSAGE_TS.ts() + i))
-                    .tags(TAGS)
+                    .channelId(channelId)
+                    .createdMessageTs(MessageTs.of(messageTs.ts() + i))
+                    .tags(tags)
                     .id(new TicketId(i))
                     .impact("Production Blocking")
                     .lastInteractedAt(Instant.now())
                     .status(TicketStatus.opened)
-                    .queryTs(MESSAGE_TS)
+                    .queryTs(messageTs)
                     .team("lions")
                     .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
                     .build());
@@ -258,10 +261,10 @@ class HomepageServiceTest {
 
             for (int i = 0; i < escalationCount; i++) {
                 builder.add(Escalation.builder()
-                        .channelId(CHANNEL_ID)
-                        .tags(TAGS)
-                        .createdMessageTs(MessageTs.of(MESSAGE_TS.ts() + counter))
-                        .status(ESCALATION_STATUS)
+                        .channelId(channelId)
+                        .tags(tags)
+                        .createdMessageTs(MessageTs.of(messageTs.ts() + counter))
+                        .status(escalationStatus)
                         .id(new EscalationId(counter))
                         .team("panthers")
                         .ticketId(ticketId)
