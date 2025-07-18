@@ -21,8 +21,6 @@ dependencies {
     // Avoiding vulnerability reports from wiremock
     testImplementation("org.eclipse.jetty:jetty-server:11.0.+")
 
-//    testImplementation('io.cucumber:cucumber-java:7.23.+')
-//    testImplementation('io.cucumber:cucumber-junit:7.23.+')
     testImplementation('io.rest-assured:rest-assured:5.5.+')
 
     // Avoiding vulnerability reports from rest-assured
