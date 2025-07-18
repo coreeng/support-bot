@@ -39,13 +39,17 @@ import java.util.concurrent.Executors;
 )
 @EnableConfigurationProperties({
         PlatformTeamsConfig.GcpProps.class,
-        GenericPlatformTeamsFetcher.Config.class
+        GenericPlatformTeamsFetcher.Config.class,
+        StaticPlatformTeamsProps.class,
+        StaticPlatformUsersProps.class
 })
 @RequiredArgsConstructor
 public class PlatformTeamsConfig {
     private final GcpProps gcpProps;
     private final CredentialsProvider gcpCredsProvider;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
+    private final StaticPlatformTeamsProps staticPlatformTeamsProps;
+    private final StaticPlatformUsersProps staticPlatformUsersProps;
 
     @Bean
     public PlatformTeamsService platformTeamsService(PlatformTeamsFetcher teamsFetcher, PlatformUsersFetcher usersFetcher) {
@@ -64,7 +68,7 @@ public class PlatformTeamsConfig {
     @Bean
     @ConditionalOnProperty("platform-integration.teams-scraping.static.enabled")
     public PlatformTeamsFetcher localPlatformTeamsFetcher() {
-        return new StaticPlatformTeamsFetcher();
+        return new StaticPlatformTeamsFetcher(staticPlatformTeamsProps);
     }
 
     @Bean
@@ -124,7 +128,7 @@ public class PlatformTeamsConfig {
     @Bean
     @ConditionalOnProperty("platform-integration.static-user.enabled")
     public PlatformUsersFetcher staticUsersFetcher() {
-        return new StaticUsersFetcher();
+        return new StaticUsersFetcher(staticPlatformUsersProps);
     }
 
     @Bean

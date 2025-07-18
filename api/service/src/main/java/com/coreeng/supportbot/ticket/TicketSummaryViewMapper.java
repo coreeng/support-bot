@@ -216,17 +216,9 @@ public class TicketSummaryViewMapper {
     }
 
     private StaticSelectElement renderTeamsInput(TicketSummaryView.TeamsInput teams) {
-        return staticSelect(s -> s
-            .actionId(TicketField.team.actionId())
-            .initialOption(
-                teams.currentTeam() != null
-                    ? OptionObject.builder()
-                    .text(plainText(teams.currentTeam()))
-                    .value(teams.currentTeam())
-                    .build()
-                    : null
-            )
-            .optionGroups(ImmutableList.of(
+        ImmutableList.Builder<OptionGroupObject> optionGroupsBuilder = ImmutableList.builderWithExpectedSize(2);
+        if (!teams.authorTeams().isEmpty()) {
+            optionGroupsBuilder.add(
                 OptionGroupObject.builder()
                     .label(plainText("Suggested teams"))
                     .options(
@@ -237,7 +229,12 @@ public class TicketSummaryViewMapper {
                                 .build())
                             .collect(toImmutableList())
                     )
-                    .build(),
+                    .build()
+
+            );
+        }
+        if (!teams.otherTeams().isEmpty()) {
+            optionGroupsBuilder.add(
                 OptionGroupObject.builder()
                     .label(plainText("Others"))
                     .options(
@@ -249,7 +246,24 @@ public class TicketSummaryViewMapper {
                             .collect(toImmutableList())
                     )
                     .build()
-            ))
+            );
+        }
+        ImmutableList<OptionGroupObject> optionGroups = optionGroupsBuilder.build();
+        return staticSelect(s -> {
+                s.actionId(TicketField.team.actionId())
+                    .initialOption(
+                        teams.currentTeam() != null
+                            ? OptionObject.builder()
+                            .text(plainText(teams.currentTeam()))
+                            .value(teams.currentTeam())
+                            .build()
+                            : null
+                    );
+                if (!optionGroups.isEmpty()) {
+                    s.optionGroups(optionGroups);
+                }
+                return s;
+            }
         );
     }
 
