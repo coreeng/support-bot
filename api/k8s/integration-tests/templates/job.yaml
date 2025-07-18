@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "support-bot-integration-tests.fullname" . }}
+  labels:
+    {{- include "support-bot-integration-tests.labels" . | nindent 4 }}
+spec:
+  backoffLimit: {{ .Values.job.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.job.activeDeadlineSeconds }}
+  parallelism: {{ .Values.job.parallelism }}
+  completions: {{ .Values.job.completions }}
+  template:
+    metadata:
+      labels:
+        {{- include "support-bot-integration-tests.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "support-bot-integration-tests.serviceAccountName" . }}
+      restartPolicy: {{ .Values.job.restartPolicy }}
+      containers:
+      - name: integration-tests
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+          - name: INTEGRATION_TEST_CONFIG
+            value: "/app/integration-tests-deployed.yaml"
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        volumeMounts:
+        - name: config
+          mountPath: /app/integration-tests-deployed.yaml
+          subPath: integration-tests-deployed.yaml
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "support-bot-integration-tests.fullname" . }}-config
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

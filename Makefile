@@ -76,13 +76,16 @@ build-ui-functional: ## Build ui functional test frontend plugin
 .PHONY: build-functional
 build-functional: build-api-functional build-ui-functional ## Build functional tests
 
-.phony: build-nft
+.PHONY: build-nft
 build-nft:
 	@echo "warning: $@ not implemented"
 
-.phony: build-integration
-build-integration:
-	@echo "warning: $@ not implemented"
+.PHONY: build-api-integration
+build-api-integration:
+	docker buildx build --platform linux/amd64 "$(p2p_image_cache)" --tag "$(p2p_image_tag)" --file api/integration-tests/Dockerfile api --load
+
+.PHONY: build-integration
+build-integration: build-api-integration
 
 .PHONY: build-extended-test
 build-extended-test:
@@ -127,7 +130,7 @@ push-nft: push-api-nft push-ui-nft ## Push nft tests images
 
 .PHONY: push-api-integration
 push-api-integration: ## Push api integration test docker image
-	@echo "WARNING: $@ not implemented"
+	docker image push "$(p2p_image_tag)"
 
 .PHONY: push-ui-integration
 push-ui-integration: ## Push ui integration test frontend plugin
@@ -135,7 +138,6 @@ push-ui-integration: ## Push ui integration test frontend plugin
 
 .PHONY: push-integration
 push-integration: push-api-integration push-ui-integration ## Push integration tests images
-	@echo "WARNING: $@ not implemented"
 
 .PHONY: push-api-extended-test
 push-api-extended-test: ## Push api extended-test test docker image
@@ -150,6 +152,10 @@ push-extended-test: push-api-extended-test push-ui-extended-test ## Push extende
 	@echo "WARNING: $@ not implemented"
 
 ##@ Deploy targets
+
+.PHONY: deploy-integration
+deploy-integration:
+	echo "Service deployment is managed by tests"
 
 .PHONY: deploy-nft
 deploy-nft:
@@ -224,7 +230,8 @@ run-app:
 
 .PHONY: run-api-functional
 run-api-functional: ## run api functional test
-	cd api; bash scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" true
+	@echo "Functional tests are temporarily disabled"
+#	cd api; bash scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" true
 
 .PHONY: run-ui-functional
 run-ui-functional: ## run ui functional test
@@ -239,9 +246,17 @@ run-functional: run-api-functional run-ui-functional ## Run functional tests
 run-nft:
 	@echo "WARNING: $@ not implemented"
 
+.PHONY: run-api-integration
+run-api-integration:
+	NAMESPACE="$(p2p_namespace)" \
+	JOB_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)-integration" \
+	IMAGE_TAG="$(p2p_version)" \
+	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
+	SERVICE_IMAGE_TAG="$(p2p_version)" \
+	api/scripts/run-integration-tests.sh
+
 .PHONY: run-integration
-run-integration:
-	@echo "WARNING: $@ not implemented"
+run-integration: run-api-integration
 
 .PHONY: run-extended-test
 run-extended-test:

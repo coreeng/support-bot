@@ -1,0 +1,162 @@
+image:
+#  repository: support-bot
+#  tag: ""
+  repository: europe-west2-docker.pkg.dev/core-platform-efb3c84c/tenant/support-bot/fast-feedback/support-bot
+  tag: 0.0.34-abc21cb2757db9d581f423c95dae371e02745883
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+  role:
+    create: true
+    rules:
+      - apiGroups: [""]
+        resources: ["configmaps"]
+        verbs: ["get", "list", "watch"]
+
+podAnnotations: {}
+podSecurityContext: {}
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: support-bot.example
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+
+resources:
+  requests:
+    cpu: 512m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8081
+  failureThreshold: 6
+  periodSeconds: 40
+  successThreshold: 1
+  timeoutSeconds: 2
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8081
+  failureThreshold: 6
+  periodSeconds: 40
+  successThreshold: 1
+  timeoutSeconds: 2
+
+metrics:
+  enabled: true
+  port: 8081
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Environment variables
+env:
+  - name: DB_URL
+    value: "jdbc:postgresql://support-bot-db-postgresql:5432/supportbot"
+  - name: DB_USERNAME
+    value: "supportbot"
+  - name: DB_PASSWORD
+    value: "supportbotpassword"
+  - name: SLACK_TICKET_CHANNEL_ID
+    value: "C08CC3MCBKN"
+  - name: SLACK_ESCALATION_CHANNEL_ID
+    value: "C08CC3MCBKN"
+  - name: SLACK_SUPPORT_GROUP_ID
+    value: "S08948NBMED"
+  - name: SLACK_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: support-bot
+        key: SLACK_TOKEN
+  - name: SLACK_SOCKET_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: support-bot
+        key: SLACK_SOCKET_TOKEN
+  - name: SLACK_SIGNING_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: support-bot
+        key: SLACK_SIGNING_SECRET
+  - name: AZURE_TENANT_ID
+    valueFrom:
+      secretKeyRef:
+        name: azure
+        key: AZURE_TENANT_ID
+  - name: AZURE_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: azure
+        key: AZURE_CLIENT_ID
+  - name: AZURE_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: azure
+        key: AZURE_CLIENT_SECRET
+
+
+# ConfigMap configuration
+configMap:
+  create: true
+  name: ""
+  annotations: {}
+  data:
+    application.yaml: |
+      spring:
+        cloud:
+          azure:
+            profile:
+              tenant-id: ${AZURE_TENANT_ID}
+            credential:
+              client-id: ${AZURE_CLIENT_ID}
+              client-secret: ${AZURE_CLIENT_SECRET}
+      enums:
+        escalationTeams:
+          - label: core
+            code: core
+            slack-group-id: S08948NBMED
+      platform-integration:
+        enabled: true
+        azure:
+          enabled: true
+        gcp:
+          enabled: false
+        teams-scraping:
+          static:
+            enabled: false
+          core-platform:
+            enabled: false
+          k8s-generic:
+            enabled: true
+            config:
+              apiVersion: v1
+              kind: ConfigMap
+              namespace: support-bot-integration
+              filter:
+                name-regexp: ^tenant-.*
+                label-selector: null
+              teamName:
+                pointer: /data/name
+              groupRef:
+                pointer: /data/groupRef

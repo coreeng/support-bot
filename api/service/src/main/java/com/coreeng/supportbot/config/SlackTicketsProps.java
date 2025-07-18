@@ -6,6 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record SlackTicketsProps(
     String channelId,
     String expectedInitialReaction,
-    String responseInitialReaction
+    String responseInitialReaction,
+    String resolvedReaction,
+    String escalatedReaction
 ) {
 }

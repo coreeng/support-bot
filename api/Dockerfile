@@ -8,7 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends postgresql post
 RUN sed -i 's/peer/trust/' '/etc/postgresql/16/main/pg_hba.conf' && \
     sed -i 's/md5/trust/' '/etc/postgresql/16/main/pg_hba.conf'
 
+COPY gradlew .
 COPY settings.gradle.kts .
+COPY gradle gradle
+RUN ./gradlew --no-daemon
+
 COPY service service
 
 ARG P2P_VERSION

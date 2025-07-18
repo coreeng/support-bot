@@ -43,8 +43,16 @@ public class TicketSlackServiceImpl implements TicketSlackService {
     @Override
     public void markTicketClosed(MessageRef threadRef) {
         addReactionToPostIfPresent(
-            "white_check_mark",
+            slackTicketsProps.resolvedReaction(),
             threadRef
+        );
+    }
+
+    @Override
+    public void markTicketEscalated(MessageRef threadRef) {
+        addReactionToPostIfPresent(
+                slackTicketsProps.escalatedReaction(),
+                threadRef
         );
     }
 
