@@ -41,6 +41,7 @@ p2p-prod:          publish-prod                           deploy-prod           
 lint-api-app: ## Lint api app
 	docker run --rm -i docker.io/hadolint/hadolint < api/Dockerfile
 	docker run --rm -i docker.io/hadolint/hadolint < api/functional/Dockerfile
+	docker run --rm -i docker.io/hadolint/hadolint < api/integration-tests/Dockerfile
 
 .PHONY: lint-ui-app
 lint-ui-app: ## Lint ui app

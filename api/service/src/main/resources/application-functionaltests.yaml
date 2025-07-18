@@ -46,37 +46,6 @@ enums:
     - label: Abnormal Behaviour
       code: abnormalBehaviour
 
-platform-integration:
-  enabled: true
-  kubernetes:
-    base-url: "http://localhost:8001"
-    disable-http-proxy: true
-  gcp:
-    enabled: false
-    app-name: Support Bot
-    client:
-      base-url: "http://localhost:8003"
-  azure:
-    enabled: true
-    client:
-      base-url: "http://localhost:8002/v1.0"
-  teams-scraping:
-    core-platform:
-      enabled: false
-    k8s-generic:
-      enabled: true
-      config:
-        apiVersion: core
-        kind: Tenant
-        namespace: null
-        filter:
-          name-regexp: null
-          label-selector: null
-        teamName:
-          pointer: /metadata/name
-        groupRef:
-          pointer: /spec/groupRef
-
 support-team:
   name: Core Support
   slack-group-id: S01234567ST
