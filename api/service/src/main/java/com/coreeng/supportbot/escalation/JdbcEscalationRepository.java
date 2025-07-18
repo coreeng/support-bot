@@ -130,7 +130,7 @@ public class JdbcEscalationRepository implements EscalationRepository {
         int escalationChanged = dsl.update(ESCALATION)
             .set(ESCALATION.STATUS, com.coreeng.supportbot.dbschema.enums.EscalationStatus.resolved)
             .where(ESCALATION.ID.eq(escalation.id().id()).and(
-                ESCALATION.STATUS.notEqual(com.coreeng.supportbot.dbschema.enums.EscalationStatus.resolved)
+                    ESCALATION.STATUS.notEqual(com.coreeng.supportbot.dbschema.enums.EscalationStatus.resolved)
             ))
             .execute();
         if (escalationChanged == 0) {
