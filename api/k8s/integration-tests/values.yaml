@@ -1,0 +1,80 @@
+image:
+  repository: support-bot-integration-tests
+  tag: latest
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "support-bot-integration-tests"
+  role:
+    create: true
+    rules:
+      # ConfigMap operations - create/delete for test setup/cleanup
+      - apiGroups: [""]
+        resources: ["configmaps"]
+        verbs: ["get", "list", "watch", "create", "patch", "delete"]
+
+      # ServiceAccount and Secrets operations – service deployment
+      - apiGroups: [""]
+        resources: ["configmaps", "serviceaccounts", "secrets"]
+        verbs: ["get", "list", "watch", "create", "delete"]
+
+      # Pod operations - for status checking, logs, and port forwarding
+      - apiGroups: [""]
+        resources: ["pods"]
+        verbs: ["get", "list", "watch"]
+      
+      # Service operations - for service discovery and verification
+      - apiGroups: [""]
+        resources: ["services"]
+        verbs: ["get", "list", "create", "delete"]
+      
+      # Deployment operations - for waiting until ready
+      - apiGroups: ["apps"]
+        resources: ["deployments", "replicasets"]
+        verbs: ["get", "list", "watch", "create", "delete"]
+
+      - apiGroups: ["rbac.authorization.k8s.io"]
+        resources: ["roles", "rolebindings"]
+        verbs: ["get", "list", "create", "delete"]
+
+job:
+  restartPolicy: Never
+  backoffLimit: 1
+  activeDeadlineSeconds: 1800  # 30 minutes timeout
+  parallelism: 1
+  completions: 1
+
+# ConfigMap configuration
+configMap:
+  config:
+    helm:
+      releaseName: support-bot
+      chartPath: /app/k8s/service
+    namespace: support-bot-integration
+    service:
+      deployment:
+        name: support-bot
+      image:
+        repository: support-bot
+        tag: latest
+    portForwarding:
+      enabled: false
+      localPort: 8080
+      remotePort: 8080
+
+
+resources:
+  requests:
+    cpu: 256m
+    memory: 1Gi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

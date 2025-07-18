@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.homepage;
 
+import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.slack.client.SimpleSlackView;
 import com.coreeng.supportbot.slack.client.SlackView;
 import com.coreeng.supportbot.ticket.TicketOperation;
@@ -10,6 +11,7 @@ import com.coreeng.supportbot.util.JsonMapper;
 import com.coreeng.supportbot.util.RelativeDateFormatter;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.block.LayoutBlock;
+import com.slack.api.model.block.SectionBlock;
 import com.slack.api.model.block.composition.TextObject;
 import com.slack.api.model.block.element.BlockElement;
 import lombok.RequiredArgsConstructor;
@@ -17,14 +19,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.slack.api.model.block.Blocks.*;
-import static com.slack.api.model.block.Blocks.context;
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
 import static com.slack.api.model.block.element.BlockElements.button;
+import static java.lang.String.*;
 import static java.lang.String.format;
 
 @Component
@@ -99,7 +103,18 @@ public class HomepageViewMapper {
             ticket.queryPermalink(),
             ticket.id().render()
         );
-        return List.of(
+        Optional<SectionBlock> escalationSection =
+            Optional.ofNullable(ticket.escalations())
+                .filter(escalations -> !escalations.isEmpty())
+                .map(escalations -> section(s -> {
+                    ImmutableList<String> teams = escalations.stream()
+                        .map(Escalation::team)
+                        .collect(toImmutableList());
+                    return s.fields(ImmutableList.of(
+                        markdownText(format("*Escalation*: %s :rocket:", join(", ", teams)))
+                    ));
+                }));
+        List<LayoutBlock> blocks = new ArrayList<>(List.of(
             section(s -> s
                 .text(markdownText(header))
                 .accessory(button(b -> b
@@ -109,36 +124,38 @@ public class HomepageViewMapper {
                 ))
             ),
             section(s -> {
-                    ImmutableList.Builder<TextObject> fields = ImmutableList.builder();
+                ImmutableList.Builder<TextObject> fields = ImmutableList.builder();
+                fields.add(
+                    markdownText(format("*Impact*: %s", ticket.impact() == null ? "Not Evaluated" : ticket.impact().label())),
+                    // empty field so that UI is aligned this way:
+                    // impact
+                    // lastOpened ----- closed
+                    markdownText(" "),
+                    markdownText(format("*Last Opened*: %s", dateFormatter.format(ticket.lastOpenedAt())))
+                );
+                if (ticket.status() == TicketStatus.closed) {
                     fields.add(
-                        markdownText(format("*Impact*: %s", ticket.impact() == null ? "Not Evaluated" : ticket.impact().label())),
-                        // empty field so that UI is aligned this way:
-                        // impact
-                        // lastOpened ----- closed
-                        markdownText(" "),
-                        markdownText(format("*Last Opened*: %s", dateFormatter.format(ticket.lastOpenedAt())))
+                        markdownText(format("*Closed*: %s", dateFormatter.format(ticket.closedAt())))
                     );
-                    if (ticket.status() == TicketStatus.closed) {
-                        fields.add(
-                            markdownText(format("*Closed*: %s", dateFormatter.format(ticket.closedAt())))
-                        );
-                    }
-                    return s.fields(fields.build());
                 }
-            ),
-            divider()
-        );
-    }
+                return s.fields(fields.build());
+            }
+        )
+    ));
+    escalationSection.ifPresent(blocks::add);
+    blocks.add(divider());
+    return ImmutableList.copyOf(blocks);
+}
 
     private String lastUpdatedMessage(HomepageView homepage) {
         return "Last updated: " + dateFormatter.format(homepage.timestamp());
     }
 
     private String viewDescriptionMessage(HomepageView homepage) {
-        return "Manage existing/closed queries including their escalations and follow up procedures."
-            + "The CommunityBot is purposed to help support engineers manage and escalate support queries for the <#"
-            + homepage.channelId()
-            + "> channel.";
+        return "Handle all queries, including their escalations. "
+                + "The bot is designed to assist support engineers in managing and escalating support queries within the <#"
+                + homepage.channelId()
+                + "> channel.";
     }
 
     private List<LayoutBlock> renderBottomBlock(HomepageView homepage) {
