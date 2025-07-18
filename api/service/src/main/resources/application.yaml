@@ -43,6 +43,10 @@ application:
   timezone: GMT+02
 
 slack:
+  mode: socket # socket or http
+  enableRequestVerification: true
+  client:
+    methods-base-url: ""
   creds:
     token: ${SLACK_TOKEN} # Token like: xoxb-abc-def
     socket-token: ${SLACK_SOCKET_TOKEN} # Token like: xapp-1-abc-def-ghi
@@ -51,6 +55,8 @@ slack:
     channel-id: ${SLACK_TICKET_CHANNEL_ID} # Channel ID like: C1234567890
     expected-initial-reaction: eyes
     response-initial-reaction: ticket
+    resolved-reaction: white_check_mark
+    escalated-reaction: rocket
   escalation:
     channel-id: ${SLACK_ESCALATION_CHANNEL_ID} # Channel ID like: C1234567890
 
@@ -99,19 +105,31 @@ enums:
 
 platform-integration:
   enabled: true
+  kubernetes:
+    disable-http-proxy: false
+    base-url: ""
   gcp:
-    enabled: true
+    enabled: false
     app-name: Support Bot
+    client:
+      base-url: ""
+  static-user:
+    enabled: true
   azure:
     enabled: false
+    client:
+      base-url: ""
   teams-scraping:
-    core-platform:
+    static:
       enabled: true
+    core-platform:
+      enabled: false
     k8s-generic:
       enabled: false
       config:
         apiVersion: v1
         kind: Namespace
+        namespace: null
         filter:
           name-regexp: null
           label-selector: "root.tree.hnc.x-k8s.io/depth"
@@ -133,4 +151,3 @@ mock-data:
 
 rbac:
   enabled: true
-

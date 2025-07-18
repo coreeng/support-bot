@@ -26,6 +26,8 @@ public class HomepageFilter {
     private ImmutableList<String> tags = ImmutableList.of();
     @Nullable
     private String impact;
+    @Nullable
+    private String escalationTeam;
 
     @Getter
     public enum Timeframe implements UIOption {

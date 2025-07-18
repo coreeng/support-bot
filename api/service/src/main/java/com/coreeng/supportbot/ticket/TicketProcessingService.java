@@ -163,6 +163,7 @@ public class TicketProcessingService {
             request.threadPermalink(),
             request.tags()
         ));
+        slackService.markTicketEscalated(ticket.queryRef());
     }
 
     public void postTicketEscalatedMessage(EscalationId escalationId) {

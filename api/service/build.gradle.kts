@@ -66,6 +66,9 @@ dependencies {
     implementation("org.jooq:jooq-meta:3.19.18")
     implementation("org.jooq:jooq-codegen:3.19.18")
 
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.microsoft.kiota:microsoft-kiota-http-okHttp:1.8.5")
+
     jooqCodegen("org.postgresql:postgresql:42.7.5")
     jooqCodegen("org.testcontainers:postgresql:1.20.4")
     jooqCodegen("org.jooq:jooq-codegen:3.19.18")
@@ -75,7 +78,8 @@ dependencies {
     annotationProcessor("org.springframework:spring-context-indexer")
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-guava")
-    implementation("com.slack.api:bolt-jakarta-socket-mode:1.45.0")
+    implementation("com.slack.api:bolt-jakarta-socket-mode:1.45.3")
+    implementation("com.slack.api:bolt-jakarta-servlet:1.45.3")
     compileOnly("jakarta.websocket:jakarta.websocket-client-api:2.2.0")
     implementation("org.glassfish.tyrus.bundles:tyrus-standalone-client:2.2.0")
     implementation("com.google.guava:guava:33.4.0-jre")

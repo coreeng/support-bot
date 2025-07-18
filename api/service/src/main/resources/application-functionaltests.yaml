@@ -1,0 +1,82 @@
+slack:
+  mode: http
+  enableRequestVerification: false
+  client:
+    methods-base-url: "http://localhost:8000/api/"
+  ticket:
+    channel-id: C1234567891
+    expected-initial-reaction: eyes
+    response-initial-reaction: ticket
+  escalation:
+    channel-id: C1234567892
+
+enums:
+  escalationTeams:
+    - label: wow
+      code: wow
+      slack-group-id: S01234ESCWW
+#    - label: infra-integration
+#      code: infra-integration
+#      slack-group-id: S01234ESCII
+#    - label: connected-app
+#      code: connected-app
+#      slack-group-id: S01234ESCCA
+  tags:
+    - label: Ingresses
+      code: ingresses
+    - label: Jenkins Pipelines
+      code: jenkins-pipelines
+    - label: Networking
+      code: networking
+    - label: Vault
+      code: vault
+    - label: Persistence/Brokers
+      code: persistence-brokers
+    - label: Observability
+      code: observability
+    - label: DNS
+      code: dns
+    - label: Osprey
+      code: osprey
+  impacts:
+    - label: Production Blocking
+      code: productionBlocking
+    - label: BAU Blocking
+      code: bauBlocking
+    - label: Abnormal Behaviour
+      code: abnormalBehaviour
+
+platform-integration:
+  enabled: true
+  kubernetes:
+    base-url: "http://localhost:8001"
+    disable-http-proxy: true
+  gcp:
+    enabled: false
+    app-name: Support Bot
+    client:
+      base-url: "http://localhost:8003"
+  azure:
+    enabled: true
+    client:
+      base-url: "http://localhost:8002/v1.0"
+  teams-scraping:
+    core-platform:
+      enabled: false
+    k8s-generic:
+      enabled: true
+      config:
+        apiVersion: core
+        kind: Tenant
+        namespace: null
+        filter:
+          name-regexp: null
+          label-selector: null
+        teamName:
+          pointer: /metadata/name
+        groupRef:
+          pointer: /spec/groupRef
+
+support-team:
+  name: Core Support
+  slack-group-id: S01234567ST

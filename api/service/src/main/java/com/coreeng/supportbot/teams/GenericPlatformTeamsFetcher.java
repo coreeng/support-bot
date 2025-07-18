@@ -6,9 +6,11 @@ import io.fabric8.kubernetes.api.model.GenericKubernetesResource;
 import io.fabric8.kubernetes.api.model.GenericKubernetesResourceList;
 import io.fabric8.kubernetes.api.model.ListOptions;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.dsl.base.ResourceDefinitionContext;
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.logging.log4j.util.Strings;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import javax.annotation.Nullable;
@@ -27,15 +29,22 @@ public class GenericPlatformTeamsFetcher implements PlatformTeamsFetcher {
     @Override
     public List<TeamAndGroupTuple> fetchTeams() {
         ListOptions listOptions = new ListOptions();
-        if (config.filter().labelSelector() != null) {
+        if (Strings.isNotBlank(config.filter().labelSelector())) {
             listOptions.setLabelSelector(config.filter().labelSelector());
         }
+
+        ResourceDefinitionContext context = new ResourceDefinitionContext.Builder()
+            .withVersion(config.apiVersion())
+            .withKind(config.kind())
+            .withPlural(config.kind().toLowerCase() + "s")
+            .withNamespaced(Strings.isNotBlank(config.namespace()))
+            .build();
         GenericKubernetesResourceList resourceList = k8sClient
-            .genericKubernetesResources(config.apiVersion(), config.kind())
+            .genericKubernetesResources(context)
             .list(listOptions);
 
         List<GenericKubernetesResource> items;
-        if (config.filter().nameRegexp() != null) {
+        if (Strings.isNotBlank(config.filter().nameRegexp())) {
             Pattern namePattern = Pattern.compile(config.filter().nameRegexp());
             items = resourceList.getItems().stream()
                 .filter(i -> namePattern.matcher(i.getMetadata().getName()).matches())
@@ -71,6 +80,7 @@ public class GenericPlatformTeamsFetcher implements PlatformTeamsFetcher {
     public record Config(
         String apiVersion,
         String kind,
+        @Nullable String namespace,
         Filter filter,
         PropertyPointer teamName,
         PropertyPointer groupRef
