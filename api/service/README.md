@@ -14,15 +14,22 @@ Once you have it, create `.envrc` using `.envrc.example`.
 You'll also need a channel for that the bot will work with.
 You can either create a private one for yourself or ask a colleague to add you to an existing one.
 Use specify it in `.envrc`.
+## 2. Codegen
 
-## 2. Run DB.
+You need to run the below make task, which generates the necessary code based on our database schema
+
+```bash
+make codegen
+```
+
+## 3. Run DB.
 This line of code will start a Postgres instance,
 expose port 5432 and mount data to `./db-data` folder, so it will persist between runs.
 ```bash
 make db-run
 ```
 
-## 3. Connect to cluster
+## 4. Connect to cluster
 Configure connection to cloud and kubernetes cluster.
 
 In Core Platform case:
@@ -35,7 +42,7 @@ In GCP case:
 gcloud auth application-default login
 ```
 
-## 4. Start the bot
+## 5. Start the bot
 ```bash
 make run
 ```

@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.homepage;
 
+import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
 import com.coreeng.supportbot.enums.TagsRegistry;
 import com.coreeng.supportbot.slack.RenderingUtils;
@@ -30,6 +31,7 @@ import static com.slack.api.model.view.Views.*;
 public class HomepageFilterMapper {
     private final TagsRegistry tagsRegistry;
     private final ImpactsRegistry impactsRegistry;
+    private final EscalationTeamsRegistry escalationTeamsRegistry;
 
     public View.ViewBuilder render(HomepageView.State state, View.ViewBuilder view) {
         HomepageFilter filter = state.filter();
@@ -57,6 +59,23 @@ public class HomepageFilterMapper {
                             toOptionObject(TicketStatus.opened),
                             toOptionObject(TicketStatus.closed)
                         ))
+                    ))
+                ),
+                input(i -> i
+                    .label(plainText("Escalation Team"))
+                    .optional(true)
+                    .element(staticSelect(s -> s
+                        .actionId(FilterField.escalationTeam.name())
+                        .initialOption(
+                                filter.escalationTeam() == null
+                                    ? null
+                                    : toOptionObjectOrNull(escalationTeamsRegistry.findEscalationTeamByCode(filter.escalationTeam()))
+                        )
+                        .options(
+                            escalationTeamsRegistry.listAllEscalationTeams().stream()
+                                .map(RenderingUtils::toOptionObject)
+                                .toList()
+                        )
                     ))
                 ),
                 input(i -> i
@@ -125,16 +144,21 @@ public class HomepageFilterMapper {
     public HomepageFilter extractSubmittedValues(View view) {
         HomepageFilter.HomepageFilterBuilder builder = HomepageFilter.builder();
         ImmutableMap<String, ViewState.Value> values = view.getState().getValues().entrySet()
-            .stream()
-            .flatMap(entry -> entry.getValue().entrySet().stream())
-            .collect(toImmutableMap(
-                Map.Entry::getKey,
-                Map.Entry::getValue
-            ));
+                .stream()
+                .flatMap(entry -> entry.getValue().entrySet().stream())
+                .collect(toImmutableMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue
+                ));
 
         ViewState.Value statusValue = values.get(FilterField.status.name());
         if (statusValue != null && statusValue.getSelectedOption() != null) {
             builder.status(TicketStatus.valueOf(statusValue.getSelectedOption().getValue()));
+        }
+
+        ViewState.Value escalationTeam = values.get(FilterField.escalationTeam.name());
+        if (escalationTeam != null && escalationTeam.getSelectedOption() != null) {
+            builder.escalationTeam(escalationTeam.getSelectedOption().getValue());
         }
 
         ViewState.Value orderValue = values.get(FilterField.order.name());
@@ -167,6 +191,7 @@ public class HomepageFilterMapper {
         order,
         timeframe,
         tags,
-        impact
+        impact,
+        escalationTeam
     }
 }
