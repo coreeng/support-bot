@@ -115,6 +115,17 @@ platform-integration:
       base-url: ""
   static-user:
     enabled: true
+    users:
+      wow-group:
+        - wow1@test.com
+      infra-group:
+        - infra1@test.com
+        - infra2@test.com
+        - infra3@test.com
+      connected-app-group:
+        - connected-app1@test.com
+        - connected-app2@test.com
+        - connected-app3@test.com
   azure:
     enabled: false
     client:
@@ -122,6 +133,13 @@ platform-integration:
   teams-scraping:
     static:
       enabled: true
+      teams:
+        - name: wow
+          groupRef: wow-group
+        - name: infra-integration
+          groupRef: infra-group
+        - name: connected-app
+          groupRef: connected-app-group
     core-platform:
       enabled: false
     k8s-generic:
