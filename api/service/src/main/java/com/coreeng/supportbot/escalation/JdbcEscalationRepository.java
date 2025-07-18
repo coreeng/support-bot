@@ -124,13 +124,14 @@ public class JdbcEscalationRepository implements EscalationRepository {
     public Escalation markResolved(Escalation escalation, Instant at) {
         checkNotNull(escalation);
         checkNotNull(escalation.id());
-        checkArgument(escalation.status() != EscalationStatus.resolved);
-        checkArgument(escalation.resolvedAt() == null);
+        if (EscalationStatus.resolved == escalation.status()) {
+            return escalation;
+        }
 
         int escalationChanged = dsl.update(ESCALATION)
             .set(ESCALATION.STATUS, com.coreeng.supportbot.dbschema.enums.EscalationStatus.resolved)
             .where(ESCALATION.ID.eq(escalation.id().id()).and(
-                ESCALATION.STATUS.notEqual(com.coreeng.supportbot.dbschema.enums.EscalationStatus.resolved)
+                    ESCALATION.STATUS.notEqual(com.coreeng.supportbot.dbschema.enums.EscalationStatus.resolved)
             ))
             .execute();
         if (escalationChanged == 0) {
