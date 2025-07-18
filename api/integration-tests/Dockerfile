@@ -1,6 +1,7 @@
 FROM gradle:8.11.1-jdk21 AS builder
 WORKDIR /home/gradle/project
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
 # Copy gradle wrapper and settings
