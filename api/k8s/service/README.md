@@ -1,6 +1,6 @@
 # Support Bot Helm Chart
 
-This Helm chart deploys the Support Bot application, a Slack bot for managing support queries for IDPs (Internal Developer Platforms).
+This Helm chart deploys the Support Bot application, a Slack bot for managing support queries coming into a Slack channel.
 
 ## Database Setup
 

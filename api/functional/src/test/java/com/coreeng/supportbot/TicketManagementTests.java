@@ -9,7 +9,7 @@ public class TicketManagementTests {
     private SlackWiremock slackWiremock;
     
     @Test
-    public void test2() {
+    public void whenMessageIsPostedAndEyesReactionIsAdded_thenTicketIsCreatedAndTicketReactionIsAdded() {
         var slackClient = new SupportBotSlackClient();
 
         slackWiremock.stubPostMessage();
