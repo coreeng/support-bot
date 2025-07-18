@@ -124,9 +124,8 @@ public class JdbcEscalationRepository implements EscalationRepository {
     public Escalation markResolved(Escalation escalation, Instant at) {
         checkNotNull(escalation);
         checkNotNull(escalation.id());
-        if (EscalationStatus.resolved == escalation.status()) {
-            return escalation;
-        }
+        checkArgument(escalation.status() != EscalationStatus.resolved);
+        checkArgument(escalation.resolvedAt() == null);
 
         int escalationChanged = dsl.update(ESCALATION)
             .set(ESCALATION.STATUS, com.coreeng.supportbot.dbschema.enums.EscalationStatus.resolved)
