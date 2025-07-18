@@ -9,11 +9,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class StaticPlatformTeamsFetcher implements PlatformTeamsFetcher {
 
+    private final StaticPlatformTeamsProps props;
+
     @Override
     public List<TeamAndGroupTuple> fetchTeams() {
-        TeamAndGroupTuple t1 = new TeamAndGroupTuple("wow", "wow-group");
-        TeamAndGroupTuple t2 = new TeamAndGroupTuple("infra-integration", "infra-group");
-        TeamAndGroupTuple t3 = new TeamAndGroupTuple("connected-app", "connected-app-group");
-        return List.of(t1, t2, t3);
+        return props.teams().stream()
+            .map(team -> new TeamAndGroupTuple(team.name(), team.groupRef()))
+            .toList();
     }
 }
