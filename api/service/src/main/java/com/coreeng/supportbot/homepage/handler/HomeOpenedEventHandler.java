@@ -27,6 +27,9 @@ public class HomeOpenedEventHandler implements SlackEventHandler<AppHomeOpenedEv
 
     @Override
     public void apply(EventsApiPayload<AppHomeOpenedEvent> event, EventContext context) {
+        if (event.getEvent().getView() != null) {
+            return;
+        }
         HomepageView homepageView = homepageService.getTicketsView(HomepageView.State.getDefault());
         slackClient.updateHomeView(event.getEvent().getUser(), viewMapper.render(homepageView));
     }
