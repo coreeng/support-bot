@@ -6,16 +6,10 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import org.junit.platform.engine.support.store.Namespace;
 import org.junit.platform.launcher.LauncherSession;
 import org.junit.platform.launcher.LauncherSessionListener;
-import org.junit.platform.launcher.TestExecutionListener;
-import org.junit.platform.launcher.TestPlan;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.time.Duration;
-
-import static io.restassured.RestAssured.given;
-import static org.awaitility.Awaitility.await;
 
 /**
  * This listener is picked up because it specified in resources/META-INF/services
@@ -33,8 +27,7 @@ public class WiremockSetupLauncherSessionListener implements LauncherSessionList
             var config = readConfigurationFile();
             wiremockManager = new WiremockManager(config);
             wiremockManager.startAll();
-
-            waitForHealthyDeployment();
+            logger.info("Wiremock servers for external services started successfully");
         } catch (RuntimeException e) {
             logger.error("Failed initialising tests", e);
             throw e;
@@ -48,30 +41,6 @@ public class WiremockSetupLauncherSessionListener implements LauncherSessionList
         wiremockManager.stopAll();
     }
 
-    private void waitForHealthyDeployment() {
-        await()
-            .atMost(Duration.ofMinutes(5))
-            .pollInterval(Duration.ofSeconds(1))
-            .until(() -> {
-                wiremockManager.checkForUnmatchedRequests();
-                try {
-                    return given()
-                               .when()
-                               .get("http://localhost:8081/health")
-                               .then()
-                               .extract()
-                               .statusCode() == 200;
-                } catch (Exception e) {
-                    if (e.getMessage().contains("Connection refused")) {
-                        logger.info("Waiting for support bot to be ready");
-                        return false;
-                    } else {
-                        logger.error("Failed to check external services health", e);
-                        throw new RuntimeException(e);
-                    }
-                }
-            });
-    }
 
     private Config readConfigurationFile() {
         try {
