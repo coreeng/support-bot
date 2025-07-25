@@ -1,16 +1,12 @@
 package com.coreeng.supportbot;
 
 import io.restassured.http.ContentType;
-import io.restassured.http.Header;
-
-import java.time.Instant;
 
 import static io.restassured.RestAssured.given;
 
 public class SupportBotSlackClient {
     // TODO: parameterise
     public void notifyChannelMessagePosted() {
-        long currentEpochSecond = Instant.now().getEpochSecond();
         given()
             .baseUri("http://localhost:8080/slack/events")
             .when()
