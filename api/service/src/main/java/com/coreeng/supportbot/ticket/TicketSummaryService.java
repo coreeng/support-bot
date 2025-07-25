@@ -38,9 +38,11 @@ public class TicketSummaryService {
         if (ticket == null) {
             throw new IllegalStateException("Ticket not found: " + id);
         }
-        TicketSummaryView.QuerySummaryView querySummary = getQuerySummaryView(ticket);
+        Message queryMessage = slackClient
+            .getMessageByTs(new SlackGetMessageByTsRequest(ticket.channelId(), ticket.queryTs()));
+        TicketSummaryView.QuerySummaryView querySummary = getQuerySummaryView(ticket, queryMessage);
         ImmutableList<TicketSummaryView.EscalationView> escalations = getEscalationViews(ticket);
-        TicketSummaryView.TeamsInput teamsInput = getTeamsInputView(ticket);
+        TicketSummaryView.TeamsInput teamsInput = getTeamsInputView(ticket, queryMessage);
         ImmutableList<Tag> allTags = tagsRegistry.listAllTags();
         ImmutableList<TicketImpact> allImpacts = impactsRegistry.listAllImpacts();
         return TicketSummaryView.of(
@@ -78,12 +80,11 @@ public class TicketSummaryService {
             .collect(toImmutableList());
     }
 
-    private TicketSummaryView.QuerySummaryView getQuerySummaryView(Ticket ticket) {
+    private TicketSummaryView.QuerySummaryView getQuerySummaryView(Ticket ticket, Message queryMessage) {
         SlackGetMessageByTsRequest messageRequest = new SlackGetMessageByTsRequest(
             ticket.channelId(),
             ticket.queryTs()
         );
-        Message queryMessage = slackClient.getMessageByTs(messageRequest);
         String permalink = slackClient.getPermalink(messageRequest);
         return new TicketSummaryView.QuerySummaryView(
             ImmutableList.copyOf(queryMessage.getBlocks()),
@@ -93,9 +94,7 @@ public class TicketSummaryService {
         );
     }
 
-    private TicketSummaryView.TeamsInput getTeamsInputView(Ticket ticket) {
-        Message queryMessage = slackClient
-            .getMessageByTs(new SlackGetMessageByTsRequest(ticket.channelId(), ticket.queryTs()));
+    private TicketSummaryView.TeamsInput getTeamsInputView(Ticket ticket, Message queryMessage) {
         User.Profile userProfile = slackClient.getUserById(queryMessage.getUser());
         String userEmail = userProfile.getEmail();
 

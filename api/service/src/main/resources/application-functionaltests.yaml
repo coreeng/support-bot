@@ -48,4 +48,37 @@ enums:
 
 support-team:
   name: Core Support
-  slack-group-id: S01234567ST
+  static:
+    enabled: true
+    members:
+      - email: coby.ivona@company.com
+        slackId: U0123456781
+      - email: sana.chernobog@company.com
+        slackId: U0123456782
+      - email: jean.kristijan@company.com
+        slackId: U0123456783
+
+platform-integration:
+  enabled: true
+  static-user:
+    enabled: true
+    users:
+      group-ref-wow:
+        - coby.ivona@company.com
+        - sana.chernobog@company.com
+      group-ref-infra-integration:
+        - jean.kristijan@company.com
+        - chandra.giustino@company.com
+      group-ref-connected-app:
+        - chandra.giustino@company.com
+        - nazira.armel@company.com
+  teams-scraping:
+    static:
+      enabled: true
+      teams:
+        - name: wow
+          groupRef: group-ref-wow
+        - name: infra-integration
+          groupRef: group-ref-infra-integration
+        - name: connected-app
+          groupRef: group-ref-connected-app
