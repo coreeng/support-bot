@@ -159,6 +159,15 @@ platform-integration:
 support-team:
   name: Core Support
   slack-group-id: S08948NBMED
+  static:
+    enabled: false
+    members:
+      - email: coby.ivona@company.com
+        slackId: U0123456781
+      - email: sana.chernobog@company.com
+        slackId: U0123456782
+      - email: jean.kristijan@company.com
+        slackId: U0123456783
 
 ai:
   sentiment-analysis:

@@ -60,12 +60,12 @@ public class SlackWiremock extends WireMockServer {
             .withFormParam("text", equalTo(URLEncoder.encode("Ticket Created", Charset.defaultCharset())))
             .withFormParam("link_names", equalTo("0"))
             .withFormParam("mrkdwn", equalTo("1"))
-            .withFormParam("blocks", equalTo("""
-                %5B%7B%22type%22%3A%22section%22%2C%22text%22%3A%7B%22type%22%3A%22mrkdwn%22%2C%22text%22%3A%22*Ticket%20Created*%3A%20%60ID-4%60%22%7D%7D%5D
-                """))
-            .withFormParam("attachments", equalTo("""
-                %5B%7B%22type%22%3A%22section%22%2C%22text%22%3A%7B%22type%22%3A%22mrkdwn%22%2C%22text%22%3A%22*Ticket%20Created*%3A%20%60ID-4%60%22%7D%7D%5D
-                """))
+            .withFormParam("blocks", equalTo(URLEncoder.encode("""
+                [{"type":"section","text":{"type":"mrkdwn","text":"*Ticket Created*: `ID-4`"}}]
+                """, Charset.defaultCharset())))
+            .withFormParam("attachments", equalTo(URLEncoder.encode("""
+                [{"type":"section","text":{"type":"mrkdwn","text":"*Ticket Created*: `ID-4`"}}]
+                """, Charset.defaultCharset())))
             .withFormParam("unfurl_media", equalTo("0"))
             .withFormParam("reply_broadcast", equalTo("0"))
             .willReturn(okJson("""
