@@ -1,40 +1,21 @@
 package com.coreeng.supportbot.teams;
 
 import com.coreeng.supportbot.config.SupportTeamProps;
-import com.coreeng.supportbot.slack.client.SlackClient;
 import com.google.common.collect.ImmutableList;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.ExecutorService;
 
 @Slf4j
-@Service
 @RequiredArgsConstructor
 public class SupportTeamService {
-    private final SlackClient slackClient;
-    private final ExecutorService executor;
     private final SupportTeamProps supportTeamProps;
-
-    private ImmutableList<SupportMember> members;
+    private final SupportMemberFetcher memberUpdater;
+    private ImmutableList<SupportMemberFetcher.SupportMember> members = ImmutableList.of();
 
     @PostConstruct
     void init() {
-        ImmutableList<String> supportTeamMembers = slackClient.getGroupMembers(supportTeamProps.slackGroupId());
-        members = reloadUsersInfo(supportTeamMembers);
-    }
-
-    public void handleMembershipUpdate(String groupId, ImmutableList<String> teamUsers) {
-        if (supportTeamProps.slackGroupId().equals(groupId)) {
-            members = reloadUsersInfo(teamUsers);
-            log.atInfo()
-                .addArgument(members::size)
-                .log("Updated support team members to {} entries");
-        }
+        this.members = memberUpdater.loadInitialMembers(supportTeamProps.slackGroupId());
     }
 
     public Team getTeam() {
@@ -42,11 +23,10 @@ public class SupportTeamService {
             supportTeamProps.name(),
             ImmutableList.of(TeamType.support)
         );
-
     }
 
     public String getSlackGroupId() {
-        return  supportTeamProps.slackGroupId();
+        return supportTeamProps.slackGroupId();
     }
 
     public boolean isMemberByUserEmail(String email) {
@@ -57,28 +37,16 @@ public class SupportTeamService {
         return members.stream().anyMatch(member -> member.slackId().equals(userId));
     }
 
-    private ImmutableList<SupportMember> reloadUsersInfo(ImmutableList<String> teamUserIds) {
-        ExecutorCompletionService<SupportMember> completionService = new ExecutorCompletionService<>(executor);
-        long totalTasks = 0;
-        for (String userId : teamUserIds) {
-            completionService.submit(() -> new SupportMember(
-                slackClient.getUserById(userId).getEmail(),
-                userId
-            ));
-            totalTasks += 1;
+    public void handleMembershipUpdate(String groupId, ImmutableList<String> teamUsers) {
+        if (!supportTeamProps.slackGroupId().equals(groupId)) {
+            return;
         }
-        ImmutableList.Builder<SupportMember> result = ImmutableList.builder();
-        for (int i = 0; i < totalTasks; i++) {
-            try {
-                SupportMember userInfo = completionService.take().get();
-                result.add(userInfo);
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException(e);
-            }
+        ImmutableList<SupportMemberFetcher.SupportMember> updatedMembers = memberUpdater.handleMembershipUpdate(groupId, teamUsers);
+        if (!updatedMembers.isEmpty()) {
+            this.members = updatedMembers;
+            log.atInfo()
+                .addArgument(updatedMembers::size)
+                .log("Updated support team members to {} entries");
         }
-        return result.build();
-    }
-
-    private record SupportMember(String email, String slackId) {
     }
 }
