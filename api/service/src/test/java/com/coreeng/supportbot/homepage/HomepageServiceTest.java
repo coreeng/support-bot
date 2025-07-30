@@ -102,13 +102,14 @@ class HomepageServiceTest {
         assertThat(ticketsView.tickets().size()).isEqualTo(1);
 
         ImmutableList<Escalation> actualEscalation = ticketsView.tickets().getFirst().escalations();
-
         assertThat(actualEscalation).isNotNull();
-        assertNotNull(actualEscalation);
         assertThat(actualEscalation.size()).isEqualTo(1);
         assertThat(actualEscalation.getFirst())
                 .usingRecursiveAssertion()
                 .isEqualTo(escalation.getFirst());
+        assertThat(requireNonNull(ticketsView.tickets().getFirst()).inquiringTeam()).isEqualTo("lions");
+        assertThat(requireNonNull(ticketsView.tickets().getFirst()).status()).isEqualTo(TicketStatus.opened);
+        assertThat(requireNonNull(ticketsView.tickets().getFirst()).impact()).isEqualTo("Production Blocking");
     }
 
     @Test
