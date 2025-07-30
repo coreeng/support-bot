@@ -67,9 +67,9 @@ public class HomepageFilterMapper {
                     .element(staticSelect(s -> s
                         .actionId(FilterField.escalationTeam.name())
                         .initialOption(
-                                filter.escalationTeam() == null
-                                    ? null
-                                    : toOptionObjectOrNull(escalationTeamsRegistry.findEscalationTeamByCode(filter.escalationTeam()))
+                            filter.escalationTeam() == null
+                                ? null
+                                : toOptionObjectOrNull(escalationTeamsRegistry.findEscalationTeamByCode(filter.escalationTeam()))
                         )
                         .options(
                             escalationTeamsRegistry.listAllEscalationTeams().stream()
@@ -192,6 +192,7 @@ public class HomepageFilterMapper {
         timeframe,
         tags,
         impact,
-        escalationTeam
+        escalationTeam,
+        inquiringTeam
     }
 }
