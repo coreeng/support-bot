@@ -31,7 +31,6 @@ import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
 
@@ -109,7 +108,7 @@ class HomepageServiceTest {
                 .isEqualTo(escalation.getFirst());
         assertThat(requireNonNull(ticketsView.tickets().getFirst()).inquiringTeam()).isEqualTo("lions");
         assertThat(requireNonNull(ticketsView.tickets().getFirst()).status()).isEqualTo(TicketStatus.opened);
-        assertThat(requireNonNull(ticketsView.tickets().getFirst()).impact()).isEqualTo("Production Blocking");
+        assertThat(requireNonNull(ticketsView.tickets().getFirst()).impact()).isEqualTo(new TicketImpact("Production Blocking", "productionBlocking"));
     }
 
     @Test
