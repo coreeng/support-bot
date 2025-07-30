@@ -12,7 +12,6 @@ import com.coreeng.supportbot.util.RelativeDateFormatter;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.SectionBlock;
-import com.slack.api.model.block.composition.TextObject;
 import com.slack.api.model.block.element.BlockElement;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -103,17 +102,9 @@ public class HomepageViewMapper {
             ticket.queryPermalink(),
             ticket.id().render()
         );
-        Optional<SectionBlock> escalationSection =
-            Optional.ofNullable(ticket.escalations())
-                .filter(escalations -> !escalations.isEmpty())
-                .map(escalations -> section(s -> {
-                    ImmutableList<String> teams = escalations.stream()
-                        .map(Escalation::team)
-                        .collect(toImmutableList());
-                    return s.fields(ImmutableList.of(
-                        markdownText(format("*Escalation*: %s :rocket:", join(", ", teams)))
-                    ));
-                }));
+        Optional<SectionBlock> inquiringTeam = buildInquiringTeamSection(ticket);
+        Optional<SectionBlock> escalationSection = buildEscalationSection(ticket);
+        Optional<SectionBlock> statusSection = buildTicketStatusSection(ticket);
         List<LayoutBlock> blocks = new ArrayList<>(List.of(
             section(s -> s
                 .text(markdownText(header))
@@ -123,29 +114,49 @@ public class HomepageViewMapper {
                     .value(ticketSummaryViewMapper.createTriggerInput(new TicketSummaryViewInput(ticket.id())))
                 ))
             ),
-            section(s -> {
-                ImmutableList.Builder<TextObject> fields = ImmutableList.builder();
-                fields.add(
-                    markdownText(format("*Impact*: %s", ticket.impact() == null ? "Not Evaluated" : ticket.impact().label())),
-                    // empty field so that UI is aligned this way:
-                    // impact
-                    // lastOpened ----- closed
-                    markdownText(" "),
-                    markdownText(format("*Last Opened*: %s", dateFormatter.format(ticket.lastOpenedAt())))
-                );
-                if (ticket.status() == TicketStatus.closed) {
-                    fields.add(
-                        markdownText(format("*Closed*: %s", dateFormatter.format(ticket.closedAt())))
-                    );
-                }
-                return s.fields(fields.build());
-            }
-        )
-    ));
+            section(s -> s.text(markdownText(format("*Impact*: %s",
+                    ticket.impact() == null ? "Not Evaluated" : ticket.impact().label()))
+             )),
+            section(s -> s.text(markdownText(format("*Last Opened*: %s",
+                    dateFormatter.format(ticket.lastOpenedAt()))))
+            )
+        ));
+    statusSection.ifPresent(blocks::add);
+    inquiringTeam.ifPresent(blocks::add);
     escalationSection.ifPresent(blocks::add);
     blocks.add(divider());
     return ImmutableList.copyOf(blocks);
 }
+    private Optional<SectionBlock> buildTicketStatusSection(TicketView ticket) {
+        return ticket.status() == TicketStatus.closed ?
+            Optional.of(section(
+                s-> s.fields(ImmutableList.of(
+                    markdownText(
+                        format("*Closed*: %s", dateFormatter.format(ticket.closedAt()))))
+                    )
+            )):
+            Optional.empty();
+    }
+
+    private Optional<SectionBlock> buildEscalationSection(TicketView ticket) {
+        return Optional.ofNullable(ticket.escalations())
+            .filter(escalations -> !escalations.isEmpty())
+            .map(escalations -> section(s -> {
+                ImmutableList<String> teams = escalations.stream()
+                    .map(Escalation::team)
+                    .collect(toImmutableList());
+                return s.fields(ImmutableList.of(
+                    markdownText(format("*Escalated to*: %s :rocket:", join(", ", teams)))
+                ));
+            }));
+    }
+
+    private Optional<SectionBlock> buildInquiringTeamSection(TicketView ticket) {
+        return Optional.ofNullable(ticket.inquiringTeam())
+            .map(inquiringTeam -> section(s -> s.fields(ImmutableList.of(
+                    markdownText(format("*Inquiring Team*: %s", inquiringTeam))
+            ))));
+    }
 
     private String lastUpdatedMessage(HomepageView homepage) {
         return "Last updated: " + dateFormatter.format(homepage.timestamp());
@@ -185,11 +196,6 @@ public class HomepageViewMapper {
         if (!pageButtons.build().isEmpty()) {
             blocks.add(actions(pageButtons.build()));
         }
-        blocks.add(context(c -> c
-            .elements(List.of(
-                plainText(":pushpin: This is a message only visible by Core-Community admins.", true)
-            ))
-        ));
         return blocks.build();
     }
 

@@ -25,4 +25,6 @@ public class TicketView {
     private ImmutableList<Escalation> escalations;
     @Nullable
     private Instant closedAt;
+    @Nullable
+    private String inquiringTeam;
 }
