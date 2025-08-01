@@ -1,15 +1,15 @@
 package com.coreeng.supportbot.escalation;
 
 import com.coreeng.supportbot.config.SlackEscalationProps;
+import com.coreeng.supportbot.config.SlackProps;
+import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.SupportTeamProps;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.enums.TagsRegistry;
-import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
-import com.coreeng.supportbot.slack.client.SlackEditMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
-import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketQueryService;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
@@ -31,27 +31,20 @@ public class EscalationProcessingService {
     private final SlackEscalationProps slackEscalationProps;
     private final EscalationCreatedMessageMapper createdMessageMapper;
     private final SlackClient slackClient;
-    private final TicketQueryService ticketQueryService;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
-    private final TagsRegistry tagsRegistry;
     private final ApplicationEventPublisher publisher;
+    private final SlackTicketsProps slackTicketsProps;
 
     public Escalation createEscalation(CreateEscalationRequest request) {
-        MessageRef threadRef = null;
-        if (request.threadPermalink() != null) {
-            threadRef = MessageRef.fromPermalink(request.threadPermalink());
-        }
-
         Escalation escalation = repository.createIfNotExists(
             Escalation.createNew(
                 request.ticket().id(),
-                threadRef,
                 request.team(),
                 request.tags()
             )
         );
         if (escalation == null) {
-            log.warn("Escalation already exists for message: {}", threadRef);
+            log.warn("Escalation already exists");
             throw new IllegalArgumentException("Escalation already exists for the thread");
         }
 
@@ -66,21 +59,17 @@ public class EscalationProcessingService {
         ChatPostMessageResponse postedMessage = slackClient.postMessage(new SlackPostMessageRequest(
             createdMessageMapper.renderMessage(EscalationCreatedMessage.of(
                 escalation,
-                checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(escalation.team())).slackGroupId(),
-                queryPermalink,
-                tagsRegistry.listTagsByCodes(escalation.tags())
+                checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(escalation.team())).slackGroupId()
             )),
-            slackEscalationProps.channelId(),
-            threadRef != null ? threadRef.actualThreadTs() : null
+            slackTicketsProps.channelId(),
+            request.ticket().queryTs()
         ));
         MessageTs postedMessageTs = MessageTs.of(postedMessage.getTs());
 
-        if (threadRef == null) {
-            escalation = escalation.toBuilder()
-                .channelId(slackEscalationProps.channelId())
-                .threadTs(postedMessageTs)
-                .build();
-        }
+        escalation = escalation.toBuilder()
+            .channelId(slackEscalationProps.channelId())
+            .threadTs(postedMessageTs)
+            .build();
 
         escalation = repository.update(
             escalation.toBuilder()
@@ -113,23 +102,7 @@ public class EscalationProcessingService {
     }
 
     private void resolve(Escalation escalation) {
-        Escalation updatedEscalation = repository.markResolved(escalation, Instant.now());
-
-        Ticket ticket = checkNotNull(ticketQueryService.findById(updatedEscalation.ticketId()));
-        String ticketQueryPermalink = slackClient.getPermalink(new SlackGetMessageByTsRequest(
-            ticket.channelId(),
-            ticket.queryTs()
-        ));
-        slackClient.editMessage(new SlackEditMessageRequest(
-            createdMessageMapper.renderMessage(EscalationCreatedMessage.of(
-                updatedEscalation,
-                checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(updatedEscalation.team())).slackGroupId(),
-                ticketQueryPermalink,
-                tagsRegistry.listTagsByCodes(escalation.tags())
-            )),
-            updatedEscalation.channelId(),
-            updatedEscalation.createdMessageTs()
-        ));
+        repository.markResolved(escalation, Instant.now());
     }
 
     @NotNull

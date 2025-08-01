@@ -7,25 +7,15 @@ import java.time.Instant;
 
 public record EscalationCreatedMessage(
     EscalationId escalationId,
-    String slackTeamGroupId,
-    EscalationStatus status,
-    Instant statusChangedDate,
-    ImmutableList<Tag> tags,
-    String ticketQueryPermalink
+    String slackTeamGroupId
 ) {
     public static EscalationCreatedMessage of(
         Escalation escalation,
-        String slackTeamGroupId,
-        String ticketQueryPermalink,
-        ImmutableList<Tag> tags
+        String slackTeamGroupId
     ) {
         return new EscalationCreatedMessage(
             escalation.id(),
-            slackTeamGroupId,
-            escalation.status(),
-            escalation.lastStatusChangedAt(),
-            tags,
-            ticketQueryPermalink
+            slackTeamGroupId
         );
     }
 }

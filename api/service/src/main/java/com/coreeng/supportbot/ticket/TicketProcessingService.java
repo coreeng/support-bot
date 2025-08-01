@@ -166,30 +166,6 @@ public class TicketProcessingService {
         slackService.markTicketEscalated(ticket.queryRef());
     }
 
-    public void postTicketEscalatedMessage(EscalationId escalationId) {
-        Escalation escalation = checkNotNull(
-            escalationQueryService.findById(escalationId),
-            "Escalation not found: {}", escalationId
-        );
-        Ticket ticket = checkNotNull(
-            repository.findTicketById(escalation.ticketId()),
-            "Ticket not found: {}", escalation.ticketId()
-        );
-        if (ticket.status() == TicketStatus.stale) {
-            ticket = repository.updateTicket(ticket.toBuilder()
-                .status(TicketStatus.opened)
-                .lastInteractedAt(Instant.now())
-                .build());
-            onStatusUpdate(ticket);
-        }
-
-        slackService.postTicketEscalatedMessage(
-            new MessageRef(ticket.queryTs(), ticket.channelId()),
-            new MessageRef(escalation.threadTs(), escalation.channelId()),
-            escalation.team()
-        );
-    }
-
     public void markAsStale(TicketId ticketId) {
         Ticket ticket = repository.findTicketById(ticketId);
         if (ticket == null) {

@@ -30,7 +30,6 @@ public class EscalationCreatedMessageMapper {
         return SimpleSlackMessage.builder()
             .text(getTextMessage(message))
             .blocks(renderBlocks(message))
-            .attachments(ImmutableList.of(renderAttachment(message)))
             .build();
     }
 
@@ -39,52 +38,14 @@ public class EscalationCreatedMessageMapper {
     }
 
     private ImmutableList<LayoutBlock> renderBlocks(EscalationCreatedMessage message) {
-        StringBuilder str = new StringBuilder();
-        str.append("Escalation created from <")
-            .append(message.ticketQueryPermalink())
-            .append("|ticket>: `")
-            .append(message.escalationId().render())
-            .append("`\nEscalated to: <!subteam^")
-            .append(message.slackTeamGroupId())
-            .append(">");
-        if (!isEmpty(message.tags())) {
-            str.append("\nTags:\n");
-            for (Tag tag : message.tags()) {
-                str.append("• ")
-                    .append(tag.label())
-                    .append("\n");
-            }
-        }
+        String str = "\nEscalated to: <!subteam^" +
+                message.slackTeamGroupId() +
+                ">";
         return ImmutableList.of(
             section(s -> s
-                .text(markdownText(str.toString()))
+                .text(markdownText(str))
             )
         );
-    }
-
-    private Attachment renderAttachment(EscalationCreatedMessage message) {
-        String statusText = message.status().label() + ": " + dateFormatter.format(message.statusChangedDate());
-        ImmutableList.Builder<LayoutBlock> blocks = ImmutableList.builder();
-        blocks.add(
-            divider(),
-            section(s -> s
-                .text(plainText(statusText))
-            )
-        );
-        if (message.status() != EscalationStatus.resolved) {
-            blocks.add(actions(ImmutableList.of(
-                button(b -> b
-                    .actionId(EscalationOperation.resolve.actionId())
-                    .value(jsonMapper.toJsonString(new EscalationResolveInput(message.escalationId())))
-                    .text(plainText("Resolve escalation"))
-                ))
-            ));
-        }
-        return Attachment.builder()
-            .color(message.status() == EscalationStatus.opened ? greenHex : redHex)
-            .fallback("Escalation created message")
-            .blocks(blocks.build())
-            .build();
     }
 
     public EscalationResolveInput parseTriggerInput(String json) {

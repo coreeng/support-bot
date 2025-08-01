@@ -25,8 +25,8 @@ public record TicketWentStaleMessage(
     }
 
     private String messageText() {
-        return ":warning: Ticket went stale, because there was no interactions with it for a long time and it's not closed.\n" +
-            "Are any other actions required or it can be closed?\n" +
+        return ":warning: Ticket went stale, because there were no interactions with it for a long time and it's not closed.\n" +
+            "Are any other actions required?\n" +
             "<@" + authorId + "> <!subteam^" + supportGroupId + ">";
     }
 }
