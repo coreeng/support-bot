@@ -77,18 +77,6 @@ public class EscalateViewMapper {
                         .toList()
                     )
                 ))
-            ),
-            input(i -> i
-                .optional(true)
-                .label(plainText("Existing escalation thread permalink"))
-                .hint(plainText("The bot will create a new thread if you omit this field"))
-                .blockId(Fields.threadPermalink.actionId())
-                .element(plainTextInput(t -> t
-                    .actionId(Fields.threadPermalink.actionId())
-                    .multiline(false)
-                    .maxLength(300) // we just need an url, it shouldn't be too big
-                    .placeholder(plainText("Paste thread permalink here"))
-                ))
             )
         );
     }
