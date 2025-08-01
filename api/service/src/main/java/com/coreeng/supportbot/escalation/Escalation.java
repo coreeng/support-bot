@@ -32,7 +32,6 @@ public class Escalation {
 
     public static Escalation createNew(
         TicketId ticketId,
-        @Nullable MessageRef threadRef,
         @Nullable String team,
         ImmutableList<String> tags
     ) {
@@ -40,8 +39,6 @@ public class Escalation {
             .ticketId(ticketId)
             .status(EscalationStatus.opened)
             .openedAt(Instant.now())
-            .threadTs(threadRef != null ? threadRef.actualThreadTs() : null)
-            .channelId(threadRef != null ? threadRef.channelId() : null)
             .team(team)
             .tags(tags)
             .build();

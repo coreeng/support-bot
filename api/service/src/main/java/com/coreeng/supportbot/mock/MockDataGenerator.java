@@ -239,7 +239,6 @@ public class MockDataGenerator implements ApplicationRunner {
 
         Escalation escalation = Escalation.createNew(
             ticket.id(),
-            new MessageRef(escalationTs, escalationProps.channelId()),
             escalationTeams.get(teamI).label(),
             pickedTags.stream()
                 .map(Tag::code)

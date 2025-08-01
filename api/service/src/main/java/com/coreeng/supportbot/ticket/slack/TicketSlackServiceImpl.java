@@ -11,7 +11,6 @@ import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.ticket.TicketCreatedMessage;
 import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
-import com.coreeng.supportbot.ticket.TicketEscalatedMessage;
 import com.coreeng.supportbot.ticket.TicketWentStaleMessage;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
@@ -97,19 +96,6 @@ public class TicketSlackServiceImpl implements TicketSlackService {
         log.atInfo()
             .addArgument(threadRef::ts)
             .log("Ticket form is updated: {}");
-    }
-
-    @Override
-    public void postTicketEscalatedMessage(MessageRef queryRef, MessageRef escalationThreadRef, String slackTeamName) {
-        String escalationThreadPermalink = slackClient.getPermalink(SlackGetMessageByTsRequest.of(escalationThreadRef));
-        slackClient.postMessage(new SlackPostMessageRequest(
-            new TicketEscalatedMessage(
-                escalationThreadPermalink,
-                slackTeamName
-            ),
-            queryRef.channelId(),
-            queryRef.ts()
-        ));
     }
 
     @Override
