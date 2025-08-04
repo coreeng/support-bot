@@ -4,24 +4,41 @@ import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackException;
+import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackEditMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.ticket.TicketCreatedMessage;
 import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
 import com.coreeng.supportbot.ticket.TicketEscalatedMessage;
 import com.coreeng.supportbot.ticket.TicketWentStaleMessage;
+import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.model.Message;
+import com.slack.api.model.block.ActionsBlock;
+import com.slack.api.model.block.LayoutBlock;
+import com.slack.api.model.block.SectionBlock;
+import com.slack.api.model.block.composition.PlainTextObject;
+import com.slack.api.model.block.element.ButtonElement;
+import static com.slack.api.model.block.Blocks.*;
+
+import java.util.List;
+import java.util.Arrays;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
+
+import static com.slack.api.model.block.Blocks.*;
+import static com.slack.api.model.block.composition.BlockCompositions.plainText;
+import static com.slack.api.model.block.element.BlockElements.button;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +49,64 @@ public class TicketSlackServiceImpl implements TicketSlackService {
     private final SupportTeamService supportTeamService;
     private final TicketCreatedMessageMapper createdMessageMapper;
 
+   // Add this method to TicketSlackServiceImpl class
+    @Override
+    public void requestFeedback(MessageRef threadRef, String ticketId, String userId) {
+
+        log.info("Requesting ratings for ticket: {} from user: {} in channel: {} with threadTs: {}", ticketId, userId,threadRef.channelId(), threadRef.ts());
+        if (threadRef.ts().mocked()) {
+            log.atInfo()
+                .addArgument(ticketId)
+                .log("Pretending to request feedback for ticket, because it's mocked: {}");
+            return;
+        }
+
+        log.info("Requesting feedback for ticket: {} from user: {}", ticketId, userId);
+        
+        SimpleSlackMessage message = SimpleSlackMessage.builder()
+            .text("Rate your support experience")
+            .blocks(ImmutableList.of(
+                section(s -> s
+                    .text(plainText("How was your support experience?\nYour feedback helps us improve."))
+                ),
+                actions(ImmutableList.of(
+                    button(b -> b
+                        .actionId("rating_1_" + ticketId + "_" + threadRef.ts().ts())
+                        .text(plainText("⭐ (1)"))
+                        .value("1")
+                    ),
+                    button(b -> b
+                        .actionId("rating_2_" + ticketId + "_" + threadRef.ts().ts())
+                        .text(plainText("⭐⭐ (2)"))
+                        .value("2")
+                    ),
+                    button(b -> b
+                        .actionId("rating_3_" + ticketId + "_" + threadRef.ts().ts())
+                        .text(plainText("⭐⭐⭐ (3)"))
+                        .value("3")
+                    ),
+                    button(b -> b
+                        .actionId("rating_4_" + ticketId + "_" + threadRef.ts().ts())
+                        .text(plainText("⭐⭐⭐⭐ (4)"))
+                        .value("4")
+                    ),
+                    button(b -> b
+                        .actionId("rating_5_" + ticketId + "_" + threadRef.ts().ts())
+                        .text(plainText("⭐⭐⭐⭐⭐ (5)"))
+                        .value("5")
+                    )
+                ))
+            ))
+            .build();
+        
+        slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
+            .message(message)
+            .channel(threadRef.channelId())
+            .threadTs(threadRef.ts())
+            .userId(userId)
+            .build()
+        );
+    }
     @Override
     public void markPostTracked(MessageRef threadRef) {
         addReactionToPostIfPresent(
@@ -73,6 +148,10 @@ public class TicketSlackServiceImpl implements TicketSlackService {
         ));
         MessageTs ts = MessageTs.of(postMessageResponse.getTs());
         log.info("Ticket form is posted: {}", ts);
+
+        Message queryMessage = slackClient.getMessageByTs(SlackGetMessageByTsRequest.of(threadRef));
+        requestFeedback(threadRef, message.ticketId().toString(), queryMessage.getUser());
+
         return new MessageRef(
             ts,
             threadRef.ts(),

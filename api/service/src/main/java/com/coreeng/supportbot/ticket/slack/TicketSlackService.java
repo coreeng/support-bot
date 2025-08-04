@@ -14,4 +14,5 @@ public interface TicketSlackService {
     void postTicketEscalatedMessage(MessageRef queryRef, MessageRef escalationThreadRef, String slackTeamName);
 
     void warnStaleness(MessageRef queryRef);
+    void requestFeedback(MessageRef threadRef, String ticketId, String userId);
 }
