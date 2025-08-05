@@ -1,4 +1,4 @@
-package com.coreeng.supportbot.ratings;
+package com.coreeng.supportbot.ticket;
 
 import javax.annotation.Nullable;
 
