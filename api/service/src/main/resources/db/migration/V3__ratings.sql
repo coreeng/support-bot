@@ -14,7 +14,7 @@ CREATE TABLE ticket_ratings (
     -- These are copies of data, not foreign keys, to maintain anonymity
     -- Added snapshot suffix to indicate these are static at time of rating and not live references
     ticket_status_snapshot ticket_status NOT NULL, -- Using existing enum type
-    ticket_impact_snapshot TEXT, -- Howcome this is not an enum that we can reuse?
+    ticket_impact_snapshot TEXT,
     
     -- Team/category context (without revealing specific assignee)
     -- Making sure to not use same names as in tickets table to avoid confusion and maintain anonymity
@@ -23,7 +23,7 @@ CREATE TABLE ticket_ratings (
 );
 
 -- Timestamp conversion trigger
--- We want to do this in postgres rather than in code to simplify creaation of timestamps
+-- We want to do this in postgres rather than in code to simplify creation of timestamps
 CREATE OR REPLACE FUNCTION update_rating_ts_iso()
     RETURNS TRIGGER AS
 $$
