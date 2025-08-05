@@ -1,4 +1,4 @@
-package com.coreeng.supportbot.ratings;
+package com.coreeng.supportbot.ticket;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -6,7 +6,6 @@ import lombok.With;
 
 import javax.annotation.Nullable;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.UUID;
 
 @Getter
@@ -15,7 +14,7 @@ public class TicketRating {
     @With
     @Nullable
     private UUID ratingId;
-    private int rating;
+    private Integer rating;
     private String ratingSubmittedTs;
     @Nullable
     private Instant ratingSubmittedTsIso;
@@ -26,14 +25,8 @@ public class TicketRating {
     private String primaryTagSnapshot;
     @Builder.Default
     private boolean escalated = false;
-    @Nullable
-    private LocalDate ratingWeek;
-    @Nullable
-    private LocalDate ratingMonth;
 
-    /**
-     * Create a new rating for submission (before database insert)
-     */
+
     public static TicketRating createNew(
         int rating,
         String ratingSubmittedTs,

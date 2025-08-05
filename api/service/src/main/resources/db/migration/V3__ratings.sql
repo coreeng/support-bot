@@ -19,7 +19,7 @@ CREATE TABLE ticket_ratings (
     -- Team/category context (without revealing specific assignee)
     -- Making sure to not use same names as in tickets table to avoid confusion and maintain anonymity
     TAG_SNAPSHOT VARCHAR(255), -- Most relevant tag at time of rating (matches tags.label column)
-    escalated BOOLEAN DEFAULT FALSE, -- Was ticket escalated to a team? We can't use escalation assignee due to anonymity
+    escalated BOOLEAN DEFAULT FALSE -- Was ticket escalated to a team? We can't use escalation assignee due to anonymity
 );
 
 -- Timestamp conversion trigger
