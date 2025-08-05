@@ -29,8 +29,6 @@ CREATE OR REPLACE FUNCTION update_rating_ts_iso()
 $$
 BEGIN
     NEW.rating_submitted_ts_iso := TO_TIMESTAMP(NEW.rating_submitted_ts::double precision);
-    NEW.rating_week := DATE_TRUNC('week', NEW.rating_submitted_ts_iso);
-    NEW.rating_month := DATE_TRUNC('month', NEW.rating_submitted_ts_iso);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
