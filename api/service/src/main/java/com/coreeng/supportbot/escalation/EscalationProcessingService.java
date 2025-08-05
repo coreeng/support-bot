@@ -47,7 +47,7 @@ public class EscalationProcessingService {
             .addArgument(escalation::id)
             .log("Escalation created: {}");
 
-        String queryPermalink = slackClient.getPermalink(new SlackGetMessageByTsRequest(
+        slackClient.getPermalink(new SlackGetMessageByTsRequest(
             request.ticket().channelId(),
             request.ticket().queryTs()
         ));
