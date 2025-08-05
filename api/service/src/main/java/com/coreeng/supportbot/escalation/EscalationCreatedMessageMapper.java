@@ -1,21 +1,16 @@
 package com.coreeng.supportbot.escalation;
 
-import com.coreeng.supportbot.enums.Tag;
+import static com.slack.api.model.block.Blocks.*;
+import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
+import static java.lang.String.format;
+
 import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
 import com.coreeng.supportbot.util.JsonMapper;
 import com.coreeng.supportbot.util.RelativeDateFormatter;
 import com.google.common.collect.ImmutableList;
-import com.slack.api.model.Attachment;
 import com.slack.api.model.block.LayoutBlock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-
-import static com.google.common.collect.Iterables.isEmpty;
-import static com.slack.api.model.block.Blocks.*;
-import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
-import static com.slack.api.model.block.composition.BlockCompositions.plainText;
-import static com.slack.api.model.block.element.BlockElements.button;
-import static java.lang.String.format;
 
 @Component
 @RequiredArgsConstructor

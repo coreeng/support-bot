@@ -1,27 +1,22 @@
 package com.coreeng.supportbot.escalation;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.coreeng.supportbot.config.SlackEscalationProps;
-import com.coreeng.supportbot.config.SlackProps;
 import com.coreeng.supportbot.config.SlackTicketsProps;
-import com.coreeng.supportbot.config.SupportTeamProps;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
-import com.coreeng.supportbot.enums.TagsRegistry;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.ticket.TicketId;
-import com.coreeng.supportbot.ticket.TicketQueryService;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-
-import java.time.Instant;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 @Service
 @RequiredArgsConstructor
