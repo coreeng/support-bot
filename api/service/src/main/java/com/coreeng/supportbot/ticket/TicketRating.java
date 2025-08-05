@@ -52,23 +52,14 @@ public class TicketRating {
             .build();
     }
 
-    /**
-     * Validate that the rating is within acceptable range
-     */
     public boolean isValidRating() {
         return rating >= 1 && rating <= 5;
     }
 
-    /**
-     * Check if this is a high rating (4 or 5 stars)
-     */
     public boolean isHighRating() {
         return rating >= 4;
     }
 
-    /**
-     * Check if this is a low rating (1 or 2 stars)
-     */
     public boolean isLowRating() {
         return rating <= 2;
     }
