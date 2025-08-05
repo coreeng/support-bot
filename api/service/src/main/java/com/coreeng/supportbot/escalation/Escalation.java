@@ -1,14 +1,12 @@
 package com.coreeng.supportbot.escalation;
 
-import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
+import java.time.Instant;
+import javax.annotation.Nullable;
 import lombok.Builder;
 import lombok.Getter;
-
-import javax.annotation.Nullable;
-import java.time.Instant;
 
 @Getter
 @Builder(toBuilder = true)
