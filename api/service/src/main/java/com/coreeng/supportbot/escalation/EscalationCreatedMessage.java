@@ -1,9 +1,6 @@
 package com.coreeng.supportbot.escalation;
 
-import com.coreeng.supportbot.enums.Tag;
-import com.google.common.collect.ImmutableList;
 
-import java.time.Instant;
 
 public record EscalationCreatedMessage(
     EscalationId escalationId,
