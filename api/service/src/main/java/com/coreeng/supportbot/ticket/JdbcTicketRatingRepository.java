@@ -1,4 +1,4 @@
-package com.coreeng.supportbot.ratings;
+package com.coreeng.supportbot.ticket;
 
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
@@ -8,8 +8,6 @@ import org.jooq.ResultQuery;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Nullable;
-import java.time.Instant;
-import java.time.LocalDate;
 import java.util.UUID;
 
 import static com.coreeng.supportbot.dbschema.Tables.TICKET_RATINGS;
@@ -84,9 +82,7 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
             record.getValue(TICKET_RATINGS.TICKET_STATUS_SNAPSHOT).toString(),
             record.getValue(TICKET_RATINGS.TICKET_IMPACT_SNAPSHOT),
             record.getValue(TICKET_RATINGS.TAG_SNAPSHOT),
-            record.getValue(TICKET_RATINGS.ESCALATED),
-            record.getValue(TICKET_RATINGS.RATING_WEEK),
-            record.getValue(TICKET_RATINGS.RATING_MONTH)
+            record.getValue(TICKET_RATINGS.ESCALATED)
         );
     }
 }
