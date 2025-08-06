@@ -18,7 +18,7 @@ import static io.restassured.RestAssured.given;
  * Test class to verify that Wiremock servers are running correctly.
  * Demonstrates injection of wiremock instances using the WiremockInjectionExtension.
  */
-@ExtendWith(WiremockInjectionExtension.class)
+@ExtendWith(TestKitExtension.class)
 public class WiremockTest {
     private static final Logger logger = LoggerFactory.getLogger(WiremockTest.class);
 

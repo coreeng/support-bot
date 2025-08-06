@@ -35,9 +35,4 @@ public class GcpWiremock extends WireMockServer {
         super.stop();
         logger.info("Stopped GCP Wiremock server");
     }
-
-    public void setupCommonStubs() {
-        // This method can be implemented later with specific GCP API stubs
-        logger.info("Setting up common GCP API stubs");
-    }
 }

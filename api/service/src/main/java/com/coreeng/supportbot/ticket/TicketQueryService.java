@@ -2,6 +2,7 @@ package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
+import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
@@ -40,5 +41,9 @@ public class TicketQueryService {
         }
         ImmutableList<Escalation> escalations = escalationQueryService.listByTicketId(id);
         return new DetailedTicket(ticket.ticket(), escalations);
+    }
+
+    public boolean queryExists(MessageRef queryRef) {
+        return repository.queryExists(queryRef);
     }
 }
