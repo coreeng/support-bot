@@ -69,7 +69,7 @@ public class TicketRatingActionHandler implements SlackBlockActionHandler {
                 // Send confirmation message
                 slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
                     .message(SimpleSlackMessage.builder()
-                        .text("✅ Thank you for your rating! Your feedback has been recorded.")
+                        .text("Thank you for your rating! Your feedback has been recorded.")
                         .build())
                     .channel(payload.getChannel().getId())
                     .threadTs(MessageTs.ofOrNull(payload.getMessage().getThreadTs()))
@@ -84,7 +84,7 @@ public class TicketRatingActionHandler implements SlackBlockActionHandler {
             log.error("Error handling rating submission", e);
             slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
                 .message(SimpleSlackMessage.builder()
-                    .text("❌ Sorry, there was an error recording your rating. Please try again.")
+                    .text("Sorry, there was an error recording your rating. Please try again.")
                     .build())
                 .channel(payload.getChannel().getId())
                 .threadTs(MessageTs.ofOrNull(payload.getMessage().getThreadTs()))
