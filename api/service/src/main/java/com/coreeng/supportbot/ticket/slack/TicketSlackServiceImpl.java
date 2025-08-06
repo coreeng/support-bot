@@ -16,6 +16,7 @@ import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
 import com.coreeng.supportbot.ticket.TicketEscalatedMessage;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.rating.TicketRatingService;
+import com.coreeng.supportbot.ticket.TicketRatingRequestMessage;
 import com.coreeng.supportbot.ticket.TicketWentStaleMessage;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
@@ -149,14 +150,7 @@ public class TicketSlackServiceImpl implements TicketSlackService {
 
         log.info("Posting ephemeral rating request for ticket {} to user {}", ticketId, userId);
 
-        SimpleSlackMessage ratingMessage = SimpleSlackMessage.builder()
-            .text(String.format(
-                "🎯 *Please rate your experience with ticket %s*\n\n" +
-                "Your feedback helps us improve our support! Please provide a rating from 1-5 and any comments.\n\n" +
-                "Thank you for using our support system! 🙏",
-                ticketId
-            ))
-            .build();
+        TicketRatingRequestMessage ratingMessage = new TicketRatingRequestMessage(ticketId);
 
         slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
             .message(ratingMessage)

@@ -25,6 +25,7 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
             .set(TICKET_RATINGS.SUBMITTED_TS, rating.submittedTs())
             .set(TICKET_RATINGS.STATUS, 
                 com.coreeng.supportbot.dbschema.enums.TicketStatus.lookupLiteral(rating.status()))
+            .set(TICKET_RATINGS.ANONYMOUS_ID, rating.anonymousId())
             .set(TICKET_RATINGS.IMPACT, rating.impact())
             .set(TICKET_RATINGS.TAGS, rating.tags())
             .set(TICKET_RATINGS.ESCALATED_TEAMS, rating.escalatedTeams())
@@ -38,6 +39,15 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
         return dsl.select()
             .from(TICKET_RATINGS)
             .where(TICKET_RATINGS.ID.eq(id))
+            .fetchOne(this::mapToTicketRating);
+    }
+
+    @Override
+    @Nullable
+    public TicketRating findByAnonymousId(String anonymousId) {
+        return dsl.select()
+            .from(TICKET_RATINGS)
+            .where(TICKET_RATINGS.ANONYMOUS_ID.eq(anonymousId))
             .fetchOne(this::mapToTicketRating);
     }
 
@@ -84,6 +94,7 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
             .rating(record.getValue(TICKET_RATINGS.RATING))
             .submittedTs(record.getValue(TICKET_RATINGS.SUBMITTED_TS))
             .status(record.getValue(TICKET_RATINGS.STATUS).toString())
+            .anonymousId(record.getValue(TICKET_RATINGS.ANONYMOUS_ID))
             .impact(record.getValue(TICKET_RATINGS.IMPACT))
             .tags(record.getValue(TICKET_RATINGS.TAGS))
             .escalatedTeams(record.getValue(TICKET_RATINGS.ESCALATED_TEAMS))
