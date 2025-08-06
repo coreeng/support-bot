@@ -5,7 +5,8 @@ import java.util.List;
 public record Config(
     Mocks mocks,
     List<Tenant> tenants,
-    List<User> users
+    List<User> users,
+    SupportBot supportBot
 ) {
     public record Mocks(
         SlackMock slack,
@@ -22,6 +23,7 @@ public record Config(
         String userId,
         String botId,
         String supportGroupId,
+        String supportChannelId,
         List<SlackSupportMember> supportMembers
     ) {}
     public record SlackSupportMember(
@@ -47,6 +49,26 @@ public record Config(
         List<User> users
     ) {}
     public record User(
-        String email
+        String email,
+        String slackUserId
     ) {}
+
+    public record SupportBot(
+        String baseUrl,
+        String token
+    ) {}
+
+    public List<User> nonSupportUsers() {
+        return users.stream()
+            .filter(u -> mocks.slack.supportMembers.stream()
+                .noneMatch(sm -> sm.email.equals(u.email)))
+            .toList();
+    }
+
+    public List<User> supportUsers() {
+        return users.stream()
+            .filter(u -> mocks.slack.supportMembers.stream()
+                .anyMatch(sm -> sm.email.equals(u.email)))
+            .toList();
+    }
 }
