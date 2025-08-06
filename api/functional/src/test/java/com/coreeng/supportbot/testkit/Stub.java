@@ -1,0 +1,25 @@
+package com.coreeng.supportbot.testkit;
+
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.admin.model.GetServeEventsResult;
+import com.github.tomakehurst.wiremock.admin.model.ServeEventQuery;
+import com.github.tomakehurst.wiremock.stubbing.StubMapping;
+import lombok.Builder;
+import lombok.Getter;
+import org.jspecify.annotations.NonNull;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@Builder
+@Getter
+public class Stub {
+    @NonNull
+    private final StubMapping mapping;
+    @NonNull
+    private final WireMockServer wireMockServer;
+
+    public void assertIsCalled() {
+        GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
+        assertThat(serveEvents.getServeEvents()).hasSize(1);
+    }
+}

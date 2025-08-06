@@ -8,7 +8,10 @@ dependencies {
     testImplementation("org.slf4j:slf4j-api:2.0.+")
     testRuntimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:2.25.+")
     testRuntimeOnly("org.apache.logging.log4j:log4j-core:2.25.+")
-
+    
+    testCompileOnly("org.projectlombok:lombok:1.18.+")
+    testAnnotationProcessor("org.projectlombok:lombok:1.18.+")
+    
     testImplementation("org.apache.commons:commons-text:1.13.1")
 
     testImplementation(platform('org.junit:junit-bom:5.13.+'))
