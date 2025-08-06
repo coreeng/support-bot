@@ -23,19 +23,13 @@ public class EscalationCreatedMessageMapper {
 
     public SimpleSlackMessage renderMessage(EscalationCreatedMessage message) {
         return SimpleSlackMessage.builder()
-            .text(getTextMessage(message))
             .blocks(renderBlocks(message))
             .build();
     }
 
-    private String getTextMessage(EscalationCreatedMessage message) {
-        return format("Escalation created: %s", message.escalationId().render());
-    }
-
     private ImmutableList<LayoutBlock> renderBlocks(EscalationCreatedMessage message) {
-        String str = "\nEscalated to: <!subteam^" +
-                message.slackTeamGroupId() +
-                ">";
+        String str = "\nEscalated to team: " + message.escalationTeam()
+                + "("+ "<!subteam^" +message.slackTeamGroupId() + ">)";
         return ImmutableList.of(
             section(s -> s
                 .text(markdownText(str))

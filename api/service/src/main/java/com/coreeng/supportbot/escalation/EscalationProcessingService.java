@@ -27,7 +27,6 @@ public class EscalationProcessingService {
     private final EscalationCreatedMessageMapper createdMessageMapper;
     private final SlackClient slackClient;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
-    private final ApplicationEventPublisher publisher;
     private final SlackTicketsProps slackTicketsProps;
 
     public Escalation createEscalation(CreateEscalationRequest request) {
@@ -38,9 +37,9 @@ public class EscalationProcessingService {
                 request.tags()
             )
         );
-        if (escalation == null) {
+        if (escalation.id() == null) {
             log.warn("Escalation already exists");
-            throw new IllegalArgumentException("Escalation already exists for the thread");
+            return escalation;
         }
 
         log.atInfo()
@@ -51,6 +50,7 @@ public class EscalationProcessingService {
             request.ticket().channelId(),
             request.ticket().queryTs()
         ));
+
         ChatPostMessageResponse postedMessage = slackClient.postMessage(new SlackPostMessageRequest(
             createdMessageMapper.renderMessage(EscalationCreatedMessage.of(
                 escalation,
@@ -72,7 +72,6 @@ public class EscalationProcessingService {
                 .build()
         );
 
-        publisher.publishEvent(new EscalationCreated(escalation.id()));
         return escalation;
     }
 
