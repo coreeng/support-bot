@@ -18,6 +18,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 public class JdbcTicketRatingRepository implements TicketRatingRepository {
     private final DSLContext dsl;
 
+    @Override
     public UUID insertRating(TicketRating rating) {
         return dsl.insertInto(TICKET_RATINGS)
             .set(TICKET_RATINGS.RATING, rating.rating())
@@ -31,6 +32,7 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
             .fetchOne(TICKET_RATINGS.RATING_ID);
     }
 
+    @Override
     @Nullable
     public TicketRating findById(UUID ratingId) {
         return dsl.select()
@@ -39,7 +41,7 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
             .fetchOne(this::mapToTicketRating);
     }
 
-
+    @Override
     public ImmutableList<TicketRating> findRatingsByStatus(String ticketStatus) {
         return fetchRatings(
             dsl.select()
@@ -50,6 +52,7 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
         );
     }
 
+    @Override
     public ImmutableList<TicketRating> findRatingsByTag(String tagCode) {
         return fetchRatings(
             dsl.select()
@@ -58,6 +61,7 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
         );
     }
 
+    @Override
     public ImmutableList<TicketRating> findEscalatedRatings() {
         return fetchRatings(
             dsl.select()
@@ -66,6 +70,7 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
         );
     }
 
+    @Override
     private ImmutableList<TicketRating> fetchRatings(ResultQuery<?> query) {
         try (var stream = query.stream()) {
             return stream.map(this::mapToTicketRating)
