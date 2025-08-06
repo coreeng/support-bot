@@ -15,48 +15,43 @@ public record TicketRatingRequestMessage(
 
     @Override
     public String getText() {
-        return String.format("Please rate your experience with ticket %s", ticketId);
+        return "How was your support experience?";
     }
 
     @Override
     public ImmutableList<LayoutBlock> renderBlocks() {
         return ImmutableList.of(
             section(s -> s
-                .text(markdownText(String.format(
-                    "🎯 *Please rate your experience with ticket %s*\n\n" +
-                    "Your feedback helps us improve our support! Please select a rating:\n\n" +
-                    "Thank you for using our support system! 🙏",
-                    ticketId
-                )))
+                .text(markdownText(
+                    "*How was your support experience?* \n" +
+                    "_Your feedback helps us improve our service_"
+                ))
             ),
             actions(ImmutableList.of(
                 button(b -> b
-                    .actionId("rating_submit_" + ticketId + "_1")
-                    .text(plainText("⭐"))
+                    .actionId("rating_submit_" + ticketId.id() + "_1")
+                    .text(plainText("⭐ (1)"))
                     .value("1")
-                    .style("primary")
                 ),
                 button(b -> b
-                    .actionId("rating_submit_" + ticketId + "_2")
-                    .text(plainText("⭐⭐"))
+                    .actionId("rating_submit_" + ticketId.id() + "_2")
+                    .text(plainText("⭐⭐ (2)"))
                     .value("2")
-                    .style("primary")
                 ),
                 button(b -> b
-                    .actionId("rating_submit_" + ticketId + "_3")
-                    .text(plainText("⭐⭐⭐"))
+                    .actionId("rating_submit_" + ticketId.id() + "_3")
+                    .text(plainText("⭐⭐⭐ (3)"))
                     .value("3")
-                    .style("primary")
                 ),
                 button(b -> b
-                    .actionId("rating_submit_" + ticketId + "_4")
-                    .text(plainText("⭐⭐⭐⭐"))
+                    .actionId("rating_submit_" + ticketId.id() + "_4")
+                    .text(plainText("⭐⭐⭐⭐ (4)"))
                     .value("4")
                     .style("primary")
                 ),
                 button(b -> b
-                    .actionId("rating_submit_" + ticketId + "_5")
-                    .text(plainText("⭐⭐⭐⭐⭐"))
+                    .actionId("rating_submit_" + ticketId.id() + "_5")
+                    .text(plainText("⭐⭐⭐⭐⭐ (5)"))
                     .value("5")
                     .style("primary")
                 )
