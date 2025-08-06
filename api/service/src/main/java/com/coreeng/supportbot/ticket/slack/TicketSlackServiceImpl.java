@@ -4,9 +4,11 @@ import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackException;
+import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackEditMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.ticket.TicketCreatedMessage;
@@ -30,6 +32,7 @@ public class TicketSlackServiceImpl implements TicketSlackService {
     private final SlackTicketsProps slackTicketsProps;
     private final SupportTeamService supportTeamService;
     private final TicketCreatedMessageMapper createdMessageMapper;
+    private final TicketRatingService ticketRatingService;
 
     @Override
     public void markPostTracked(MessageRef threadRef) {
@@ -116,6 +119,38 @@ public class TicketSlackServiceImpl implements TicketSlackService {
             queryRef.channelId(),
             queryRef.ts()
         ));
+    }
+
+    @Override
+    public void postRatingRequest(MessageRef queryRef, TicketId ticketId, String userId) {
+        if (queryRef.ts().mocked()) {
+            log.atInfo()
+                .addArgument(ticketId)
+                .addArgument(queryRef::ts)
+                .log("Pretending to post rating request for ticket({}), because it's mocked: {}");
+            return;
+        }
+
+        log.info("Posting ephemeral rating request for ticket {} to user {}", ticketId, userId);
+
+        SimpleSlackMessage ratingMessage = SimpleSlackMessage.builder()
+            .text(String.format(
+                "🎯 *Please rate your experience with ticket %s*\n\n" +
+                "Your feedback helps us improve our support! Please provide a rating from 1-5 and any comments.\n\n" +
+                "Thank you for using our support system! 🙏",
+                ticketId
+            ))
+            .build();
+
+        slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
+            .message(ratingMessage)
+            .channel(queryRef.channelId())
+            .threadTs(queryRef.ts())
+            .userId(userId)
+            .build()
+        );
+
+        log.info("Ephemeral rating request posted for ticket {} to user {}", ticketId, userId);
     }
 
     private void addReactionToPostIfPresent(
