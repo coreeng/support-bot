@@ -76,15 +76,7 @@ public class TicketRatingActionHandler implements SlackBlockActionHandler {
                 
                 // Check if user has already rated this ticket
                 if (ticketRatingService.hasAlreadyRated(anonymousId)) {
-                    slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
-                        .message(SimpleSlackMessage.builder()
-                            .text("You have already submitted a rating for this ticket. Thank you for your feedback!")
-                            .build())
-                        .channel(payload.getChannel().getId())
-                        .threadTs(MessageTs.ofOrNull(payload.getMessage() != null ? payload.getMessage().getThreadTs() : null))
-                        .userId(userId)
-                        .build()
-                    );
+                    log.info("User {} already submitted a rating for ticket {} - ignoring duplicate", userId, ticketIdStr);
                     return;
                 }
                 
@@ -92,20 +84,27 @@ public class TicketRatingActionHandler implements SlackBlockActionHandler {
                 TicketId ticketId = new TicketId(Integer.parseInt(ticketIdStr));
                 Ticket ticket = ticketRepository.findTicketById(ticketId);
                 
-                String impact = ticket != null ? ticket.getImpact() : null;
-                String[] tags = ticket != null && ticket.getTags() != null ? 
-                    ticket.getTags().toArray(new String[0]) : null;
+                String impact = ticket != null ? ticket.impact() : null;
+                String[] tags = ticket != null && ticket.tags() != null ? 
+                    ticket.tags().toArray(new String[0]) : null;
                 
                 // Handle the rating submission
                 UUID ratingId = handleRating(rating, anonymousId, TicketStatus.closed.name(), impact, tags, null);
                 
-                // Send confirmation message
+                // Send confirmation message in the same thread as the rating request
+                MessageTs threadTs = null;
+                if (payload.getContainer() != null && payload.getContainer().getThreadTs() != null) {
+                    threadTs = MessageTs.of(payload.getContainer().getThreadTs());
+                } else if (payload.getMessage() != null && payload.getMessage().getThreadTs() != null) {
+                    threadTs = MessageTs.of(payload.getMessage().getThreadTs());
+                }
+                
                 slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
                     .message(SimpleSlackMessage.builder()
-                        .text(String.format("Thank you for your %s star rating! Your feedback has been recorded.", "⭐".repeat(rating)))
+                        .text(String.format("Thank you for your %d star rating! Your feedback has been recorded.", rating))
                         .build())
                     .channel(payload.getChannel().getId())
-                    .threadTs(MessageTs.ofOrNull(payload.getMessage() != null ? payload.getMessage().getThreadTs() : null))
+                    .threadTs(threadTs)
                     .userId(userId)
                     .build()
                 );
@@ -115,12 +114,20 @@ public class TicketRatingActionHandler implements SlackBlockActionHandler {
             }
         } catch (Exception e) {
             log.error("Error handling rating submission", e);
+            
+            MessageTs threadTs = null;
+            if (payload.getContainer() != null && payload.getContainer().getThreadTs() != null) {
+                threadTs = MessageTs.of(payload.getContainer().getThreadTs());
+            } else if (payload.getMessage() != null && payload.getMessage().getThreadTs() != null) {
+                threadTs = MessageTs.of(payload.getMessage().getThreadTs());
+            }
+            
             slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
                 .message(SimpleSlackMessage.builder()
                     .text("Sorry, there was an error recording your rating. Please try again.")
                     .build())
                 .channel(payload.getChannel().getId())
-                .threadTs(MessageTs.ofOrNull(payload.getMessage() != null ? payload.getMessage().getThreadTs() : null))
+                .threadTs(threadTs)
                 .userId(userId)
                 .build()
             );
