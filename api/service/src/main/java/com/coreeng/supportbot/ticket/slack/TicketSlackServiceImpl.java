@@ -133,14 +133,7 @@ public class TicketSlackServiceImpl implements TicketSlackService {
 
         log.info("Posting ephemeral rating request for ticket {} to user {}", ticketId, userId);
 
-        SimpleSlackMessage ratingMessage = SimpleSlackMessage.builder()
-            .text(String.format(
-                "🎯 *Please rate your experience with ticket %s*\n\n" +
-                "Your feedback helps us improve our support! Please provide a rating from 1-5 and any comments.\n\n" +
-                "Thank you for using our support system! 🙏",
-                ticketId
-            ))
-            .build();
+        TicketRatingRequestMessage ratingMessage = new TicketRatingRequestMessage(ticketId);
 
         slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
             .message(ratingMessage)

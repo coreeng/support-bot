@@ -26,6 +26,15 @@ public class TicketRatingService {
         return repository.findById(id);
     }
 
+    @Nullable
+    public TicketRating findByAnonymousId(String anonymousId) {
+        return repository.findByAnonymousId(anonymousId);
+    }
+
+    public boolean hasAlreadyRated(String anonymousId) {
+        return findByAnonymousId(anonymousId) != null;
+    }
+
     public ImmutableList<TicketRating> findRatingsByStatus(String status) {
         return repository.findRatingsByStatus(status);
     }
