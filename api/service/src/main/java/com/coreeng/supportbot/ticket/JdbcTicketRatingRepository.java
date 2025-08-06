@@ -70,7 +70,6 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
         );
     }
 
-    @Override
     private ImmutableList<TicketRating> fetchRatings(ResultQuery<?> query) {
         try (var stream = query.stream()) {
             return stream.map(this::mapToTicketRating)
