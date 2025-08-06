@@ -2,6 +2,7 @@ package com.coreeng.supportbot.ticket.slack;
 
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.ticket.TicketCreatedMessage;
+import com.coreeng.supportbot.ticket.TicketId;
 
 public interface TicketSlackService {
     void markPostTracked(MessageRef threadRef);
@@ -14,4 +15,5 @@ public interface TicketSlackService {
     void postTicketEscalatedMessage(MessageRef queryRef, MessageRef escalationThreadRef, String slackTeamName);
 
     void warnStaleness(MessageRef queryRef);
+    void postRatingRequest(MessageRef queryRef, TicketId ticketId, String userId);
 }
