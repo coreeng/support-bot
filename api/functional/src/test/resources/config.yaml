@@ -1,3 +1,4 @@
+# todo: come up with a better config structure so that we don't have duplicate users that much
 mocks:
   slack:
     port: 8000
@@ -7,15 +8,13 @@ mocks:
     userId: U0123456789
     botId: B0123456789
     supportGroupId: S01234567ST
+    supportChannelId: C1234567891
     supportMembers:
-      - userId: U0123456781
-        name: Coby Ivona
+      - name: Coby Ivona
         email: coby.ivona@company.com
-      - userId: U0123456782
-        name: Sana Chernobog
+      - name: Sana Chernobog
         email: sana.chernobog@company.com
-      - userId: U0123456783
-        name: Jean Kristijan
+      - name: Jean Kristijan
         email: jean.kristijan@company.com
   kubernetes:
     port: 8001
@@ -44,8 +43,17 @@ tenants:
 users:
   # support members
   - email: coby.ivona@company.com
+    slackUserId: U0123456781
   - email: sana.chernobog@company.com
+    slackUserId: U0123456782
   - email: jean.kristijan@company.com
+    slackUserId: U0123456783
   # others
   - email: chandra.giustino@company.com
+    slackUserId: U0123456784
   - email: nazira.armel@company.com
+    slackUserId: U0123456785
+
+supportBot:
+  token: dummy-token-dummy-token
+  baseUrl: http://localhost:8080

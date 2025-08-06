@@ -3,6 +3,8 @@ slack:
   enableRequestVerification: false
   client:
     methods-base-url: "http://localhost:8000/api/"
+  creds:
+    token: dummy-token-dummy-token
   ticket:
     channel-id: C1234567891
     expected-initial-reaction: eyes
