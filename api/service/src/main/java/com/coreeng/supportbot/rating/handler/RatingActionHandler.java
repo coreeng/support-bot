@@ -2,13 +2,11 @@ package com.coreeng.supportbot.rating.handler;
 
 import com.coreeng.supportbot.rating.Rating;
 import com.coreeng.supportbot.rating.RatingService;
-import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackBlockActionHandler;
 import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
-import com.coreeng.supportbot.rbac.RbacRestrictionMessage;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketRepository;
@@ -96,6 +94,8 @@ public class RatingActionHandler implements SlackBlockActionHandler {
                 // Handle the rating submission
                 UUID ratingId = handleRating(rating, anonymousId, TicketStatus.closed.name(), impact, tags, isEscalated);
                 
+                log.info("Successfully recorded rating {} for ticket {} with ratingId {}", rating, ticketIdStr, ratingId);
+                
                 // Send confirmation message in the same thread as the rating request
                 MessageTs threadTs = null;
                 if (payload.getContainer() != null && payload.getContainer().getThreadTs() != null) {
@@ -115,7 +115,9 @@ public class RatingActionHandler implements SlackBlockActionHandler {
                 );
                 
             } else {
-                log.warn("Invalid rating action format: {}", action.getActionId());
+                if (log.isWarnEnabled()) {
+                    log.warn("Invalid rating action format: {}", action.getActionId());
+                }
             }
         } catch (Exception e) {
             log.error("Error handling rating submission", e);
