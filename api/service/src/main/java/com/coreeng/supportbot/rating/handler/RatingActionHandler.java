@@ -1,7 +1,7 @@
 package com.coreeng.supportbot.rating.handler;
 
-import com.coreeng.supportbot.rating.TicketRating;
-import com.coreeng.supportbot.rating.TicketRatingService;
+import com.coreeng.supportbot.rating.Rating;
+import com.coreeng.supportbot.rating.RatingService;
 import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackBlockActionHandler;
@@ -33,8 +33,8 @@ import java.util.regex.Pattern;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class TicketRatingActionHandler implements SlackBlockActionHandler {
-    private final TicketRatingService ticketRatingService;
+public class RatingActionHandler implements SlackBlockActionHandler {
+    private final RatingService ratingService;
     private final SlackClient slackClient;
     private final TicketRepository ticketRepository;
     private final EscalationQueryService escalationQueryService;
@@ -77,7 +77,7 @@ public class TicketRatingActionHandler implements SlackBlockActionHandler {
                 String anonymousId = createAnonymousId(ticketIdStr, userId);
                 
                 // Check if user has already rated this ticket
-                if (ticketRatingService.hasAlreadyRated(anonymousId)) {
+                if (ratingService.hasAlreadyRated(anonymousId)) {
                     log.info("User {} already submitted a rating for ticket {} - ignoring duplicate", userId, ticketIdStr);
                     return;
                 }
@@ -152,7 +152,7 @@ public class TicketRatingActionHandler implements SlackBlockActionHandler {
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         
         // Create new rating
-        TicketRating ticketRating = TicketRating.createNew(
+        Rating ratingRecord = Rating.createNew(
                 rating,
                 timestamp,
                 ticketStatus,
@@ -163,7 +163,7 @@ public class TicketRatingActionHandler implements SlackBlockActionHandler {
         );
         
         // Save rating
-        UUID ratingId = ticketRatingService.createRating(ticketRating);
+        UUID ratingId = ratingService.createRating(ratingRecord);
         
         if (isEscalated) {
             log.warn("Rating for escalated ticket: rating={}.", rating);

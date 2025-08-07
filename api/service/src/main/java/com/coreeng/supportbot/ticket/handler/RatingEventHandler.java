@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TicketRatingEventHandler {
+public class RatingEventHandler {
     private final TicketSlackService slackService;
     private final TicketRepository ticketRepository;
     private final SlackClient slackClient;
