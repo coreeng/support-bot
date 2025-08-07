@@ -9,7 +9,7 @@ import java.util.UUID;
 
 @Getter
 @Builder(toBuilder = true)
-public class TicketRating {
+public class Rating {
     @With
     @Nullable
     private UUID id;
@@ -23,7 +23,7 @@ public class TicketRating {
     private String[] tags;
     private boolean isEscalated;
 
-    public static TicketRating createNew(
+    public static Rating createNew(
         int rating,
         String submittedTs,
         String status,
@@ -32,7 +32,7 @@ public class TicketRating {
         @Nullable String[] tags,
         boolean isEscalated
     ) {
-        return TicketRating.builder()
+        return Rating.builder()
             .rating(rating)
             .submittedTs(submittedTs)
             .status(status)

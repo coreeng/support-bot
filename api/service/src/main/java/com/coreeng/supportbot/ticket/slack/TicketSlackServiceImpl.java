@@ -15,8 +15,8 @@ import com.coreeng.supportbot.ticket.TicketCreatedMessage;
 import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
 import com.coreeng.supportbot.ticket.TicketEscalatedMessage;
 import com.coreeng.supportbot.ticket.TicketId;
-import com.coreeng.supportbot.rating.TicketRatingService;
-import com.coreeng.supportbot.ticket.TicketRatingRequestMessage;
+import com.coreeng.supportbot.rating.RatingService;
+import com.coreeng.supportbot.ticket.RatingRequestMessage;
 import com.coreeng.supportbot.ticket.TicketWentStaleMessage;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
@@ -36,7 +36,7 @@ public class TicketSlackServiceImpl implements TicketSlackService {
     private final SlackTicketsProps slackTicketsProps;
     private final SupportTeamService supportTeamService;
     private final TicketCreatedMessageMapper createdMessageMapper;
-    private final TicketRatingService ticketRatingService;
+    private final RatingService ratingService;
 
     @Override
     public void markPostTracked(MessageRef threadRef) {
@@ -150,7 +150,7 @@ public class TicketSlackServiceImpl implements TicketSlackService {
 
         log.info("Posting ephemeral rating request for ticket {} to user {}", ticketId, userId);
 
-        TicketRatingRequestMessage ratingMessage = new TicketRatingRequestMessage(ticketId);
+        RatingRequestMessage ratingMessage = new RatingRequestMessage(ticketId);
 
         slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
             .message(ratingMessage)

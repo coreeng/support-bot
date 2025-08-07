@@ -10,13 +10,13 @@ import java.util.UUID;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
-public class TicketRatingInMemoryRepository implements TicketRatingRepository {
-    private final Map<UUID, TicketRating> ratings = new HashMap<>();
+public class RatingInMemoryRepository implements RatingRepository {
+    private final Map<UUID, Rating> ratings = new HashMap<>();
 
     @Override
-    public UUID insertRating(TicketRating rating) {
+    public UUID insertRating(Rating rating) {
         UUID id = UUID.randomUUID();
-        TicketRating savedRating = rating.toBuilder()
+        Rating savedRating = rating.toBuilder()
                 .id(id)
                 .build();
         ratings.put(id, savedRating);
@@ -25,13 +25,13 @@ public class TicketRatingInMemoryRepository implements TicketRatingRepository {
 
     @Nullable
     @Override
-    public TicketRating findById(UUID ratingId) {
+    public Rating findById(UUID ratingId) {
         return ratings.get(ratingId);
     }
 
     @Nullable
     @Override
-    public TicketRating findByAnonymousId(String anonymousId) {
+    public Rating findByAnonymousId(String anonymousId) {
         return ratings.values().stream()
                 .filter(rating -> anonymousId.equals(rating.anonymousId()))
                 .findFirst()
@@ -39,23 +39,23 @@ public class TicketRatingInMemoryRepository implements TicketRatingRepository {
     }
 
     @Override
-    public ImmutableList<TicketRating> findRatingsByStatus(String ticketStatus) {
+    public ImmutableList<Rating> findRatingsByStatus(String ticketStatus) {
         return ratings.values().stream()
                 .filter(rating -> ticketStatus.equals(rating.status()))
                 .collect(toImmutableList());
     }
 
     @Override
-    public ImmutableList<TicketRating> findRatingsByTag(String tagCode) {
+    public ImmutableList<Rating> findRatingsByTag(String tagCode) {
         return ratings.values().stream()
                 .filter(rating -> rating.tags() != null && Arrays.asList(rating.tags()).contains(tagCode))
                 .collect(toImmutableList());
     }
 
     @Override
-    public ImmutableList<TicketRating> findEscalatedRatings() {
+    public ImmutableList<Rating> findEscalatedRatings() {
         return ratings.values().stream()
-                .filter(TicketRating::isEscalated)
+                .filter(Rating::isEscalated)
                 .collect(toImmutableList());
     }
 

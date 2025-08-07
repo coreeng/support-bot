@@ -1,7 +1,7 @@
 package com.coreeng.supportbot.rating.handler;
 
-import com.coreeng.supportbot.rating.TicketRating;
-import com.coreeng.supportbot.rating.TicketRatingService;
+import com.coreeng.supportbot.rating.Rating;
+import com.coreeng.supportbot.rating.RatingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -12,9 +12,9 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class TicketRatingHandler {
+public class RatingHandler {
 
-    private final TicketRatingService ticketRatingService;
+    private final RatingService ratingService;
 
     public UUID handleRating(String ticketId, int rating, String ticketStatus, String ticketImpact, String[] tags, boolean isEscalated) {
         log.info("Handling ticket rating: ticketId={}, rating={}, status={}", ticketId, rating, ticketStatus);
@@ -31,7 +31,7 @@ public class TicketRatingHandler {
         String anonymousId = createAnonymousId(ticketId, "system");
         
         // Create new rating
-        TicketRating ticketRating = TicketRating.createNew(
+        Rating ratingRecord = Rating.createNew(
                 rating,
                 timestamp,
                 ticketStatus,
@@ -42,7 +42,7 @@ public class TicketRatingHandler {
         );
         
         // Save rating
-        UUID ratingId = ticketRatingService.createRating(ticketRating);
+        UUID ratingId = ratingService.createRating(ratingRecord);
         
         if (isEscalated) {
             log.warn("Rating for escalated ticket {}: rating={}.", ticketId, rating);
