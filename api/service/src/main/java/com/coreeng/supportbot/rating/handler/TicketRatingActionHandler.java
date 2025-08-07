@@ -13,6 +13,7 @@ import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
+import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.slack.api.app_backend.interactive_components.payload.BlockActionPayload;
 import com.slack.api.bolt.context.builtin.ActionContext;
 import com.slack.api.bolt.request.builtin.BlockActionRequest;
@@ -36,6 +37,7 @@ public class TicketRatingActionHandler implements SlackBlockActionHandler {
     private final TicketRatingService ticketRatingService;
     private final SlackClient slackClient;
     private final TicketRepository ticketRepository;
+    private final EscalationQueryService escalationQueryService;
 
     @Override
     public Pattern getPattern() {
@@ -88,8 +90,11 @@ public class TicketRatingActionHandler implements SlackBlockActionHandler {
                 String[] tags = ticket != null && ticket.tags() != null ? 
                     ticket.tags().toArray(new String[0]) : null;
                 
+                // Determine if ticket has any unresolved escalations
+                boolean isEscalated = escalationQueryService.countNotResolvedByTicketId(ticketId) > 0;
+                
                 // Handle the rating submission
-                UUID ratingId = handleRating(rating, anonymousId, TicketStatus.closed.name(), impact, tags, null);
+                UUID ratingId = handleRating(rating, anonymousId, TicketStatus.closed.name(), impact, tags, isEscalated);
                 
                 // Send confirmation message in the same thread as the rating request
                 MessageTs threadTs = null;
@@ -135,7 +140,7 @@ public class TicketRatingActionHandler implements SlackBlockActionHandler {
     }
 
     // Combined rating handling logic
-    public UUID handleRating(int rating, String anonymousId, String ticketStatus, String ticketImpact, String[] tags, String[] escalatedTeams) {
+    public UUID handleRating(int rating, String anonymousId, String ticketStatus, String ticketImpact, String[] tags, boolean isEscalated) {
         log.info("Handling ticket rating: anonymousId={}, rating={}, status={}", anonymousId, rating, ticketStatus);
         
         // Validate rating
@@ -154,16 +159,14 @@ public class TicketRatingActionHandler implements SlackBlockActionHandler {
                 anonymousId,
                 ticketImpact,
                 tags,
-                escalatedTeams
+                isEscalated
         );
         
         // Save rating
         UUID ratingId = ticketRatingService.createRating(ticketRating);
         
-        boolean isEscalated = ticketRating.isEscalated();
         if (isEscalated) {
-            log.warn("Rating for escalated ticket: rating={}, escalated teams={}.", 
-                    rating, escalatedTeams);
+            log.warn("Rating for escalated ticket: rating={}.", rating);
         }
         
         log.info("Successfully handled ticket rating: anonymousId={}, ratingId={}, escalated={}", 
@@ -176,7 +179,7 @@ public class TicketRatingActionHandler implements SlackBlockActionHandler {
         // Simplified version with default values - ticket must be closed to submit rating
         // Note: This method should not be used for user submissions as it doesn't prevent duplicates
         String anonymousId = createAnonymousId(ticketId, "system");
-        return handleRating(rating, anonymousId, TicketStatus.closed.name(), null, null, null);
+        return handleRating(rating, anonymousId, TicketStatus.closed.name(), null, null, false);
     }
     
     private String createAnonymousId(String ticketId, String userId) {
