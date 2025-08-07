@@ -1,8 +1,8 @@
 package com.coreeng.supportbot.ticket;
 
-import com.coreeng.supportbot.rating.TicketRating;
-import com.coreeng.supportbot.rating.TicketRatingRepository;
-import com.coreeng.supportbot.rating.TicketRatingService;
+import com.coreeng.supportbot.rating.Rating;
+import com.coreeng.supportbot.rating.RatingRepository;
+import com.coreeng.supportbot.rating.RatingService;
 import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,21 +19,21 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class TicketRatingServiceTest {
+class RatingServiceTest {
 
     @Mock
-    private TicketRatingRepository repository;
+    private RatingRepository repository;
 
     @InjectMocks
-    private TicketRatingService service;
+    private RatingService service;
 
-    private TicketRating sampleRating;
+    private Rating sampleRating;
     private UUID sampleRatingId;
 
     @BeforeEach
     void setUp() {
         sampleRatingId = UUID.randomUUID();
-        sampleRating = TicketRating.createNew(
+        sampleRating = Rating.createNew(
                 4,
                 "1640995200",
                 "closed",
@@ -47,7 +47,7 @@ class TicketRatingServiceTest {
     @Test
     void shouldCreateRating() {
         // Given
-        when(repository.insertRating(any(TicketRating.class))).thenReturn(sampleRatingId);
+        when(repository.insertRating(any(Rating.class))).thenReturn(sampleRatingId);
 
         // When
         UUID result = service.createRating(sampleRating);
@@ -63,7 +63,7 @@ class TicketRatingServiceTest {
         when(repository.findById(sampleRatingId)).thenReturn(sampleRating);
 
         // When
-        TicketRating result = service.findById(sampleRatingId);
+        Rating result = service.findById(sampleRatingId);
 
         // Then
         assertThat(result).isEqualTo(sampleRating);
@@ -77,7 +77,7 @@ class TicketRatingServiceTest {
         when(repository.findById(nonExistentId)).thenReturn(null);
 
         // When
-        TicketRating result = service.findById(nonExistentId);
+        Rating result = service.findById(nonExistentId);
 
         // Then
         assertThat(result).isNull();
@@ -88,11 +88,11 @@ class TicketRatingServiceTest {
     void shouldFindRatingsByStatus() {
         // Given
         String status = "closed";
-        ImmutableList<TicketRating> expectedRatings = ImmutableList.of(sampleRating);
+        ImmutableList<Rating> expectedRatings = ImmutableList.of(sampleRating);
         when(repository.findRatingsByStatus(status)).thenReturn(expectedRatings);
 
         // When
-        ImmutableList<TicketRating> result = service.findRatingsByStatus(status);
+        ImmutableList<Rating> result = service.findRatingsByStatus(status);
 
         // Then
         assertThat(result).isEqualTo(expectedRatings);
@@ -105,11 +105,11 @@ class TicketRatingServiceTest {
     void shouldReturnEmptyListWhenNoRatingsFoundByStatus() {
         // Given
         String status = "non-existent";
-        ImmutableList<TicketRating> emptyList = ImmutableList.of();
+        ImmutableList<Rating> emptyList = ImmutableList.of();
         when(repository.findRatingsByStatus(status)).thenReturn(emptyList);
 
         // When
-        ImmutableList<TicketRating> result = service.findRatingsByStatus(status);
+        ImmutableList<Rating> result = service.findRatingsByStatus(status);
 
         // Then
         assertThat(result).isEmpty();
@@ -120,11 +120,11 @@ class TicketRatingServiceTest {
     void shouldFindRatingsByTag() {
         // Given
         String tagCode = "ingress";
-        ImmutableList<TicketRating> expectedRatings = ImmutableList.of(sampleRating);
+        ImmutableList<Rating> expectedRatings = ImmutableList.of(sampleRating);
         when(repository.findRatingsByTag(tagCode)).thenReturn(expectedRatings);
 
         // When
-        ImmutableList<TicketRating> result = service.findRatingsByTag(tagCode);
+        ImmutableList<Rating> result = service.findRatingsByTag(tagCode);
 
         // Then
         assertThat(result).isEqualTo(expectedRatings);
@@ -137,11 +137,11 @@ class TicketRatingServiceTest {
     void shouldReturnEmptyListWhenNoRatingsFoundByTag() {
         // Given
         String tagCode = "non-existent-tag";
-        ImmutableList<TicketRating> emptyList = ImmutableList.of();
+        ImmutableList<Rating> emptyList = ImmutableList.of();
         when(repository.findRatingsByTag(tagCode)).thenReturn(emptyList);
 
         // When
-        ImmutableList<TicketRating> result = service.findRatingsByTag(tagCode);
+        ImmutableList<Rating> result = service.findRatingsByTag(tagCode);
 
         // Then
         assertThat(result).isEmpty();
@@ -151,7 +151,7 @@ class TicketRatingServiceTest {
     @Test
     void shouldFindEscalatedRatings() {
         // Given
-        TicketRating escalatedRating = TicketRating.createNew(
+        Rating escalatedRating = Rating.createNew(
                 1,
                 "1640995200",
                 "open",
@@ -160,11 +160,11 @@ class TicketRatingServiceTest {
                 new String[]{"database"},
                 true // escalated
         );
-        ImmutableList<TicketRating> expectedRatings = ImmutableList.of(escalatedRating);
+        ImmutableList<Rating> expectedRatings = ImmutableList.of(escalatedRating);
         when(repository.findEscalatedRatings()).thenReturn(expectedRatings);
 
         // When
-        ImmutableList<TicketRating> result = service.findEscalatedRatings();
+        ImmutableList<Rating> result = service.findEscalatedRatings();
 
         // Then
         assertThat(result).isEqualTo(expectedRatings);
@@ -176,11 +176,11 @@ class TicketRatingServiceTest {
     @Test
     void shouldReturnEmptyListWhenNoEscalatedRatings() {
         // Given
-        ImmutableList<TicketRating> emptyList = ImmutableList.of();
+        ImmutableList<Rating> emptyList = ImmutableList.of();
         when(repository.findEscalatedRatings()).thenReturn(emptyList);
 
         // When
-        ImmutableList<TicketRating> result = service.findEscalatedRatings();
+        ImmutableList<Rating> result = service.findEscalatedRatings();
 
         // Then
         assertThat(result).isEmpty();
@@ -190,16 +190,16 @@ class TicketRatingServiceTest {
     @Test
     void shouldHandleMultipleRatingsInResults() {
         // Given
-        TicketRating rating1 = TicketRating.createNew(5, "1640995200", "closed", "anon1", "low", new String[]{"api"}, false);
-        TicketRating rating2 = TicketRating.createNew(3, "1640995300", "closed", "anon2", "medium", new String[]{"ui"}, false);
-        TicketRating rating3 = TicketRating.createNew(2, "1640995400", "closed", "anon3", "high", new String[]{"database"}, false);
+        Rating rating1 = Rating.createNew(5, "1640995200", "closed", "anon1", "low", new String[]{"api"}, false);
+        Rating rating2 = Rating.createNew(3, "1640995300", "closed", "anon2", "medium", new String[]{"ui"}, false);
+        Rating rating3 = Rating.createNew(2, "1640995400", "closed", "anon3", "high", new String[]{"database"}, false);
         
         String status = "closed";
-        ImmutableList<TicketRating> expectedRatings = ImmutableList.of(rating1, rating2, rating3);
+        ImmutableList<Rating> expectedRatings = ImmutableList.of(rating1, rating2, rating3);
         when(repository.findRatingsByStatus(status)).thenReturn(expectedRatings);
 
         // When
-        ImmutableList<TicketRating> result = service.findRatingsByStatus(status);
+        ImmutableList<Rating> result = service.findRatingsByStatus(status);
 
         // Then
         assertThat(result).hasSize(3);
