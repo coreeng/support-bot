@@ -1,16 +1,19 @@
-package com.coreeng.supportbot.ticket;
+package com.coreeng.supportbot.rating;
 
-import com.coreeng.supportbot.rating.TicketRating;
+import com.coreeng.supportbot.rating.Rating;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class TicketRatingTest {
+@ExtendWith(MockitoExtension.class)
+class RatingTest {
 
     @Test
     void shouldCreateNewRating() {
         // When
-        TicketRating rating = TicketRating.createNew(
+        Rating rating = Rating.createNew(
                 5,
                 "1640995200",
                 "closed",
@@ -33,9 +36,9 @@ class TicketRatingTest {
 
     @Test
     void shouldValidateValidRatings() {
-        TicketRating rating1 = createRatingWithValue(1);
-        TicketRating rating2 = createRatingWithValue(3);
-        TicketRating rating5 = createRatingWithValue(5);
+        Rating rating1 = createRatingWithValue(1);
+        Rating rating2 = createRatingWithValue(3);
+        Rating rating5 = createRatingWithValue(5);
 
         assertThat(rating1.isValidRating()).isTrue();
         assertThat(rating2.isValidRating()).isTrue();
@@ -44,9 +47,9 @@ class TicketRatingTest {
 
     @Test
     void shouldValidateInvalidRatings() {
-        TicketRating rating0 = createRatingWithValue(0);
-        TicketRating rating6 = createRatingWithValue(6);
-        TicketRating ratingNegative = createRatingWithValue(-1);
+        Rating rating0 = createRatingWithValue(0);
+        Rating rating6 = createRatingWithValue(6);
+        Rating ratingNegative = createRatingWithValue(-1);
 
         assertThat(rating0.isValidRating()).isFalse();
         assertThat(rating6.isValidRating()).isFalse();
@@ -55,9 +58,9 @@ class TicketRatingTest {
 
     @Test
     void shouldIdentifyHighRatings() {
-        TicketRating rating4 = createRatingWithValue(4);
-        TicketRating rating5 = createRatingWithValue(5);
-        TicketRating rating3 = createRatingWithValue(3);
+        Rating rating4 = createRatingWithValue(4);
+        Rating rating5 = createRatingWithValue(5);
+        Rating rating3 = createRatingWithValue(3);
 
         assertThat(rating4.isHighRating()).isTrue();
         assertThat(rating5.isHighRating()).isTrue();
@@ -66,17 +69,17 @@ class TicketRatingTest {
 
     @Test
     void shouldIdentifyLowRatings() {
-        TicketRating rating1 = createRatingWithValue(1);
-        TicketRating rating2 = createRatingWithValue(2);
-        TicketRating rating3 = createRatingWithValue(3);
+        Rating rating1 = createRatingWithValue(1);
+        Rating rating2 = createRatingWithValue(2);
+        Rating rating3 = createRatingWithValue(3);
 
         assertThat(rating1.isLowRating()).isTrue();
         assertThat(rating2.isLowRating()).isTrue();
         assertThat(rating3.isLowRating()).isFalse();
     }
 
-    private TicketRating createRatingWithValue(int rating) {
-        return TicketRating.createNew(
+    private Rating createRatingWithValue(int rating) {
+        return Rating.createNew(
                 rating,
                 "1640995200",
                 "closed",
