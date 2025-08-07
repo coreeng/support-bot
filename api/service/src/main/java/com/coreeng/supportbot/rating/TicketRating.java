@@ -21,8 +21,7 @@ public class TicketRating {
     private String impact;
     @Nullable
     private String[] tags;
-    @Nullable
-    private String[] escalatedTeams;
+    private boolean isEscalated;
 
     public static TicketRating createNew(
         int rating,
@@ -31,7 +30,7 @@ public class TicketRating {
         String anonymousId,
         @Nullable String impact,
         @Nullable String[] tags,
-        @Nullable String[] escalatedTeams
+        boolean isEscalated
     ) {
         return TicketRating.builder()
             .rating(rating)
@@ -40,7 +39,7 @@ public class TicketRating {
             .anonymousId(anonymousId)
             .impact(impact)
             .tags(tags)
-            .escalatedTeams(escalatedTeams)
+            .isEscalated(isEscalated)
             .build();
     }
 
@@ -57,6 +56,6 @@ public class TicketRating {
     }
 
     public boolean isEscalated() {
-        return escalatedTeams != null && escalatedTeams.length > 0;
+        return isEscalated;
     }
 }

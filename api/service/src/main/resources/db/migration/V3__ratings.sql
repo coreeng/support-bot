@@ -7,10 +7,13 @@ CREATE TABLE ticket_ratings (
     rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
     submitted_ts TEXT NOT NULL,
 
+    -- Anonymous identifier for duplicate prevention (hash of ticket_id + user_id)
+    anonymous_id VARCHAR(64) NOT NULL,
+
     -- I'm adding snapshot prefix to make it clear that we're copying these values that exist in other tables for anonymity
     status ticket_status NOT NULL, -- Using existing enum type
     impact TEXT REFERENCES impact(code), -- Foreign key to impact table
 
     tags VARCHAR(255)[], -- Array of tags at time of rating
-    escalated_teams VARCHAR(255)[] -- Array of teams ticket was escalated to
+    is_escalated BOOLEAN NOT NULL DEFAULT FALSE -- Whether the ticket was escalated
 );
