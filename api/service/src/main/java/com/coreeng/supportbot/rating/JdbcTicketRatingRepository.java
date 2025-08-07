@@ -28,7 +28,7 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
             .set(TICKET_RATINGS.ANONYMOUS_ID, rating.anonymousId())
             .set(TICKET_RATINGS.IMPACT, rating.impact())
             .set(TICKET_RATINGS.TAGS, rating.tags())
-            .set(TICKET_RATINGS.ESCALATED_TEAMS, rating.escalatedTeams())
+            .set(TICKET_RATINGS.IS_ESCALATED, rating.isEscalated())
             .returningResult(TICKET_RATINGS.ID)
             .fetchOne(TICKET_RATINGS.ID);
     }
@@ -76,8 +76,7 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
         return fetchRatings(
             dsl.select()
                 .from(TICKET_RATINGS)
-                .where(TICKET_RATINGS.ESCALATED_TEAMS.isNotNull()
-                    .and(TICKET_RATINGS.ESCALATED_TEAMS.notEqual(new String[]{})))
+                .where(TICKET_RATINGS.IS_ESCALATED.eq(true))
         );
     }
 
@@ -97,7 +96,7 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
             .anonymousId(record.getValue(TICKET_RATINGS.ANONYMOUS_ID))
             .impact(record.getValue(TICKET_RATINGS.IMPACT))
             .tags(record.getValue(TICKET_RATINGS.TAGS))
-            .escalatedTeams(record.getValue(TICKET_RATINGS.ESCALATED_TEAMS))
+            .isEscalated(record.getValue(TICKET_RATINGS.IS_ESCALATED))
             .build();
     }
 }
