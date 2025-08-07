@@ -1,5 +1,8 @@
 package com.coreeng.supportbot.ticket;
 
+import com.coreeng.supportbot.rating.TicketRating;
+import com.coreeng.supportbot.rating.TicketRatingRepository;
+import com.coreeng.supportbot.rating.TicketRatingService;
 import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,8 +37,9 @@ class TicketRatingServiceTest {
                 4,
                 "1640995200",
                 "closed",
+                "anonymous123",
                 "production blocking",
-                "ingress",
+                new String[]{"ingress"},
                 false
         );
     }
@@ -151,8 +155,9 @@ class TicketRatingServiceTest {
                 1,
                 "1640995200",
                 "open",
+                "anonymous456",
                 "production blocking",
-                "database",
+                new String[]{"database"},
                 true // escalated
         );
         ImmutableList<TicketRating> expectedRatings = ImmutableList.of(escalatedRating);
@@ -164,7 +169,7 @@ class TicketRatingServiceTest {
         // Then
         assertThat(result).isEqualTo(expectedRatings);
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).escalated()).isTrue();
+        assertThat(result.get(0).isEscalated()).isTrue();
         verify(repository).findEscalatedRatings();
     }
 
@@ -185,9 +190,9 @@ class TicketRatingServiceTest {
     @Test
     void shouldHandleMultipleRatingsInResults() {
         // Given
-        TicketRating rating1 = TicketRating.createNew(5, "1640995200", "closed", "low", "api", false);
-        TicketRating rating2 = TicketRating.createNew(3, "1640995300", "closed", "medium", "ui", false);
-        TicketRating rating3 = TicketRating.createNew(2, "1640995400", "closed", "high", "database", false);
+        TicketRating rating1 = TicketRating.createNew(5, "1640995200", "closed", "anon1", "low", new String[]{"api"}, false);
+        TicketRating rating2 = TicketRating.createNew(3, "1640995300", "closed", "anon2", "medium", new String[]{"ui"}, false);
+        TicketRating rating3 = TicketRating.createNew(2, "1640995400", "closed", "anon3", "high", new String[]{"database"}, false);
         
         String status = "closed";
         ImmutableList<TicketRating> expectedRatings = ImmutableList.of(rating1, rating2, rating3);
