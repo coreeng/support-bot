@@ -17,10 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.UUID;
-
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,7 +47,7 @@ class RatingEventHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new RatingEventHandler(slackService, ticketRepository, slackClient);
-        ticketId = new TicketId(12345);
+        ticketId = new TicketId(12_345);
         queryRef = new MessageRef(new MessageTs("1754593060", false), "C1234567890");
         userId = "U1234567890";
     }
@@ -141,7 +138,7 @@ class RatingEventHandlerTest {
     @Test
     void shouldNotPostRatingRequestForNonClosedStatuses() {
         // Given - test each non-closed status
-        TicketId testTicketId = new TicketId(99999);
+        TicketId testTicketId = new TicketId(99_999);
         
         // When - test opened status
         handler.onTicketStatusChange(new TicketStatusChanged(testTicketId, TicketStatus.opened));
