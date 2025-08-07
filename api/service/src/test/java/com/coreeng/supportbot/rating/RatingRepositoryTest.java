@@ -1,7 +1,7 @@
 package com.coreeng.supportbot.ticket;
 
-import com.coreeng.supportbot.rating.TicketRating;
-import com.coreeng.supportbot.rating.TicketRatingInMemoryRepository;
+import com.coreeng.supportbot.rating.Rating;
+import com.coreeng.supportbot.rating.RatingInMemoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -10,19 +10,19 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class TicketRatingRepositoryTest {
+class RatingRepositoryTest {
 
-    private TicketRatingInMemoryRepository ratingRepository;
+    private RatingInMemoryRepository ratingRepository;
 
     @BeforeEach
     void setUp() {
-        ratingRepository = new TicketRatingInMemoryRepository();
+        ratingRepository = new RatingInMemoryRepository();
     }
 
     @Test
     void shouldInsertRatingAndReturnId() {
         // Given
-        TicketRating rating = TicketRating.createNew(
+        Rating rating = Rating.createNew(
                 5,
                 String.valueOf(Instant.now().getEpochSecond()),
                 "closed",
@@ -43,7 +43,7 @@ class TicketRatingRepositoryTest {
     @Test
     void shouldFindRatingById() {
         // Given
-        TicketRating rating = TicketRating.createNew(
+        Rating rating = Rating.createNew(
                 4,
                 String.valueOf(Instant.now().getEpochSecond()),
                 "opened",
@@ -55,7 +55,7 @@ class TicketRatingRepositoryTest {
         UUID savedId = ratingRepository.insertRating(rating);
 
         // When
-        TicketRating found = ratingRepository.findById(savedId);
+        Rating found = ratingRepository.findById(savedId);
 
         // Then
         assertNotNull(found, "Should find the rating");
@@ -73,7 +73,7 @@ class TicketRatingRepositoryTest {
         UUID nonExistentId = UUID.randomUUID();
 
         // When
-        TicketRating result = ratingRepository.findById(nonExistentId);
+        Rating result = ratingRepository.findById(nonExistentId);
 
         // Then
         assertNull(result, "Should return null for non-existent ID");
@@ -82,7 +82,7 @@ class TicketRatingRepositoryTest {
     @Test
     void shouldHandleNullOptionalFields() {
         // Given
-        TicketRating rating = TicketRating.createNew(
+        Rating rating = Rating.createNew(
                 3,
                 String.valueOf(Instant.now().getEpochSecond()),
                 "stale",
@@ -94,7 +94,7 @@ class TicketRatingRepositoryTest {
 
         // When
         UUID savedId = ratingRepository.insertRating(rating);
-        TicketRating found = ratingRepository.findById(savedId);
+        Rating found = ratingRepository.findById(savedId);
 
         // Then
         assertNotNull(found, "Should find the rating");
@@ -106,9 +106,9 @@ class TicketRatingRepositoryTest {
     @Test
     void shouldFindRatingsByStatus() {
         // Given
-        TicketRating openedRating = TicketRating.createNew(5, "1000", "opened", "anon1", "production blocking", new String[]{"gatekeeper"}, false);
-        TicketRating closedRating = TicketRating.createNew(3, "2000", "closed", "anon2", "low", new String[]{"jenkins"}, true);
-        TicketRating anotherOpenedRating = TicketRating.createNew(4, "3000", "opened", "anon3", "bau", new String[]{"eks"}, false);
+        Rating openedRating = Rating.createNew(5, "1000", "opened", "anon1", "production blocking", new String[]{"gatekeeper"}, false);
+        Rating closedRating = Rating.createNew(3, "2000", "closed", "anon2", "low", new String[]{"jenkins"}, true);
+        Rating anotherOpenedRating = Rating.createNew(4, "3000", "opened", "anon3", "bau", new String[]{"eks"}, false);
         
         ratingRepository.insertRating(openedRating);
         ratingRepository.insertRating(closedRating);
@@ -131,9 +131,9 @@ class TicketRatingRepositoryTest {
     @Test
     void shouldFindRatingsByTag() {
         // Given
-        TicketRating bugRating = TicketRating.createNew(2, "1000", "opened", "anon4", "production blocking", new String[]{"ingress"}, false);
-        TicketRating featureRating = TicketRating.createNew(4, "2000", "closed", "anon5", "bau", new String[]{"new-feature"}, true);
-        TicketRating anotherBugRating = TicketRating.createNew(1, "3000", "stale", "anon6", "production blocking", new String[]{"ingress"}, true);
+        Rating bugRating = Rating.createNew(2, "1000", "opened", "anon4", "production blocking", new String[]{"ingress"}, false);
+        Rating featureRating = Rating.createNew(4, "2000", "closed", "anon5", "bau", new String[]{"new-feature"}, true);
+        Rating anotherBugRating = Rating.createNew(1, "3000", "stale", "anon6", "production blocking", new String[]{"ingress"}, true);
         
         ratingRepository.insertRating(bugRating);
         ratingRepository.insertRating(featureRating);
@@ -156,9 +156,9 @@ class TicketRatingRepositoryTest {
     @Test
     void shouldFindEscalatedRatings() {
         // Given
-        TicketRating escalatedRating1 = TicketRating.createNew(1, "1000", "opened", "anon7", "production blocking", new String[]{"ingress"}, true);
-        TicketRating normalRating = TicketRating.createNew(5, "2000", "closed", "anon8", "low", new String[]{"bau"}, false);
-        TicketRating escalatedRating2 = TicketRating.createNew(2, "3000", "stale", "anon9", "production blocking", new String[]{"github"}, true);
+        Rating escalatedRating1 = Rating.createNew(1, "1000", "opened", "anon7", "production blocking", new String[]{"ingress"}, true);
+        Rating normalRating = Rating.createNew(5, "2000", "closed", "anon8", "low", new String[]{"bau"}, false);
+        Rating escalatedRating2 = Rating.createNew(2, "3000", "stale", "anon9", "production blocking", new String[]{"github"}, true);
         
         ratingRepository.insertRating(escalatedRating1);
         ratingRepository.insertRating(normalRating);
@@ -169,7 +169,7 @@ class TicketRatingRepositoryTest {
 
         // Then
         assertEquals(2, escalatedRatings.size(), "Should find 2 escalated ratings");
-        assertTrue(escalatedRatings.stream().allMatch(TicketRating::isEscalated), 
+        assertTrue(escalatedRatings.stream().allMatch(Rating::isEscalated), 
                 "All found ratings should be escalated");
     }
 
@@ -189,8 +189,8 @@ class TicketRatingRepositoryTest {
     @Test
     void shouldGenerateUniqueIds() {
         // Given
-        TicketRating rating1 = TicketRating.createNew(4, "1000", "opened", "anon10", "bau", new String[]{"github"}, false);
-        TicketRating rating2 = TicketRating.createNew(3, "2000", "closed", "anon11", "low", new String[]{"argocd"}, true);
+        Rating rating1 = Rating.createNew(4, "1000", "opened", "anon10", "bau", new String[]{"github"}, false);
+        Rating rating2 = Rating.createNew(3, "2000", "closed", "anon11", "low", new String[]{"argocd"}, true);
         
         // When
         UUID id1 = ratingRepository.insertRating(rating1);
