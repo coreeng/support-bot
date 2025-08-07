@@ -15,11 +15,11 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 
 @Component
 @RequiredArgsConstructor
-public class JdbcTicketRatingRepository implements TicketRatingRepository {
+public class JdbcRatingRepository implements RatingRepository {
     private final DSLContext dsl;
 
     @Override
-    public UUID insertRating(TicketRating rating) {
+    public UUID insertRating(Rating rating) {
         return dsl.insertInto(TICKET_RATINGS)
             .set(TICKET_RATINGS.RATING, rating.rating())
             .set(TICKET_RATINGS.SUBMITTED_TS, rating.submittedTs())
@@ -35,24 +35,24 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
 
     @Override
     @Nullable
-    public TicketRating findById(UUID id) {
+    public Rating findById(UUID id) {
         return dsl.select()
             .from(TICKET_RATINGS)
             .where(TICKET_RATINGS.ID.eq(id))
-            .fetchOne(this::mapToTicketRating);
+            .fetchOne(this::mapToRating);
     }
 
     @Override
     @Nullable
-    public TicketRating findByAnonymousId(String anonymousId) {
+    public Rating findByAnonymousId(String anonymousId) {
         return dsl.select()
             .from(TICKET_RATINGS)
             .where(TICKET_RATINGS.ANONYMOUS_ID.eq(anonymousId))
-            .fetchOne(this::mapToTicketRating);
+            .fetchOne(this::mapToRating);
     }
 
     @Override
-    public ImmutableList<TicketRating> findRatingsByStatus(String status) {
+    public ImmutableList<Rating> findRatingsByStatus(String status) {
         return fetchRatings(
             dsl.select()
                 .from(TICKET_RATINGS)
@@ -63,7 +63,7 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
     }
 
     @Override
-    public ImmutableList<TicketRating> findRatingsByTag(String tag) {
+    public ImmutableList<Rating> findRatingsByTag(String tag) {
         return fetchRatings(
             dsl.select()
                 .from(TICKET_RATINGS)
@@ -72,7 +72,7 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
     }
 
     @Override
-    public ImmutableList<TicketRating> findEscalatedRatings() {
+    public ImmutableList<Rating> findEscalatedRatings() {
         return fetchRatings(
             dsl.select()
                 .from(TICKET_RATINGS)
@@ -80,15 +80,15 @@ public class JdbcTicketRatingRepository implements TicketRatingRepository {
         );
     }
 
-    private ImmutableList<TicketRating> fetchRatings(ResultQuery<?> query) {
+    private ImmutableList<Rating> fetchRatings(ResultQuery<?> query) {
         try (var stream = query.stream()) {
-            return stream.map(this::mapToTicketRating)
+            return stream.map(this::mapToRating)
                 .collect(toImmutableList());
         }
     }
 
-    private TicketRating mapToTicketRating(Record record) {
-        return TicketRating.builder()
+    private Rating mapToRating(Record record) {
+        return Rating.builder()
             .id(record.getValue(TICKET_RATINGS.ID))
             .rating(record.getValue(TICKET_RATINGS.RATING))
             .submittedTs(record.getValue(TICKET_RATINGS.SUBMITTED_TS))

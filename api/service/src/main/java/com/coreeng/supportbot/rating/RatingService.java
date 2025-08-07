@@ -13,21 +13,21 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(readOnly = true)
-public class TicketRatingService {
-    private final TicketRatingRepository repository;
+public class RatingService {
+    private final RatingRepository repository;
 
     @Transactional
-    public UUID createRating(TicketRating rating) {
+    public UUID createRating(Rating rating) {
         return repository.insertRating(rating);
     }
 
     @Nullable
-    public TicketRating findById(UUID id) {
+    public Rating findById(UUID id) {
         return repository.findById(id);
     }
 
     @Nullable
-    public TicketRating findByAnonymousId(String anonymousId) {
+    public Rating findByAnonymousId(String anonymousId) {
         return repository.findByAnonymousId(anonymousId);
     }
 
@@ -35,15 +35,15 @@ public class TicketRatingService {
         return findByAnonymousId(anonymousId) != null;
     }
 
-    public ImmutableList<TicketRating> findRatingsByStatus(String status) {
+    public ImmutableList<Rating> findRatingsByStatus(String status) {
         return repository.findRatingsByStatus(status);
     }
 
-    public ImmutableList<TicketRating> findRatingsByTag(String tag) {
+    public ImmutableList<Rating> findRatingsByTag(String tag) {
         return repository.findRatingsByTag(tag);
     }
 
-    public ImmutableList<TicketRating> findEscalatedRatings() {
+    public ImmutableList<Rating> findEscalatedRatings() {
         return repository.findEscalatedRatings();
     }
 }
