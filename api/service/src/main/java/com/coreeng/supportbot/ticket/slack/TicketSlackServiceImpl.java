@@ -32,7 +32,7 @@ public class TicketSlackServiceImpl implements TicketSlackService {
     private final SlackTicketsProps slackTicketsProps;
     private final SupportTeamService supportTeamService;
     private final TicketCreatedMessageMapper createdMessageMapper;
-    private final TicketRatingService ticketRatingService;
+    private final RatingService ratingService;
 
     @Override
     public void markPostTracked(MessageRef threadRef) {
@@ -133,7 +133,7 @@ public class TicketSlackServiceImpl implements TicketSlackService {
 
         log.info("Posting ephemeral rating request for ticket {} to user {}", ticketId, userId);
 
-        TicketRatingRequestMessage ratingMessage = new TicketRatingRequestMessage(ticketId);
+        RatingRequestMessage ratingMessage = new RatingRequestMessage(ticketId);
 
         slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
             .message(ratingMessage)
