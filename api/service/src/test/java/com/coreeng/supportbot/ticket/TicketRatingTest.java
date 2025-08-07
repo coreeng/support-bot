@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
+import com.coreeng.supportbot.rating.TicketRating;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -13,19 +14,21 @@ class TicketRatingTest {
                 5,
                 "1640995200",
                 "closed",
+                "anonymous123",
                 "production blocking",
-                "ingress",
+                new String[]{"ingress"},
                 true
         );
 
         // Then
         assertThat(rating.rating()).isEqualTo(5);
-        assertThat(rating.ratingSubmittedTs()).isEqualTo("1640995200");
-        assertThat(rating.ticketStatusSnapshot()).isEqualTo("closed");
-        assertThat(rating.ticketImpactSnapshot()).isEqualTo("production blocking");
-        assertThat(rating.primaryTagSnapshot()).isEqualTo("ingress");
-        assertThat(rating.escalated()).isTrue();
-        assertThat(rating.ratingId()).isNull();
+        assertThat(rating.submittedTs()).isEqualTo("1640995200");
+        assertThat(rating.status()).isEqualTo("closed");
+        assertThat(rating.anonymousId()).isEqualTo("anonymous123");
+        assertThat(rating.impact()).isEqualTo("production blocking");
+        assertThat(rating.tags()).isEqualTo(new String[]{"ingress"});
+        assertThat(rating.isEscalated()).isTrue();
+        assertThat(rating.id()).isNull();
     }
 
     @Test
@@ -77,8 +80,9 @@ class TicketRatingTest {
                 rating,
                 "1640995200",
                 "closed",
+                "anonymous123",
                 "medium",
-                "test",
+                new String[]{"test"},
                 false
         );
     }
