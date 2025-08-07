@@ -6,7 +6,6 @@ import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketStatusChanged;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
-import com.slack.api.model.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -26,7 +25,9 @@ public class RatingEventHandler {
             // Trigger rating collection when ticket is closed
             var ticket = ticketRepository.findTicketById(event.ticketId());
             if (ticket != null) {
-                log.info("Ticket {} closed, posting rating request", event.ticketId());
+                if (log.isInfoEnabled()) {
+                    log.info("Ticket {} closed, posting rating request", event.ticketId());
+                }
                 
                 try {
                     // Get the original query message to find the user who created the ticket
@@ -36,13 +37,19 @@ public class RatingEventHandler {
                     if (userId != null) {
                         slackService.postRatingRequest(ticket.queryRef(), event.ticketId(), userId);
                     } else {
-                        log.warn("Could not determine user for ticket {} rating request", event.ticketId());
+                        if (log.isWarnEnabled()) {
+                            log.warn("Could not determine user for ticket {} rating request", event.ticketId());
+                        }
                     }
                 } catch (Exception e) {
-                    log.error("Error getting original message for ticket {} rating request", event.ticketId(), e);
+                    if (log.isErrorEnabled()) {
+                        log.error("Error getting original message for ticket {} rating request", event.ticketId(), e);
+                    }
                 }
             } else {
-                log.warn("Could not find ticket {} to post rating request", event.ticketId());
+                if (log.isWarnEnabled()) {
+                    log.warn("Could not find ticket {} to post rating request", event.ticketId());
+                }
             }
         }
     }
