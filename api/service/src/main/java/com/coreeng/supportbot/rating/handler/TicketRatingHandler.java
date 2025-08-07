@@ -16,7 +16,7 @@ public class TicketRatingHandler {
 
     private final TicketRatingService ticketRatingService;
 
-    public UUID handleRating(String ticketId, int rating, String ticketStatus, String ticketImpact, String[] tags, String[] escalatedTeams) {
+    public UUID handleRating(String ticketId, int rating, String ticketStatus, String ticketImpact, String[] tags, boolean isEscalated) {
         log.info("Handling ticket rating: ticketId={}, rating={}, status={}", ticketId, rating, ticketStatus);
         
         // Validate rating
@@ -38,16 +38,14 @@ public class TicketRatingHandler {
                 anonymousId,
                 ticketImpact,
                 tags,
-                escalatedTeams
+                isEscalated
         );
         
         // Save rating
         UUID ratingId = ticketRatingService.createRating(ticketRating);
         
-        boolean isEscalated = ticketRating.isEscalated();
         if (isEscalated) {
-            log.warn("Rating for escalated ticket {}: rating={}, escalated teams={}.", 
-                    ticketId, rating, escalatedTeams);
+            log.warn("Rating for escalated ticket {}: rating={}.", ticketId, rating);
         }
         
         log.info("Successfully handled ticket rating: ticketId={}, ratingId={}, escalated={}", 
@@ -58,7 +56,7 @@ public class TicketRatingHandler {
     
     public UUID handleRating(String ticketId, int rating) {
         // Simplified version with default values
-        return handleRating(ticketId, rating, "unknown", null, null, null);
+        return handleRating(ticketId, rating, "unknown", null, null, false);
     }
     
     private boolean isValidRating(int rating) {
