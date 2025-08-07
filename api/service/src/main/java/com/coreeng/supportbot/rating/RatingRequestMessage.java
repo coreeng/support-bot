@@ -9,7 +9,7 @@ import static com.slack.api.model.block.composition.BlockCompositions.markdownTe
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
 import static com.slack.api.model.block.element.BlockElements.button;
 
-public record TicketRatingRequestMessage(
+public record RatingRequestMessage(
     TicketId ticketId
 ) implements SlackMessage {
 
