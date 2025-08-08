@@ -24,6 +24,7 @@ public class EscalationCreatedMessageMapper {
     public SimpleSlackMessage renderMessage(EscalationCreatedMessage message) {
         return SimpleSlackMessage.builder()
             .blocks(renderBlocks(message))
+            .text(getTextMessage(message))
             .build();
     }
 
@@ -35,6 +36,10 @@ public class EscalationCreatedMessageMapper {
                 .text(markdownText(str))
             )
         );
+    }
+
+    private String getTextMessage(EscalationCreatedMessage message) {
+        return format("Escalation to team: %s", message.escalationTeam());
     }
 
     public EscalationResolveInput parseTriggerInput(String json) {

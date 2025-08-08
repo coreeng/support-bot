@@ -46,11 +46,6 @@ public class EscalationProcessingService {
             .addArgument(escalation::id)
             .log("Escalation created: {}");
 
-        slackClient.getPermalink(new SlackGetMessageByTsRequest(
-            request.ticket().channelId(),
-            request.ticket().queryTs()
-        ));
-
         ChatPostMessageResponse postedMessage = slackClient.postMessage(new SlackPostMessageRequest(
             createdMessageMapper.renderMessage(EscalationCreatedMessage.of(
                 escalation,
@@ -63,12 +58,12 @@ public class EscalationProcessingService {
 
         escalation = escalation.toBuilder()
             .channelId(slackEscalationProps.channelId())
-            .threadTs(postedMessageTs)
+            .threadTs(request.ticket().queryTs())
             .build();
 
         escalation = repository.update(
             escalation.toBuilder()
-                .createdMessageTs(postedMessageTs)
+                .createdMessageTs(request.ticket().queryTs())
                 .build()
         );
 
