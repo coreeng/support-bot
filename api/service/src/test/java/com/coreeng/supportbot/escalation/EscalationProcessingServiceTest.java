@@ -21,22 +21,22 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class EscalationProcessingServiceTest {
-  private EscalationProcessingService escalationProcessingService;
+  private EscalationProcessingService processingService;
 
   @Mock private EscalationRepository escalationRepository;
   @Mock private SlackEscalationProps slackEscalationProps;
-  @Mock private EscalationCreatedMessageMapper escalationCreatedMessageMapper;
+  @Mock private EscalationCreatedMessageMapper escalationMapper;
   @Mock private SlackClient slackClient;
   @Mock private EscalationTeamsRegistry escalationTeamsRegistry;
   @Mock private SlackTicketsProps slackTicketsProps;
 
   @BeforeEach
   public void setup() {
-    escalationProcessingService =
+    processingService =
         new EscalationProcessingService(
             escalationRepository,
             slackEscalationProps,
-            escalationCreatedMessageMapper,
+                escalationMapper,
             slackClient,
             escalationTeamsRegistry,
             slackTicketsProps);
@@ -56,7 +56,7 @@ class EscalationProcessingServiceTest {
         .thenReturn(Escalation.builder().id(null).build());
 
     // when
-    Escalation escalation = escalationProcessingService.createEscalation(escalationRequest);
+    Escalation escalation = processingService.createEscalation(escalationRequest);
 
     // then
     assertThat(escalation).isNotNull();
@@ -90,7 +90,7 @@ class EscalationProcessingServiceTest {
     when(escalationTeamsRegistry.findEscalationTeamByName(any())).thenReturn(new EscalationTeam("some-team","someTeam","id"));
 
     // when
-    Escalation escalation = escalationProcessingService.createEscalation(escalationRequest);
+    Escalation escalation = processingService.createEscalation(escalationRequest);
 
     // then
     assertThat(escalation).isNotNull();
