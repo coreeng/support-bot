@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Nullable;
 import java.util.UUID;
 
-import static com.coreeng.supportbot.dbschema.Tables.TICKET_RATINGS;
+import static com.coreeng.supportbot.dbschema.Tables.RATINGS;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 @Component
@@ -20,25 +20,25 @@ public class JdbcRatingRepository implements RatingRepository {
 
     @Override
     public UUID insertRating(Rating rating) {
-        return dsl.insertInto(TICKET_RATINGS)
-            .set(TICKET_RATINGS.RATING, rating.rating())
-            .set(TICKET_RATINGS.SUBMITTED_TS, rating.submittedTs())
-            .set(TICKET_RATINGS.STATUS, 
+        return dsl.insertInto(RATINGS)
+            .set(RATINGS.RATING, rating.rating())
+            .set(RATINGS.SUBMITTED_TS, rating.submittedTs())
+            .set(RATINGS.STATUS, 
                 com.coreeng.supportbot.dbschema.enums.TicketStatus.lookupLiteral(rating.status()))
-            .set(TICKET_RATINGS.ANONYMOUS_ID, rating.anonymousId())
-            .set(TICKET_RATINGS.IMPACT, rating.impact())
-            .set(TICKET_RATINGS.TAGS, rating.tags())
-            .set(TICKET_RATINGS.IS_ESCALATED, rating.isEscalated())
-            .returningResult(TICKET_RATINGS.ID)
-            .fetchOne(TICKET_RATINGS.ID);
+            .set(RATINGS.ANONYMOUS_ID, rating.anonymousId())
+            .set(RATINGS.IMPACT, rating.impact())
+            .set(RATINGS.TAGS, rating.tags())
+            .set(RATINGS.IS_ESCALATED, rating.isEscalated())
+            .returningResult(RATINGS.ID)
+            .fetchOne(RATINGS.ID);
     }
 
     @Override
     @Nullable
     public Rating findById(UUID id) {
         return dsl.select()
-            .from(TICKET_RATINGS)
-            .where(TICKET_RATINGS.ID.eq(id))
+            .from(RATINGS)
+            .where(RATINGS.ID.eq(id))
             .fetchOne(this::mapToRating);
     }
 
@@ -46,8 +46,8 @@ public class JdbcRatingRepository implements RatingRepository {
     @Nullable
     public Rating findByAnonymousId(String anonymousId) {
         return dsl.select()
-            .from(TICKET_RATINGS)
-            .where(TICKET_RATINGS.ANONYMOUS_ID.eq(anonymousId))
+            .from(RATINGS)
+            .where(RATINGS.ANONYMOUS_ID.eq(anonymousId))
             .fetchOne(this::mapToRating);
     }
 
@@ -55,8 +55,8 @@ public class JdbcRatingRepository implements RatingRepository {
     public ImmutableList<Rating> findRatingsByStatus(String status) {
         return fetchRatings(
             dsl.select()
-                .from(TICKET_RATINGS)
-                .where(TICKET_RATINGS.STATUS.eq(
+                .from(RATINGS)
+                .where(RATINGS.STATUS.eq(
                     com.coreeng.supportbot.dbschema.enums.TicketStatus.lookupLiteral(status)
             ))
         );
@@ -66,8 +66,8 @@ public class JdbcRatingRepository implements RatingRepository {
     public ImmutableList<Rating> findRatingsByTag(String tag) {
         return fetchRatings(
             dsl.select()
-                .from(TICKET_RATINGS)
-                .where(TICKET_RATINGS.TAGS.contains(new String[]{tag}))
+                .from(RATINGS)
+                .where(RATINGS.TAGS.contains(new String[]{tag}))
         );
     }
 
@@ -75,8 +75,8 @@ public class JdbcRatingRepository implements RatingRepository {
     public ImmutableList<Rating> findEscalatedRatings() {
         return fetchRatings(
             dsl.select()
-                .from(TICKET_RATINGS)
-                .where(TICKET_RATINGS.IS_ESCALATED.eq(true))
+                .from(RATINGS)
+                .where(RATINGS.IS_ESCALATED.eq(true))
         );
     }
 
@@ -89,14 +89,14 @@ public class JdbcRatingRepository implements RatingRepository {
 
     private Rating mapToRating(Record record) {
         return Rating.builder()
-            .id(record.getValue(TICKET_RATINGS.ID))
-            .rating(record.getValue(TICKET_RATINGS.RATING))
-            .submittedTs(record.getValue(TICKET_RATINGS.SUBMITTED_TS))
-            .status(record.getValue(TICKET_RATINGS.STATUS).toString())
-            .anonymousId(record.getValue(TICKET_RATINGS.ANONYMOUS_ID))
-            .impact(record.getValue(TICKET_RATINGS.IMPACT))
-            .tags(record.getValue(TICKET_RATINGS.TAGS))
-            .isEscalated(record.getValue(TICKET_RATINGS.IS_ESCALATED))
+            .id(record.getValue(RATINGS.ID))
+            .rating(record.getValue(RATINGS.RATING))
+            .submittedTs(record.getValue(RATINGS.SUBMITTED_TS))
+            .status(record.getValue(RATINGS.STATUS).toString())
+            .anonymousId(record.getValue(RATINGS.ANONYMOUS_ID))
+            .impact(record.getValue(RATINGS.IMPACT))
+            .tags(record.getValue(RATINGS.TAGS))
+            .isEscalated(record.getValue(RATINGS.IS_ESCALATED))
             .build();
     }
 }
