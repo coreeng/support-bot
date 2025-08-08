@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.rating;
 
 import com.coreeng.supportbot.slack.client.SlackMessage;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.block.LayoutBlock;
 
