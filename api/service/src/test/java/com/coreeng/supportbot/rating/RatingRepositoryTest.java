@@ -1,7 +1,5 @@
 package com.coreeng.supportbot.rating;
 
-import com.coreeng.supportbot.rating.Rating;
-import com.coreeng.supportbot.rating.RatingInMemoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
