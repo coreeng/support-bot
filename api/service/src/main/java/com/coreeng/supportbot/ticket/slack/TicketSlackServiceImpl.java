@@ -15,7 +15,7 @@ import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
 import com.coreeng.supportbot.ticket.TicketEscalatedMessage;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.rating.RatingService;
-import com.coreeng.supportbot.ticket.RatingRequestMessage;
+import com.coreeng.supportbot.rating.RatingRequestMessage;
 import com.coreeng.supportbot.ticket.TicketWentStaleMessage;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
