@@ -58,12 +58,12 @@ public class EscalationProcessingService {
 
         escalation = escalation.toBuilder()
             .channelId(slackEscalationProps.channelId())
-            .threadTs(request.ticket().queryTs())
+            .threadTs(request.ticket().createdMessageTs())
             .build();
 
         escalation = repository.update(
             escalation.toBuilder()
-                .createdMessageTs(request.ticket().queryTs())
+                .createdMessageTs(request.ticket().createdMessageTs())
                 .build()
         );
 
