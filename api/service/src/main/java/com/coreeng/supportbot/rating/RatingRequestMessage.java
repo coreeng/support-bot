@@ -1,4 +1,4 @@
-package com.coreeng.supportbot.ticket;
+package com.coreeng.supportbot.rating;
 
 import com.coreeng.supportbot.slack.client.SlackMessage;
 import com.google.common.collect.ImmutableList;

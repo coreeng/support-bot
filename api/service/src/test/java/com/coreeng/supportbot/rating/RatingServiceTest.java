@@ -1,4 +1,4 @@
-package com.coreeng.supportbot.ticket;
+package com.coreeng.supportbot.rating;
 
 import com.coreeng.supportbot.rating.Rating;
 import com.coreeng.supportbot.rating.RatingRepository;
