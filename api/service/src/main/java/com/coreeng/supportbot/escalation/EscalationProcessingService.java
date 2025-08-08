@@ -43,7 +43,7 @@ public class EscalationProcessingService {
             .addArgument(escalation::id)
             .log("Escalation created: {}");
 
-        ChatPostMessageResponse postedMessage = slackClient.postMessage(new SlackPostMessageRequest(
+        slackClient.postMessage(new SlackPostMessageRequest(
             createdMessageMapper.renderMessage(EscalationCreatedMessage.of(
                 escalation,
                 checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(escalation.team())).slackGroupId()
