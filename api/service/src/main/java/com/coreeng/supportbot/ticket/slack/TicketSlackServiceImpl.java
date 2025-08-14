@@ -132,6 +132,14 @@ public class TicketSlackServiceImpl implements TicketSlackService {
 
         log.info("Posting ephemeral rating request for ticket {} to user {}", ticketId, userId);
 
+        // If the user voted before on the same thread, we don't want them to do so again
+        String anonymousId = ratingService.createAnonymousId(String.valueOf(ticketId.id()), userId);
+
+        if (ratingService.hasAlreadyRated(anonymousId)) {
+            log.info("User {} already submitted a rating for ticket {} - ignoring duplicate", userId, ticketId.render());
+            return;
+        }
+
         RatingRequestMessage ratingMessage = new RatingRequestMessage(ticketId);
 
         slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()

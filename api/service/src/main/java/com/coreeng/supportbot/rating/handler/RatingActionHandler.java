@@ -72,7 +72,7 @@ public class RatingActionHandler implements SlackBlockActionHandler {
                 log.info("User {} submitted rating {} for ticket {}", userId, rating, ticketIdStr);
                 
                 // Create anonymous identifier to prevent duplicates while maintaining anonymity
-                String anonymousId = createAnonymousId(ticketIdStr, userId);
+                String anonymousId = ratingService.createAnonymousId(ticketIdStr, userId);
                 
                 // Check if user has already rated this ticket
                 if (ratingService.hasAlreadyRated(anonymousId)) {
@@ -180,30 +180,8 @@ public class RatingActionHandler implements SlackBlockActionHandler {
     public UUID handleRating(String ticketId, int rating) {
         // Simplified version with default values - ticket must be closed to submit rating
         // Note: This method should not be used for user submissions as it doesn't prevent duplicates
-        String anonymousId = createAnonymousId(ticketId, "system");
+        String anonymousId = ratingService.createAnonymousId(ticketId, "system");
         return handleRating(rating, anonymousId, TicketStatus.closed.name(), null, null, false);
-    }
-    
-    private String createAnonymousId(String ticketId, String userId) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            String combined = ticketId + ":" + userId;
-            byte[] hash = digest.digest(combined.getBytes(StandardCharsets.UTF_8));
-            
-            // Convert to hex string
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) {
-                    hexString.append('0');
-                }
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (NoSuchAlgorithmException e) {
-            // Fallback to simple hash if SHA-256 is not available
-            return String.valueOf((ticketId + ":" + userId).hashCode());
-        }
     }
     
     private boolean isValidRating(int rating) {
