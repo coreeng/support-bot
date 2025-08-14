@@ -31,30 +31,28 @@ public record RatingRequestMessage(
             actions(ImmutableList.of(
                 button(b -> b
                     .actionId("rating_submit_" + ticketId.id() + "_1")
-                    .text(plainText("⭐ (1)"))
+                    .text(plainText("⭐"))
                     .value("1")
                 ),
                 button(b -> b
                     .actionId("rating_submit_" + ticketId.id() + "_2")
-                    .text(plainText("⭐⭐ (2)"))
+                    .text(plainText("⭐⭐"))
                     .value("2")
                 ),
                 button(b -> b
                     .actionId("rating_submit_" + ticketId.id() + "_3")
-                    .text(plainText("⭐⭐⭐ (3)"))
+                    .text(plainText("⭐⭐⭐"))
                     .value("3")
                 ),
                 button(b -> b
                     .actionId("rating_submit_" + ticketId.id() + "_4")
-                    .text(plainText("⭐⭐⭐⭐ (4)"))
+                    .text(plainText("⭐⭐⭐⭐"))
                     .value("4")
-                    .style("primary")
                 ),
                 button(b -> b
                     .actionId("rating_submit_" + ticketId.id() + "_5")
-                    .text(plainText("⭐⭐⭐⭐⭐ (5)"))
+                    .text(plainText("⭐⭐⭐⭐⭐"))
                     .value("5")
-                    .style("primary")
                 )
             ))
         );
