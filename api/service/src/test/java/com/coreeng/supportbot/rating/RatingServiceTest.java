@@ -190,7 +190,7 @@ class RatingServiceTest {
         Rating rating1 = Rating.createNew(5, "1640995200", "closed", "anon1", "low", new String[]{"api"}, false);
         Rating rating2 = Rating.createNew(3, "1640995300", "closed", "anon2", "medium", new String[]{"ui"}, false);
         Rating rating3 = Rating.createNew(2, "1640995400", "closed", "anon3", "high", new String[]{"database"}, false);
-        
+
         String status = "closed";
         ImmutableList<Rating> expectedRatings = ImmutableList.of(rating1, rating2, rating3);
         when(repository.findRatingsByStatus(status)).thenReturn(expectedRatings);
@@ -202,5 +202,17 @@ class RatingServiceTest {
         assertThat(result).hasSize(3);
         assertThat(result).containsExactly(rating1, rating2, rating3);
         verify(repository).findRatingsByStatus(status);
+    }
+
+    @Test
+    public void shouldReturnExpectedHash() {
+        // given
+        String expectedTicketToUserHash = "79d56e69d9167acb76c830cfcdf48ad068a1303b0c76afecee8adb9c185b0669";
+
+        // when
+        String anonymous1 = service.createAnonymousId("1", "anonymous1");
+
+        // then
+        assertThat(anonymous1).isEqualTo(expectedTicketToUserHash);
     }
 }
