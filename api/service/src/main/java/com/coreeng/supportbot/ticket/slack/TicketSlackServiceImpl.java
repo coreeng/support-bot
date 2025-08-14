@@ -136,7 +136,10 @@ public class TicketSlackServiceImpl implements TicketSlackService {
         String anonymousId = ratingService.createAnonymousId(String.valueOf(ticketId.id()), userId);
 
         if (ratingService.hasAlreadyRated(anonymousId)) {
-            log.info("User {} already submitted a rating for ticket {} - ignoring duplicate", userId, ticketId.render());
+            log.atInfo()
+                .addArgument(userId)
+                .addArgument(ticketId.render())
+                .log("User {} already submitted a rating for ticket {} - ignoring duplicate");
             return;
         }
 
