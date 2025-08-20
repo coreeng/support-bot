@@ -56,9 +56,14 @@ class RatingEventHandlerTest {
     void shouldPostRatingRequestWhenTicketClosed() {
         // Given
         TicketStatusChanged event = new TicketStatusChanged(ticketId, TicketStatus.closed);
+        MessageTs createdMessageTs = new MessageTs("1754593100", false);
+        String channelId = "C1234567890";
+        MessageRef expectedThreadRef = new MessageRef(createdMessageTs, createdMessageTs, channelId);
         
         when(ticketRepository.findTicketById(ticketId)).thenReturn(ticket);
         when(ticket.queryRef()).thenReturn(queryRef);
+        when(ticket.createdMessageTs()).thenReturn(createdMessageTs);
+        when(ticket.channelId()).thenReturn(channelId);
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(originalMessage);
         when(originalMessage.getUser()).thenReturn(userId);
         
@@ -68,7 +73,7 @@ class RatingEventHandlerTest {
         // Then
         verify(ticketRepository).findTicketById(ticketId);
         verify(slackClient).getMessageByTs(SlackGetMessageByTsRequest.of(queryRef));
-        verify(slackService).postRatingRequest(queryRef, ticketId, userId);
+        verify(slackService).postRatingRequest(expectedThreadRef, ticketId, userId);
     }
     
     @Test
@@ -121,9 +126,14 @@ class RatingEventHandlerTest {
     void shouldPostRatingRequestWithCorrectParameters() {
         // Given
         TicketStatusChanged event = new TicketStatusChanged(ticketId, TicketStatus.closed);
+        MessageTs createdMessageTs = new MessageTs("1754593100", false);
+        String channelId = "C1234567890";
+        MessageRef expectedThreadRef = new MessageRef(createdMessageTs, createdMessageTs, channelId);
         
         when(ticketRepository.findTicketById(ticketId)).thenReturn(ticket);
         when(ticket.queryRef()).thenReturn(queryRef);
+        when(ticket.createdMessageTs()).thenReturn(createdMessageTs);
+        when(ticket.channelId()).thenReturn(channelId);
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(originalMessage);
         when(originalMessage.getUser()).thenReturn(userId);
         
@@ -131,7 +141,7 @@ class RatingEventHandlerTest {
         handler.onTicketStatusChange(event);
         
         // Then - verify rating request is called with exactly the right parameters
-        verify(slackService).postRatingRequest(queryRef, ticketId, userId);
+        verify(slackService).postRatingRequest(expectedThreadRef, ticketId, userId);
         verify(slackService, times(1)).postRatingRequest(any(MessageRef.class), any(TicketId.class), any(String.class));
     }
     

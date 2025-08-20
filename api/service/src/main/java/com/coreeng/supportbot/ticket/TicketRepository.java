@@ -27,4 +27,7 @@ public interface TicketRepository {
 
     ImmutableList<TicketId> listStaleTicketIds(Instant checkAt, Duration timeToStale);
     ImmutableList<TicketId> listStaleTicketIdsToRemindOf(Instant checkAt, Duration reminderInterval);
+
+    boolean isTicketRated(TicketId ticketId);
+    void markTicketAsRated(TicketId ticketId);
 }
