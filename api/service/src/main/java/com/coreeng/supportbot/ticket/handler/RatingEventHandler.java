@@ -1,7 +1,9 @@
 package com.coreeng.supportbot.ticket.handler;
 
+import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketStatusChanged;
@@ -23,7 +25,7 @@ public class RatingEventHandler {
     public void onTicketStatusChange(TicketStatusChanged event) {
         if (event.status() == TicketStatus.closed) {
             // Trigger rating collection when ticket is closed
-            var ticket = ticketRepository.findTicketById(event.ticketId());
+            Ticket ticket = ticketRepository.findTicketById(event.ticketId());
             if (ticket != null) {
                 if (log.isInfoEnabled()) {
                     log.info("Ticket {} closed, posting rating request", event.ticketId());
@@ -35,7 +37,16 @@ public class RatingEventHandler {
                     
                     String userId = originalMessage.getUser();
                     if (userId != null) {
-                        slackService.postRatingRequest(ticket.queryRef(), event.ticketId(), userId);
+                        if (ticketRepository.isTicketRated(event.ticketId())) {
+                            if (log.isInfoEnabled()) {
+                                log.info("Ticket {} already has a rating submitted, skipping rating request", event.ticketId());
+                            }
+                            return;
+                        }
+                        
+                        // Create a thread reference using the ticket form message as the thread timestamp
+                        var threadRef = new MessageRef(ticket.createdMessageTs(), ticket.createdMessageTs(), ticket.channelId());
+                        slackService.postRatingRequest(threadRef, event.ticketId(), userId);
                     } else {
                         if (log.isWarnEnabled()) {
                             log.warn("Could not determine user for ticket {} rating request", event.ticketId());

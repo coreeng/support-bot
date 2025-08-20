@@ -11,7 +11,6 @@ public interface RatingRepository {
     UUID insertRating(Rating rating);
     
     @Nullable Rating findById(UUID id);
-    @Nullable Rating findByAnonymousId(String anonymousId);
     ImmutableList<Rating> findRatingsByStatus(String status);
     ImmutableList<Rating> findRatingsByTag(String tag);
     ImmutableList<Rating> findEscalatedRatings();

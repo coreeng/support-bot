@@ -25,7 +25,6 @@ public class JdbcRatingRepository implements RatingRepository {
             .set(RATINGS.SUBMITTED_TS, rating.submittedTs())
             .set(RATINGS.STATUS, 
                 com.coreeng.supportbot.dbschema.enums.TicketStatus.lookupLiteral(rating.status()))
-            .set(RATINGS.ANONYMOUS_ID, rating.anonymousId())
             .set(RATINGS.IMPACT, rating.impact())
             .set(RATINGS.TAGS, rating.tags())
             .set(RATINGS.IS_ESCALATED, rating.isEscalated())
@@ -39,15 +38,6 @@ public class JdbcRatingRepository implements RatingRepository {
         return dsl.select()
             .from(RATINGS)
             .where(RATINGS.ID.eq(id))
-            .fetchOne(this::mapToRating);
-    }
-
-    @Override
-    @Nullable
-    public Rating findByAnonymousId(String anonymousId) {
-        return dsl.select()
-            .from(RATINGS)
-            .where(RATINGS.ANONYMOUS_ID.eq(anonymousId))
             .fetchOne(this::mapToRating);
     }
 
@@ -93,7 +83,6 @@ public class JdbcRatingRepository implements RatingRepository {
             .rating(record.getValue(RATINGS.RATING))
             .submittedTs(record.getValue(RATINGS.SUBMITTED_TS))
             .status(record.getValue(RATINGS.STATUS).toString())
-            .anonymousId(record.getValue(RATINGS.ANONYMOUS_ID))
             .impact(record.getValue(RATINGS.IMPACT))
             .tags(record.getValue(RATINGS.TAGS))
             .isEscalated(record.getValue(RATINGS.IS_ESCALATED))

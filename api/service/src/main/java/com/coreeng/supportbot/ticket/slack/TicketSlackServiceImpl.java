@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.ticket.slack;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.rating.RatingRequestMessage;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackException;
@@ -31,7 +32,6 @@ public class TicketSlackServiceImpl implements TicketSlackService {
     private final SlackTicketsProps slackTicketsProps;
     private final SupportTeamService supportTeamService;
     private final TicketCreatedMessageMapper createdMessageMapper;
-    private final RatingService ratingService;
 
     @Override
     public void markPostTracked(MessageRef threadRef) {
@@ -132,23 +132,12 @@ public class TicketSlackServiceImpl implements TicketSlackService {
 
         log.info("Posting ephemeral rating request for ticket {} to user {}", ticketId, userId);
 
-        // If the user voted before on the same thread, we don't want them to do so again
-        String anonymousId = ratingService.createAnonymousId(String.valueOf(ticketId.id()), userId);
-
-        if (ratingService.hasAlreadyRated(anonymousId)) {
-            log.atInfo()
-                .addArgument(userId)
-                .addArgument(ticketId.render())
-                .log("User {} already submitted a rating for ticket {} - ignoring duplicate");
-            return;
-        }
-
         RatingRequestMessage ratingMessage = new RatingRequestMessage(ticketId);
 
         slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
             .message(ratingMessage)
             .channel(queryRef.channelId())
-            .threadTs(queryRef.ts())
+            .threadTs(queryRef.threadTs())
             .userId(userId)
             .build()
         );
