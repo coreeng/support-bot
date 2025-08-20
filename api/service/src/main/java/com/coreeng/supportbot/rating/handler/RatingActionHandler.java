@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.rating.handler;
 
 import com.coreeng.supportbot.rating.Rating;
+import com.coreeng.supportbot.rating.RatingService;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackBlockActionHandler;
 import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
@@ -10,7 +11,6 @@ import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
-import com.coreeng.supportbot.ticket.TicketProcessingService;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.slack.api.app_backend.interactive_components.payload.BlockActionPayload;
 import com.slack.api.bolt.context.builtin.ActionContext;
@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 @Slf4j
 public class RatingActionHandler implements SlackBlockActionHandler {
-    private final TicketProcessingService ticketProcessingService;
+    private final RatingService ratingService;
     private final SlackClient slackClient;
     private final TicketRepository ticketRepository;
     private final EscalationQueryService escalationQueryService;
@@ -76,7 +76,7 @@ public class RatingActionHandler implements SlackBlockActionHandler {
                 log.info("User {} submitted rating {} for ticket {}", userId, rating, ticketId);
                 
                 // Check if ticket has already been rated
-                if (!ticketProcessingService.canRateTicket(ticketId)) {
+                if (ticketRepository.isTicketRated(ticketId)) {
                     log.info("Ticket {} has already been rated - ignoring duplicate", ticketIdStr);
                     return;
                 }
@@ -101,7 +101,8 @@ public class RatingActionHandler implements SlackBlockActionHandler {
                     isEscalated
                 );
                 
-                UUID ratingId = ticketProcessingService.submitTicketRating(ticketId, ratingRecord);
+                UUID ratingId = ratingService.createRating(ratingRecord);
+                ticketRepository.markTicketAsRated(ticketId);
                 
                 log.info("Successfully recorded rating {} for ticket {} with ratingId {}", rating, ticketIdStr, ratingId);
                 
