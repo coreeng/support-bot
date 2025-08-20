@@ -29,15 +29,6 @@ public class RatingInMemoryRepository implements RatingRepository {
         return ratings.get(ratingId);
     }
 
-    @Nullable
-    @Override
-    public Rating findByAnonymousId(String anonymousId) {
-        return ratings.values().stream()
-                .filter(rating -> anonymousId.equals(rating.anonymousId()))
-                .findFirst()
-                .orElse(null);
-    }
-
     @Override
     public ImmutableList<Rating> findRatingsByStatus(String ticketStatus) {
         return ratings.values().stream()

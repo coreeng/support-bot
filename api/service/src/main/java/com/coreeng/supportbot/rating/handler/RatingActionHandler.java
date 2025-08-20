@@ -1,7 +1,6 @@
 package com.coreeng.supportbot.rating.handler;
 
 import com.coreeng.supportbot.rating.Rating;
-import com.coreeng.supportbot.rating.RatingService;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackBlockActionHandler;
 import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
@@ -11,6 +10,7 @@ import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
+import com.coreeng.supportbot.ticket.TicketProcessingService;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.slack.api.app_backend.interactive_components.payload.BlockActionPayload;
 import com.slack.api.bolt.context.builtin.ActionContext;
@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 @Slf4j
 public class RatingActionHandler implements SlackBlockActionHandler {
-    private final RatingService ratingService;
+    private final TicketProcessingService ticketProcessingService;
     private final SlackClient slackClient;
     private final TicketRepository ticketRepository;
     private final EscalationQueryService escalationQueryService;
@@ -66,19 +66,22 @@ public class RatingActionHandler implements SlackBlockActionHandler {
                 String ticketIdStr = parts[2];
                 int rating = Integer.parseInt(parts[3]);
                 
-                log.info("User {} submitted rating {} for ticket {}", userId, rating, ticketIdStr);
+                // Validate rating value
+                if (!isValidRating(rating)) {
+                    log.warn("Invalid rating value {} submitted by user {} for ticket {}", rating, userId, ticketIdStr);
+                    return;
+                }
                 
-                // Create anonymous identifier to prevent duplicates while maintaining anonymity
-                String anonymousId = ratingService.createAnonymousId(ticketIdStr, userId);
+                TicketId ticketId = new TicketId(Long.parseLong(ticketIdStr));
+                log.info("User {} submitted rating {} for ticket {}", userId, rating, ticketId);
                 
-                // Check if user has already rated this ticket
-                if (ratingService.hasAlreadyRated(anonymousId)) {
-                    log.info("User {} already submitted a rating for ticket {} - ignoring duplicate", userId, ticketIdStr);
+                // Check if ticket has already been rated
+                if (!ticketProcessingService.canRateTicket(ticketId)) {
+                    log.info("Ticket {} has already been rated - ignoring duplicate", ticketIdStr);
                     return;
                 }
                 
                 // Fetch ticket details for impact and tags
-                TicketId ticketId = new TicketId(Integer.parseInt(ticketIdStr));
                 Ticket ticket = ticketRepository.findTicketById(ticketId);
                 
                 String impact = ticket != null ? ticket.impact() : null;
@@ -88,8 +91,17 @@ public class RatingActionHandler implements SlackBlockActionHandler {
                 // Determine if ticket has any unresolved escalations
                 boolean isEscalated = escalationQueryService.countNotResolvedByTicketId(ticketId) > 0;
                 
-                // Handle the rating submission
-                UUID ratingId = handleRating(rating, anonymousId, TicketStatus.closed.name(), impact, tags, isEscalated);
+                // Create and submit the rating
+                Rating ratingRecord = Rating.createNew(
+                    rating,
+                    String.valueOf(Instant.now().getEpochSecond()),
+                    TicketStatus.closed.name(),
+                    impact,
+                    tags,
+                    isEscalated
+                );
+                
+                UUID ratingId = ticketProcessingService.submitTicketRating(ticketId, ratingRecord);
                 
                 log.info("Successfully recorded rating {} for ticket {} with ratingId {}", rating, ticketIdStr, ratingId);
                 
@@ -138,49 +150,6 @@ public class RatingActionHandler implements SlackBlockActionHandler {
         }
     }
 
-    // Combined rating handling logic
-    public UUID handleRating(int rating, String anonymousId, String ticketStatus, String ticketImpact, String[] tags, boolean isEscalated) {
-        log.info("Handling ticket rating: anonymousId={}, rating={}, status={}", anonymousId, rating, ticketStatus);
-        
-        // Validate rating
-        if (!isValidRating(rating)) {
-            throw new IllegalArgumentException("Rating must be between 1 and 5, but was: " + rating);
-        }
-        
-        // Create timestamp
-        String timestamp = String.valueOf(Instant.now().getEpochSecond());
-        
-        // Create new rating
-        Rating ratingRecord = Rating.createNew(
-                rating,
-                timestamp,
-                ticketStatus,
-                anonymousId,
-                ticketImpact,
-                tags,
-                isEscalated
-        );
-        
-        // Save rating
-        UUID ratingId = ratingService.createRating(ratingRecord);
-        
-        if (isEscalated) {
-            log.warn("Rating for escalated ticket: rating={}.", rating);
-        }
-        
-        log.info("Successfully handled ticket rating: anonymousId={}, ratingId={}, escalated={}", 
-                anonymousId, ratingId, isEscalated);
-        
-        return ratingId;
-    }
-    
-    public UUID handleRating(String ticketId, int rating) {
-        // Simplified version with default values - ticket must be closed to submit rating
-        // Note: This method should not be used for user submissions as it doesn't prevent duplicates
-        String anonymousId = ratingService.createAnonymousId(ticketId, "system");
-        return handleRating(rating, anonymousId, TicketStatus.closed.name(), null, null, false);
-    }
-    
     private boolean isValidRating(int rating) {
         return rating >= 1 && rating <= 5;
     }

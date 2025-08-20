@@ -24,7 +24,6 @@ class RatingRepositoryTest {
                 5,
                 String.valueOf(Instant.now().getEpochSecond()),
                 "closed",
-                "anonymous123",
                 "production blocking",
                 new String[]{"ingress"},
                 false
@@ -45,7 +44,6 @@ class RatingRepositoryTest {
                 4,
                 String.valueOf(Instant.now().getEpochSecond()),
                 "opened",
-                "anonymous456",
                 "bau",
                 new String[]{"ingress"},
                 true
@@ -84,7 +82,6 @@ class RatingRepositoryTest {
                 3,
                 String.valueOf(Instant.now().getEpochSecond()),
                 "stale",
-                "anonymous789",
                 null, // null impact
                 null, // null tags
                 false
@@ -104,9 +101,9 @@ class RatingRepositoryTest {
     @Test
     void shouldFindRatingsByStatus() {
         // Given
-        Rating openedRating = Rating.createNew(5, "1000", "opened", "anon1", "production blocking", new String[]{"gatekeeper"}, false);
-        Rating closedRating = Rating.createNew(3, "2000", "closed", "anon2", "low", new String[]{"jenkins"}, true);
-        Rating anotherOpenedRating = Rating.createNew(4, "3000", "opened", "anon3", "bau", new String[]{"eks"}, false);
+        Rating openedRating = Rating.createNew(5, "1000", "opened", "production blocking", new String[]{"gatekeeper"}, false);
+        Rating closedRating = Rating.createNew(3, "2000", "closed", "low", new String[]{"jenkins"}, true);
+        Rating anotherOpenedRating = Rating.createNew(4, "3000", "opened", "bau", new String[]{"eks"}, false);
         
         ratingRepository.insertRating(openedRating);
         ratingRepository.insertRating(closedRating);
@@ -129,9 +126,9 @@ class RatingRepositoryTest {
     @Test
     void shouldFindRatingsByTag() {
         // Given
-        Rating bugRating = Rating.createNew(2, "1000", "opened", "anon4", "production blocking", new String[]{"ingress"}, false);
-        Rating featureRating = Rating.createNew(4, "2000", "closed", "anon5", "bau", new String[]{"new-feature"}, true);
-        Rating anotherBugRating = Rating.createNew(1, "3000", "stale", "anon6", "production blocking", new String[]{"ingress"}, true);
+        Rating bugRating = Rating.createNew(2, "1000", "opened", "production blocking", new String[]{"ingress"}, false);
+        Rating featureRating = Rating.createNew(4, "2000", "closed", "bau", new String[]{"new-feature"}, true);
+        Rating anotherBugRating = Rating.createNew(1, "3000", "stale", "production blocking", new String[]{"ingress"}, true);
         
         ratingRepository.insertRating(bugRating);
         ratingRepository.insertRating(featureRating);
@@ -154,9 +151,9 @@ class RatingRepositoryTest {
     @Test
     void shouldFindEscalatedRatings() {
         // Given
-        Rating escalatedRating1 = Rating.createNew(1, "1000", "opened", "anon7", "production blocking", new String[]{"ingress"}, true);
-        Rating normalRating = Rating.createNew(5, "2000", "closed", "anon8", "low", new String[]{"bau"}, false);
-        Rating escalatedRating2 = Rating.createNew(2, "3000", "stale", "anon9", "production blocking", new String[]{"github"}, true);
+        Rating escalatedRating1 = Rating.createNew(1, "1000", "opened", "production blocking", new String[]{"ingress"}, true);
+        Rating normalRating = Rating.createNew(5, "2000", "closed", "low", new String[]{"bau"}, false);
+        Rating escalatedRating2 = Rating.createNew(2, "3000", "stale", "production blocking", new String[]{"github"}, true);
         
         ratingRepository.insertRating(escalatedRating1);
         ratingRepository.insertRating(normalRating);
@@ -187,8 +184,8 @@ class RatingRepositoryTest {
     @Test
     void shouldGenerateUniqueIds() {
         // Given
-        Rating rating1 = Rating.createNew(4, "1000", "opened", "anon10", "bau", new String[]{"github"}, false);
-        Rating rating2 = Rating.createNew(3, "2000", "closed", "anon11", "low", new String[]{"argocd"}, true);
+        Rating rating1 = Rating.createNew(4, "1000", "opened", "bau", new String[]{"github"}, false);
+        Rating rating2 = Rating.createNew(3, "2000", "closed", "low", new String[]{"argocd"}, true);
         
         // When
         UUID id1 = ratingRepository.insertRating(rating1);

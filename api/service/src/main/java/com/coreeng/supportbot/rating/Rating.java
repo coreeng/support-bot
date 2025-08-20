@@ -16,7 +16,6 @@ public class Rating {
     private Integer rating;
     private String submittedTs;
     private String status;
-    private String anonymousId; // Hash of ticketId + userId for duplicate prevention without compromising anonymity
     @Nullable
     private String impact;
     @Nullable
@@ -27,7 +26,6 @@ public class Rating {
         int rating,
         String submittedTs,
         String status,
-        String anonymousId,
         @Nullable String impact,
         @Nullable String[] tags,
         boolean isEscalated
@@ -36,7 +34,6 @@ public class Rating {
             .rating(rating)
             .submittedTs(submittedTs)
             .status(status)
-            .anonymousId(anonymousId)
             .impact(impact)
             .tags(tags)
             .isEscalated(isEscalated)

@@ -246,4 +246,18 @@ public class TicketInMemoryRepository implements TicketRepository {
             .map(Ticket::id)
             .collect(toImmutableList());
     }
+
+    @Override
+    public boolean isTicketRated(TicketId ticketId) {
+        Ticket ticket = tickets.get(ticketId);
+        return ticket != null && ticket.ratingSubmitted();
+    }
+
+    @Override
+    public void markTicketAsRated(TicketId ticketId) {
+        Ticket ticket = tickets.get(ticketId);
+        if (ticket != null) {
+            tickets.put(ticketId, ticket.toBuilder().ratingSubmitted(true).build());
+        }
+    }
 }
