@@ -528,7 +528,8 @@ public class JdbcTicketRepository implements TicketRepository {
             TICKET.CREATED_MESSAGE_TS,
             TICKET.STATUS,
             TICKET.TEAM,
-            TICKET.IMPACT_CODE
+            TICKET.IMPACT_CODE,
+            TICKET.RATING_SUBMITTED
         );
     }
 
@@ -541,7 +542,28 @@ public class JdbcTicketRepository implements TicketRepository {
             .status(TicketStatus.valueOf(r.get(TICKET.STATUS).getLiteral()))
             .team(r.get(TICKET.TEAM))
             .impact(r.get(TICKET.IMPACT_CODE))
+            .ratingSubmitted(r.get(TICKET.RATING_SUBMITTED))
             .build();
+    }
+
+    @Override
+    public boolean isTicketRated(TicketId ticketId) {
+        return dsl
+            .select(TICKET.RATING_SUBMITTED)
+            .from(TICKET)
+            .where(TICKET.ID.eq(ticketId.id()))
+            .fetchOptional()
+            .map(r -> r.get(TICKET.RATING_SUBMITTED))
+            .orElse(false);
+    }
+
+    @Override
+    public void markTicketAsRated(TicketId ticketId) {
+        dsl
+            .update(TICKET)
+            .set(TICKET.RATING_SUBMITTED, true)
+            .where(TICKET.ID.eq(ticketId.id()))
+            .execute();
     }
 }
 

@@ -27,15 +27,11 @@ public class RatingHandler {
         // Create timestamp
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         
-        // Create anonymous identifier for this rating
-        String anonymousId = ratingService.createAnonymousId(ticketId, "system");
-        
         // Create new rating
         Rating ratingRecord = Rating.createNew(
                 rating,
                 timestamp,
                 ticketStatus,
-                anonymousId,
                 ticketImpact,
                 tags,
                 isEscalated

@@ -16,7 +16,6 @@ class RatingTest {
                 5,
                 "1640995200",
                 "closed",
-                "anonymous123",
                 "production blocking",
                 new String[]{"ingress"},
                 true
@@ -26,7 +25,6 @@ class RatingTest {
         assertThat(rating.rating()).isEqualTo(5);
         assertThat(rating.submittedTs()).isEqualTo("1640995200");
         assertThat(rating.status()).isEqualTo("closed");
-        assertThat(rating.anonymousId()).isEqualTo("anonymous123");
         assertThat(rating.impact()).isEqualTo("production blocking");
         assertThat(rating.tags()).isEqualTo(new String[]{"ingress"});
         assertThat(rating.isEscalated()).isTrue();
@@ -82,7 +80,6 @@ class RatingTest {
                 rating,
                 "1640995200",
                 "closed",
-                "anonymous123",
                 "medium",
                 new String[]{"test"},
                 false
