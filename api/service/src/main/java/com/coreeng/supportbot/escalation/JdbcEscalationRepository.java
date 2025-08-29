@@ -63,7 +63,7 @@ public class JdbcEscalationRepository implements EscalationRepository {
                 com.coreeng.supportbot.dbschema.enums.EscalationStatus.lookupLiteral(escalation.status().name()),
                 escalation.team()
             )
-            .onConflict(ESCALATION.THREAD_TS, ESCALATION.CHANNEL_ID).doNothing()
+            .onConflict().doNothing()
             .returning(ESCALATION.ID)
             .fetchOne(ESCALATION.ID);
         if (id == null) {

@@ -1,14 +1,12 @@
 package com.coreeng.supportbot.escalation;
 
-import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
+import java.time.Instant;
+import javax.annotation.Nullable;
 import lombok.Builder;
 import lombok.Getter;
-
-import javax.annotation.Nullable;
-import java.time.Instant;
 
 @Getter
 @Builder(toBuilder = true)
@@ -32,7 +30,6 @@ public class Escalation {
 
     public static Escalation createNew(
         TicketId ticketId,
-        @Nullable MessageRef threadRef,
         @Nullable String team,
         ImmutableList<String> tags
     ) {
@@ -40,8 +37,6 @@ public class Escalation {
             .ticketId(ticketId)
             .status(EscalationStatus.opened)
             .openedAt(Instant.now())
-            .threadTs(threadRef != null ? threadRef.actualThreadTs() : null)
-            .channelId(threadRef != null ? threadRef.channelId() : null)
             .team(team)
             .tags(tags)
             .build();
