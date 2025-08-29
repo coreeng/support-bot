@@ -29,7 +29,6 @@ public class TicketEventsHandler {
             processingService.createEscalation(CreateEscalationRequest.builder()
                 .ticket(event.ticket())
                 .team(event.team())
-                .threadPermalink(event.threadPermalink())
                 .tags(event.tags())
                 .build());
         } catch (Exception e) {

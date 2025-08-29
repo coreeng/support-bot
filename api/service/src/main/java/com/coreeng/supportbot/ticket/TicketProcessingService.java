@@ -1,8 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
-import com.coreeng.supportbot.escalation.Escalation;
-import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.events.MessagePosted;
@@ -10,15 +8,12 @@ import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import jakarta.validation.constraints.NotNull;
+import java.time.Instant;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-
-import java.time.Instant;
-import java.util.Objects;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 @Service
 @Slf4j
@@ -164,30 +159,6 @@ public class TicketProcessingService {
             request.tags()
         ));
         slackService.markTicketEscalated(ticket.queryRef());
-    }
-
-    public void postTicketEscalatedMessage(EscalationId escalationId) {
-        Escalation escalation = checkNotNull(
-            escalationQueryService.findById(escalationId),
-            "Escalation not found: {}", escalationId
-        );
-        Ticket ticket = checkNotNull(
-            repository.findTicketById(escalation.ticketId()),
-            "Ticket not found: {}", escalation.ticketId()
-        );
-        if (ticket.status() == TicketStatus.stale) {
-            ticket = repository.updateTicket(ticket.toBuilder()
-                .status(TicketStatus.opened)
-                .lastInteractedAt(Instant.now())
-                .build());
-            onStatusUpdate(ticket);
-        }
-
-        slackService.postTicketEscalatedMessage(
-            new MessageRef(ticket.queryTs(), ticket.channelId()),
-            new MessageRef(escalation.threadTs(), escalation.channelId()),
-            escalation.team()
-        );
     }
 
     public void markAsStale(TicketId ticketId) {

@@ -22,7 +22,7 @@ RUN service postgresql start && sleep 6 && \
     su postgres -c "psql -c \"CREATE DATABASE flywaydb;\"" && \
     su postgres -c "psql -c \"ALTER USER postgres WITH PASSWORD 'fly';\"" && \
     su postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE flywaydb TO postgres;\"" && \
-    gradle -Ddocker=true :service:jooqCodegen :service:build -Pversion="${P2P_VERSION}" --no-daemon
+    ./gradlew -Ddocker=true :service:jooqCodegen :service:build -Pversion="${P2P_VERSION}" --no-daemon
 
 ## Final stage
 FROM registry.access.redhat.com/ubi8/openjdk-21:1.21

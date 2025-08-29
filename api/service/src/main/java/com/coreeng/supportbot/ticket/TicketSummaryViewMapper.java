@@ -188,9 +188,6 @@ public class TicketSummaryViewMapper {
     private ImmutableList<LayoutBlock> renderEscalation(TicketSummaryView.EscalationView escalation) {
         return ImmutableList.of(
             section(s -> s
-                .text(markdownText(
-                    "<" + escalation.threadPermalink() + "|" + escalation.id().render() + ">"
-                ))
                 .fields(ImmutableList.of(
                     plainText(t -> t
                         .text("Status: " + escalation.status().label())
