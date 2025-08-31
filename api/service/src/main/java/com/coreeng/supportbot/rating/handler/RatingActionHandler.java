@@ -68,12 +68,12 @@ public class RatingActionHandler implements SlackBlockActionHandler {
                 
                 // Validate rating value
                 if (!isValidRating(rating)) {
-                    log.warn("Invalid rating value {} submitted by user {} for ticket {}", rating, userId, ticketIdStr);
+                    log.warn("Invalid rating value {} submitted for ticket {}", rating, ticketIdStr);
                     return;
                 }
                 
                 TicketId ticketId = new TicketId(Long.parseLong(ticketIdStr));
-                log.info("User {} submitted rating {} for ticket {}", userId, rating, ticketId);
+                log.info("Submitted rating {} for ticket {}", rating, ticketId);
                 
                 // Check if ticket has already been rated
                 if (ticketRepository.isTicketRated(ticketId)) {

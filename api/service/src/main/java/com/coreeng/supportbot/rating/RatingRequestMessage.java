@@ -25,7 +25,7 @@ public record RatingRequestMessage(
             section(s -> s
                 .text(markdownText(
                     "*How was your support experience?* \n" +
-                    "_Your feedback helps us improve our service_"
+                    "_Your feedback helps us improve our service. Ratings are collected anonymously to protect your privacy._"
                 ))
             ),
             actions(ImmutableList.of(
