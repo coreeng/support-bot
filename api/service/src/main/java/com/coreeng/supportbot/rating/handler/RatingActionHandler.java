@@ -6,6 +6,7 @@ import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackBlockActionHandler;
 import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
 import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
@@ -16,6 +17,9 @@ import com.slack.api.app_backend.interactive_components.payload.BlockActionPaylo
 import com.slack.api.bolt.context.builtin.ActionContext;
 import com.slack.api.bolt.request.builtin.BlockActionRequest;
 import com.slack.api.methods.SlackApiException;
+import com.slack.api.model.Message;
+import com.slack.api.model.User;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -43,13 +47,12 @@ public class RatingActionHandler implements SlackBlockActionHandler {
     @Override
     public void apply(BlockActionRequest req, ActionContext context) throws IOException, SlackApiException {
         BlockActionPayload payload = req.getPayload();
-        String userId = payload.getUser().getId();
 
         for (BlockActionPayload.Action action : payload.getActions()) {
             String actionId = action.getActionId();
             
             if (actionId.startsWith("rating_submit_")) {
-                handleRatingSubmission(action, payload, userId);
+                handleRatingSubmission(action, payload);
             } else {
                 log.atWarn()
                     .addArgument(actionId)
@@ -58,7 +61,7 @@ public class RatingActionHandler implements SlackBlockActionHandler {
         }
     }
 
-    private void handleRatingSubmission(BlockActionPayload.Action action, BlockActionPayload payload, String userId) {
+    private void handleRatingSubmission(BlockActionPayload.Action action, BlockActionPayload payload) {
         try {
             // Parse action ID format: "rating_submit_{ticketId}_{rating}"
             String[] parts = action.getActionId().split("_");
@@ -113,6 +116,9 @@ public class RatingActionHandler implements SlackBlockActionHandler {
                 } else if (payload.getMessage() != null && payload.getMessage().getThreadTs() != null) {
                     threadTs = MessageTs.of(payload.getMessage().getThreadTs());
                 }
+
+                Message queryMessage = slackClient.getMessageByTs(new SlackGetMessageByTsRequest(payload.getChannel().getId(), ticket.queryTs()));
+                String userId = queryMessage.getUser();
                 
                 slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
                     .message(SimpleSlackMessage.builder()
@@ -131,23 +137,6 @@ public class RatingActionHandler implements SlackBlockActionHandler {
             }
         } catch (Exception e) {
             log.error("Error handling rating submission", e);
-            
-            MessageTs threadTs = null;
-            if (payload.getContainer() != null && payload.getContainer().getThreadTs() != null) {
-                threadTs = MessageTs.of(payload.getContainer().getThreadTs());
-            } else if (payload.getMessage() != null && payload.getMessage().getThreadTs() != null) {
-                threadTs = MessageTs.of(payload.getMessage().getThreadTs());
-            }
-            
-            slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
-                .message(SimpleSlackMessage.builder()
-                    .text("Sorry, there was an error recording your rating. Please try again.")
-                    .build())
-                .channel(payload.getChannel().getId())
-                .threadTs(threadTs)
-                .userId(userId)
-                .build()
-            );
         }
     }
 
