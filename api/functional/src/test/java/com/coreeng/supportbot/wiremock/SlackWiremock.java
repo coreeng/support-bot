@@ -1,21 +1,30 @@
 package com.coreeng.supportbot.wiremock;
 
-import com.coreeng.supportbot.Config;
-import com.coreeng.supportbot.testkit.ReactionAddedExpectation;
-import com.coreeng.supportbot.testkit.Stub;
-import com.coreeng.supportbot.testkit.StubWithResult;
-import com.coreeng.supportbot.testkit.ThreadMessagePostedExpectation;
-import com.coreeng.supportbot.testkit.TicketMessage;
-import com.github.tomakehurst.wiremock.WireMockServer;
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
-import com.github.tomakehurst.wiremock.stubbing.StubMapping;
+import java.util.Map;
+
+import com.coreeng.supportbot.testkit.MessageTs;
 import org.apache.commons.text.StringSubstitutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Map;
-
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import com.coreeng.supportbot.Config;
+import com.coreeng.supportbot.testkit.MessageToGet;
+import com.coreeng.supportbot.testkit.ReactionAddedExpectation;
+import com.coreeng.supportbot.testkit.Stub;
+import com.coreeng.supportbot.testkit.StubWithResult;
+import com.coreeng.supportbot.testkit.ThreadMessagePostedExpectation;
+import com.coreeng.supportbot.testkit.UserProfileToGet;
+import com.coreeng.supportbot.testkit.ViewsOpenExpectation;
+import com.coreeng.supportbot.testkit.matcher.UrlDecodedPattern;
+import com.github.tomakehurst.wiremock.WireMockServer;
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.and;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.github.tomakehurst.wiremock.stubbing.StubMapping;
 
 
 /**
@@ -75,7 +84,7 @@ public class SlackWiremock extends WireMockServer {
         StubMapping stubMapping = givenThat(post("/api/reactions.add")
             .withFormParam("name", equalTo(expectation.reaction()))
             .withFormParam("channel", equalTo(expectation.channelId()))
-            .withFormParam("timestamp", equalTo(expectation.ts()))
+            .withFormParam("timestamp", equalTo(expectation.ts().toString()))
             .willReturn(okJson("""
                 {"ok":true}
                 """))
@@ -86,10 +95,10 @@ public class SlackWiremock extends WireMockServer {
             .build();
     }
 
-    public StubWithResult<TicketMessage> stubMessagePosted(ThreadMessagePostedExpectation<TicketMessage> expectation) {
+    public <T> StubWithResult<T> stubMessagePosted(ThreadMessagePostedExpectation<T> expectation) {
         StubMapping mapping = givenThat(expectation.receiver().configureStub(post("/api/chat.postMessage"))
             .withFormParam("channel", equalTo(expectation.channelId()))
-            .withFormParam("thread_ts", equalTo(expectation.threadTs()))
+            .withFormParam("thread_ts", equalTo(expectation.threadTs().toString()))
             .willReturn(aResponse()
                 .withTransformers("response-template")
                 .withStatus(200)
@@ -117,31 +126,135 @@ public class SlackWiremock extends WireMockServer {
                     }
                     """))
         );
-        return StubWithResult.<TicketMessage>builder()
+        return StubWithResult.<T>builder()
             .mapping(mapping)
             .wireMockServer(this)
             .receiver(expectation.receiver())
             .build();
     }
 
-    public Stub stubGetPermalink(String channelId, String ts) {
+    public Stub stubGetPermalink(String channelId, MessageTs ts, String permalink) {
         StubMapping stubMapping = givenThat(post("/api/chat.getPermalink")
             .withFormParam("channel", equalTo(channelId))
-            .withFormParam("message_ts", equalTo(ts))
+            .withFormParam("message_ts", equalTo(ts.toString()))
             .willReturn(okJson(StringSubstitutor.replace("""
                 {
                   "ok": true,
                   "channel": "${channelId}",
-                  "permalink": "https://slack.com/messages/${channelId}/${ts}"
+                  "permalink": "${permalink}"
                 }
                 """, Map.of(
                 "channelId", channelId,
-                "ts", ts
+                "permalink", permalink
             ))))
         );
         return Stub.builder()
             .mapping(stubMapping)
             .wireMockServer(this)
+            .build();
+    }
+
+    public Stub stubGetPermalink(String channelId, MessageTs ts) {
+        return stubGetPermalink(channelId, ts, "https://slack.com/messages/" + channelId + "/" + ts);
+    }
+
+    public Stub stubGetMessage(MessageToGet message) {
+        StubMapping stubMapping = givenThat(post("/api/conversations.history")
+            .withFormParam("channel", equalTo(message.channelId()))
+            .withFormParam("limit", equalTo("1"))
+            .withFormParam("oldest", equalTo(message.ts().toString()))
+            .withFormParam("inclusive", equalTo("1"))
+            .withFormParam("include_all_metadata", equalTo("0"))
+            .willReturn(okJson(StringSubstitutor.replace("""
+                    {
+                        "ok": true,
+                        "oldest": "${ts}",
+                        "messages": [
+                            {
+                                "user": "${user}",
+                                "team": "${team}",
+                                "type": "message",
+                                "ts": "${ts}",
+                                "thread_ts": "${threadTs}",
+                                "blocks": ${blocks}
+                            }
+                        ]
+                    }
+                    """, Map.of(
+                        "user", message.user(),
+                        "team", message.team(),
+                        "blocks", message.blocksJson(),
+                        "ts", message.ts(),
+                        "threadTs", message.threadTs()
+                    )))
+        ));
+        return Stub.builder()
+            .mapping(stubMapping)
+            .wireMockServer(this)
+            .build();
+    }
+
+    public Stub stubGetUserProfileById(UserProfileToGet userProfile) {
+        StubMapping stubMapping = givenThat(post("/api/users.profile.get")
+            .withFormParam("user", equalTo(userProfile.userId()))
+            .willReturn(okJson(StringSubstitutor.replace("""
+                {
+                    "ok": true,
+                    "profile": {
+                        "email": "${email}"
+                    }
+                }
+                """, Map.of(
+                    "userId", userProfile.userId(),
+                    "email", userProfile.email()
+                ))))
+        );
+        return Stub.builder()
+            .mapping(stubMapping)
+            .wireMockServer(this)
+            .build();
+    }
+
+    public <T> StubWithResult<T> stubViewsOpen(ViewsOpenExpectation<T> expectation) {
+        StubMapping mapping = givenThat(expectation.receiver().configureStub(post("/api/views.open"))
+            .withFormParam("trigger_id", equalTo(expectation.triggerId()))
+            .withFormParam("view", new UrlDecodedPattern(and(
+                matchingJsonPath("$.type", equalTo(expectation.viewType())),
+                matchingJsonPath("$.callback_id", equalTo(expectation.viewCallbackId()))
+            )))
+            .willReturn(aResponse()
+                .withTransformers("response-template")
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody("""
+                    {{formData request.body 'formArgs' urlDecode=true}}
+                    {{parseJson formArgs.view 'formArgView'}}
+                    {
+                      "ok": true,
+                      "view": {
+                        "id":"UNSET_BY_TESTS",
+                        "team_id":"UNSET_BY_TESTS",
+                        "root_view_id":"UNSET_BY_TESTS",
+                        "app_id":"UNSET_BY_TESTS",
+                        "external_id":"",
+                        "app_installed_team_id":"UNSET_BY_TESTS",
+                        "bot_id":"UNSET_BY_TESTS",
+                        "hash":"UNSET_BY_TESTS",
+                        "type":"modal",
+                        "callback_id":"ticket-summary",
+                        "blocks": {{toJson formArgView.blocks}},
+                        "private_metadata": {{toJson formArgView.private_metadata}},
+                        "title": {{toJson formArgView.title}},
+                        "close": {{toJson formArgView.close}},
+                        "submit": {{toJson formArgView.submit}}
+                      }
+                    }
+                    """))
+        );
+        return StubWithResult.<T>builder()
+            .mapping(mapping)
+            .wireMockServer(this)
+            .receiver(expectation.receiver())
             .build();
     }
 }

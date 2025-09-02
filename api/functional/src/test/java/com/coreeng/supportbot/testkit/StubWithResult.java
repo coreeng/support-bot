@@ -28,11 +28,17 @@ public class StubWithResult<T> {
 
     public void assertIsCalled() {
         GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
-        assertThat(serveEvents.getServeEvents()).hasSize(1);
-        assertThatNoException().isThrownBy(() ->
-            result = receiver.extractResult(serveEvents.getServeEvents().getFirst())
+        assertThat(serveEvents.getServeEvents())
+            .as("stub was called exactly once")
+            .hasSize(1);
+        assertThatNoException()
+            .as("stub returned a result")
+            .isThrownBy(() ->
+            result = receiver.assertAndExtractResult(serveEvents.getServeEvents().getFirst())
         );
-        assertThat(result).isNotNull();
+        assertThat(result)
+            .as("stub returned a non-null result")
+            .isNotNull();
         resultCalculated = true;
     }
 
@@ -44,6 +50,6 @@ public class StubWithResult<T> {
     public interface Receiver<T> {
         MappingBuilder configureStub(MappingBuilder stubBuilder);
 
-        T extractResult(ServeEvent servedStub) throws Exception;
+        T assertAndExtractResult(ServeEvent servedStub) throws Exception;
     }
 }

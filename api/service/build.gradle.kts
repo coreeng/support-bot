@@ -46,7 +46,7 @@ repositories {
     mavenCentral()
 }
 
-val lombokVersion = "1.18.36"
+val lombokVersion = "1.18.+"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web") {

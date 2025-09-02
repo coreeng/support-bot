@@ -1,12 +1,14 @@
 package com.coreeng.supportbot.slack;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 import javax.annotation.Nullable;
 import java.time.Instant;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public record MessageTs(
-    String ts,
+    @JsonValue String ts,
     // TODO: delete me when no more mocking data is required
     boolean mocked
 ) {

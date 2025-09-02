@@ -29,8 +29,13 @@ public class TicketUIMapper {
                     ticket.ticket().channelId(),
                     ticket.ticket().queryTs()
                 )),
-                ticket.ticket().queryTs().getDate()
+                ticket.ticket().queryTs().getDate(),
+                ticket.ticket().queryTs()
             ))
+            .formMessage(new TicketUI.FormMessage(
+                ticket.ticket().createdMessageTs()
+            ))
+            .channelId(ticket.ticket().channelId())
             .status(ticket.ticket().status())
             .team(
                 ticket.ticket().team() != null

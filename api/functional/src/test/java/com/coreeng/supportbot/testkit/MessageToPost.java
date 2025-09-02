@@ -16,6 +16,6 @@ public class MessageToPost {
     private final String channelId;
     @NonNull
     private final String message;
-    @Nullable
-    private final String ts;
+    @NonNull
+    private final MessageTs ts;
 }

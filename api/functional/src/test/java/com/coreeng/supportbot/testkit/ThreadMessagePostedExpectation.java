@@ -11,8 +11,8 @@ public class ThreadMessagePostedExpectation<T> {
     @NonNull
     private final UserRole from;
     @NonNull
-    private final String newMessageTs;
+    private final MessageTs newMessageTs;
 
     private final String channelId;
-    private final String threadTs;
+    private final MessageTs threadTs;
 }
