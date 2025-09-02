@@ -9,13 +9,13 @@ public class SlackTestKit {
     private final SlackWiremock slackWiremock;
     private final SupportBotSlackClient supportBotSlackClient;
 
-    public SlackMessage postMessage(String message) {
-        slackWiremock.stubAuthTest();
+    public SlackMessage postMessage(MessageTs ts, String message) {
         return supportBotSlackClient.notifyMessagePosted(MessageToPost.builder()
             .userId(testKit.userId())
             .teamId(testKit.teamId())
             .channelId(testKit.channelId())
             .message(message)
+            .ts(ts)
             .build());
     }
 
@@ -27,6 +27,29 @@ public class SlackTestKit {
             .channelId(targetMessage.channelId())
             .ts(targetMessage.ts())
             .reaction(reaction)
+            .build());
+    }
+
+    public void clickMessageButton(MessageButtonClick click) {
+        click.preSetupMocks();
+        supportBotSlackClient.notifyButtonClicked(RawButtonClick.builder()
+            .teamId(testKit.teamId())
+            .userId(testKit.userId())
+            .triggerId(click.triggerId())
+            .actionId(click.actionId())
+            .privateMetadata(click.privateMetadata())
+            .build());
+    }
+
+    public void submitView(ViewSubmission viewSubmission) {
+        supportBotSlackClient.notifyViewSubmitted(RawViewSubmission.builder()
+            .teamId(testKit.teamId())
+            .userId(testKit.userId())
+            .triggerId(viewSubmission.triggerId())
+            .callbackId(viewSubmission.callbackId())
+            .privateMetadata(viewSubmission.privateMetadata())
+            .values(viewSubmission.values())
+            .viewType(viewSubmission.viewType())
             .build());
     }
 }

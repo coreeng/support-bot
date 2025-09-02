@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Nullable;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static com.coreeng.supportbot.dbschema.Tables.*;
@@ -35,7 +36,6 @@ import static org.jooq.impl.DSL.*;
 @Transactional
 public class JdbcEscalationRepository implements EscalationRepository {
     private final DSLContext dsl;
-    private final ZoneId timezone;
 
     @Nullable
     @Override
@@ -227,7 +227,7 @@ public class JdbcEscalationRepository implements EscalationRepository {
             ));
         }
         if (query.dateFrom() != null) {
-            Instant dateFrom = query.dateFrom().atStartOfDay(timezone).toInstant();
+            Instant dateFrom = query.dateFrom().atStartOfDay().toInstant(ZoneOffset.UTC);
             condition = condition.and(exists(
                 selectOne()
                     .from(
@@ -240,7 +240,7 @@ public class JdbcEscalationRepository implements EscalationRepository {
             ));
         }
         if (query.dateTo() != null) {
-            Instant dateTo = query.dateTo().plusDays(1).atStartOfDay(timezone).toInstant();
+            Instant dateTo = query.dateTo().plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
             condition = condition.and(exists(
                 selectOne()
                     .from(

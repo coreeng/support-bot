@@ -2,7 +2,6 @@ package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.slack.RenderingUtils;
 import com.coreeng.supportbot.util.JsonMapper;
-import com.coreeng.supportbot.util.RelativeDateFormatter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.slack.api.model.block.LayoutBlock;
@@ -16,6 +15,8 @@ import com.slack.api.model.view.ViewState;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +37,6 @@ import static java.lang.String.format;
 @RequiredArgsConstructor
 public class TicketSummaryViewMapper {
     private final JsonMapper jsonMapper;
-    private final RelativeDateFormatter dateFormatter;
 
     public String createTriggerInput(TicketSummaryViewInput input) {
         checkNotNull(input);
@@ -77,7 +77,7 @@ public class TicketSummaryViewMapper {
                                     Sent by <@%s> | %s | <%s|View Message>
                                     """,
                                 summaryView.query().senderId(),
-                                dateFormatter.format(summaryView.query().messageTs().getDate()),
+                                formatSlackDate(summaryView.query().messageTs().getDate()),
                                 summaryView.query().permalink()
                             )))
                     )),
@@ -172,7 +172,7 @@ public class TicketSummaryViewMapper {
             str.append(" ");
             str.append(item.status().label())
                 .append(": ")
-                .append(dateFormatter.format(item.date()));
+                .append(formatSlackDate(item.date()));
             str.append("\n");
             if (i < statusLogs.size() - 1) {
                 // padding as spaces is applied so that bar is nicely aligned with the circle emoji
@@ -301,6 +301,9 @@ public class TicketSummaryViewMapper {
             .build();
     }
 
+    private String formatSlackDate(Instant instant) {
+        return "<!date^" + instant.getEpochSecond() + "^{date_short_pretty} at {time}|" + instant.truncatedTo(ChronoUnit.MINUTES) + ">";
+    }
 
     private record Metadata(
         long ticketId
