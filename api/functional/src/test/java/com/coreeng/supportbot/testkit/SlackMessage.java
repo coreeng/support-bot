@@ -1,9 +1,11 @@
 package com.coreeng.supportbot.testkit;
 
+import org.jspecify.annotations.NonNull;
+
 import com.coreeng.supportbot.wiremock.SlackWiremock;
+
 import lombok.Builder;
 import lombok.Getter;
-import org.jspecify.annotations.NonNull;
 
 @Builder
 @Getter
@@ -12,7 +14,7 @@ public class SlackMessage {
     private final SlackWiremock slackWiremock;
 
     @NonNull
-    private final String ts;
+    private final MessageTs ts;
     @NonNull
     private final String channelId;
 
@@ -31,9 +33,5 @@ public class SlackMessage {
             .threadTs(ts)
             .channelId(channelId)
             .build());
-    }
-
-    public static String generateNewTs() {
-        return System.currentTimeMillis() + "." + System.currentTimeMillis();
     }
 }

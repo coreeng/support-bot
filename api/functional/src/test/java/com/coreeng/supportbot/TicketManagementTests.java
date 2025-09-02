@@ -1,5 +1,9 @@
 package com.coreeng.supportbot;
 
+import com.coreeng.supportbot.testkit.FullSummaryButtonClick;
+import com.coreeng.supportbot.testkit.FullSummaryForm;
+import com.coreeng.supportbot.testkit.FullSummaryFormSubmission;
+import com.coreeng.supportbot.testkit.MessageTs;
 import com.coreeng.supportbot.testkit.SlackMessage;
 import com.coreeng.supportbot.testkit.SlackTestKit;
 import com.coreeng.supportbot.testkit.Stub;
@@ -7,7 +11,10 @@ import com.coreeng.supportbot.testkit.StubWithResult;
 import com.coreeng.supportbot.testkit.SupportBotClient;
 import com.coreeng.supportbot.testkit.TestKit;
 import com.coreeng.supportbot.testkit.ThreadMessagePostedExpectation;
+import com.coreeng.supportbot.testkit.Ticket;
 import com.coreeng.supportbot.testkit.TicketMessage;
+import com.coreeng.supportbot.wiremock.SlackWiremock;
+import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -21,6 +28,7 @@ import static org.awaitility.Awaitility.await;
 public class TicketManagementTests {
     private TestKit testKit;
     private SupportBotClient supportBotClient;
+    private SlackWiremock slackWiremock;
 
     @Test
     public void whenQueryIsPosted_thenQueryIsRegisteredInBot() {
@@ -28,7 +36,10 @@ public class TicketManagementTests {
         SlackTestKit asTenant = testKit.as(tenant).slack();
 
         // when
-        SlackMessage tenantsMessage = asTenant.postMessage("Please, help me with my query");
+        SlackMessage tenantsMessage = asTenant.postMessage(
+            MessageTs.now(),
+            "Please, help me with my query"
+        );
 
         // then
         supportBotClient.assertQueryExistsByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts());
@@ -37,20 +48,25 @@ public class TicketManagementTests {
     @Test
     public void whenSupportReactedWithEyes_ticketRegistered() {
         // given
-        SlackTestKit asTenant = testKit.as(tenant).slack();
-        SlackTestKit asSupport = testKit.as(support).slack();
+        TestKit.RoledTestKit asTenant = testKit.as(tenant);
+        SlackTestKit asTenantSlack = asTenant.slack();
+        SlackTestKit asSupportSlack = testKit.as(support).slack();
 
         // when
-        SlackMessage tenantsMessage = asTenant.postMessage("Please, help me with my query");
+        SlackMessage tenantsMessage = asTenantSlack.postMessage(
+            MessageTs.now(),
+            "Please, help me with my query"
+        );
         Stub ticketReactionAddedStub = tenantsMessage.expectReactionAdded("ticket");
-        String ticketMessageTs = SlackMessage.generateNewTs();
-        StubWithResult<TicketMessage> ticketMessagePostedStub = tenantsMessage.expectThreadMessagePosted(ThreadMessagePostedExpectation.<TicketMessage>builder()
-            .receiver(new TicketMessage.Receiver())
-            .from(supportBot)
-            .newMessageTs(ticketMessageTs)
-            .build());
+        MessageTs ticketMessageTs = MessageTs.now();
+        StubWithResult<TicketMessage> ticketMessagePostedStub = tenantsMessage
+            .expectThreadMessagePosted(ThreadMessagePostedExpectation.<TicketMessage>builder()
+                .receiver(new TicketMessage.Receiver())
+                .from(supportBot)
+                .newMessageTs(ticketMessageTs)
+                .build());
 
-        asSupport.addReactionTo(tenantsMessage, "eyes");
+        asSupportSlack.addReactionTo(tenantsMessage, "eyes");
 
         // then
         await()
@@ -61,11 +77,40 @@ public class TicketManagementTests {
             });
         TicketMessage ticketMessage = ticketMessagePostedStub.result();
         assertThat(ticketMessage).isNotNull();
-        supportBotClient.assertTicketExists(ticketMessage);
+        var ticketResponse = supportBotClient.assertTicketExists(ticketMessage);
+        ticketMessage.assertMatches(ticketResponse);
     }
 
     @Test
     public void whenTicketIsEditedByUsingFullSummaryForm_changesAreSavedToADatabase() {
+        // given
+        TestKit.RoledTestKit asSupport = testKit.as(support);
+        Ticket ticket = asSupport.ticket().create(t -> t
+            .queryTs(MessageTs.now())
+            .createdMessageTs(MessageTs.now())
+        );
 
+        // when
+        String openFullSummaryTriggerId = "whenFullSummaryButtonIsClicked_formIsOpened";
+        StubWithResult<FullSummaryForm> fullSummaryFormOpenedExpectation = ticket.expectFullSummaryFormOpened(openFullSummaryTriggerId);
+        FullSummaryButtonClick fullSummaryClick = ticket.fullSummaryButtonClick(openFullSummaryTriggerId);
+        asSupport.slack().clickMessageButton(fullSummaryClick);
+        await().atMost(Duration.ofSeconds(5))
+            .untilAsserted(fullSummaryFormOpenedExpectation::assertIsCalled);
+
+        FullSummaryFormSubmission.Values values = FullSummaryFormSubmission.Values.builder()
+            .status("opened")
+            .team("wow")
+            .tags(ImmutableList.of("ingresses", "networking"))
+            .impact("productionBlocking")
+            .build();
+        asSupport.slack().submitView(ticket.fullSummaryFormSubmit(
+            openFullSummaryTriggerId,
+            values));
+
+        // then
+        ticket.applyChangesLocally(values);
+        var ticketResponse = supportBotClient.assertTicketExists(ticket);
+        ticket.assertMatches(ticketResponse);
     }
 }

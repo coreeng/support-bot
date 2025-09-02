@@ -8,5 +8,5 @@ import lombok.Getter;
 public class ReactionAddedExpectation {
     private final String reaction;
     private final String channelId;
-    private final String ts;
+    private final MessageTs ts;
 }

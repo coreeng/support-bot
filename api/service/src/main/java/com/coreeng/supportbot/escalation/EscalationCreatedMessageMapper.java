@@ -6,7 +6,6 @@ import static java.lang.String.format;
 
 import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
 import com.coreeng.supportbot.util.JsonMapper;
-import com.coreeng.supportbot.util.RelativeDateFormatter;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.block.LayoutBlock;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +18,6 @@ public class EscalationCreatedMessageMapper {
     private final static String greenHex = "#00ff00";
 
     private final JsonMapper jsonMapper;
-    private final RelativeDateFormatter dateFormatter;
 
     public SimpleSlackMessage renderMessage(EscalationCreatedMessage message) {
         return SimpleSlackMessage.builder()
