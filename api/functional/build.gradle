@@ -24,13 +24,16 @@ dependencies {
     // Avoiding vulnerability reports from wiremock
     testImplementation("org.eclipse.jetty:jetty-server:11.0.+")
 
+    testImplementation("com.fasterxml.jackson.datatype:jackson-datatype-guava")
     testImplementation('io.rest-assured:rest-assured:5.5.+')
 
     // Avoiding vulnerability reports from rest-assured
     testImplementation("org.apache.commons:commons-lang3:3.18.+")
     testImplementation("commons-codec:commons-codec:1.18.+")
 
+    // TODO remove jsonassert
     testImplementation('org.skyscreamer:jsonassert:1.5.+')
+    testImplementation("net.javacrumbs.json-unit:json-unit-assertj:4.1.+")
     testImplementation("net.datafaker:datafaker:2.4.3")
 }
 

@@ -8,7 +8,6 @@ import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketSummaryViewInput;
 import com.coreeng.supportbot.ticket.TicketSummaryViewMapper;
 import com.coreeng.supportbot.util.JsonMapper;
-import com.coreeng.supportbot.util.RelativeDateFormatter;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.SectionBlock;
@@ -18,8 +17,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Nullable;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -29,13 +31,13 @@ import static com.slack.api.model.block.composition.BlockCompositions.plainText;
 import static com.slack.api.model.block.element.BlockElements.button;
 import static java.lang.String.*;
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class HomepageViewMapper {
     private final TicketSummaryViewMapper ticketSummaryViewMapper;
-    private final RelativeDateFormatter dateFormatter;
     private final JsonMapper jsonMapper;
 
     public SlackView render(HomepageView homepage) {
@@ -118,7 +120,7 @@ public class HomepageViewMapper {
                     ticket.impact() == null ? "Not Evaluated" : ticket.impact().label()))
              )),
             section(s -> s.text(markdownText(format("*Last Opened*: %s",
-                    dateFormatter.format(ticket.lastOpenedAt()))))
+                    formatSlackDate(ticket.lastOpenedAt()))))
             )
         ));
     statusSection.ifPresent(blocks::add);
@@ -132,7 +134,7 @@ public class HomepageViewMapper {
             Optional.of(section(
                 s-> s.fields(ImmutableList.of(
                     markdownText(
-                        format("*Closed*: %s", dateFormatter.format(ticket.closedAt()))))
+                        format("*Closed*: %s", formatSlackDate(requireNonNull(ticket.closedAt())))))
                     )
             )):
             Optional.empty();
@@ -159,7 +161,7 @@ public class HomepageViewMapper {
     }
 
     private String lastUpdatedMessage(HomepageView homepage) {
-        return "Last updated: " + dateFormatter.format(homepage.timestamp());
+        return "Last updated: " + formatSlackDate(homepage.timestamp());
     }
 
     private String viewDescriptionMessage(HomepageView homepage) {
@@ -201,5 +203,9 @@ public class HomepageViewMapper {
 
     private String pageNumberMessage(HomepageView homepage) {
         return format("Page %d of %d", homepage.page() + 1, homepage.totalPages());
+    }
+
+    private String formatSlackDate(Instant instant) {
+        return "<!date^" + instant.getEpochSecond() + "^{date_short_pretty} at {time}|" + instant.truncatedTo(ChronoUnit.MINUTES) + ">";
     }
 }

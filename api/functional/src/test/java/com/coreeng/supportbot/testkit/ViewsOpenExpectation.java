@@ -4,15 +4,16 @@ import lombok.Builder;
 import lombok.Getter;
 import org.jspecify.annotations.NonNull;
 
-@Builder(toBuilder = true)
+@Builder
 @Getter
-public class ThreadMessagePostedExpectation<T> {
+public class ViewsOpenExpectation<T> {
     private final StubWithResult.@NonNull Receiver<T> receiver;
-    @NonNull
-    private final UserRole from;
-    @NonNull
-    private final MessageTs newMessageTs;
 
-    private final String channelId;
-    private final MessageTs threadTs;
+    @NonNull
+    private final String triggerId;
+    @NonNull
+    private final String viewCallbackId;
+    @NonNull
+    @Builder.Default
+    private final String viewType = "modal";
 }

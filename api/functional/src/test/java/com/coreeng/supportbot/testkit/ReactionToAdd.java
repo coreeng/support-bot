@@ -14,7 +14,7 @@ public class ReactionToAdd {
     @NonNull
     private final String channelId;
     @NonNull
-    private final String ts;
+    private final MessageTs ts;
     @NonNull
     private final String reaction;
 }

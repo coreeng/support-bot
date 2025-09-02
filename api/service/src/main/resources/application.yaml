@@ -39,9 +39,6 @@ spring:
       data-source-properties:
         reWriteBatchedInserts: true
 
-application:
-  timezone: GMT+02
-
 slack:
   mode: socket # socket or http
   enableRequestVerification: true
