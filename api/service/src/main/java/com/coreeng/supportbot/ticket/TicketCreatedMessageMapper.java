@@ -2,7 +2,6 @@ package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
 import com.coreeng.supportbot.slack.client.SlackMessage;
-import com.coreeng.supportbot.util.RelativeDateFormatter;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.Attachment;
 import com.slack.api.model.block.LayoutBlock;
@@ -10,6 +9,9 @@ import com.slack.api.model.block.element.BlockElement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.List;
 
 import static com.slack.api.model.block.Blocks.*;
@@ -27,7 +29,6 @@ public class TicketCreatedMessageMapper {
 
     private final TicketSummaryViewMapper summaryViewMapper;
     private final EscalateViewMapper escalateViewMapper;
-    private final RelativeDateFormatter dateFormatter;
 
     public SlackMessage renderMessage(TicketCreatedMessage message) {
         return SimpleSlackMessage.builder()
@@ -50,7 +51,7 @@ public class TicketCreatedMessageMapper {
     }
 
     private ImmutableList<Attachment> renderAttachments(TicketCreatedMessage message) {
-        String title = message.status().label() + ": " + dateFormatter.format(message.statusChangedDate());
+        String title = message.status().label() + ": " + formatSlackDate(message.statusChangedDate());
         ImmutableList.Builder<LayoutBlock> blocks = ImmutableList.builder();
         blocks.add(
             divider(),
@@ -89,5 +90,9 @@ public class TicketCreatedMessageMapper {
                 case closed -> redHex;
             })
             .build());
+    }
+
+    private String formatSlackDate(Instant instant) {
+        return "<!date^" + instant.getEpochSecond() + "^{date_short_pretty} at {time}|" + instant.truncatedTo(ChronoUnit.MINUTES) + ">";
     }
 }

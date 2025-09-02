@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static com.coreeng.supportbot.dbschema.Tables.*;
@@ -42,7 +43,6 @@ import static org.jooq.impl.SQLDataType.CLOB;
 @Transactional
 public class JdbcTicketRepository implements TicketRepository {
     private final DSLContext dsl;
-    private final ZoneId timezone;
 
     @Override
     public void createQueryIfNotExists(MessageRef queryRef) {
@@ -420,11 +420,11 @@ public class JdbcTicketRepository implements TicketRepository {
             );
         }
         if (query.dateFrom() != null) {
-            Instant dateFrom = query.dateFrom().atStartOfDay(timezone).toInstant();
+            Instant dateFrom = query.dateFrom().atStartOfDay().toInstant(ZoneOffset.UTC);
             condition = condition.and(QUERY.DATE.ge(dateFrom));
         }
         if (query.dateTo() != null) {
-            Instant dateTo = query.dateTo().plusDays(1).atStartOfDay(timezone).toInstant();
+            Instant dateTo = query.dateTo().plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
             condition = condition.and(QUERY.DATE.le(dateTo));
         }
         if (query.escalated() != null) {

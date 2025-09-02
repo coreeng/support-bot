@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.ticket.rest;
 
 import com.coreeng.supportbot.escalation.rest.EscalationUI;
+import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.teams.rest.TeamUI;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketStatus;
@@ -18,6 +19,8 @@ import java.time.Instant;
 public class TicketUI {
     private TicketId id;
     private Query query;
+    private FormMessage formMessage;
+    private String channelId;
     private TicketStatus status;
     private boolean escalated;
     @Nullable
@@ -30,7 +33,11 @@ public class TicketUI {
 
     public record Query(
         String link,
-        Instant date
+        Instant date,
+        MessageTs ts
+    ) {}
+    public record FormMessage(
+        MessageTs ts
     ) {}
     public record Log(
         Instant date,

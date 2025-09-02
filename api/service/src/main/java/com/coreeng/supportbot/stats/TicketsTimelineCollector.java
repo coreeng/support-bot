@@ -22,7 +22,6 @@ import static java.util.stream.Collectors.groupingBy;
 @RequiredArgsConstructor
 public class TicketsTimelineCollector implements StatsCollector<StatsRequest.TicketTimeline> {
     private final TicketRepository repository;
-    private final ZoneId timezone;
 
     @Override
     public StatsType getSupportedType() {
@@ -47,7 +46,7 @@ public class TicketsTimelineCollector implements StatsCollector<StatsRequest.Tic
     }
 
     private ImmutableList<StatsResult.DatedValue<Long>> countOpenedTickets(Page<Ticket> tickets) {
-        ZoneOffset offset = timezone.getRules().getOffset(Instant.now());
+        ZoneOffset offset = ZoneOffset.UTC;
         return tickets.content().stream()
             .collect(groupingBy(
                 t -> t.statusLog().getFirst().date().atOffset(offset).toLocalDate(),
@@ -60,7 +59,7 @@ public class TicketsTimelineCollector implements StatsCollector<StatsRequest.Tic
 
     // TODO: not correct algorithm, need to fix it later
     private ImmutableList<StatsResult.DatedValue<Long>> countActiveTickets(Page<Ticket> tickets) {
-        ZoneOffset offset = timezone.getRules().getOffset(Instant.now());
+        ZoneOffset offset = ZoneOffset.UTC;
         return tickets.content().stream()
             .filter(t -> t.status() != TicketStatus.closed)
             .collect(groupingBy(

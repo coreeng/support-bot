@@ -1,0 +1,120 @@
+package com.coreeng.supportbot.testkit;
+
+import java.time.Instant;
+import java.time.ZoneId;
+
+import com.coreeng.supportbot.Config;
+import org.jspecify.annotations.NonNull;
+
+import com.coreeng.supportbot.wiremock.SlackWiremock;
+import com.google.common.collect.ImmutableList;
+
+import lombok.Builder;
+import lombok.Getter;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@Builder
+@Getter
+public class Ticket implements SearchableForTicket {
+    private final long id;
+    @NonNull
+    private final MessageTs queryTs;
+    @NonNull
+    private final MessageTs formMessageTs;
+    @NonNull
+    private final String channelId;
+    @NonNull
+    private String status;
+    private String team;
+    private String impact;
+    @NonNull
+    @Builder.Default
+    private ImmutableList<@NonNull String> tags = ImmutableList.of();
+    @NonNull
+    @Builder.Default
+    private ImmutableList<@NonNull StatusLog> logs = ImmutableList.of();
+
+    @NonNull
+    private final SlackWiremock slackWiremock;
+    private final Config.@NonNull User user;
+    @NonNull
+    private final String teamId;
+    @NonNull
+    private final String queryBlocksJson;
+    @NonNull
+    private final String queryPermalink;
+
+    public static TicketBuilder fromResponse(SupportBotClient.TicketResponse ticketResponse) {
+        return Ticket.builder()
+            .id(ticketResponse.id())
+            .queryTs(ticketResponse.query().ts())
+            .formMessageTs(ticketResponse.formMessage().ts())
+            .channelId(ticketResponse.channelId())
+            .status(ticketResponse.status())
+            .team(
+                ticketResponse.team() != null
+                    ? ticketResponse.team().name()
+                    : null
+            )
+            .tags(ticketResponse.tags())
+            .logs(ticketResponse.logs());
+    }
+
+    public FullSummaryButtonClick fullSummaryButtonClick(String triggerId) {
+        return FullSummaryButtonClick.builder()
+            .triggerId(triggerId)
+            .actionId("ticket-summary-view")
+            .ticket(this)
+            .slackWiremock(slackWiremock)
+            .build();
+    }
+
+    public StubWithResult<FullSummaryForm> expectFullSummaryFormOpened(String triggerId) {
+        var expectation = ViewsOpenExpectation.<FullSummaryForm>builder()
+            .viewCallbackId("ticket-summary")
+            .viewType("modal")
+            .triggerId(triggerId)
+            .receiver(new FullSummaryForm.Reciever(this))
+            .build();
+        return slackWiremock.stubViewsOpen(expectation);
+    }
+
+    public FullSummaryFormSubmission fullSummaryFormSubmit(String triggerId, FullSummaryFormSubmission.Values values) {
+        return FullSummaryFormSubmission.builder()
+            .triggerId(triggerId)
+            .callbackId("ticket-summary")
+            .ticketId(id)
+            .values(values)
+            .build();
+    }
+
+    public void applyChangesLocally(FullSummaryFormSubmission.Values values) {
+        status = values.status();
+        team = values.team();
+        tags = values.tags();
+        impact = values.impact();
+    }
+
+    public void assertMatches(SupportBotClient.TicketResponse response) {
+        assertThat(response.id()).isEqualTo(id);
+        assertThat(response.query().ts()).isEqualTo(queryTs);
+        assertThat(response.formMessage().ts()).isEqualTo(formMessageTs);
+        assertThat(response.channelId()).isEqualTo(channelId);
+        assertThat(response.status()).isEqualTo(status);
+        assertThat(response.team().name()).isEqualTo(team);
+        assertThat(response.tags()).isEqualTo(tags());
+        assertThat(response.logs()).isEqualTo(logs);
+    }
+
+    @Override
+    public long ticketId() {
+        return id;
+    }
+
+    record StatusLog(
+        String status,
+        Instant date
+    ) {
+    }
+}
