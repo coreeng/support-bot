@@ -171,8 +171,18 @@ public class TicketSummaryViewMapper {
             str.setLength(0);
             str.append(" ");
             str.append(item.status().label())
-                .append(": ")
-                .append(formatSlackDate(item.date()));
+                .append(": ");
+            elements.add(RichTextSectionElement.Text.builder()
+                .text(str.toString())
+                .build());
+
+            elements.add(RichTextSectionElement.Date.builder()
+                .timestamp((int) item.date().getEpochSecond())
+                .format("{date_short_pretty} at {time}")
+                .fallback(item.date().truncatedTo(ChronoUnit.MINUTES).toString())
+                .build());
+
+            str.setLength(0);
             str.append("\n");
             if (i < statusLogs.size() - 1) {
                 // padding as spaces is applied so that bar is nicely aligned with the circle emoji

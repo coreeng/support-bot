@@ -1,18 +1,18 @@
 package com.coreeng.supportbot.testkit;
 
 import java.time.Instant;
-import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 
-import com.coreeng.supportbot.Config;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import org.jspecify.annotations.NonNull;
 
+import com.coreeng.supportbot.Config;
 import com.coreeng.supportbot.wiremock.SlackWiremock;
 import com.google.common.collect.ImmutableList;
 
 import lombok.Builder;
 import lombok.Getter;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 @Builder
 @Getter
@@ -89,12 +89,10 @@ public class Ticket implements SearchableForTicket {
             .build();
     }
 
-    public void applyChangesLocally(FullSummaryFormSubmission.Values values) {
-        status = values.status();
-        team = values.team();
-        tags = values.tags();
-        impact = values.impact();
+    public TicketUpdater applyChangesLocally() {
+        return new TicketUpdater();
     }
+
 
     public void assertMatches(SupportBotClient.TicketResponse response) {
         assertThat(response.id()).isEqualTo(id);
@@ -104,7 +102,14 @@ public class Ticket implements SearchableForTicket {
         assertThat(response.status()).isEqualTo(status);
         assertThat(response.team().name()).isEqualTo(team);
         assertThat(response.tags()).isEqualTo(tags());
-        assertThat(response.logs()).isEqualTo(logs);
+
+        assertThat(response.logs()).hasSize(logs.size());
+        for (int i = 0; i < response.logs().size(); i++) {
+            var expectedLog = logs.get(i);
+            var actualLog = response.logs().get(i);
+            assertThat(actualLog.event()).isEqualTo(expectedLog.event());
+            assertThat(actualLog.date()).isCloseTo(expectedLog.date(), within(1, ChronoUnit.SECONDS));
+        }
     }
 
     @Override
@@ -112,8 +117,26 @@ public class Ticket implements SearchableForTicket {
         return id;
     }
 
+    public class TicketUpdater {
+        public TicketUpdater applyFormValues(FullSummaryFormSubmission.Values values) {
+            status = values.status();
+            team = values.team();
+            tags = values.tags();
+            impact = values.impact();
+            return this;
+        }
+
+        public TicketUpdater addLog(String status) {
+            logs = ImmutableList.<StatusLog>builder()
+                .addAll(logs)
+                .add(new StatusLog(status, Instant.now()))
+                .build();
+            return this;
+        }
+    }
+
     record StatusLog(
-        String status,
+        String event,
         Instant date
     ) {
     }
