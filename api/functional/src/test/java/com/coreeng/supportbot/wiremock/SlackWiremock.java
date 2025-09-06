@@ -2,13 +2,14 @@ package com.coreeng.supportbot.wiremock;
 
 import java.util.Map;
 
-import com.coreeng.supportbot.testkit.MessageTs;
 import org.apache.commons.text.StringSubstitutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.coreeng.supportbot.Config;
 import com.coreeng.supportbot.testkit.MessageToGet;
+import com.coreeng.supportbot.testkit.MessageTs;
+import com.coreeng.supportbot.testkit.MessageUpdatedExpectation;
 import com.coreeng.supportbot.testkit.ReactionAddedExpectation;
 import com.coreeng.supportbot.testkit.Stub;
 import com.coreeng.supportbot.testkit.StubWithResult;
@@ -133,6 +134,46 @@ public class SlackWiremock extends WireMockServer {
             .build();
     }
 
+    public <T> StubWithResult<T> stubMessageUpdated(MessageUpdatedExpectation<T> expectation) {
+        StubMapping stubMapping = givenThat(expectation.receiver().configureStub(post("/api/chat.update"))
+            .withFormParam("channel", equalTo(expectation.channelId()))
+            .withFormParam("ts", equalTo(expectation.ts().toString()))
+            .willReturn(aResponse()
+                .withTransformers("response-template")
+                .withStatus(200)
+                .withHeader("Content-Type", "application/json")
+                .withBody(StringSubstitutor.replace("""
+                    {{formData request.body 'formArgs' urlDecode=true}}
+                    {
+                      "ok": true,
+                      "channel": "{{formArgs.channel}}",
+                      "ts": "{{formArgs.ts}}",
+                      "message": {
+                        "user": "UNSET_BY_TESTS",
+                        "edited": {
+                          "user": "UNSET_BY_TESTS",
+                          "ts": "UNSET_BY_TESTS"
+                        },
+                        "bot_id": "UNSET_BY_TESTS",
+                        "app_id": "UNSET_BY_TESTS",
+                        "team": "UNSET_BY_TESTS",
+                        "type": "message",
+                        "ts": "{{formArgs.ts}}",
+                        "thread_ts": "${thread_ts}",
+                        "attachments": {{formArgs.attachments}},
+                        "blocks": {{formArgs.blocks}}
+                      }
+                    }
+                    """, Map.of(
+                        "thread_ts", expectation.threadTs().toString()
+                    )))));
+        return StubWithResult.<T>builder()
+            .mapping(stubMapping)
+            .wireMockServer(this)
+            .receiver(expectation.receiver())
+            .build();
+    }
+
     public Stub stubGetPermalink(String channelId, MessageTs ts, String permalink) {
         StubMapping stubMapping = givenThat(post("/api/chat.getPermalink")
             .withFormParam("channel", equalTo(channelId))
@@ -207,8 +248,8 @@ public class SlackWiremock extends WireMockServer {
                 """, Map.of(
                     "userId", userProfile.userId(),
                     "email", userProfile.email()
-                ))))
-        );
+                )))
+        ));
         return Stub.builder()
             .mapping(stubMapping)
             .wireMockServer(this)

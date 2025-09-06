@@ -55,7 +55,7 @@ public class TicketCreatedMessageMapper {
         ImmutableList.Builder<LayoutBlock> blocks = ImmutableList.builder();
         blocks.add(
             divider(),
-            section(s -> s.text(plainText(title)))
+            section(s -> s.text(markdownText(title)))
         );
         ImmutableList.Builder<BlockElement> secondaryButtons = ImmutableList.builder();
         secondaryButtons.add(
