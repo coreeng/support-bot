@@ -103,6 +103,7 @@ public class SupportBotClient {
         private TicketFormMessage formMessage;
         private String channelId;
         private String status;
+        private String impact;
         private Team team;
         private ImmutableList<@NonNull String> tags;
         private ImmutableList<Ticket.@NonNull StatusLog> logs;
