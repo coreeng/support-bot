@@ -47,7 +47,7 @@ public class HomepageViewMapper {
                 .text(plainText(":rocket: Admin Panel", true))
             ),
             section(s -> s
-                .text(plainText(lastUpdatedMessage(homepage)))
+                .text(markdownText(lastUpdatedMessage(homepage)))
                 .accessory(button(b -> b
                     .actionId(HomepageOperation.refresh.actionId())
                     .text(plainText("Refresh"))

@@ -1,14 +1,8 @@
 package com.coreeng.supportbot.testkit;
 
-import java.net.URLDecoder;
-import java.nio.charset.Charset;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
 import java.util.Map;
-import static java.util.stream.Collectors.toMap;
 
-import com.github.tomakehurst.wiremock.http.FormParameter;
 import org.apache.commons.text.StringSubstitutor;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -125,7 +119,17 @@ public class FullSummaryForm {
                           },
                           {
                             "type": "text",
-                            "text": " Opened: <!date^${openedAtTs}^{date_short_pretty} at {time}|${openedAt}>\\n"
+                            "text": " Opened: "
+                          },
+                          {
+                            "type": "date",
+                            "timestamp": ${openedAtTs},
+                            "format": "{date_short_pretty} at {time}",
+                            "fallback": "${openedAt}"
+                          },
+                          {
+                            "type": "text",
+                            "text": "\\n"
                           }
                         ]
                       }
