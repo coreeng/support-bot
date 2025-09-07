@@ -20,14 +20,14 @@ class RatingRepositoryTest {
     @Test
     void shouldInsertRatingAndReturnId() {
         // Given
-        Rating rating = Rating.createNew(
-                5,
-                String.valueOf(Instant.now().getEpochSecond()),
-                "closed",
-                "production blocking",
-                new String[]{"ingress"},
-                false
-        );
+        Rating rating = Rating.builder()
+                .rating(5)
+                .submittedTs(String.valueOf(Instant.now().getEpochSecond()))
+                .status("closed")
+                .impact("production blocking")
+                .tags(new String[]{"ingress"})
+                .isEscalated(false)
+                .build();
 
         // When
         UUID savedId = ratingRepository.insertRating(rating);
@@ -40,14 +40,14 @@ class RatingRepositoryTest {
     @Test
     void shouldFindRatingById() {
         // Given
-        Rating rating = Rating.createNew(
-                4,
-                String.valueOf(Instant.now().getEpochSecond()),
-                "opened",
-                "bau",
-                new String[]{"ingress"},
-                true
-        );
+        Rating rating = Rating.builder()
+                .rating(4)
+                .submittedTs(String.valueOf(Instant.now().getEpochSecond()))
+                .status("opened")
+                .impact("bau")
+                .tags(new String[]{"ingress"})
+                .isEscalated(true)
+                .build();
         UUID savedId = ratingRepository.insertRating(rating);
 
         // When
@@ -78,14 +78,14 @@ class RatingRepositoryTest {
     @Test
     void shouldHandleNullOptionalFields() {
         // Given
-        Rating rating = Rating.createNew(
-                3,
-                String.valueOf(Instant.now().getEpochSecond()),
-                "stale",
-                null, // null impact
-                null, // null tags
-                false
-        );
+        Rating rating = Rating.builder()
+                .rating(3)
+                .submittedTs(String.valueOf(Instant.now().getEpochSecond()))
+                .status("stale")
+                .impact(null) // null impact
+                .tags(null) // null tags
+                .isEscalated(false)
+                .build();
 
         // When
         UUID savedId = ratingRepository.insertRating(rating);
@@ -101,9 +101,9 @@ class RatingRepositoryTest {
     @Test
     void shouldFindRatingsByStatus() {
         // Given
-        Rating openedRating = Rating.createNew(5, "1000", "opened", "production blocking", new String[]{"gatekeeper"}, false);
-        Rating closedRating = Rating.createNew(3, "2000", "closed", "low", new String[]{"jenkins"}, true);
-        Rating anotherOpenedRating = Rating.createNew(4, "3000", "opened", "bau", new String[]{"eks"}, false);
+        Rating openedRating = Rating.builder().rating(5).submittedTs("1000").status("opened").impact("production blocking").tags(new String[]{"gatekeeper"}).isEscalated(false).build();
+        Rating closedRating = Rating.builder().rating(3).submittedTs("2000").status("closed").impact("low").tags(new String[]{"jenkins"}).isEscalated(true).build();
+        Rating anotherOpenedRating = Rating.builder().rating(4).submittedTs("3000").status("opened").impact("bau").tags(new String[]{"eks"}).isEscalated(false).build();
         
         ratingRepository.insertRating(openedRating);
         ratingRepository.insertRating(closedRating);
@@ -126,9 +126,9 @@ class RatingRepositoryTest {
     @Test
     void shouldFindRatingsByTag() {
         // Given
-        Rating bugRating = Rating.createNew(2, "1000", "opened", "production blocking", new String[]{"ingress"}, false);
-        Rating featureRating = Rating.createNew(4, "2000", "closed", "bau", new String[]{"new-feature"}, true);
-        Rating anotherBugRating = Rating.createNew(1, "3000", "stale", "production blocking", new String[]{"ingress"}, true);
+        Rating bugRating = Rating.builder().rating(2).submittedTs("1000").status("opened").impact("production blocking").tags(new String[]{"ingress"}).isEscalated(false).build();
+        Rating featureRating = Rating.builder().rating(4).submittedTs("2000").status("closed").impact("bau").tags(new String[]{"new-feature"}).isEscalated(true).build();
+        Rating anotherBugRating = Rating.builder().rating(1).submittedTs("3000").status("stale").impact("production blocking").tags(new String[]{"ingress"}).isEscalated(true).build();
         
         ratingRepository.insertRating(bugRating);
         ratingRepository.insertRating(featureRating);
@@ -151,9 +151,9 @@ class RatingRepositoryTest {
     @Test
     void shouldFindEscalatedRatings() {
         // Given
-        Rating escalatedRating1 = Rating.createNew(1, "1000", "opened", "production blocking", new String[]{"ingress"}, true);
-        Rating normalRating = Rating.createNew(5, "2000", "closed", "low", new String[]{"bau"}, false);
-        Rating escalatedRating2 = Rating.createNew(2, "3000", "stale", "production blocking", new String[]{"github"}, true);
+        Rating escalatedRating1 = Rating.builder().rating(1).submittedTs("1000").status("opened").impact("production blocking").tags(new String[]{"ingress"}).isEscalated(true).build();
+        Rating normalRating = Rating.builder().rating(5).submittedTs("2000").status("closed").impact("low").tags(new String[]{"bau"}).isEscalated(false).build();
+        Rating escalatedRating2 = Rating.builder().rating(2).submittedTs("3000").status("stale").impact("production blocking").tags(new String[]{"github"}).isEscalated(true).build();
         
         ratingRepository.insertRating(escalatedRating1);
         ratingRepository.insertRating(normalRating);
@@ -184,8 +184,8 @@ class RatingRepositoryTest {
     @Test
     void shouldGenerateUniqueIds() {
         // Given
-        Rating rating1 = Rating.createNew(4, "1000", "opened", "bau", new String[]{"github"}, false);
-        Rating rating2 = Rating.createNew(3, "2000", "closed", "low", new String[]{"argocd"}, true);
+        Rating rating1 = Rating.builder().rating(4).submittedTs("1000").status("opened").impact("bau").tags(new String[]{"github"}).isEscalated(false).build();
+        Rating rating2 = Rating.builder().rating(3).submittedTs("2000").status("closed").impact("low").tags(new String[]{"argocd"}).isEscalated(true).build();
         
         // When
         UUID id1 = ratingRepository.insertRating(rating1);
