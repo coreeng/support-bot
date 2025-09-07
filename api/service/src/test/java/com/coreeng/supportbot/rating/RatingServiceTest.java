@@ -30,14 +30,14 @@ class RatingServiceTest {
     @BeforeEach
     void setUp() {
         sampleRatingId = UUID.randomUUID();
-        sampleRating = Rating.createNew(
-                4,
-                "1640995200",
-                "closed",
-                "production blocking",
-                new String[]{"ingress"},
-                false
-        );
+        sampleRating = Rating.builder()
+                .rating(4)
+                .submittedTs("1640995200")
+                .status("closed")
+                .impact("production blocking")
+                .tags(new String[]{"ingress"})
+                .isEscalated(false)
+                .build();
     }
 
     @Test
@@ -147,14 +147,14 @@ class RatingServiceTest {
     @Test
     void shouldFindEscalatedRatings() {
         // Given
-        Rating escalatedRating = Rating.createNew(
-                1,
-                "1640995200",
-                "open",
-                "production blocking",
-                new String[]{"database"},
-                true // escalated
-        );
+        Rating escalatedRating = Rating.builder()
+                .rating(1)
+                .submittedTs("1640995200")
+                .status("open")
+                .impact("production blocking")
+                .tags(new String[]{"database"})
+                .isEscalated(true) // escalated
+                .build();
         ImmutableList<Rating> expectedRatings = ImmutableList.of(escalatedRating);
         when(repository.findEscalatedRatings()).thenReturn(expectedRatings);
 
@@ -185,9 +185,9 @@ class RatingServiceTest {
     @Test
     void shouldHandleMultipleRatingsInResults() {
         // Given
-        Rating rating1 = Rating.createNew(5, "1640995200", "closed", "low", new String[]{"api"}, false);
-        Rating rating2 = Rating.createNew(3, "1640995300", "closed", "medium", new String[]{"ui"}, false);
-        Rating rating3 = Rating.createNew(2, "1640995400", "closed", "high", new String[]{"database"}, false);
+        Rating rating1 = Rating.builder().rating(5).submittedTs("1640995200").status("closed").impact("low").tags(new String[]{"api"}).isEscalated(false).build();
+        Rating rating2 = Rating.builder().rating(3).submittedTs("1640995300").status("closed").impact("medium").tags(new String[]{"ui"}).isEscalated(false).build();
+        Rating rating3 = Rating.builder().rating(2).submittedTs("1640995400").status("closed").impact("high").tags(new String[]{"database"}).isEscalated(false).build();
 
         String status = "closed";
         ImmutableList<Rating> expectedRatings = ImmutableList.of(rating1, rating2, rating3);

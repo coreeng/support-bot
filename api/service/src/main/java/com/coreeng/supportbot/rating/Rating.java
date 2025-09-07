@@ -22,24 +22,6 @@ public class Rating {
     private String[] tags;
     private boolean isEscalated;
 
-    public static Rating createNew(
-        int rating,
-        String submittedTs,
-        String status,
-        @Nullable String impact,
-        @Nullable String[] tags,
-        boolean isEscalated
-    ) {
-        return Rating.builder()
-            .rating(rating)
-            .submittedTs(submittedTs)
-            .status(status)
-            .impact(impact)
-            .tags(tags)
-            .isEscalated(isEscalated)
-            .build();
-    }
-
     public boolean isValidRating() {
         return rating >= 1 && rating <= 5;
     }

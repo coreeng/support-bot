@@ -14,6 +14,7 @@ import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.ticket.TicketCreatedMessage;
 import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
 import com.coreeng.supportbot.ticket.TicketWentStaleMessage;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
