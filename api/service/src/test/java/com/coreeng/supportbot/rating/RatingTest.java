@@ -12,14 +12,14 @@ class RatingTest {
     @Test
     void shouldCreateNewRating() {
         // When
-        Rating rating = Rating.createNew(
-                5,
-                "1640995200",
-                "closed",
-                "production blocking",
-                new String[]{"ingress"},
-                true
-        );
+        Rating rating = Rating.builder()
+                .rating(5)
+                .submittedTs("1640995200")
+                .status("closed")
+                .impact("production blocking")
+                .tags(new String[]{"ingress"})
+                .isEscalated(true)
+                .build();
 
         // Then
         assertThat(rating.rating()).isEqualTo(5);
@@ -76,13 +76,13 @@ class RatingTest {
     }
 
     private Rating createRatingWithValue(int rating) {
-        return Rating.createNew(
-                rating,
-                "1640995200",
-                "closed",
-                "medium",
-                new String[]{"test"},
-                false
-        );
+        return Rating.builder()
+                .rating(rating)
+                .submittedTs("1640995200")
+                .status("closed")
+                .impact("medium")
+                .tags(new String[]{"test"})
+                .isEscalated(false)
+                .build();
     }
 }

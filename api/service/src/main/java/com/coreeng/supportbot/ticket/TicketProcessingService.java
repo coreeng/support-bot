@@ -2,7 +2,6 @@ package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
-import com.coreeng.supportbot.rating.Rating;
 import com.coreeng.supportbot.rating.RatingService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.events.MessagePosted;
@@ -16,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Slf4j
@@ -241,16 +239,6 @@ public class TicketProcessingService {
      */
     public boolean canRateTicket(TicketId ticketId) {
         return !repository.isTicketRated(ticketId);
-    }
-
-    /**
-     * Submit a rating for a ticket and mark it as rated
-     */
-    @Transactional
-    public UUID submitTicketRating(TicketId ticketId, Rating rating) {
-        UUID ratingId = ratingService.createRating(rating);
-        repository.markTicketAsRated(ticketId);
-        return ratingId;
     }
 
     private boolean isQueryEvent(SlackEvent event) {

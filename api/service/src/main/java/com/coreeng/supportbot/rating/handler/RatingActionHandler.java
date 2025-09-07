@@ -18,11 +18,11 @@ import com.slack.api.bolt.context.builtin.ActionContext;
 import com.slack.api.bolt.request.builtin.BlockActionRequest;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.model.Message;
-import com.slack.api.model.User;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -49,32 +49,26 @@ public class RatingActionHandler implements SlackBlockActionHandler {
         BlockActionPayload payload = req.getPayload();
 
         for (BlockActionPayload.Action action : payload.getActions()) {
-            String actionId = action.getActionId();
-            
-            if (actionId.startsWith("rating_submit_")) {
-                handleRatingSubmission(action, payload);
-            } else {
-                log.atWarn()
-                    .addArgument(actionId)
-                    .log("Unknown rating action: {}");
-            }
+            handleRatingSubmission(action, payload);
         }
     }
 
+    @Transactional
     private void handleRatingSubmission(BlockActionPayload.Action action, BlockActionPayload payload) {
         try {
             // Parse action ID format: "rating_submit_{ticketId}_{rating}"
             String[] parts = action.getActionId().split("_");
             if (parts.length >= 4) {
                 String ticketIdStr = parts[2];
-                int rating = Integer.parseInt(parts[3]);
+                String ratingStr = parts[3];
                 
                 // Validate rating value
-                if (!isValidRating(rating)) {
-                    log.warn("Invalid rating value {} submitted for ticket {}", rating, ticketIdStr);
+                if (!isValidRating(ratingStr)) {
+                    log.warn("Invalid rating value '{}' submitted for ticket {}", ratingStr, ticketIdStr);
                     return;
                 }
                 
+                int rating = Integer.parseInt(ratingStr); // Safe to parse since isValidRating passed
                 TicketId ticketId = new TicketId(Long.parseLong(ticketIdStr));
                 log.info("Submitted rating {} for ticket {}", rating, ticketId);
                 
@@ -95,14 +89,14 @@ public class RatingActionHandler implements SlackBlockActionHandler {
                 boolean isEscalated = escalationQueryService.countNotResolvedByTicketId(ticketId) > 0;
                 
                 // Create and submit the rating
-                Rating ratingRecord = Rating.createNew(
-                    rating,
-                    String.valueOf(Instant.now().getEpochSecond()),
-                    TicketStatus.closed.name(),
-                    impact,
-                    tags,
-                    isEscalated
-                );
+                Rating ratingRecord = Rating.builder()
+                    .rating(rating)
+                    .submittedTs(String.valueOf(Instant.now().getEpochSecond()))
+                    .status(TicketStatus.closed.name())
+                    .impact(impact)
+                    .tags(tags)
+                    .isEscalated(isEscalated)
+                    .build();
                 
                 UUID ratingId = ratingService.createRating(ratingRecord);
                 ticketRepository.markTicketAsRated(ticketId);
@@ -140,7 +134,13 @@ public class RatingActionHandler implements SlackBlockActionHandler {
         }
     }
 
-    private boolean isValidRating(int rating) {
-        return rating >= 1 && rating <= 5;
+    private boolean isValidRating(String rating) {
+        try {
+            int ratingValue = Integer.parseInt(rating);
+            return ratingValue >= 1 && ratingValue <= 5;
+        } catch (NumberFormatException e) {
+            log.warn("Rating value '{}' is not a valid integer", rating);
+            return false;
+        }
     }
 }
