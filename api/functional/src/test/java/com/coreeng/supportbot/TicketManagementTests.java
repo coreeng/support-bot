@@ -10,6 +10,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import com.coreeng.supportbot.testkit.FullSummaryButtonClick;
 import com.coreeng.supportbot.testkit.FullSummaryForm;
 import com.coreeng.supportbot.testkit.FullSummaryFormSubmission;
+import com.coreeng.supportbot.testkit.EscalationForm;
+import com.coreeng.supportbot.testkit.EscalationFormSubmission;
+import com.coreeng.supportbot.testkit.EscalationMessage;
 import com.coreeng.supportbot.testkit.MessageTs;
 import com.coreeng.supportbot.testkit.MessageUpdatedExpectation;
 import com.coreeng.supportbot.testkit.ReactionAddedExpectation;
@@ -33,6 +36,7 @@ public class TicketManagementTests {
     private TestKit testKit;
     private SupportBotClient supportBotClient;
     private SlackWiremock slackWiremock;
+    private Config config;
 
     @Test
     public void whenQueryIsPosted_thenQueryIsRegisteredInBot() {
@@ -180,5 +184,57 @@ public class TicketManagementTests {
         var ticketResponse = supportBotClient.assertTicketExists(ticket);
         ticket.assertMatches(ticketResponse);
         updatedTicketMessageStub.result().assertMatches(ticketResponse);
+    }
+
+    @Test
+    public void whenTicketIsEscalated_escalationIsCreatedInDatabase() {
+        // given
+        TestKit.RoledTestKit asSupport = testKit.as(support);
+        Ticket ticket = asSupport.ticket().create(t -> t
+            .queryTs(MessageTs.now())
+            .createdMessageTs(MessageTs.now())
+        );
+
+        Config.EscalationTeam escalationTeam = config.escalationTeams().getFirst();
+
+        String openEscalationTriggerId = "whenEscalateButtonIsClicked_formIsOpened";
+        StubWithResult<EscalationForm> escalationFormOpenedStub = ticket.expectEscalationFormOpened(openEscalationTriggerId);
+        StubWithResult<EscalationMessage> escalationMessageCreatedStub = ticket.expectEscalationMessagePosted(escalationTeam.slackGroupId(), MessageTs.now());
+        // Stub the rocket reaction added to the query thread after escalation
+        Stub rocketReactionAddedStub = slackWiremock.stubReactionAdd(
+            ReactionAddedExpectation.builder()
+                .reaction("rocket")
+                .channelId(ticket.channelId())
+                .ts(ticket.queryTs())
+                .build()
+        );
+
+        // when
+        asSupport.slack().clickMessageButton(ticket.escalateButtonClick(openEscalationTriggerId));
+        await().atMost(Duration.ofSeconds(5))
+            .untilAsserted(escalationFormOpenedStub::assertIsCalled);
+
+        EscalationFormSubmission.Values values = EscalationFormSubmission.Values.builder()
+            .team(escalationTeam.name())
+            .tags(ImmutableList.of("jenkins-pipelines", "networking"))
+            .build();
+        asSupport.slack().submitView(ticket.escalationFormSubmit(openEscalationTriggerId, values));
+
+        ticket.applyChangesLocally()
+            .applyEscalationFromValues(values);
+
+        // then
+        await().atMost(Duration.ofSeconds(5))
+            .untilAsserted(() -> {
+                escalationMessageCreatedStub.assertIsCalled();
+                rocketReactionAddedStub.assertIsCalled();
+            });
+        var ticketResponse = supportBotClient.assertTicketExists(ticket);
+        ticket.assertMatches(ticketResponse);
+        escalationMessageCreatedStub.result().assertMatches(ticketResponse);
+    }
+
+    public void whenEscalatedTicketIsClosed_warningDisplayedAndEscalationsAreClosed() {
+
     }
 }

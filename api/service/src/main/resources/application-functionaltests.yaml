@@ -9,8 +9,6 @@ slack:
     channel-id: C1234567891
     expected-initial-reaction: eyes
     response-initial-reaction: ticket
-  escalation:
-    channel-id: C1234567892
 
 enums:
   escalationTeams:

@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.mock;
 
-import com.coreeng.supportbot.config.SlackEscalationProps;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
@@ -74,7 +73,6 @@ public class MockDataGenerator implements ApplicationRunner {
     private final static double closedTicketIsEscalatedChance = 33.0; //NOPMD - suppressed LongVariable
 
     private final SlackTicketsProps ticketsProps;
-    private final SlackEscalationProps escalationProps;
     private final TicketRepository ticketRepository;
     private final EscalationRepository escalationRepository;
     private final SentimentRepository sentimentRepository;
@@ -82,7 +80,6 @@ public class MockDataGenerator implements ApplicationRunner {
     private final ImpactsRegistry impactsRegistry;
     private final TagsRegistry tagsRegistry;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
-    private final ZoneId timezone;
 
     @Transactional
     @Override
@@ -340,7 +337,7 @@ public class MockDataGenerator implements ApplicationRunner {
 
     private MessageTs generateMessageTsAt(Random random, LocalDate date) {
         LocalTime time = LocalTime.ofSecondOfDay(random.nextLong(secondsPerDay));
-        ZoneOffset offset = Instant.now().atZone(timezone).getOffset();
+        ZoneOffset offset = Instant.now().atZone(ZoneOffset.UTC).getOffset();
         Instant queryCreatedDate = date.atTime(time).toInstant(offset);
         return messageTsFromInstant(random, queryCreatedDate);
     }
