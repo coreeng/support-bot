@@ -1,16 +1,5 @@
 package com.coreeng.supportbot.testkit;
 
-import java.io.IOException;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import org.apache.commons.text.StringSubstitutor;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,11 +8,21 @@ import com.github.tomakehurst.wiremock.http.FormParameter;
 import com.github.tomakehurst.wiremock.matching.AnythingPattern;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import com.jayway.jsonpath.JsonPath;
-
 import lombok.Builder;
 import lombok.Getter;
+import org.apache.commons.text.StringSubstitutor;
+
+import java.io.IOException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.JSON;
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 @Builder
 @Getter
@@ -125,7 +124,7 @@ public class TicketMessage implements SearchableForTicket {
 
             // Build button elements dynamically based on ticket status
             String buttonElements = buildButtonElements(ticketId, expectedStatusCode);
-            
+
             String expectedJson = StringSubstitutor.replace("""
                  [
                    {
@@ -236,6 +235,7 @@ public class TicketMessage implements SearchableForTicket {
         public record AttachmentView(
             Instant statusChangedAt,
             String status
-        ) {}
+        ) {
+        }
     }
 }

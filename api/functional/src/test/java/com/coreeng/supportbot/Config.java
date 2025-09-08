@@ -9,6 +9,9 @@ public record Config(
         Mocks mocks,
         List<Tenant> tenants,
         List<User> users,
+        List<EscalationTeam> escalationTeams,
+        List<Tag> tags,
+        List<Impact> impacts,
         SupportBot supportBot
 ) {
     public List<User> nonSupportUsers() {
@@ -94,4 +97,17 @@ public record Config(
             String token
     ) {
     }
+
+    public record EscalationTeam(
+        String name,
+        String slackGroupId
+    ) {}
+    public record Tag(
+        String code,
+        String label
+    ) {}
+    public record Impact(
+        String code,
+        String label
+    ) {}
 }

@@ -40,6 +40,34 @@ tenants:
       - email: chandra.giustino@company.com
       - email: nazira.armel@company.com
 
+escalationTeams:
+  - name: wow
+    slackGroupId: S01234ESCWW
+tags:
+  - label: Ingresses
+    code: ingresses
+  - label: Jenkins Pipelines
+    code: jenkins-pipelines
+  - label: Networking
+    code: networking
+  - label: Vault
+    code: vault
+  - label: Persistence/Brokers
+    code: persistence-brokers
+  - label: Observability
+    code: observability
+  - label: DNS
+    code: dns
+  - label: Osprey
+    code: osprey
+impacts:
+  - label: Production Blocking
+    code: productionBlocking
+  - label: BAU Blocking
+    code: bauBlocking
+  - label: Abnormal Behaviour
+    code: abnormalBehaviour
+
 users:
   # support members
   - email: coby.ivona@company.com
