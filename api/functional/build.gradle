@@ -31,8 +31,6 @@ dependencies {
     testImplementation("org.apache.commons:commons-lang3:3.18.+")
     testImplementation("commons-codec:commons-codec:1.18.+")
 
-    // TODO remove jsonassert
-    testImplementation('org.skyscreamer:jsonassert:1.5.+')
     testImplementation("net.javacrumbs.json-unit:json-unit-assertj:4.1.+")
     testImplementation("net.datafaker:datafaker:2.4.3")
 }

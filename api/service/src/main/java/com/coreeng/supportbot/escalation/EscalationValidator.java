@@ -1,6 +1,6 @@
 package com.coreeng.supportbot.escalation;
 
-import com.coreeng.supportbot.config.SlackEscalationProps;
+import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
@@ -15,7 +15,7 @@ import java.util.Objects;
 @RequiredArgsConstructor
 @Slf4j
 public class EscalationValidator {
-    private final SlackEscalationProps slackEscalationProps;
+    private final SlackTicketsProps slackTicketsProps;
     private final SlackClient slackClient;
     private final EscalationQueryService queryService;
 
@@ -26,7 +26,7 @@ public class EscalationValidator {
         }
 
         MessageRef threadRef = MessageRef.fromPermalink(threadPermalink);
-        if (!Objects.equals(slackEscalationProps.channelId(), threadRef.channelId())) {
+        if (!Objects.equals(slackTicketsProps.channelId(), threadRef.channelId())) {
             return "Link leads to the wrong channel. Channel for escalations is expected.";
         }
         if (threadRef.isReply()) {

@@ -4,7 +4,6 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import com.coreeng.supportbot.config.SlackEscalationProps;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
@@ -24,7 +23,6 @@ class EscalationProcessingServiceTest {
   private EscalationProcessingService processingService;
 
   @Mock private EscalationRepository escalationRepository;
-  @Mock private SlackEscalationProps slackEscalationProps;
   @Mock private EscalationCreatedMessageMapper escalationMapper;
   @Mock private SlackClient slackClient;
   @Mock private EscalationTeamsRegistry escalationTeamsRegistry;
@@ -35,8 +33,7 @@ class EscalationProcessingServiceTest {
     processingService =
         new EscalationProcessingService(
             escalationRepository,
-            slackEscalationProps,
-                escalationMapper,
+            escalationMapper,
             slackClient,
             escalationTeamsRegistry,
             slackTicketsProps);

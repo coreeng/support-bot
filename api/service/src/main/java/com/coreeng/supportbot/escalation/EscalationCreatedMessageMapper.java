@@ -14,9 +14,6 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class EscalationCreatedMessageMapper {
-    private final static String redHex = "#ff000d";
-    private final static String greenHex = "#00ff00";
-
     private final JsonMapper jsonMapper;
 
     public SimpleSlackMessage renderMessage(EscalationCreatedMessage message) {
@@ -28,7 +25,7 @@ public class EscalationCreatedMessageMapper {
 
     private ImmutableList<LayoutBlock> renderBlocks(EscalationCreatedMessage message) {
         String str = "\nEscalated to team: " + message.escalationTeam()
-                + "("+ "<!subteam^" +message.slackTeamGroupId() + ">)";
+                     + "("+ "<!subteam^" +message.slackTeamGroupId() + ">)";
         return ImmutableList.of(
             section(s -> s
                 .text(markdownText(str))
@@ -42,5 +39,4 @@ public class EscalationCreatedMessageMapper {
 
     public EscalationResolveInput parseTriggerInput(String json) {
         return jsonMapper.fromJsonString(json, EscalationResolveInput.class);
-    }
-}
+    }}
