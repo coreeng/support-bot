@@ -107,9 +107,19 @@ public class SupportBotClient {
         private Team team;
         private ImmutableList<@NonNull String> tags;
         private ImmutableList<Ticket.@NonNull StatusLog> logs;
+        private boolean escalated;
+        private ImmutableList<Escalation> escalations;
     }
 
     public record QueryResponse(String link, Instant date, MessageTs ts) {}
     public record TicketFormMessage(MessageTs ts) {}
     public record Team(String name, ImmutableList<@NonNull String> types) {}
+    @Builder
+    @Getter
+    @Jacksonized
+    public static class Escalation {
+        private String threadLink;
+        private Team team;
+        private ImmutableList<@NonNull String> tags;
+    }
 }

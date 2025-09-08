@@ -3,6 +3,7 @@ package com.coreeng.supportbot.testkit;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import org.jspecify.annotations.NonNull;
@@ -39,11 +40,18 @@ public class Ticket implements SearchableForTicket {
     private final SlackWiremock slackWiremock;
     private final Config.@NonNull User user;
     @NonNull
+    private final Config config;
+    @NonNull
     private final String teamId;
     @NonNull
     private final String queryBlocksJson;
     @NonNull
     private final String queryPermalink;
+
+    @Builder.Default
+    private boolean escalated = false;
+    @Builder.Default
+    private ImmutableList<@NonNull EscalationInfo> escalations = ImmutableList.of();
 
     public static TicketBuilder fromResponse(SupportBotClient.TicketResponse ticketResponse) {
         return Ticket.builder()
@@ -100,8 +108,26 @@ public class Ticket implements SearchableForTicket {
         assertThat(response.formMessage().ts()).isEqualTo(formMessageTs);
         assertThat(response.channelId()).isEqualTo(channelId);
         assertThat(response.status()).isEqualTo(status);
-        assertThat(response.team().name()).isEqualTo(team);
+        if (team == null) {
+            assertThat(response.team()).isNull();
+        } else {
+            assertThat(response.team().name()).isEqualTo(team);
+        }
         assertThat(response.tags()).isEqualTo(tags());
+
+        assertThat(response.escalated()).isEqualTo(escalated);
+        if (escalated) {
+            assertThat(response.escalations()).isNotEmpty();
+            for (EscalationInfo info : escalations) {
+                assertThat(response.escalations())
+                    .anySatisfy(e -> {
+                        assertThat(e.team().name()).isEqualTo(info.team());
+                        assertThat(e.tags()).isEqualTo(info.tags());
+                    });
+            }
+        } else {
+            assertThat(response.escalations()).isEmpty();
+        }
 
         assertThat(response.logs()).hasSize(logs.size());
         for (int i = 0; i < response.logs().size(); i++) {
@@ -133,6 +159,15 @@ public class Ticket implements SearchableForTicket {
                 .build();
             return this;
         }
+
+        public TicketUpdater applyEscalationFromValues(EscalationFormSubmission.Values values) {
+            escalated = true;
+            escalations = ImmutableList.<EscalationInfo>builder()
+                .addAll(escalations)
+                .add(new EscalationInfo(values.team(), values.tags()))
+                .build();
+            return this;
+        }
     }
 
     record StatusLog(
@@ -140,4 +175,44 @@ public class Ticket implements SearchableForTicket {
         Instant date
     ) {
     }
+
+    public EscalationButtonClick escalateButtonClick(String triggerId) {
+        return EscalationButtonClick.builder()
+            .triggerId(triggerId)
+            .ticket(this)
+            .build();
+    }
+
+    public StubWithResult<EscalationForm> expectEscalationFormOpened(String triggerId) {
+        var expectation = ViewsOpenExpectation.<EscalationForm>builder()
+            .viewCallbackId("ticket-escalate")
+            .viewType("modal")
+            .triggerId(triggerId)
+            .receiver(new EscalationForm.Receiver(this))
+            .build();
+        return slackWiremock.stubViewsOpen(expectation);
+    }
+
+    public EscalationFormSubmission escalationFormSubmit(String triggerId, EscalationFormSubmission.Values values) {
+        return EscalationFormSubmission.builder()
+            .triggerId(triggerId)
+            .ticketId(id)
+            .values(values)
+            .build();
+    }
+
+    public StubWithResult<EscalationMessage> expectEscalationMessagePosted(String expectedSlackGroupId, MessageTs ts) {
+        return slackWiremock.stubMessagePosted(ThreadMessagePostedExpectation.<EscalationMessage>builder()
+            .receiver(new EscalationMessage.Receiver(expectedSlackGroupId))
+            .from(UserRole.supportBot)
+            .newMessageTs(ts)
+            .channelId(channelId)
+            .threadTs(queryTs)
+            .build());
+    }
+
+    public record EscalationInfo(
+        String team,
+        ImmutableList<@NonNull String> tags
+    ) {}
 }

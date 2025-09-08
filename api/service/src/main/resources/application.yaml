@@ -54,8 +54,6 @@ slack:
     response-initial-reaction: ticket
     resolved-reaction: white_check_mark
     escalated-reaction: rocket
-  escalation:
-    channel-id: ${SLACK_ESCALATION_CHANNEL_ID} # Channel ID like: C1234567890
 
 ticket:
   staleness-check-job:

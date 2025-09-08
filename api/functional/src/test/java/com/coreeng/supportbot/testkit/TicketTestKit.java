@@ -39,6 +39,7 @@ public class TicketTestKit {
 
         return Ticket.fromResponse(response)
             .user(requireNonNull(config.userById(testKit.userId())))
+            .config(config)
             .teamId(testKit.teamId())
             .slackWiremock(slackWiremock)
             .queryBlocksJson(messageToBlocksJson(ticketToCreate.message()))

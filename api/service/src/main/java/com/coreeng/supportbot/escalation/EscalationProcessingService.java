@@ -2,13 +2,15 @@ package com.coreeng.supportbot.escalation;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.coreeng.supportbot.config.SlackEscalationProps;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
+import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.ticket.TicketId;
 import java.time.Instant;
+
+import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -19,7 +21,6 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class EscalationProcessingService {
     private final EscalationRepository repository;
-    private final SlackEscalationProps slackEscalationProps;
     private final EscalationCreatedMessageMapper createdMessageMapper;
     private final SlackClient slackClient;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
@@ -42,7 +43,7 @@ public class EscalationProcessingService {
             .addArgument(escalation::id)
             .log("Escalation created: {}");
 
-        slackClient.postMessage(new SlackPostMessageRequest(
+        ChatPostMessageResponse messagePostResponse = slackClient.postMessage(new SlackPostMessageRequest(
             createdMessageMapper.renderMessage(EscalationCreatedMessage.of(
                 escalation,
                 checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(escalation.team())).slackGroupId()
@@ -52,15 +53,11 @@ public class EscalationProcessingService {
         ));
 
         escalation = escalation.toBuilder()
-            .channelId(slackEscalationProps.channelId())
-            .threadTs(request.ticket().createdMessageTs())
+            .channelId(request.ticket().channelId())
+            .threadTs(request.ticket().queryTs())
+            .createdMessageTs(MessageTs.of(messagePostResponse.getTs()))
             .build();
-
-        escalation = repository.update(
-            escalation.toBuilder()
-                .createdMessageTs(request.ticket().createdMessageTs())
-                .build()
-        );
+        escalation = repository.update(escalation);
 
         return escalation;
     }

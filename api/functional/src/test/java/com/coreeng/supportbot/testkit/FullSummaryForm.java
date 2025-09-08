@@ -4,11 +4,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
 import org.apache.commons.text.StringSubstitutor;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.skyscreamer.jsonassert.JSONAssert;
-import org.skyscreamer.jsonassert.JSONCompareMode;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 public class FullSummaryForm {
     @RequiredArgsConstructor
     public static class Reciever implements StubWithResult.Receiver<FullSummaryForm> {
+        private final static ObjectMapper objectMapper = new ObjectMapper();
         private final Ticket ticket;
 
         @Override
@@ -28,64 +29,56 @@ public class FullSummaryForm {
         @Override
         public FullSummaryForm assertAndExtractResult(ServeEvent servedStub) throws Exception {
             String rawView = servedStub.getRequest().formParameter("view").getValues().getFirst();
-            JSONObject view = new JSONObject(rawView);
-            JSONAssert.assertEquals(String.format("""
-                    {
-                        "type": "plain_text",
-                        "text": "Ticket ID-%d Summary",
-                        "emoji": false
-                    }
-                    """, ticket.id()),
-                view.getJSONObject("title"),
-                JSONCompareMode.STRICT_ORDER
+            JsonNode view = objectMapper.readTree(rawView);
+            assertThatJson(view.get("title").toString()).isEqualTo(String.format(
+                """
+                {
+                  "type": "plain_text",
+                  "text": "Ticket ID-%d Summary",
+                  "emoji": false
+                }
+                """, ticket.id()));
+            assertThatJson(view.get("close").toString()).isEqualTo(
+                """
+                {
+                  "type": "plain_text",
+                  "text": "Close",
+                  "emoji": false
+                }
+                """
             );
-            JSONAssert.assertEquals("""
-                    {
-                        "type": "plain_text",
-                        "text": "Close",
-                        "emoji": false
-                    }
-                    """,
-                view.getJSONObject("close"),
-                JSONCompareMode.STRICT_ORDER
+            assertThatJson(view.get("submit").toString()).isEqualTo(
+                """
+                {
+                  "type": "plain_text",
+                  "text": "Apply Changes",
+                  "emoji": false
+                }
+                """
             );
-            JSONAssert.assertEquals("""
-                    {
-                        "type": "plain_text",
-                        "text": "Apply Changes",
-                        "emoji": false
-                    }
-                    """,
-                view.getJSONObject("submit"),
-                JSONCompareMode.STRICT_ORDER
-            );
-            JSONAssert.assertEquals(String.format("""
-                    {
-                      "ticketId": %d
-                    }
-                    """, ticket.id()),
-                view.getString("private_metadata"),
-                JSONCompareMode.STRICT_ORDER
-            );
-            JSONArray expectedBlocks = buildExpectedBlocks();
-            JSONArray realBlocks = view.getJSONArray("blocks");
-            JSONAssert.assertEquals(expectedBlocks, realBlocks, JSONCompareMode.STRICT_ORDER);
+            assertThatJson(view.get("private_metadata").asText()).isEqualTo(String.format(
+                """
+                {
+                  "ticketId": %d
+                }
+                """, ticket.id()));
+            ArrayNode expectedBlocks = buildExpectedBlocks();
+            JsonNode realBlocks = view.get("blocks");
+            assertThatJson(realBlocks.toString()).isEqualTo(expectedBlocks.toString());
             return new FullSummaryForm();
         }
 
-        private JSONArray buildExpectedBlocks() throws JSONException {
-            JSONArray result = new JSONArray();
-            JSONObject header = new JSONObject("""
-                    {
-                      "type": "header",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "Ticket Summary"
-                      }
-                    }
-                """);
-            JSONArray queryBlocks = new JSONArray(ticket.queryBlocksJson());
-            JSONArray restBlocks = new JSONArray(StringSubstitutor.replace("""
+        private ArrayNode buildExpectedBlocks() throws Exception {
+            ArrayNode result = objectMapper.createArrayNode();
+            ObjectNode header = objectMapper.createObjectNode();
+            header.put("type", "header");
+            ObjectNode headerText = objectMapper.createObjectNode();
+            headerText.put("type", "plain_text");
+            headerText.put("text", "Ticket Summary");
+            header.set("text", headerText);
+            ArrayNode queryBlocks = (ArrayNode) objectMapper.readTree(ticket.queryBlocksJson());
+            ArrayNode restBlocks = (ArrayNode) objectMapper.readTree(StringSubstitutor.replace(
+                """
                 [
                   {
                     "type": "context",
@@ -362,21 +355,23 @@ public class FullSummaryForm {
                     }
                   }
                 ]
-                """, Map.of(
-                "userId", ticket.user().slackUserId(),
-                "postedAt", ticket.queryTs().instant().truncatedTo(ChronoUnit.MINUTES),
-                "postedAtTs", ticket.queryTs().instant().getEpochSecond(),
-                "openedAt", ticket.logs().getFirst().date().truncatedTo(ChronoUnit.MINUTES),
-                "openedAtTs", ticket.logs().getFirst().date().getEpochSecond(),
-                "queryPermalink", ticket.queryPermalink()
-            )));
+                """,
+                Map.of(
+                    "userId", ticket.user().slackUserId(),
+                    "postedAt", ticket.queryTs().instant().truncatedTo(ChronoUnit.MINUTES),
+                    "postedAtTs", ticket.queryTs().instant().getEpochSecond(),
+                    "openedAt", ticket.logs().getFirst().date().truncatedTo(ChronoUnit.MINUTES),
+                    "openedAtTs", ticket.logs().getFirst().date().getEpochSecond(),
+                    "queryPermalink", ticket.queryPermalink()
+                )
+            ));
 
-            result.put(header);
-            for (int i = 0; i < queryBlocks.length(); i++) {
-                result.put(queryBlocks.get(i));
+            result.add(header);
+            for (JsonNode n : queryBlocks) {
+                result.add(n);
             }
-            for (int i = 0; i < restBlocks.length(); i++) {
-                result.put(restBlocks.get(i));
+            for (JsonNode n : restBlocks) {
+                result.add(n);
             }
             return result;
         }
