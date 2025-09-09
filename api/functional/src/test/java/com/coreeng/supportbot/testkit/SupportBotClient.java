@@ -2,7 +2,6 @@ package com.coreeng.supportbot.testkit;
 
 import java.time.Instant;
 
-import lombok.extern.jackson.Jacksonized;
 import org.jspecify.annotations.NonNull;
 
 import com.coreeng.supportbot.wiremock.SlackWiremock;
@@ -20,9 +19,11 @@ import io.restassured.config.ObjectMapperConfig;
 import io.restassured.config.RestAssuredConfig;
 import io.restassured.filter.log.LogDetail;
 import io.restassured.http.ContentType;
+import static io.restassured.http.ContentType.JSON;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.jackson.Jacksonized;
 
 @RequiredArgsConstructor
 public class SupportBotClient {
@@ -81,6 +82,18 @@ public class SupportBotClient {
                 .and()
                 .extract().body().as(TicketResponse.class);
         }
+
+        public void escalateTicket(EscalationToCreate escalation) {
+            given()
+                .config(restAssuredConfig)
+                .when()
+                .contentType(JSON)
+                .body(escalation)
+                .post(baseUrl + "/test/escalation")
+                .then()
+                .log().ifValidationFails(LogDetail.ALL, true)
+                .statusCode(200);
+        }
     }
 
     @Builder
@@ -120,6 +133,18 @@ public class SupportBotClient {
     public static class Escalation {
         private String threadLink;
         private Team team;
+        private ImmutableList<@NonNull String> tags;
+        private Instant openedAt;
+        private Instant resolvedAt;
+    }
+
+    @Builder
+    @Getter
+    @Jacksonized
+    public static class EscalationToCreate {
+        private long ticketId;
+        private String team;
+        private MessageTs createdMessageTs;
         private ImmutableList<@NonNull String> tags;
     }
 }
