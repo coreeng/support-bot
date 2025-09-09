@@ -42,6 +42,7 @@ public class TicketTestKit {
             .config(config)
             .teamId(testKit.teamId())
             .slackWiremock(slackWiremock)
+            .supportBotClient(supportBotClient)
             .queryBlocksJson(messageToBlocksJson(ticketToCreate.message()))
             .queryPermalink("https://slack.com/messages/" + testKit.channelId() + "/" + ticketToCreate.queryTs())
             .build();

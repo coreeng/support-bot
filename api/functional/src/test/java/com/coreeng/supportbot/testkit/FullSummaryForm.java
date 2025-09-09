@@ -4,16 +4,17 @@ import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
 import org.apache.commons.text.StringSubstitutor;
+
+import com.coreeng.supportbot.Config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
-
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 
 import lombok.RequiredArgsConstructor;
+import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 
 public class FullSummaryForm {
     @RequiredArgsConstructor
@@ -32,36 +33,36 @@ public class FullSummaryForm {
             JsonNode view = objectMapper.readTree(rawView);
             assertThatJson(view.get("title").toString()).isEqualTo(String.format(
                 """
-                {
-                  "type": "plain_text",
-                  "text": "Ticket ID-%d Summary",
-                  "emoji": false
-                }
-                """, ticket.id()));
+                    {
+                      "type": "plain_text",
+                      "text": "Ticket ID-%d Summary",
+                      "emoji": false
+                    }
+                    """, ticket.id()));
             assertThatJson(view.get("close").toString()).isEqualTo(
                 """
-                {
-                  "type": "plain_text",
-                  "text": "Close",
-                  "emoji": false
-                }
-                """
+                    {
+                      "type": "plain_text",
+                      "text": "Close",
+                      "emoji": false
+                    }
+                    """
             );
             assertThatJson(view.get("submit").toString()).isEqualTo(
                 """
-                {
-                  "type": "plain_text",
-                  "text": "Apply Changes",
-                  "emoji": false
-                }
-                """
+                    {
+                      "type": "plain_text",
+                      "text": "Apply Changes",
+                      "emoji": false
+                    }
+                    """
             );
             assertThatJson(view.get("private_metadata").asText()).isEqualTo(String.format(
                 """
-                {
-                  "ticketId": %d
-                }
-                """, ticket.id()));
+                    {
+                      "ticketId": %d
+                    }
+                    """, ticket.id()));
             ArrayNode expectedBlocks = buildExpectedBlocks();
             JsonNode realBlocks = view.get("blocks");
             assertThatJson(realBlocks.toString()).isEqualTo(expectedBlocks.toString());
@@ -77,292 +78,319 @@ public class FullSummaryForm {
             headerText.put("text", "Ticket Summary");
             header.set("text", headerText);
             ArrayNode queryBlocks = (ArrayNode) objectMapper.readTree(ticket.queryBlocksJson());
-            ArrayNode restBlocks = (ArrayNode) objectMapper.readTree(StringSubstitutor.replace(
-                """
-                [
-                  {
-                    "type": "context",
-                    "elements": [
+            // Build Escalations block depending on whether the ticket has escalations
+            String escalationsBlock;
+            if (ticket.escalations().isEmpty()) {
+                escalationsBlock = """
                       {
-                        "type": "mrkdwn",
-                        "text": "Sent by <@${userId}> | <!date^${postedAtTs}^{date_short_pretty} at {time}|${postedAt}> | <${queryPermalink}|View Message>\\n",
-                        "verbatim": false
-                      }
-                    ]
-                  },
-                  {
-                    "type": "divider"
-                  },
-                  {
-                    "type": "header",
-                    "text": {
-                      "type": "plain_text",
-                      "text": "Status History"
-                    }
-                  },
-                  {
-                    "type": "rich_text",
-                    "elements": [
-                      {
-                        "type": "rich_text_section",
+                        "type": "context",
                         "elements": [
                           {
-                            "type": "emoji",
-                            "name": "large_orange_circle"
-                          },
-                          {
-                            "type": "text",
-                            "text": " Opened: "
-                          },
-                          {
-                            "type": "date",
-                            "timestamp": ${openedAtTs},
-                            "format": "{date_short_pretty} at {time}",
-                            "fallback": "${openedAt}"
-                          },
-                          {
-                            "type": "text",
-                            "text": "\\n"
+                            "type": "plain_text",
+                            "text": "No escalations for this ticket"
                           }
                         ]
                       }
-                    ]
-                  },
-                  {
-                    "type": "divider"
-                  },
-                  {
-                    "type": "header",
-                    "text": {
-                      "type": "plain_text",
-                      "text": "Escalations"
-                    }
-                  },
-                  {
-                    "type": "context",
-                    "elements": [
+                    """;
+            } else {
+                String teamName = ticket.escalations().getFirst().team();
+                String groupId = ticket.config().escalationTeams().stream()
+                    .filter(t -> t.name().equals(teamName))
+                    .findFirst()
+                    .map(Config.EscalationTeam::slackGroupId)
+                    .orElseThrow(() -> new AssertionError("Team not found: " + teamName));
+                escalationsBlock = String.format(
+                    """
+                        {
+                          "type": "section",
+                          "fields": [
+                            {"type": "plain_text", "text": "Status: Opened"},
+                            {"type": "mrkdwn", "text": "Team: <!subteam^%s>"}
+                          ]
+                        }""",
+                    groupId
+                );
+            }
+
+            ArrayNode restBlocks = (ArrayNode) objectMapper.readTree(StringSubstitutor.replace(
+                """
+                    [
                       {
-                        "type": "plain_text",
-                        "text": "No escalations for this ticket"
-                      }
-                    ]
-                  },
-                  {
-                    "type": "divider"
-                  },
-                  {
-                    "type": "header",
-                    "text": {
-                      "type": "plain_text",
-                      "text": "Modify Ticket"
-                    }
-                  },
-                  {
-                    "type": "input",
-                    "label": {
-                      "type": "plain_text",
-                      "text": "Change Status"
-                    },
-                    "optional": false,
-                    "element": {
-                      "type": "static_select",
-                      "action_id": "change-status",
-                      "initial_option": {
+                        "type": "context",
+                        "elements": [
+                          {
+                            "type": "mrkdwn",
+                            "text": "Sent by <@${userId}> | <!date^${postedAtTs}^{date_short_pretty} at {time}|${postedAt}> | <${queryPermalink}|View Message>\\n",
+                            "verbatim": false
+                          }
+                        ]
+                      },
+                      {
+                        "type": "divider"
+                      },
+                      {
+                        "type": "header",
                         "text": {
                           "type": "plain_text",
-                          "text": "Opened"
-                        },
-                        "value": "opened"
-                      },
-                      "options": [
-                        {
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Opened"
-                          },
-                          "value": "opened"
-                        },
-                        {
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Closed"
-                          },
-                          "value": "closed"
+                          "text": "Status History"
                         }
-                      ]
-                    }
-                  },
-                  {
-                    "type": "input",
-                    "label": {
-                      "type": "plain_text",
-                      "text": "Select the Author's Team"
-                    },
-                    "optional": false,
-                    "element": {
-                      "type": "static_select",
-                      "action_id": "change-team",
-                      "option_groups": [
-                        {
-                          "options": [{
-                            "text": {
-                              "text": "wow",
-                              "type": "plain_text"
-                            },
-                            "value": "wow"
-                          }],
-                          "label": {
-                            "text": "Suggested teams",
-                            "type": "plain_text"
+                      },
+                      {
+                        "type": "rich_text",
+                        "elements": [
+                          {
+                            "type": "rich_text_section",
+                            "elements": [
+                              {
+                                "type": "emoji",
+                                "name": "large_orange_circle"
+                              },
+                              {
+                                "type": "text",
+                                "text": " Opened: "
+                              },
+                              {
+                                "type": "date",
+                                "timestamp": ${openedAtTs},
+                                "format": "{date_short_pretty} at {time}",
+                                "fallback": "${openedAt}"
+                              },
+                              {
+                                "type": "text",
+                                "text": "\\n"
+                              }
+                            ]
                           }
+                        ]
+                      },
+                      {
+                        "type": "divider"
+                      },
+                      {
+                        "type": "header",
+                        "text": {
+                          "type": "plain_text",
+                          "text": "Escalations"
+                        }
+                      },
+                      ${escalationsBlock},
+                      {
+                        "type": "divider"
+                      },
+                      {
+                        "type": "header",
+                        "text": {
+                          "type": "plain_text",
+                          "text": "Modify Ticket"
+                        }
+                      },
+                      {
+                        "type": "input",
+                        "label": {
+                          "type": "plain_text",
+                          "text": "Change Status"
                         },
-                        {
-                          "label": {
-                            "type": "plain_text",
-                            "text": "Others"
+                        "optional": false,
+                        "element": {
+                          "type": "static_select",
+                          "action_id": "change-status",
+                          "initial_option": {
+                            "text": {
+                              "type": "plain_text",
+                              "text": "Opened"
+                            },
+                            "value": "opened"
                           },
                           "options": [
                             {
                               "text": {
                                 "type": "plain_text",
-                                "text": "connected-app"
+                                "text": "Opened"
                               },
-                              "value": "connected-app"
+                              "value": "opened"
                             },
                             {
                               "text": {
                                 "type": "plain_text",
-                                "text": "infra-integration"
+                                "text": "Closed"
                               },
-                              "value": "infra-integration"
+                              "value": "closed"
                             }
                           ]
                         }
-                      ]
-                    }
-                  },
-                  {
-                    "type": "input",
-                    "label": {
-                      "type": "plain_text",
-                      "text": "Select Tags"
-                    },
-                    "hint": {
-                      "type": "plain_text",
-                      "text": "Select all applicable tags."
-                    },
-                    "optional": false,
-                    "element": {
-                      "type": "multi_static_select",
-                      "action_id": "change-tags",
-                      "options": [
-                        {
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Ingresses"
-                          },
-                          "value": "ingresses"
-                        },
-                        {
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Jenkins Pipelines"
-                          },
-                          "value": "jenkins-pipelines"
-                        },
-                        {
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Networking"
-                          },
-                          "value": "networking"
-                        },
-                        {
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Vault"
-                          },
-                          "value": "vault"
-                        },
-                        {
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Persistence/Brokers"
-                          },
-                          "value": "persistence-brokers"
-                        },
-                        {
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Observability"
-                          },
-                          "value": "observability"
-                        },
-                        {
-                          "text": {
-                            "type": "plain_text",
-                            "text": "DNS"
-                          },
-                          "value": "dns"
-                        },
-                        {
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Osprey"
-                          },
-                          "value": "osprey"
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "type": "input",
-                    "label": {
-                      "type": "plain_text",
-                      "text": "Change Impact"
-                    },
-                    "optional": false,
-                    "element": {
-                      "type": "static_select",
-                      "action_id": "change-impact",
-                      "placeholder": {
-                        "type": "plain_text",
-                        "text": "Not Evaluated"
                       },
-                      "options": [
-                        {
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Production Blocking"
-                          },
-                          "value": "productionBlocking"
+                      {
+                        "type": "input",
+                        "label": {
+                          "type": "plain_text",
+                          "text": "Select the Author's Team"
                         },
-                        {
-                          "text": {
-                            "type": "plain_text",
-                            "text": "BAU Blocking"
-                          },
-                          "value": "bauBlocking"
-                        },
-                        {
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Abnormal Behaviour"
-                          },
-                          "value": "abnormalBehaviour"
+                        "optional": false,
+                        "element": {
+                          "type": "static_select",
+                          "action_id": "change-team",
+                          "option_groups": [
+                            {
+                              "options": [{
+                                "text": {
+                                  "text": "wow",
+                                  "type": "plain_text"
+                                },
+                                "value": "wow"
+                              }],
+                              "label": {
+                                "text": "Suggested teams",
+                                "type": "plain_text"
+                              }
+                            },
+                            {
+                              "label": {
+                                "type": "plain_text",
+                                "text": "Others"
+                              },
+                              "options": [
+                                {
+                                  "text": {
+                                    "type": "plain_text",
+                                    "text": "connected-app"
+                                  },
+                                  "value": "connected-app"
+                                },
+                                {
+                                  "text": {
+                                    "type": "plain_text",
+                                    "text": "infra-integration"
+                                  },
+                                  "value": "infra-integration"
+                                }
+                              ]
+                            }
+                          ]
                         }
-                      ]
-                    }
-                  }
-                ]
-                """,
+                      },
+                      {
+                        "type": "input",
+                        "label": {
+                          "type": "plain_text",
+                          "text": "Select Tags"
+                        },
+                        "hint": {
+                          "type": "plain_text",
+                          "text": "Select all applicable tags."
+                        },
+                        "optional": false,
+                        "element": {
+                          "type": "multi_static_select",
+                          "action_id": "change-tags",
+                          "options": [
+                            {
+                              "text": {
+                                "type": "plain_text",
+                                "text": "Ingresses"
+                              },
+                              "value": "ingresses"
+                            },
+                            {
+                              "text": {
+                                "type": "plain_text",
+                                "text": "Jenkins Pipelines"
+                              },
+                              "value": "jenkins-pipelines"
+                            },
+                            {
+                              "text": {
+                                "type": "plain_text",
+                                "text": "Networking"
+                              },
+                              "value": "networking"
+                            },
+                            {
+                              "text": {
+                                "type": "plain_text",
+                                "text": "Vault"
+                              },
+                              "value": "vault"
+                            },
+                            {
+                              "text": {
+                                "type": "plain_text",
+                                "text": "Persistence/Brokers"
+                              },
+                              "value": "persistence-brokers"
+                            },
+                            {
+                              "text": {
+                                "type": "plain_text",
+                                "text": "Observability"
+                              },
+                              "value": "observability"
+                            },
+                            {
+                              "text": {
+                                "type": "plain_text",
+                                "text": "DNS"
+                              },
+                              "value": "dns"
+                            },
+                            {
+                              "text": {
+                                "type": "plain_text",
+                                "text": "Osprey"
+                              },
+                              "value": "osprey"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "type": "input",
+                        "label": {
+                          "type": "plain_text",
+                          "text": "Change Impact"
+                        },
+                        "optional": false,
+                        "element": {
+                          "type": "static_select",
+                          "action_id": "change-impact",
+                          "placeholder": {
+                            "type": "plain_text",
+                            "text": "Not Evaluated"
+                          },
+                          "options": [
+                            {
+                              "text": {
+                                "type": "plain_text",
+                                "text": "Production Blocking"
+                              },
+                              "value": "productionBlocking"
+                            },
+                            {
+                              "text": {
+                                "type": "plain_text",
+                                "text": "BAU Blocking"
+                              },
+                              "value": "bauBlocking"
+                            },
+                            {
+                              "text": {
+                                "type": "plain_text",
+                                "text": "Abnormal Behaviour"
+                              },
+                              "value": "abnormalBehaviour"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                    """,
                 Map.of(
                     "userId", ticket.user().slackUserId(),
                     "postedAt", ticket.queryTs().instant().truncatedTo(ChronoUnit.MINUTES),
                     "postedAtTs", ticket.queryTs().instant().getEpochSecond(),
                     "openedAt", ticket.logs().getFirst().date().truncatedTo(ChronoUnit.MINUTES),
                     "openedAtTs", ticket.logs().getFirst().date().getEpochSecond(),
-                    "queryPermalink", ticket.queryPermalink()
+                    "queryPermalink", ticket.queryPermalink(),
+                    "escalationsBlock", escalationsBlock
                 )
             ));
 
