@@ -27,17 +27,21 @@ public class StubWithResult<T> {
     private boolean resultCalculated;
 
     public void assertIsCalled() {
+        assertIsCalled("");
+    }
+
+    public void assertIsCalled(String message) {
         GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
         assertThat(serveEvents.getServeEvents())
-            .as("stub was called exactly once")
+            .as("%s: stub was called exactly once", message)
             .hasSize(1);
         assertThatNoException()
-            .as("stub returned a result")
+            .as("%s: stub returned a result", message)
             .isThrownBy(() ->
             result = receiver.assertAndExtractResult(serveEvents.getServeEvents().getFirst())
         );
         assertThat(result)
-            .as("stub returned a non-null result")
+            .as("%s: stub returned a non-null result", message)
             .isNotNull();
         resultCalculated = true;
     }

@@ -3,7 +3,6 @@ package com.coreeng.supportbot.testkit;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import org.jspecify.annotations.NonNull;
@@ -35,9 +34,9 @@ public class Ticket implements SearchableForTicket {
     @NonNull
     @Builder.Default
     private ImmutableList<@NonNull StatusLog> logs = ImmutableList.of();
-
     @NonNull
     private final SlackWiremock slackWiremock;
+    private final SupportBotClient supportBotClient;
     private final Config.@NonNull User user;
     @NonNull
     private final Config config;
@@ -85,6 +84,12 @@ public class Ticket implements SearchableForTicket {
             .triggerId(triggerId)
             .receiver(new FullSummaryForm.Reciever(this))
             .build();
+
+        // Stub permalink for the ticket form message (used for escalation thread links in summary)
+        if (!escalations.isEmpty()) {
+            slackWiremock.stubGetPermalink(channelId, formMessageTs);
+        }
+
         return slackWiremock.stubViewsOpen(expectation);
     }
 
@@ -116,17 +121,18 @@ public class Ticket implements SearchableForTicket {
         assertThat(response.tags()).isEqualTo(tags());
 
         assertThat(response.escalated()).isEqualTo(escalated);
-        if (escalated) {
-            assertThat(response.escalations()).isNotEmpty();
-            for (EscalationInfo info : escalations) {
-                assertThat(response.escalations())
-                    .anySatisfy(e -> {
-                        assertThat(e.team().name()).isEqualTo(info.team());
-                        assertThat(e.tags()).isEqualTo(info.tags());
-                    });
+        assertThat(response.escalations()).hasSize(escalations.size());
+        for (int i = 0; i < escalations.size(); i++) {
+            var expectedEscalation = escalations.get(i);
+            var actualEscalation = response.escalations().get(i);
+            assertThat(actualEscalation.team().name()).isEqualTo(expectedEscalation.team());
+            assertThat(actualEscalation.tags()).isEqualTo(expectedEscalation.tags());
+            if (expectedEscalation.createdAt() != null) {
+                assertThat(actualEscalation.openedAt()).isCloseTo(expectedEscalation.createdAt(), within(2, ChronoUnit.SECONDS));
             }
-        } else {
-            assertThat(response.escalations()).isEmpty();
+            if (expectedEscalation.resolvedAt() != null) {
+                assertThat(actualEscalation.resolvedAt()).isCloseTo(expectedEscalation.resolvedAt(), within(2, ChronoUnit.SECONDS));
+            }
         }
 
         assertThat(response.logs()).hasSize(logs.size());
@@ -141,39 +147,6 @@ public class Ticket implements SearchableForTicket {
     @Override
     public long ticketId() {
         return id;
-    }
-
-    public class TicketUpdater {
-        public TicketUpdater applyFormValues(FullSummaryFormSubmission.Values values) {
-            status = values.status();
-            team = values.team();
-            tags = values.tags();
-            impact = values.impact();
-            return this;
-        }
-
-        public TicketUpdater addLog(String status) {
-            logs = ImmutableList.<StatusLog>builder()
-                .addAll(logs)
-                .add(new StatusLog(status, Instant.now()))
-                .build();
-            return this;
-        }
-
-        public TicketUpdater applyEscalationFromValues(EscalationFormSubmission.Values values) {
-            escalated = true;
-            escalations = ImmutableList.<EscalationInfo>builder()
-                .addAll(escalations)
-                .add(new EscalationInfo(values.team(), values.tags()))
-                .build();
-            return this;
-        }
-    }
-
-    record StatusLog(
-        String event,
-        Instant date
-    ) {
     }
 
     public EscalationButtonClick escalateButtonClick(String triggerId) {
@@ -211,8 +184,66 @@ public class Ticket implements SearchableForTicket {
             .build());
     }
 
+    public void escalateViaTestApi(MessageTs ts, String team, ImmutableList<@NonNull String> tags) {
+        supportBotClient.test().escalateTicket(SupportBotClient.EscalationToCreate.builder()
+            .ticketId(id)
+            .createdMessageTs(ts)
+            .team(team)
+            .tags(tags)
+            .build());
+        escalated = true;
+        escalations = ImmutableList.<EscalationInfo>builder()
+            .addAll(escalations)
+            .add(new EscalationInfo(team, tags, Instant.now(), null))
+            .build();
+    }
+
+    record StatusLog(
+        String event,
+        Instant date
+    ) {
+    }
+
     public record EscalationInfo(
         String team,
-        ImmutableList<@NonNull String> tags
-    ) {}
+        ImmutableList<@NonNull String> tags,
+        Instant createdAt,
+        Instant resolvedAt
+    ) {
+    }
+
+    public class TicketUpdater {
+        public TicketUpdater applyFormValues(FullSummaryFormSubmission.Values values) {
+            status = values.status();
+            team = values.team();
+            tags = values.tags();
+            impact = values.impact();
+            return this;
+        }
+
+        public TicketUpdater addLog(String status) {
+            logs = ImmutableList.<StatusLog>builder()
+                .addAll(logs)
+                .add(new StatusLog(status, Instant.now()))
+                .build();
+            return this;
+        }
+
+        public TicketUpdater applyEscalationFromValues(EscalationFormSubmission.Values values) {
+            escalated = true;
+            escalations = ImmutableList.<EscalationInfo>builder()
+                .addAll(escalations)
+                .add(new EscalationInfo(values.team(), values.tags(), Instant.now(), null))
+                .build();
+            return this;
+        }
+
+        public TicketUpdater resolveEscalations() {
+            escalated = false;
+            escalations = escalations.stream()
+                .map(e -> new EscalationInfo(e.team(), e.tags(), e.createdAt(), Instant.now()))
+                .collect(ImmutableList.toImmutableList());
+            return this;
+        }
+    }
 }

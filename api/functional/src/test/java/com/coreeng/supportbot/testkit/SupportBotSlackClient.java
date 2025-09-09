@@ -188,6 +188,29 @@ public class SupportBotSlackClient {
     }
 
     public void notifyViewSubmitted(RawViewSubmission rawViewSubmission) {
+        String payload = createViewSubmittedPayload(rawViewSubmission);
+        given()
+            .when()
+            .formParam("payload", payload)
+            .post(config.supportBot().baseUrl() + "/slack/events")
+            .then()
+            .log().ifValidationFails(LogDetail.ALL, true)
+            .statusCode(200);
+    }
+
+    public String notifyViewSubmittedAndReturnBody(RawViewSubmission rawViewSubmission) {
+        String payload = createViewSubmittedPayload(rawViewSubmission);
+        return given()
+            .when()
+            .formParam("payload", payload)
+            .post(config.supportBot().baseUrl() + "/slack/events")
+            .then()
+            .log().ifValidationFails(LogDetail.ALL, true)
+            .statusCode(200)
+            .extract().asString();
+    }
+
+    private String createViewSubmittedPayload(RawViewSubmission rawViewSubmission) {
         String valuesJson = rawViewSubmission.values().stream()
             .map(value -> String.format("""
                 "%s": {
@@ -229,12 +252,6 @@ public class SupportBotSlackClient {
                 "valuesJson", valuesJson
             )
         );
-        given()
-            .when()
-            .formParam("payload", payload)
-            .post(config.supportBot().baseUrl() + "/slack/events")
-            .then()
-            .log().ifValidationFails(LogDetail.ALL, true)
-            .statusCode(200);
+        return payload;
     }
 }
