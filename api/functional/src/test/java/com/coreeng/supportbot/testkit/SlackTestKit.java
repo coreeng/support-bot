@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.testkit;
 
 import com.coreeng.supportbot.wiremock.SlackWiremock;
+
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
@@ -51,5 +52,18 @@ public class SlackTestKit {
             .values(viewSubmission.values())
             .viewType(viewSubmission.viewType())
             .build());
+    }
+
+    public <T> T submitView(ViewSubmission viewSubmission, ViewSubmissionResponseReceiver<T> receiver) {
+        String responseBody = supportBotSlackClient.notifyViewSubmittedAndReturnBody(RawViewSubmission.builder()
+            .teamId(testKit.teamId())
+            .userId(testKit.userId())
+            .triggerId(viewSubmission.triggerId())
+            .callbackId(viewSubmission.callbackId())
+            .privateMetadata(viewSubmission.privateMetadata())
+            .values(viewSubmission.values())
+            .viewType(viewSubmission.viewType())
+            .build());
+        return receiver.parse(responseBody);
     }
 }

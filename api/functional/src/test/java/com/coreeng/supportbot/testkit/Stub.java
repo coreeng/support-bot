@@ -19,7 +19,13 @@ public class Stub {
     private final WireMockServer wireMockServer;
 
     public void assertIsCalled() {
+        assertIsCalled("");
+    }
+
+    public void assertIsCalled(String message) {
         GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
-        assertThat(serveEvents.getServeEvents()).hasSize(1);
+        assertThat(serveEvents.getServeEvents())
+            .as("%s: stub was called exactly once", message)
+            .hasSize(1);
     }
 }

@@ -4,15 +4,16 @@ import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import com.coreeng.supportbot.testkit.FullSummaryButtonClick;
-import com.coreeng.supportbot.testkit.FullSummaryForm;
-import com.coreeng.supportbot.testkit.FullSummaryFormSubmission;
 import com.coreeng.supportbot.testkit.EscalationForm;
 import com.coreeng.supportbot.testkit.EscalationFormSubmission;
 import com.coreeng.supportbot.testkit.EscalationMessage;
+import com.coreeng.supportbot.testkit.FullSummaryButtonClick;
+import com.coreeng.supportbot.testkit.FullSummaryForm;
+import com.coreeng.supportbot.testkit.FullSummaryFormSubmission;
 import com.coreeng.supportbot.testkit.MessageTs;
 import com.coreeng.supportbot.testkit.MessageUpdatedExpectation;
 import com.coreeng.supportbot.testkit.ReactionAddedExpectation;
@@ -20,6 +21,7 @@ import com.coreeng.supportbot.testkit.SlackMessage;
 import com.coreeng.supportbot.testkit.SlackTestKit;
 import com.coreeng.supportbot.testkit.Stub;
 import com.coreeng.supportbot.testkit.StubWithResult;
+import com.coreeng.supportbot.testkit.SummaryCloseConfirm;
 import com.coreeng.supportbot.testkit.SupportBotClient;
 import com.coreeng.supportbot.testkit.TestKit;
 import com.coreeng.supportbot.testkit.ThreadMessagePostedExpectation;
@@ -234,7 +236,75 @@ public class TicketManagementTests {
         escalationMessageCreatedStub.result().assertMatches(ticketResponse);
     }
 
+    @Test
     public void whenEscalatedTicketIsClosed_warningDisplayedAndEscalationsAreClosed() {
+        // given
+        TestKit.RoledTestKit asSupport = testKit.as(support);
+        MessageTs queryTs = MessageTs.now();
+        Ticket ticket = asSupport.ticket().create(t -> t
+            .queryTs(queryTs)
+            .createdMessageTs(MessageTs.now())
+        );
 
+        // Escalate via test controller
+        ImmutableList<@NonNull String> escalationTags = ImmutableList.of("jenkins-pipelines", "networking");
+        ticket.escalateViaTestApi(MessageTs.now(), config.escalationTeams().getFirst().name(), escalationTags);
+
+        // Stub Slack updates for closing
+        StubWithResult<TicketMessage> updatedTicketMessageStub = slackWiremock.stubMessageUpdated(
+            MessageUpdatedExpectation.<TicketMessage>builder()
+                .channelId(ticket.channelId())
+                .ts(ticket.formMessageTs())
+                .threadTs(queryTs)
+                .receiver(new TicketMessage.Receiver())
+                .build()
+        );
+        Stub whiteCheckMarkReactionStub = slackWiremock.stubReactionAdd(
+            ReactionAddedExpectation.builder()
+                .reaction("white_check_mark")
+                .channelId(ticket.channelId())
+                .ts(ticket.queryTs())
+                .build()
+        );
+
+        // Open summary view
+        String openFullSummaryTriggerId = "whenEscalatedTicketIsClosed_openSummary";
+        StubWithResult<FullSummaryForm> fullSummaryFormOpenedExpectation = ticket.expectFullSummaryFormOpened(openFullSummaryTriggerId);
+        FullSummaryButtonClick fullSummaryClick = ticket.fullSummaryButtonClick(openFullSummaryTriggerId);
+        asSupport.slack().clickMessageButton(fullSummaryClick);
+        await().atMost(Duration.ofSeconds(5))
+            .untilAsserted(() -> fullSummaryFormOpenedExpectation.assertIsCalled("full summary form opened"));
+
+        // Submit full summary form and expect a close confirmation
+        FullSummaryFormSubmission.Values values = FullSummaryFormSubmission.Values.builder()
+            .status("closed")
+            .team("connected-app")
+            .tags(ImmutableList.of("jenkins-pipelines", "networking"))
+            .impact("productionBlocking")
+            .build();
+
+        SummaryCloseConfirm confirm = asSupport.slack().submitView(
+            ticket.fullSummaryFormSubmit(openFullSummaryTriggerId, values),
+            new SummaryCloseConfirm.Receiver(ticket.id(), 1)
+        ).assertMatches(values);
+
+        // Submit SummaryCloseConfirm via submitView
+        asSupport.slack().submitView(confirm.toSubmission(openFullSummaryTriggerId + "_confirm"));
+
+        ticket.applyChangesLocally()
+            .applyFormValues(values)
+            .addLog("closed")
+            .resolveEscalations();
+
+        // then
+        await().atMost(Duration.ofSeconds(5))
+            .untilAsserted(() -> {
+                updatedTicketMessageStub.assertIsCalled("ticket form update");
+                whiteCheckMarkReactionStub.assertIsCalled("checkmark on ticket close");
+            });
+
+        var ticketResponse = supportBotClient.assertTicketExists(ticket);
+        ticket.assertMatches(ticketResponse);
+        updatedTicketMessageStub.result().assertMatches(ticketResponse);
     }
 }
