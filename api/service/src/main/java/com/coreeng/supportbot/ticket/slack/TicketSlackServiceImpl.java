@@ -131,6 +131,13 @@ public class TicketSlackServiceImpl implements TicketSlackService {
             return;
         }
 
+        if (userId == null) {
+            if (log.isWarnEnabled()) {
+                log.warn("Could not determine user for ticket {} rating request", ticketId);
+            }
+            return;
+        }
+
         log.info("Posting ephemeral rating request for ticket {} to user {}", ticketId, userId);
 
         RatingRequestMessage ratingMessage = new RatingRequestMessage(ticketId);

@@ -31,27 +31,19 @@ public class RatingEventHandler {
                     log.info("Ticket {} closed, posting rating request", event.ticketId());
                 }
                 
+                // Check if ticket is already rated using the ticket object
+                if (ticketRepository.isTicketRated(ticket.id())) {
+                    if (log.isInfoEnabled()) {
+                        log.info("Ticket {} already has a rating submitted, skipping rating request", event.ticketId());
+                    }
+                    return;
+                }
+                
                 try {
                     // Get the original query message to find the user who created the ticket
                     var originalMessage = slackClient.getMessageByTs(SlackGetMessageByTsRequest.of(ticket.queryRef()));
-                    
-                    String userId = originalMessage.getUser();
-                    if (userId != null) {
-                        if (ticketRepository.isTicketRated(event.ticketId())) {
-                            if (log.isInfoEnabled()) {
-                                log.info("Ticket {} already has a rating submitted, skipping rating request", event.ticketId());
-                            }
-                            return;
-                        }
-                        
-                        // Create a thread reference using the ticket form message as the thread timestamp
-                        var threadRef = new MessageRef(ticket.createdMessageTs(), ticket.createdMessageTs(), ticket.channelId());
-                        slackService.postRatingRequest(threadRef, event.ticketId(), userId);
-                    } else {
-                        if (log.isWarnEnabled()) {
-                            log.warn("Could not determine user for ticket {} rating request", event.ticketId());
-                        }
-                    }
+                    var threadRef = new MessageRef(ticket.createdMessageTs(), ticket.createdMessageTs(), ticket.channelId());
+                    slackService.postRatingRequest(threadRef, event.ticketId(), originalMessage.getUser());
                 } catch (Exception e) {
                     if (log.isErrorEnabled()) {
                         log.error("Error getting original message for ticket {} rating request", event.ticketId(), e);

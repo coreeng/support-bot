@@ -33,6 +33,8 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 @Slf4j
 public class RatingActionHandler implements SlackBlockActionHandler {
+    private static final String ratingSubmitPrefix = "rating_submit_";
+    
     private final RatingService ratingService;
     private final SlackClient slackClient;
     private final TicketRepository ticketRepository;
@@ -40,8 +42,7 @@ public class RatingActionHandler implements SlackBlockActionHandler {
 
     @Override
     public Pattern getPattern() {
-        // Pattern to match rating action IDs like "rating_submit_ticketId_rating"
-        return Pattern.compile("rating_.*");
+        return Pattern.compile(Pattern.quote(ratingSubmitPrefix) + ".*");
     }
 
     @Override
@@ -56,19 +57,21 @@ public class RatingActionHandler implements SlackBlockActionHandler {
     @Transactional
     private void handleRatingSubmission(BlockActionPayload.Action action, BlockActionPayload payload) {
         try {
-            // Parse action ID format: "rating_submit_{ticketId}_{rating}"
-            String[] parts = action.getActionId().split("_");
-            if (parts.length >= 4) {
-                String ticketIdStr = parts[2];
-                String ratingStr = parts[3];
+            String actionId = action.getActionId();
+            String remainder = actionId.substring(ratingSubmitPrefix.length());
+            String[] parts = remainder.split("_");
+            
+            if (parts.length >= 2) {
+                String ticketIdStr = parts[0];
+                String ratingStr = parts[1];
                 
-                // Validate rating value
-                if (!isValidRating(ratingStr)) {
+                // Parse and validate rating value
+                int rating = parseRating(ratingStr);
+                if (rating < 0) {
                     log.warn("Invalid rating value '{}' submitted for ticket {}", ratingStr, ticketIdStr);
                     return;
                 }
                 
-                int rating = Integer.parseInt(ratingStr); // Safe to parse since isValidRating passed
                 TicketId ticketId = new TicketId(Long.parseLong(ticketIdStr));
                 log.info("Submitted rating {} for ticket {}", rating, ticketId);
                 
@@ -125,22 +128,25 @@ public class RatingActionHandler implements SlackBlockActionHandler {
                 );
                 
             } else {
-                if (log.isWarnEnabled()) {
-                    log.warn("Invalid rating action format: {}", action.getActionId());
-                }
+                log.warn("Invalid rating action format after prefix removal: {}", remainder);
             }
         } catch (Exception e) {
             log.error("Error handling rating submission", e);
         }
     }
 
-    private boolean isValidRating(String rating) {
+    private int parseRating(String rating) {
         try {
             int ratingValue = Integer.parseInt(rating);
-            return ratingValue >= 1 && ratingValue <= 5;
+            if (ratingValue >= 1 && ratingValue <= 5) {
+                return ratingValue;
+            } else {
+                log.warn("Rating value {} is out of valid range (1-5)", ratingValue);
+                return -1; // Return -1 to indicate invalid rating
+            }
         } catch (NumberFormatException e) {
             log.warn("Rating value '{}' is not a valid integer", rating);
-            return false;
+            return -1; // Return -1 to indicate invalid rating
         }
     }
 }
