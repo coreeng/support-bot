@@ -28,7 +28,7 @@ public class RatingEventHandler {
             Ticket ticket = ticketRepository.findTicketById(event.ticketId());
             if (ticket != null) {
                 // Check if ticket is already rated using the ticket object
-                if (ticket.isRatingSubmitted()) {
+                if (ticket.ratingSubmitted()) {
                     if (log.isInfoEnabled()) {
                         log.info("Ticket {} already has a rating submitted, skipping rating request", event.ticketId());
                     }
