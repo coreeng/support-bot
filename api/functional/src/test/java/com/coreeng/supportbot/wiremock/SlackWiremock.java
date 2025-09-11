@@ -96,6 +96,21 @@ public class SlackWiremock extends WireMockServer {
             .build();
     }
 
+    public Stub stubReactionRemove(ReactionAddedExpectation expectation) {
+        StubMapping stubMapping = givenThat(post("/api/reactions.remove")
+            .withFormParam("name", equalTo(expectation.reaction()))
+            .withFormParam("channel", equalTo(expectation.channelId()))
+            .withFormParam("timestamp", equalTo(expectation.ts().toString()))
+            .willReturn(okJson("""
+                {"ok":true}
+                """))
+        );
+        return Stub.builder()
+            .mapping(stubMapping)
+            .wireMockServer(this)
+            .build();
+    }
+
     public <T> StubWithResult<T> stubMessagePosted(ThreadMessagePostedExpectation<T> expectation) {
         StubMapping mapping = givenThat(expectation.receiver().configureStub(post("/api/chat.postMessage"))
             .withFormParam("channel", equalTo(expectation.channelId()))
