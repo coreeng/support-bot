@@ -1,17 +1,20 @@
 package com.coreeng.supportbot.ticket.slack;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.rating.RatingRequestMessage;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackEditMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.ticket.TicketCreatedMessage;
 import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
 import com.coreeng.supportbot.ticket.TicketWentStaleMessage;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
@@ -116,6 +119,38 @@ public class TicketSlackServiceImpl implements TicketSlackService {
             queryRef.channelId(),
             queryRef.ts()
         ));
+    }
+
+    @Override
+    public void postRatingRequest(MessageRef queryRef, TicketId ticketId, String userId) {
+        if (queryRef.ts().mocked()) {
+            log.atInfo()
+                .addArgument(ticketId)
+                .addArgument(queryRef::ts)
+                .log("Pretending to post rating request for ticket({}), because it's mocked: {}");
+            return;
+        }
+
+        if (userId == null) {
+            if (log.isWarnEnabled()) {
+                log.warn("Could not determine user for ticket {} rating request", ticketId);
+            }
+            return;
+        }
+
+        log.info("Posting ephemeral rating request for ticket {} to user {}", ticketId, userId);
+
+        RatingRequestMessage ratingMessage = new RatingRequestMessage(ticketId);
+
+        slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
+            .message(ratingMessage)
+            .channel(queryRef.channelId())
+            .threadTs(queryRef.threadTs())
+            .userId(userId)
+            .build()
+        );
+
+        log.info("Ephemeral rating request posted for ticket {} to user {}", ticketId, userId);
     }
 
     private void addReactionToPostIfPresent(
