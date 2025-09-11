@@ -27,16 +27,16 @@ public class RatingEventHandler {
             // Trigger rating collection when ticket is closed
             Ticket ticket = ticketRepository.findTicketById(event.ticketId());
             if (ticket != null) {
-                if (log.isInfoEnabled()) {
-                    log.info("Ticket {} closed, posting rating request", event.ticketId());
-                }
-                
                 // Check if ticket is already rated using the ticket object
-                if (ticketRepository.isTicketRated(ticket.id())) {
+                if (ticket.isRatingSubmitted()) {
                     if (log.isInfoEnabled()) {
                         log.info("Ticket {} already has a rating submitted, skipping rating request", event.ticketId());
                     }
                     return;
+                }
+                
+                if (log.isInfoEnabled()) {
+                    log.info("Ticket {} closed, posting rating request", event.ticketId());
                 }
                 
                 try {
