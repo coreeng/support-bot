@@ -1,5 +1,15 @@
 package com.coreeng.supportbot.testkit;
 
+import java.io.IOException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.text.StringSubstitutor;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,21 +18,11 @@ import com.github.tomakehurst.wiremock.http.FormParameter;
 import com.github.tomakehurst.wiremock.matching.AnythingPattern;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import com.jayway.jsonpath.JsonPath;
+
 import lombok.Builder;
 import lombok.Getter;
-import org.apache.commons.text.StringSubstitutor;
-
-import java.io.IOException;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.JSON;
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
 
 @Builder
 @Getter
@@ -34,7 +34,7 @@ public class TicketMessage implements SearchableForTicket {
     private final String channelId;
     private final MessageTs ts;
     private final MessageTs queryTs;
-    private final String status;
+    private final Ticket.Status status;
     private final Instant statusChangedAt;
 
     public void assertMatches(SupportBotClient.TicketResponse response) {
@@ -42,7 +42,7 @@ public class TicketMessage implements SearchableForTicket {
         assertThat(channelId).isEqualTo(response.channelId());
         assertThat(ts).isEqualTo(response.formMessage().ts());
         assertThat(queryTs).isEqualTo(response.query().ts());
-        assertThat(status).isEqualTo(response.status());
+        assertThat(status.code()).isEqualTo(response.status());
         assertThat(statusChangedAt)
             .isEqualTo(response.logs().getLast().date().truncatedTo(ChronoUnit.SECONDS));
     }
@@ -50,9 +50,7 @@ public class TicketMessage implements SearchableForTicket {
     public static class Receiver implements StubWithResult.Receiver<TicketMessage> {
         private static final ObjectMapper objectMapper = new ObjectMapper();
         private static final Pattern headerRegex = Pattern.compile("^Ticket Created: ID-(?<id>\\d+)$");
-        private static final Pattern statusRegex = Pattern.compile("^(?<status>Opened|Closed): <!date\\^(?<ts>[^^]+)\\^\\{date_short_pretty} at \\{time}\\|(?<tsString>[^>]+)>$");
-        private static final String openedColor = "#00ff00";
-        private static final String closedColor = "#ff000d";
+        private static final Pattern statusRegex = Pattern.compile("^(?<status>Opened|Closed): <!date\\^(?<ts>[^\\^]+)\\^\\{date_short_pretty} at \\{time}\\|(?<tsString>[^>]+)>$");
 
         @Override
         public MappingBuilder configureStub(MappingBuilder stubBuilder) {
@@ -104,26 +102,10 @@ public class TicketMessage implements SearchableForTicket {
 
             // Check if the ticket is closed or opened based on the color
             String color = JsonPath.read(attachmentsRaw, "$[0].color");
-            String expectedColor = "";
-            String expectedStatus = "";
-            String expectedStatusCode = "";
-
-            switch (color) {
-                case closedColor -> {
-                    expectedColor = "#ff000d";
-                    expectedStatus = "Closed";
-                    expectedStatusCode = "closed";
-                }
-                case openedColor -> {
-                    expectedColor = "#00ff00";
-                    expectedStatus = "Opened";
-                    expectedStatusCode = "opened";
-                }
-                default -> fail("Unexpected attachments color: %s", color);
-            }
+            Ticket.Status expectedStatus = Ticket.Status.fromColor(color);
 
             // Build button elements dynamically based on ticket status
-            String buttonElements = buildButtonElements(ticketId, expectedStatusCode);
+            String buttonElements = buildButtonElements(ticketId, expectedStatus);
 
             String expectedJson = StringSubstitutor.replace("""
                  [
@@ -158,7 +140,7 @@ public class TicketMessage implements SearchableForTicket {
                      ]
                    }
                 ]""", Map.of(
-                "expectedColor", expectedColor,
+                "expectedColor", expectedStatus.colorHex(),
                 "buttonElements", buttonElements
             ));
 
@@ -174,11 +156,11 @@ public class TicketMessage implements SearchableForTicket {
             String statusTs = statusMatcher.group("ts");
             String statusTsString = statusMatcher.group("tsString");
 
-            assertThat(status).isEqualTo(expectedStatus);
+            assertThat(status).isEqualTo(expectedStatus.label());
             Instant statusChangedAt = Instant.ofEpochSecond(Long.parseLong(statusTs));
             assertThat(statusChangedAt.truncatedTo(ChronoUnit.MINUTES).toString())
                 .isEqualTo(statusTsString);
-            return new AttachmentView(statusChangedAt, expectedStatusCode);
+            return new AttachmentView(statusChangedAt, expectedStatus);
         }
 
         private void assertBlocks(FormParameter blocksParam, long ticketId) {
@@ -191,8 +173,8 @@ public class TicketMessage implements SearchableForTicket {
                     """, ticketId));
         }
 
-        private String buildButtonElements(long ticketId, String statusCode) {
-            if ("opened".equals(statusCode)) {
+        private String buildButtonElements(long ticketId, Ticket.Status expectedStatus) {
+            if (Ticket.Status.opened.equals(expectedStatus)) {
                 // Opened ticket: both "Full Summary" and "Escalate" buttons
                 return String.format("""
                     [
@@ -234,7 +216,7 @@ public class TicketMessage implements SearchableForTicket {
 
         public record AttachmentView(
             Instant statusChangedAt,
-            String status
+            Ticket.Status status
         ) {
         }
     }
