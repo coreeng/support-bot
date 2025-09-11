@@ -378,23 +378,27 @@ public class FullSummaryForm {
                       }
                     """;
             } else {
-                String teamName = ticket.escalations().getFirst().team();
-                String groupId = ticket.config().escalationTeams().stream()
-                    .filter(t -> t.name().equals(teamName))
-                    .findFirst()
-                    .map(Config.EscalationTeam::slackGroupId)
-                    .orElseThrow(() -> new AssertionError("Team not found: " + teamName));
-                escalationsBlock = String.format(
-                    """
-                        {
-                          "type": "section",
-                          "fields": [
-                            {"type": "plain_text", "text": "Status: Opened"},
-                            {"type": "mrkdwn", "text": "Team: <!subteam^%s>"}
-                          ]
-                        }""",
-                    groupId
-                );
+                escalationsBlock = ticket.escalations().stream()
+                    .map(escalation -> {
+                        String teamName = escalation.team();
+                        String groupId = ticket.config().escalationTeams().stream()
+                            .filter(t -> t.name().equals(teamName))
+                            .findFirst()
+                            .map(Config.EscalationTeam::slackGroupId)
+                            .orElseThrow(() -> new AssertionError("Team not found: " + teamName));
+                        return String.format(
+                            """
+                                {
+                                  "type": "section",
+                                  "fields": [
+                                    {"type": "plain_text", "text": "Status: Opened"},
+                                    {"type": "mrkdwn", "text": "Team: <!subteam^%s>"}
+                                  ]
+                                }""",
+                            groupId
+                        );
+                    })
+                    .collect(joining(", {\"type\":\"divider\"}"));
             }
             return escalationsBlock;
         }
