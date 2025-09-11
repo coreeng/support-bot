@@ -109,7 +109,7 @@ public class TicketManagementTests {
             .untilAsserted(fullSummaryFormOpenedExpectation::assertIsCalled);
 
         FullSummaryFormSubmission.Values values = FullSummaryFormSubmission.Values.builder()
-            .status("opened")
+            .status(Ticket.Status.opened)
             .team("wow")
             .tags(ImmutableList.of("ingresses", "networking"))
             .impact("productionBlocking")
@@ -162,7 +162,7 @@ public class TicketManagementTests {
             .untilAsserted(fullSummaryFormOpenedExpectation::assertIsCalled);
 
         FullSummaryFormSubmission.Values values = FullSummaryFormSubmission.Values.builder()
-            .status("closed")
+            .status(Ticket.Status.closed)
             .team("connected-app")
             .tags(ImmutableList.of("jenkins-pipelines", "networking"))
             .impact("bauBlocking")
@@ -277,7 +277,7 @@ public class TicketManagementTests {
 
         // Submit full summary form and expect a close confirmation
         FullSummaryFormSubmission.Values values = FullSummaryFormSubmission.Values.builder()
-            .status("closed")
+            .status(Ticket.Status.closed)
             .team("connected-app")
             .tags(ImmutableList.of("jenkins-pipelines", "networking"))
             .impact("productionBlocking")
@@ -306,5 +306,101 @@ public class TicketManagementTests {
         var ticketResponse = supportBotClient.assertTicketExists(ticket);
         ticket.assertMatches(ticketResponse);
         updatedTicketMessageStub.result().assertMatches(ticketResponse);
+    }
+
+    @Test
+    public void whenClosedTicketIsReopened_ticketIsMarkedAsOpenedAndCheckmarkRemoved() {
+        // given
+        TestKit.RoledTestKit asSupport = testKit.as(support);
+        MessageTs queryTs = MessageTs.now();
+        Ticket ticket = asSupport.ticket().create(t -> t
+            .queryTs(queryTs)
+            .createdMessageTs(MessageTs.now())
+        );
+
+        // Stub Slack updates for closing
+        StubWithResult<TicketMessage> updatedTicketMessageOnClose = slackWiremock.stubMessageUpdated(
+            MessageUpdatedExpectation.<TicketMessage>builder()
+                .channelId(ticket.channelId())
+                .ts(ticket.formMessageTs())
+                .threadTs(queryTs)
+                .receiver(new TicketMessage.Receiver())
+                .build()
+        );
+        Stub whiteCheckMarkReactionAdded = slackWiremock.stubReactionAdd(
+            ReactionAddedExpectation.builder()
+                .reaction("white_check_mark")
+                .channelId(ticket.channelId())
+                .ts(ticket.queryTs())
+                .build()
+        );
+
+        // when: close via full summary
+        String triggerClose = "whenTicketIsReopened_closeFirst";
+        StubWithResult<FullSummaryForm> formOpenedOnClose = ticket.expectFullSummaryFormOpened(triggerClose);
+        asSupport.slack().clickMessageButton(ticket.fullSummaryButtonClick(triggerClose));
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(formOpenedOnClose::assertIsCalled);
+
+        FullSummaryFormSubmission.Values closeValues = FullSummaryFormSubmission.Values.builder()
+            .status(Ticket.Status.closed)
+            .team("connected-app")
+            .tags(ImmutableList.of("jenkins-pipelines", "networking"))
+            .impact("bauBlocking")
+            .build();
+        asSupport.slack().submitView(ticket.fullSummaryFormSubmit(triggerClose, closeValues));
+
+        ticket.applyChangesLocally()
+            .applyFormValues(closeValues)
+            .addLog("closed");
+
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            updatedTicketMessageOnClose.assertIsCalled();
+            whiteCheckMarkReactionAdded.assertIsCalled();
+        });
+
+        // Prepare reopen stubs
+        StubWithResult<TicketMessage> updatedTicketMessageOnReopen = slackWiremock.stubMessageUpdated(
+            MessageUpdatedExpectation.<TicketMessage>builder()
+                .channelId(ticket.channelId())
+                .ts(ticket.formMessageTs())
+                .threadTs(queryTs)
+                .receiver(new TicketMessage.Receiver())
+                .build()
+        );
+        Stub whiteCheckMarkReactionRemoved = slackWiremock.stubReactionRemove(
+            ReactionAddedExpectation.builder()
+                .reaction("white_check_mark")
+                .channelId(ticket.channelId())
+                .ts(ticket.queryTs())
+                .build()
+        );
+
+        // when: reopen via full summary
+        String triggerReopen = "whenTicketIsReopened_openSummary";
+        StubWithResult<FullSummaryForm> formOpenedOnReopen = ticket.expectFullSummaryFormOpened(triggerReopen);
+        asSupport.slack().clickMessageButton(ticket.fullSummaryButtonClick(triggerReopen));
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(formOpenedOnReopen::assertIsCalled);
+
+        FullSummaryFormSubmission.Values reopenValues = FullSummaryFormSubmission.Values.builder()
+            .status(Ticket.Status.opened)
+            .team("connected-app")
+            .tags(ImmutableList.of("jenkins-pipelines", "networking"))
+            .impact("productionBlocking")
+            .build();
+        asSupport.slack().submitView(ticket.fullSummaryFormSubmit(triggerReopen, reopenValues));
+
+        ticket.applyChangesLocally()
+            .applyFormValues(reopenValues)
+            .addLog("opened");
+
+        // then
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            updatedTicketMessageOnReopen.assertIsCalled();
+            whiteCheckMarkReactionRemoved.assertIsCalled();
+        });
+
+        var ticketResponse = supportBotClient.assertTicketExists(ticket);
+        ticket.assertMatches(ticketResponse);
+        updatedTicketMessageOnReopen.result().assertMatches(ticketResponse);
     }
 }
