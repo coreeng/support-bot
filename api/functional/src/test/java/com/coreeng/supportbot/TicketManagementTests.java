@@ -56,6 +56,83 @@ public class TicketManagementTests {
     }
 
     @Test
+    public void whenTicketHasMultipleEscalations_summaryShowsAllAndCloseResolvesAll() {
+        // given
+        TestKit.RoledTestKit asSupport = testKit.as(support);
+        MessageTs queryTs = MessageTs.now();
+        Ticket ticket = asSupport.ticket().create(t -> t
+            .queryTs(queryTs)
+            .createdMessageTs(MessageTs.now())
+        );
+
+        // Escalate via test controller to two teams (reuse first if only one available)
+        Config.EscalationTeam firstTeam = config.escalationTeams().get(0);
+        Config.EscalationTeam secondTeam = config.escalationTeams().get(1);
+
+        ImmutableList<@NonNull String> firstTags = ImmutableList.of("jenkins-pipelines", "networking");
+        ImmutableList<@NonNull String> secondTags = ImmutableList.of("ingresses", "networking");
+
+        ticket.escalateViaTestApi(MessageTs.now(), firstTeam.name(), firstTags);
+        ticket.escalateViaTestApi(MessageTs.now(), secondTeam.name(), secondTags);
+
+        // Prepare Slack stubs for closing after summary open
+        StubWithResult<TicketMessage> updatedTicketMessageStub = slackWiremock.stubMessageUpdated(
+            MessageUpdatedExpectation.<TicketMessage>builder()
+                .channelId(ticket.channelId())
+                .ts(ticket.formMessageTs())
+                .threadTs(queryTs)
+                .receiver(new TicketMessage.Receiver())
+                .build()
+        );
+        Stub whiteCheckMarkReactionStub = slackWiremock.stubReactionAdd(
+            ReactionAddedExpectation.builder()
+                .reaction("white_check_mark")
+                .channelId(ticket.channelId())
+                .ts(ticket.queryTs())
+                .build()
+        );
+
+        // when: open Full Summary and assert full structure (including both escalations)
+        String openFullSummaryTriggerId = "whenTicketHasMultipleEscalations_openSummary";
+        StubWithResult<FullSummaryForm> formOpened = ticket.expectFullSummaryFormOpened(openFullSummaryTriggerId);
+        FullSummaryButtonClick fullSummaryClick = ticket.fullSummaryButtonClick(openFullSummaryTriggerId);
+        asSupport.slack().clickMessageButton(fullSummaryClick);
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(formOpened::assertIsCalled);
+
+        // Submit full summary with closed status -> expect confirmation for 2 open escalations
+        FullSummaryFormSubmission.Values closeValues = FullSummaryFormSubmission.Values.builder()
+            .status(Ticket.Status.closed)
+            .team("connected-app")
+            .tags(ImmutableList.of("jenkins-pipelines", "networking"))
+            .impact("productionBlocking")
+            .build();
+
+        SummaryCloseConfirm confirm = asSupport.slack().submitView(
+            ticket.fullSummaryFormSubmit(openFullSummaryTriggerId, closeValues),
+            new SummaryCloseConfirm.Receiver(ticket.id(), 2)
+        ).assertMatches(closeValues);
+
+        // confirm closing
+        asSupport.slack().submitView(confirm.toSubmission(openFullSummaryTriggerId + "_confirm"));
+
+        ticket.applyChangesLocally()
+            .applyFormValues(closeValues)
+            .addLog("closed")
+            .resolveEscalations();
+
+        // then
+        await().atMost(Duration.ofSeconds(5))
+            .untilAsserted(() -> {
+                updatedTicketMessageStub.assertIsCalled("ticket form update");
+                whiteCheckMarkReactionStub.assertIsCalled("checkmark on ticket close");
+            });
+
+        var ticketResponse = supportBotClient.assertTicketExists(ticket);
+        ticket.assertMatches(ticketResponse);
+        updatedTicketMessageStub.result().assertMatches(ticketResponse);
+    }
+
+    @Test
     public void whenSupportReactedWithEyes_ticketRegistered() {
         // given
         TestKit.RoledTestKit asTenant = testKit.as(tenant);
