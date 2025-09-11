@@ -29,6 +29,8 @@ public class Ticket {
     @Nullable
     private String impact;
     private Instant lastInteractedAt;
+    @Builder.Default
+    private boolean ratingSubmitted = false;
 
     public static Ticket createNew(MessageTs queryTs, String channelID) {
         return Ticket.builder()
