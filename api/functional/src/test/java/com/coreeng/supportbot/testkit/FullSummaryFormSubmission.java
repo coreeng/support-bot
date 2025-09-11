@@ -21,12 +21,11 @@ public class FullSummaryFormSubmission implements ViewSubmission {
     @Builder
     @Getter
     public static class Values {
-        @NonNull
-        private final String status;
+        private final Ticket.@NonNull Status status;
         @NonNull
         private final String team;
         @NonNull
-        private final ImmutableList<String> tags;
+        private final ImmutableList<@NonNull String> tags;
         @NonNull
         private final String impact;
     }
@@ -37,9 +36,9 @@ public class FullSummaryFormSubmission implements ViewSubmission {
     }
 
     @Override
-    public ImmutableList<Value> values() {
+    public ImmutableList<@NonNull Value> values() {
         return ImmutableList.of(
-            new StaticSelectValue("change-status", values.status()),
+            new StaticSelectValue("change-status", values.status().code()),
             new StaticSelectValue("change-team", values.team()),
             new MultiStaticSelectValue("change-tags", values.tags()),
             new StaticSelectValue("change-impact", values.impact())

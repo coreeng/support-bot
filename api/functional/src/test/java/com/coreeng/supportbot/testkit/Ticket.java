@@ -24,8 +24,7 @@ public class Ticket implements SearchableForTicket {
     private final MessageTs formMessageTs;
     @NonNull
     private final String channelId;
-    @NonNull
-    private String status;
+    private Ticket.@NonNull Status status;
     private String team;
     private String impact;
     @NonNull
@@ -58,7 +57,7 @@ public class Ticket implements SearchableForTicket {
             .queryTs(ticketResponse.query().ts())
             .formMessageTs(ticketResponse.formMessage().ts())
             .channelId(ticketResponse.channelId())
-            .status(ticketResponse.status())
+            .status(Ticket.Status.fromCode(ticketResponse.status()))
             .team(
                 ticketResponse.team() != null
                     ? ticketResponse.team().name()
@@ -112,7 +111,7 @@ public class Ticket implements SearchableForTicket {
         assertThat(response.query().ts()).isEqualTo(queryTs);
         assertThat(response.formMessage().ts()).isEqualTo(formMessageTs);
         assertThat(response.channelId()).isEqualTo(channelId);
-        assertThat(response.status()).isEqualTo(status);
+        assertThat(response.status()).isEqualTo(status.code());
         if (team == null) {
             assertThat(response.team()).isNull();
         } else {
@@ -244,6 +243,55 @@ public class Ticket implements SearchableForTicket {
                 .map(e -> new EscalationInfo(e.team(), e.tags(), e.createdAt(), Instant.now()))
                 .collect(ImmutableList.toImmutableList());
             return this;
+        }
+    }
+
+    public enum Status {
+        opened("opened", "Opened", "#00ff00", "large_orange_circle"),
+        closed("closed", "Closed", "#ff000d", "large_green_circle");
+
+        private final String code;
+        private final String label;
+        private final String colorHex;
+        private final String emojiName;
+
+        Status(String code, String label, String colorHex, String emojiName) {
+            this.code = code;
+            this.label = label;
+            this.colorHex = colorHex;
+            this.emojiName = emojiName;
+        }
+
+        public String code() { return code; }
+        public String label() { return label; }
+        public String colorHex() { return colorHex; }
+        public String emojiName() { return emojiName; }
+
+        public static Status fromCode(String code) {
+            for (Status s : values()) {
+                if (s.code.equals(code)) {
+                    return s;
+                }
+            }
+            throw new IllegalArgumentException("Unknown ticket status code: " + code);
+        }
+
+        public static Status fromLabel(String label) {
+            for (Status s : values()) {
+                if (s.label.equals(label)) {
+                    return s;
+                }
+            }
+            throw new IllegalArgumentException("Unknown ticket status label: " + label);
+        }
+
+        public static Status fromColor(String colorHex) {
+            for (Status s : values()) {
+                if (s.colorHex.equalsIgnoreCase(colorHex)) {
+                    return s;
+                }
+            }
+            throw new IllegalArgumentException("Unknown ticket status color: " + colorHex);
         }
     }
 }
