@@ -1,7 +1,7 @@
 package com.coreeng.supportbot.testkit;
 
 import java.time.temporal.ChronoUnit;
-import java.util.Map;
+import static java.util.stream.Collectors.joining;
 
 import org.apache.commons.text.StringSubstitutor;
 
@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
+import com.google.common.collect.ImmutableMap;
 
 import lombok.RequiredArgsConstructor;
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
@@ -71,46 +72,51 @@ public class FullSummaryForm {
 
         private ArrayNode buildExpectedBlocks() throws Exception {
             ArrayNode result = objectMapper.createArrayNode();
-            ObjectNode header = objectMapper.createObjectNode();
-            header.put("type", "header");
-            ObjectNode headerText = objectMapper.createObjectNode();
-            headerText.put("type", "plain_text");
-            headerText.put("text", "Ticket Summary");
-            header.set("text", headerText);
+            ObjectNode header = (ObjectNode) objectMapper.readTree("""
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Ticket Summary"
+                  }
+                }
+                """);
             ArrayNode queryBlocks = (ArrayNode) objectMapper.readTree(ticket.queryBlocksJson());
-            // Build Escalations block depending on whether the ticket has escalations
-            String escalationsBlock;
-            if (ticket.escalations().isEmpty()) {
-                escalationsBlock = """
-                      {
-                        "type": "context",
-                        "elements": [
-                          {
-                            "type": "plain_text",
-                            "text": "No escalations for this ticket"
-                          }
-                        ]
-                      }
-                    """;
-            } else {
-                String teamName = ticket.escalations().getFirst().team();
-                String groupId = ticket.config().escalationTeams().stream()
-                    .filter(t -> t.name().equals(teamName))
-                    .findFirst()
-                    .map(Config.EscalationTeam::slackGroupId)
-                    .orElseThrow(() -> new AssertionError("Team not found: " + teamName));
-                escalationsBlock = String.format(
+            String escalationsBlock = buildEscalationBlock();
+            String statusHistoryElements = buildStatusHistoryBlocks();
+
+            String teamInitialOption = ticket.team() != null
+                ? String.format(
                     """
-                        {
-                          "type": "section",
-                          "fields": [
-                            {"type": "plain_text", "text": "Status: Opened"},
-                            {"type": "mrkdwn", "text": "Team: <!subteam^%s>"}
-                          ]
-                        }""",
-                    groupId
-                );
-            }
+                        "initial_option": {
+                          "text": {"type": "plain_text", "text": "%s"},
+                          "value": "%s"
+                        },
+                    """,
+                    ticket.team(), ticket.team()
+                )
+                : "";
+
+            String tagsInitialOptions = !ticket.tags().isEmpty()
+                ? String.format(
+                    """
+                        "initial_options": [%s],
+                    """,
+                    buildTagsInitialOptionsFromConfig()
+                )
+                : "";
+
+            String impactInitialOption = ticket.impact() != null
+                ? String.format(
+                    """
+                        "initial_option": {
+                          "text": {"type": "plain_text", "text": "%s"},
+                          "value": "%s"
+                        },
+                    """,
+                    findImpactLabel(ticket.impact()), ticket.impact()
+                )
+                : "";
 
             ArrayNode restBlocks = (ArrayNode) objectMapper.readTree(StringSubstitutor.replace(
                 """
@@ -141,24 +147,7 @@ public class FullSummaryForm {
                           {
                             "type": "rich_text_section",
                             "elements": [
-                              {
-                                "type": "emoji",
-                                "name": "large_orange_circle"
-                              },
-                              {
-                                "type": "text",
-                                "text": " Opened: "
-                              },
-                              {
-                                "type": "date",
-                                "timestamp": ${openedAtTs},
-                                "format": "{date_short_pretty} at {time}",
-                                "fallback": "${openedAt}"
-                              },
-                              {
-                                "type": "text",
-                                "text": "\\n"
-                              }
+                              ${statusHistoryElements}
                             ]
                           }
                         ]
@@ -197,9 +186,9 @@ public class FullSummaryForm {
                           "initial_option": {
                             "text": {
                               "type": "plain_text",
-                              "text": "Opened"
+                              "text": "${statusInitialText}"
                             },
-                            "value": "opened"
+                            "value": "${statusInitialValue}"
                           },
                           "options": [
                             {
@@ -229,6 +218,7 @@ public class FullSummaryForm {
                         "element": {
                           "type": "static_select",
                           "action_id": "change-team",
+                          ${teamInitialOption}
                           "option_groups": [
                             {
                               "options": [{
@@ -282,64 +272,8 @@ public class FullSummaryForm {
                         "element": {
                           "type": "multi_static_select",
                           "action_id": "change-tags",
-                          "options": [
-                            {
-                              "text": {
-                                "type": "plain_text",
-                                "text": "Ingresses"
-                              },
-                              "value": "ingresses"
-                            },
-                            {
-                              "text": {
-                                "type": "plain_text",
-                                "text": "Jenkins Pipelines"
-                              },
-                              "value": "jenkins-pipelines"
-                            },
-                            {
-                              "text": {
-                                "type": "plain_text",
-                                "text": "Networking"
-                              },
-                              "value": "networking"
-                            },
-                            {
-                              "text": {
-                                "type": "plain_text",
-                                "text": "Vault"
-                              },
-                              "value": "vault"
-                            },
-                            {
-                              "text": {
-                                "type": "plain_text",
-                                "text": "Persistence/Brokers"
-                              },
-                              "value": "persistence-brokers"
-                            },
-                            {
-                              "text": {
-                                "type": "plain_text",
-                                "text": "Observability"
-                              },
-                              "value": "observability"
-                            },
-                            {
-                              "text": {
-                                "type": "plain_text",
-                                "text": "DNS"
-                              },
-                              "value": "dns"
-                            },
-                            {
-                              "text": {
-                                "type": "plain_text",
-                                "text": "Osprey"
-                              },
-                              "value": "osprey"
-                            }
-                          ]
+                          ${tagsInitialOptions}
+                          "options": ${tagsOptions}
                         }
                       },
                       {
@@ -356,42 +290,27 @@ public class FullSummaryForm {
                             "type": "plain_text",
                             "text": "Not Evaluated"
                           },
-                          "options": [
-                            {
-                              "text": {
-                                "type": "plain_text",
-                                "text": "Production Blocking"
-                              },
-                              "value": "productionBlocking"
-                            },
-                            {
-                              "text": {
-                                "type": "plain_text",
-                                "text": "BAU Blocking"
-                              },
-                              "value": "bauBlocking"
-                            },
-                            {
-                              "text": {
-                                "type": "plain_text",
-                                "text": "Abnormal Behaviour"
-                              },
-                              "value": "abnormalBehaviour"
-                            }
-                          ]
+                          ${impactInitialOption}
+                          "options": ${impactsOptions}
                         }
                       }
                     ]
                     """,
-                Map.of(
-                    "userId", ticket.user().slackUserId(),
-                    "postedAt", ticket.queryTs().instant().truncatedTo(ChronoUnit.MINUTES),
-                    "postedAtTs", ticket.queryTs().instant().getEpochSecond(),
-                    "openedAt", ticket.logs().getFirst().date().truncatedTo(ChronoUnit.MINUTES),
-                    "openedAtTs", ticket.logs().getFirst().date().getEpochSecond(),
-                    "queryPermalink", ticket.queryPermalink(),
-                    "escalationsBlock", escalationsBlock
-                )
+                ImmutableMap.<String, Object>builder()
+                    .put("userId", ticket.user().slackUserId())
+                    .put("postedAt", ticket.queryTs().instant().truncatedTo(ChronoUnit.MINUTES))
+                    .put("postedAtTs", ticket.queryTs().instant().getEpochSecond())
+                    .put("statusHistoryElements", statusHistoryElements)
+                    .put("statusInitialText", ticket.status().label())
+                    .put("statusInitialValue", ticket.status().code())
+                    .put("queryPermalink", ticket.queryPermalink())
+                    .put("escalationsBlock", escalationsBlock)
+                    .put("teamInitialOption", teamInitialOption)
+                    .put("tagsInitialOptions", tagsInitialOptions)
+                    .put("impactInitialOption", impactInitialOption)
+                    .put("tagsOptions", buildTagsOptionsFromConfig())
+                    .put("impactsOptions", buildImpactsOptionsFromConfig())
+                    .build()
             ));
 
             result.add(header);
@@ -402,6 +321,123 @@ public class FullSummaryForm {
                 result.add(n);
             }
             return result;
+        }
+
+        private String buildStatusHistoryBlocks() {
+            StringBuilder statusHistoryBuilder = new StringBuilder();
+            for (int i = 0; i < ticket.logs().size(); i++) {
+                Ticket.StatusLog log = ticket.logs().get(i);
+                Ticket.Status st = Ticket.Status.fromCode(log.event());
+                String tail = (i < ticket.logs().size() - 1) ? "  |\\n" : "";
+                statusHistoryBuilder.append(String.format(
+                    """
+                        {
+                          "type": "emoji",
+                          "name": "%s"
+                        },
+                        {
+                          "type": "text",
+                          "text": " %s: "
+                        },
+                        {
+                          "type": "date",
+                          "timestamp": %d,
+                          "format": "{date_short_pretty} at {time}",
+                          "fallback": "%s"
+                        },
+                        {
+                          "type": "text",
+                          "text": "\\n%s"
+                        }
+                    """,
+                    st.emojiName(),
+                    st.label(),
+                    log.date().getEpochSecond(),
+                    log.date().truncatedTo(ChronoUnit.MINUTES),
+                    tail
+                ));
+                if (i < ticket.logs().size() - 1) {
+                    statusHistoryBuilder.append(",");
+                }
+            }
+            return statusHistoryBuilder.toString();
+        }
+
+        private String buildEscalationBlock() {
+            String escalationsBlock;
+            if (ticket.escalations().isEmpty()) {
+                escalationsBlock = """
+                      {
+                        "type": "context",
+                        "elements": [
+                          {
+                            "type": "plain_text",
+                            "text": "No escalations for this ticket"
+                          }
+                        ]
+                      }
+                    """;
+            } else {
+                String teamName = ticket.escalations().getFirst().team();
+                String groupId = ticket.config().escalationTeams().stream()
+                    .filter(t -> t.name().equals(teamName))
+                    .findFirst()
+                    .map(Config.EscalationTeam::slackGroupId)
+                    .orElseThrow(() -> new AssertionError("Team not found: " + teamName));
+                escalationsBlock = String.format(
+                    """
+                        {
+                          "type": "section",
+                          "fields": [
+                            {"type": "plain_text", "text": "Status: Opened"},
+                            {"type": "mrkdwn", "text": "Team: <!subteam^%s>"}
+                          ]
+                        }""",
+                    groupId
+                );
+            }
+            return escalationsBlock;
+        }
+
+        private String buildTagsInitialOptionsFromConfig() {
+            return ticket.tags().stream()
+                .map(tag -> String.format("""
+                        {"text": {"type": "plain_text", "text": "%s"}, "value": "%s"}""",
+                    findTagLabel(tag), tag
+                ))
+                .collect(joining(", "));
+        }
+
+        private String buildTagsOptionsFromConfig() {
+            return ticket.config().tags().stream()
+                .map(tag -> """
+                    {"text": {"type": "plain_text", "text": "%s"}, "value": "%s"}""".formatted(tag.label(), tag.code()))
+                .collect(joining(",", "[", "]"));
+        }
+
+        private String buildImpactsOptionsFromConfig() {
+            return ticket.config().impacts().stream()
+                .map(imp -> String.format("""
+                    {"text": {"type": "plain_text", "text": "%s"}, "value": "%s"}""",
+                    imp.label(), imp.code()))
+                .collect(joining(",", "[", "]"));
+        }
+
+        private String findTagLabel(String code) {
+            return ticket.config().tags().stream()
+                .filter(t -> t.code().equals(code))
+                .findFirst()
+                .map(Config.Tag::label)
+                .orElse(code);
+        }
+
+        private String findImpactLabel(String code) {
+            if (code == null) return "Not Evaluated";
+            return ticket.config().impacts().stream()
+                .filter(i -> i.code().equals(code))
+                .findFirst()
+                .map(Config.Impact::label)
+                .orElse(code);
         }
     }
 }
