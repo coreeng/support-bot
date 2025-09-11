@@ -132,6 +132,7 @@ public class RatingActionHandler implements SlackBlockActionHandler {
             }
         } catch (Exception e) {
             log.error("Error handling rating submission", e);
+            throw e;
         }
     }
 
