@@ -54,4 +54,88 @@ test {
             println('\n' + ('-' * repeatLength) + '\n' + startItem + output + endItem + '\n' + ('-' * repeatLength))
         }
     }
+
+    outputs.upToDateWhen { System.getProperty("rerun") == null }
+}
+
+import java.util.concurrent.TimeUnit
+
+def serviceProcess
+def serviceAlreadyRunning = false
+tasks.register('testIntegrated') {
+    dependsOn ':service:bootJar'
+    finalizedBy 'test'
+    finalizedBy 'stopService'
+    doFirst {
+        def healthUrl = new URI("http://localhost:8081/health").toURL()
+        boolean up = false
+        logger.lifecycle("Checking for running service at ${healthUrl}")
+
+        // Quick probe: if service is already running, skip startup
+        try {
+            def conn = (HttpURLConnection) healthUrl.openConnection()
+            conn.connectTimeout = 1000
+            conn.readTimeout = 1000
+            conn.requestMethod = "GET"
+            if (conn.responseCode == 200) {
+                serviceAlreadyRunning = true
+                up = true
+                logger.lifecycle("Detected running service at ${healthUrl}; skipping startup")
+            }
+        } catch (Throwable ignored) {
+            logger.lifecycle("No running service detected at ${healthUrl}; starting service")
+        }
+
+        def logfilePath = "${project(":service").projectDir.path}/logs/support-bot.log"
+        if (!up) {
+            def bootJarTask = project(':service').tasks.named('bootJar').get()
+            def jarFile = bootJarTask.archiveFile.get().asFile
+
+            logger.lifecycle("Starting service: ${jarFile}")
+            serviceProcess = new ProcessBuilder(
+                    "${System.properties['java.home']}/bin/java",
+                    "-jar", jarFile.absolutePath,
+                    "--spring.profiles.active=functionaltests"
+            )
+                    .redirectErrorStream(true)
+                    .redirectOutput(new File(logfilePath))
+                    .start()
+
+            def deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(10)
+
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    def conn = (HttpURLConnection) healthUrl.openConnection()
+                    conn.connectTimeout = 1000
+                    conn.readTimeout = 1000
+                    conn.requestMethod = "GET"
+                    if (conn.responseCode == 200) {
+                        up = true
+                        break
+                    }
+                } catch (Throwable ignored) {}
+                if (!serviceProcess.isAlive()) {
+                    throw new GradleException("Service terminated early. See ${project.layout.buildDirectory}")
+                }
+                Thread.sleep(1000)
+            }
+        }
+
+        if (!up) {
+            throw new GradleException("Service not healthy at http://localhost:8081/health within timeout. See ${logfilePath}")
+        }
+        logger.lifecycle("Service is up; running functional tests...")
+    }
+}
+
+tasks.register('stopService') {
+    doLast {
+        if (!serviceAlreadyRunning && serviceProcess != null && serviceProcess.isAlive()) {
+            logger.lifecycle("Stopping service...")
+            serviceProcess.destroy()
+            if (!serviceProcess.waitFor(10, TimeUnit.SECONDS)) {
+                serviceProcess.destroyForcibly()
+            }
+        }
+    }
 }
