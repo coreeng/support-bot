@@ -1,5 +1,8 @@
 package com.coreeng.supportbot.testkit;
 
+import java.time.Duration;
+
+import static org.awaitility.Awaitility.await;
 import org.jspecify.annotations.NonNull;
 
 import com.coreeng.supportbot.wiremock.SlackWiremock;
@@ -33,5 +36,26 @@ public class SlackMessage {
             .threadTs(ts)
             .channelId(channelId)
             .build());
+    }
+
+    public TicketCreationFlowStubs stubTicketCreationFlow(MessageTs newTicketMessageTs) {
+        Stub reaction = expectReactionAdded("ticket");
+        StubWithResult<TicketMessage> posted = expectThreadMessagePosted(
+            ThreadMessagePostedExpectation.<TicketMessage>builder()
+                .receiver(new TicketMessage.Receiver())
+                .from(UserRole.supportBot)
+                .newMessageTs(newTicketMessageTs)
+                .build()
+        );
+        return new TicketCreationFlowStubs(reaction, posted);
+    }
+
+    public record TicketCreationFlowStubs(Stub reactionAdded, StubWithResult<TicketMessage> ticketMessagePosted) {
+        public void awaitAllCalled(Duration timeout, String reason) {
+            await().atMost(timeout).untilAsserted(() -> {
+                reactionAdded.assertIsCalled(reason + ": reaction added");
+                ticketMessagePosted.assertIsCalled(reason + ": ticket message posted");
+            });
+        }
     }
 }
