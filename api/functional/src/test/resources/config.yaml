@@ -43,6 +43,8 @@ tenants:
 escalationTeams:
   - name: wow
     slackGroupId: S01234ESCWW
+  - name: infra-integration
+    slackGroupId: S01234ESCII
 tags:
   - label: Ingresses
     code: ingresses
