@@ -7,13 +7,13 @@ Exposes metrics about processed tickets and escalations.
 
 ## 1. Slack bot credentials
 You have to have Slack credentials for the bot to authorize itself.
-To achieve this, either create your own instance of the bot or ask for credentials a colleague
+To achieve this, it is recommended that you create your own Slack application instance and get unique credentials.
 
 Once you have it, create `.envrc` using `.envrc.example`.
 
-You'll also need a channel for that the bot will work with.
-You can either create a private one for yourself or ask a colleague to add you to an existing one.
-Use specify it in `.envrc`.
+You'll also need a Slack channel for that the bot to operate in.
+You can create one for yourself in your slack workspace, and specify it in `.envrc`.
+
 ## 2. Codegen
 
 You need to run the below make task, which generates the necessary code based on our database schema
@@ -32,12 +32,12 @@ make db-run
 ## 4. Connect to cluster
 Configure connection to cloud and kubernetes cluster.
 
-In Core Platform case:
+For [Core-Platform](https://coreplatform.io/):
 ```bash
 corectl env connect gcp-dev -b -f
 ```
 
-In GCP case:
+For GCP:
 ```bash
 gcloud auth application-default login
 ```
@@ -46,3 +46,11 @@ gcloud auth application-default login
 ```bash
 make run
 ```
+
+# CodeStyle and Linting
+
+```bash
+make lint
+```
+
+Ruleset can be found [here](pmd-ruleset.xml)
