@@ -38,7 +38,7 @@ public class TicketManagementTests {
         // when
         SlackMessage tenantsMessage = asTenant.postMessage(
             MessageTs.now(),
-            "Please, help me with my query"
+            "Please, help me with my query!"
         );
 
         // then
