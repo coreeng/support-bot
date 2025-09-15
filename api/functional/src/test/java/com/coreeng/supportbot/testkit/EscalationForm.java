@@ -1,18 +1,17 @@
 package com.coreeng.supportbot.testkit;
 
-import com.coreeng.supportbot.Config;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
+import java.util.Map;
+import java.util.stream.Collectors;
 
+import org.apache.commons.text.StringSubstitutor;
+
+import com.coreeng.supportbot.Config;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.text.StringSubstitutor;
-import java.util.Map;
-import java.util.stream.Collectors;
+import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 
 public class EscalationForm {
     @RequiredArgsConstructor
@@ -27,46 +26,14 @@ public class EscalationForm {
         }
 
         @Override
-        public EscalationForm assertAndExtractResult(ServeEvent servedStub) throws Exception {
+        public EscalationForm assertAndExtractResult(ServeEvent servedStub) {
             String rawView = servedStub.getRequest().formParameter("view").getValues().getFirst();
-            JsonNode view = objectMapper.readTree(rawView);
-
-            assertThatJson(view.get("title").toString()).isEqualTo(String.format("""
-                {
-                  "type": "plain_text",
-                  "text": "Escalate Ticket ID-%d",
-                  "emoji": false
-                }
-                """, ticket.id()));
-            assertThatJson(view.get("close").toString()).isEqualTo("""
-                {
-                  "type": "plain_text",
-                  "text": "Cancel",
-                  "emoji": false
-                }
-                """);
-            assertThatJson(view.get("submit").toString()).isEqualTo("""
-                {
-                  "type": "plain_text",
-                  "text": "Escalate",
-                  "emoji": false
-                }
-                """);
-
-            assertThatJson(view.get("private_metadata").asText()).isEqualTo(String.format("""
-                {
-                  "ticketId": %d
-                }
-                """, ticket.id()));
-
-            JsonNode realBlocks = view.get("blocks");
-            ArrayNode expectedBlocks = buildExpectedBlocks();
-            assertThatJson(realBlocks.toString()).isEqualTo(expectedBlocks.toString());
-
+            String expectedView = buildExpectedViewJson();
+            assertThatJson(rawView).isEqualTo(expectedView);
             return new EscalationForm();
         }
 
-        private ArrayNode buildExpectedBlocks() throws Exception {
+        private String buildExpectedViewJson() {
             String tagOptions = ticket.config().tags().stream()
                 .map(tag -> String.format(
                     """
@@ -92,40 +59,51 @@ public class EscalationForm {
                 ))
                 .collect(Collectors.joining(",\n"));
 
-            String blocksJson = StringSubstitutor.replace(
+            String privateMetadataQuoted = safeJson(String.format("{\"ticketId\":%d}", ticket.id()));
+
+            return StringSubstitutor.replace(
                 """
-                [
-                  {
-                    "type": "input",
-                    "block_id": "escalation-tags",
-                    "label": { "type": "plain_text", "text": "Pick tags" },
-                    "element": {
-                      "type": "multi_static_select",
-                      "action_id": "escalation-tags",
-                      "options": [ ${tagOptions} ]
+                {
+                  "type": "modal",
+                  "title": { "type": "plain_text", "text": ${titleText}, "emoji": false },
+                  "submit": { "type": "plain_text", "text": "Escalate", "emoji": false },
+                  "close": { "type": "plain_text", "text": "Cancel", "emoji": false },
+                  "callback_id": "ticket-escalate",
+                  "clear_on_close": true,
+                  "blocks": [
+                    {
+                      "type": "input",
+                      "block_id": "escalation-tags",
+                      "label": { "type": "plain_text", "text": "Pick tags" },
+                      "element": {
+                        "type": "multi_static_select",
+                        "action_id": "escalation-tags",
+                        "options": [ ${tagOptions} ]
+                      },
+                      "optional": false
                     },
-                    "optional": false
-                  },
-                  {
-                    "type": "input",
-                    "block_id": "escalation-team",
-                    "label": { "type": "plain_text", "text": "Team to escalate to" },
-                    "element": {
-                      "type": "static_select",
-                      "action_id": "escalation-team",
-                      "options": [ ${teamOptions} ]
-                    },
-                    "optional": false
-                  }
-                ]
+                    {
+                      "type": "input",
+                      "block_id": "escalation-team",
+                      "label": { "type": "plain_text", "text": "Team to escalate to" },
+                      "element": {
+                        "type": "static_select",
+                        "action_id": "escalation-team",
+                        "options": [ ${teamOptions} ]
+                      },
+                      "optional": false
+                    }
+                  ],
+                  "private_metadata": ${privateMetadata}
+                }
                 """,
                 Map.of(
+                    "titleText", safeJson("Escalate Ticket ID-" + ticket.id()),
                     "tagOptions", tagOptions,
-                    "teamOptions", teamOptions
+                    "teamOptions", teamOptions,
+                    "privateMetadata", privateMetadataQuoted
                 )
             );
-
-            return (ArrayNode) objectMapper.readTree(blocksJson);
         }
 
         private String safeJson(String value) {

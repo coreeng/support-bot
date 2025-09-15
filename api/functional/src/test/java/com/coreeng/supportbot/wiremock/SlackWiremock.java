@@ -297,7 +297,7 @@ public class SlackWiremock extends WireMockServer {
                         "bot_id":"UNSET_BY_TESTS",
                         "hash":"UNSET_BY_TESTS",
                         "type":"modal",
-                        "callback_id":"ticket-summary",
+                        "callback_id": {{toJson formArgView.callback_id}},
                         "blocks": {{toJson formArgView.blocks}},
                         "private_metadata": {{toJson formArgView.private_metadata}},
                         "title": {{toJson formArgView.title}},

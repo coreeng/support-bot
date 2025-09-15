@@ -1,10 +1,12 @@
 package com.coreeng.supportbot.testkit;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
+import static org.awaitility.Awaitility.await;
 import org.jspecify.annotations.NonNull;
 
 import com.coreeng.supportbot.Config;
@@ -24,15 +26,6 @@ public class Ticket implements SearchableForTicket {
     private final MessageTs formMessageTs;
     @NonNull
     private final String channelId;
-    private Ticket.@NonNull Status status;
-    private String team;
-    private String impact;
-    @NonNull
-    @Builder.Default
-    private ImmutableList<@NonNull String> tags = ImmutableList.of();
-    @NonNull
-    @Builder.Default
-    private ImmutableList<@NonNull StatusLog> logs = ImmutableList.of();
     @NonNull
     private final SlackWiremock slackWiremock;
     private final SupportBotClient supportBotClient;
@@ -45,7 +38,15 @@ public class Ticket implements SearchableForTicket {
     private final String queryBlocksJson;
     @NonNull
     private final String queryPermalink;
-
+    private Ticket.@NonNull Status status;
+    private String team;
+    private String impact;
+    @NonNull
+    @Builder.Default
+    private ImmutableList<@NonNull String> tags = ImmutableList.of();
+    @NonNull
+    @Builder.Default
+    private ImmutableList<@NonNull StatusLog> logs = ImmutableList.of();
     @Builder.Default
     private boolean escalated = false;
     @Builder.Default
@@ -81,7 +82,7 @@ public class Ticket implements SearchableForTicket {
             .viewCallbackId("ticket-summary")
             .viewType("modal")
             .triggerId(triggerId)
-            .receiver(new FullSummaryForm.Reciever(this))
+            .receiver(new FullSummaryForm.Receiver(this))
             .build();
 
         // Stub permalink for the ticket form message (used for escalation thread links in summary)
@@ -105,6 +106,70 @@ public class Ticket implements SearchableForTicket {
         return new TicketUpdater();
     }
 
+    public CloseFlowStubs stubCloseFlow(MessageTs threadTs) {
+        StubWithResult<TicketMessage> updated = slackWiremock.stubMessageUpdated(
+            MessageUpdatedExpectation.<TicketMessage>builder()
+                .channelId(channelId)
+                .ts(formMessageTs)
+                .threadTs(threadTs)
+                .receiver(new TicketMessage.Receiver())
+                .build()
+        );
+        Stub check = slackWiremock.stubReactionAdd(
+            ReactionAddedExpectation.builder()
+                .reaction("white_check_mark")
+                .channelId(channelId)
+                .ts(queryTs)
+                .build()
+        );
+        return new CloseFlowStubs(updated, check);
+    }
+
+    public ReopenFlowStubs stubReopenFlow(MessageTs threadTs) {
+        StubWithResult<TicketMessage> updated = slackWiremock.stubMessageUpdated(
+            MessageUpdatedExpectation.<TicketMessage>builder()
+                .channelId(channelId)
+                .ts(formMessageTs)
+                .threadTs(threadTs)
+                .receiver(new TicketMessage.Receiver())
+                .build()
+        );
+        Stub uncheck = slackWiremock.stubReactionRemove(
+            ReactionAddedExpectation.builder()
+                .reaction("white_check_mark")
+                .channelId(channelId)
+                .ts(queryTs)
+                .build()
+        );
+        return new ReopenFlowStubs(updated, uncheck);
+    }
+
+    public void openSummaryAndSubmit(SlackTestKit asSupportSlack, String triggerId, FullSummaryFormSubmission.Values values) {
+        StubWithResult<FullSummaryForm> opened = expectFullSummaryFormOpened(triggerId);
+        asSupportSlack.clickMessageButton(fullSummaryButtonClick(triggerId));
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> opened.assertIsCalled("full summary form opened"));
+        asSupportSlack.submitView(fullSummaryFormSubmit(triggerId, values));
+    }
+
+
+    public EscalateFlowStubs stubEscalateFlow(String expectedSlackGroupId, MessageTs newEscalationMessageTs) {
+        StubWithResult<EscalationMessage> escalationMessage = expectEscalationMessagePosted(expectedSlackGroupId, newEscalationMessageTs);
+        Stub rocketReactionAdded = slackWiremock.stubReactionAdd(
+            ReactionAddedExpectation.builder()
+                .reaction("rocket")
+                .channelId(channelId)
+                .ts(queryTs)
+                .build()
+        );
+        return new EscalateFlowStubs(escalationMessage, rocketReactionAdded);
+    }
+
+    public void openEscalationAndSubmit(SlackTestKit asSupportSlack, String triggerId, EscalationFormSubmission.Values values) {
+        StubWithResult<EscalationForm> opened = expectEscalationFormOpened(triggerId);
+        asSupportSlack.clickMessageButton(escalateButtonClick(triggerId));
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> opened.assertIsCalled("escalation form opened"));
+        asSupportSlack.submitView(escalationFormSubmit(triggerId, values));
+    }
 
     public void assertMatches(SupportBotClient.TicketResponse response) {
         assertThat(response.id()).isEqualTo(id);
@@ -197,6 +262,51 @@ public class Ticket implements SearchableForTicket {
             .build();
     }
 
+    @Getter
+    public enum Status {
+        opened("opened", "Opened", "#00ff00", "large_orange_circle"),
+        closed("closed", "Closed", "#ff000d", "large_green_circle");
+
+        private final String code;
+        private final String label;
+        private final String colorHex;
+        private final String emojiName;
+
+        Status(String code, String label, String colorHex, String emojiName) {
+            this.code = code;
+            this.label = label;
+            this.colorHex = colorHex;
+            this.emojiName = emojiName;
+        }
+
+        public static Status fromCode(String code) {
+            for (Status s : values()) {
+                if (s.code.equals(code)) {
+                    return s;
+                }
+            }
+            throw new IllegalArgumentException("Unknown ticket status code: " + code);
+        }
+
+        public static Status fromLabel(String label) {
+            for (Status s : values()) {
+                if (s.label.equals(label)) {
+                    return s;
+                }
+            }
+            throw new IllegalArgumentException("Unknown ticket status label: " + label);
+        }
+
+        public static Status fromColor(String colorHex) {
+            for (Status s : values()) {
+                if (s.colorHex.equalsIgnoreCase(colorHex)) {
+                    return s;
+                }
+            }
+            throw new IllegalArgumentException("Unknown ticket status color: " + colorHex);
+        }
+    }
+
     record StatusLog(
         String event,
         Instant date
@@ -246,52 +356,29 @@ public class Ticket implements SearchableForTicket {
         }
     }
 
-    public enum Status {
-        opened("opened", "Opened", "#00ff00", "large_orange_circle"),
-        closed("closed", "Closed", "#ff000d", "large_green_circle");
-
-        private final String code;
-        private final String label;
-        private final String colorHex;
-        private final String emojiName;
-
-        Status(String code, String label, String colorHex, String emojiName) {
-            this.code = code;
-            this.label = label;
-            this.colorHex = colorHex;
-            this.emojiName = emojiName;
+    public record CloseFlowStubs(StubWithResult<TicketMessage> messageUpdated, Stub whiteCheckMarkAdded) {
+        public void awaitAllCalled(Duration timeout, String reason) {
+            await().atMost(timeout).untilAsserted(() -> {
+                messageUpdated.assertIsCalled(reason + ": ticket form update");
+                whiteCheckMarkAdded.assertIsCalled(reason + ": checkmark added");
+            });
         }
+    }
 
-        public String code() { return code; }
-        public String label() { return label; }
-        public String colorHex() { return colorHex; }
-        public String emojiName() { return emojiName; }
-
-        public static Status fromCode(String code) {
-            for (Status s : values()) {
-                if (s.code.equals(code)) {
-                    return s;
-                }
-            }
-            throw new IllegalArgumentException("Unknown ticket status code: " + code);
+    public record ReopenFlowStubs(StubWithResult<TicketMessage> messageUpdated, Stub whiteCheckMarkRemoved) {
+        public void awaitAllCalled(Duration timeout, String reason) {
+            await().atMost(timeout).untilAsserted(() -> {
+                messageUpdated.assertIsCalled(reason + ": ticket form update");
+                whiteCheckMarkRemoved.assertIsCalled(reason + ": checkmark removed");
+            });
         }
-
-        public static Status fromLabel(String label) {
-            for (Status s : values()) {
-                if (s.label.equals(label)) {
-                    return s;
-                }
-            }
-            throw new IllegalArgumentException("Unknown ticket status label: " + label);
-        }
-
-        public static Status fromColor(String colorHex) {
-            for (Status s : values()) {
-                if (s.colorHex.equalsIgnoreCase(colorHex)) {
-                    return s;
-                }
-            }
-            throw new IllegalArgumentException("Unknown ticket status color: " + colorHex);
+    }
+    public record EscalateFlowStubs(StubWithResult<EscalationMessage> escalationMessage, Stub rocketReactionAdded) {
+        public void awaitAllCalled(Duration timeout, String reason) {
+            await().atMost(timeout).untilAsserted(() -> {
+                escalationMessage.assertIsCalled(reason + ": escalation message posted");
+                rocketReactionAdded.assertIsCalled(reason + ": rocket reaction added");
+            });
         }
     }
 }

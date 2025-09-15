@@ -26,10 +26,6 @@ public class StubWithResult<T> {
     private T result;
     private boolean resultCalculated;
 
-    public void assertIsCalled() {
-        assertIsCalled("");
-    }
-
     public void assertIsCalled(String message) {
         GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
         assertThat(serveEvents.getServeEvents())

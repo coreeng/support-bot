@@ -15,9 +15,9 @@ enums:
     - label: wow
       code: wow
       slack-group-id: S01234ESCWW
-#    - label: infra-integration
-#      code: infra-integration
-#      slack-group-id: S01234ESCII
+    - label: infra-integration
+      code: infra-integration
+      slack-group-id: S01234ESCII
 #    - label: connected-app
 #      code: connected-app
 #      slack-group-id: S01234ESCCA
