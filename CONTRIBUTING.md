@@ -9,7 +9,7 @@ To contribute to this project, you will need:
 
 - **Java 21**: Required to build and run the project.
 - **Gradle**: The project uses the Gradle wrapper (`gradlew`) for builds, tests and code generation.
-- **Docker**: Used for running the local database and optionally building Docker images.
+- **Docker Desktop or alternative**: Used for running the local database and optionally building Docker images.
 
 ## Code Guidelines
 
@@ -30,7 +30,7 @@ Make sure to update the `README.md` if necessary.
 * Fork the repository on GitHub and clone your fork locally.
 * Create a feature branch, e.g: `git checkout -b feature_xyz`.
 * Create your changes, run tests and linting (see the service [README.md](api/service/README.md)) and commit locally.
-  * Use clear, descriptive commit messages. Follow the format:
+  * Use clear, descriptive [commit messages](https://www.conventionalcommits.org/en/v1.0.0/). Example:
     * `feat: add support for X`
     * `fix: correct bug in Y`
     * `docs: update local run guide in readme`
@@ -46,7 +46,8 @@ Make sure to update the `README.md` if necessary.
 
 ### Submit the PR
 
-* Maintainers will review your submission, provide feedback if needed, and merge it once it meets the project’s requirements.
+* Maintainers will review your submission, provide feedback if needed, and merge it once it meets the project’s requirements. We commit
+to review the PR within 3 working days.
 
 ## Coding standards/style
 
@@ -56,6 +57,7 @@ Make sure to update the `README.md` if necessary.
 
 ### Reporting Bugs/Issues
 
+When reporting Bugs or Issues, please raise a new GitHub issue in the repository, adding a `Bug` label.
 Please include whether the issue is consistently reproducible, steps to reproduce, expected behaviour and environment details.
 
 # Contributor Code of Conduct
