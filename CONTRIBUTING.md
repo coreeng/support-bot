@@ -17,7 +17,7 @@ To contribute to this project, you will need:
 - **Functional tests**: Required for all new features and bug fixes.
 - **Integration tests**: Add integration tests when introducing or modifying any third-party service or external dependency.
  
-> Pull requests without appropriate test coverage will not be accepted.
+> We require all code changes to be accompanied by adequate test coverage
 
 ## Contributing
 
