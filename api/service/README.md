@@ -8,18 +8,8 @@ Exposes metrics about processed tickets and escalations.
 ## 1. Slack bot credentials
 You have to have Slack credentials for the bot to authorize itself.
 To achieve this, it is recommended that you create your own Slack application instance and get unique credentials. Documentation
-can be found [here](https://docs.slack.dev/quickstart/). Bot Token Scopes required are as follows:
-
-* **app_mentions:read**
-* **channels:history**
-* **chat:write**
-* **groups:history**
-* **reactions:read**
-* **reactions:write**
-* **usergroups:read**
-* **users.profile:read**
-
-> Make sure to Enable Socket Mode
+can be found [here](https://docs.slack.dev/quickstart/). Click on `Create an app`, and then create a new app `From a Manifest`.
+You can use [this manifest](docs/configuration.md#slack), change the `name`, `description` and `background_color` as desired.
 
 After the Slack Application is set up, you can install it in your organisation Slack workspace.
 
@@ -43,21 +33,10 @@ expose port 5432 and mount data to `./db-data` folder, so it will persist betwee
 make db-run
 ```
 
-## 4. Connect to cluster
-Configure connection to cloud and kubernetes cluster.
-
-For [Core-Platform](https://coreplatform.io/):
-```bash
-corectl env connect gcp-dev -b -f
-```
-
-For GCP:
-```bash
-gcloud auth application-default login
-```
-
-For Azure:
-Details on Azure integration can be found [here](docs/configuration.md), under `spring.cloud.azure`
+## 4. Identity Provider Integrations
+Identity Provider integrations are disabled by default for local runs. What you can do instead, is look at the [app config](src/main/resources/application.yaml)
+and ensure the `platform-integration.static-user` is set to true, while `platform-integration.gcp.enabled` and `platform-integration.azure.enabled` are set to `false`. 
+You can set your desired `platform-integration.static-user.users` entries.
 
 ## 5. Start the bot
 ```bash
