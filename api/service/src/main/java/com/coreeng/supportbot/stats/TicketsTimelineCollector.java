@@ -1,22 +1,21 @@
 package com.coreeng.supportbot.stats;
 
+import java.time.ZoneOffset;
+import java.util.Map;
+import static java.util.stream.Collectors.counting;
+import static java.util.stream.Collectors.groupingBy;
+
+import org.springframework.stereotype.Component;
+
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
-
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.util.Map;
-
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static java.util.stream.Collectors.counting;
-import static java.util.stream.Collectors.groupingBy;
+
+import lombok.RequiredArgsConstructor;
 
 @Component
 @RequiredArgsConstructor

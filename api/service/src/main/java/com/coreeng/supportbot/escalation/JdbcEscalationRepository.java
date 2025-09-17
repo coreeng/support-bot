@@ -1,34 +1,44 @@
 package com.coreeng.supportbot.escalation;
 
-import com.coreeng.supportbot.dbschema.enums.EscalationEventType;
-import com.coreeng.supportbot.slack.MessageTs;
-import com.coreeng.supportbot.ticket.TicketId;
-import com.coreeng.supportbot.util.Page;
-import com.google.common.collect.ImmutableCollection;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableListMultimap;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
+
+import javax.annotation.Nullable;
+
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.SelectField;
+import static org.jooq.impl.DSL.any;
+import static org.jooq.impl.DSL.exists;
+import static org.jooq.impl.DSL.noCondition;
+import static org.jooq.impl.DSL.noField;
+import static org.jooq.impl.DSL.row;
+import static org.jooq.impl.DSL.select;
+import static org.jooq.impl.DSL.selectOne;
+import static org.jooq.impl.DSL.value;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.Nullable;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.util.List;
-
-import static com.coreeng.supportbot.dbschema.Tables.*;
+import static com.coreeng.supportbot.dbschema.Tables.ESCALATION;
+import static com.coreeng.supportbot.dbschema.Tables.ESCALATION_LOG;
+import static com.coreeng.supportbot.dbschema.Tables.ESCALATION_TO_TAG;
+import com.coreeng.supportbot.dbschema.enums.EscalationEventType;
+import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.ticket.TicketId;
 import static com.coreeng.supportbot.util.JooqUtils.bigCount;
+import com.coreeng.supportbot.util.Page;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import com.google.common.collect.ImmutableCollection;
+import com.google.common.collect.ImmutableList;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import com.google.common.collect.ImmutableListMultimap;
 import static com.google.common.collect.ImmutableListMultimap.toImmutableListMultimap;
-import static org.jooq.impl.DSL.*;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Repository
 @RequiredArgsConstructor
