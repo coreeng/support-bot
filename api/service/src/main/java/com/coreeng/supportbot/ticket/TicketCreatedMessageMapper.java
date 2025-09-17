@@ -1,24 +1,27 @@
 package com.coreeng.supportbot.ticket;
 
+import static java.lang.String.format;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+
+import org.springframework.stereotype.Component;
+
 import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
 import com.coreeng.supportbot.slack.client.SlackMessage;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.Attachment;
+import static com.slack.api.model.block.Blocks.actions;
+import static com.slack.api.model.block.Blocks.context;
+import static com.slack.api.model.block.Blocks.divider;
+import static com.slack.api.model.block.Blocks.section;
 import com.slack.api.model.block.LayoutBlock;
-import com.slack.api.model.block.element.BlockElement;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
-
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
-import java.util.List;
-
-import static com.slack.api.model.block.Blocks.*;
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
+import com.slack.api.model.block.element.BlockElement;
 import static com.slack.api.model.block.element.BlockElements.button;
-import static java.lang.String.format;
+
+import lombok.RequiredArgsConstructor;
 
 @Component
 @RequiredArgsConstructor

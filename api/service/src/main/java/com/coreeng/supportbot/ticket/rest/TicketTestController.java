@@ -1,18 +1,8 @@
 package com.coreeng.supportbot.ticket.rest;
 
-import com.coreeng.supportbot.slack.MessageTs;
-import com.coreeng.supportbot.ticket.DetailedTicket;
-import com.coreeng.supportbot.ticket.Ticket;
-import com.coreeng.supportbot.ticket.TicketId;
-import com.coreeng.supportbot.ticket.TicketProcessingService;
-import com.coreeng.supportbot.ticket.TicketStatus;
-import com.coreeng.supportbot.ticket.TicketSubmission;
-import com.coreeng.supportbot.ticket.TicketSubmitResult;
-import com.coreeng.supportbot.ticket.TicketRepository;
-import com.google.common.collect.ImmutableList;
-import lombok.RequiredArgsConstructor;
+import static java.util.Objects.requireNonNull;
+
 import org.springframework.context.annotation.Profile;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -21,9 +11,18 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Objects;
+import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.ticket.DetailedTicket;
+import com.coreeng.supportbot.ticket.Ticket;
+import com.coreeng.supportbot.ticket.TicketId;
+import com.coreeng.supportbot.ticket.TicketProcessingService;
+import com.coreeng.supportbot.ticket.TicketRepository;
+import com.coreeng.supportbot.ticket.TicketStatus;
+import com.coreeng.supportbot.ticket.TicketSubmission;
+import com.coreeng.supportbot.ticket.TicketSubmitResult;
+import com.google.common.collect.ImmutableList;
 
-import static java.util.Objects.*;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @Profile("functionaltests")
