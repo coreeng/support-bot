@@ -20,7 +20,8 @@ jobs:
         uses: snyk/actions/setup@master
         with:
           version: 'latest'
-          token: ${{ secrets.SNYK_TOKEN }}
 
       - name: Run Snyk test
         run: snyk test --all-projects --severity-threshold=high
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
