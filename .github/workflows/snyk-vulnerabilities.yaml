@@ -16,9 +16,6 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Resolve Gradle dependencies
-        run: ./gradlew build -x test
-
       - name: Set up Snyk CLI
         uses: snyk/actions/setup@master
         with:
