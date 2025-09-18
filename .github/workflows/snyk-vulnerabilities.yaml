@@ -20,7 +20,7 @@ jobs:
         run: ./gradlew build -x test
 
       - name: Set up Snyk CLI
-        uses: snyk/actions/setup@v2
+        uses: snyk/actions/setup@master
         with:
           version: 'latest'
           token: ${{ secrets.SNYK_TOKEN }}
