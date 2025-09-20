@@ -132,6 +132,22 @@ support-team:
   name: Core Support # Label showed on the UI
   slack-group-id: S08948NBMED # Slack group ID with people on support-duty
 
+# Adds a "Support Insights" section to the Slack Home tab with quick links to your support dashboards; remove the list to hide the section
+support-insights:
+  dashboards:
+    - title: Weekly Trends
+      url: https://grafana.example.com/d/support-weekly-trends
+      description: Ticket volume and response performance over the last week
+    - title: Ticket Insights
+      url: https://grafana.example.com/d/support-ticket-insights
+      description: Lifecycle metrics and SLA adherence for active tickets
+    - title: Escalation Overview
+      url: https://grafana.example.com/d/support-escalations
+      description: Escalation rate and resolution timing per team
+    - title: Tag Insights
+      url: https://grafana.example.com/d/support-tag-insights
+      description: Request distribution and trends by tag
+
 ai: # AI powered features
   sentiment-analysis: # Analyze tenant and support sentiment per ticket
     enabled: false

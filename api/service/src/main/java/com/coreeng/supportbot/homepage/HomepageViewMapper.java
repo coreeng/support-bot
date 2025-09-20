@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.homepage;
 
+<<<<<<< HEAD
 import static java.lang.String.format;
 import static java.lang.String.join;
 import java.time.Instant;
@@ -13,6 +14,9 @@ import javax.annotation.Nullable;
 
 import org.springframework.stereotype.Component;
 
+=======
+import com.coreeng.supportbot.config.SupportInsightsProps;
+>>>>>>> d0e1eda (feat: add support insights section to home view)
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.slack.client.SimpleSlackView;
 import com.coreeng.supportbot.slack.client.SlackView;
@@ -30,13 +34,33 @@ import static com.slack.api.model.block.Blocks.header;
 import static com.slack.api.model.block.Blocks.section;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.SectionBlock;
+<<<<<<< HEAD
+=======
+import com.slack.api.model.block.composition.TextObject;
+import com.slack.api.model.block.element.BlockElement;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.slack.api.model.block.Blocks.*;
+>>>>>>> d0e1eda (feat: add support insights section to home view)
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
 import com.slack.api.model.block.element.BlockElement;
 import static com.slack.api.model.block.element.BlockElements.button;
+<<<<<<< HEAD
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+=======
+import static java.lang.String.*;
+>>>>>>> d0e1eda (feat: add support insights section to home view)
 
 @Component
 @RequiredArgsConstructor
@@ -44,6 +68,7 @@ import lombok.extern.slf4j.Slf4j;
 public class HomepageViewMapper {
     private final TicketSummaryViewMapper ticketSummaryViewMapper;
     private final JsonMapper jsonMapper;
+    private final SupportInsightsProps supportInsightsProps;
 
     public SlackView render(HomepageView homepage) {
         ImmutableList.Builder<LayoutBlock> blocks = ImmutableList.builder();
@@ -58,7 +83,20 @@ public class HomepageViewMapper {
                     .text(plainText("Refresh"))
                 ))
             ),
-            divider(),
+            divider()
+        );
+        // Add Support Insights Section
+        List<LayoutBlock> supportInsights = renderSupportInsights();
+        if (!supportInsights.isEmpty()) {
+            blocks.add(
+                header(h -> h
+                    .text(plainText(":bar_chart: Support Insights", true))
+                )
+            );
+            blocks.addAll(supportInsights);
+            blocks.add(divider());
+        }
+        blocks.add(
             header(h -> h
                 .text(plainText(":ticket: Support Query Tickets Summary", true))
             ),
@@ -84,6 +122,34 @@ public class HomepageViewMapper {
             blocks.build(),
             privateMetadata(homepage)
         );
+    }
+
+    private List<LayoutBlock> renderSupportInsights() {
+        List<SupportInsightsProps.Dashboard> dashboards = supportInsightsProps.dashboards();
+        if (dashboards.isEmpty()) {
+            return List.of();
+        }
+
+        ImmutableList.Builder<LayoutBlock> blocks = ImmutableList.builder();
+        // Render dashboard links two per row so that Slack uses the horizontal space.
+        for (int i = 0; i < dashboards.size(); i += 2) {
+            SupportInsightsProps.Dashboard first = dashboards.get(i);
+            ImmutableList.Builder<TextObject> fields = ImmutableList.builder();
+            fields.add(markdownText(formatEntry(first)));
+            if (i + 1 < dashboards.size()) {
+                fields.add(markdownText(formatEntry(dashboards.get(i + 1))));
+            }
+            blocks.add(section(s -> s.fields(fields.build())));
+        }
+        return blocks.build();
+    }
+
+    private String formatEntry(SupportInsightsProps.Dashboard dashboard) {
+        String description = dashboard.description();
+        String suffix = description == null || description.isBlank()
+            ? ""
+            : format("\n%s", description);
+        return format("*<%s|%s>*%s", dashboard.url(), dashboard.title(), suffix);
     }
 
     public HomepageView.State parseMetadataOrDefault(@Nullable String json) {
@@ -128,12 +194,13 @@ public class HomepageViewMapper {
                     formatSlackDate(ticket.lastOpenedAt()))))
             )
         ));
-    statusSection.ifPresent(blocks::add);
-    inquiringTeam.ifPresent(blocks::add);
-    escalationSection.ifPresent(blocks::add);
-    blocks.add(divider());
-    return ImmutableList.copyOf(blocks);
-}
+        statusSection.ifPresent(blocks::add);
+        inquiringTeam.ifPresent(blocks::add);
+        escalationSection.ifPresent(blocks::add);
+        blocks.add(divider());
+        return ImmutableList.copyOf(blocks);
+    }
+
     private Optional<SectionBlock> buildTicketStatusSection(TicketView ticket) {
         return ticket.status() == TicketStatus.closed ?
             Optional.of(section(
