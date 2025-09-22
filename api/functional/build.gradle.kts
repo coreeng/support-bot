@@ -31,6 +31,7 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.13.+"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.13.+")
     testImplementation("org.junit.platform:junit-platform-launcher:1.13.+")
+    testRuntimeOnly("org.junit.platform:junit-platform-console")
     testImplementation("org.awaitility:awaitility:4.3.+")
     testImplementation("org.assertj:assertj-core:3.27.+")
     testImplementation("org.wiremock:wiremock:3.13.+")
