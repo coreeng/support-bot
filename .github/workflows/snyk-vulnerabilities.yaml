@@ -24,7 +24,12 @@ jobs:
         id: snyk_test
         continue-on-error: true
         run: |
-          snyk test api --severity-threshold=critical --sarif-file-output=snyk.sarif
+          snyk test api/service --severity-threshold=critical --sarif-file-output=service.sarif
+          snyk test api/integration-tests --severity-threshold=critical --sarif-file-output=int.sarif
+          snyk test api/functional --severity-threshold=critical --sarif-file-output=functional.sarif
+          
+          jq -s '{runs: map(.runs[]) }' service.sarif int.sarif functional.sarif > snyk.sarif
+          
           echo "snyk_exit_code=$?" >> $GITHUB_OUTPUT
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
