@@ -3552,7 +3552,7 @@ __metadata:
     d3-zoom: "npm:^3.0.0"
     js-yaml: "npm:^4.1.0"
     linkify-react: "npm:4.1.3"
-    linkifyjs: "npm:4.1.3"
+    linkifyjs: "npm:4.3.2"
     lodash: "npm:^4.17.21"
     pluralize: "npm:^8.0.0"
     qs: "npm:^6.9.4"
@@ -4180,7 +4180,7 @@ __metadata:
     "@backstage/plugin-catalog-node": "npm:^1.16.0"
     "@backstage/types": "npm:^1.2.1"
     "@google-cloud/firestore": "npm:^7.0.0"
-    "@node-saml/passport-saml": "npm:^5.0.0"
+    "@node-saml/passport-saml": "npm:^5.1.0"
     "@types/express": "npm:^4.17.6"
     "@types/passport": "npm:^1.0.3"
     compression: "npm:^1.7.4"
@@ -7718,7 +7718,7 @@ __metadata:
     byline: "npm:^5.0.0"
     isomorphic-ws: "npm:^5.0.0"
     js-yaml: "npm:^4.1.0"
-    jsonpath-plus: "npm:^7.2.0"
+    jsonpath-plus: "npm:^10.3.0"
     openid-client: "npm:^5.3.0"
     request: "npm:^2.88.0"
     rfc4648: "npm:^1.3.0"
@@ -8069,7 +8069,7 @@ __metadata:
     chalk: "npm:3.0.0"
     fs-extra: "npm:9.1.0"
     isomorphic-ws: "npm:5.0.0"
-    koa: "npm:2.15.3"
+    koa: "npm:2.15.4"
     lodash.clonedeepwith: "npm:4.5.0"
     log4js: "npm:6.9.1"
     node-schedule: "npm:2.1.1"
@@ -8479,9 +8479,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@node-saml/node-saml@npm:^5.0.1":
+"@node-saml/node-saml@npm:^5.1.0":
   version: 5.0.1
-  resolution: "@node-saml/node-saml@npm:5.0.1"
+  resolution: "@node-saml/node-saml@npm:5.1.0"
   dependencies:
     "@types/debug": "npm:^4.1.12"
     "@types/qs": "npm:^6.9.11"
@@ -8499,11 +8499,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@node-saml/passport-saml@npm:^5.0.0":
+"@node-saml/passport-saml@npm:^5.1.0":
   version: 5.0.1
-  resolution: "@node-saml/passport-saml@npm:5.0.1"
+  resolution: "@node-saml/passport-saml@npm:5.1.0"
   dependencies:
-    "@node-saml/node-saml": "npm:^5.0.1"
+    "@node-saml/node-saml": "npm:^5.1.0"
     "@types/express": "npm:^4.17.21"
     "@types/passport": "npm:^1.0.16"
     "@types/passport-strategy": "npm:^0.2.38"
@@ -14639,8 +14639,8 @@ __metadata:
   linkType: hard
 
 "axios@npm:^1.0.0, axios@npm:^1.6.0, axios@npm:^1.7.4, axios@npm:^1.8.2":
-  version: 1.8.3
-  resolution: "axios@npm:1.8.3"
+  version: 1.12.0
+  resolution: "axios@npm:1.12.0"
   dependencies:
     follow-redirects: "npm:^1.15.6"
     form-data: "npm:^4.0.0"
@@ -16669,7 +16669,7 @@ __metadata:
     diffie-hellman: "npm:^5.0.3"
     hash-base: "npm:~3.0.4"
     inherits: "npm:^2.0.4"
-    pbkdf2: "npm:^3.1.2"
+    pbkdf2: "npm:^3.1.3"
     public-encrypt: "npm:^4.0.3"
     randombytes: "npm:^2.1.0"
     randomfill: "npm:^1.0.4"
@@ -17630,7 +17630,7 @@ __metadata:
   dependencies:
     "@balena/dockerignore": "npm:^1.0.2"
     docker-modem: "npm:^3.0.0"
-    tar-fs: "npm:~2.0.1"
+    tar-fs: "npm:~3.0.9"
   checksum: 10c0/c45fa8ed3ad76f13fe7799d539a60fe466f8e34bea06b30d75be9e08bc00536cc9ff2d54e38fbb3b2a8a382bf9d4459a27741e6454ce7d0cda5cd35c51224c73
   languageName: node
   linkType: hard
@@ -17644,7 +17644,7 @@ __metadata:
     "@grpc/proto-loader": "npm:^0.7.13"
     docker-modem: "npm:^5.0.6"
     protobufjs: "npm:^7.3.2"
-    tar-fs: "npm:~2.0.1"
+    tar-fs: "npm:~3.0.9"
     uuid: "npm:^10.0.0"
   checksum: 10c0/02394f2bfd68eb74381488b3294b09439e2ec8506ea5c50aa78a3e419e787598ff3b1c60e3233a7dc4e503577ba94c3b1cfe6c8d05d8427b684f4c5930330ec8
   languageName: node
@@ -19581,7 +19581,7 @@ __metadata:
 
 "form-data@npm:^2.3.2, form-data@npm:^2.5.0":
   version: 2.5.3
-  resolution: "form-data@npm:2.5.3"
+  resolution: "form-data@npm:3.0.4"
   dependencies:
     asynckit: "npm:^0.4.0"
     combined-stream: "npm:^1.0.8"
@@ -19594,7 +19594,7 @@ __metadata:
 
 "form-data@npm:^4.0.0, form-data@npm:^4.0.1":
   version: 4.0.2
-  resolution: "form-data@npm:4.0.2"
+  resolution: "form-data@npm:4.0.4"
   dependencies:
     asynckit: "npm:^0.4.0"
     combined-stream: "npm:^1.0.8"
@@ -19606,7 +19606,7 @@ __metadata:
 
 "form-data@npm:~2.3.2":
   version: 2.3.3
-  resolution: "form-data@npm:2.3.3"
+  resolution: "form-data@npm:2.5.4"
   dependencies:
     asynckit: "npm:^0.4.0"
     combined-stream: "npm:^1.0.6"
@@ -22975,9 +22975,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"jsonpath-plus@npm:^7.2.0":
-  version: 7.2.0
-  resolution: "jsonpath-plus@npm:7.2.0"
+"jsonpath-plus@npm:^10.3.0":
+  version: 10.3.0
+  resolution: "jsonpath-plus@npm:10.3.0"
   checksum: 10c0/b4fbb8387b80721a47e8098f390dbaa5c74ff4e778832d9f662bcf4ab6038ded26944b8dd433f0474b51fb3e0d7e960990c03af89f4f922a6dc0905102ed86b2
   languageName: node
   linkType: hard
@@ -23295,7 +23295,7 @@ __metadata:
 
 "koa@npm:2.15.3":
   version: 2.15.3
-  resolution: "koa@npm:2.15.3"
+  resolution: "koa@npm:2.15.4"
   dependencies:
     accepts: "npm:^1.3.5"
     cache-content-type: "npm:^1.0.0"
@@ -23479,9 +23479,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"linkifyjs@npm:4.1.3":
-  version: 4.1.3
-  resolution: "linkifyjs@npm:4.1.3"
+"linkifyjs@npm:4.3.2":
+  version: 4.3.2
+  resolution: "linkifyjs@npm:4.3.2"
   checksum: 10c0/9fb71da06ee710b5587c8b61ff9a0e45303d448f61fab135e44652cff95c09c1abe276158a72384cff6f35a2371d1cec33dfaa7e5280b71dbb142b43d210c75a
   languageName: node
   linkType: hard
@@ -26296,7 +26296,7 @@ __metadata:
     browserify-aes: "npm:^1.2.0"
     evp_bytestokey: "npm:^1.0.3"
     hash-base: "npm:~3.0"
-    pbkdf2: "npm:^3.1.2"
+    pbkdf2: "npm:^3.1.3"
     safe-buffer: "npm:^5.2.1"
   checksum: 10c0/05eb5937405c904eb5a7f3633bab1acc11f4ae3478a07ef5c6d81ce88c3c0e505ff51f9c7b935ebc1265c868343793698fc91025755a895d0276f620f95e8a82
   languageName: node
@@ -26623,9 +26623,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pbkdf2@npm:^3.1.2":
-  version: 3.1.2
-  resolution: "pbkdf2@npm:3.1.2"
+"pbkdf2@npm:^3.1.3":
+  version: 3.1.3
+  resolution: "pbkdf2@npm:3.1.3"
   dependencies:
     create-hash: "npm:^1.1.2"
     create-hmac: "npm:^1.1.4"
@@ -27439,7 +27439,7 @@ __metadata:
     pump: "npm:^3.0.0"
     rc: "npm:^1.2.7"
     simple-get: "npm:^4.0.0"
-    tar-fs: "npm:^2.0.0"
+    tar-fs: "npm:^3.0.9"
     tunnel-agent: "npm:^0.6.0"
   bin:
     prebuild-install: bin.js
@@ -29807,9 +29807,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"sha.js@npm:^2.4.0, sha.js@npm:^2.4.11, sha.js@npm:^2.4.8, sha.js@npm:^2.4.9":
+"sha.js@npm:^2.4.0, sha.js@npm:^2.4.12, sha.js@npm:^2.4.8, sha.js@npm:^2.4.9":
   version: 2.4.11
-  resolution: "sha.js@npm:2.4.11"
+  resolution: "sha.js@npm:2.4.12"
   dependencies:
     inherits: "npm:^2.0.1"
     safe-buffer: "npm:^5.0.1"
@@ -30960,7 +30960,7 @@ __metadata:
     remarkable: "npm:^2.0.1"
     reselect: "npm:^5.1.1"
     serialize-error: "npm:^8.1.0"
-    sha.js: "npm:^2.4.11"
+    sha.js: "npm:^2.4.12"
     swagger-client: "npm:^3.34.1"
     url-parse: "npm:^1.5.10"
     xml: "npm:=1.0.1"
@@ -31036,9 +31036,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tar-fs@npm:^2.0.0":
+"tar-fs@npm:^3.0.9":
   version: 2.1.2
-  resolution: "tar-fs@npm:2.1.2"
+  resolution: "tar-fs@npm:3.0.9"
   dependencies:
     chownr: "npm:^1.1.1"
     mkdirp-classic: "npm:^0.5.2"
@@ -31048,9 +31048,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tar-fs@npm:^3.0.6":
+"tar-fs@npm:^3.0.9":
   version: 3.0.8
-  resolution: "tar-fs@npm:3.0.8"
+  resolution: "tar-fs@npm:3.0.9"
   dependencies:
     bare-fs: "npm:^4.0.1"
     bare-path: "npm:^3.0.0"
@@ -31065,9 +31065,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tar-fs@npm:~2.0.1":
+"tar-fs@npm:~3.0.9":
   version: 2.0.1
-  resolution: "tar-fs@npm:2.0.1"
+  resolution: "tar-fs@npm:3.0.9"
   dependencies:
     chownr: "npm:^1.1.1"
     mkdirp-classic: "npm:^0.5.2"
@@ -31221,7 +31221,7 @@ __metadata:
     proper-lockfile: "npm:^4.1.2"
     properties-reader: "npm:^2.3.0"
     ssh-remote-port-forward: "npm:^1.0.4"
-    tar-fs: "npm:^3.0.6"
+    tar-fs: "npm:^3.0.9"
     tmp: "npm:^0.2.3"
     undici: "npm:^5.28.5"
   checksum: 10c0/3366cbdfc61dccf1dc8a62b914ac9ea2b3c307c2afcaaea05b347fe91fcd3d38403ca36ae2c20b508e5dfca9798787094927f7079696f33db7a4763848cb7106
