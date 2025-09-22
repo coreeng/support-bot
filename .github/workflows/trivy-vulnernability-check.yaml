@@ -1,0 +1,44 @@
+name: Trivy Vulnerability Scan
+
+on:
+  pull_request:
+
+jobs:
+  trivy-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+
+      - name: Run Trivy on api/service
+        continue-on-error: true
+        run: trivy fs --severity CRITICAL,HIGH --format sarif --output service.sarif api/service
+
+      - name: Upload service SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: service.sarif
+          category: trivy-service
+
+      - name: Run Trivy on api/integration-tests
+        continue-on-error: true
+        run: trivy fs --severity CRITICAL,HIGH --format sarif --output int.sarif api/integration-tests
+
+      - name: Upload integration-tests SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: int.sarif
+          category: trivy-integration
+
+      - name: Run Trivy on api/functional
+        continue-on-error: true
+        run: trivy fs --severity CRITICAL,HIGH --format sarif --output functional.sarif api/functional
+
+      - name: Upload functional SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: functional.sarif
+          category: trivy-functional
