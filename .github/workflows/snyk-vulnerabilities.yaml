@@ -20,26 +20,61 @@ jobs:
         with:
           version: 'latest'
 
-      - name: Run Snyk test
-        id: snyk_test
+      - name: Run Snyk test for service
+        id: snyk_service
         continue-on-error: true
         run: |
           snyk test api/service --severity-threshold=critical --sarif-file-output=service.sarif
-          snyk test api/integration-tests --severity-threshold=critical --sarif-file-output=int.sarif
-          snyk test api/functional --severity-threshold=critical --sarif-file-output=functional.sarif
-          
-          jq -s '{runs: map(.runs[]) }' service.sarif int.sarif functional.sarif > snyk.sarif
-          
+                    
           echo "snyk_exit_code=$?" >> $GITHUB_OUTPUT
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
 
-      - name: Upload Snyk SARIF to GitHub Security tab
+      - name: Upload service SARIF
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: snyk.sarif
+          sarif_file: service.sarif
+          category: snyk-service
 
-      - name: Fail workflow if critical vulnerabilities found
-        if: steps.snyk_test.outputs.snyk_exit_code != '0'
+      - name: Fail workflow if critical vulnerabilities in service
+        if: steps.snyk_service.outputs.snyk_exit_code != '0'
+        run: exit 1
+
+      - name: Run Snyk test and upload SARIF for integration-tests
+        id: snyk_integration
+        continue-on-error: true
+        run: |
+          snyk test api/integration-tests --severity-threshold=critical --sarif-file-output=int.sarif
+          echo "snyk_exit_code=$?" >> $GITHUB_OUTPUT
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Upload integration-tests SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: int.sarif
+          category: snyk-integration
+
+      - name: Fail workflow if critical vulnerabilities in integration-tests
+        if: steps.snyk_integration.outputs.snyk_exit_code != '0'
+        run: exit 1
+
+      - name: Run Snyk test and upload SARIF for functional
+        id: snyk_functional
+        continue-on-error: true
+        run: |
+          snyk test api/functional --severity-threshold=critical --sarif-file-output=functional.sarif
+          echo "snyk_exit_code=$?" >> $GITHUB_OUTPUT
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Upload functional SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: functional.sarif
+          category: snyk-functional
+
+      - name: Fail workflow if critical vulnerabilities in functional
+        if: steps.snyk_functional.outputs.snyk_exit_code != '0'
         run: exit 1
