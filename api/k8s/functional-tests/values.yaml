@@ -1,0 +1,26 @@
+image:
+  repository: support-bot-functional-tests
+  tag: latest
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+job:
+  restartPolicy: Never
+  backoffLimit: 0
+  activeDeadlineSeconds: 60
+  parallelism: 1
+  completions: 1
+
+resources:
+  requests:
+    cpu: 256m
+    memory: 256m
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
