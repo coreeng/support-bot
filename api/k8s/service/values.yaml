@@ -1,8 +1,6 @@
 image:
-#  repository: support-bot
-#  tag: ""
-  repository: europe-west2-docker.pkg.dev/core-platform-efb3c84c/tenant/support-bot/fast-feedback/support-bot
-  tag: 0.0.34-abc21cb2757db9d581f423c95dae371e02745883
+  repository: support-bot
+  tag: ""
   pullPolicy: IfNotPresent
 
 nameOverride: ""

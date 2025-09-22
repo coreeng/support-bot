@@ -1,0 +1,14 @@
+configMap:
+  create: false
+
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: functionaltests
+  - name: SLACK_CLIENT_METHODS_BASE_URL
+    value: "http://support-bot-functional-tests-wiremock:8000/api/"
+  - name: DB_URL
+    value: "jdbc:postgresql://support-bot-db-postgresql:5432/supportbot"
+  - name: DB_USERNAME
+    value: "supportbot"
+  - name: DB_PASSWORD
+    value: "supportbotpassword"

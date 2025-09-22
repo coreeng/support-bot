@@ -1,7 +1,5 @@
 package com.coreeng.supportbot.testkit;
 
-import com.coreeng.supportbot.wiremock.SlackWiremock;
-
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor

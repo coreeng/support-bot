@@ -5,8 +5,6 @@ import java.time.Duration;
 import static org.awaitility.Awaitility.await;
 import org.jspecify.annotations.NonNull;
 
-import com.coreeng.supportbot.wiremock.SlackWiremock;
-
 import lombok.Builder;
 import lombok.Getter;
 
