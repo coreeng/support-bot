@@ -16,12 +16,37 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
       - name: Set up Snyk CLI
         uses: snyk/actions/setup@master
         with:
           version: 'latest'
 
+      - name: Install snyk-to-sarif
+        run: npm install -g snyk-to-sarif
+
       - name: Run Snyk test
-        run: snyk test --all-projects --exclude=ui --severity-threshold=critical
+        run: |
+          snyk test --all-projects --exclude=ui --severity-threshold=critical --json > snyk.json || true
+          
+          snyk-to-sarif snyk.json -o snyk.sarif
+          CRITICAL_FOUND=$(jq '.vulnerabilities | map(select(.severity=="critical")) | length' snyk.json)
+          echo "critical_found=$CRITICAL_FOUND" >> $GITHUB_OUTPUT
+
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Upload Snyk SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: snyk.sarif
+
+      - name: Fail if critical vulnerabilities found
+        if: steps.snyk_test.outputs.critical_found != '0'
+        run: |
+          echo "Critical vulnerabilities found! Failing workflow."
+          exit 1
