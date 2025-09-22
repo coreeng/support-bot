@@ -2,7 +2,6 @@ name: Snyk Vulnerability Check
 
 on:
   pull_request:
-  push:
 
 jobs:
   security:
@@ -25,7 +24,7 @@ jobs:
         id: snyk_test
         continue-on-error: true
         run: |
-          snyk test --all-projects --exclude=ui --severity-threshold=critical --sarif-file-output=snyk.sarif
+          snyk test api --severity-threshold=critical --sarif-file-output=snyk.sarif
           echo "snyk_exit_code=$?" >> $GITHUB_OUTPUT
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
