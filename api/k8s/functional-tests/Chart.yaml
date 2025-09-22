@@ -1,0 +1,10 @@
+apiVersion: v2
+name: support-bot-functional-tests
+description: Helm chart for Support Bot functional tests job
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+
+
+

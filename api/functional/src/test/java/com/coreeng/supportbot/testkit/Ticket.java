@@ -10,7 +10,6 @@ import static org.awaitility.Awaitility.await;
 import org.jspecify.annotations.NonNull;
 
 import com.coreeng.supportbot.Config;
-import com.coreeng.supportbot.wiremock.SlackWiremock;
 import com.google.common.collect.ImmutableList;
 
 import lombok.Builder;
@@ -286,15 +285,6 @@ public class Ticket implements SearchableForTicket {
                 }
             }
             throw new IllegalArgumentException("Unknown ticket status code: " + code);
-        }
-
-        public static Status fromLabel(String label) {
-            for (Status s : values()) {
-                if (s.label.equals(label)) {
-                    return s;
-                }
-            }
-            throw new IllegalArgumentException("Unknown ticket status label: " + label);
         }
 
         public static Status fromColor(String colorHex) {

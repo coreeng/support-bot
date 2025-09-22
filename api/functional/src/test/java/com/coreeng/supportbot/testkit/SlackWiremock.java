@@ -1,4 +1,4 @@
-package com.coreeng.supportbot.wiremock;
+package com.coreeng.supportbot.testkit;
 
 import java.util.Map;
 
@@ -7,15 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.coreeng.supportbot.Config;
-import com.coreeng.supportbot.testkit.MessageToGet;
-import com.coreeng.supportbot.testkit.MessageTs;
-import com.coreeng.supportbot.testkit.MessageUpdatedExpectation;
-import com.coreeng.supportbot.testkit.ReactionAddedExpectation;
-import com.coreeng.supportbot.testkit.Stub;
-import com.coreeng.supportbot.testkit.StubWithResult;
-import com.coreeng.supportbot.testkit.ThreadMessagePostedExpectation;
-import com.coreeng.supportbot.testkit.UserProfileToGet;
-import com.coreeng.supportbot.testkit.ViewsOpenExpectation;
 import com.coreeng.supportbot.testkit.matcher.UrlDecodedPattern;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;

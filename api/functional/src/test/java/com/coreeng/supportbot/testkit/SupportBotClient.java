@@ -4,7 +4,6 @@ import java.time.Instant;
 
 import org.jspecify.annotations.NonNull;
 
-import com.coreeng.supportbot.wiremock.SlackWiremock;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.core.JsonParser;
@@ -121,7 +120,7 @@ public class SupportBotClient {
         private ImmutableList<@NonNull String> tags;
         private ImmutableList<Ticket.@NonNull StatusLog> logs;
         private boolean escalated;
-        private ImmutableList<Escalation> escalations;
+        private ImmutableList<@NonNull Escalation> escalations;
     }
 
     public record QueryResponse(String link, Instant date, MessageTs ts) {}
