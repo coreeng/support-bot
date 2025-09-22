@@ -30,3 +30,18 @@ jobs:
       app-name: support-bot
       version: ${{ needs.version.outputs.version }}
       working-directory: ./
+
+  trivy_scan:
+    needs: [ fastfeedback ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Trivy
+        uses: aquasecurity/trivy-action@0.20.0
+
+      - name: Scan Docker image
+        run: |
+          echo "Scanning Docker image with Trivy..."
+          trivy image --severity CRITICAL,HIGH support-bot:${{ needs.version.outputs.version }}
