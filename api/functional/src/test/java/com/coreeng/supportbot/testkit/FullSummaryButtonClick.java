@@ -2,8 +2,6 @@ package com.coreeng.supportbot.testkit;
 
 import org.jspecify.annotations.NonNull;
 
-import com.coreeng.supportbot.wiremock.SlackWiremock;
-
 import lombok.Builder;
 import lombok.Getter;
 

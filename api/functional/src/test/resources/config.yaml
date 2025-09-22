@@ -16,12 +16,6 @@ mocks:
         email: sana.chernobog@company.com
       - name: Jean Kristijan
         email: jean.kristijan@company.com
-  kubernetes:
-    port: 8001
-  azure:
-    port: 8002
-  gcp:
-    port: 8003
 
 tenants:
   - name: wow
@@ -86,4 +80,4 @@ users:
 
 supportBot:
   token: dummy-token-dummy-token
-  baseUrl: http://localhost:8080
+  baseUrl: ${SERVICE_ENDPOINT:http://localhost:8080}

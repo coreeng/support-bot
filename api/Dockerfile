@@ -25,7 +25,7 @@ RUN service postgresql start && sleep 6 && \
     ./gradlew -Ddocker=true :service:jooqCodegen :service:build -Pversion="${P2P_VERSION}" --no-daemon
 
 ## Final stage
-FROM registry.access.redhat.com/ubi8/openjdk-21:1.21
+FROM registry.access.redhat.com/ubi8/openjdk-21-runtime:1.23
 WORKDIR /app
 COPY --from=build /build/service/build/libs/service-*.jar /app/service.jar
 

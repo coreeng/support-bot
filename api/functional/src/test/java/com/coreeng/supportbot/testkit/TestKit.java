@@ -1,14 +1,13 @@
 package com.coreeng.supportbot.testkit;
 
 import com.coreeng.supportbot.Config;
-import com.coreeng.supportbot.wiremock.WiremockManager;
 
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 public class TestKit {
-    private final WiremockManager wiremockManager;
+    private final SlackWiremock slackWiremock;
     private final SupportBotSlackClient supportBotSlackClient;
     private final SupportBotClient supportBotClient;
     private final Config config;
@@ -22,11 +21,11 @@ public class TestKit {
         private final UserRole role;
 
         public SlackTestKit slack() {
-            return new SlackTestKit(this, wiremockManager.slackWiremock, supportBotSlackClient);
+            return new SlackTestKit(this, slackWiremock, supportBotSlackClient);
         }
         
         public TicketTestKit ticket() {
-            return new TicketTestKit(this, supportBotClient, wiremockManager.slackWiremock, config);
+            return new TicketTestKit(this, supportBotClient, slackWiremock, config);
         }
         
         public String userId() {

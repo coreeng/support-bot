@@ -8,7 +8,6 @@ import org.apache.commons.text.StringEscapeUtils;
 import org.apache.commons.text.StringSubstitutor;
 
 import com.coreeng.supportbot.Config;
-import com.coreeng.supportbot.wiremock.SlackWiremock;
 
 import static io.restassured.RestAssured.given;
 import io.restassured.filter.log.LogDetail;
@@ -219,7 +218,7 @@ public class SupportBotSlackClient {
                 """, RandomStringUtils.secure().nextAlphabetic(5), value.name(), value.renderJson())
             )
             .collect(Collectors.joining(","));
-        String payload = StringSubstitutor.replace("""
+        return StringSubstitutor.replace("""
             {
                 "type": "view_submission",
                 "user": {
@@ -252,6 +251,5 @@ public class SupportBotSlackClient {
                 "valuesJson", valuesJson
             )
         );
-        return payload;
     }
 }

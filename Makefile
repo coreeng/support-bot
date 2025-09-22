@@ -166,46 +166,16 @@ deploy-nft:
 deploy-extended-test:
 	@echo "WARNING: $@ not implemented"
 
-.PHONY: deploy-%
-deploy-%: ## Deploy mathing target `deploy-%`
-	helm repo add bitnami https://charts.bitnami.com/bitnami
-	helm upgrade --install "$(p2p_app_name)-db" bitnami/postgresql -n "$(p2p_namespace)" \
-		--set global.postgresql.auth.postgresPassword=rootpassword \
-		--set global.postgresql.auth.username=supportbot \
-		--set global.postgresql.auth.password=supportbotpassword \
-		--set global.postgresql.auth.database=supportbot \
-		--set primary.pdb.create=false \
-		--atomic
-	helm repo add core-platform-assets https://coreeng.github.io/core-platform-assets
-	helm upgrade --install "$(p2p_app_name)" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
-		-f api/helm-values.yaml \
-		--set nameOverride="$(p2p_app_name)" \
-		--set tenantName="$(p2p_tenant_name)" \
-		--set image.repository="$(p2p_registry)/$(p2p_app_name)" \
-		--set image.tag="$(p2p_version)" \
-		--set ingress.appUrlSuffix="$(p2p_app_url_suffix)" \
-		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
-		--set serviceAccount.annotations.iam\\.gke\\.io/gcp-service-account="$(p2p_tenant_name)-ca@$(PROJECT_ID).iam.gserviceaccount.com" \
-		--set envVarsMap.DB_URL="jdbc:postgresql://$(p2p_app_name)-db-postgresql.$(p2p_namespace).svc.cluster.local:5432/supportbot" \
-		--set envVarsMap.DB_USERNAME="supportbot" \
-		--set envVarsMap.DB_PASSWORD="supportbotpassword" \
-		--set envVarsMap.SLACK_TOKEN="$${SUPPORT_BOT_SLACK_TOKEN}" \
-		--set envVarsMap.SLACK_SOCKET_TOKEN="$${SUPPORT_BOT_SLACK_SOCKET_TOKEN}" \
-		--set envVarsMap.SLACK_SIGNING_SECRET="$${SUPPORT_BOT_SLACK_SIGNING_SECRET}" \
-		--set envVarsMap.SLACK_TICKET_CHANNEL_ID="$${SUPPORT_BOT_SLACK_TICKET_CHANNEL_ID}" \
-		--set envVarsMap.SLACK_ESCALATION_CHANNEL_ID="$${SUPPORT_BOT_SLACK_ESCALATION_CHANNEL_ID}" \
-		--atomic
-	helm upgrade --install "$(p2p_app_name)-ui" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
-		-f ui/helm-values.yaml \
-		--set nameOverride="$(p2p_app_name)-ui" \
-		--set tenantName="$(p2p_tenant_name)" \
-		--set image.repository="$(p2p_registry)/$(p2p_app_name)-ui" \
-		--set image.tag="$(p2p_version)" \
-		--set ingress.appUrlSuffix="$(p2p_app_url_suffix)" \
-		--set ingress.domain="$(INTERNAL_SERVICES_DOMAIN)" \
-		--set envVarsMap.SUPPORT_BOT_API_URL="http://$(p2p_app_name):8080" \
-		--atomic
-
+.PHONY: deploy-functional
+deploy-functional: ## Deploy service and DB for functional tests, then run tests
+	NAMESPACE="$(p2p_namespace)" \
+	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
+	SERVICE_IMAGE_TAG="$(p2p_version)" \
+	DB_RELEASE="$(p2p_app_name)-db" \
+	SERVICE_RELEASE="$(p2p_app_name)" \
+	ACTION=deploy \
+	VALUES_FILE=api/k8s/service/values-functional.yaml \
+	./api/scripts/deploy-service.sh
 
 ##@ Run targets
 
@@ -230,18 +200,25 @@ run-app:
 
 
 .PHONY: run-api-functional
-run-api-functional: ## run api functional test
-	@echo "Functional tests are temporarily disabled"
-#	cd api; bash scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" true
+run-api-functional:
+	NAMESPACE="$(p2p_namespace)" \
+	JOB_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)-functional" \
+	IMAGE_TAG="$(p2p_version)" \
+	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
+	SERVICE_IMAGE_TAG="$(p2p_version)" \
+	DEPLOY_SERVICE=false \
+	./api/scripts/run-functional-tests.sh && \
 
-.PHONY: run-ui-functional
-run-ui-functional: ## run ui functional test
-	@echo "WARNING: $@ not implemented"
+	NAMESPACE="$(p2p_namespace)" \
+	SERVICE_RELEASE="$(p2p_app_name)" \
+	DB_RELEASE="$(p2p_app_name)-db" \
+	ACTION=delete \
+	DELETE_DB=true \
+	DEPLOY_DB=true \
+	./api/scripts/deploy-service.sh
 
 .PHONY: run-functional
-run-functional: run-api-functional run-ui-functional ## Run functional tests
-	@echo "WARNING: $@ WIP"
-
+run-functional: run-api-functional
 
 .PHONY: run-nft
 run-nft:
