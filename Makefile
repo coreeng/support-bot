@@ -62,8 +62,7 @@ build-ui-app: lint-ui-app ## Build ui app
 	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" --build-arg P2P_VERSION="$(p2p_version)" ui
 
 .PHONY: build-app
-build-app: build-api-app build-ui-app ## Build api & ui apps
-
+build-app: build-api-app ## Build api & ui apps
 
 
 .PHONY: build-api-functional
@@ -104,7 +103,7 @@ push-ui-app: ## Push ui app
 	docker image push "$(call p2p_image_tag,$(p2p_app_name)-ui)"
 
 .PHONY: push-app ## Push api & ui apps
-push-app: push-api-app push-ui-app
+push-app: push-api-app
 
 .PHONY: push-api-functional
 push-api-functional: ## Push api functional test docker image
@@ -204,13 +203,13 @@ run-api-functional:
 	NAMESPACE="$(p2p_namespace)" \
 	JOB_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)-functional" \
 	IMAGE_TAG="$(p2p_version)" \
-	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
-	SERVICE_IMAGE_TAG="$(p2p_version)" \
 	DEPLOY_SERVICE=false \
-	./api/scripts/run-functional-tests.sh && \
+	./api/scripts/run-functional-tests.sh
 
 	NAMESPACE="$(p2p_namespace)" \
 	SERVICE_RELEASE="$(p2p_app_name)" \
+	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
+	SERVICE_IMAGE_TAG="$(p2p_version)" \
 	DB_RELEASE="$(p2p_app_name)-db" \
 	ACTION=delete \
 	DELETE_DB=true \

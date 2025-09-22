@@ -21,7 +21,7 @@ helm_uninstall_if_exists() {
 }
 
 wait_for_job_with_logs() {
-  local job_name="$1" ns="$2" timeout="${3:-60}" logs_container="${4:-functional-tests}"
+  local job_name="$1" ns="$2" timeout="${3:-60}" logs_container="${4:?logs_container is required}"
   local start
   start=$(date +%s)
   local end=$(( start + timeout ))
