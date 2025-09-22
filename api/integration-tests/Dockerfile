@@ -16,7 +16,7 @@ COPY integration-tests/src integration-tests/src
 
 RUN ./gradlew :integration-tests:jar --no-daemon
 
-FROM registry.access.redhat.com/ubi8/openjdk-21:1.21
+FROM registry.access.redhat.com/ubi8/openjdk-21-runtime:1.23
 WORKDIR /app
 
 COPY --from=builder /usr/local/bin/helm /usr/local/bin/helm

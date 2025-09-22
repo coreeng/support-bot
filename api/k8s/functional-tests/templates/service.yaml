@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "support-bot-functional-tests.fullname" . }}-wiremock
+  labels:
+    {{- include "support-bot-functional-tests.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    job-name: {{ include "support-bot-functional-tests.fullname" . }}
+  ports:
+    - name: slack
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+
+
+
+
