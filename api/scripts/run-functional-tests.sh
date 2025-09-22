@@ -19,8 +19,8 @@ JOB_IMAGE_REPOSITORY="${JOB_IMAGE_REPOSITORY:?JOB_IMAGE_REPOSITORY is required}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 DEPLOY_SERVICE="${DEPLOY_SERVICE:-true}" # if true, deploy service before running tests
 CLEAN_DEPLOY_DB="${CLEAN_DEPLOY_DB:-true}" # controls DB deployment via deploy-service.sh
-SERVICE_IMAGE_REPOSITORY="${SERVICE_IMAGE_REPOSITORY:?SERVICE_IMAGE_REPOSITORY is required}"
-SERVICE_IMAGE_TAG="${SERVICE_IMAGE_TAG:-latest}"
+SERVICE_IMAGE_REPOSITORY="${SERVICE_IMAGE_REPOSITORY:-}"
+SERVICE_IMAGE_TAG="${SERVICE_IMAGE_TAG:-}"
 CLEANUP="${CLEANUP:-true}"
 
 cleanup_all() {
@@ -76,7 +76,7 @@ main() {
     --wait --timeout=1m
   log_success "Functional test job deployed"
 
-  if wait_for_job_with_logs "$JOB_RELEASE" "$NAMESPACE" "$TIMEOUT"; then
+  if wait_for_job_with_logs "$JOB_RELEASE" "$NAMESPACE" "$TIMEOUT" "functional-tests"; then
     log_success "Functional tests passed!"
     exit 0
   else

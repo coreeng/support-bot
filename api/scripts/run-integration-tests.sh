@@ -61,7 +61,7 @@ main() {
 
   deploy_chart
 
-  if wait_for_job_with_logs "$RELEASE_NAME" "$NAMESPACE" "$TIMEOUT"; then
+  if wait_for_job_with_logs "$RELEASE_NAME" "$NAMESPACE" "$TIMEOUT" "integration-tests"; then
     log_success "Integration tests passed!"
     exit 0
   else
