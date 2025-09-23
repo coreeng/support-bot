@@ -58,6 +58,14 @@ jobs:
           scanners: license
           cache-dir: ${{ env.TRIVY_CACHE_DIR }}
 
+      - name: Upload Trivy Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-results
+          path: |
+            trivy-results.json
+            trivy-license-results.json
+
       - name: Summarize Scan Results
         run: |
           echo "# Complete Repository Security Scan Summary" >> $GITHUB_STEP_SUMMARY
@@ -92,32 +100,42 @@ jobs:
           summarize_trivy trivy-results.json "Vulnerability/Secret/Config"
           summarize_trivy trivy-license-results.json "License"
 
+      - name: Fail if Critical Vulns Found
+        run: |
+          CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-results.json || echo 0)
+          if [ "$CRIT" -gt 0 ]; then
+            echo "❌ Found $CRIT critical vulnerabilities"
+            exit 1
+          else
+            echo "✅ No critical vulnerabilities found"
+          fi
+
       - name: Comment on PR with findings
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-      
+            
             const files = [
               { path: 'trivy-results.json', type: 'Vulnerability/Secret/Config' },
               { path: 'trivy-license-results.json', type: 'License' }
             ];
-      
+            
             let comment = '# Complete Repository Security Scan Report\n\n';
             const now = new Date();
             comment += `**Date:** ${now.toISOString().split('T')[0]}\n`;
             comment += `**Branch:** ${context.payload.pull_request.head.ref}\n\n`;
-      
+            
             for (const f of files) {
               if (!fs.existsSync(f.path)) {
                 comment += `**${f.type} scan results not found.**\n\n`;
                 continue;
               }
-      
+            
               const data = JSON.parse(fs.readFileSync(f.path, 'utf8'));
               let total = 0, vulns = 0, misconfigs = 0, secrets = 0, licenses = 0;
-      
+            
               for (const r of data.Results || []) {
                 vulns += (r.Vulnerabilities?.length || 0);
                 misconfigs += (r.Misconfigurations?.length || 0);
@@ -125,7 +143,7 @@ jobs:
                 licenses += (r.Licenses?.length || 0);
               }
               total = vulns + misconfigs + secrets + licenses;
-      
+            
               comment += `### ${f.type} Scan\n`;
               comment += '| Category | Count |\n|----------|-------|\n';
               comment += `| Vulnerabilities | ${vulns} |\n`;
@@ -133,8 +151,18 @@ jobs:
               comment += `| Secrets | ${secrets} |\n`;
               comment += `| Licenses | ${licenses} |\n`;
               comment += `| **Total Issues** | **${total}** |\n\n`;
-      
-              // Vulnerabilities details
+            
+              if (f.type === 'License' && licenses > 0) {
+                comment += `#### License Details\n| Package | License |\n|---------|---------|\n`;
+                for (const target of data.Results || []) {
+                  if (!target.Licenses?.length) continue;
+                  for (const l of target.Licenses) {
+                    comment += `| ${l.PkgName} | ${l.License} |\n`;
+                  }
+                }
+                comment += '\n';
+              }
+            
               if (vulns > 0) {
                 comment += `#### Vulnerabilities Details (Top 10 per target)\n| Severity | Package | Installed Version | Fixed Version | CVE |\n|----------|---------|-----------------|---------------|-----|\n`;
                 for (const target of data.Results || []) {
@@ -150,8 +178,7 @@ jobs:
                 }
                 comment += '\n';
               }
-      
-              // Misconfigurations (all, collapsible)
+            
               if (misconfigs > 0) {
                 comment += `#### Misconfigurations Details\n| Severity | ID | Message |\n|----------|----|--------|\n`;
                 for (const target of data.Results || []) {
@@ -163,8 +190,7 @@ jobs:
                 }
                 comment += '\n';
               }
-      
-              // Secrets (all, collapsible)
+            
               if (secrets > 0) {
                 comment += `#### Secrets Details\n| Rule | Match |\n|------|-------|\n`;
                 for (const target of data.Results || []) {
@@ -177,19 +203,17 @@ jobs:
                 comment += '\n';
               }
             }
-      
+            
             if (files.every(f => !fs.existsSync(f.path))) {
               comment += '⚠️ No scan results found.\n';
             }
-      
-            comment += '\n---\n_Scan by [Trivy](https://github.com/aquasecurity/trivy)_';
-      
+            
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-      
+            
             const existing = comments.find(c => c.body.startsWith('# Complete Repository Security Scan Report'));
             if (existing) {
               await github.rest.issues.updateComment({
