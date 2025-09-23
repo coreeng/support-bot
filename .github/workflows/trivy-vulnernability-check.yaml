@@ -77,22 +77,6 @@ jobs:
           cp trivy-results.json trivy-artifacts/
           cp trivy-license-results.json trivy-artifacts/
 
-      - name: Fail on Critical Misconfigurations
-        run: |
-          CRIT=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="CRITICAL")] | length' trivy-results.json)
-          if [ "$CRIT" -gt 0 ]; then
-          echo "❌ Critical misconfigurations found: $CRIT"
-          exit 1
-          fi
-
-      - name: Fail on Critical Vulnerabilities
-        run: |
-          CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-results.json)
-          if [ "$CRIT" -gt 0 ]; then
-            echo "❌ Critical vulnerabilities found: $CRIT"
-            exit 1
-          fi
-
       - name: Comment on PR with findings
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
@@ -219,3 +203,19 @@ jobs:
                 body: comment
               });
             }
+
+      - name: Fail on Critical Misconfigurations
+        run: |
+          CRIT=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="CRITICAL")] | length' trivy-results.json)
+          if [ "$CRIT" -gt 0 ]; then
+          echo "❌ Critical misconfigurations found: $CRIT"
+          exit 1
+          fi
+
+      - name: Fail on Critical Vulnerabilities
+        run: |
+          CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-results.json)
+          if [ "$CRIT" -gt 0 ]; then
+            echo "❌ Critical vulnerabilities found: $CRIT"
+            exit 1
+          fi
