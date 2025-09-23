@@ -1,18 +1,37 @@
 package com.coreeng.supportbot.teams.rest;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HelmClient {
     private static final Logger log = LoggerFactory.getLogger(HelmClient.class);
 
-    public void install(String releaseName, String chartPath, String namespace) throws IOException, InterruptedException {
+    public void install(String releaseName, String chartPath, String namespace, Map<String, String> values) throws IOException, InterruptedException {
         log.info("Attempting to deploy Helm chart...");
-        ProcessBuilder helmProcessBuilder = new ProcessBuilder("helm", "install", releaseName, chartPath, "--namespace", namespace, "--atomic", "--wait");
+        List<String> command = new ArrayList<>();
+        command.add("helm");
+        command.add("install");
+        command.add(releaseName);
+        command.add(chartPath);
+        command.add("--namespace");
+        command.add(namespace);
+        if (values != null && !values.isEmpty()) {
+            for (Map.Entry<String, String> entry : values.entrySet()) {
+                command.add("--set");
+                command.add(entry.getKey() + "=" + entry.getValue());
+            }
+        }
+        command.add("--atomic");
+        command.add("--wait");
+
+        ProcessBuilder helmProcessBuilder = new ProcessBuilder(command);
         helmProcessBuilder.inheritIO();
         Process helmInstallProcess = helmProcessBuilder.start();
         int helmExitCode = helmInstallProcess.waitFor();
