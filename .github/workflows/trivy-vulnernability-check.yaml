@@ -62,7 +62,7 @@ jobs:
         run: |
           echo "# Complete Repository Security Scan Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-
+          
           summarize_trivy() {
             local file=$1
             local type=$2
@@ -70,19 +70,15 @@ jobs:
               TOTAL=$(jq '[.Results[] | (.Vulnerabilities // []) + (.Misconfigurations // []) + (.Secrets // []) + (.Licenses // [])] | length' "$file" || echo 0)
               CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' "$file" || echo 0)
               HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' "$file" || echo 0)
-              MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' "$file" || echo 0)
-              LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' "$file" || echo 0)
               MIS=$(jq '[.Results[]?.Misconfigurations[]?] | length' "$file" || echo 0)
               SECRETS=$(jq '[.Results[]?.Secrets[]?] | length' "$file" || echo 0)
               LICENSES=$(jq '[.Results[]?.Licenses[]?] | length' "$file" || echo 0)
-
+          
               echo "### $type Scan" >> $GITHUB_STEP_SUMMARY
               echo "| Type | Severity | Count |" >> $GITHUB_STEP_SUMMARY
               echo "|------|----------|-------|" >> $GITHUB_STEP_SUMMARY
               echo "| Vulnerabilities | Critical | $CRIT |" >> $GITHUB_STEP_SUMMARY
               echo "| Vulnerabilities | High | $HIGH |" >> $GITHUB_STEP_SUMMARY
-              echo "| Vulnerabilities | Medium | $MED |" >> $GITHUB_STEP_SUMMARY
-              echo "| Vulnerabilities | Low | $LOW |" >> $GITHUB_STEP_SUMMARY
               echo "| Misconfigurations | - | $MIS |" >> $GITHUB_STEP_SUMMARY
               echo "| Secrets | - | $SECRETS |" >> $GITHUB_STEP_SUMMARY
               echo "| Licenses | - | $LICENSES |" >> $GITHUB_STEP_SUMMARY
@@ -92,7 +88,7 @@ jobs:
               echo "**$type scan file not found.**" >> $GITHUB_STEP_SUMMARY
             fi
           }
-
+          
           summarize_trivy trivy-results.json "Vulnerability/Secret/Config"
           summarize_trivy trivy-license-results.json "License"
 
@@ -102,26 +98,26 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-
+            
             const files = [
               { path: 'trivy-results.json', type: 'Vulnerability/Secret/Config' },
               { path: 'trivy-license-results.json', type: 'License' }
             ];
-
+            
             let comment = '# Complete Repository Security Scan Report\n\n';
             const now = new Date();
             comment += `**Date:** ${now.toISOString().split('T')[0]}\n`;
             comment += `**Branch:** ${context.payload.pull_request.head.ref}\n\n`;
-
+            
             for (const f of files) {
               if (!fs.existsSync(f.path)) {
                 comment += `**${f.type} scan results not found.**\n\n`;
                 continue;
               }
-
+            
               const data = JSON.parse(fs.readFileSync(f.path, 'utf8'));
               let total = 0, vulns = 0, misconfigs = 0, secrets = 0, licenses = 0;
-
+            
               for (const r of data.Results || []) {
                 vulns += (r.Vulnerabilities?.length || 0);
                 misconfigs += (r.Misconfigurations?.length || 0);
@@ -129,7 +125,7 @@ jobs:
                 licenses += (r.Licenses?.length || 0);
               }
               total = vulns + misconfigs + secrets + licenses;
-
+            
               comment += `### ${f.type} Scan\n`;
               comment += '| Category | Count |\n|----------|-------|\n';
               comment += `| Vulnerabilities | ${vulns} |\n`;
@@ -137,20 +133,35 @@ jobs:
               comment += `| Secrets | ${secrets} |\n`;
               comment += `| Licenses | ${licenses} |\n`;
               comment += `| **Total Issues** | **${total}** |\n\n`;
+            
+              // Detailed Vulnerabilities Table
+              if (r.Vulnerabilities?.length) {
+                comment += `#### Vulnerabilities Details (Top 10 per target)\n| Severity | Package | Version | CVE |\n|----------|---------|---------|-----|\n`;
+                for (const target of data.Results || []) {
+                  if (!target.Vulnerabilities?.length) continue;
+                  for (const v of target.Vulnerabilities.slice(0,10)) {
+                    comment += `| ${v.Severity} | ${v.PkgName} | ${v.InstalledVersion} | ${v.VulnerabilityID} |\n`;
+                  }
+                  if (target.Vulnerabilities.length > 10) {
+                    comment += `*...and ${target.Vulnerabilities.length - 10} more for ${target.Target}*\n`;
+                  }
+                }
+                comment += '\n';
+              }
             }
-
+            
             if (files.every(f => !fs.existsSync(f.path))) {
               comment += '⚠️ No scan results found.\n';
             }
-
+            
             comment += '\n---\n_Scan by [Trivy](https://github.com/aquasecurity/trivy)_';
-
+            
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-
+            
             const existing = comments.find(c => c.body.startsWith('# Complete Repository Security Scan Report'));
             if (existing) {
               await github.rest.issues.updateComment({
