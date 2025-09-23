@@ -4,44 +4,205 @@ on:
   pull_request:
   push:
 
+concurrency:
+  group: security-scan-${{ github.head_ref }}
+  cancel-in-progress: true
+
+env:
+  TRIVY_CACHE_DIR: /tmp/trivy-cache
+
 jobs:
-  trivy-scan:
+  security-scan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+      security-events: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
-      - name: Run Trivy
+      - name: Cache Trivy DB
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TRIVY_CACHE_DIR }}
+          key: trivy-db-${{ runner.os }}-${{ hashFiles('**/build.gradle', '**/build.gradle.kts')
+          restore-keys: |
+            trivy-db-${{ runner.os }}-
+
+      - name: Run vulnernability/secret/config scan
         uses: aquasecurity/trivy-action@0.28.0
         continue-on-error: true
         with:
           scan-type: 'fs'
+          scan-ref: '.'
+          output: trivy-results.json
           ignore-unfixed: 'true'
-          exit-code: '1'
-          vuln-type: 'os,library'
-          format: 'table'
+          cache-dir: ${{ env.TRIVY_CACHE_DIR }}
+          scanners: vuln,config,secret
+          format: 'json'
           severity: 'HIGH,CRITICAL'
 
-      - name: Report to PR
+      - name: Run License Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: json
+          output: trivy-license-results.json
+          scanners: license
+          cache-dir: ${{ env.TRIVY_CACHE_DIR }}
+
+      - name: Summarize Scan Results
+        run: |
+          echo "# Complete Repository Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Parse results using jq and calculate counts of issues
+          if [ -f trivy-results.json ]; then
+            TOTAL=$(jq '[.Results[] | (.Vulnerabilities // []) + (.Misconfigurations // []) + (.Secrets // [])] | length' trivy-results.json || echo 0)
+            CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-results.json || echo 0)
+            HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' trivy-results.json || echo 0)
+            MED=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' trivy-results.json || echo 0)
+            LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' trivy-results.json || echo 0)
+            MIS=$(jq '[.Results[]?.Misconfigurations[]?] | length' trivy-results.json || echo 0)
+            SECRETS=$(jq '[.Results[]?.Secrets[]?] | length' trivy-results.json || echo 0)
+          
+            # Print results in markdown table
+            echo "| Type | Severity | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|----------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Vulnerabilities | Critical | $CRIT |" >> $GITHUB_STEP_SUMMARY
+            echo "| Vulnerabilities | High | $HIGH |" >> $GITHUB_STEP_SUMMARY
+            echo "| Vulnerabilities | Medium | $MED |" >> $GITHUB_STEP_SUMMARY
+            echo "| Vulnerabilities | Low | $LOW |" >> $GITHUB_STEP_SUMMARY
+            echo "| Misconfigurations | - | $MIS |" >> $GITHUB_STEP_SUMMARY
+            echo "| Secrets | - | $SECRETS |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Total Issues** | - | **$((TOTAL))** |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          
+            # Add metadata
+            echo "- **Scan Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Branch:** ${{ github.head_ref }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          
+            # Final message based on findings
+            if [ "$TOTAL" -eq 0 ]; then
+              echo "**No issues found. Repository is secure.**" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "**$TOTAL issues found. Please review the PR comment for details.**" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "**Scan failed: trivy-results.json not found**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Comment on PR with findings
         uses: actions/github-script@v7
         if: github.event_name == 'pull_request'
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            const report = fs.readFileSync('./apps/alpha/trivy-report.txt', 'utf8');
-            const output = `Trivy report:
-            \`\`\`\n
-            ${report.length > 0 ? report : 'No issues found'}
-            \`\`\`
-            
-            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
+            const path = 'trivy-results.json';
+            if (!fs.existsSync(path)) {
+              core.warning('No results to post');
+              return;
+            }
+
+            // Read and parse Trivy results
+            const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+            let comment = '# Complete Repository Security Scan Report\n\n';
+            const now = new Date();
+            comment += `**Date:** ${now.toISOString().split('T')[0]} \n`;
+            comment += `**Branch:** ${context.payload.pull_request.head.ref} \n\n`;
+
+            // Calculate totals
+            let total = 0, vulns = 0, misconfigs = 0, secrets = 0;
+            for (const r of data.Results || []) {
+              if (r.Vulnerabilities) vulns += r.Vulnerabilities.length;
+              if (r.Misconfigurations) misconfigs += r.Misconfigurations.length;
+              if (r.Secrets) secrets += r.Secrets.length;
+            }
+            total = vulns + misconfigs + secrets;
+
+            // Add summary table
+            comment += '| Category | Count |\n';
+            comment += '|----------|-------|\n';
+            comment += `| Vulnerabilities | ${vulns} |\n`;
+            comment += `| Misconfigurations | ${misconfigs} |\n`;
+            comment += `| Secrets | ${secrets} |\n`;
+            comment += `| **Total Issues** | **${total}** |\n\n`;
+
+            // Details if any issues found
+            if (total === 0) {
+              comment += 'No security issues found.';
+            } else {
+              comment += 'Security issues detected. Review details below.\n\n';
+
+              for (const r of data.Results) {
+                const hasIssues = (r.Vulnerabilities?.length || 0) + (r.Misconfigurations?.length || 0) + (r.Secrets?.length || 0);
+                if (!hasIssues) continue;
+
+                comment += `## ${r.Target}\n`;
+
+                // Vulnerabilities section
+                if (r.Vulnerabilities?.length) {
+                  comment += `### Vulnerabilities\n| Severity | Package | Version | CVE |\n|----------|---------|---------|-----|\n`;
+                  for (const v of r.Vulnerabilities.slice(0, 10)) {
+                    comment += `| ${v.Severity} | ${v.PkgName} | ${v.InstalledVersion} | ${v.VulnerabilityID} |\n`;
+                  }
+                  if (r.Vulnerabilities.length > 10) comment += `*...and ${r.Vulnerabilities.length - 10} more*\n`;
+                }
+
+                // Misconfigurations section
+                if (r.Misconfigurations?.length) {
+                  comment += `\n### Misconfigurations\n| Severity | ID | Message |\n|----------|----|---------|\n`;
+                  for (const m of r.Misconfigurations.slice(0, 5)) {
+                    comment += `| ${m.Severity} | ${m.ID} | ${(m.Message || '').substring(0, 50)}... |\n`;
+                  }
+                  if (r.Misconfigurations.length > 5) comment += `*...and ${r.Misconfigurations.length - 5} more*\n`;
+                }
+
+                // Secrets section
+                if (r.Secrets?.length) {
+                  comment += `\n### Secrets\n| Rule | Match |\n|------|-------|\n`;
+                  for (const s of r.Secrets.slice(0, 3)) {
+                    comment += `| ${s.RuleID} | ${(s.Match || '').substring(0, 20)}... |\n`;
+                  }
+                  if (r.Secrets.length > 3) comment += `*...and ${r.Secrets.length - 3} more*\n`;
+                }
+
+                comment += '\n---\n';
+              }
+
+              comment += '\n**Please address these issues before merging.**\n';
+            }
+
+            // Add scan credit
+            comment += '\n---\n_Scan by [Trivy](https://github.com/aquasecurity/trivy)_';
+
+            // Post or update PR comment
+            const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: output
-            })
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body.startsWith('# Complete Repository Security Scan Report'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
