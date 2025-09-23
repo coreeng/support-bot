@@ -27,7 +27,6 @@ public class ServiceStartupTest {
     private static final String testGroupRef = "2d5ac5ab-4acc-457e-af4d-117bd135671c";
     
     private static Config config;
-    private static HelmClient helmClient;
     private static KubernetesTestClient kubernetesClient;
 
     @BeforeAll
@@ -35,20 +34,12 @@ public class ServiceStartupTest {
         try {
             config = Config.load();
 
-            helmClient = new HelmClient();
             kubernetesClient = new KubernetesTestClient();
 
             ConfigMapTeamData teamData = new ConfigMapTeamData(testTeamName, testGroupRef);
             kubernetesClient.createOrUpdateConfigMap(testConfigMapName, config.namespace(), teamData);
 
-            if (helmClient.isReleaseDeployed(config.helm().releaseName(), config.namespace())) {
-                helmClient.uninstall(config.helm().releaseName(), config.namespace());
-            }
-            Map<String, String> helmValues = Map.of(
-                "image.repository", config.service().image().repository(),
-                "image.tag", config.service().image().tag()
-            );
-            helmClient.install(config.helm().releaseName(), config.helm().chartPath(), config.namespace(), helmValues);
+            runServiceScript("deploy");
             kubernetesClient.waitUntilDeploymentReady(config.service().deployment().name(), config.namespace());
 
             if (logger.isDebugEnabled()) {
@@ -72,9 +63,7 @@ public class ServiceStartupTest {
     @AfterAll
     static void cleanup() {
         try {
-            if (helmClient != null) {
-                helmClient.uninstall(config.helm().releaseName(), config.namespace());
-            }
+            runServiceScript("delete");
         } catch (Exception e) {
             logger.error("Error during cleanup, couldn't uninstall service chart", e);
         }
@@ -115,5 +104,28 @@ public class ServiceStartupTest {
         assertThat(teams)
             .as("Response should contain at least one team")
             .isNotEmpty();
+    }
+
+    private static void runServiceScript(String action) throws Exception {
+        String scriptPath = config.service().deploymentScript().scriptPath();
+        String chartPath = config.service().deploymentScript().chartPath();
+        String helmRelease = config.service().deploymentScript().releaseName();
+        ProcessBuilder pb = new ProcessBuilder(scriptPath);
+        Map<String, String> env = pb.environment();
+        env.put("ACTION", action);
+        env.put("NAMESPACE", config.namespace());
+        env.put("SERVICE_RELEASE", helmRelease);
+        env.put("SERVICE_CHART_PATH", chartPath);
+        env.put("SERVICE_IMAGE_REPOSITORY", config.service().image().repository());
+        env.put("SERVICE_IMAGE_TAG", config.service().image().tag());
+        env.put("WAIT_TIMEOUT", "60");
+        env.put("REDEPLOY", action.equals("deploy") ? "true" : "false");
+
+        pb.inheritIO();
+        Process p = pb.start();
+        int code = p.waitFor();
+        if (code != 0) {
+            throw new IllegalStateException("deploy-service.sh failed with exit code " + code + " (action=" + action + ")");
+        }
     }
 }
