@@ -30,7 +30,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.TRIVY_CACHE_DIR }}
-          key: trivy-db-${{ runner.os }}-${{ hashFiles('**/build.gradle', '**/build.gradle.kts')
+          key: trivy-db-${{ runner.os }}-${{ hashFiles('**/build.gradle', '**/build.gradle.kts') }}
           restore-keys: |
             trivy-db-${{ runner.os }}-
 
