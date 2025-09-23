@@ -68,12 +68,19 @@ jobs:
           name: trivy-reports
           path: trivy-artifacts
 
+      - name: Summarize Scan Results and Upload Artifacts
+        run: |
+          echo "# Complete Repository Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          mkdir -p trivy-artifacts
+          cp trivy-results.json trivy-artifacts/
+          cp trivy-license-results.json trivy-artifacts/
+
       - name: Fail on Critical Misconfigurations
         run: |
           CRIT=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="CRITICAL")] | length' trivy-results.json)
           if [ "$CRIT" -gt 0 ]; then
-            echo "❌ Critical misconfigurations found: $CRIT"
-            exit 1
+          echo "❌ Critical misconfigurations found: $CRIT"
+          exit 1
           fi
 
       - name: Fail on Critical Vulnerabilities
@@ -95,23 +102,23 @@ jobs:
               { path: 'trivy-results.json', type: 'Vulnerability/Secret/Config' },
               { path: 'trivy-license-results.json', type: 'License' }
             ];
-
+            
             let comment = '# Complete Repository Security Scan Report\n\n';
             const now = new Date();
             comment += `**Date:** ${now.toISOString().split('T')[0]}\n`;
             comment += `**Branch:** ${context.payload.pull_request.head.ref}\n\n`;
             
             comment += `Artifacts: [trivy-reports](https://github.com/${context.repo.owner}/${context.repo.repo}/suites/${context.runId}/artifacts)\n\n`;
-
+            
             for (const f of files) {
               if (!fs.existsSync(f.path)) {
                 comment += `**${f.type} scan results not found.**\n\n`;
                 continue;
               }
-
+            
               const data = JSON.parse(fs.readFileSync(f.path, 'utf8'));
               let total = 0, vulns = 0, misconfigs = 0, secrets = 0, licenses = 0;
-
+            
               for (const r of data.Results || []) {
                 vulns += (r.Vulnerabilities?.length || 0);
                 misconfigs += (r.Misconfigurations?.length || 0);
@@ -119,7 +126,7 @@ jobs:
                 licenses += (r.Licenses?.length || 0);
               }
               total = vulns + misconfigs + secrets + licenses;
-
+            
               comment += `### ${f.type} Scan\n`;
               comment += '| Category | Count |\n|----------|-------|\n';
               comment += `| Vulnerabilities | ${vulns} |\n`;
@@ -127,7 +134,7 @@ jobs:
               comment += `| Secrets | ${secrets} |\n`;
               comment += `| Licenses | ${licenses} |\n`;
               comment += `| **Total Issues** | **${total}** |\n\n`;
-
+            
               // Vulnerabilities Details
               if (vulns > 0) {
                 comment += `#### Vulnerabilities Details (Top 10 per target)\n| Severity | Package | Installed Version | Fixed Version | CVE |\n|----------|---------|-----------------|---------------|-----|\n`;
@@ -144,7 +151,7 @@ jobs:
                 }
                 comment += '\n';
               }
-
+            
               // Misconfigurations Details (all, collapsible)
               if (misconfigs > 0) {
                 comment += `#### Misconfigurations Details\n| Severity | ID | Message |\n|----------|----|--------|\n`;
@@ -157,7 +164,7 @@ jobs:
                 }
                 comment += '\n';
               }
-
+            
               // Secrets Details (all, collapsible)
               if (secrets > 0) {
                 comment += `#### Secrets Details\n| Rule | Match |\n|------|-------|\n`;
@@ -170,7 +177,7 @@ jobs:
                 }
                 comment += '\n';
               }
-
+            
               // License Details
               if (f.type === 'License' && licenses > 0) {
                 comment += `#### License Details\n| Package | License |\n|---------|---------|\n`;
@@ -183,17 +190,17 @@ jobs:
                 comment += '\n';
               }
             }
-
+            
             if (files.every(f => !fs.existsSync(f.path))) {
               comment += '⚠️ No scan results found.\n';
             }
-
+            
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-
+            
             const existing = comments.find(c => c.body.startsWith('# Complete Repository Security Scan Report'));
             if (existing) {
               await github.rest.issues.updateComment({
