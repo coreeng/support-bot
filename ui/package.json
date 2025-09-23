@@ -40,7 +40,9 @@
   },
   "resolutions": {
     "@types/react": "^18",
-    "@types/react-dom": "^18"
+    "@types/react-dom": "^18",
+    "@node-saml/node-saml": "5.1.0",
+    "@node-saml/passport-saml": "5.1.0"
   },
   "prettier": "@backstage/cli/config/prettier",
   "lint-staged": {
@@ -52,5 +54,8 @@
       "prettier --write"
     ]
   },
-  "packageManager": "yarn@4.4.1"
+  "packageManager": "yarn@4.4.1",
+  "dependencies": {
+    "@node-saml/node-saml": "5.1.0"
+  }
 }
