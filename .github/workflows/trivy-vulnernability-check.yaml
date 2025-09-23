@@ -93,117 +93,117 @@ jobs:
           summarize_trivy trivy-license-results.json "License"
 
       - name: Comment on PR with findings
-  if: github.event_name == 'pull_request'
-  uses: actions/github-script@v7
-  with:
-    script: |
-      const fs = require('fs');
-
-      const files = [
-        { path: 'trivy-results.json', type: 'Vulnerability/Secret/Config' },
-        { path: 'trivy-license-results.json', type: 'License' }
-      ];
-
-      let comment = '# Complete Repository Security Scan Report\n\n';
-      const now = new Date();
-      comment += `**Date:** ${now.toISOString().split('T')[0]}\n`;
-      comment += `**Branch:** ${context.payload.pull_request.head.ref}\n\n`;
-
-      for (const f of files) {
-        if (!fs.existsSync(f.path)) {
-          comment += `**${f.type} scan results not found.**\n\n`;
-          continue;
-        }
-
-        const data = JSON.parse(fs.readFileSync(f.path, 'utf8'));
-        let total = 0, vulns = 0, misconfigs = 0, secrets = 0, licenses = 0;
-
-        for (const r of data.Results || []) {
-          vulns += (r.Vulnerabilities?.length || 0);
-          misconfigs += (r.Misconfigurations?.length || 0);
-          secrets += (r.Secrets?.length || 0);
-          licenses += (r.Licenses?.length || 0);
-        }
-        total = vulns + misconfigs + secrets + licenses;
-
-        comment += `### ${f.type} Scan\n`;
-        comment += '| Category | Count |\n|----------|-------|\n';
-        comment += `| Vulnerabilities | ${vulns} |\n`;
-        comment += `| Misconfigurations | ${misconfigs} |\n`;
-        comment += `| Secrets | ${secrets} |\n`;
-        comment += `| Licenses | ${licenses} |\n`;
-        comment += `| **Total Issues** | **${total}** |\n\n`;
-
-        // Vulnerabilities details
-        if (vulns > 0) {
-          comment += `#### Vulnerabilities Details (Top 10 per target)\n| Severity | Package | Installed Version | Fixed Version | CVE |\n|----------|---------|-----------------|---------------|-----|\n`;
-          for (const target of data.Results || []) {
-            if (!target.Vulnerabilities?.length) continue;
-            for (const v of target.Vulnerabilities.slice(0,10)) {
-              const fixedVersion = v.FixedVersion || '-';
-              const cveLink = v.VulnerabilityID ? `[${v.VulnerabilityID}](https://cve.mitre.org/cgi-bin/cvename.cgi?name=${v.VulnerabilityID})` : '-';
-              comment += `| ${v.Severity} | ${v.PkgName} | ${v.InstalledVersion} | ${fixedVersion} | ${cveLink} |\n`;
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+      
+            const files = [
+              { path: 'trivy-results.json', type: 'Vulnerability/Secret/Config' },
+              { path: 'trivy-license-results.json', type: 'License' }
+            ];
+      
+            let comment = '# Complete Repository Security Scan Report\n\n';
+            const now = new Date();
+            comment += `**Date:** ${now.toISOString().split('T')[0]}\n`;
+            comment += `**Branch:** ${context.payload.pull_request.head.ref}\n\n`;
+      
+            for (const f of files) {
+              if (!fs.existsSync(f.path)) {
+                comment += `**${f.type} scan results not found.**\n\n`;
+                continue;
+              }
+      
+              const data = JSON.parse(fs.readFileSync(f.path, 'utf8'));
+              let total = 0, vulns = 0, misconfigs = 0, secrets = 0, licenses = 0;
+      
+              for (const r of data.Results || []) {
+                vulns += (r.Vulnerabilities?.length || 0);
+                misconfigs += (r.Misconfigurations?.length || 0);
+                secrets += (r.Secrets?.length || 0);
+                licenses += (r.Licenses?.length || 0);
+              }
+              total = vulns + misconfigs + secrets + licenses;
+      
+              comment += `### ${f.type} Scan\n`;
+              comment += '| Category | Count |\n|----------|-------|\n';
+              comment += `| Vulnerabilities | ${vulns} |\n`;
+              comment += `| Misconfigurations | ${misconfigs} |\n`;
+              comment += `| Secrets | ${secrets} |\n`;
+              comment += `| Licenses | ${licenses} |\n`;
+              comment += `| **Total Issues** | **${total}** |\n\n`;
+      
+              // Vulnerabilities details
+              if (vulns > 0) {
+                comment += `#### Vulnerabilities Details (Top 10 per target)\n| Severity | Package | Installed Version | Fixed Version | CVE |\n|----------|---------|-----------------|---------------|-----|\n`;
+                for (const target of data.Results || []) {
+                  if (!target.Vulnerabilities?.length) continue;
+                  for (const v of target.Vulnerabilities.slice(0,10)) {
+                    const fixedVersion = v.FixedVersion || '-';
+                    const cveLink = v.VulnerabilityID ? `[${v.VulnerabilityID}](https://cve.mitre.org/cgi-bin/cvename.cgi?name=${v.VulnerabilityID})` : '-';
+                    comment += `| ${v.Severity} | ${v.PkgName} | ${v.InstalledVersion} | ${fixedVersion} | ${cveLink} |\n`;
+                  }
+                  if (target.Vulnerabilities.length > 10) {
+                    comment += `*...and ${target.Vulnerabilities.length - 10} more for ${target.Target}*\n`;
+                  }
+                }
+                comment += '\n';
+              }
+      
+              // Misconfigurations (all, collapsible)
+              if (misconfigs > 0) {
+                comment += `#### Misconfigurations Details\n| Severity | ID | Message |\n|----------|----|--------|\n`;
+                for (const target of data.Results || []) {
+                  if (!target.Misconfigurations?.length) continue;
+                  for (const m of target.Misconfigurations) {
+                    const safeMessage = (m.Message || '').replace(/\n/g, ' ');
+                    comment += `| ${m.Severity} | ${m.ID} | <details><summary>View</summary>${safeMessage}</details> |\n`;
+                  }
+                }
+                comment += '\n';
+              }
+      
+              // Secrets (all, collapsible)
+              if (secrets > 0) {
+                comment += `#### Secrets Details\n| Rule | Match |\n|------|-------|\n`;
+                for (const target of data.Results || []) {
+                  if (!target.Secrets?.length) continue;
+                  for (const s of target.Secrets) {
+                    const safeMatch = (s.Match || '').replace(/\n/g, ' ');
+                    comment += `| ${s.RuleID} | <details><summary>View</summary>${safeMatch}</details> |\n`;
+                  }
+                }
+                comment += '\n';
+              }
             }
-            if (target.Vulnerabilities.length > 10) {
-              comment += `*...and ${target.Vulnerabilities.length - 10} more for ${target.Target}*\n`;
+      
+            if (files.every(f => !fs.existsSync(f.path))) {
+              comment += '⚠️ No scan results found.\n';
             }
-          }
-          comment += '\n';
-        }
-
-        // Misconfigurations (all, collapsible)
-        if (misconfigs > 0) {
-          comment += `#### Misconfigurations Details\n| Severity | ID | Message |\n|----------|----|--------|\n`;
-          for (const target of data.Results || []) {
-            if (!target.Misconfigurations?.length) continue;
-            for (const m of target.Misconfigurations) {
-              const safeMessage = (m.Message || '').replace(/\n/g, ' ');
-              comment += `| ${m.Severity} | ${m.ID} | <details><summary>View</summary>${safeMessage}</details> |\n`;
+      
+            comment += '\n---\n_Scan by [Trivy](https://github.com/aquasecurity/trivy)_';
+      
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+      
+            const existing = comments.find(c => c.body.startsWith('# Complete Repository Security Scan Report'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
             }
-          }
-          comment += '\n';
-        }
-
-        // Secrets (all, collapsible)
-        if (secrets > 0) {
-          comment += `#### Secrets Details\n| Rule | Match |\n|------|-------|\n`;
-          for (const target of data.Results || []) {
-            if (!target.Secrets?.length) continue;
-            for (const s of target.Secrets) {
-              const safeMatch = (s.Match || '').replace(/\n/g, ' ');
-              comment += `| ${s.RuleID} | <details><summary>View</summary>${safeMatch}</details> |\n`;
-            }
-          }
-          comment += '\n';
-        }
-      }
-
-      if (files.every(f => !fs.existsSync(f.path))) {
-        comment += '⚠️ No scan results found.\n';
-      }
-
-      comment += '\n---\n_Scan by [Trivy](https://github.com/aquasecurity/trivy)_';
-
-      const { data: comments } = await github.rest.issues.listComments({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        issue_number: context.issue.number,
-      });
-
-      const existing = comments.find(c => c.body.startsWith('# Complete Repository Security Scan Report'));
-      if (existing) {
-        await github.rest.issues.updateComment({
-          owner: context.repo.owner,
-          repo: context.repo.repo,
-          comment_id: existing.id,
-          body: comment
-        });
-      } else {
-        await github.rest.issues.createComment({
-          owner: context.repo.owner,
-          repo: context.repo.repo,
-          issue_number: context.issue.number,
-          body: comment
-        });
-      }
-
+  
