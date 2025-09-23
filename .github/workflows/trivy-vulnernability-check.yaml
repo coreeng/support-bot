@@ -65,7 +65,7 @@ jobs:
           cp trivy-license-results.json trivy-artifacts/
 
       - name: Upload Trivy Scan Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: trivy-reports
           path: trivy-artifacts
