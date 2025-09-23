@@ -12,7 +12,7 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
-      - name: Set up Trivy
+      - name: Run Trivy
         uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type: 'fs'
@@ -21,3 +21,25 @@ jobs:
           vuln-type: 'os,library'
           format: 'table'
           severity: 'HIGH,CRITICAL'
+
+      - name: Report to PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('./apps/alpha/trivy-report.txt', 'utf8');
+            const output = `Trivy report:
+            \`\`\`\n
+            ${report.length > 0 ? report : 'No issues found'}
+            \`\`\`
+            
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
