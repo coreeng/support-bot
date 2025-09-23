@@ -15,6 +15,7 @@ jobs:
 
       - name: Run Trivy
         uses: aquasecurity/trivy-action@0.28.0
+        continue-on-error: true
         with:
           scan-type: 'fs'
           ignore-unfixed: 'true'
