@@ -2,6 +2,7 @@ name: Trivy Vulnerability Scan
 
 on:
   pull_request:
+  push:
 
 jobs:
   trivy-scan:
