@@ -1,8 +1,9 @@
-helm:
-  releaseName: support-bot
-  chartPath: ../k8s/service
 namespace: support-bot-integration
 service:
+  deploymentScript:
+    releaseName: support-bot
+    chartPath: ../k8s/service
+    scriptPath: ../scripts/deploy-service.sh
   deployment:
     name: support-bot
   image:

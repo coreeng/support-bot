@@ -32,10 +32,10 @@ serviceAccount:
       - apiGroups: [""]
         resources: ["services"]
         verbs: ["get", "list", "create", "delete"]
-      
+
       # Deployment operations - for waiting until ready
       - apiGroups: ["apps"]
-        resources: ["deployments", "replicasets"]
+        resources: ["statefulsets", "deployments", "replicasets"]
         verbs: ["get", "list", "watch", "create", "delete"]
 
       - apiGroups: ["rbac.authorization.k8s.io"]
@@ -52,11 +52,12 @@ job:
 # ConfigMap configuration
 configMap:
   config:
-    helm:
-      releaseName: support-bot
-      chartPath: /app/k8s/service
     namespace: support-bot-integration
     service:
+      deploymentScript:
+        releaseName: support-bot
+        chartPath: /app/k8s/service
+        scriptPath: /app/scripts/deploy-service.sh
       deployment:
         name: support-bot
       image:
