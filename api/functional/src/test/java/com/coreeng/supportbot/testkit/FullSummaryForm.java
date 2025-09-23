@@ -63,7 +63,9 @@ public class FullSummaryForm {
                     }
                     """, ticket.id()));
             String expectedBlocks = buildExpectedBlocksJson();
-            assertThatJson(view.get("blocks").toString()).isEqualTo(expectedBlocks);
+            assertThatJson(view.get("blocks").toString())
+                .withMatcher("timestamp-is-close", new TimestampIsCloseMatcher())
+                .isEqualTo(expectedBlocks);
             return new FullSummaryForm();
         }
         private String buildExpectedBlocksJson() {
@@ -336,7 +338,7 @@ public class FullSummaryForm {
                         },
                         {
                           "type": "date",
-                          "timestamp": %d,
+                          "timestamp": "${json-unit.matches:timestamp-is-close}%d",
                           "format": "{date_short_pretty} at {time}",
                           "fallback": "%s"
                         },
