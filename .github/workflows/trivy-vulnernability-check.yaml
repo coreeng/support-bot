@@ -52,8 +52,8 @@ jobs:
         with:
           scan-type: fs
           scan-ref: .
-          format: json
-          output: trivy-license-results.json
+          format: table
+#          output: trivy-license-results.json
           scanners: license
           cache-dir: ${{ env.TRIVY_CACHE_DIR }}
 
