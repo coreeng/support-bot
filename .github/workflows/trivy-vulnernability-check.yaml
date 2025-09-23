@@ -150,17 +150,17 @@ jobs:
               }
               comment += '\n';
 
-              // Detailed Misconfigurations Table
-              comment += `#### Misconfigurations (Top 5 per target)\n| Severity | ID | Message |\n|----------|----|--------|\n`;
+              // Misconfigurations Table with collapsible full messages
+              comment += `#### Misconfigurations per target\n| Severity | ID | Message |\n|----------|----|--------|\n`;
               for (const target of data.Results || []) {
                 if (!target.Misconfigurations?.length) continue;
-                for (const m of target.Misconfigurations.slice(0,5)) {
-                  comment += `| ${m.Severity} | ${m.ID} | ${(m.Message || '').substring(0, 50)}... |\n`;
-                }
-                if (target.Misconfigurations.length > 5) {
-                  comment += `*...and ${target.Misconfigurations.length - 5} more misconfigurations for ${target.Target}*\n`;
+                for (const m of target.Misconfigurations) {
+                  const safeMessage = (m.Message || '').replace(/\n/g, ' '); // remove line breaks
+                  comment += `| ${m.Severity} | ${m.ID} | <details><summary>View</summary>${safeMessage}</details> |\n`;
                 }
               }
+              comment += '\n';
+              
               comment += '\n';
 
               // Detailed Secrets Table
