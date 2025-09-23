@@ -41,8 +41,8 @@
   "resolutions": {
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@node-saml/node-saml": "5.1.0",
-    "@node-saml/passport-saml": "5.1.0",
+    "@node-saml/node-saml": "5.0.1",
+    "@node-saml/passport-saml": "5.0.1",
     "jsonpath-plus": "10.2.0",
     "koa": "2.15.4",
     "linkifyjs": "4.3.2",
