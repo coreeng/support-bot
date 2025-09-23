@@ -16,11 +16,11 @@ serviceAccount:
       # ConfigMap operations - create/delete for test setup/cleanup
       - apiGroups: [""]
         resources: ["configmaps"]
-        verbs: ["get", "list", "watch", "create", "patch", "delete"]
+        verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
 
       # ServiceAccount and Secrets operations – service deployment
       - apiGroups: [""]
-        resources: ["configmaps", "serviceaccounts", "secrets"]
+        resources: ["serviceaccounts", "secrets"]
         verbs: ["get", "list", "watch", "create", "delete"]
 
       # Pod operations - for status checking, logs, and port forwarding

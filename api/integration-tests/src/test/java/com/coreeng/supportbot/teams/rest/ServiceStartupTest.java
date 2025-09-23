@@ -31,31 +31,36 @@ public class ServiceStartupTest {
 
     @BeforeAll
     static void setup() throws Exception {
-        config = Config.load();
+        try {
+            config = Config.load();
 
-        helmClient = new HelmClient();
-        kubernetesClient = new KubernetesTestClient();
+            helmClient = new HelmClient();
+            kubernetesClient = new KubernetesTestClient();
 
-        ConfigMapTeamData teamData = new ConfigMapTeamData(testTeamName, testGroupRef);
-        kubernetesClient.createOrUpdateConfigMap(testConfigMapName, config.namespace(), teamData);
+            ConfigMapTeamData teamData = new ConfigMapTeamData(testTeamName, testGroupRef);
+            kubernetesClient.createOrUpdateConfigMap(testConfigMapName, config.namespace(), teamData);
 
-        if (helmClient.isReleaseDeployed(config.helm().releaseName(), config.namespace())) {
-            helmClient.uninstall(config.helm().releaseName(), config.namespace());
-        }
-        helmClient.install(config.helm().releaseName(), config.helm().chartPath(), config.namespace());
-        kubernetesClient.waitUntilDeploymentReady(config.service().deployment().name(), config.namespace());
+            if (helmClient.isReleaseDeployed(config.helm().releaseName(), config.namespace())) {
+                helmClient.uninstall(config.helm().releaseName(), config.namespace());
+            }
+            helmClient.install(config.helm().releaseName(), config.helm().chartPath(), config.namespace());
+            kubernetesClient.waitUntilDeploymentReady(config.service().deployment().name(), config.namespace());
 
-        if (logger.isDebugEnabled()) {
-            logger.debug("Pod logs:\n{}", kubernetesClient.getDeploymentLogs(config.service().deployment().name(), config.namespace()));
-        }
+            if (logger.isDebugEnabled()) {
+                logger.debug("Pod logs:\n{}", kubernetesClient.getDeploymentLogs(config.service().deployment().name(), config.namespace()));
+            }
 
-        if (config.portForwarding().enabled()) {
-            Pod pod = kubernetesClient.getPodForDeployment(config.service().deployment().name(), config.namespace());
-            kubernetesClient.portForward(pod.getMetadata().getName(), config.namespace(),
-                config.portForwarding().localPort(), config.portForwarding().remotePort());
-            RestAssured.baseURI = "http://localhost:" + config.portForwarding().localPort();
-        } else {
-            RestAssured.baseURI = "http://" + config.service().deployment().name() + "." + config.namespace() + ".svc.cluster.local:" + config.portForwarding().remotePort();
+            if (config.portForwarding().enabled()) {
+                Pod pod = kubernetesClient.getPodForDeployment(config.service().deployment().name(), config.namespace());
+                kubernetesClient.portForward(pod.getMetadata().getName(), config.namespace(),
+                    config.portForwarding().localPort(), config.portForwarding().remotePort());
+                RestAssured.baseURI = "http://localhost:" + config.portForwarding().localPort();
+            } else {
+                RestAssured.baseURI = "http://" + config.service().deployment().name() + "." + config.namespace() + ".svc.cluster.local:" + config.portForwarding().remotePort();
+            }
+        } catch (Exception e) {
+            logger.error("Error during setup", e);
+            throw e;
         }
     }
 
@@ -65,12 +70,17 @@ public class ServiceStartupTest {
             if (helmClient != null) {
                 helmClient.uninstall(config.helm().releaseName(), config.namespace());
             }
+        } catch (Exception e) {
+            logger.error("Error during cleanup, couldn't uninstall service chart", e);
+        }
+
+        try {
             if (kubernetesClient != null) {
                 kubernetesClient.deleteConfigMap(testConfigMapName, config.namespace());
                 kubernetesClient.close();
             }
         } catch (Exception e) {
-            logger.error("Error during cleanup", e);
+            logger.error("Error during cleanup, couldn't delete ConfigMap", e);
         }
     }
 
