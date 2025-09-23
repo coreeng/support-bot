@@ -41,3 +41,7 @@ tasks.jar {
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
+
+tasks.test {
+    useJUnitPlatform()
+}
