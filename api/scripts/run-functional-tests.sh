@@ -73,7 +73,7 @@ main() {
     --set image.repository="$JOB_IMAGE_REPOSITORY" \
     --set image.tag="$IMAGE_TAG" \
     --set job.activeDeadlineSeconds="$TIMEOUT" \
-    --wait --timeout=1m
+    --wait --timeout=10m
   log_success "Functional test job deployed"
 
   if wait_for_job_with_logs "$JOB_RELEASE" "$NAMESPACE" "$TIMEOUT" "functional-tests"; then
