@@ -12,9 +12,9 @@ CHART_PATH="${CHART_PATH:-${SCRIPT_DIR}/../k8s/integration-tests}"
 RELEASE_NAME="${RELEASE_NAME:-support-bot-integration-tests}"
 TIMEOUT="${TIMEOUT:-600}" # 10 mins
 JOB_IMAGE_REPOSITORY="${JOB_IMAGE_REPOSITORY:?required argument}"
-IMAGE_TAG="${IMAGE_TAG:-latest}"
+IMAGE_TAG="${IMAGE_TAG:?required argument}"
 SERVICE_IMAGE_REPOSITORY="${SERVICE_IMAGE_REPOSITORY:?required argument}"
-SERVICE_IMAGE_TAG="${SERVICE_IMAGE_TAG:-latest}"
+SERVICE_IMAGE_TAG="${SERVICE_IMAGE_TAG:?required argument}"
 CLEANUP="${CLEANUP:-true}"
 
 cleanup_job() {
