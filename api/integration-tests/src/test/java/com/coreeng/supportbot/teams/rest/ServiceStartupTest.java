@@ -1,18 +1,19 @@
 package com.coreeng.supportbot.teams.rest;
 
-import io.fabric8.kubernetes.api.model.Pod;
-import io.restassured.RestAssured;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-
+import io.fabric8.kubernetes.api.model.Pod;
+import io.restassured.RestAssured;
 import static io.restassured.RestAssured.when;
-import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("integration")
 @Tag("smoke")
@@ -43,7 +44,11 @@ public class ServiceStartupTest {
             if (helmClient.isReleaseDeployed(config.helm().releaseName(), config.namespace())) {
                 helmClient.uninstall(config.helm().releaseName(), config.namespace());
             }
-            helmClient.install(config.helm().releaseName(), config.helm().chartPath(), config.namespace());
+            Map<String, String> helmValues = Map.of(
+                "image.repository", config.service().image().repository(),
+                "image.tag", config.service().image().tag()
+            );
+            helmClient.install(config.helm().releaseName(), config.helm().chartPath(), config.namespace(), helmValues);
             kubernetesClient.waitUntilDeploymentReady(config.service().deployment().name(), config.namespace());
 
             if (logger.isDebugEnabled()) {
