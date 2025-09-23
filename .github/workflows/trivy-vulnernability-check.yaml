@@ -135,20 +135,18 @@ jobs:
               comment += `| **Total Issues** | **${total}** |\n\n`;
             
               // Detailed Vulnerabilities Table
-              if (r.Vulnerabilities?.length) {
-                comment += `#### Vulnerabilities Details (Top 10 per target)\n| Severity | Package | Version | CVE |\n|----------|---------|---------|-----|\n`;
-                for (const target of data.Results || []) {
-                  if (!target.Vulnerabilities?.length) continue;
-                  for (const v of target.Vulnerabilities.slice(0,10)) {
-                    comment += `| ${v.Severity} | ${v.PkgName} | ${v.InstalledVersion} | ${v.VulnerabilityID} |\n`;
-                  }
-                  if (target.Vulnerabilities.length > 10) {
-                    comment += `*...and ${target.Vulnerabilities.length - 10} more for ${target.Target}*\n`;
-                  }
+              comment += `#### Vulnerabilities Details (Top 10 per target)\n| Severity | Package | Version | CVE |\n|----------|---------|---------|-----|\n`;
+              for (const target of data.Results || []) {
+              if (!target.Vulnerabilities?.length) continue;
+              for (const v of target.Vulnerabilities.slice(0,10)) {
+              comment += `| ${v.Severity} | ${v.PkgName} | ${v.InstalledVersion} | ${v.VulnerabilityID} |\n`;
                 }
-                comment += '\n';
-              }
-            }
+              if (target.Vulnerabilities.length > 10) {
+              comment += `*...and ${target.Vulnerabilities.length - 10} more for ${target.Target}*\n`;
+                }
+               }
+              comment += '\n';
+             }
             
             if (files.every(f => !fs.existsSync(f.path))) {
               comment += '⚠️ No scan results found.\n';
