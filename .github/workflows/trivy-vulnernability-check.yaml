@@ -58,56 +58,30 @@ jobs:
           scanners: license
           cache-dir: ${{ env.TRIVY_CACHE_DIR }}
 
-      - name: Upload Trivy Results
-        uses: actions/upload-artifact@v4
+      - name: Upload Trivy Scan Artifacts
+        run: |
+          mkdir -p trivy-artifacts
+          cp trivy-results.json trivy-artifacts/
+          cp trivy-license-results.json trivy-artifacts/
+        uses: actions/upload-artifact@v3
         with:
-          name: trivy-results
-          path: |
-            trivy-results.json
-            trivy-license-results.json
+          name: trivy-reports
+          path: trivy-artifacts
 
-      - name: Summarize Scan Results
+      - name: Fail on Critical Misconfigurations
         run: |
-          echo "# Complete Repository Security Scan Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          summarize_trivy() {
-            local file=$1
-            local type=$2
-            if [ -f "$file" ]; then
-              TOTAL=$(jq '[.Results[] | (.Vulnerabilities // []) + (.Misconfigurations // []) + (.Secrets // []) + (.Licenses // [])] | length' "$file" || echo 0)
-              CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' "$file" || echo 0)
-              HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' "$file" || echo 0)
-              MIS=$(jq '[.Results[]?.Misconfigurations[]?] | length' "$file" || echo 0)
-              SECRETS=$(jq '[.Results[]?.Secrets[]?] | length' "$file" || echo 0)
-              LICENSES=$(jq '[.Results[]?.Licenses[]?] | length' "$file" || echo 0)
-          
-              echo "### $type Scan" >> $GITHUB_STEP_SUMMARY
-              echo "| Type | Severity | Count |" >> $GITHUB_STEP_SUMMARY
-              echo "|------|----------|-------|" >> $GITHUB_STEP_SUMMARY
-              echo "| Vulnerabilities | Critical | $CRIT |" >> $GITHUB_STEP_SUMMARY
-              echo "| Vulnerabilities | High | $HIGH |" >> $GITHUB_STEP_SUMMARY
-              echo "| Misconfigurations | - | $MIS |" >> $GITHUB_STEP_SUMMARY
-              echo "| Secrets | - | $SECRETS |" >> $GITHUB_STEP_SUMMARY
-              echo "| Licenses | - | $LICENSES |" >> $GITHUB_STEP_SUMMARY
-              echo "| **Total Issues** | - | **$TOTAL** |" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "**$type scan file not found.**" >> $GITHUB_STEP_SUMMARY
-            fi
-          }
-          
-          summarize_trivy trivy-results.json "Vulnerability/Secret/Config"
-          summarize_trivy trivy-license-results.json "License"
-
-      - name: Fail if Critical Vulns Found
-        run: |
-          CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-results.json || echo 0)
+          CRIT=$(jq '[.Results[]?.Misconfigurations[]? | select(.Severity=="CRITICAL")] | length' trivy-results.json)
           if [ "$CRIT" -gt 0 ]; then
-            echo "❌ Found $CRIT critical vulnerabilities"
+            echo "❌ Critical misconfigurations found: $CRIT"
             exit 1
-          else
-            echo "✅ No critical vulnerabilities found"
+          fi
+
+      - name: Fail on Critical Vulnerabilities
+        run: |
+          CRIT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-results.json)
+          if [ "$CRIT" -gt 0 ]; then
+            echo "❌ Critical vulnerabilities found: $CRIT"
+            exit 1
           fi
 
       - name: Comment on PR with findings
@@ -121,21 +95,23 @@ jobs:
               { path: 'trivy-results.json', type: 'Vulnerability/Secret/Config' },
               { path: 'trivy-license-results.json', type: 'License' }
             ];
-            
+
             let comment = '# Complete Repository Security Scan Report\n\n';
             const now = new Date();
             comment += `**Date:** ${now.toISOString().split('T')[0]}\n`;
             comment += `**Branch:** ${context.payload.pull_request.head.ref}\n\n`;
             
+            comment += `Artifacts: [trivy-reports](https://github.com/${context.repo.owner}/${context.repo.repo}/suites/${context.runId}/artifacts)\n\n`;
+
             for (const f of files) {
               if (!fs.existsSync(f.path)) {
                 comment += `**${f.type} scan results not found.**\n\n`;
                 continue;
               }
-            
+
               const data = JSON.parse(fs.readFileSync(f.path, 'utf8'));
               let total = 0, vulns = 0, misconfigs = 0, secrets = 0, licenses = 0;
-            
+
               for (const r of data.Results || []) {
                 vulns += (r.Vulnerabilities?.length || 0);
                 misconfigs += (r.Misconfigurations?.length || 0);
@@ -143,7 +119,7 @@ jobs:
                 licenses += (r.Licenses?.length || 0);
               }
               total = vulns + misconfigs + secrets + licenses;
-            
+
               comment += `### ${f.type} Scan\n`;
               comment += '| Category | Count |\n|----------|-------|\n';
               comment += `| Vulnerabilities | ${vulns} |\n`;
@@ -151,18 +127,8 @@ jobs:
               comment += `| Secrets | ${secrets} |\n`;
               comment += `| Licenses | ${licenses} |\n`;
               comment += `| **Total Issues** | **${total}** |\n\n`;
-            
-              if (f.type === 'License' && licenses > 0) {
-                comment += `#### License Details\n| Package | License |\n|---------|---------|\n`;
-                for (const target of data.Results || []) {
-                  if (!target.Licenses?.length) continue;
-                  for (const l of target.Licenses) {
-                    comment += `| ${l.PkgName} | ${l.License} |\n`;
-                  }
-                }
-                comment += '\n';
-              }
-            
+
+              // Vulnerabilities Details
               if (vulns > 0) {
                 comment += `#### Vulnerabilities Details (Top 10 per target)\n| Severity | Package | Installed Version | Fixed Version | CVE |\n|----------|---------|-----------------|---------------|-----|\n`;
                 for (const target of data.Results || []) {
@@ -178,7 +144,8 @@ jobs:
                 }
                 comment += '\n';
               }
-            
+
+              // Misconfigurations Details (all, collapsible)
               if (misconfigs > 0) {
                 comment += `#### Misconfigurations Details\n| Severity | ID | Message |\n|----------|----|--------|\n`;
                 for (const target of data.Results || []) {
@@ -190,7 +157,8 @@ jobs:
                 }
                 comment += '\n';
               }
-            
+
+              // Secrets Details (all, collapsible)
               if (secrets > 0) {
                 comment += `#### Secrets Details\n| Rule | Match |\n|------|-------|\n`;
                 for (const target of data.Results || []) {
@@ -202,18 +170,30 @@ jobs:
                 }
                 comment += '\n';
               }
+
+              // License Details
+              if (f.type === 'License' && licenses > 0) {
+                comment += `#### License Details\n| Package | License |\n|---------|---------|\n`;
+                for (const target of data.Results || []) {
+                  if (!target.Licenses?.length) continue;
+                  for (const l of target.Licenses) {
+                    comment += `| ${l.PkgName} | ${l.License} |\n`;
+                  }
+                }
+                comment += '\n';
+              }
             }
-            
+
             if (files.every(f => !fs.existsSync(f.path))) {
               comment += '⚠️ No scan results found.\n';
             }
-            
+
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
+
             const existing = comments.find(c => c.body.startsWith('# Complete Repository Security Scan Report'));
             if (existing) {
               await github.rest.issues.updateComment({
@@ -230,4 +210,3 @@ jobs:
                 body: comment
               });
             }
-  
