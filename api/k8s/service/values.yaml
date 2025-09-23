@@ -138,7 +138,7 @@ configMap:
         enabled: true
         azure:
           enabled: true
-        gcp:
+        static-user:
           enabled: false
         teams-scraping:
           static:

@@ -1,26 +1,26 @@
 package com.coreeng.supportbot.teams.rest;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+
 public record Config(
-    HelmConfig helm,
     ServiceConfig service,
     String namespace,
     PortForwardingConfig portForwarding
 ) {
     private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
 
-    public record HelmConfig(
+    public record DeploymentScriptConfig(
         String releaseName,
-        String chartPath
+        String chartPath,
+        String scriptPath
     ) {}
 
     public record ImageConfig(
@@ -30,7 +30,8 @@ public record Config(
 
     public record ServiceConfig(
         @JsonProperty("deployment") DeploymentConfig deployment,
-        @JsonProperty("image") ImageConfig image
+        @JsonProperty("image") ImageConfig image,
+        @JsonProperty("deploymentScript") DeploymentScriptConfig deploymentScript
     ) {}
 
     public record PortForwardingConfig(
