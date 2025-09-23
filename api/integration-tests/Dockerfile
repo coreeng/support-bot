@@ -3,6 +3,9 @@ WORKDIR /home/gradle/project
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+RUN curl -L -o kubectl "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+  && chmod +x kubectl \
+  && mv kubectl /usr/local/bin/kubectl
 
 # Copy gradle wrapper and settings
 COPY gradlew .
@@ -20,9 +23,13 @@ FROM registry.access.redhat.com/ubi8/openjdk-21-runtime:1.23
 WORKDIR /app
 
 COPY --from=builder /usr/local/bin/helm /usr/local/bin/helm
+COPY --from=builder /usr/local/bin/kubectl /usr/local/bin/kubectl
 
 COPY --from=builder /home/gradle/project/integration-tests/build/libs/integration-tests.jar .
 
 COPY k8s/service k8s/service
+COPY scripts scripts
+
+ENV INTEGRATION_TEST_CONFIG=integration-test-docker.yaml
 
 ENTRYPOINT ["java", "-jar", "integration-tests.jar", "execute", "-p", "com.coreeng.supportbot"]
