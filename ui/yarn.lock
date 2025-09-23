@@ -5817,15 +5817,18 @@ __metadata:
     "@material-ui/core": "npm:^4.9.13"
     "@material-ui/icons": "npm:^4.9.1"
     "@material-ui/lab": "npm:^4.0.0-alpha.61"
+    "@node-saml/passport-saml": "npm:5.1.0"
     "@testing-library/jest-dom": "npm:^6.0.0"
     "@testing-library/react": "npm:^14.0.0"
     "@testing-library/user-event": "npm:^14.0.0"
     "@types/luxon": "npm:^3"
+    "@types/sha.js": "npm:^2"
     luxon: "npm:^3.5.0"
     msw: "npm:^1.0.0"
     react: "npm:^16.13.1 || ^17.0.0 || ^18.0.0"
     react-use: "npm:^17.2.4"
     recharts: "npm:^2.15.0"
+    sha.js: "npm:2.4.12"
   peerDependencies:
     react: ^16.13.1 || ^17.0.0 || ^18.0.0
     react-router-dom: "*"
@@ -7168,10 +7171,15 @@ __metadata:
     "@backstage/cli": "npm:^0.29.4"
     "@backstage/errors": "npm:^1.2.6"
     "@backstage/plugin-catalog-node": "npm:^1.15.0"
+    "@node-saml/node-saml": "npm:5.1.0"
+    "@node-saml/passport-saml": "npm:5.1.0"
     "@types/express": "npm:^4.17.6"
+    "@types/sha.js": "npm:^2"
     "@types/supertest": "npm:^2.0.12"
     express: "npm:^4.17.1"
     express-promise-router: "npm:^4.1.0"
+    form-data: "npm:4.0.4"
+    sha.js: "npm:2.4.12"
     supertest: "npm:^6.2.4"
     zod: "npm:^3.22.4"
   languageName: unknown
@@ -8479,7 +8487,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@node-saml/node-saml@npm:5.1.0, @node-saml/node-saml@npm:^5.1.0":
+"@node-saml/node-saml@npm:5.1.0":
   version: 5.1.0
   resolution: "@node-saml/node-saml@npm:5.1.0"
   dependencies:
@@ -8499,26 +8507,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@node-saml/node-saml@npm:^5.0.1":
-  version: 5.0.1
-  resolution: "@node-saml/node-saml@npm:5.0.1"
-  dependencies:
-    "@types/debug": "npm:^4.1.12"
-    "@types/qs": "npm:^6.9.11"
-    "@types/xml-encryption": "npm:^1.2.4"
-    "@types/xml2js": "npm:^0.4.14"
-    "@xmldom/is-dom-node": "npm:^1.0.1"
-    "@xmldom/xmldom": "npm:^0.8.10"
-    debug: "npm:^4.3.4"
-    xml-crypto: "npm:^6.0.1"
-    xml-encryption: "npm:^3.0.2"
-    xml2js: "npm:^0.6.2"
-    xmlbuilder: "npm:^15.1.1"
-    xpath: "npm:^0.0.34"
-  checksum: 10c0/07e66f763a94d44c9fc5ab2f8839cf0a98bcc8929c1641925e165ba5966cbee5886f4c4bfe1c2b6c040e2dbd178529c67b9169343dc6a4bb333dff7debcb17da
-  languageName: node
-  linkType: hard
-
 "@node-saml/passport-saml@npm:5.1.0":
   version: 5.1.0
   resolution: "@node-saml/passport-saml@npm:5.1.0"
@@ -8530,20 +8518,6 @@ __metadata:
     passport: "npm:^0.7.0"
     passport-strategy: "npm:^1.0.0"
   checksum: 10c0/a0962b8f80e4867342984deb007a5ce3a95014e594d88652e5d34d33f62d5db8559d98a4f2c668a145bdb0212c5fdac19284bd60591537061998b46404d4acd6
-  languageName: node
-  linkType: hard
-
-"@node-saml/passport-saml@npm:^5.0.0":
-  version: 5.0.1
-  resolution: "@node-saml/passport-saml@npm:5.0.1"
-  dependencies:
-    "@node-saml/node-saml": "npm:^5.0.1"
-    "@types/express": "npm:^4.17.21"
-    "@types/passport": "npm:^1.0.16"
-    "@types/passport-strategy": "npm:^0.2.38"
-    passport: "npm:^0.7.0"
-    passport-strategy: "npm:^1.0.0"
-  checksum: 10c0/edc811b9da16b0b48f4226b055afa3419e314fd7dd98a384a0635a9bb2c57a3c2b00a8f9484b38b0cc95207d38640821fc1ff87a84b3eef517f78fc9040c5c6f
   languageName: node
   linkType: hard
 
@@ -13024,7 +12998,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/qs@npm:*, @types/qs@npm:^6.9.11, @types/qs@npm:^6.9.6":
+"@types/qs@npm:*, @types/qs@npm:^6.9.6":
   version: 6.9.18
   resolution: "@types/qs@npm:6.9.18"
   checksum: 10c0/790b9091348e06dde2c8e4118b5771ab386a8c22a952139a2eb0675360a2070d0b155663bf6f75b23f258fd0a1f7ffc0ba0f059d99a719332c03c40d9e9cd63b
@@ -14917,10 +14891,15 @@ __metadata:
     "@backstage/plugin-search-backend-module-techdocs": "npm:^0.3.6"
     "@backstage/plugin-search-backend-node": "npm:^1.3.8"
     "@backstage/plugin-techdocs-backend": "npm:^1.11.6"
+    "@node-saml/node-saml": "npm:5.1.0"
+    "@node-saml/passport-saml": "npm:5.1.0"
+    "@types/sha.js": "npm:^2"
     app: "link:../app"
     better-sqlite3: "npm:^9.0.0"
     node-gyp: "npm:^10.0.0"
     pg: "npm:^8.11.3"
+    sha.js: "npm:2.4.12"
+    tar-fs: "npm:3.0.9"
   languageName: unknown
   linkType: soft
 
@@ -29451,6 +29430,7 @@ __metadata:
   dependencies:
     "@backstage/cli": "npm:^0.30.0"
     "@backstage/e2e-test-utils": "npm:^0.1.1"
+    "@node-saml/node-saml": "npm:5.1.0"
     "@playwright/test": "npm:^1.32.3"
     node-gyp: "npm:^10.0.0"
     prettier: "npm:^2.3.2"
@@ -33388,17 +33368,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"xml-crypto@npm:^6.0.1":
-  version: 6.0.1
-  resolution: "xml-crypto@npm:6.0.1"
-  dependencies:
-    "@xmldom/is-dom-node": "npm:^1.0.1"
-    "@xmldom/xmldom": "npm:^0.8.10"
-    xpath: "npm:^0.0.33"
-  checksum: 10c0/608121007ddc50e7e0e23c1305af1dba5e449ff79ab3d0ecfb034a8072896f47bc082d377d7ef13c4ee82137f64cd1b5dde1d2f8eecea59fda55a04c1b080d0a
-  languageName: node
-  linkType: hard
-
 "xml-crypto@npm:^6.1.2":
   version: 6.1.2
   resolution: "xml-crypto@npm:6.1.2"
@@ -33410,7 +33379,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"xml-encryption@npm:^3.0.2, xml-encryption@npm:^3.1.0":
+"xml-encryption@npm:^3.1.0":
   version: 3.1.0
   resolution: "xml-encryption@npm:3.1.0"
   dependencies:
