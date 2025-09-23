@@ -58,11 +58,13 @@ jobs:
           scanners: license
           cache-dir: ${{ env.TRIVY_CACHE_DIR }}
 
-      - name: Upload Trivy Scan Artifacts
+      - name: Prepare Artifacts
         run: |
           mkdir -p trivy-artifacts
           cp trivy-results.json trivy-artifacts/
           cp trivy-license-results.json trivy-artifacts/
+
+      - name: Upload Trivy Scan Artifacts
         uses: actions/upload-artifact@v3
         with:
           name: trivy-reports
