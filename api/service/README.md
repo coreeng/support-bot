@@ -1,7 +1,4 @@
-# Support bot
-
-Slack Support Bot that handles tickets and escalations.
-Exposes metrics about processed tickets and escalations.
+# Support bot service
 
 # Running bot locally
 
@@ -42,6 +39,11 @@ You can set your desired `platform-integration.static-user.users` entries.
 ```bash
 make run
 ```
+
+> *Note*: you can specify spring profile when running the service. Example:
+> ```
+> SPRING_PROFILES_ACTIVE=functionaltests
+> ```
 
 # CodeStyle and Linting
 
