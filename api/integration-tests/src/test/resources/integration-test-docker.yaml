@@ -1,0 +1,16 @@
+namespace: support-bot-integration
+service:
+  deploymentScript:
+    releaseName: support-bot
+    chartPath: /app/k8s/service
+    scriptPath: /app/scripts/deploy-service.sh
+  deployment:
+    name: support-bot
+  image:
+    repository: support-bot
+    tag: latest
+portForwarding:
+  enabled: true
+  localPort: 8080
+  remotePort: 8080
+

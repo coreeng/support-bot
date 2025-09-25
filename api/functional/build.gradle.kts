@@ -139,13 +139,15 @@ tasks.register("testIntegrated") {
             val jarFile = bootJarTask.archiveFile.get().asFile
 
             logger.lifecycle("Starting service: $jarFile")
+            val logfile = File(logfilePath)
+            logfile.createNewFile()
             serviceProcess = ProcessBuilder(
                 "${System.getProperty("java.home")}/bin/java",
                 "-jar", jarFile.absolutePath,
                 "--spring.profiles.active=functionaltests"
             )
                 .redirectErrorStream(true)
-                .redirectOutput(File(logfilePath))
+                .redirectOutput(logfile)
                 .start()
 
             val deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(10)
