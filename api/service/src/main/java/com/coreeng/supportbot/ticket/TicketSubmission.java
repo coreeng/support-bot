@@ -15,4 +15,5 @@ public class TicketSubmission {
     private ImmutableList<String> tags;
     private String impact;
     private boolean confirmed;
+    private boolean requiresDocumentation;
 }

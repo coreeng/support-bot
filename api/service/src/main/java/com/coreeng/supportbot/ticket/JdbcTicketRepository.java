@@ -129,6 +129,7 @@ public class JdbcTicketRepository implements TicketRepository {
             .set(TICKET.TEAM, ticket.team())
             .set(TICKET.IMPACT_CODE, ticket.impact())
             .set(TICKET.LAST_INTERACTED_AT, ticket.lastInteractedAt())
+            .set(TICKET.REQUIRES_DOCUMENTATION, ticket.requiresDocumentation())
             .where(TICKET.ID.eq(ticket.id().id()))
             .execute();
         if (updatedTickets == 0) {
@@ -529,7 +530,8 @@ public class JdbcTicketRepository implements TicketRepository {
             TICKET.STATUS,
             TICKET.TEAM,
             TICKET.IMPACT_CODE,
-            TICKET.RATING_SUBMITTED
+            TICKET.RATING_SUBMITTED,
+            TICKET.REQUIRES_DOCUMENTATION
         );
     }
 
@@ -543,6 +545,7 @@ public class JdbcTicketRepository implements TicketRepository {
             .team(r.get(TICKET.TEAM))
             .impact(r.get(TICKET.IMPACT_CODE))
             .ratingSubmitted(r.get(TICKET.RATING_SUBMITTED))
+            .requiresDocumentation(r.get(TICKET.REQUIRES_DOCUMENTATION))
             .build();
     }
 

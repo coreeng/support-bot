@@ -16,6 +16,8 @@ import com.slack.api.methods.response.views.ViewsPublishResponse;
 import com.slack.api.model.Message;
 import com.slack.api.model.User;
 
+import java.util.List;
+
 public interface SlackClient {
     ReactionsAddResponse addReaction(ReactionsAddRequest request);
 
@@ -28,6 +30,8 @@ public interface SlackClient {
     ChatUpdateResponse editMessage(SlackEditMessageRequest request);
 
     Message getMessageByTs(SlackGetMessageByTsRequest request);
+
+    List<Message> getMessagesByTs(SlackGetMessageByTsRequest request);
 
     String getPermalink(SlackGetMessageByTsRequest request);
 

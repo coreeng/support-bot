@@ -57,7 +57,8 @@ public class TicketSummaryService {
                 ? allImpacts.stream()
                     .filter(i -> ticket.impact().contains(i.code()))
                     .findAny().orElse(null)
-                : null
+                : null,
+            ticket.requiresDocumentation()
         );
     }
 

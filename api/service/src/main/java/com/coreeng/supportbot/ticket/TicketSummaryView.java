@@ -21,7 +21,8 @@ public record TicketSummaryView(
     ImmutableList<Tag> tags,
     ImmutableList<Tag> currentTags,
     ImmutableList<TicketImpact> impacts,
-    @Nullable TicketImpact currentImpact
+    @Nullable TicketImpact currentImpact,
+    boolean requiresDocumentation
 ) {
     public static TicketSummaryView of(
         Ticket ticket,
@@ -31,7 +32,8 @@ public record TicketSummaryView(
         ImmutableList<Tag> tags,
         ImmutableList<Tag> currentTags,
         ImmutableList<TicketImpact> impacts,
-        @Nullable TicketImpact currentImpact
+        @Nullable TicketImpact currentImpact,
+        boolean requiresDocumentation
     ) {
         return new TicketSummaryView(
             ticket.id(),
@@ -43,7 +45,8 @@ public record TicketSummaryView(
             tags,
             currentTags,
             impacts,
-            currentImpact
+            currentImpact,
+            requiresDocumentation
         );
     }
 

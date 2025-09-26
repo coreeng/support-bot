@@ -26,8 +26,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Iterables.isEmpty;
 import static com.slack.api.model.block.Blocks.*;
-import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
-import static com.slack.api.model.block.composition.BlockCompositions.plainText;
+import static com.slack.api.model.block.composition.BlockCompositions.*;
 import static com.slack.api.model.block.element.BlockElements.*;
 import static com.slack.api.model.view.Views.*;
 import static java.lang.String.format;
@@ -104,6 +103,26 @@ public class TicketSummaryViewMapper {
                         .label(plainText("Change Status"))
                         .element(statusPicker(summaryView))
                         .optional(false)),
+                    input(i -> i
+                        .label(plainText("Documentation update required?"))
+                        .element(checkboxes(s -> s
+                            .actionId(TicketField.documentation_required.actionId())
+                            .options(List.of(
+                                option(o -> o
+                                    .text(plainText("Yes"))
+                                    .value("docs_required")
+                                )
+                            ))
+                            .initialOptions(
+                                summaryView.requiresDocumentation()
+                                    ? List.of(option(o -> o
+                                    .text(plainText("Yes"))
+                                    .value("docs_required")))
+                                    : null
+                            )
+                        ))
+                        .optional(true)
+                    ),
                     input(i -> i
                         .label(plainText("Select the Author's Team"))
                         .optional(false)
@@ -280,6 +299,7 @@ public class TicketSummaryViewMapper {
         ViewState.Value statusValue = checkNotNull(passedValues.get(TicketField.status.actionId()));
         ViewState.Value tagsValue = passedValues.get(TicketField.tags.actionId());
         ViewState.Value impactValue = passedValues.get(TicketField.impact.actionId());
+        ViewState.Value requiresDocumentation = passedValues.get(TicketField.documentation_required.actionId());
 
         return TicketSubmission.builder()
             .ticketId(new TicketId(metadata.ticketId()))
@@ -298,6 +318,7 @@ public class TicketSummaryViewMapper {
                     : null
             )
             .confirmed(false)
+            .requiresDocumentation(requiresDocumentation != null && !requiresDocumentation.getSelectedOptions().isEmpty())
             .build();
     }
 

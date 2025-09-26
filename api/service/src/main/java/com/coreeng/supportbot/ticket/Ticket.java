@@ -31,6 +31,8 @@ public class Ticket {
     private Instant lastInteractedAt;
     @Builder.Default
     private boolean ratingSubmitted = false;
+    @Builder.Default
+    private boolean requiresDocumentation = false;
 
     public static Ticket createNew(MessageTs queryTs, String channelID) {
         return Ticket.builder()

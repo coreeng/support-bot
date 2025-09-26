@@ -2,19 +2,26 @@ package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
-import com.coreeng.supportbot.rating.RatingService;
+import com.coreeng.supportbot.git.GitHubService;
 import com.coreeng.supportbot.slack.MessageRef;
+import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
+import com.slack.api.model.Message;
 import jakarta.validation.constraints.NotNull;
-import java.time.Instant;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -25,7 +32,8 @@ public class TicketProcessingService {
     private final EscalationQueryService escalationQueryService;
     private final SlackTicketsProps slackTicketsProps;
     private final ApplicationEventPublisher publisher;
-    private final RatingService ratingService;
+    private final GitHubService gitHubService;
+    private final SlackClient slackClient;
 
     public void handleMessagePosted(MessagePosted e) {
         if (isQueryEvent(e)) {
@@ -130,11 +138,24 @@ public class TicketProcessingService {
                 .tags(submission.tags())
                 .impact(submission.impact())
                 .lastInteractedAt(Instant.now())
+                .requiresDocumentation(submission.requiresDocumentation())
                 .build()
         );
 
         if (ticket.status() != updatedTicket.status()) {
             onStatusUpdate(updatedTicket);
+        }
+
+        if (submission.requiresDocumentation() && submission.status() == TicketStatus.closed) {
+            CompletableFuture.runAsync(() -> {
+                try {
+                    List<Message> messageByTs = slackClient.getMessagesByTs(SlackGetMessageByTsRequest.of(updatedTicket.queryRef()));
+                    gitHubService.createIssue(updatedTicket, messageByTs);
+                } catch (IOException | InterruptedException e) {
+                    //TODO Handle exceptions
+                    throw new RuntimeException(e);
+                }
+            });
         }
         return new TicketSubmitResult.Success();
     }

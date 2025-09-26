@@ -57,7 +57,9 @@ dependencies {
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.3")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-cache")
-
+    implementation("org.kohsuke:github-api:2.0-rc.5") {
+        exclude(group = "com.infradna.tool", module = "bridge-method-annotation")
+    }
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     runtimeOnly("org.postgresql:postgresql")
     implementation("org.flywaydb:flyway-database-postgresql")
