@@ -62,7 +62,7 @@ build-ui-app: lint-ui-app ## Build ui app
 	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" --build-arg P2P_VERSION="$(p2p_version)" ui
 
 .PHONY: build-app
-build-app: build-api-app ## Build api & ui apps
+build-app: build-api-app ## Build api app
 
 
 .PHONY: build-api-functional
@@ -102,7 +102,7 @@ push-api-app: ## Push api app
 push-ui-app: ## Push ui app
 	docker image push "$(call p2p_image_tag,$(p2p_app_name)-ui)"
 
-.PHONY: push-app ## Push api & ui apps
+.PHONY: push-app ## Push api app
 push-app: push-api-app
 
 .PHONY: push-api-functional
