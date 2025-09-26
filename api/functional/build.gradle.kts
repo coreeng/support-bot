@@ -36,7 +36,7 @@ dependencies {
     testImplementation("org.assertj:assertj-core:3.27.+")
     testImplementation("org.wiremock:wiremock:3.13.+")
 
-    // Avoiding vulnerability reports from wiremock
+// Override Jetty to address security findings reported for wiremock's transitive dependency
     testImplementation("org.eclipse.jetty:jetty-server:11.0.+")
 
     testImplementation("com.fasterxml.jackson.datatype:jackson-datatype-guava")

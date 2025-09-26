@@ -581,3 +581,4 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/vim,intellij,intellij+all,intellij+iml,windows,macos,linux,emacs,visualstudiocode,webstorm,webstorm+all,webstorm+iml
+api/service/logs/support-bot.log
