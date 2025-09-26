@@ -2,10 +2,10 @@ FROM gradle:8.11.1-jdk21 AS builder
 WORKDIR /home/gradle/project
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-RUN curl -L -o kubectl "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
-  && chmod +x kubectl \
-  && mv kubectl /usr/local/bin/kubectl
+RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash && \
+  curl -L -o kubectl "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+  chmod +x kubectl && \
+  mv kubectl /usr/local/bin/kubectl
 
 # Copy gradle wrapper and settings
 COPY gradlew .

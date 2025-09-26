@@ -78,11 +78,11 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "  NAMESPACE                  Kubernetes namespace (default: support-bot-integration)"
   echo "  CHART_PATH                 Path to Helm chart (default: ../k8s/integration-tests)"
   echo "  RELEASE_NAME               Helm release name (default: support-bot-integration-tests)"
-  echo "  TIMEOUT                    Job timeout in seconds (default: 1800)"
-  echo "  JOB_IMAGE_REPOSITORY       Docker repository for test job container"
-  echo "  IMAGE_TAG                  Docker image tag for test container (default: latest)"
-  echo "  SERVICE_IMAGE_REPOSITORY   Service Docker repository"
-  echo "  SERVICE_IMAGE_TAG          Service Docker image tag (default: latest)"
+  echo "  TIMEOUT                    Job timeout in seconds (default: 600)"
+  echo "  JOB_IMAGE_REPOSITORY       Docker repository for test job container (required)"
+  echo "  IMAGE_TAG                  Docker image tag for test container (required)"
+  echo "  SERVICE_IMAGE_REPOSITORY   Service Docker repository (required)"
+  echo "  SERVICE_IMAGE_TAG          Service Docker image tag (required)"
   echo "  CLEANUP                    Cleanup resources after completion (default: true)"
   exit 0
 fi

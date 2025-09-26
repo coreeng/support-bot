@@ -13,7 +13,7 @@ the testing process with different configuration provided.
 
 # Steps to run
 
-Open a configuration file under `src/test/resources` folder and change 
+Open the `integration-test-local.yaml` file under `src/test/resources` folder and change
 the service image repository and the tag, so that you will test against the specific version of the service.
 
 Ensure you have a connection to the external systems you will test against.
