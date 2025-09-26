@@ -13,7 +13,7 @@ DB_RELEASE="${DB_RELEASE:-support-bot-db}"
 SERVICE_RELEASE="${SERVICE_RELEASE:-support-bot}"
 JOB_RELEASE="${JOB_RELEASE:-support-bot-functional-tests}"
 
-TIMEOUT="${TIMEOUT:-60}"
+TIMEOUT="${TIMEOUT:-180}"
 
 JOB_IMAGE_REPOSITORY="${JOB_IMAGE_REPOSITORY:?JOB_IMAGE_REPOSITORY is required}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
@@ -64,7 +64,7 @@ main() {
       SERVICE_IMAGE_TAG="$SERVICE_IMAGE_TAG" \
       WAIT_TIMEOUT=180
   else
-    log_warning "Skipping service deployment per SKIP_SERVICE_DEPLOYMENT=true"
+    log_warning "Skipping service deployment per DEPLOY_SERVICE=false"
   fi
 
   log "Installing functional test job [$JOB_RELEASE]..."
@@ -96,7 +96,7 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   echo "  DB_RELEASE                 DB Helm release name (default: support-bot-db)"
   echo "  SERVICE_RELEASE            Service Helm release name (default: support-bot)"
   echo "  JOB_RELEASE                Job Helm release name (default: support-bot-functional-tests)"
-  echo "  TIMEOUT                    Job timeout in seconds (default: 60)"
+  echo "  TIMEOUT                    Job timeout in seconds (default: 180)"
   echo "  JOB_IMAGE_REPOSITORY       Docker repository for tests job"
   echo "  IMAGE_TAG                  Docker image tag for job (default: latest)"
   echo "  SERVICE_IMAGE_REPOSITORY   Service Docker repository"
@@ -106,4 +106,3 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 fi
 
 main "$@"
-
