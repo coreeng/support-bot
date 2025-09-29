@@ -7,9 +7,6 @@ import java.util.List;
 
 @ConfigurationProperties("support-insights")
 public record SupportInsightsProps(List<Dashboard> dashboards) {
-    public SupportInsightsProps {
-        dashboards = dashboards == null ? List.of() : List.copyOf(dashboards);
-    }
 
     public record Dashboard(
         String title,

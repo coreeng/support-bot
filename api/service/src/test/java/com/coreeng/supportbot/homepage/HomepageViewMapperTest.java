@@ -4,7 +4,6 @@ import com.coreeng.supportbot.config.SupportInsightsProps;
 import com.coreeng.supportbot.slack.client.SlackView;
 import com.coreeng.supportbot.ticket.TicketSummaryViewMapper;
 import com.coreeng.supportbot.util.JsonMapper;
-import com.coreeng.supportbot.util.RelativeDateFormatter;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.block.HeaderBlock;
 import com.slack.api.model.block.LayoutBlock;
@@ -13,16 +12,14 @@ import com.slack.api.model.block.composition.MarkdownTextObject;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class HomepageViewMapperTest {
-    private final RelativeDateFormatter dateFormatter = new RelativeDateFormatter(ZoneId.of("UTC"));
     private final JsonMapper jsonMapper = new JsonMapper();
     private final TicketSummaryViewMapper ticketSummaryViewMapper =
-        new TicketSummaryViewMapper(jsonMapper, dateFormatter);
+        new TicketSummaryViewMapper(jsonMapper);
 
     @Test
     void renderShouldIncludeSupportInsightsWhenConfigured() {
@@ -33,7 +30,6 @@ class HomepageViewMapperTest {
 
         HomepageViewMapper mapper = new HomepageViewMapper(
             ticketSummaryViewMapper,
-            dateFormatter,
             jsonMapper,
             props
         );
@@ -66,7 +62,6 @@ class HomepageViewMapperTest {
         SupportInsightsProps props = new SupportInsightsProps(List.of());
         HomepageViewMapper mapper = new HomepageViewMapper(
             ticketSummaryViewMapper,
-            dateFormatter,
             jsonMapper,
             props
         );
