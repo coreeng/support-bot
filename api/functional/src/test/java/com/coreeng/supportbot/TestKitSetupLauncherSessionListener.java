@@ -35,7 +35,7 @@ public class TestKitSetupLauncherSessionListener implements LauncherSessionListe
     public void launcherSessionOpened(LauncherSession session) {
         Config config;
         try {
-            config = readConfigurationFile();
+            config = readConfigurationFileOnClasspath(configFile);
             slackWiremock = new SlackWiremock(config.mocks().slack());
             slackWiremock.start();
             logger.info("SlackWiremock server started successfully");
@@ -58,11 +58,11 @@ public class TestKitSetupLauncherSessionListener implements LauncherSessionListe
         slackWiremock.stop();
     }
 
-    private Config readConfigurationFile() {
+    private Config readConfigurationFileOnClasspath(String fileName) {
         try {
             var env = new StandardEnvironment();
             var yamlLoader = new YamlPropertySourceLoader();
-            List<PropertySource<?>> yaml = yamlLoader.load("config", new ClassPathResource(configFile));
+            List<PropertySource<?>> yaml = yamlLoader.load("config", new ClassPathResource(fileName));
             yaml.forEach(ps -> env.getPropertySources().addLast(ps));
             var binder = new Binder(
                 ConfigurationPropertySources.get(env),
