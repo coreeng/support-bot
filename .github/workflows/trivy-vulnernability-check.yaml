@@ -46,6 +46,7 @@ jobs:
           ignore-unfixed: true
           severity: HIGH,CRITICAL
           cache-dir: ${{ env.TRIVY_CACHE_DIR }}
+          config: trivy.yaml
 
       - name: Run License Scan
         uses: aquasecurity/trivy-action@0.28.0
@@ -57,6 +58,7 @@ jobs:
           format: json
           scanners: license
           cache-dir: ${{ env.TRIVY_CACHE_DIR }}
+          config: trivy.yaml
 
       - name: Prepare Artifacts
         run: |
