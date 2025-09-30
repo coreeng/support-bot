@@ -34,6 +34,7 @@ deploy_db() {
   helm repo add bitnami https://charts.bitnami.com/bitnami
   helm repo update bitnami
   helm upgrade --install "$release" bitnami/postgresql -n "$ns" \
+    --set image.repository=bitnamilegacy/postgresql \
     --set global.postgresql.auth.postgresPassword=rootpassword \
     --set global.postgresql.auth.username=supportbot \
     --set global.postgresql.auth.password=supportbotpassword \
