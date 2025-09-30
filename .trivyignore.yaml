@@ -3,3 +3,18 @@ misconfigurations:
     paths:
       - api/k8s/service/templates/configmap.yaml
     statement: ConfigMap contains placeholders referencing Secrets; no real secrets stored here.
+  - id: KSV056
+    paths:
+      - api/k8s/integration-tests/templates/role.yaml
+    statement: |
+      A role for the integration tests should be able to deploy the database and the service.
+      Since it's a test environment, there is not harm in being able to redirect the traffic.
+  - id: KSV050
+    paths:
+      - api/k8s/integration-tests/templates/role.yaml
+    statement: |
+      A role for the integration tests should be able to deploy the service.
+      The service expects to have access to the Kubernetes cluster where it's running,
+      so the integration tests should be able to deploy Role and RoleBinding for the service.
+      The role configured for the integration test is scoped to the namespaces it's running in,
+      and it won't be able to create a Role with broader permissions.
