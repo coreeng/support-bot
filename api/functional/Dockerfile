@@ -25,4 +25,4 @@ WORKDIR /app
 COPY --from=builder /home/gradle/project/functional/build/libs/functional.jar ./functional-tests.jar
 
 ENTRYPOINT ["java", "-jar", "functional-tests.jar", "execute", "-p", "com.coreeng.supportbot"]
-USER 1001
+USER 185
