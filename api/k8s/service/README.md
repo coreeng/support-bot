@@ -9,6 +9,7 @@ The chart expects a PostgreSQL database to be available. You can deploy PostgreS
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm install support-bot-db bitnami/postgresql \
+  --set image.repository=bitnamilegacy/postgresql \
   --set global.postgresql.auth.postgresPassword=rootpassword \
   --set global.postgresql.auth.username=supportbot \
   --set global.postgresql.auth.password=supportbotpassword \
