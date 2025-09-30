@@ -56,11 +56,13 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /app/config
+          {{- end }}
+      {{- if .Values.configMap.create }}
       volumes:
         - name: config
           configMap:
             name: {{ include "support-bot.fullname" . }}
-          {{- end }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

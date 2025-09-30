@@ -48,7 +48,10 @@ deploy_db() {
 deploy_service() {
   local ns="$1" release="$2" chart_path="$3" image_repo="$4" image_tag="$5"
   log "Installing service [${release}] in ${ns} from ${chart_path}..."
-  local args=(upgrade --install "$release" "$chart_path" -n "$ns" --set image.repository="$image_repo" --set image.tag="$image_tag" --wait --atomic --timeout=5m)
+  local args=(upgrade --install "$release" "$chart_path" -n "$ns" \
+    --set image.repository="$image_repo" \
+    --set image.tag="$image_tag" \
+    --wait --atomic --timeout=5m)
   if [[ -n "${VALUES_FILE}" ]]; then
     args+=( -f "$VALUES_FILE" )
   fi
