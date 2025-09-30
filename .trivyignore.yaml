@@ -1,0 +1,5 @@
+misconfigurations:
+  - id: AVD-KSV-0109
+    paths:
+      - api/k8s/service/templates/configmap.yaml
+    statement: ConfigMap contains placeholders referencing Secrets; no real secrets stored here.
