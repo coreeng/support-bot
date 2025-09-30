@@ -36,11 +36,21 @@ spec:
           readOnly: true
         - name: tmp
           mountPath: /tmp
+        - name: helm-home
+          mountPath: /home/jboss/.config/helm
+        - name: helm-home
+          mountPath: /home/jboss/.cache/helm
+        - name: kube-home
+          mountPath: /home/jboss/.kube
       volumes:
       - name: config
         configMap:
           name: {{ include "support-bot-integration-tests.fullname" . }}-config
       - name: tmp
+        emptyDir: {}
+      - name: helm-home
+        emptyDir: {}
+      - name: kube-home
         emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
