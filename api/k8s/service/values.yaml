@@ -20,9 +20,9 @@ serviceAccount:
 podAnnotations: {}
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 1001
-  runAsGroup: 1001
-  fsGroup: 1001
+  runAsUser: 185
+  runAsGroup: 185
+  fsGroup: 185
   seccompProfile:
     type: RuntimeDefault
 securityContext:

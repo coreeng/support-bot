@@ -45,4 +45,4 @@ COPY scripts scripts
 ENV INTEGRATION_TEST_CONFIG=integration-test-docker.yaml
 
 ENTRYPOINT ["java", "-jar", "integration-tests.jar", "execute", "-p", "com.coreeng.supportbot"]
-USER 1001
+USER 185
