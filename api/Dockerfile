@@ -1,9 +1,10 @@
 ## Build stage
-FROM gradle:jdk21 AS build
+FROM gradle:8.12.1-jdk21 AS build
 WORKDIR /build
 
 # hadolint ignore=DL3008
-RUN apt-get update && apt-get install -y --no-install-recommends postgresql postgresql-contrib
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql postgresql-contrib && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN sed -i 's/peer/trust/' '/etc/postgresql/16/main/pg_hba.conf' && \
     sed -i 's/md5/trust/' '/etc/postgresql/16/main/pg_hba.conf'
@@ -32,3 +33,4 @@ COPY --from=build /build/service/build/libs/service-*.jar /app/service.jar
 CMD ["java", "-jar", "/app/service.jar"]
 
 EXPOSE 8080 8081
+USER 1001
