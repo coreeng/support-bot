@@ -13,17 +13,12 @@ serviceAccount:
   role:
     create: true
     rules:
-      # ConfigMap operations - create/delete for test setup/cleanup
+      # ConfigMap operations - create/delete for test setup/cleanup and team scraping by service
       - apiGroups: [""]
         resources: ["configmaps"]
         verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
 
-      # ServiceAccount and Secrets operations – service deployment
-      - apiGroups: [""]
-        resources: ["serviceaccounts", "secrets"]
-        verbs: ["get", "list", "watch", "create", "delete"]
-
-      # Pod operations - for status checking, logs, and port forwarding
+      # Pod operations - for status checking
       - apiGroups: [""]
         resources: ["pods"]
         verbs: ["get", "list", "watch"]
@@ -35,9 +30,13 @@ serviceAccount:
 
       # Deployment operations - for waiting until ready
       - apiGroups: ["apps"]
-        resources: ["statefulsets", "deployments", "replicasets"]
+        resources: ["statefulsets", "deployments"]
         verbs: ["get", "list", "watch", "create", "delete"]
 
+      # RBAC operation for deploying the service
+      - apiGroups: [""]
+        resources: ["serviceaccounts"]
+        verbs: ["get", "list", "create", "delete"]
       - apiGroups: ["rbac.authorization.k8s.io"]
         resources: ["roles", "rolebindings"]
         verbs: ["get", "list", "create", "delete"]
@@ -45,7 +44,7 @@ serviceAccount:
 job:
   restartPolicy: Never
   backoffLimit: 1
-  activeDeadlineSeconds: 1800  # 30 minutes timeout
+  activeDeadlineSeconds: 180  # 3 minutes timeout
   parallelism: 1
   completions: 1
 
