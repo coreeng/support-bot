@@ -30,7 +30,7 @@ serviceAccount:
 
       # Deployment operations - for waiting until ready
       - apiGroups: ["apps"]
-        resources: ["statefulsets", "deployments"]
+        resources: ["statefulsets", "deployments", "replicasets"]
         verbs: ["get", "list", "watch", "create", "delete"]
 
       # RBAC operation for deploying the service
