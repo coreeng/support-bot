@@ -120,6 +120,7 @@ public class ServiceStartupTest {
         env.put("SERVICE_IMAGE_TAG", config.service().image().tag());
         env.put("WAIT_TIMEOUT", "60");
         env.put("REDEPLOY", action.equals("deploy") ? "true" : "false");
+        env.put("DEPLOY_DB", "false");
         env.put("HELM_DRIVER", "configmap");
 
         pb.inheritIO();
