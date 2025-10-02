@@ -42,7 +42,6 @@ deploy_db() {
     --set primary.pdb.create=false \
     --set primary.networkPolicy.enabled=false \
     --set serviceAccount.create=false \
-    --set auth.existingSecret=postgresql-master-password \
     --wait --atomic --timeout=3m
   log_success "PostgreSQL deployed"
 }
@@ -117,4 +116,7 @@ main() {
   esac
 }
 
-main "$@"
+# Allow this script to be sourced for reusing functions without executing main
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
