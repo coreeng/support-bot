@@ -32,12 +32,12 @@ public class GitHubService {
         GitHub gh = new GitHubBuilder().withOAuthToken(System.getenv("GITHUB_OAUTH_TOKEN")).build();
 
         String querySummary = timedOllamaSummarisation(threadedMessages);
-
+        String issueTitle = ollamaGenerateTitle(threadedMessages);
         GHRepository repository = gh.getRepository(REPOSITORY);
 
         String issueBody = getIssueBodyTemplate(ticket, querySummary);
 
-        repository.createIssue("Documentation updates")
+        repository.createIssue(issueTitle)
                 .label("Documentation")
                 .body(issueBody)
                 .create();
@@ -97,11 +97,43 @@ public class GitHubService {
         return String.format(
                 "A tenant of our Kubernetes platform reported a problem and we provided a resolution. " +
                         "Produce a single, clear, and concise paragraph summarizing both the problem and the solution. " +
-                        "Do not include any headers, quotes, and do not address a person. Just provide a descriptive text suitable for posting in a GitHub issue.\n" +
+                        "Do not include any headers, introductions quotes. ONLY provide a descriptive text suitable for posting in a GitHub issue." +
+                        "You must NOT say here is a clear and concise paragraph, or anything like that. Just produce the summary only.\n" +
                         "Problem: %s\nSolution: %s",
                 query,
                 resolution
         );
+    }
+
+    private String ollamaGenerateTitle(List<Message> threadedMessages) throws IOException, InterruptedException {
+        String prompt = String.format(
+                "Generate a concise GitHub issue title based on the following problem and solution. " +
+                        "Rules:\n" +
+                        "1. The title MUST start with 'Docs: '.\n" +
+                        "2. Keep it under 10 words.\n" +
+                        "3. Do not include explanations, introductions, or quotes. Return ONLY the title.\n" +
+                        "Problem: %s\nSolution: %s",
+                threadedMessages.get(0).getText().trim(),
+                threadedMessages.get(2).getText().trim()
+        );
+
+
+        String payload = objectMapper.writeValueAsString(Map.of(
+                "model", "llama3.1",
+                "prompt", prompt,
+                "stream", false
+        ));
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(OLLAMA_URL))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        JsonNode node = objectMapper.readTree(response.body());
+
+        return node.path("response").asText().trim();
     }
 }
 
