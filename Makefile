@@ -2,8 +2,6 @@
 P2P_TENANT_NAME ?= support-bot
 P2P_APP_NAME ?= support-bot
 
-P2P_IMAGE_NAMES := $(P2P_APP_NAME)
-
 # Download and include p2p makefile
 $(shell curl -fsSL "https://raw.githubusercontent.com/coreeng/p2p/v1/p2p.mk" -o ".p2p.mk")
 include .p2p.mk
@@ -34,121 +32,56 @@ p2p-integration:   build-integration   push-integration   deploy-integration   r
 p2p-extended-test: build-extended-test push-extended-test deploy-extended-test run-extended-test ## p2p extended tests
 p2p-prod:          publish-prod                           deploy-prod                            ## p2p release to production
 
-
 ##@ Lint targets
 
-.PHONY: lint-api-app
-lint-api-app: ## Lint api app
+.PHONY: lint-app
+lint-app: ## Lint app
 	docker run --rm -i docker.io/hadolint/hadolint < api/Dockerfile
 	docker run --rm -i docker.io/hadolint/hadolint < api/functional/Dockerfile
 	docker run --rm -i docker.io/hadolint/hadolint < api/integration-tests/Dockerfile
 
-.PHONY: lint-ui-app
-lint-ui-app: ## Lint ui app
-	docker run --rm -i docker.io/hadolint/hadolint < ui/Dockerfile
-
-.PHONY: lint-app
-lint-app: lint-api-app lint-ui-app ## Lint api & ui app
-
-
 ##@ Build targets
 
-.PHONY: build-api-app
-build-api-app: lint-api-app ## Build api app
+.PHONY: build-app
+build-app: lint-app ## Build app
 	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --build-arg P2P_VERSION="$(p2p_version)" api
 
-.PHONY: build-ui-app
-build-ui-app: lint-ui-app ## Build ui app
-	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" --build-arg P2P_VERSION="$(p2p_version)" ui
-
-.PHONY: build-app
-build-app: build-api-app ## Build api app
-
-
-.PHONY: build-api-functional
-build-api-functional: ## Build api functional test docker image
-	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --file api/functional/Dockerfile api
-
-.PHONY: build-ui-functional
-build-ui-functional: ## Build ui functional test frontend plugin
-	@echo "WARNING: $@ not implemented"
-
 .PHONY: build-functional
-build-functional: build-api-functional build-ui-functional ## Build functional tests
+build-functional: ## Build functional test docker image
+	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --file api/functional/Dockerfile api
 
 .PHONY: build-nft
 build-nft:
 	@echo "warning: $@ not implemented"
 
-.PHONY: build-api-integration
-build-api-integration:
-	docker buildx build --platform linux/amd64 "$(p2p_image_cache)" --tag "$(p2p_image_tag)" --file api/integration-tests/Dockerfile api --load
-
 .PHONY: build-integration
-build-integration: build-api-integration
+build-integration:
+	docker buildx build --platform linux/amd64 "$(p2p_image_cache)" --tag "$(p2p_image_tag)" --file api/integration-tests/Dockerfile api --load
 
 .PHONY: build-extended-test
 build-extended-test:
 	@echo "WARNING: $@ not implemented"
 
-
 ##@ Push targets
 
-.PHONY: push-api-app
-push-api-app: ## Push api app
+.PHONY: push-app
+push-app: ## Push app
 	docker image push "$(p2p_image_tag)"
-
-.PHONY: push-ui-app
-push-ui-app: ## Push ui app
-	docker image push "$(call p2p_image_tag,$(p2p_app_name)-ui)"
-
-.PHONY: push-app ## Push api app
-push-app: push-api-app
-
-.PHONY: push-api-functional
-push-api-functional: ## Push api functional test docker image
-	docker image push "$(p2p_image_tag)"
-
-.PHONY: push-ui-functional
-push-ui-functional: ## Push ui functional test frontend plugin
-	@echo "WARNING: $@ not implemented"
 
 .PHONY: push-functional
-push-functional: push-api-functional push-ui-functional ## Push functional tests images
-
-.PHONY: push-api-nft
-push-api-nft: ## Push api nft test docker image
-	@echo "WARNING: $@ not implemented"
-
-.PHONY: push-ui-nft
-push-ui-nft: ## Push ui nft test frontend plugin
-	@echo "WARNING: $@ not implemented"
-
-.PHONY: push-nft
-push-nft: push-api-nft push-ui-nft ## Push nft tests images
-	@echo "WARNING: $@ not implemented"
-
-.PHONY: push-api-integration
-push-api-integration: ## Push api integration test docker image
+push-functional: ## Push functional test docker image
 	docker image push "$(p2p_image_tag)"
 
-.PHONY: push-ui-integration
-push-ui-integration: ## Push ui integration test frontend plugin
+.PHONY: push-nft
+push-nft: ## Push nft test docker image
 	@echo "WARNING: $@ not implemented"
 
 .PHONY: push-integration
-push-integration: push-api-integration push-ui-integration ## Push integration tests images
-
-.PHONY: push-api-extended-test
-push-api-extended-test: ## Push api extended-test test docker image
-	@echo "WARNING: $@ not implemented"
-
-.PHONY: push-ui-extended-test
-push-ui-extended-test: ## Push ui extended-test test frontend plugin
-	@echo "WARNING: $@ not implemented"
+push-integration: ## Push integration test docker image
+	docker image push "$(p2p_image_tag)"
 
 .PHONY: push-extended-test
-push-extended-test: push-api-extended-test push-ui-extended-test ## Push extended-test tests images
+push-extended-test: ## Push extended-test test docker image
 	@echo "WARNING: $@ not implemented"
 
 ##@ Deploy targets
@@ -178,28 +111,15 @@ deploy-functional: ## Deploy service and DB for functional tests, then run tests
 
 ##@ Run targets
 
-.PHONY: run-api-app
-run-api-app: ## Run api app
+.PHONY: run-app
+run-app: ## Run app
 	@docker network inspect "$(p2p_app_name)" >/dev/null 2>&1 || docker network create "$(p2p_app_name)" >/dev/null
 	docker run --rm --network "$(p2p_app_name)" --name "$(p2p_app_name)" \
 		-p 8080:8080 \
 		"$(p2p_image_tag)"
 
-.PHONY: run-ui-app
-run-ui-app: ## Run ui app
-	@docker network inspect "$(p2p_app_name)" >/dev/null 2>&1 || docker network create "$(p2p_app_name)" >/dev/null
-	docker run --rm --network "$(p2p_app_name)" --name "$(p2p_app_name)-ui" \
-		-p 7007:7007 \
-		-e SUPPORT_BOT_API_URL='http://$(p2p_app_name):8080' \
-		"$(call p2p_image_tag,$(p2p_app_name)-ui)"
-
-.PHONY: run-app ## Run api & ui apps
-run-app:
-	@echo "WARNING: $@ not implemented"
-
-
-.PHONY: run-api-functional
-run-api-functional:
+.PHONY: run-functional
+run-functional:
 	NAMESPACE="$(p2p_namespace)" \
 	JOB_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)-functional" \
 	IMAGE_TAG="$(p2p_version)" \
@@ -216,15 +136,12 @@ run-api-functional:
 	DEPLOY_DB=true \
 	./api/scripts/deploy-service.sh
 
-.PHONY: run-functional
-run-functional: run-api-functional
-
 .PHONY: run-nft
 run-nft:
 	@echo "WARNING: $@ not implemented"
 
-.PHONY: run-api-integration
-run-api-integration:
+.PHONY: run-integration
+run-integration:
 	NAMESPACE="$(p2p_namespace)" \
 	JOB_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)-integration" \
 	IMAGE_TAG="$(p2p_version)" \
@@ -232,42 +149,14 @@ run-api-integration:
 	SERVICE_IMAGE_TAG="$(p2p_version)" \
 	api/scripts/run-integration-tests.sh
 
-.PHONY: run-integration
-run-integration: run-api-integration
-
 .PHONY: run-extended-test
 run-extended-test:
 	@echo "WARNING: $@ not implemented"
 
+##@ Publish target
 
-##@ Publish targets
-
-.PHONY: publish-api-prod
-publish-api-prod: ## Publish api container image
+.PHONY: publish-prod
+publish-prod: ## Publish container image
 	@printf "Login to ghcr.io... "
 	@echo "$(GITHUB_TOKEN)" | skopeo login --username "$(or $(GITHUB_ACTOR),anonymous)" --password-stdin ghcr.io
 	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/$(p2p_app_name):$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name):$(p2p_version)"
-
-.PHONY: publish-ui-prod
-publish-ui-prod: ## Publish ui npm package
-	@npm set "//npm.pkg.github.com/:_authToken=$(GITHUB_TOKEN)"
-	@npm set "@coreeng:registry=https://npm.pkg.github.com/"
-	docker create --name plugin-container "$(p2p_registry)/$(p2p_app_name)-ui:$(p2p_version)"
-	docker cp plugin-container:/app/coreeng-$(p2p_app_name).tgz ./coreeng-$(p2p_app_name).tgz
-	docker rm plugin-container
-	@published_shasum=`npm view @coreeng/$(p2p_app_name)@$(p2p_version) dist.shasum 2>/dev/null || echo none` ; \
-	if [ "$$published_shasum" = "none" ] ; then \
-		echo "Publishing npm package $(p2p_version)" ; \
-		npm publish coreeng-$(p2p_app_name).tgz ; \
-	else \
-		local_shasum=`shasum coreeng-$(p2p_app_name).tgz | awk '{print $$1}'` ; \
-		if [ "$$published_shasum" = "$$local_shasum" ] ; then \
-			echo "Publishing npm package $(p2p_version) skipped as it already exists with same shasum" ; \
-		else \
-			echo "Publishing npm package $(p2p_version) failed as it already exists with a different shasum" ; \
-			exit 1 ; \
-		fi ; \
-	fi
-
-.PHONY: publish-prod
-publish-prod: publish-api-prod publish-ui-prod ## Publish api & ui artifacts
