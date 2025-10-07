@@ -1,4 +1,4 @@
-# Support-Bot
+# Support Bot
 
 ![Build Status](https://img.shields.io/github/actions/workflow/status/coreeng/support-bot/support-bot-fast-feedback.yaml?branch=main)
 ![License](https://img.shields.io/github/license/coreeng/support-bot)
@@ -6,14 +6,14 @@
 
 ___
 ## 🚀 Introduction 
-The Support-Bot is a Slack integration designed to **simplify** and **automate** support workflows directly
+The Support Bot is a Slack integration designed to **simplify** and **automate** support workflows directly
 within your workspace.
 
 You can:
 
 🧾 Create tickets from Slack messages in dedicated channels.
 
-👀 View and track ticket statuses.
+👀 View and track ticket statuses. 
 
 ⚙️ Update and manage ticket states (open, closed).
 
@@ -37,15 +37,15 @@ ___
 
 ## Running locally
 
-To run the Support-Bot locally, please refer to [the service README](https://github.com/coreeng/support-bot/blob/main/api/service/README.md) for instructions.
+To run the Support Bot locally, please refer to [the service README](https://github.com/coreeng/support-bot/blob/main/api/service/README.md) for instructions.
 
 ## Running within a Kubernetes Cluster
 
-Follow these steps to deploy the Support-Bot in a Kubernetes environment:
+Follow these steps to deploy the Support Bot in a Kubernetes environment:
 
 ### 1️⃣ Image
 
-You can reference the official Support-Bot image directly in your deployment:
+You can reference the official Support Bot image directly in your deployment:
 
 ```
 ghcr.io/coreeng/support-bot:<latestVersionFromRegistry>
@@ -65,8 +65,10 @@ FROM ghcr.io/coreeng/support-bot:0.0.48
 ### 2️⃣ Database
 
 A `Postgres` database is required for the application to function. Ensure your cluster has a running
-Postgres instance and that the Support-Bot can connect to it. The Support-Bot will run database migrations on startup.
+Postgres instance and that the Support Bot can connect to it.
 
+> Note:
+> The Support Bot will run database migrations on startup
 ### 3️⃣ Application Configuration
 
 We recommend mounting your custom configuration as a Kubernetes `ConfigMap`.
@@ -92,7 +94,7 @@ For the application to function correctly, you will need to set the following en
 
 ### 5️⃣ Identity Provider Integration (Optional)
 
-The Support-Bot can integrate with an Identity Provider(E.g: Azure) to fetch real organisational user details, 
+The Support Bot can integrate with an Identity Provider(E.g: Azure) to fetch real organisational user details, 
 so we are able to associate support tickets with teams.
 
 For local runs or testing, you can define a static list of users and groups instead.  
@@ -112,4 +114,4 @@ This project is licensed under the **Apache 2.0 License**. See [LICENSE](LICENCE
 
 ---
 
-Developer & Maintained by [CECG](https://cecg.io/about-us) 🚀
+Developer & Maintained with 💙 by [CECG](https://cecg.io/about-us) 🚀
