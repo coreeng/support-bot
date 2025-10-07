@@ -92,7 +92,9 @@ For the application to function correctly, you will need to set the following en
 
 ### 5️⃣ Identity Provider Integration (Optional)
 
-The Support-Bot can integrate with an Identity Provider(E.g: Azure) to fetch real user details.  
+The Support-Bot can integrate with an Identity Provider(E.g: Azure) to fetch real organisational user details, 
+so we are able to associate support tickets with teams.
+
 For local runs or testing, you can define a static list of users and groups instead.  
 If you want to use real users in Slack, configuring an Identity Provider is recommended.
 
