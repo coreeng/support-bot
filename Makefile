@@ -30,7 +30,7 @@ p2p-functional:    build-functional    push-functional    deploy-functional    r
 p2p-nft:           build-nft           push-nft           deploy-nft           run-nft           ## p2p nft tests
 p2p-integration:   build-integration   push-integration   deploy-integration   run-integration   ## p2p integration tests
 p2p-extended-test: build-extended-test push-extended-test deploy-extended-test run-extended-test ## p2p extended tests
-p2p-prod:          publish-prod                           deploy-prod                            ## p2p release to production
+p2p-prod:          publish-prod                            			                             ## p2p release to production
 
 ##@ Lint targets
 
