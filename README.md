@@ -27,6 +27,12 @@ You can:
 
 ___
 
+## 🤝 Contributing
+
+We welcome contributions! Please read the [CONTRIBUTING guide](CONTRIBUTING.md) before submitting issues or pull requests.
+
+___
+
 ## 📦 Installation
 
 ## Running locally
@@ -37,22 +43,25 @@ To run the Support-Bot locally, please refer to [the service README](https://git
 
 Follow these steps to deploy the Support-Bot in a Kubernetes environment:
 
-### 1️⃣ Dockerfile
+### 1️⃣ Image
 
-Create a `Dockerfile` that uses our base image. You can reference the image below:
+You can reference the official Support-Bot image directly in your deployment:
 
 ```
 ghcr.io/coreeng/support-bot:<latestVersionFromRegistry>
 ```
- 
+
 * Replace `<latestVersionFromRegistry>` with the latest version
 * For a full list of available versions, see the [package registry](https://github.com/coreeng/support-bot/pkgs/container/support-bot)
+
+If you need to customize the image (e.g., add extra config, commands, or scripts), create a Dockerfile based on the base image:
 
 ```Dockerfile
 # Dockerfile example
 FROM ghcr.io/coreeng/support-bot:0.0.48
 # Optional: add custom config/commands
 ```
+
 ### 2️⃣ Database
 
 A `Postgres` database is required for the application to function. Ensure your cluster has a running
@@ -81,10 +90,12 @@ For the application to function correctly, you will need to set the following en
 | `SLACK_SIGNING_SECRET` | Slack signing secret |
 | `SLACK_TICKET_CHANNEL_ID` | Slack channel ID where queries arrive |
 
-### 5️⃣ Identity Provider
+### 5️⃣ Identity Provider Integration (Optional)
 
-The Support-Bot integrates with an **Identity Provider** to fetch member details.  
-An Identity Provider is a prerequisite for the bot to function.  
+The Support-Bot can integrate with an Identity Provider(E.g: Azure) to fetch real user details.  
+For local runs or testing, you can define a static list of users and groups instead.  
+If you want to use real users in Slack, configuring an Identity Provider is recommended.
+
 More details under `platform-integration` in the [configuration docs](https://github.com/coreeng/support-bot/blob/main/api/service/docs/configuration.md).
 
 ## 6️⃣ Feedback & Support
@@ -93,10 +104,10 @@ If you have questions, need assistance, or want to provide feedback, feel free t
 
 --- 
 
-## 📄 License
+## 📄 Licence
 
 This project is licensed under the **Apache 2.0 License**. See [LICENSE](LICENCE) for details.
 
 ---
 
-Developer & Maintained by [CECG](https://cecg.io/about-us)
+Developer & Maintained by [CECG](https://cecg.io/about-us) 🚀
