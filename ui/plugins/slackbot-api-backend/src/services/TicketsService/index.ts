@@ -1,1 +1,0 @@
-export { createTicketsService } from './createTicketsService';
