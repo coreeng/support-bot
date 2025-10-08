@@ -1,1 +1,0 @@
-export { TicketTableComponent } from './TicketTableComponent';
