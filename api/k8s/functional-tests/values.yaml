@@ -6,6 +6,20 @@ image:
 nameOverride: ""
 fullnameOverride: ""
 
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 185
+  runAsGroup: 185
+  fsGroup: 185
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
 job:
   restartPolicy: Never
   backoffLimit: 0
@@ -23,4 +37,3 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
-

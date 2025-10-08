@@ -1,4 +1,4 @@
-FROM gradle:8.11.1-jdk21 AS builder
+FROM gradle:8.12.1-jdk21 AS builder
 WORKDIR /home/gradle/project
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -25,3 +25,4 @@ WORKDIR /app
 COPY --from=builder /home/gradle/project/functional/build/libs/functional.jar ./functional-tests.jar
 
 ENTRYPOINT ["java", "-jar", "functional-tests.jar", "execute", "-p", "com.coreeng.supportbot"]
+USER 185

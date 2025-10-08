@@ -52,15 +52,21 @@ spec:
             {{- toYaml .Values.readinessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          {{- if .Values.configMap.create }}
           volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if .Values.configMap.create }}
             - name: config
               mountPath: /app/config
+            {{- end }}
       volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.configMap.create }}
         - name: config
           configMap:
             name: {{ include "support-bot.fullname" . }}
-          {{- end }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
