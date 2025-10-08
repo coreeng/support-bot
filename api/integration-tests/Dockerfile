@@ -1,11 +1,23 @@
-FROM gradle:8.11.1-jdk21 AS builder
+FROM gradle:8.12.1-jdk21 AS builder
 WORKDIR /home/gradle/project
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash && \
-  curl -L -o kubectl "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
-  chmod +x kubectl && \
-  mv kubectl /usr/local/bin/kubectl
+# Install Helm and kubectl with pinned versions and checksum verification
+ARG HELM_VERSION=3.19.0
+ARG KUBECTL_VERSION=v1.33.5
+
+RUN set -euxo pipefail; \
+  curl -fsSLO "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz" && \
+  curl -fsSLO "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz.sha256sum" && \
+  sha256sum -c "helm-v${HELM_VERSION}-linux-amd64.tar.gz.sha256sum" && \
+  tar -xzf "helm-v${HELM_VERSION}-linux-amd64.tar.gz" && \
+  mv linux-amd64/helm /usr/local/bin/helm && \
+  rm -rf linux-amd64 "helm-v${HELM_VERSION}-linux-amd64.tar.gz"* && \
+  curl -fsSLo kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
+  curl -fsSLo kubectl.sha256 "https://dl.k8s.io/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256" && \
+  echo "$(cat kubectl.sha256)  kubectl" | sha256sum -c - && \
+  install -m 0755 kubectl /usr/local/bin/kubectl && \
+  rm -f kubectl kubectl.sha256
 
 # Copy gradle wrapper and settings
 COPY gradlew .
@@ -33,3 +45,4 @@ COPY scripts scripts
 ENV INTEGRATION_TEST_CONFIG=integration-test-docker.yaml
 
 ENTRYPOINT ["java", "-jar", "integration-tests.jar", "execute", "-p", "com.coreeng.supportbot"]
+USER 185

@@ -15,11 +15,15 @@ spec:
         {{- include "support-bot-integration-tests.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "support-bot-integration-tests.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       restartPolicy: {{ .Values.job.restartPolicy }}
       containers:
       - name: integration-tests
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
         env:
           - name: INTEGRATION_TEST_CONFIG
             value: "/app/integration-tests-deployed.yaml"
@@ -30,10 +34,24 @@ spec:
           mountPath: /app/integration-tests-deployed.yaml
           subPath: integration-tests-deployed.yaml
           readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        - name: helm-home
+          mountPath: /home/jboss/.config/helm
+        - name: helm-home
+          mountPath: /home/jboss/.cache/helm
+        - name: kube-home
+          mountPath: /home/jboss/.kube
       volumes:
       - name: config
         configMap:
           name: {{ include "support-bot-integration-tests.fullname" . }}-config
+      - name: tmp
+        emptyDir: {}
+      - name: helm-home
+        emptyDir: {}
+      - name: kube-home
+        emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
