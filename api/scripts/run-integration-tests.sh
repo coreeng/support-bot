@@ -17,12 +17,20 @@ SERVICE_IMAGE_REPOSITORY="${SERVICE_IMAGE_REPOSITORY:?required argument}"
 SERVICE_IMAGE_TAG="${SERVICE_IMAGE_TAG:?required argument}"
 CLEANUP="${CLEANUP:-true}"
 
+# shellcheck source=deploy-service.sh
+. "${SCRIPT_DIR}/deploy-service.sh"
+
 cleanup_job() {
   if [[ "$CLEANUP" == "true" ]]; then
     log "Cleaning up Helm release: $RELEASE_NAME"
     helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --ignore-not-found || true
   else
     log_warning "Cleanup disabled. Helm release $RELEASE_NAME will remain in namespace $NAMESPACE"
+  fi
+
+  if [[ "$DELETE_DB" == "true" && "$DEPLOY_DB" == "true" ]]; then
+    log "Cleaning up DB release: $DB_RELEASE"
+    helm uninstall "$DB_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
   fi
 }
 trap cleanup_job EXIT
@@ -59,6 +67,13 @@ main() {
   log "  Timeout: ${TIMEOUT}s"
   log "  Cleanup: $CLEANUP"
 
+  # Optionally deploy database first
+  if [[ "$DEPLOY_DB" == "true" ]]; then
+    deploy_db "$NAMESPACE" "$DB_RELEASE"
+  else
+    log_warning "DEPLOY_DB is false; assuming database already available in $NAMESPACE"
+  fi
+
   deploy_chart
 
   if wait_for_job_with_logs "$RELEASE_NAME" "$NAMESPACE" "$TIMEOUT" "integration-tests"; then
@@ -84,6 +99,9 @@ if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "  SERVICE_IMAGE_REPOSITORY   Service Docker repository (required)"
   echo "  SERVICE_IMAGE_TAG          Service Docker image tag (required)"
   echo "  CLEANUP                    Cleanup resources after completion (default: true)"
+  echo "  DEPLOY_DB                  Deploy DB before tests (default: true)"
+  echo "  DB_RELEASE                 Helm release name for DB (default: support-bot-db)"
+  echo "  DELETE_DB                  Delete DB during cleanup (default: true)"
   exit 0
 fi
 
