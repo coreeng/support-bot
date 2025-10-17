@@ -47,7 +47,7 @@ spring:
 #         client-secret: ${AZURE_CLIENT_SECRET}
     gcp:
       core:
-        enabled: true # enable only in case GCP integration is enabled
+        enabled: false # enable only in case GCP integration is enabled
       credentials:
         scopes: [ "https://www.googleapis.com/auth/cloud-identity.groups.readonly" ]
   datasource:
@@ -70,8 +70,8 @@ slack:
     channel-id: ${SLACK_TICKET_CHANNEL_ID} # Channel ID (C1234567890) where tenants post queries
     expected-initial-reaction: eyes # Reaction to trigger ticket creation -- emoji name needs to already exist in slack
     response-initial-reaction: ticket # Reaction posted when ticket is created -- emoji name needs to already exist in slack
-  escalation:
-    channel-id: ${SLACK_ESCALATION_CHANNEL_ID} # Channel ID (C1234567890) where escalations are posted
+    resolved-reaction: white_check_mark # Reaction posted when ticket is resolved -- emoji name needs to already exist in slack
+    escalation-reaction: warning # Reaction posted when ticket is escalated -- emoji name needs to already exist in slack
 
 ticket:
   staleness-check-job: # Job that check for stale tickets – open tickets that didn't have any interactions over some period
@@ -83,7 +83,7 @@ ticket:
 enums:
   escalationTeams: # Platform teams for query escalation
     - label: wow # Label showed on the UI
-      code: wow # Team ID. have to be unique
+      code: wow # Team ID. have to be unique and match the team name in the platform
       slack-group-id: S08948NBMED # Slack group ID that will be tagged on escalations
   tags: # Ticket tags
     - label: Ingresses # Label showed on the UI
@@ -118,14 +118,16 @@ platform-integration: # Whether to enable platform integration to automatically 
       enabled: false
       config:
         apiVersion: v1
+        apiGroup: ""
         kind: Namespace # Search for namespaces with the following filter
+        namespace: null # Namespace filter, null for global resources
         filter:
           name-regexp: null
           label-selector: "root.tree.hnc.x-k8s.io/depth"
-        teamName: # Will use the namespace name from /metadata/name as a team name
-          pointer: /metadata/name
-        groupRef: # Will use the namespace uid from /metadata/uid as a group reference. Supposed to be changed to a real configuration.
-          pointer: /metadata/uid
+        teamName: # Will use the namespace name from .metadata.name as a team name
+          jqExpression: .metadata.name
+        groupRef: # Will use the namespace uid from .metadata.uid as a group reference. Supposed to be changed to a real configuration.
+          jqExpression: .metadata.uid
 
 
 support-team:
@@ -214,8 +216,8 @@ You will need Azure Cloud integration in case you manage your organization membe
 You will need to register an application with the following parameters:
 1. Supported account types – `Accounts in this organizational directory only`
 2. API Permissions:
-2.1 `Group.Read.All` with `Application` type
-2.2 `User.Read.All` with `Application` type
+2.1 `GroupMember.Read.All` with `Application` type
+2.2 `User.ReadBasic.All` with `Application` type
 
 You will also need
 to create a secret for the registered application so that it can be used for authentication by Support Bot.

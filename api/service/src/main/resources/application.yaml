@@ -28,7 +28,7 @@ spring:
 #         client-secret: ${AZURE_CLIENT_SECRET}
     gcp:
       core:
-        enabled: true
+        enabled: false
       credentials:
         scopes: [ "https://www.googleapis.com/auth/cloud-identity.groups.readonly" ]
   datasource:
@@ -140,6 +140,7 @@ platform-integration:
     k8s-generic:
       enabled: false
       config:
+        apiGroup: ""
         apiVersion: v1
         kind: Namespace
         namespace: null
@@ -147,9 +148,9 @@ platform-integration:
           name-regexp: null
           label-selector: "root.tree.hnc.x-k8s.io/depth"
         teamName:
-          pointer: /metadata/name
+          jqExpression: .metadata.name
         groupRef:
-          pointer: /metadata/uid
+          jqExpression: .metadata.uid
 
 support-team:
   name: Core Support

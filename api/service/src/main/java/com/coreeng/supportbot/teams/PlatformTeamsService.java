@@ -80,7 +80,7 @@ public class PlatformTeamsService {
             .map(PlatformTeamsFetcher.TeamAndGroupTuple::name)
             .collect(toImmutableSet());
         ImmutableSet<String> escalationTeamNames = escalationTeamsRegistry.listAllEscalationTeams().stream()
-            .map(EscalationTeam::label)
+            .map(EscalationTeam::code)
             .collect(toImmutableSet());
         var setsDiff = Sets.difference(escalationTeamNames, teamNames);
         if (!setsDiff.isEmpty()) {
