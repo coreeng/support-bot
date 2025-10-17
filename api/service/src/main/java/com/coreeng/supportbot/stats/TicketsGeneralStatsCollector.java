@@ -1,9 +1,6 @@
 package com.coreeng.supportbot.stats;
 
-import com.coreeng.supportbot.ticket.Ticket;
-import com.coreeng.supportbot.ticket.TicketRepository;
-import com.coreeng.supportbot.ticket.TicketStatus;
-import com.coreeng.supportbot.ticket.TicketsQuery;
+import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -23,48 +20,50 @@ public class TicketsGeneralStatsCollector implements StatsCollector<StatsRequest
 
     @Override
     public StatsResult calculateResults(StatsRequest.TicketGeneral request) {
-        Page<Ticket> tickets = repository.listTickets(TicketsQuery.builder()
+        Page<DetailedTicket> tickets = repository.listDetailedTickets(TicketsQuery.builder()
             .unlimited(true)
             .dateFrom(request.from())
             .dateTo(request.to())
             .build());
-
         double avgResolutionTime = tickets.content().stream()
-            .filter(t -> t.status() == TicketStatus.closed)
+            .filter(t -> t.ticket().status() == TicketStatus.closed)
             .mapToDouble(t -> Duration.between(
-                t.queryTs().getDate(),
-                t.statusLog().getLast().date()
+                t.ticket().queryTs().getDate(),
+                t.ticket().statusLog().getLast().date()
             ).getSeconds())
             .average()
             .orElse(0.0);
 
         double avgResponseTime = tickets.content().stream()
             .mapToDouble(t -> Duration.between(
-                t.queryTs().getDate(),
-                t.statusLog().getFirst().date()
+                t.ticket().queryTs().getDate(),
+                t.ticket().statusLog().getFirst().date()
             ).getSeconds())
             .average()
             .orElse(0.0);
 
         double largestActiveTicketSecs = tickets.content().stream()
-            .mapToDouble(t -> switch (t.status()) {
+            .mapToDouble(t -> switch (t.ticket().status()) {
                 case closed -> Duration.between(
-                    t.statusLog().getFirst().date(),
-                    t.statusLog().getLast().date()
+                    t.ticket().statusLog().getFirst().date(),
+                    t.ticket().statusLog().getLast().date()
                 ).getSeconds();
                 case opened, stale -> Duration.between(
-                    t.statusLog().getFirst().date(),
+                    t.ticket().statusLog().getFirst().date(),
                     Instant.now()
                 ).getSeconds();
             })
             .max()
             .orElse(0.0);
 
+        long escalatedCount = tickets.content().stream().filter(DetailedTicket::escalated).count();
+
         return StatsResult.TicketGeneral.builder()
             .request(request)
             .avgResolutionTimeSecs(avgResolutionTime)
             .avgResponseTimeSecs(avgResponseTime)
             .largestActiveTicketSecs(largestActiveTicketSecs)
+            .totalEscalations(escalatedCount)
             .build();
     }
 }

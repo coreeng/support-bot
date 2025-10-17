@@ -93,7 +93,7 @@ class RatingServiceTest {
         // Then
         assertThat(result).isEqualTo(expectedRatings);
         assertThat(result).hasSize(1);
-        assertThat(result.get(0)).isEqualTo(sampleRating);
+        assertThat(result.getFirst()).isEqualTo(sampleRating);
         verify(repository).findRatingsByStatus(status);
     }
 
@@ -125,7 +125,7 @@ class RatingServiceTest {
         // Then
         assertThat(result).isEqualTo(expectedRatings);
         assertThat(result).hasSize(1);
-        assertThat(result.get(0)).isEqualTo(sampleRating);
+        assertThat(result.getFirst()).isEqualTo(sampleRating);
         verify(repository).findRatingsByTag(tagCode);
     }
 
@@ -164,7 +164,7 @@ class RatingServiceTest {
         // Then
         assertThat(result).isEqualTo(expectedRatings);
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).isEscalated()).isTrue();
+        assertThat(result.getFirst().isEscalated()).isTrue();
         verify(repository).findEscalatedRatings();
     }
 

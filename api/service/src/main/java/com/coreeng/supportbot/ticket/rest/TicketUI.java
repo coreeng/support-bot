@@ -29,6 +29,7 @@ public class TicketUI {
     private ImmutableList<String> tags;
     private ImmutableList<Log> logs;
     private ImmutableList<EscalationUI> escalations;
+    private boolean ratingSubmitted;
 
 
     public record Query(
