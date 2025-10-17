@@ -10,7 +10,7 @@ import java.util.List;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Requires Azure permissions: GroupMember.Read.All, User.Read.All
+ * Requires Azure permissions: GroupMember.Read.All, User.ReadBasic.All
  */
 @Slf4j
 @RequiredArgsConstructor

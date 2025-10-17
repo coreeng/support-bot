@@ -88,6 +88,8 @@ dependencies {
     implementation("io.fabric8:kubernetes-client:7.1.0")
     testImplementation("io.fabric8:kubernetes-server-mock:7.1.0")
 
+    implementation("net.thisptr:jackson-jq:1.6.0")
+
     implementation("com.google.cloud:spring-cloud-gcp-starter:5.10.0")
     implementation("com.google.apis:google-api-services-cloudidentity:v1-rev20241208-2.0.0")
 
