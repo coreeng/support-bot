@@ -98,6 +98,18 @@ public class SlackClientImpl implements SlackClient {
     }
 
     @Override
+    public List<Message> getMessagesByTs(SlackGetMessageByTsRequest request) {
+        ConversationsRepliesResponse response = doRequest(() -> client.conversationsReplies(ConversationsRepliesRequest.builder()
+                        .ts(request.ts().ts())
+                        .channel(request.channelId())
+                        .inclusive(true)
+                        .limit(5)
+                        .build()),
+                r -> errorDetailsOrEmpty(r.getResponseMetadata()));
+        return response.getMessages();
+    }
+
+    @Override
     public String getPermalink(SlackGetMessageByTsRequest request) {
         return permalinkCache.get(request, () -> {
             if (request.ts().mocked()) {
