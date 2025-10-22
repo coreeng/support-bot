@@ -58,9 +58,6 @@ spring:
       data-source-properties:
         reWriteBatchedInserts: true
 
-application:
-  timezone: GMT+02 # Used to specify timestamps in message contents, for example
-
 slack:
   creds: # Credentials of Slack App
     token: ${SLACK_TOKEN} # Token like: xoxb-abc-def
@@ -81,7 +78,7 @@ ticket:
     stale-reminder-interval: 1d
 
 enums:
-  escalationTeams: # Platform teams for query escalation
+  escalation-teams: # Platform teams for query escalation
     - label: wow # Label showed on the UI
       code: wow # Team ID. have to be unique and match the team name in the platform
       slack-group-id: S08948NBMED # Slack group ID that will be tagged on escalations
@@ -117,17 +114,17 @@ platform-integration: # Whether to enable platform integration to automatically 
     k8s-generic: # A generic scraper that might be used in any K8S environment
       enabled: false
       config:
-        apiVersion: v1
-        apiGroup: ""
+        api-version: v1
+        api-group: ""
         kind: Namespace # Search for namespaces with the following filter
         namespace: null # Namespace filter, null for global resources
         filter:
-          name-regexp: null
-          label-selector: "root.tree.hnc.x-k8s.io/depth"
+          name-regexp: null # Regexp filter for namespace names
+          label-selector: "root.tree.hnc.x-k8s.io/depth" # Label selector filter for namespace labels. Look [here](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) for syntax
         teamName: # Will use the namespace name from .metadata.name as a team name
-          jqExpression: .metadata.name
+          jq-expression: .metadata.name
         groupRef: # Will use the namespace uid from .metadata.uid as a group reference. Supposed to be changed to a real configuration.
-          jqExpression: .metadata.uid
+          jq-expression: .metadata.uid
 
 
 support-team:

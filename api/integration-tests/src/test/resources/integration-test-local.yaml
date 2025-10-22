@@ -3,6 +3,7 @@ service:
   deploymentScript:
     releaseName: support-bot
     chartPath: ../k8s/service
+    valuesFilePath: ../k8s/service/values-integrationtests.yaml
     scriptPath: ../scripts/deploy-service.sh
   deployment:
     name: support-bot
