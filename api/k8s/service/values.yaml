@@ -86,12 +86,6 @@ env:
     value: "supportbot"
   - name: DB_PASSWORD
     value: "supportbotpassword"
-  - name: SLACK_TICKET_CHANNEL_ID
-    value: "C08CC3MCBKN"
-  - name: SLACK_ESCALATION_CHANNEL_ID
-    value: "C08CC3MCBKN"
-  - name: SLACK_SUPPORT_GROUP_ID
-    value: "S08948NBMED"
   - name: SLACK_TOKEN
     valueFrom:
       secretKeyRef:
@@ -107,22 +101,6 @@ env:
       secretKeyRef:
         name: support-bot
         key: SLACK_SIGNING_SECRET
-  - name: AZURE_TENANT_ID
-    valueFrom:
-      secretKeyRef:
-        name: azure
-        key: AZURE_TENANT_ID
-  - name: AZURE_CLIENT_ID
-    valueFrom:
-      secretKeyRef:
-        name: azure
-        key: AZURE_CLIENT_ID
-  - name: AZURE_CLIENT_SECRET
-    valueFrom:
-      secretKeyRef:
-        name: azure
-        key: AZURE_CLIENT_SECRET
-
 
 # ConfigMap configuration
 configMap:
@@ -130,40 +108,4 @@ configMap:
   name: ""
   annotations: {}
   data:
-    spring:
-      cloud:
-        azure:
-          profile:
-            tenant-id: ${AZURE_TENANT_ID}
-          credential:
-            client-id: ${AZURE_CLIENT_ID}
-            client-secret: ${AZURE_CLIENT_SECRET}
-    enums:
-      escalationTeams:
-        - label: core
-          code: core
-          slack-group-id: S08948NBMED
-    platform-integration:
-      enabled: true
-      azure:
-        enabled: true
-      static-user:
-        enabled: false
-      teams-scraping:
-        static:
-          enabled: false
-        core-platform:
-          enabled: false
-        k8s-generic:
-          enabled: true
-          config:
-            apiVersion: v1
-            kind: ConfigMap
-            namespace: support-bot-integration
-            filter:
-              name-regexp: ^tenant-.*
-              label-selector: null
-            teamName:
-              jqExpression: .data.name
-            groupRef:
-              jqExpression: .data.groupRef
+    # your properties for application.yaml

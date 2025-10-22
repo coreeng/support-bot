@@ -118,6 +118,7 @@ public class ServiceStartupTest {
         env.put("SERVICE_CHART_PATH", chartPath);
         env.put("SERVICE_IMAGE_REPOSITORY", config.service().image().repository());
         env.put("SERVICE_IMAGE_TAG", config.service().image().tag());
+        env.put("VALUES_FILE", config.service().deploymentScript().valuesFilePath());
         env.put("WAIT_TIMEOUT", "60");
         env.put("REDEPLOY", action.equals("deploy") ? "true" : "false");
         env.put("DEPLOY_DB", "false");
