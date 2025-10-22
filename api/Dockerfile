@@ -28,7 +28,7 @@ RUN service postgresql start && sleep 6 && \
 ## Final stage
 FROM registry.access.redhat.com/ubi8/openjdk-21-runtime:1.23
 WORKDIR /app
-COPY --from=build /build/service/build/libs/service-*.jar /app/service.jar
+COPY --from=build /build/service/build/libs/service.jar /app/service.jar
 
 CMD ["java", "-jar", "/app/service.jar"]
 

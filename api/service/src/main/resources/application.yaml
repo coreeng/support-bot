@@ -20,12 +20,12 @@ spring:
     name: support-bot
   cloud:
 # Uncomment in case you require Azure integration
-#     azure:
-#       profile:
-#         tenant-id: ${AZURE_TENANT_ID}
-#       credential:
-#         client-id: ${AZURE_CLIENT_ID}
-#         client-secret: ${AZURE_CLIENT_SECRET}
+#    azure:
+#      profile:
+#        tenant-id: ${AZURE_TENANT_ID}
+#      credential:
+#        client-id: ${AZURE_CLIENT_ID}
+#        client-secret: ${AZURE_CLIENT_SECRET}
     gcp:
       core:
         enabled: false
@@ -41,7 +41,7 @@ spring:
 
 slack:
   mode: socket # socket or http
-  enableRequestVerification: true
+  enable-request-verification: true
   client:
     methods-base-url: ""
   creds:
@@ -63,40 +63,40 @@ ticket:
     stale-reminder-interval: 1d
 
 enums:
-  escalationTeams:
-  - label: wow
-    code: wow
-    slack-group-id: S08948NBMED
-  - label: infra-integration
-    code: infra-integration
-    slack-group-id: S08948NBMED
-  - label: connected-app
-    code: connected-app
-    slack-group-id: S08948NBMED
+  escalation-teams:
+    - label: wow
+      code: wow
+      slack-group-id: S08948NBMED
+    - label: infra-integration
+      code: infra-integration
+      slack-group-id: S08948NBMED
+    - label: connected-app
+      code: connected-app
+      slack-group-id: S08948NBMED
   tags:
-  - label: Ingresses
-    code: ingresses
-  - label: Jenkins Pipelines
-    code: jenkins-pipelines
-  - label: Networking
-    code: networking
-  - label: Vault
-    code: vault
-  - label: Persistence/Brokers
-    code: persistence-brokers
-  - label: Observability
-    code: observability
-  - label: DNS
-    code: dns
-  - label: Osprey
-    code: osprey
+    - label: Ingresses
+      code: ingresses
+    - label: Jenkins Pipelines
+      code: jenkins-pipelines
+    - label: Networking
+      code: networking
+    - label: Vault
+      code: vault
+    - label: Persistence/Brokers
+      code: persistence-brokers
+    - label: Observability
+      code: observability
+    - label: DNS
+      code: dns
+    - label: Osprey
+      code: osprey
   impacts:
-  - label: Production Blocking
-    code: productionBlocking
-  - label: BAU Blocking
-    code: bauBlocking
-  - label: Abnormal Behaviour
-    code: abnormalBehaviour
+    - label: Production Blocking
+      code: productionBlocking
+    - label: BAU Blocking
+      code: bauBlocking
+    - label: Abnormal Behaviour
+      code: abnormalBehaviour
 
 platform-integration:
   enabled: true
@@ -130,27 +130,27 @@ platform-integration:
       enabled: true
       teams:
         - name: wow
-          groupRef: wow-group
+          group-ref: wow-group
         - name: infra-integration
-          groupRef: infra-group
+          group-ref: infra-group
         - name: connected-app
-          groupRef: connected-app-group
+          group-ref: connected-app-group
     core-platform:
       enabled: false
     k8s-generic:
       enabled: false
       config:
-        apiGroup: ""
-        apiVersion: v1
+        api-group: ""
+        api-version: v1
         kind: Namespace
         namespace: null
         filter:
           name-regexp: null
           label-selector: "root.tree.hnc.x-k8s.io/depth"
         teamName:
-          jqExpression: .metadata.name
+          jq-expression: .metadata.name
         groupRef:
-          jqExpression: .metadata.uid
+          jq-expression: .metadata.uid
 
 support-team:
   name: Core Support
@@ -159,11 +159,11 @@ support-team:
     enabled: false
     members:
       - email: coby.ivona@company.com
-        slackId: U0123456781
+        slack-id: U0123456781
       - email: sana.chernobog@company.com
-        slackId: U0123456782
+        slack-id: U0123456782
       - email: jean.kristijan@company.com
-        slackId: U0123456783
+        slack-id: U0123456783
 
 ai:
   sentiment-analysis:
