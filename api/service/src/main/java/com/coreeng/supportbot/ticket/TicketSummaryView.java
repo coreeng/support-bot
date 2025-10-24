@@ -8,16 +8,15 @@ import com.coreeng.supportbot.escalation.EscalationStatus;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.block.LayoutBlock;
-
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public record TicketSummaryView(
     TicketId ticketId,
     QuerySummaryView query,
     TicketStatus currentStatus,
+    @Nullable String currentTeam,
     ImmutableList<EscalationView> escalations,
     ImmutableList<Ticket.StatusLog> statusLogs,
-    TeamsInput teamsInput,
     ImmutableList<Tag> tags,
     ImmutableList<Tag> currentTags,
     ImmutableList<TicketImpact> impacts,
@@ -27,7 +26,6 @@ public record TicketSummaryView(
         Ticket ticket,
         QuerySummaryView query,
         ImmutableList<EscalationView> escalationViews,
-        TeamsInput teamsInput,
         ImmutableList<Tag> tags,
         ImmutableList<Tag> currentTags,
         ImmutableList<TicketImpact> impacts,
@@ -37,13 +35,20 @@ public record TicketSummaryView(
             ticket.id(),
             query,
             ticket.status(),
+            ticket.team(),
             escalationViews,
             ticket.statusLog(),
-            teamsInput,
             tags,
             currentTags,
             impacts,
             currentImpact
+        );
+    }
+
+    public Metadata metadata() {
+        return new Metadata(
+            ticketId().id(),
+            query().senderId()
         );
     }
 
@@ -75,10 +80,9 @@ public record TicketSummaryView(
         }
     }
 
-    public record TeamsInput(
-        @Nullable
-        String currentTeam,
-        ImmutableList<String> authorTeams,
-        ImmutableList<String> otherTeams
-    ) {}
+    public record Metadata(
+        long ticketId,
+        String authorId
+    ) {
+    }
 }

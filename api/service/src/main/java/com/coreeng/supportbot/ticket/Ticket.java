@@ -6,8 +6,8 @@ import com.google.common.collect.ImmutableList;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.time.Instant;
 
 @Getter
