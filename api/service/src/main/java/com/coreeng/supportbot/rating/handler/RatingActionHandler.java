@@ -55,6 +55,7 @@ public class RatingActionHandler implements SlackBlockActionHandler {
     }
 
     @Transactional
+    // TODO: Fix transactional
     private void handleRatingSubmission(BlockActionPayload.Action action, BlockActionPayload payload) {
         try {
             String actionId = action.getActionId();
