@@ -10,11 +10,8 @@ import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
-import com.coreeng.supportbot.teams.PlatformTeam;
-import com.coreeng.supportbot.teams.PlatformTeamsService;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.Message;
-import com.slack.api.model.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -31,7 +28,6 @@ public class TicketSummaryService {
     private final TagsRegistry tagsRegistry;
     private final ImpactsRegistry impactsRegistry;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
-    private final PlatformTeamsService platformTeamsService;
 
     public TicketSummaryView summaryView(TicketId id) {
         Ticket ticket = repository.findTicketById(id);
@@ -42,14 +38,12 @@ public class TicketSummaryService {
             .getMessageByTs(new SlackGetMessageByTsRequest(ticket.channelId(), ticket.queryTs()));
         TicketSummaryView.QuerySummaryView querySummary = getQuerySummaryView(ticket, queryMessage);
         ImmutableList<TicketSummaryView.EscalationView> escalations = getEscalationViews(ticket);
-        TicketSummaryView.TeamsInput teamsInput = getTeamsInputView(ticket, queryMessage);
         ImmutableList<Tag> allTags = tagsRegistry.listAllTags();
         ImmutableList<TicketImpact> allImpacts = impactsRegistry.listAllImpacts();
         return TicketSummaryView.of(
             ticket,
             querySummary,
             escalations,
-            teamsInput,
             allTags,
             allTags.stream()
                 .filter(t -> ticket.tags().contains(t.code()))
@@ -91,26 +85,6 @@ public class TicketSummaryService {
             new MessageTs(queryMessage.getTs()),
             queryMessage.getUser(),
             permalink
-        );
-    }
-
-    private TicketSummaryView.TeamsInput getTeamsInputView(Ticket ticket, Message queryMessage) {
-        User.Profile userProfile = slackClient.getUserById(queryMessage.getUser());
-        String userEmail = userProfile.getEmail();
-
-        ImmutableList<String> allTeams = platformTeamsService.listTeams().stream()
-            .map(PlatformTeam::name)
-            .collect(toImmutableList());
-        ImmutableList<String> authorTeams = platformTeamsService.listTeamsByUserEmail(userEmail).stream()
-            .map(PlatformTeam::name)
-            .collect(toImmutableList());
-        ImmutableList<String> otherTeams = allTeams.stream()
-            .filter(t -> !authorTeams.contains(t))
-            .collect(toImmutableList());
-        return new TicketSummaryView.TeamsInput(
-            ticket.team(),
-            authorTeams,
-            otherTeams
         );
     }
 }

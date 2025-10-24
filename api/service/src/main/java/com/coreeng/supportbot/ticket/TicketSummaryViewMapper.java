@@ -5,14 +5,16 @@ import com.coreeng.supportbot.util.JsonMapper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.slack.api.model.block.LayoutBlock;
-import com.slack.api.model.block.composition.OptionGroupObject;
 import com.slack.api.model.block.composition.OptionObject;
+import com.slack.api.model.block.element.ExternalSelectElement;
 import com.slack.api.model.block.element.RichTextElement;
 import com.slack.api.model.block.element.RichTextSectionElement;
 import com.slack.api.model.block.element.StaticSelectElement;
 import com.slack.api.model.view.View;
 import com.slack.api.model.view.ViewState;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -38,21 +40,22 @@ import static java.lang.String.format;
 public class TicketSummaryViewMapper {
     private final JsonMapper jsonMapper;
 
-    public String createTriggerInput(TicketSummaryViewInput input) {
-        checkNotNull(input);
+    public String createTriggerInput(@NonNull TicketSummaryViewInput input) {
         return jsonMapper.toJsonString(input);
     }
 
-    public TicketSummaryViewInput parseTriggerInput(String input) {
-        checkNotNull(input);
+    public TicketSummaryViewInput parseTriggerInput(@NonNull String input) {
         return jsonMapper.fromJsonString(input, TicketSummaryViewInput.class);
+    }
+
+    public TicketSummaryView.Metadata parseMetadata(@NonNull String metadata) {
+        return jsonMapper.fromJsonString(metadata, TicketSummaryView.Metadata.class);
     }
 
     public View.ViewBuilder render(TicketSummaryView summaryView, View.ViewBuilder viewBuilder) {
         checkNotNull(summaryView);
         checkNotNull(viewBuilder);
 
-        Metadata metadata = new Metadata(summaryView.ticketId().id());
         return viewBuilder
             .title(viewTitle(t -> t
                 .type("plain_text")
@@ -65,7 +68,7 @@ public class TicketSummaryViewMapper {
                 .type("plain_text")
                 .text("Close")
             ))
-            .privateMetadata(jsonMapper.toJsonString(metadata))
+            .privateMetadata(jsonMapper.toJsonString(summaryView.metadata()))
             .blocks(ImmutableList.<LayoutBlock>builder()
                 .add(header(h -> h.text(plainText("Ticket Summary"))))
                 .addAll(summaryView.query().blocks())
@@ -107,7 +110,7 @@ public class TicketSummaryViewMapper {
                     input(i -> i
                         .label(plainText("Select the Author's Team"))
                         .optional(false)
-                        .element(renderTeamsInput(summaryView.teamsInput()))
+                        .element(renderDynamicTeamsInput(summaryView.currentTeam()))
                     ),
                     input(i -> i
                         .label(plainText("Select Tags"))
@@ -222,62 +225,23 @@ public class TicketSummaryViewMapper {
         );
     }
 
-    private StaticSelectElement renderTeamsInput(TicketSummaryView.TeamsInput teams) {
-        ImmutableList.Builder<OptionGroupObject> optionGroupsBuilder = ImmutableList.builderWithExpectedSize(2);
-        if (!teams.authorTeams().isEmpty()) {
-            optionGroupsBuilder.add(
-                OptionGroupObject.builder()
-                    .label(plainText("Suggested teams"))
-                    .options(
-                        teams.authorTeams().stream()
-                            .map(t -> OptionObject.builder()
-                                .text(plainText(t))
-                                .value(t)
-                                .build())
-                            .collect(toImmutableList())
-                    )
+    private ExternalSelectElement renderDynamicTeamsInput(@Nullable String currentTeam) {
+        return externalSelect(s -> s
+            .actionId(TicketField.team.actionId())
+            .initialOption(
+                currentTeam != null
+                    ? OptionObject.builder()
+                    .text(plainText(currentTeam))
+                    .value(currentTeam)
                     .build()
-
-            );
-        }
-        if (!teams.otherTeams().isEmpty()) {
-            optionGroupsBuilder.add(
-                OptionGroupObject.builder()
-                    .label(plainText("Others"))
-                    .options(
-                        teams.otherTeams().stream()
-                            .map(t -> OptionObject.builder()
-                                .text(plainText(t))
-                                .value(t)
-                                .build())
-                            .collect(toImmutableList())
-                    )
-                    .build()
-            );
-        }
-        ImmutableList<OptionGroupObject> optionGroups = optionGroupsBuilder.build();
-        return staticSelect(s -> {
-                s.actionId(TicketField.team.actionId())
-                    .initialOption(
-                        teams.currentTeam() != null
-                            ? OptionObject.builder()
-                            .text(plainText(teams.currentTeam()))
-                            .value(teams.currentTeam())
-                            .build()
-                            : null
-                    );
-                if (!optionGroups.isEmpty()) {
-                    s.optionGroups(optionGroups);
-                }
-                return s;
-            }
-        );
+                    : null)
+            .minQueryLength(0));
     }
 
     public TicketSubmission extractSubmittedValues(View view) {
         checkNotNull(view);
 
-        Metadata metadata = jsonMapper.fromJsonString(view.getPrivateMetadata(), Metadata.class);
+        var metadata = parseMetadata(view.getPrivateMetadata());
         ImmutableMap<String, ViewState.Value> passedValues = view.getState().getValues().entrySet()
             .stream()
             .flatMap(entry -> entry.getValue().entrySet().stream())
@@ -313,10 +277,5 @@ public class TicketSummaryViewMapper {
 
     private String formatSlackDate(Instant instant) {
         return "<!date^" + instant.getEpochSecond() + "^{date_short_pretty} at {time}|" + instant.truncatedTo(ChronoUnit.MINUTES) + ">";
-    }
-
-    private record Metadata(
-        long ticketId
-    ) {
     }
 }
