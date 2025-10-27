@@ -19,6 +19,7 @@ public interface EscalationRepository {
     @Nullable
     Escalation findById(EscalationId id);
     boolean existsByThreadTs(MessageTs threadTs);
+    boolean existsByTicketId(TicketId ticketId);
 
     ImmutableList<Escalation> listByTicketId(TicketId ticketId);
 
