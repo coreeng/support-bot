@@ -2,12 +2,14 @@ package com.coreeng.supportbot.ticket.slack;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.rating.RatingRequestMessage;
+import com.coreeng.supportbot.rating.RatingRequestMessageMapper;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackEditMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.slack.client.SlackMessage;
 import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.teams.SupportTeamService;
@@ -33,6 +35,7 @@ public class TicketSlackServiceImpl implements TicketSlackService {
     private final SlackTicketsProps slackTicketsProps;
     private final SupportTeamService supportTeamService;
     private final TicketCreatedMessageMapper createdMessageMapper;
+    private final RatingRequestMessageMapper ratingReqMessageMapper;
 
     @Override
     public void markPostTracked(MessageRef threadRef) {
@@ -139,17 +142,14 @@ public class TicketSlackServiceImpl implements TicketSlackService {
         }
 
         log.info("Posting ephemeral rating request for ticket {} to user {}", ticketId, userId);
-
-        RatingRequestMessage ratingMessage = new RatingRequestMessage(ticketId);
-
+        SlackMessage message = ratingReqMessageMapper.renderRatingRequestMessage(new RatingRequestMessage(ticketId));
         slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
-            .message(ratingMessage)
+            .message(message)
             .channel(queryRef.channelId())
-            .threadTs(queryRef.threadTs())
+            .threadTs(queryRef.ts())
             .userId(userId)
             .build()
         );
-
         log.info("Ephemeral rating request posted for ticket {} to user {}", ticketId, userId);
     }
 

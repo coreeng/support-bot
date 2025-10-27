@@ -1,9 +1,9 @@
 package com.coreeng.supportbot.ticket.handler;
 
-import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.ticket.Ticket;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketStatusChanged;
@@ -23,37 +23,27 @@ public class RatingEventHandler {
 
     @EventListener
     public void onTicketStatusChange(TicketStatusChanged event) {
-        if (event.status() == TicketStatus.closed) {
-            // Trigger rating collection when ticket is closed
-            Ticket ticket = ticketRepository.findTicketById(event.ticketId());
-            if (ticket != null) {
-                // Check if ticket is already rated using the ticket object
-                if (ticket.ratingSubmitted()) {
-                    if (log.isInfoEnabled()) {
-                        log.info("Ticket {} already has a rating submitted, skipping rating request", event.ticketId());
-                    }
-                    return;
-                }
-                
-                if (log.isInfoEnabled()) {
-                    log.info("Ticket {} closed, posting rating request", event.ticketId());
-                }
-                
-                try {
-                    // Get the original query message to find the user who created the ticket
-                    var originalMessage = slackClient.getMessageByTs(SlackGetMessageByTsRequest.of(ticket.queryRef()));
-                    var threadRef = new MessageRef(ticket.createdMessageTs(), ticket.createdMessageTs(), ticket.channelId());
-                    slackService.postRatingRequest(threadRef, event.ticketId(), originalMessage.getUser());
-                } catch (Exception e) {
-                    if (log.isErrorEnabled()) {
-                        log.error("Error getting original message for ticket {} rating request", event.ticketId(), e);
-                    }
-                }
-            } else {
-                if (log.isWarnEnabled()) {
-                    log.warn("Could not find ticket {} to post rating request", event.ticketId());
-                }
-            }
+        if (event.status() != TicketStatus.closed) {
+            return;
+        }
+        TicketId ticketId = event.ticketId();
+        Ticket ticket = ticketRepository.findTicketById(ticketId);
+        if (ticket == null) {
+            log.warn("Ticket {} not found when publishing rating request", ticketId);
+            return;
+        }
+        if (ticket.ratingSubmitted()) {
+            log.info("Ticket {} already has a rating submitted, skipping rating request", ticketId);
+            return;
+        }
+
+        log.info("Ticket {} closed, posting rating request", ticketId);
+        try {
+            // Get the original query message to find the user who created the ticket
+            var originalMessage = slackClient.getMessageByTs(SlackGetMessageByTsRequest.of(ticket.queryRef()));
+            slackService.postRatingRequest(ticket.queryRef(), ticketId, originalMessage.getUser());
+        } catch (Exception e) {
+            log.error("Error posting rating request for ticket {}", ticketId, e);
         }
     }
 }

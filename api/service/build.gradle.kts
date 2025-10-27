@@ -173,6 +173,11 @@ jooq {
                         includeTypes = "timestamptz"
                         userType = Instant::class.java.canonicalName
                     }
+                    forcedType {
+                        userType = "java.util.List<java.lang.String>"
+                        isAutoConverter = true
+                        includeTypes = "_varchar"
+                    }
                 }
             }
             target {

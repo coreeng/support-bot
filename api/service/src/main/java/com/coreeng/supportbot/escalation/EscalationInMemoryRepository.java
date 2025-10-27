@@ -92,6 +92,12 @@ public class EscalationInMemoryRepository implements EscalationRepository {
     }
 
     @Override
+    public boolean existsByTicketId(TicketId ticketId) {
+        return escalations.values().stream()
+            .anyMatch(e -> ticketId.equals(e.ticketId()));
+    }
+
+    @Override
     public ImmutableList<Escalation> listByTicketId(TicketId ticketId) {
         return escalations.values().stream()
             .filter(e -> ticketId.equals(e.ticketId()))

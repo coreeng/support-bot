@@ -33,6 +33,10 @@ public class EscalationQueryService {
         return repository.existsByThreadTs(threadTs);
     }
 
+    public boolean existsByTicketId(TicketId ticketId) {
+        return repository.existsByTicketId(ticketId);
+    }
+
     public long countNotResolvedByTicketId(TicketId ticketId) {
         return repository.countNotResolvedByTicketId(ticketId);
     }
