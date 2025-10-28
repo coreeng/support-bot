@@ -100,6 +100,9 @@ enums:
 
 platform-integration:
   enabled: true
+  fetch:
+    max-concurrency: 64
+    timeout: 30s
   kubernetes:
     disable-http-proxy: false
     base-url: ""
