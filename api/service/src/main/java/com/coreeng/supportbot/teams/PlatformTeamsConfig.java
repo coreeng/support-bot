@@ -41,7 +41,8 @@ import java.util.concurrent.Executors;
     PlatformTeamsConfig.GcpProps.class,
     GenericPlatformTeamsFetcher.Config.class,
     StaticPlatformTeamsProps.class,
-    StaticPlatformUsersProps.class
+    StaticPlatformUsersProps.class,
+    PlatformTeamsFetchProps.class
 })
 @RequiredArgsConstructor
 public class PlatformTeamsConfig {
@@ -51,8 +52,8 @@ public class PlatformTeamsConfig {
     private final StaticPlatformUsersProps staticPlatformUsersProps;
 
     @Bean
-    public PlatformTeamsService platformTeamsService(PlatformTeamsFetcher teamsFetcher, PlatformUsersFetcher usersFetcher) {
-        return new PlatformTeamsService(teamsFetcher, usersFetcher, escalationTeamsRegistry);
+    public PlatformTeamsService platformTeamsService(PlatformTeamsFetcher teamsFetcher, PlatformUsersFetcher usersFetcher, PlatformTeamsFetchProps fetchProps) {
+        return new PlatformTeamsService(teamsFetcher, usersFetcher, escalationTeamsRegistry, fetchProps);
     }
 
     @Bean
