@@ -104,6 +104,7 @@ env:
 
 # ConfigMap configuration
 configMap:
+  enabled: true
   create: true
   name: ""
   annotations: {}
