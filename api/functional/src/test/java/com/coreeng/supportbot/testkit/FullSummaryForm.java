@@ -342,12 +342,12 @@ public class FullSummaryForm {
             } else {
                 escalationsBlock = ticket.escalations().stream()
                     .map(escalation -> {
-                        String teamName = escalation.team();
+                        String teamCode = escalation.team();
                         String groupId = ticket.config().escalationTeams().stream()
-                            .filter(t -> t.name().equals(teamName))
+                            .filter(t -> t.code().equals(teamCode))
                             .findFirst()
                             .map(Config.EscalationTeam::slackGroupId)
-                            .orElseThrow(() -> new AssertionError("Team not found: " + teamName));
+                            .orElseThrow(() -> new AssertionError("Team not found: " + teamCode));
                         return String.format(
                             """
                                 {

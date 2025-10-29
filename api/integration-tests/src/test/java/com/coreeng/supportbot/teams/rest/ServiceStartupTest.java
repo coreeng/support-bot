@@ -88,14 +88,14 @@ public class ServiceStartupTest {
             .extract().body().jsonPath().getList("", TeamUI.class);
 
         TeamUI coreTeam = teams.stream()
-            .filter(team -> testTeamName.equals(team.name()))
+            .filter(team -> testTeamName.equals(team.code()))
             .findFirst()
             .orElse(null);
 
         assertThat(coreTeam)
             .as("Team '%s' should be present in response", testTeamName)
             .isNotNull();
-        assertThat(coreTeam.name())
+        assertThat(coreTeam.code())
             .as("Team name should match expected value")
             .isEqualTo(testTeamName);
         assertThat(coreTeam.types())

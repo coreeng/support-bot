@@ -1,8 +1,7 @@
 package com.coreeng.supportbot.escalation;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
@@ -34,7 +33,7 @@ public class EscalationProcessingService {
                 request.tags()
             )
         );
-        if (escalation.id() == null) {
+        if (escalation == null || escalation.id() == null) {
             log.warn("Escalation already exists");
             return escalation;
         }
@@ -43,10 +42,11 @@ public class EscalationProcessingService {
             .addArgument(escalation::id)
             .log("Escalation created: {}");
 
+        EscalationTeam team = escalationTeamsRegistry.findEscalationTeamByCode(escalation.team());
         ChatPostMessageResponse messagePostResponse = slackClient.postMessage(new SlackPostMessageRequest(
-            createdMessageMapper.renderMessage(EscalationCreatedMessage.of(
-                escalation,
-                checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(escalation.team())).slackGroupId()
+            createdMessageMapper.renderMessage(new EscalationCreatedMessage(
+                escalation.id(),
+                team
             )),
             slackTicketsProps.channelId(),
             request.ticket().queryTs()

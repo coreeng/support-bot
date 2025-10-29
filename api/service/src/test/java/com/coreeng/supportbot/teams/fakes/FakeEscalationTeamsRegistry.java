@@ -20,10 +20,5 @@ public class FakeEscalationTeamsRegistry implements EscalationTeamsRegistry {
     public EscalationTeam findEscalationTeamByCode(String code) {
         return teams.stream().filter(t -> t.code().equals(code)).findFirst().orElse(null);
     }
-
-    @Override
-    public EscalationTeam findEscalationTeamByName(String teamName) {
-        return teams.stream().filter(t -> t.label().equals(teamName)).findFirst().orElse(null);
-    }
 }
 

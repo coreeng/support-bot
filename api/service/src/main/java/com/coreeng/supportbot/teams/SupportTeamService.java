@@ -21,6 +21,7 @@ public class SupportTeamService {
     public Team getTeam() {
         return new Team(
             supportTeamProps.name(),
+            supportTeamProps.code(),
             ImmutableList.of(TeamType.support)
         );
     }

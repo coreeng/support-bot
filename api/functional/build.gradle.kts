@@ -139,8 +139,10 @@ tasks.register("testIntegrated") {
             val jarFile = bootJarTask.archiveFile.get().asFile
 
             logger.lifecycle("Starting service: $jarFile")
-            val logfile = File(logfilePath)
-            logfile.createNewFile()
+            val logfile = File(logfilePath).apply {
+                parentFile.mkdirs()
+                createNewFile()
+            }
             serviceProcess = ProcessBuilder(
                 "${System.getProperty("java.home")}/bin/java",
                 "-jar", jarFile.absolutePath,

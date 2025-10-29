@@ -5,7 +5,6 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.text.StringSubstitutor;
 
-import com.coreeng.supportbot.Config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
@@ -47,15 +46,14 @@ public class EscalationForm {
                 .collect(Collectors.joining(",\n"));
 
             String teamOptions = ticket.config().escalationTeams().stream()
-                .map(Config.EscalationTeam::name)
-                .map(teamName -> String.format(
+                .map(team -> String.format(
                     """
                         {
                           "text": {"type": "plain_text", "text": %s},
                           "value": %s
                         }""",
-                    safeJson(teamName),
-                    safeJson(teamName)
+                    safeJson(team.label()),
+                    safeJson(team.code())
                 ))
                 .collect(Collectors.joining(",\n"));
 

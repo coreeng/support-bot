@@ -12,10 +12,10 @@ slack:
 
 enums:
   escalation-teams:
-    - label: wow
+    - label: WoW
       code: wow
       slack-group-id: S01234ESCWW
-    - label: infra-integration
+    - label: Infra Integration
       code: infra-integration
       slack-group-id: S01234ESCII
 #    - label: connected-app

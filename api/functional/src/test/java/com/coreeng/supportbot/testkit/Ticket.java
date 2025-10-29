@@ -60,7 +60,7 @@ public class Ticket implements SearchableForTicket {
             .status(Ticket.Status.fromCode(ticketResponse.status()))
             .team(
                 ticketResponse.team() != null
-                    ? ticketResponse.team().name()
+                    ? ticketResponse.team().code()
                     : null
             )
             .tags(ticketResponse.tags())
@@ -179,7 +179,7 @@ public class Ticket implements SearchableForTicket {
         if (team == null) {
             assertThat(response.team()).isNull();
         } else {
-            assertThat(response.team().name()).isEqualTo(team);
+            assertThat(response.team().code()).isEqualTo(team);
         }
         assertThat(response.tags()).isEqualTo(tags());
 
@@ -188,7 +188,7 @@ public class Ticket implements SearchableForTicket {
         for (int i = 0; i < escalations.size(); i++) {
             var expectedEscalation = escalations.get(i);
             var actualEscalation = response.escalations().get(i);
-            assertThat(actualEscalation.team().name()).isEqualTo(expectedEscalation.team());
+            assertThat(actualEscalation.team().code()).isEqualTo(expectedEscalation.team());
             assertThat(actualEscalation.tags()).isEqualTo(expectedEscalation.tags());
             if (expectedEscalation.createdAt() != null) {
                 assertThat(actualEscalation.openedAt()).isCloseTo(expectedEscalation.createdAt(), within(2, ChronoUnit.SECONDS));

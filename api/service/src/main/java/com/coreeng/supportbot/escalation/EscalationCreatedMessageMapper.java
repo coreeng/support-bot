@@ -24,8 +24,8 @@ public class EscalationCreatedMessageMapper {
     }
 
     private ImmutableList<LayoutBlock> renderBlocks(EscalationCreatedMessage message) {
-        String str = "\nEscalated to team: " + message.escalationTeam()
-                     + "("+ "<!subteam^" +message.slackTeamGroupId() + ">)";
+        String str = "\nEscalated to team: " + message.team().label()
+                     + "("+ "<!subteam^" +message.team().slackGroupId() + ">)";
         return ImmutableList.of(
             section(s -> s
                 .text(markdownText(str))
@@ -34,7 +34,7 @@ public class EscalationCreatedMessageMapper {
     }
 
     private String getTextMessage(EscalationCreatedMessage message) {
-        return format("Escalation to team: %s", message.escalationTeam());
+        return format("Escalation to team: %s", message.team().label());
     }
 
     public EscalationResolveInput parseTriggerInput(String json) {
