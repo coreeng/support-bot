@@ -4,7 +4,8 @@ import com.coreeng.supportbot.teams.TeamType;
 import com.google.common.collect.ImmutableList;
 
 public record TeamUI(
-    String name,
+    String label,
+    String code,
     ImmutableList<TeamType> types
 ) {
 }

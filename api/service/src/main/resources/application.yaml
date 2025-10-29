@@ -157,6 +157,7 @@ platform-integration:
 
 support-team:
   name: Core Support
+  code: support
   slack-group-id: S08948NBMED
   static:
     enabled: false

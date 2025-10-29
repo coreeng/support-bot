@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 public record TeamUI(
-    @JsonProperty("name") String name,
+    @JsonProperty("label") String label,
+    @JsonProperty("code") String code,
     @JsonProperty("types") List<String> types
 ) {}
