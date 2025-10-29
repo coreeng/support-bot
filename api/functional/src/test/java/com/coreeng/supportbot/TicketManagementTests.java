@@ -62,8 +62,8 @@ public class TicketManagementTests {
         ImmutableList<@NonNull String> firstTags = ImmutableList.of("jenkins-pipelines", "networking");
         ImmutableList<@NonNull String> secondTags = ImmutableList.of("ingresses", "networking");
 
-        ticket.escalateViaTestApi(MessageTs.now(), firstTeam.name(), firstTags);
-        ticket.escalateViaTestApi(MessageTs.now(), secondTeam.name(), secondTags);
+        ticket.escalateViaTestApi(MessageTs.now(), firstTeam.code(), firstTags);
+        ticket.escalateViaTestApi(MessageTs.now(), secondTeam.code(), secondTags);
 
         var closeStubs = ticket.stubCloseFlow(queryTs);
 
@@ -203,12 +203,12 @@ public class TicketManagementTests {
 
         // when
         ticket.openEscalationAndSubmit(asSupport.slack(), openEscalationTriggerId, EscalationFormSubmission.Values.builder()
-            .team(escalationTeam.name())
+            .team(escalationTeam.code())
             .tags(ImmutableList.of("jenkins-pipelines", "networking"))
             .build());
 
         EscalationFormSubmission.Values values = EscalationFormSubmission.Values.builder()
-            .team(escalationTeam.name())
+            .team(escalationTeam.code())
             .tags(ImmutableList.of("jenkins-pipelines", "networking"))
             .build();
 
@@ -234,7 +234,7 @@ public class TicketManagementTests {
 
         // Escalate via test controller
         ImmutableList<@NonNull String> escalationTags = ImmutableList.of("jenkins-pipelines", "networking");
-        ticket.escalateViaTestApi(MessageTs.now(), config.escalationTeams().getFirst().name(), escalationTags);
+        ticket.escalateViaTestApi(MessageTs.now(), config.escalationTeams().getFirst().code(), escalationTags);
 
         // Stub Slack updates for closing (composite)
         var closeStubs_whenEscalatedClosed = ticket.stubCloseFlow(queryTs);

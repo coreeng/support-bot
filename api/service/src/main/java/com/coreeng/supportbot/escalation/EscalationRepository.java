@@ -4,8 +4,8 @@ import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
+import org.jspecify.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.time.Instant;
 
 public interface EscalationRepository {

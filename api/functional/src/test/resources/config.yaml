@@ -35,9 +35,11 @@ tenants:
       - email: nazira.armel@company.com
 
 escalationTeams:
-  - name: wow
+  - label: WoW
+    code: wow
     slackGroupId: S01234ESCWW
-  - name: infra-integration
+  - label: Infra Integration
+    code: infra-integration
     slackGroupId: S01234ESCII
 tags:
   - label: Ingresses

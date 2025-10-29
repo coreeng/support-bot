@@ -80,10 +80,10 @@ class EscalationProcessingServiceTest {
     ChatPostMessageResponse chatPostMessageResponse = new ChatPostMessageResponse();
     chatPostMessageResponse.setTs("ts");
     when(escalationRepository.createIfNotExists(any(Escalation.class)))
-        .thenReturn(Escalation.builder().id(new EscalationId(1)).build());
+        .thenReturn(expectedEscalation.toBuilder().id(new EscalationId(1)).build());
     when(slackClient.postMessage(any())).thenReturn(chatPostMessageResponse);
     when(escalationRepository.update(any(Escalation.class))).thenReturn(expectedEscalation);
-    when(escalationTeamsRegistry.findEscalationTeamByName(any())).thenReturn(new EscalationTeam("some-team","someTeam","id"));
+    when(escalationTeamsRegistry.findEscalationTeamByCode("some-team")).thenReturn(new EscalationTeam("some-team","someTeam","id"));
 
     // when
     Escalation escalation = processingService.createEscalation(escalationRequest);

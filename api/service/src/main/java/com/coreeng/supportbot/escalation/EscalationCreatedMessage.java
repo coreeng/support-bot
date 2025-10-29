@@ -1,20 +1,10 @@
 package com.coreeng.supportbot.escalation;
 
 
+import com.coreeng.supportbot.enums.EscalationTeam;
 
 public record EscalationCreatedMessage(
     EscalationId escalationId,
-    String escalationTeam,
-    String slackTeamGroupId
+    EscalationTeam team
 ) {
-    public static EscalationCreatedMessage of(
-        Escalation escalation,
-        String slackTeamGroupId
-    ) {
-        return new EscalationCreatedMessage(
-            escalation.id(),
-            escalation.team(),
-            slackTeamGroupId
-        );
-    }
 }

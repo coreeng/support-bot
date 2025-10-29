@@ -8,6 +8,4 @@ public interface EscalationTeamsRegistry {
     ImmutableList<EscalationTeam> listAllEscalationTeams();
     @Nullable
     EscalationTeam findEscalationTeamByCode(String code);
-    @Nullable
-    EscalationTeam findEscalationTeamByName(String teamName);
 }

@@ -107,9 +107,7 @@ public class EscalateViewMapper {
             .collect(toImmutableList());
 
         ViewState.Value teamValue = checkNotNull(passedValues.get(Fields.team.actionId()));
-        String team = checkNotNull(escalationTeamsRegistry.findEscalationTeamByCode(
-            teamValue.getSelectedOption().getValue()
-        )).label();
+        String team = teamValue.getSelectedOption().getValue();
 
         ViewState.Value threadPermalinkValue = passedValues.get(Fields.threadPermalink.actionId());
         String threadPermalink = threadPermalinkValue != null
