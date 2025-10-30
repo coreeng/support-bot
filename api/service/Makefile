@@ -31,20 +31,11 @@ check:
 
 TAG=latest
 IMAGE_NAME=ghcr.io/coreeng/support-bot
-PUBLISH=false
-# Specify next variables in case PUBLISH=true
-USERNAME=
-PASSWORD=
 .ONESHELL: docker-build
 .PHONY: docker-build
 docker-build:
-	@export password="$(PASSWORD)"
 	@export args="-DimageName=$(IMAGE_NAME):$(TAG)"
-	@if [[ "$(PUBLISH)" == "true" ]]; then \
-		args+=" --publishImage -Dusername=$(USERNAME) -Dpassword=$${password}"; \
-	fi
-	@../gradlew bootBuildImage $${args}
-
+	@docker build .. -t ${IMAGE_NAME}:${TAG}
 
 .PHONY: db-run
 db-run:

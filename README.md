@@ -81,6 +81,16 @@ For example, to override the enums configuration, replace the enums block in you
 
 For a more detailed explanation of all configuration options see the [Configuration Documentation](https://github.com/coreeng/support-bot/blob/main/api/service/docs/configuration.md)
 
+### Helm Chart
+
+We've built a helm chart that you can use to make the deployment easier.
+Find the documentation for it [here](https://github.com/coreeng/support-bot/blob/main/api/k8s/service/README.md).
+
+How to use the helm chart:
+```bash
+helm install support-bot oci://ghcr.io/coreeng/charts/support-bot
+```
+
 ### 4️⃣ Environment Variables
 
 For the application to function correctly, you will need to set the following environment variables:

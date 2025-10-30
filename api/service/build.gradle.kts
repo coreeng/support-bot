@@ -1,6 +1,6 @@
 import org.flywaydb.gradle.task.AbstractFlywayTask
 import org.jooq.codegen.gradle.CodegenTask
-import org.springframework.boot.gradle.tasks.bundling.BootBuildImage
+import org.springframework.boot.gradle.tasks.bundling.BootJar
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy
 import org.testcontainers.containers.wait.strategy.Wait
@@ -28,6 +28,14 @@ java {
         languageVersion = JavaLanguageVersion.of(21)
     }
 }
+// we only use result of the bootJar
+tasks.getByName<Jar>("jar") {
+    enabled = false
+}
+
+tasks.named<BootJar>("bootJar") {
+    archiveFileName.set("service.jar")
+}
 
 pmd {
     isIgnoreFailures = false
@@ -49,12 +57,12 @@ repositories {
 val lombokVersion = "1.18.+"
 
 dependencies {
+    implementation("org.jspecify:jspecify:1.0.0")
+
     implementation("org.springframework.boot:spring-boot-starter-web") {
         exclude(group = "org.springframework.boot", module = "spring-boot-starter-tomcat")
     }
     implementation("org.springframework.boot:spring-boot-starter-jetty")
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.3")
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:2.8.3")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-cache")
 
@@ -88,6 +96,8 @@ dependencies {
     implementation("io.fabric8:kubernetes-client:7.1.0")
     testImplementation("io.fabric8:kubernetes-server-mock:7.1.0")
 
+    implementation("net.thisptr:jackson-jq:1.6.0")
+
     implementation("com.google.cloud:spring-cloud-gcp-starter:5.10.0")
     implementation("com.google.apis:google-api-services-cloudidentity:v1-rev20241208-2.0.0")
 
@@ -113,17 +123,6 @@ tasks.withType<Test> {
         "-javaagent:${mockitoAgent.asPath}",
         "-XX:+EnableDynamicAgentLoading", "-Xshare:off"
     )
-}
-
-tasks.withType<BootBuildImage> {
-    imageName = System.getProperty("imageName") ?: "support-bot:latest"
-    docker {
-        publishRegistry {
-            username = System.getProperty("username")
-            password = System.getProperty("password")
-        }
-    }
-    setPullPolicy("IF_NOT_PRESENT")
 }
 
 buildscript {
@@ -173,6 +172,11 @@ jooq {
                     forcedType {
                         includeTypes = "timestamptz"
                         userType = Instant::class.java.canonicalName
+                    }
+                    forcedType {
+                        userType = "java.util.List<java.lang.String>"
+                        isAutoConverter = true
+                        includeTypes = "_varchar"
                     }
                 }
             }

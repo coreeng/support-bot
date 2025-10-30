@@ -59,9 +59,10 @@ public class FullSummaryForm {
             assertThatJson(view.get("private_metadata").asText()).isEqualTo(String.format(
                 """
                     {
-                      "ticketId": %d
+                      "ticketId": %d,
+                      "authorId": "%s"
                     }
-                    """, ticket.id()));
+                    """, ticket.id(), ticket.user().slackUserId()));
             String expectedBlocks = buildExpectedBlocksJson();
             assertThatJson(view.get("blocks").toString())
                 .withMatcher("timestamp-is-close", new TimestampIsCloseMatcher())
@@ -178,7 +179,7 @@ public class FullSummaryForm {
                     "optional": false,
                     "element": {
                       "type": "static_select",
-                      "action_id": "change-status",
+                      "action_id": "ticket-change-status",
                       "initial_option": {
                         "text": {
                           "type": "plain_text",
@@ -212,46 +213,10 @@ public class FullSummaryForm {
                     },
                     "optional": false,
                     "element": {
-                      "type": "static_select",
-                      "action_id": "change-team",
                       ${teamInitialOption}
-                      "option_groups": [
-                        {
-                          "options": [{
-                            "text": {
-                              "text": "wow",
-                              "type": "plain_text"
-                            },
-                            "value": "wow"
-                          }],
-                          "label": {
-                            "text": "Suggested teams",
-                            "type": "plain_text"
-                          }
-                        },
-                        {
-                          "label": {
-                            "type": "plain_text",
-                            "text": "Others"
-                          },
-                          "options": [
-                            {
-                              "text": {
-                                "type": "plain_text",
-                                "text": "connected-app"
-                              },
-                              "value": "connected-app"
-                            },
-                            {
-                              "text": {
-                                "type": "plain_text",
-                                "text": "infra-integration"
-                              },
-                              "value": "infra-integration"
-                            }
-                          ]
-                        }
-                      ]
+                      "type": "external_select",
+                      "action_id": "ticket-change-team",
+                      "min_query_length": 0
                     }
                   },
                   {
@@ -267,7 +232,7 @@ public class FullSummaryForm {
                     "optional": false,
                     "element": {
                       "type": "multi_static_select",
-                      "action_id": "change-tags",
+                      "action_id": "ticket-change-tags",
                       ${tagsInitialOptions}
                       "options": ${tagsOptions}
                     }
@@ -281,7 +246,7 @@ public class FullSummaryForm {
                     "optional": false,
                     "element": {
                       "type": "static_select",
-                      "action_id": "change-impact",
+                      "action_id": "ticket-change-impact",
                       "placeholder": {
                         "type": "plain_text",
                         "text": "Not Evaluated"

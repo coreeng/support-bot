@@ -30,7 +30,7 @@ p2p-functional:    build-functional    push-functional    deploy-functional    r
 p2p-nft:           build-nft           push-nft           deploy-nft           run-nft           ## p2p nft tests
 p2p-integration:   build-integration   push-integration   deploy-integration   run-integration   ## p2p integration tests
 p2p-extended-test: build-extended-test push-extended-test deploy-extended-test run-extended-test ## p2p extended tests
-p2p-prod:          publish-prod                            			                             ## p2p release to production
+p2p-prod:          publish-prod        publish-chart                                             ## p2p release to production
 
 ##@ Lint targets
 
@@ -160,3 +160,17 @@ publish-prod: ## Publish container image
 	@printf "Login to ghcr.io... "
 	@echo "$(GITHUB_TOKEN)" | skopeo login --username "$(or $(GITHUB_ACTOR),anonymous)" --password-stdin ghcr.io
 	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/$(p2p_app_name):$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name):$(p2p_version)"
+
+.PHONY: publish-chart
+publish-chart: ## Package and publish Helm chart (version aligned to image)
+	@echo "Packaging Helm chart with version $(p2p_version)..."
+	@mkdir -p dist/charts
+	helm package api/k8s/service \
+	  --version "$(p2p_version)" \
+	  --app-version "$(p2p_version)" \
+	  --destination dist/charts
+	@printf "Login to ghcr.io for Helm... "
+	@echo "$(GITHUB_TOKEN)" | helm registry login ghcr.io \
+	  --username "$(or $(GITHUB_ACTOR),anonymous)" --password-stdin
+	# Push to GHCR as an OCI Helm chart. Result path: ghcr.io/coreeng/charts/support-bot:$(p2p_version)
+	helm push "dist/charts/support-bot-$(p2p_version).tgz" oci://ghcr.io/coreeng/charts

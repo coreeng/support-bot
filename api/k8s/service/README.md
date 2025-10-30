@@ -1,10 +1,24 @@
 # Support Bot Helm Chart
 
-This Helm chart deploys the Support Bot application, a Slack bot for managing support queries coming into a Slack channel.
+This chart deploys the Support Bot (a Slack bot that manages support requests) to Kubernetes.
 
-## Database Setup
+## Install
 
-The chart expects a PostgreSQL database to be available. You can deploy PostgreSQL using the Bitnami chart:
+From the repository root (or any path where `k8s/service` is accessible):
+
+```bash
+helm install support-bot oci://ghcr.io/coreeng/charts/support-bot \
+  --set image.repository="ghcr.io/coreeng/support-bot" \
+  --set image.tag="<your-image-tag>"
+```
+
+Notes:
+- `image.tag` defaults to the chart `appVersion` when empty which corresponds to the bot version that it was built with.
+- If your image requires credentials, set `imagePullSecrets` (see Configuration).
+
+## Database
+
+Support Bot requires PostgreSQL. One simple option is to install Bitnami PostgreSQL and use the default service name expected by this chart’s default `DB_URL`:
 
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -16,24 +30,17 @@ helm install support-bot-db bitnami/postgresql \
   --set global.postgresql.auth.database=supportbot
 ```
 
+By default the chart sets environment variables:
+- `DB_URL=jdbc:postgresql://support-bot-db-postgresql:5432/supportbot`
+- `DB_USERNAME=supportbot`
+- `DB_PASSWORD=supportbotpassword`
+
+Use Secrets for credentials in real environments by overriding the `env` entries (see below).
+
 ## Required Secrets
 
-Before deploying the helm chart, you must create the following secrets in your cluster:
+Create a Kubernetes Secret named `support-bot` with Slack credentials referenced by `values.yaml`:
 
-### Azure Secret
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: azure
-type: Opaque
-stringData:
-  AZURE_CLIENT_ID: "your-azure-client-id"
-  AZURE_TENANT_ID: "your-azure-tenant-id"
-  AZURE_CLIENT_SECRET: "your-azure-client-secret"
-```
-
-### Support Bot Secret
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -46,58 +53,41 @@ stringData:
   SLACK_SIGNING_SECRET: "your-slack-signing-secret"
 ```
 
-Apply these secrets to your cluster before deploying:
+Apply it before installing the chart:
+
 ```bash
-kubectl apply -f azure.yaml
 kubectl apply -f support-bot.yaml
 ```
 
-### Alternative: Custom Environment Configuration
+This secret is referenced by default from environment variables.
+If you override environment variables, you might not need to set up this secret, depending on your configuration.
 
-Alternatively, you can modify the `env` property in `values.yaml` to use your own secret management approach. This allows you to reference different secrets or use external secret management systems:
+## Configuration
+
+### ConfigMap
+
+This chart can template an `application.yaml` and mount it at `/app/config` when enabled.
+
+- `configMap.create` (bool): Create and mount a ConfigMap. Default `true`.
+- `configMap.enabled` (bool): Enable ConfigMap mount. If true and `configMap.create` is false, it's expected that you created a ConfigMap yourself.
+- `configMap.name` (string): Optional name for the created ConfigMap; defaults to the chart’s full name.
+- `configMap.annotations` (map): Annotations for the ConfigMap.
+- `configMap.config` (map): Content rendered into `application.yaml`.
+
+Example in `values.yaml`:
 
 ```yaml
-env:
-  - name: AZURE_CLIENT_ID
-    valueFrom:
-      secretKeyRef:
-        name: my-custom-azure-secret
-        key: client_id
-  - name: SLACK_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: my-custom-slack-secret
-        key: bot_token
-  # ... other environment variables
+configMap:
+  create: true
+  config:
+    spring:
+      profiles:
+        active: default
+    some:
+      key: value
 ```
 
-When using this approach, you'll need to ensure your custom secrets are created and managed according to your own secret management strategy.
+## Health and Metrics
 
-## ConfigMap Management
-
-The chart automatically creates ConfigMap to manage application configuration:
-
-### ConfigMap Resource
-Contains non-sensitive service configuration:
-- Database URL and username
-- Slack channel IDs
-
-### Using External Resources
-
-To use an existing ConfigMap resource instead of creating a new one:
-
-```bash
-# Use external configmap
-helm install support-bot ./k8s/service \
-  --set configMap.create=false \
-  --set configMap.name=my-existing-configmap
-```
-
-## Health Checks
-
-The application provides health endpoints on port 8081:
-- `/health` - Health check endpoint used by liveness and readiness probes
-
-## Metrics
-
-When metrics are enabled, Prometheus metrics are available on port 8081.
+- Health endpoint: `/health` on port `8081` (used by liveness/readiness).
+- When `metrics.enabled=true`, metrics are exposed on port `8081` and a `metrics` Service port is added.

@@ -170,6 +170,15 @@ public class JdbcEscalationRepository implements EscalationRepository {
         );
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsByTicketId(TicketId ticketId) {
+        return dsl.fetchExists(
+            ESCALATION,
+            ESCALATION.TICKET_ID.eq(ticketId.id())
+        );
+    }
+
     @Transactional(readOnly = true)
     @Override
     public long countNotResolvedByTicketId(TicketId ticketId) {

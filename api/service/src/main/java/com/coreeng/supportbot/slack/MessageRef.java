@@ -16,11 +16,20 @@ public record MessageRef(
     }
 
     public static MessageRef from(BlockActionPayload payload) {
-        return new MessageRef(
-            MessageTs.of(payload.getMessage().getTs()),
-            MessageTs.ofOrNull(payload.getMessage().getThreadTs()),
-            payload.getChannel().getId()
-        );
+        if (payload.getContainer() != null) {
+            return new MessageRef(
+                MessageTs.of(payload.getContainer().getMessageTs()),
+                MessageTs.ofOrNull(payload.getContainer().getThreadTs()),
+                payload.getChannel().getId()
+            );
+        } else if (payload.getMessage() != null) {
+            return new MessageRef(
+                MessageTs.of(payload.getMessage().getTs()),
+                MessageTs.ofOrNull(payload.getMessage().getThreadTs()),
+                payload.getChannel().getId()
+            );
+        }
+        throw new IllegalArgumentException("Couldn't build a message ref from payload");
     }
 
     // Top level link: https://cecg-group.slack.com/archives/C0860GW8BSN/p1736330024278409

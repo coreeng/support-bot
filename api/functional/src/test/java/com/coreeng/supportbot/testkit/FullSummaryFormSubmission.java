@@ -38,10 +38,10 @@ public class FullSummaryFormSubmission implements ViewSubmission {
     @Override
     public ImmutableList<@NonNull Value> values() {
         return ImmutableList.of(
-            new StaticSelectValue("change-status", values.status().code()),
-            new StaticSelectValue("change-team", values.team()),
-            new MultiStaticSelectValue("change-tags", values.tags()),
-            new StaticSelectValue("change-impact", values.impact())
+            new StaticSelectValue("ticket-change-status", values.status().code()),
+            new StaticSelectValue("ticket-change-team", values.team()),
+            new MultiStaticSelectValue("ticket-change-tags", values.tags()),
+            new StaticSelectValue("ticket-change-impact", values.impact())
         );
     }
 

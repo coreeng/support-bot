@@ -20,6 +20,7 @@ public record Config(
     public record DeploymentScriptConfig(
         String releaseName,
         String chartPath,
+        String valuesFilePath,
         String scriptPath
     ) {}
 
