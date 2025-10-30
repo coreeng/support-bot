@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.config;
 
 import com.coreeng.supportbot.slack.SlackBlockActionHandler;
+import com.coreeng.supportbot.slack.SlackBlockSuggestionHandler;
 import com.coreeng.supportbot.slack.SlackEventHandler;
 import com.coreeng.supportbot.slack.SlackViewSubmitHandler;
 import com.slack.api.app_backend.interactive_components.payload.BlockActionPayload;
@@ -28,7 +29,7 @@ public class SlackAppInit implements InitializingBean {
     private final List<SlackEventHandler<? extends Event>> eventHandlers;
     private final List<SlackBlockActionHandler> actionHandlers;
     private final List<SlackViewSubmitHandler> submitHandlers;
-
+    private final List<SlackBlockSuggestionHandler> blockSuggestionHandlers;
 
     @Override
     public void afterPropertiesSet() {
@@ -79,6 +80,13 @@ public class SlackAppInit implements InitializingBean {
                     }
                 });
                 return ctx.ack();
+            });
+        }
+
+        for (var handler : blockSuggestionHandlers) {
+            app.blockSuggestion(handler.getPattern(), (req, ctx) -> {
+                // Have to be processed synchronously
+                return ctx.ack(handler.apply(req, ctx));
             });
         }
 

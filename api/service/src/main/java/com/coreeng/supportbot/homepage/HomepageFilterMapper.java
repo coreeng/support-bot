@@ -9,6 +9,7 @@ import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.google.common.collect.ImmutableMap;
 import com.slack.api.model.view.View;
 import com.slack.api.model.view.ViewState;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -53,7 +54,7 @@ public class HomepageFilterMapper {
                     .label(plainText("Status"))
                     .optional(true)
                     .element(staticSelect(s -> s
-                        .actionId(FilterField.status.name())
+                        .actionId(FilterField.status.actionId())
                         .initialOption(toOptionObjectOrNull(filter.status()))
                         .options(List.of(
                             toOptionObject(TicketStatus.opened),
@@ -65,7 +66,7 @@ public class HomepageFilterMapper {
                     .label(plainText("Escalation Team"))
                     .optional(true)
                     .element(staticSelect(s -> s
-                        .actionId(FilterField.escalationTeam.name())
+                        .actionId(FilterField.escalationTeam.actionId())
                         .initialOption(
                             filter.escalationTeam() == null
                                 ? null
@@ -82,7 +83,7 @@ public class HomepageFilterMapper {
                     .label(plainText("Order"))
                     .optional(true)
                     .element(staticSelect(s -> s
-                        .actionId(FilterField.order.name())
+                        .actionId(FilterField.order.actionId())
                         .initialOption(toOptionObjectOrNull(filter.order()))
                         .options(List.of(
                             toOptionObject(TicketsQuery.Order.desc),
@@ -94,7 +95,7 @@ public class HomepageFilterMapper {
                     .label(plainText("Timeframe"))
                     .optional(true)
                     .element(staticSelect(s -> s
-                        .actionId(FilterField.timeframe.name())
+                        .actionId(FilterField.timeframe.actionId())
                         .initialOption(toOptionObjectOrNull(filter.timeframe()))
                         .options(List.of(
                             toOptionObject(HomepageFilter.Timeframe.thisWeek),
@@ -106,7 +107,7 @@ public class HomepageFilterMapper {
                     .label(plainText("Tags"))
                     .optional(true)
                     .element(multiStaticSelect(s -> s
-                        .actionId(FilterField.tags.name())
+                        .actionId(FilterField.tags.actionId())
                         .initialOptions(
                             isEmpty(filter.tags())
                                 ? null
@@ -125,7 +126,7 @@ public class HomepageFilterMapper {
                     .label(plainText("Impact"))
                     .optional(true)
                     .element(staticSelect(s -> s
-                        .actionId(FilterField.impact.name())
+                        .actionId(FilterField.impact.actionId())
                         .initialOption(
                             filter.impact() == null
                                 ? null
@@ -151,34 +152,34 @@ public class HomepageFilterMapper {
                         Map.Entry::getValue
                 ));
 
-        ViewState.Value statusValue = values.get(FilterField.status.name());
+        ViewState.Value statusValue = values.get(FilterField.status.actionId());
         if (statusValue != null && statusValue.getSelectedOption() != null) {
             builder.status(TicketStatus.valueOf(statusValue.getSelectedOption().getValue()));
         }
 
-        ViewState.Value escalationTeam = values.get(FilterField.escalationTeam.name());
+        ViewState.Value escalationTeam = values.get(FilterField.escalationTeam.actionId());
         if (escalationTeam != null && escalationTeam.getSelectedOption() != null) {
             builder.escalationTeam(escalationTeam.getSelectedOption().getValue());
         }
 
-        ViewState.Value orderValue = values.get(FilterField.order.name());
+        ViewState.Value orderValue = values.get(FilterField.order.actionId());
         if (orderValue != null && orderValue.getSelectedOption() != null) {
             builder.order(TicketsQuery.Order.valueOf(orderValue.getSelectedOption().getValue()));
         }
 
-        ViewState.Value timeframeValue = values.get(FilterField.timeframe.name());
+        ViewState.Value timeframeValue = values.get(FilterField.timeframe.actionId());
         if (timeframeValue != null && timeframeValue.getSelectedOption() != null) {
             builder.timeframe(HomepageFilter.Timeframe.valueOf(timeframeValue.getSelectedOption().getValue()));
         }
 
-        ViewState.Value tagsValue = values.get(FilterField.tags.name());
+        ViewState.Value tagsValue = values.get(FilterField.tags.actionId());
         if (tagsValue != null && tagsValue.getSelectedOptions() != null) {
             builder.tags(tagsValue.getSelectedOptions().stream()
                 .map(ViewState.SelectedOption::getValue)
                 .collect(toImmutableList()));
         }
 
-        ViewState.Value impactValue = values.get(FilterField.impact.name());
+        ViewState.Value impactValue = values.get(FilterField.impact.actionId());
         if (impactValue != null && impactValue.getSelectedOption() != null) {
             builder.impact(impactValue.getSelectedOption().getValue());
         }
@@ -186,13 +187,17 @@ public class HomepageFilterMapper {
         return builder.build();
     }
 
+    @Getter
+    @RequiredArgsConstructor
     public enum FilterField {
-        status,
-        order,
-        timeframe,
-        tags,
-        impact,
-        escalationTeam,
-        inquiringTeam
+        status("homepage-filter-status"),
+        order("homepage-filter-order"),
+        timeframe("homepage-filter-timeframe"),
+        tags("homepage-filter-tags"),
+        impact("homepage-filter-impact"),
+        escalationTeam("homepage-filter-escalation-team"),
+        inquiringTeam("homepage-filter-inquiring-team");
+
+        private final String actionId;
     }
 }

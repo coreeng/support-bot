@@ -1,5 +1,6 @@
 configMap:
   create: false
+  enabled: false
 
 env:
   - name: SPRING_PROFILES_ACTIVE

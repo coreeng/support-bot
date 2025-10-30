@@ -55,17 +55,17 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-            {{- if .Values.configMap.create }}
+            {{- if .Values.configMap.enabled }}
             - name: config
               mountPath: /app/config
             {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
-        {{- if .Values.configMap.create }}
+        {{- if .Values.configMap.enabled }}
         - name: config
           configMap:
-            name: {{ include "support-bot.fullname" . }}
+            name: {{ .Values.configMap.name | default (include "support-bot.fullname" .) }}
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

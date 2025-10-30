@@ -1,10 +1,12 @@
 package com.coreeng.supportbot.rating;
 
+import com.coreeng.supportbot.ticket.TicketStatus;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.With;
 
 import javax.annotation.Nullable;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -15,26 +17,10 @@ public class Rating {
     private UUID id;
     private Integer rating;
     private String submittedTs;
-    private String status;
+    private TicketStatus status;
     @Nullable
     private String impact;
     @Nullable
-    private String[] tags;
+    private List<String> tags;
     private boolean isEscalated;
-
-    public boolean isValidRating() {
-        return rating >= 1 && rating <= 5;
-    }
-
-    public boolean isHighRating() {
-        return rating >= 4;
-    }
-
-    public boolean isLowRating() {
-        return rating <= 2;
-    }
-
-    public boolean isEscalated() {
-        return isEscalated;
-    }
 }

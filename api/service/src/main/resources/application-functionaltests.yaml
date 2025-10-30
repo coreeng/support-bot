@@ -1,6 +1,6 @@
 slack:
   mode: http
-  enableRequestVerification: false
+  enable-request-verification: false
   client:
     methods-base-url: "http://localhost:8000/api/"
   creds:
@@ -11,7 +11,7 @@ slack:
     response-initial-reaction: ticket
 
 enums:
-  escalationTeams:
+  escalation-teams:
     - label: wow
       code: wow
       slack-group-id: S01234ESCWW
@@ -52,11 +52,11 @@ support-team:
     enabled: true
     members:
       - email: coby.ivona@company.com
-        slackId: U0123456781
+        slack-id: U0123456781
       - email: sana.chernobog@company.com
-        slackId: U0123456782
+        slack-id: U0123456782
       - email: jean.kristijan@company.com
-        slackId: U0123456783
+        slack-id: U0123456783
 
 platform-integration:
   enabled: true

@@ -54,10 +54,12 @@ public class PlatformTeamsService {
             List<PlatformUsersFetcher.Membership> memberships = usersFetcher.fetchMembershipsByGroupRef(t.groupRef());
             List<PlatformUser> users = new ArrayList<>();
             for (PlatformUsersFetcher.Membership m : memberships) {
-                PlatformUser user = usersByEmail.computeIfAbsent(m.email(), k -> new PlatformUser(
-                    m.email(),
-                    new HashSet<>()
-                ));
+                String normalisedEmail = m.email().toLowerCase();
+                PlatformUser user = usersByEmail.computeIfAbsent(
+                    normalisedEmail, k -> new PlatformUser(
+                        normalisedEmail,
+                        new HashSet<>()
+                    ));
                 users.add(user);
             }
 
@@ -80,13 +82,13 @@ public class PlatformTeamsService {
             .map(PlatformTeamsFetcher.TeamAndGroupTuple::name)
             .collect(toImmutableSet());
         ImmutableSet<String> escalationTeamNames = escalationTeamsRegistry.listAllEscalationTeams().stream()
-            .map(EscalationTeam::label)
+            .map(EscalationTeam::code)
             .collect(toImmutableSet());
         var setsDiff = Sets.difference(escalationTeamNames, teamNames);
         if (!setsDiff.isEmpty()) {
             throw new IllegalStateException("Unknown escalation teams specified: " +
-                setsDiff.stream()
-                    .collect(joining(", ", "[", "]"))
+                                            setsDiff.stream()
+                                                .collect(joining(", ", "[", "]"))
             );
         }
     }
@@ -96,7 +98,7 @@ public class PlatformTeamsService {
     }
 
     public ImmutableList<PlatformTeam> listTeamsByUserEmail(String email) {
-        PlatformUser user = usersByEmail.get(email);
+        PlatformUser user = usersByEmail.get(email.toLowerCase());
         if (user == null) {
             return ImmutableList.of();
         }
@@ -110,6 +112,6 @@ public class PlatformTeamsService {
 
     @Nullable
     public PlatformUser findUserByEmail(String email) {
-        return usersByEmail.get(email);
+        return usersByEmail.get(email.toLowerCase());
     }
 }
