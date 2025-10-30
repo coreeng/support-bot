@@ -2,7 +2,6 @@ package com.coreeng.supportbot.ticket.rest;
 
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
-import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.ticket.TicketQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
