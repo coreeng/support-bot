@@ -1,13 +1,8 @@
 package com.coreeng.supportbot.ticket.rest;
 
-import com.coreeng.supportbot.escalation.Escalation;
-import com.coreeng.supportbot.escalation.EscalationQuery;
-import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,7 +17,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 @RequiredArgsConstructor
 public class TicketController {
     private final TicketQueryService queryService;
-    private final EscalationQueryService escalationQueryService;
     private final TicketUIMapper mapper;
 
     @GetMapping
@@ -49,34 +43,17 @@ public class TicketController {
                 .escalated(escalated)
                 .build();
 
-        Page<Ticket> ticketsPage = queryService.findByQuery(ticketQuery);
+        Page<DetailedTicket> detailedTicketsPage = queryService.findDetailedTicketByQuery(ticketQuery);
 
-        ImmutableList<TicketId> ticketIds = ticketsPage.content().stream()
-                .map(Ticket::id)
-                .collect(toImmutableList());
-
-        Page<Escalation> escalationsPage = escalationQueryService.findByQuery(
-                EscalationQuery.builder()
-                        .ticketIds(ticketIds)
-                        .unlimited(true)
-                        .build()
-        );
-
-        Multimap<TicketId, Escalation> escalationsByTicket = Multimaps.index(
-                escalationsPage.content(), Escalation::ticketId
-        );
-
-        ImmutableList<TicketUI> ticketUIs = ticketsPage.content().stream()
-                .map(ticket -> new DetailedTicket(ticket,
-                        ImmutableList.copyOf(escalationsByTicket.get(ticket.id()))))
+        ImmutableList<TicketUI> ticketUIs = detailedTicketsPage.content().stream()
                 .map(mapper::mapToUI)
                 .collect(toImmutableList());
 
         Page<TicketUI> ticketUIPage = new Page<>(
                 ticketUIs,
-                ticketsPage.page(),
-                ticketsPage.totalPages(),
-                ticketsPage.totalElements()
+                detailedTicketsPage.page(),
+                detailedTicketsPage.totalPages(),
+                detailedTicketsPage.totalElements()
         );
 
         return ResponseEntity.ok(ticketUIPage);
