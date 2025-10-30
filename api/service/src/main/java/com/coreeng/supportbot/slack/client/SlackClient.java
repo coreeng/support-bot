@@ -31,8 +31,6 @@ public interface SlackClient {
 
     Message getMessageByTs(SlackGetMessageByTsRequest request);
 
-    List<Message> getMessagesByTs(SlackGetMessageByTsRequest request);
-
     String getPermalink(SlackGetMessageByTsRequest request);
 
     ConversationsRepliesResponse getThreadPage(ConversationsRepliesRequest request);
