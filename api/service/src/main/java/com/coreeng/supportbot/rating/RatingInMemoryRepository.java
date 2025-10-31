@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.rating;
 
-import com.coreeng.supportbot.ticket.TicketStatus;
 import com.google.common.collect.ImmutableList;
 
 import java.util.HashMap;
