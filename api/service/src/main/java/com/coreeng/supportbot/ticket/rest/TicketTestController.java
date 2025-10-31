@@ -2,6 +2,7 @@ package com.coreeng.supportbot.ticket.rest;
 
 import static java.util.Objects.requireNonNull;
 
+import com.coreeng.supportbot.ticket.TicketQueryService;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class TicketTestController {
     private final TicketRepository repository;
+    private final TicketQueryService queryService;
     private final TicketUIMapper mapper;
     private final TicketProcessingService ticketProcessingService;
 
@@ -44,7 +46,7 @@ public class TicketTestController {
             ).toBuilder()
             .createdMessageTs(MessageTs.ofOrNull(ticketToCreate.createdMessageTs()))
             .build());
-        DetailedTicket detailedTicket = repository.findDetailedById(ticket.id());
+        DetailedTicket detailedTicket = queryService.findDetailedById(ticket.id());
         return mapper.mapToUI(requireNonNull(detailedTicket));
     }
 
@@ -68,7 +70,7 @@ public class TicketTestController {
             return ResponseEntity.internalServerError()
                 .body("Expected a successful result, got: " + result);
         }
-        DetailedTicket ticket = repository.findDetailedById(ticketId);
+        DetailedTicket ticket = queryService.findDetailedById(ticketId);
         return ResponseEntity.ok(mapper.mapToUI(requireNonNull(ticket)));
     }
 

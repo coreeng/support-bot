@@ -37,7 +37,7 @@ public class JdbcRatingRepository implements RatingRepository {
                 dsl.select()
                         .from(RATINGS)
                         .where(RATINGS.STATUS.eq(
-                                com.coreeng.supportbot.dbschema.enums.TicketStatus.lookupLiteral(status)
+                                TicketStatus.lookupLiteral(status)
                         ))
         );
     }

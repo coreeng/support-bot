@@ -103,16 +103,6 @@ public class TicketInMemoryRepository implements TicketRepository {
         return ticketsByQuery.get(queryRef);
     }
 
-    @Nullable
-    @Override
-    public DetailedTicket findDetailedById(TicketId id) {
-        Ticket ticket = findTicketById(id);
-        if (ticket == null) {
-            return null;
-        }
-        return mapToDetailed(ticket);
-    }
-
     @Override
     public Ticket insertStatusLog(Ticket ticket, Instant at) {
         return tickets.computeIfPresent(ticket.id(), (id, t) -> {
@@ -132,11 +122,6 @@ public class TicketInMemoryRepository implements TicketRepository {
     @Override
     public Page<Ticket> listTickets(TicketsQuery query) {
         return findTicketsAndMap(query, Function.identity());
-    }
-
-    @Override
-    public Page<DetailedTicket> listDetailedTickets(TicketsQuery query) {
-        return findTicketsAndMap(query, this::mapToDetailed);
     }
 
     @NotNull
@@ -172,13 +157,6 @@ public class TicketInMemoryRepository implements TicketRepository {
         return new Page<>(
             elements,
             page, totalPages, queryResult.size()
-        );
-    }
-
-    private DetailedTicket mapToDetailed(Ticket ticket) {
-        return new DetailedTicket(
-            ticket,
-            escalationQueryService.countNotResolvedByTicketId(ticket.id()) > 0
         );
     }
 

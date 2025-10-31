@@ -2,16 +2,11 @@ package com.coreeng.supportbot.homepage;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
-import com.coreeng.supportbot.escalation.Escalation;
-import com.coreeng.supportbot.escalation.EscalationQuery;
-import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,7 +17,6 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.stream.Stream;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Comparator.comparing;
@@ -36,32 +30,16 @@ public class HomepageService {
     private final SlackClient slackClient;
     private final SlackTicketsProps slackTicketsProps;
     private final ImpactsRegistry impactsRegistry;
-    private final EscalationQueryService escalationQueryService;
 
     public HomepageView getTicketsView(HomepageView.State state) {
-        Page<Ticket> page = ticketQueryService.findByQuery(state.toTicketsQuery());
-
-        ImmutableList<TicketId> ticketIds = page.content().stream()
-                .map(Ticket::id)
-                .collect(toImmutableList());
-
-        Page<Escalation> escalations = escalationQueryService.findByQuery(
-                EscalationQuery.builder()
-                        .ticketIds(ticketIds)
-                        .unlimited(true)
-                        .build());
-
-        Multimap<TicketId, Escalation> escalationsByTicketId =
-                Multimaps.index(escalations.content(), Escalation::ticketId);
-
-        ImmutableList<DetailedTicket> detailedTickets = getDetailedTickets(page, escalationsByTicketId);
+        Page<DetailedTicket> page = ticketQueryService.findDetailedTicketByQuery(state.toTicketsQuery());
 
         Map<TicketId, String> permalinkByTicketId = collectPermalinks(page.content());
 
         return HomepageView.builder()
             .timestamp(Instant.now())
             .tickets(
-                detailedTickets.stream()
+                page.content().stream()
                     .map(dt -> ticketToTicketView(dt, permalinkByTicketId.get(dt.ticket().id())))
                     .collect(toImmutableList())
             )
@@ -73,35 +51,26 @@ public class HomepageService {
             .build();
     }
 
-    private ImmutableList<DetailedTicket> getDetailedTickets(Page<Ticket> page, Multimap<TicketId, Escalation> escalationsByTicketId) {
-        Stream<DetailedTicket> detailedTicketStream = page.content().stream()
-                .map(ticket -> {
-                    ImmutableList<Escalation> escalations =
-                            ImmutableList.copyOf(escalationsByTicketId.get(ticket.id()));
-                    return new DetailedTicket(ticket, escalations);
-                });
-        return detailedTicketStream.collect(toImmutableList());
-    }
-
-    private Map<TicketId, String> collectPermalinks(ImmutableList<Ticket> tickets) {
+    private Map<TicketId, String> collectPermalinks(ImmutableList<DetailedTicket> tickets) {
         record TicketPermalink(TicketId id, String permalink) {
         }
         CompletionService<TicketPermalink> completionService = new ExecutorCompletionService<>(executor);
         List<Future<TicketPermalink>> futures = new ArrayList<>(tickets.size());
         Map<TicketId, String> result = new HashMap<>();
         try {
-            for (Ticket t : tickets) {
+            for (DetailedTicket t : tickets) {
                 futures.add(completionService.submit(() -> {
+                    Ticket ticket = t.ticket();
                     try {
                         String permalink = slackClient.getPermalink(new SlackGetMessageByTsRequest(
-                            t.channelId(),
-                            t.queryTs()
+                            ticket.channelId(),
+                            ticket.queryTs()
                         ));
-                        return new TicketPermalink(t.id(), permalink);
+                        return new TicketPermalink(ticket.id(), permalink);
                     } catch (Exception e) {
                         log.atError()
                             .setCause(e)
-                            .addArgument(t::id)
+                            .addArgument(ticket::id)
                             .log("Error while collecting permalink for ticket {}");
                         throw e;
                     }
