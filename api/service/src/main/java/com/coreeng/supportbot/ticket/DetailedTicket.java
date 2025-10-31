@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.escalation.Escalation;
+import com.coreeng.supportbot.escalation.EscalationStatus;
 import com.google.common.collect.ImmutableList;
 
 public record DetailedTicket(
@@ -8,6 +9,7 @@ public record DetailedTicket(
     ImmutableList<Escalation> escalations
 ) {
     public boolean escalated() {
-        return !escalations.isEmpty();
+        return escalations.stream()
+            .anyMatch(e -> e.status() != EscalationStatus.resolved);
     }
 }
