@@ -18,12 +18,10 @@ public interface TicketRepository {
 
     @Nullable Ticket findTicketById(TicketId ticketId);
     @Nullable Ticket findTicketByQuery(MessageRef queryRef);
-    @Nullable DetailedTicket findDetailedById(TicketId id);
 
     Ticket insertStatusLog(Ticket ticket, Instant at);
 
     Page<Ticket> listTickets(TicketsQuery query);
-    Page<DetailedTicket> listDetailedTickets(TicketsQuery query);
 
     ImmutableList<TicketId> listStaleTicketIds(Instant checkAt, Duration timeToStale);
     ImmutableList<TicketId> listStaleTicketIdsToRemindOf(Instant checkAt, Duration reminderInterval);

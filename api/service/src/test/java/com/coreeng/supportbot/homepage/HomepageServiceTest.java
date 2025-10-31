@@ -5,10 +5,10 @@ import com.coreeng.supportbot.enums.ImpactsRegistry;
 import com.coreeng.supportbot.enums.TicketImpact;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationId;
-import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.escalation.EscalationStatus;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.ticket.DetailedTicket;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketQueryService;
@@ -50,8 +50,6 @@ class HomepageServiceTest {
     SlackClient slackClient;
     @Mock
     ImpactsRegistry impactsRegistry;
-    @Mock
-    EscalationQueryService escalationQueryService;
 
     @BeforeEach
     void setup() {
@@ -60,8 +58,7 @@ class HomepageServiceTest {
                 executorService,
                 slackClient,
                 new SlackTicketsProps(channelId, "eyes", "ticket", "tick", "rocket"),
-                impactsRegistry,
-                escalationQueryService
+                impactsRegistry
         );
     }
 
@@ -82,14 +79,15 @@ class HomepageServiceTest {
             requireNonNull(tickets.getFirst().id()), 1
         );
 
-        ImmutableList<Escalation> escalation = buildEscalationsFromMap(escalationsMap);
+        ImmutableList<Escalation> escalations = buildEscalationsFromMap(escalationsMap);
 
-        Page<Ticket> ticketPage = new Page<>(ImmutableList.of(tickets.getFirst()), 1, 1, 1);
-        Page<Escalation> escalationPage = new Page<>(ImmutableList.of(escalation.getFirst()), 1, 1, 1);
+        Page<DetailedTicket> ticketPage = new Page<>(
+            buildDetailedTickets(tickets, escalations),
+            1, 1, 1
+        );
 
-        when(ticketQueryService.findByQuery(any()))
+        when(ticketQueryService.findDetailedTicketByQuery(any()))
                 .thenReturn(ticketPage);
-        when(escalationQueryService.findByQuery(any())).thenReturn(escalationPage);
         when(slackClient.getPermalink(any())).thenReturn("perma.link");
         when(impactsRegistry.findImpactByCode(any())).thenReturn(new TicketImpact("Production Blocking", "productionBlocking"));
 
@@ -105,7 +103,7 @@ class HomepageServiceTest {
         assertThat(actualEscalation.size()).isEqualTo(1);
         assertThat(actualEscalation.getFirst())
                 .usingRecursiveAssertion()
-                .isEqualTo(escalation.getFirst());
+                .isEqualTo(escalations.getFirst());
         assertThat(requireNonNull(ticketsView.tickets().getFirst()).inquiringTeam()).isEqualTo("lions");
         assertThat(requireNonNull(ticketsView.tickets().getFirst()).status()).isEqualTo(TicketStatus.opened);
         assertThat(requireNonNull(ticketsView.tickets().getFirst()).impact()).isEqualTo(new TicketImpact("Production Blocking", "productionBlocking"));
@@ -126,11 +124,10 @@ class HomepageServiceTest {
 
         ImmutableList<Escalation> escalations = buildEscalationsFromMap(escalationsMap);
 
-        Page<Ticket> ticketPage = new Page<>(tickets, 1, 1, tickets.size());
-        Page<Escalation> escalationPage = new Page<>(escalations, 1, 1, escalations.size());
+        ImmutableList<DetailedTicket> detailedTickets = buildDetailedTickets(tickets, escalations);
 
-        when(ticketQueryService.findByQuery(any())).thenReturn(ticketPage);
-        when(escalationQueryService.findByQuery(any())).thenReturn(escalationPage);
+        when(ticketQueryService.findDetailedTicketByQuery(any()))
+                .thenReturn(new Page<>(detailedTickets, 1, 1, detailedTickets.size()));
         when(slackClient.getPermalink(any())).thenReturn("perma.link");
         when(impactsRegistry.findImpactByCode(any())).thenReturn(new TicketImpact("Production Blocking", "productionBlocking"));
 
@@ -173,11 +170,10 @@ class HomepageServiceTest {
 
         ImmutableList<Escalation> escalations = buildEscalationsFromMap(escalationsMap);
 
-        Page<Ticket> ticketPage = new Page<>(tickets, 1, 1, tickets.size());
-        Page<Escalation> escalationPage = new Page<>(escalations, 1, 1, escalations.size());
+        ImmutableList<DetailedTicket> detailedTickets = buildDetailedTickets(tickets, escalations);
 
-        when(ticketQueryService.findByQuery(any())).thenReturn(ticketPage);
-        when(escalationQueryService.findByQuery(any())).thenReturn(escalationPage);
+        when(ticketQueryService.findDetailedTicketByQuery(any()))
+                .thenReturn(new Page<>(detailedTickets, 1, 1, detailedTickets.size()));
         when(slackClient.getPermalink(any())).thenReturn("perma.link");
         when(impactsRegistry.findImpactByCode(any())).thenReturn(new TicketImpact("Production Blocking", "productionBlocking"));
 
@@ -214,10 +210,10 @@ class HomepageServiceTest {
 
         ImmutableList<Ticket> tickets = buildTickets(2);
 
-        Page<Ticket> ticketPage = new Page<>(tickets, 1, 1, tickets.size());
+        ImmutableList<DetailedTicket> detailedTickets = buildDetailedTickets(tickets, ImmutableList.of());
 
-        when(ticketQueryService.findByQuery(any())).thenReturn(ticketPage);
-        when(escalationQueryService.findByQuery(any())).thenReturn(new Page<>(ImmutableList.of(), 1, 1, 0));
+        when(ticketQueryService.findDetailedTicketByQuery(any()))
+                .thenReturn(new Page<>(detailedTickets, 1, 1, detailedTickets.size()));
         when(slackClient.getPermalink(any())).thenReturn("perma.link");
         when(impactsRegistry.findImpactByCode(any())).thenReturn(new TicketImpact("Production Blocking", "productionBlocking"));
 
@@ -249,6 +245,23 @@ class HomepageServiceTest {
                     .build());
         }
         return builder.build();
+    }
+
+    private ImmutableList<DetailedTicket> buildDetailedTickets(
+            ImmutableList<Ticket> tickets,
+            ImmutableList<Escalation> escalations
+    ) {
+        Map<TicketId, List<Escalation>> escalationsByTicket =
+                escalations.stream().collect(Collectors.groupingBy(Escalation::ticketId));
+
+        return ImmutableList.copyOf(
+                tickets.stream()
+                        .map(t -> new DetailedTicket(
+                                t,
+                                ImmutableList.copyOf(escalationsByTicket.getOrDefault(t.id(), List.of()))
+                        ))
+                        .collect(Collectors.toList())
+        );
     }
 
     private ImmutableList<Escalation> buildEscalationsFromMap(Map<TicketId, Integer> escalationsPerTicket) {

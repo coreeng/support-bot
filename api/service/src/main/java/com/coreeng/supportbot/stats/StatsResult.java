@@ -41,6 +41,7 @@ public class StatsResult {
         private double avgResponseTimeSecs;
         private double avgResolutionTimeSecs;
         private double largestActiveTicketSecs;
+        private long totalEscalations;
     }
 
     @Getter

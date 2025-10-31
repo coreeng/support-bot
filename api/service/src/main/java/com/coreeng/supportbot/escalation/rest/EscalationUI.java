@@ -16,6 +16,7 @@ import java.time.Instant;
 public class EscalationUI {
     private EscalationId id;
     private TicketId ticketId;
+    private String escalatingTeam;
     private String threadLink;
     private Instant openedAt;
     private Instant resolvedAt;

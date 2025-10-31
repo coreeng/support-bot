@@ -1,8 +1,12 @@
 package com.coreeng.supportbot.rating;
 
+import com.google.common.collect.ImmutableList;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
 public class RatingInMemoryRepository implements RatingRepository {
     private final Map<UUID, Rating> ratings = new HashMap<>();
@@ -15,6 +19,11 @@ public class RatingInMemoryRepository implements RatingRepository {
                 .build();
         ratings.put(id, savedRating);
         return id;
+    }
+
+    @Override
+    public ImmutableList<Rating> getAllRatings() {
+        return ratings.values().stream().collect(toImmutableList());
     }
 
     public Rating findById(UUID ratingId) {

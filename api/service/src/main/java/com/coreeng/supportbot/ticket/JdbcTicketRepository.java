@@ -211,31 +211,6 @@ public class JdbcTicketRepository implements TicketRepository {
             .orElse(null);
     }
 
-    @Transactional(readOnly = true)
-    @Nullable
-    @Override
-    public DetailedTicket findDetailedById(TicketId id) {
-        String escalatedField = "escalated";
-        var query = dsl.select(
-                ImmutableList.<SelectField<?>>builder()
-                    .addAll(selectTicketFields())
-                    .add(createIsEscalatedQuery().as(escalatedField))
-                    .build()
-            )
-            .from(TICKET)
-            .join(QUERY).on(TICKET.QUERY_ID.eq(QUERY.ID))
-            .where(TICKET.ID.eq(id.id()));
-        return query.fetchOptional(r -> new DetailedTicket(
-                buildTicketFromRow(r),
-                r.get(escalatedField, Boolean.class)
-            ))
-            .map(t -> new DetailedTicket(
-                populateTicket(t.ticket()),
-                t.escalated()
-            ))
-            .orElse(null);
-    }
-
     @Override
     public Ticket insertStatusLog(Ticket ticket, Instant at) {
         Ticket.StatusLog log = dsl.insertInto(TICKET_LOG, TICKET_LOG.TICKET_ID, TICKET_LOG.EVENT, TICKET_LOG.DATE)
@@ -296,59 +271,6 @@ public class JdbcTicketRepository implements TicketRepository {
             content,
             query.page(),
             (int) Math.ceil((double) ticketsTotal / query.pageSize()), // Convert to double before dividing, then use Math.ceil to round up
-            ticketsTotal
-        );
-    }
-
-    @Transactional(readOnly = true)
-    @Override
-    public Page<DetailedTicket> listDetailedTickets(TicketsQuery query) {
-        checkNotNull(query);
-        checkArgument(query.page() >= 0);
-        checkArgument(query.pageSize() > 0);
-
-        String escalatedField = "escalated";
-        List<DetailedTicket> tickets = createFindQuery(query, ImmutableList.<SelectField<?>>builder()
-            .addAll(selectTicketFields())
-            .add(createIsEscalatedQuery().as(escalatedField))
-            .build()
-        ).fetch(r -> new DetailedTicket(
-            buildTicketFromRow(r),
-            r.get(escalatedField, Boolean.class)
-        ));
-        ImmutableList<Long> ids = tickets.stream()
-            .map(t -> checkNotNull(t.ticket().id()).id())
-            .collect(toImmutableList());
-        ImmutableListMultimap<TicketId, Ticket.StatusLog> logsByTicketId = fetchStatusLogs(ids);
-        ImmutableListMultimap<TicketId, String> tagsByTicketId = fetchTags(ids);
-        ImmutableList<DetailedTicket> content = tickets.stream()
-            .map(t -> new DetailedTicket(
-                t.ticket().toBuilder()
-                    .statusLog(logsByTicketId.get(checkNotNull(t.ticket().id())))
-                    .tags(tagsByTicketId.get(t.ticket().id()))
-                    .build(),
-                t.escalated()
-            ))
-            .collect(toImmutableList());
-
-        long ticketsTotal;
-        if (query.unlimited()) {
-            ticketsTotal = tickets.size();
-        } else {
-            ticketsTotal = checkNotNull(
-                createFindQuery(
-                    query.toBuilder()
-                        .order(null)
-                        .unlimited(true)
-                        .build(),
-                    ImmutableList.of(bigCount())
-                ).fetchOne(0, Long.class)
-            );
-        }
-        return new Page<>(
-            content,
-            query.page(),
-            ticketsTotal / query.pageSize() + 1,
             ticketsTotal
         );
     }
