@@ -32,13 +32,10 @@ public class JdbcRatingRepository implements RatingRepository {
     }
 
     @Override
-    public ImmutableList<Rating> findRatingsByStatus(String status) {
+    public ImmutableList<Rating> getAllRatings() {
         return fetchRatings(
                 dsl.select()
                         .from(RATINGS)
-                        .where(RATINGS.STATUS.eq(
-                                TicketStatus.lookupLiteral(status)
-                        ))
         );
     }
 

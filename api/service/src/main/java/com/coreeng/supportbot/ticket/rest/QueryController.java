@@ -17,7 +17,6 @@ public class QueryController {
     private final TicketQueryService queryService;
 
     @GetMapping
-    @RequestMapping
     ResponseEntity<Void> checkQueryExists(@RequestParam("channelId") String channelId,
                                           @RequestParam("messageTs") String messageTs) {
         MessageRef messageRef = new MessageRef(MessageTs.of(messageTs), channelId);

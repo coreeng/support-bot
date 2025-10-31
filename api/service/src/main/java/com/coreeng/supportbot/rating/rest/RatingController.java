@@ -17,7 +17,7 @@ public class RatingController {
 
     @GetMapping
     public ResponseEntity<ImmutableList<RatingUI>> list() {
-        ImmutableList<RatingUI> ratings = ratingService.findRatingsByStatus("closed")
+        ImmutableList<RatingUI> ratings = ratingService.getAllRatings()
                 .stream().map(mapper::mapToUI).collect(ImmutableList.toImmutableList());
         return ResponseEntity.ok(ratings);
     }
