@@ -11,7 +11,7 @@ import java.time.Instant;
 @Component
 @RequiredArgsConstructor
 public class TicketsGeneralStatsCollector implements StatsCollector<StatsRequest.TicketGeneral> {
-    private final TicketRepository repository;
+    private final TicketQueryService queryService;
 
     @Override
     public StatsType getSupportedType() {
@@ -20,7 +20,7 @@ public class TicketsGeneralStatsCollector implements StatsCollector<StatsRequest
 
     @Override
     public StatsResult calculateResults(StatsRequest.TicketGeneral request) {
-        Page<DetailedTicket> tickets = repository.listDetailedTickets(TicketsQuery.builder()
+        Page<DetailedTicket> tickets = queryService.findDetailedTicketByQuery(TicketsQuery.builder()
             .unlimited(true)
             .dateFrom(request.from())
             .dateTo(request.to())

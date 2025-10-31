@@ -70,12 +70,12 @@ public class TicketQueryService {
 
     @Nullable
     public DetailedTicket findDetailedById(TicketId id) {
-        DetailedTicket ticket = repository.findDetailedById(id);
+        Ticket ticket = repository.findTicketById(id);
         if (ticket == null) {
             return null;
         }
         ImmutableList<Escalation> escalations = escalationQueryService.listByTicketId(id);
-        return new DetailedTicket(ticket.ticket(), escalations);
+        return new DetailedTicket(ticket, escalations);
     }
 
     public boolean queryExists(MessageRef queryRef) {

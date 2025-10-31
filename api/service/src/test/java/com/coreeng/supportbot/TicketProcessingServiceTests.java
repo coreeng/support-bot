@@ -3,7 +3,6 @@ package com.coreeng.supportbot;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.escalation.EscalationInMemoryRepository;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
-import com.coreeng.supportbot.rating.RatingService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.events.MessagePosted;
@@ -38,8 +37,6 @@ public class TicketProcessingServiceTests {
     private TicketRepository ticketRepository;
     @Mock
     private TicketSlackService slackService;
-    @Mock
-    private RatingService ratingService;
     private SlackTicketsProps slackTicketsProps;
     @Mock
     private ApplicationEventPublisher publisher;
@@ -64,8 +61,7 @@ public class TicketProcessingServiceTests {
             slackService,
             escalationQueryService,
             slackTicketsProps,
-            publisher,
-            ratingService
+            publisher
         );
     }
 

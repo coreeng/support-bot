@@ -2,7 +2,6 @@ package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
-import com.coreeng.supportbot.rating.RatingService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
@@ -25,7 +24,6 @@ public class TicketProcessingService {
     private final EscalationQueryService escalationQueryService;
     private final SlackTicketsProps slackTicketsProps;
     private final ApplicationEventPublisher publisher;
-    private final RatingService ratingService;
 
     public void handleMessagePosted(MessagePosted e) {
         if (isQueryEvent(e)) {

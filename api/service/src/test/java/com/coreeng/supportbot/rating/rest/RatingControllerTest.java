@@ -10,6 +10,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
@@ -27,8 +29,8 @@ class RatingControllerTest {
         Rating rating1 = mock(Rating.class);
         Rating rating2 = mock(Rating.class);
 
-        RatingUI ui1 = new RatingUI("Alice", 5, new String[]{"fast", "helpful"});
-        RatingUI ui2 = new RatingUI("Bob", 3, new String[]{"slow"});
+        RatingUI ui1 = new RatingUI("Alice", 5, List.of("fast", "helpful"));
+        RatingUI ui2 = new RatingUI("Bob", 3, List.of("slow"));
 
         when(ratingService.findRatingsByStatus("closed"))
                 .thenReturn(ImmutableList.of(rating1, rating2));
