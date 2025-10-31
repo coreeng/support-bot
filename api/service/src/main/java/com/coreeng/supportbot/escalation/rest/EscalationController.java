@@ -62,9 +62,9 @@ public class EscalationController {
                 .map(esc -> {
                     Ticket ticket = ticketsById.get(esc.ticketId());
 
-                    EscalationUI base = mapper.mapToUI(esc);
+                    EscalationUI escalationUI = mapper.mapToUI(esc);
 
-                    return base.toBuilder()
+                    return escalationUI.toBuilder()
                             .escalatingTeam(ticket != null && ticket.team() != null
                                     ? ticket.team()
                                     : null)

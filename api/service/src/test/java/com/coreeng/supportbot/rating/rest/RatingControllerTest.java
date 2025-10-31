@@ -32,7 +32,7 @@ class RatingControllerTest {
         RatingUI ui1 = new RatingUI("Alice", 5, List.of("fast", "helpful"));
         RatingUI ui2 = new RatingUI("Bob", 3, List.of("slow"));
 
-        when(ratingService.findRatingsByStatus("closed"))
+        when(ratingService.getAllRatings())
                 .thenReturn(ImmutableList.of(rating1, rating2));
         when(mapper.mapToUI(rating1)).thenReturn(ui1);
         when(mapper.mapToUI(rating2)).thenReturn(ui2);
@@ -44,7 +44,7 @@ class RatingControllerTest {
         assertThat(response.getStatusCodeValue()).isEqualTo(200);
         assertThat(response.getBody()).containsExactly(ui1, ui2);
 
-        verify(ratingService).findRatingsByStatus("closed");
+        verify(ratingService).getAllRatings();
         verify(mapper).mapToUI(rating1);
         verify(mapper).mapToUI(rating2);
         verifyNoMoreInteractions(ratingService, mapper);
@@ -53,7 +53,7 @@ class RatingControllerTest {
     @Test
     void shouldReturnEmptyListIfNoRatings() {
         // given
-        when(ratingService.findRatingsByStatus("closed")).thenReturn(ImmutableList.of());
+        when(ratingService.getAllRatings()).thenReturn(ImmutableList.of());
 
         // when
         ResponseEntity<ImmutableList<RatingUI>> response = controller.list();
@@ -62,7 +62,7 @@ class RatingControllerTest {
         assertThat(response.getStatusCodeValue()).isEqualTo(200);
         assertThat(response.getBody()).isEmpty();
 
-        verify(ratingService).findRatingsByStatus("closed");
+        verify(ratingService).getAllRatings();
         verifyNoMoreInteractions(ratingService, mapper);
     }
 }

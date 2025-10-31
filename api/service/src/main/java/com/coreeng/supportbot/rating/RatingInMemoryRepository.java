@@ -23,10 +23,8 @@ public class RatingInMemoryRepository implements RatingRepository {
     }
 
     @Override
-    public ImmutableList<Rating> findRatingsByStatus(String ticketStatus) {
-        return ratings.values().stream()
-                .filter(rating -> TicketStatus.valueOf(ticketStatus).equals(rating.status()))
-                .collect(toImmutableList());
+    public ImmutableList<Rating> getAllRatings() {
+        return ratings.values().stream().collect(toImmutableList());
     }
 
     public Rating findById(UUID ratingId) {

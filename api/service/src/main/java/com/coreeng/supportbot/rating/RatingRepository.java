@@ -6,5 +6,5 @@ import java.util.UUID;
 
 public interface RatingRepository {
     UUID insertRating(Rating rating);
-    ImmutableList<Rating> findRatingsByStatus(String status);
+    ImmutableList<Rating> getAllRatings();
 }

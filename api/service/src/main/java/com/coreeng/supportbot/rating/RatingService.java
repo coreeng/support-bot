@@ -60,7 +60,7 @@ public class RatingService {
             .id(ratingId)
             .build();
     }
-    public ImmutableList<Rating> findRatingsByStatus(String status) {
-        return repository.findRatingsByStatus(status);
+    public ImmutableList<Rating> getAllRatings() {
+        return repository.getAllRatings();
     }
 }
