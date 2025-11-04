@@ -8,12 +8,10 @@ import static com.slack.api.model.block.Blocks.section;
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
 
 public record TicketWentStaleMessage(
-    String authorId,
-    String supportGroupId
+    String authorId
 ) implements SlackMessage {
     @Override
     public String getText() {
-//        return "Ticket went stale";
         return messageText();
     }
 
@@ -27,6 +25,6 @@ public record TicketWentStaleMessage(
     private String messageText() {
         return ":warning: Ticket went stale, because there were no interactions with it for a long time and it's not closed.\n" +
             "Are any other actions required?\n" +
-            "<@" + authorId + "> <!subteam^" + supportGroupId + ">";
+            "<@" + authorId + ">";
     }
 }
