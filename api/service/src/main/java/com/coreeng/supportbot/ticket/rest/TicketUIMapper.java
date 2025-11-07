@@ -64,6 +64,7 @@ public class TicketUIMapper {
                     .map(escalationUIMapper::mapToUI)
                     .collect(toImmutableList())
             )
+            .ratingSubmitted(ticket.ticket().ratingSubmitted())
             .build();
     }
 }

@@ -41,6 +41,7 @@ public class StatsResult {
         private double avgResponseTimeSecs;
         private double avgResolutionTimeSecs;
         private double largestActiveTicketSecs;
+        private long totalEscalations;
     }
 
     @Getter
@@ -50,6 +51,23 @@ public class StatsResult {
         @JsonUnwrapped
         private StatsRequest.TicketSentimentCounts request;
         private ImmutableList<TicketSentimentCountPerDate> values;
+    }
+
+    @Getter
+    @SuperBuilder
+    @Jacksonized
+    public static class Ratings extends StatsResult {
+        @JsonUnwrapped
+        private StatsRequest.Ratings request;
+        private RatingsValues values;
+    }
+
+    @Getter
+    @SuperBuilder
+    @Jacksonized
+    public static class RatingsValues {
+        private Double average;
+        private Integer count;
     }
 
     public record DatedValue<T>(
