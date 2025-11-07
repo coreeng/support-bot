@@ -23,7 +23,8 @@ public class TeamUIMapper {
 
     public TeamUI mapToUI(Team team) {
         return new TeamUI(
-            team.name(),
+            team.label(),
+            team.code(),
             team.types()
         );
     }

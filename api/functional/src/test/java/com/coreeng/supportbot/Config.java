@@ -99,7 +99,8 @@ public record Config(
     }
 
     public record EscalationTeam(
-        String name,
+        String label,
+        String code,
         String slackGroupId
     ) {}
     public record Tag(

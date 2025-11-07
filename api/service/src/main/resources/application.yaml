@@ -57,6 +57,7 @@ slack:
 
 ticket:
   staleness-check-job:
+    enabled: true
     find-stale-cron: 0 0 9 * * 1-5
     time-to-stale: 3d
     remind-about-stale-cron: 0 10 9 * * 1-5
@@ -100,6 +101,9 @@ enums:
 
 platform-integration:
   enabled: true
+  fetch:
+    max-concurrency: 64
+    timeout: 30s
   kubernetes:
     disable-http-proxy: false
     base-url: ""
@@ -154,6 +158,7 @@ platform-integration:
 
 support-team:
   name: Core Support
+  code: support
   slack-group-id: S08948NBMED
   static:
     enabled: false
