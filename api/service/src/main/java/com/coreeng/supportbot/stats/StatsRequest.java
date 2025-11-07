@@ -73,6 +73,15 @@ public class StatsRequest {
         }
     }
 
+    @Getter
+    @SuperBuilder(toBuilder = true)
+    @Jacksonized
+    public static class Ratings extends StatsRequest {
+        {
+            type = StatsType.ticketRating;
+        }
+    }
+
     public static class TypeIdResolver extends TypeIdResolverBase {
 
         @Override
@@ -83,6 +92,7 @@ public class StatsRequest {
                 case ticketsAmount -> TicketAmount.class;
                 case ticketGeneral -> TicketGeneral.class;
                 case ticketSentimentsCount -> TicketSentimentCounts.class;
+                case ticketRating -> Ratings.class;
                 case null -> throw new IllegalArgumentException("Unknown type-id: " + id);
             };
             return context.constructType(subClass);

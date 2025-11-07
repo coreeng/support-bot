@@ -4,6 +4,7 @@ import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketRepository;
+import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -58,5 +59,8 @@ public class RatingService {
         return ratingRecord.toBuilder()
             .id(ratingId)
             .build();
+    }
+    public ImmutableList<Rating> getAllRatings() {
+        return repository.getAllRatings();
     }
 }
