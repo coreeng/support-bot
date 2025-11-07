@@ -10,7 +10,8 @@ public enum StatsType {
     ticketTimeline("ticket-timeline"),
     ticketsAmount("ticket-amount"),
     ticketGeneral("ticket-general"),
-    ticketSentimentsCount("ticket-sentiments-count");
+    ticketSentimentsCount("ticket-sentiments-count"),
+    ticketRating("ticket-ratings");
 
     @JsonValue
     private final String label;
