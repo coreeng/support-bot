@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.stats;
 
+import com.coreeng.supportbot.rating.rest.RatingUI;
 import com.coreeng.supportbot.stats.rest.StatsController;
 import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,10 +32,21 @@ class StatsControllerTest {
                 .metric(StatsRequest.TicketTimeline.Metric.opened)
                 .build();
 
+        StatsRequest.Ratings ratingsRequest = StatsRequest.Ratings.builder()
+                .from(LocalDate.of(2024, 1, 1))
+                .to(LocalDate.of(2024, 12, 31))
+                .build();
+
         StatsRequest.TicketAmount amountRequest = StatsRequest.TicketAmount.builder()
                 .from(LocalDate.of(2024, 2, 1))
                 .to(LocalDate.of(2024, 2, 28))
                 .groupBy(StatsRequest.TicketAmount.GroupBy.status)
+                .build();
+
+        StatsResult.Ratings ratingsResult = StatsResult.Ratings.builder()
+                .request(ratingsRequest)
+                .values(ImmutableList.of(new RatingUI("production-blocking", 5, List.of("ingress")),
+                        new RatingUI("bau", 3, List.of("DNS"))))
                 .build();
 
         StatsResult.TicketTimeline timelineResult = StatsResult.TicketTimeline.builder()
@@ -55,15 +67,17 @@ class StatsControllerTest {
 
         when(statsService.calculate(timelineRequest)).thenReturn(timelineResult);
         when(statsService.calculate(amountRequest)).thenReturn(amountResult);
+        when(statsService.calculate(ratingsRequest)).thenReturn(ratingsResult);
 
         // when
-        List<StatsResult> results = controller.stats(List.of(timelineRequest, amountRequest));
+        List<StatsResult> results = controller.stats(List.of(timelineRequest, amountRequest, ratingsRequest));
 
         // then
-        assertThat(results).containsExactly(timelineResult, amountResult);
+        assertThat(results).containsExactly(timelineResult, amountResult, ratingsResult);
 
         verify(statsService).calculate(timelineRequest);
         verify(statsService).calculate(amountRequest);
+        verify(statsService).calculate(ratingsRequest);
         verifyNoMoreInteractions(statsService);
     }
 }
