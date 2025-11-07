@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.stats;
 
-import com.coreeng.supportbot.rating.rest.RatingUI;
 import com.coreeng.supportbot.stats.rest.StatsController;
 import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,10 +42,14 @@ class StatsControllerTest {
                 .groupBy(StatsRequest.TicketAmount.GroupBy.status)
                 .build();
 
+        StatsResult.RatingsValues ratingsValues = StatsResult.RatingsValues.builder()
+                .average(3.75)
+                .count(42)
+                .build();
+
         StatsResult.Ratings ratingsResult = StatsResult.Ratings.builder()
                 .request(ratingsRequest)
-                .values(ImmutableList.of(new RatingUI("production-blocking", 5, List.of("ingress")),
-                        new RatingUI("bau", 3, List.of("DNS"))))
+                .values(ratingsValues)
                 .build();
 
         StatsResult.TicketTimeline timelineResult = StatsResult.TicketTimeline.builder()
