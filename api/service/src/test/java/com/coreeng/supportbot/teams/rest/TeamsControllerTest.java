@@ -26,15 +26,16 @@ class TeamsControllerTest {
     void shouldListAllTeamsWhenTypeIsNull() {
         // given
         Team support = mock(Team.class);
-        when(support.name()).thenReturn("support");
+
+        when(support.label()).thenReturn("support");
         when(support.types()).thenReturn(ImmutableList.of(TeamType.support));
 
         Team tenant = mock(Team.class);
-        when(tenant.name()).thenReturn("tenant");
+        when(tenant.label()).thenReturn("tenant");
         when(tenant.types()).thenReturn(ImmutableList.of(TeamType.tenant));
 
         Team l2support = mock(Team.class);
-        when(l2support.name()).thenReturn("l2support");
+        when(l2support.label()).thenReturn("l2support");
         when(l2support.types()).thenReturn(ImmutableList.of(TeamType.l2Support));
 
         when(teamService.listTeams()).thenReturn(ImmutableList.of(support, tenant, l2support));
@@ -44,11 +45,11 @@ class TeamsControllerTest {
 
         // then
         assertThat(result).hasSize(3);
-        assertThat(result.get(0).name()).isEqualTo("support");
+        assertThat(result.get(0).label()).isEqualTo("support");
         assertThat(result.get(0).types()).containsExactly(TeamType.support);
-        assertThat(result.get(1).name()).isEqualTo("tenant");
+        assertThat(result.get(1).label()).isEqualTo("tenant");
         assertThat(result.get(1).types()).containsExactly(TeamType.tenant);
-        assertThat(result.get(2).name()).isEqualTo("l2support");
+        assertThat(result.get(2).label()).isEqualTo("l2support");
         assertThat(result.get(2).types()).containsExactly(TeamType.l2Support);
 
         verify(teamService).listTeams();
@@ -59,7 +60,7 @@ class TeamsControllerTest {
     void shouldListTeamsByTypeWhenTypeIsProvided() {
         // given
         Team team = mock(Team.class);
-        when(team.name()).thenReturn("support");
+        when(team.label()).thenReturn("support");
         when(team.types()).thenReturn(ImmutableList.of(TeamType.support));
 
         when(teamService.listTeamsByType(TeamType.support)).thenReturn(ImmutableList.of(team));
@@ -70,7 +71,7 @@ class TeamsControllerTest {
         // then
         assertThat(result).hasSize(1);
         TeamUI ui = result.getFirst();
-        assertThat(ui.name()).isEqualTo("support");
+        assertThat(ui.label()).isEqualTo("support");
         assertThat(ui.types()).containsExactly(TeamType.support);
 
         verify(teamService).listTeamsByType(TeamType.support);
