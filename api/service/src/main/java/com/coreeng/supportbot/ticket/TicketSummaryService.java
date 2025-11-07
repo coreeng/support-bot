@@ -68,7 +68,7 @@ public class TicketSummaryService {
                 return TicketSummaryView.EscalationView.of(
                     e,
                     threadPermalink,
-                    checkNotNull(escalationTeamsRegistry.findEscalationTeamByName(e.team())).slackGroupId()
+                    checkNotNull(escalationTeamsRegistry.findEscalationTeamByCode(e.team())).slackGroupId()
                 );
             })
             .collect(toImmutableList());

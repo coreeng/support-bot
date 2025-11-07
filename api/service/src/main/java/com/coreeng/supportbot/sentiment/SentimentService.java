@@ -71,7 +71,7 @@ public class SentimentService {
             .map(m -> {
                 String email = userIdToEmail.get(m.getUser());
                 String team = supportTeamService.isMemberByUserEmail(email)
-                    ? supportTeam.name()
+                    ? supportTeam.code()
                     : ticket.team();
                 return Message.builder()
                     .user(m.getUser())
@@ -88,8 +88,8 @@ public class SentimentService {
 
         String ticketAuthorId = threadPage.getMessages().getFirst().getUser();
         Sentiment authorSentiment = calculateAuthorSentiment(ticketAuthorId, messageSentiments);
-        Sentiment supportSentiment = calculateSupportTeamSentiment(supportTeam.name(), messageSentiments);
-        Sentiment othersSentiment = calculateOthersSentiment(ticketAuthorId, supportTeam.name(), messageSentiments);
+        Sentiment supportSentiment = calculateSupportTeamSentiment(supportTeam.code(), messageSentiments);
+        Sentiment othersSentiment = calculateOthersSentiment(ticketAuthorId, supportTeam.code(), messageSentiments);
 
         return TicketSentimentResults.builder()
             .ticketId(id)

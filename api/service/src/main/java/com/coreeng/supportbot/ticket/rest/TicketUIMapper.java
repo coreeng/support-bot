@@ -39,7 +39,7 @@ public class TicketUIMapper {
             .status(ticket.ticket().status())
             .team(
                 ticket.ticket().team() != null
-                    ? teamUIMapper.mapToUI(checkNotNull(teamService.findTeamByName(ticket.ticket().team())))
+                    ? teamUIMapper.mapToUI(checkNotNull(teamService.findTeamByCode(ticket.ticket().team())))
                     : null
             )
             .impact(ticket.ticket().impact())

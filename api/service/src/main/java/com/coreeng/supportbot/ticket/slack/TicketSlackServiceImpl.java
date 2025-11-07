@@ -12,7 +12,6 @@ import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.slack.client.SlackMessage;
 import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
-import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.ticket.TicketCreatedMessage;
 import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
 import com.coreeng.supportbot.ticket.TicketWentStaleMessage;
@@ -33,7 +32,6 @@ import java.util.Objects;
 public class TicketSlackServiceImpl implements TicketSlackService {
     private final SlackClient slackClient;
     private final SlackTicketsProps slackTicketsProps;
-    private final SupportTeamService supportTeamService;
     private final TicketCreatedMessageMapper createdMessageMapper;
     private final RatingRequestMessageMapper ratingReqMessageMapper;
 
@@ -115,10 +113,7 @@ public class TicketSlackServiceImpl implements TicketSlackService {
 
         Message queryMessage = slackClient.getMessageByTs(SlackGetMessageByTsRequest.of(queryRef));
         slackClient.postMessage(new SlackPostMessageRequest(
-            new TicketWentStaleMessage(
-                queryMessage.getUser(),
-                supportTeamService.getSlackGroupId()
-            ),
+            new TicketWentStaleMessage(queryMessage.getUser()),
             queryRef.channelId(),
             queryRef.ts()
         ));

@@ -59,15 +59,6 @@ public class EnumsService implements
     }
 
     @Nullable
-    @Override
-    public EscalationTeam findEscalationTeamByName(String teamName) {
-        return escalationTeams.stream()
-            .filter(t -> teamName.equals(t.label()))
-            .findAny()
-            .orElse(null);
-    }
-
-    @Nullable
     private <T extends EnumerationValue> T findByCode(String code, ImmutableList<T> values) {
         return values.stream()
             .filter(v -> code.equals(v.code()))

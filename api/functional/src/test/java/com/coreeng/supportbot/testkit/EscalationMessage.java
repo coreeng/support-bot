@@ -24,7 +24,7 @@ public class EscalationMessage {
 
     private final String channelId;
     private final MessageTs threadTs;
-    private final String team;
+    private final String teamLabel;
     private final String slackGroupId;
     private final String expectedSlackGroupId;
 
@@ -33,7 +33,7 @@ public class EscalationMessage {
         assertThat(response.query().ts()).isEqualTo(threadTs);
         assertThat(response.escalated()).isTrue();
         assertThat(response.escalations())
-            .anySatisfy(e -> assertThat(e.team().name()).isEqualTo(team));
+            .anySatisfy(e -> assertThat(e.team().label()).isEqualTo(teamLabel));
 
         assertThat(slackGroupId).isNotBlank();
         if (expectedSlackGroupId != null && !expectedSlackGroupId.isBlank()) {
@@ -67,11 +67,11 @@ public class EscalationMessage {
             String mrkdwn = objectMapper.readTree(blocksRaw).get(0).get("text").get("text").asText();
             Matcher matcher = GROUP_PATTERN.matcher(mrkdwn);
             assertThat(matcher).matches();
-            String team = matcher.group("team");
+            String teamLabel = matcher.group("team");
             String groupId = matcher.group("group");
 
             String text = servedStub.getRequest().formParameter("text").firstValue();
-            assertThat(text).isEqualTo("Escalation to team: " + team);
+            assertThat(text).isEqualTo("Escalation to team: " + teamLabel);
 
             // Validate full blocks JSON equals expected
             String expectedBlocks = String.format("""
@@ -84,7 +84,7 @@ public class EscalationMessage {
                     }
                   }
                 ]
-                """, team, groupId);
+                """, teamLabel, groupId);
             assertThatJson(objectMapper.readTree(blocksRaw)).isEqualTo(expectedBlocks);
 
             JsonNode responseBody = objectMapper.readTree(servedStub.getResponse().getBody());
@@ -94,7 +94,7 @@ public class EscalationMessage {
             return EscalationMessage.builder()
                 .channelId(channelId)
                 .threadTs(threadTs)
-                .team(team)
+                .teamLabel(teamLabel)
                 .slackGroupId(groupId)
                 .expectedSlackGroupId(expectedSlackGroupId)
                 .build();

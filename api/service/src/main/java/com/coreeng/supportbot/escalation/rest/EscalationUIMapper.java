@@ -27,7 +27,7 @@ public class EscalationUIMapper {
             )))
             .openedAt(escalation.openedAt())
             .resolvedAt(escalation.resolvedAt())
-            .team(teamUIMapper.mapToUI(checkNotNull(teamService.findTeamByName(escalation.team()))))
+            .team(teamUIMapper.mapToUI(checkNotNull(teamService.findTeamByCode(escalation.team()))))
             .tags(escalation.tags())
             .build();
     }

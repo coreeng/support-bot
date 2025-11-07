@@ -125,7 +125,7 @@ public class SupportBotClient {
 
     public record QueryResponse(String link, Instant date, MessageTs ts) {}
     public record TicketFormMessage(MessageTs ts) {}
-    public record Team(String name, ImmutableList<@NonNull String> types) {}
+    public record Team(String label, String code, ImmutableList<@NonNull String> types) {}
     @Builder
     @Getter
     @Jacksonized

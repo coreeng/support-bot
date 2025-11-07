@@ -72,6 +72,7 @@ slack:
 
 ticket:
   staleness-check-job: # Job that check for stale tickets – open tickets that didn't have any interactions over some period
+    enabled: true
     find-stale-cron: 0 0 9 * * 1-5 # Schedule for identifying stale tickets
     time-to-stale: 3d
     remind-about-stale-cron: 0 10 9 * * 1-5 # Schedule for reminding about stale tickets in case no action is performed
@@ -129,7 +130,7 @@ platform-integration: # Whether to enable platform integration to automatically 
 
 support-team:
   name: Core Support # Label showed on the UI
-  slack-group-id: S08948NBMED # Slack group ID with people on support-duty
+  slack-group-id: S08948NBMED # Slack group ID of the support team
 
 ai: # AI powered features
   sentiment-analysis: # Analyze tenant and support sentiment per ticket
