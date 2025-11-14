@@ -79,9 +79,9 @@ ticket:
     stale-reminder-interval: 1d
 
 enums:
-  escalation-teams: # Platform teams for query escalation
+  escalation-teams: # Teams available for query escalation
     - label: wow # Label showed on the UI
-      code: wow # Team ID. have to be unique and match the team name in the platform
+      code: wow # Team ID. Must be unique. Have to match platform team name unless platform-integration.fetch.ignore-unknown-teams is set to true
       slack-group-id: S08948NBMED # Slack group ID that will be tagged on escalations
   tags: # Ticket tags
     - label: Ingresses # Label showed on the UI
@@ -104,6 +104,12 @@ enums:
 
 platform-integration: # Whether to enable platform integration to automatically scrape for teams and members
   enabled: true
+  fetch:
+    max-concurrency: 64 # Maximum number of concurrent requests when fetching team data
+    timeout: 30s # Timeout for fetching all team data
+    ignore-unknown-teams: false # Whether to allow escalation teams that don't exist in platform teams.
+                                 # If false, startup will fail if any escalation team is not found in platform teams.
+                                 # If true, escalation-only teams are allowed (they will have only 'l2Support' type).
   gcp:
     app-name: Support Bot # Used by GCP client
     enabled: true

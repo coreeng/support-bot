@@ -27,7 +27,6 @@ public class TeamService {
                 .addAll(teams)
                 .add(supportTeamService.getTeam())
                 .build();
-
         }
         return teams;
     }
@@ -43,8 +42,14 @@ public class TeamService {
         return switch (type) {
             case tenant -> mapPlatformTeams(platformTeamsService.listTeams());
             case l2Support -> escalationTeamsRegistry.listAllEscalationTeams().stream()
-                .map(t -> new Team(t.label(), t.code(), ImmutableList.of(TeamType.l2Support)))
-                .collect(toImmutableList());
+                    .map(t -> {
+                        PlatformTeam platformTeam = platformTeamsService.findTeamByName(t.code());
+                        if (platformTeam != null) {
+                            return new Team(t.label(), t.code(), ImmutableList.of(TeamType.tenant, TeamType.l2Support));
+                        }
+                        return new Team(t.label(), t.code(), ImmutableList.of(TeamType.l2Support));
+                    })
+                    .collect(toImmutableList());
             case support -> ImmutableList.of(supportTeamService.getTeam());
         };
     }
@@ -55,10 +60,18 @@ public class TeamService {
         if (supportTeam.code().equals(code)) {
             return supportTeam;
         }
-        PlatformTeam team = platformTeamsService.findTeamByName(code);
-        return team != null
-            ? mapPlatformTeam(team)
-            : null;
+
+        PlatformTeam platformTeam = platformTeamsService.findTeamByName(code);
+        if (platformTeam != null) {
+            return mapPlatformTeam(platformTeam);
+        }
+
+        EscalationTeam escalationTeam = escalationTeamsRegistry.findEscalationTeamByCode(code);
+        if (escalationTeam != null) {
+            return new Team(escalationTeam.label(), escalationTeam.code(), ImmutableList.of(TeamType.l2Support));
+        }
+
+        return null;
     }
 
     private ImmutableList<Team> mapPlatformTeams(ImmutableList<PlatformTeam> platformTeams) {

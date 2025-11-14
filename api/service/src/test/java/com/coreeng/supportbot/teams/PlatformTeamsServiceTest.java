@@ -28,7 +28,7 @@ class PlatformTeamsServiceTest {
             new EscalationTeam("wow", "wow", "SOME")
         ));
 
-        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(4, Duration.ofSeconds(2));
+        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(4, Duration.ofSeconds(2), false);
         PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, usersFetcher, registry, props);
 
         service.init();
@@ -64,7 +64,7 @@ class PlatformTeamsServiceTest {
             new EscalationTeam("B", "B", "SOME")
         ));
 
-        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(4, Duration.ofSeconds(2));
+        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(4, Duration.ofSeconds(2), false);
         PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, usersFetcher, registry, props);
 
         service.init();
@@ -99,7 +99,7 @@ class PlatformTeamsServiceTest {
             new EscalationTeam("T1", "T1", "SOME")
         ));
 
-        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(4, Duration.ofSeconds(2));
+        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(4, Duration.ofSeconds(2), false);
         PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, usersFetcher, registry, props);
 
         service.init();
@@ -123,11 +123,40 @@ class PlatformTeamsServiceTest {
             new EscalationTeam("unknown", "unknown", "SOME")
         ));
 
-        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(2, Duration.ofSeconds(1));
+        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(2, Duration.ofSeconds(1), false);
         PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, usersFetcher, registry, props);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, service::init);
         assertEquals("Unknown escalation teams specified: [unknown]", ex.getMessage());
+    }
+
+    @Test
+    void escalationMappingMismatch_ignoresUnknownTeamsWhenFlagIsTrue() {
+        PlatformTeamsFetcher teamsFetcher = new FakeTeamsFetcher(List.of(
+            new PlatformTeamsFetcher.TeamAndGroupTuple("wow", "G")
+        ));
+        PlatformUsersFetcher usersFetcher = new FakeUsersFetcher(
+            Map.of("G", List.of(new PlatformUsersFetcher.Membership("user@test.com")))
+        );
+
+        EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(List.of(
+            new EscalationTeam("wow", "wow", "SOME"),
+            new EscalationTeam("unknown", "unknown", "SOME"),
+            new EscalationTeam("another-unknown", "another-unknown", "SOME2")
+        ));
+
+        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(2, Duration.ofSeconds(1), true);
+        PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, usersFetcher, registry, props);
+
+        // Should not throw an exception
+        service.init();
+
+        // Verify that the service initialized correctly with the known team
+        assertEquals(1, service.listTeams().size());
+        var team = service.findTeamByName("wow");
+        assertNotNull(team);
+        assertEquals("wow", team.name());
+        assertEquals(1, team.users().size());
     }
 
     @Test
@@ -140,7 +169,7 @@ class PlatformTeamsServiceTest {
             new EscalationTeam("T", "T", "SOME")
         ));
 
-        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(1, Duration.ofMillis(50));
+        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(1, Duration.ofMillis(50), false);
         PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, usersFetcher, registry, props);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, service::init);
@@ -153,7 +182,7 @@ class PlatformTeamsServiceTest {
         FakeUsersFetcher usersFetcher = new FakeUsersFetcher(Map.of());
         EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(List.of());
 
-        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(2, Duration.ofSeconds(1));
+        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(2, Duration.ofSeconds(1), false);
         PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, usersFetcher, registry, props);
 
         service.init();
@@ -176,7 +205,7 @@ class PlatformTeamsServiceTest {
             new EscalationTeam("T", "T", "SOME")
         ));
 
-        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(4, Duration.ofSeconds(2));
+        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(4, Duration.ofSeconds(2), false);
         PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, usersFetcher, registry, props);
 
         service.init();

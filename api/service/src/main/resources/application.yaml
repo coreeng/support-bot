@@ -104,6 +104,7 @@ platform-integration:
   fetch:
     max-concurrency: 64
     timeout: 30s
+    ignore-unknown-teams: false # Whether to check for unknown escalation teams and fail if any are found
   kubernetes:
     disable-http-proxy: false
     base-url: ""
