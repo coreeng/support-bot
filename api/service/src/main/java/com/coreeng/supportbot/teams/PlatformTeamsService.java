@@ -175,10 +175,16 @@ public class PlatformTeamsService {
             .collect(toImmutableSet());
         var setsDiff = Sets.difference(escalationTeamNames, teamNames);
         if (!setsDiff.isEmpty()) {
-            throw new IllegalStateException("Unknown escalation teams specified: " +
-                                            setsDiff.stream()
-                                                .collect(joining(", ", "[", "]"))
-            );
+            if (fetchProps.ignoreUnknownTeams()) {
+                log.info("""
+                    Found unknown escalation teams: {}.
+                    Ensure that it's expected that these teams are not found among platform teams.""", setsDiff);
+            } else {
+                throw new IllegalStateException("Unknown escalation teams specified: " +
+                                                setsDiff.stream()
+                                                    .collect(joining(", ", "[", "]"))
+                );
+            }
         }
     }
 
