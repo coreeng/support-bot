@@ -44,7 +44,7 @@ class PlatformTeamsServiceConcurrencyTest {
 
         EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(escalationTeams);
 
-        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(maxConcurrency, timeout);
+        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(maxConcurrency, timeout, false);
         PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, usersFetcher, registry, props);
 
         // Act

@@ -7,7 +7,8 @@ import java.time.Duration;
 @ConfigurationProperties("platform-integration.fetch")
 public record PlatformTeamsFetchProps(
     int maxConcurrency,
-    Duration timeout
+    Duration timeout,
+    boolean ignoreUnknownTeams
 ) {
 }
 
