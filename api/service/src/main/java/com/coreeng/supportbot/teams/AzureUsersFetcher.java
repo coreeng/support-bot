@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.teams;
 
+import com.microsoft.graph.models.GroupCollectionResponse;
 import com.microsoft.graph.models.UserCollectionResponse;
 import com.microsoft.graph.serviceclient.GraphServiceClient;
 import lombok.RequiredArgsConstructor;
@@ -20,17 +21,17 @@ public class AzureUsersFetcher implements PlatformUsersFetcher {
     @Override
     public List<Membership> fetchMembershipsByGroupRef(String groupRef) {
         UserCollectionResponse response = graphClient.groups().byGroupId(groupRef)
-            .transitiveMembers().graphUser().get(req -> {
-                requireNonNull(req.queryParameters);
-                req.queryParameters.select = new String[]{"mail", "accountEnabled", "deletedDateTime"};
-            });
+                .transitiveMembers().graphUser().get(req -> {
+                    requireNonNull(req.queryParameters);
+                    req.queryParameters.select = new String[]{"mail", "accountEnabled", "deletedDateTime", "userPrincipalName"};
+                });
         requireNonNull(response);
         requireNonNull(response.getValue());
         return response.getValue().stream()
             .filter(v -> v.getDeletedDateTime() == null
                 && v.getAccountEnabled() != null && v.getAccountEnabled()
                 && v.getMail() != null && !v.getMail().isBlank())
-            .map(v -> new Membership(v.getMail()))
+            .map(v -> new Membership(v.getMail() != null ? v.getMail() : v.getUserPrincipalName()))
             .toList();
     }
 }
