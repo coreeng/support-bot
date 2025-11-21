@@ -46,7 +46,7 @@ INSERT INTO bank_holidays (holiday_date, name) VALUES
 ('2026-12-28', 'Boxing Day (Substitute)');
 
 CREATE TABLE support_calendar (
-    hour_ts    TIMESTAMP NOT NULL,
+    hour_ts    TIMESTAMPTZ NOT NULL,
     work_hour  BOOLEAN NOT NULL DEFAULT TRUE,
     type       TEXT DEFAULT 'business hour',
 
@@ -55,19 +55,19 @@ CREATE TABLE support_calendar (
 
 INSERT INTO support_calendar (hour_ts)
 SELECT generate_series(
-       '2023-01-01 00:00:00'::timestamp,
-       '2026-12-31 23:00:00'::timestamp,
-       '1 hour'::interval
+   '2023-01-01 00:00:00 Europe/London'::timestamptz,
+   '2027-01-01 00:00:00 Europe/London'::timestamptz,
+   '1 hour'::interval
 );
 
 UPDATE support_calendar
 SET    work_hour = FALSE,
        type      = 'off hour'
 WHERE  NOT (
-    EXTRACT(DOW FROM hour_ts) BETWEEN 1 AND 5        -- 1=Mon ... 5=Fri
-        AND hour_ts::time >= TIME '08:00'
-        AND hour_ts::time <  TIME '18:00'
-    );
+    EXTRACT(DOW FROM hour_ts AT TIME ZONE 'Europe/London') BETWEEN 1 AND 5
+    AND (hour_ts AT TIME ZONE 'Europe/London')::time >= TIME '08:00'
+    AND (hour_ts AT TIME ZONE 'Europe/London')::time <  TIME '18:00'
+);
 
 UPDATE support_calendar
 SET    work_hour = FALSE,
