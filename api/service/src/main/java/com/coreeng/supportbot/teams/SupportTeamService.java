@@ -3,6 +3,7 @@ package com.coreeng.supportbot.teams;
 import com.coreeng.supportbot.config.SupportTeamProps;
 import com.google.common.collect.ImmutableList;
 import jakarta.annotation.PostConstruct;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -11,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 public class SupportTeamService {
     private final SupportTeamProps supportTeamProps;
     private final SupportMemberFetcher memberUpdater;
+    @Getter
     private ImmutableList<SupportMemberFetcher.SupportMember> members = ImmutableList.of();
 
     @PostConstruct
