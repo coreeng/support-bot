@@ -22,6 +22,9 @@ WHERE  NOT (
         AND (hour_ts AT TIME ZONE 'Europe/London')::time <  TIME '18:00'
     );
 
+DROP VIEW IF EXISTS working_hours;
+CREATE VIEW working_hours AS
+SELECT hour_ts FROM support_calendar WHERE work_hour is TRUE;
 
 CREATE TABLE bank_holidays (
                                holiday_date DATE PRIMARY KEY,
