@@ -73,13 +73,16 @@ SELECT date_trunc('week', first_open_ts) AS week,
 FROM aggregated_ticket_data
 GROUP BY week, tags;
 
+DROP VIEW IF EXISTS working_hours;
+CREATE VIEW working_hours AS
+SELECT hour_ts FROM support_calendar WHERE work_hour is TRUE;
 
 DROP VIEW IF EXISTS ticket_working_hours_summary;
 CREATE VIEW ticket_working_hours_summary AS
 SELECT ticket_id,
-       3600 * (SELECT count(*) FROM support_calendar sc WHERE sc.work_hour IS TRUE AND sc.hour_ts >= first_open_ts AND sc.hour_ts <  last_closed_ts) AS duration,
-       3600 * (SELECT count(*) FROM support_calendar sc WHERE sc.work_hour IS TRUE AND sc.hour_ts >= escalation_open_ts AND sc.hour_ts <  COALESCE(last_closed_ts, now())) AS escalation_duration,
-       3600 * (SELECT count(*) FROM support_calendar sc WHERE sc.work_hour IS TRUE AND sc.hour_ts >= query_posted_ts AND sc.hour_ts <  first_open_ts) AS duration_to_first_response
+       3600 * (SELECT count(*) FROM working_hours WHERE hour_ts >= first_open_ts AND hour_ts <  last_closed_ts) AS duration,
+       3600 * (SELECT count(*) FROM working_hours WHERE hour_ts >= escalation_open_ts AND hour_ts <  COALESCE(last_closed_ts, now())) AS escalation_duration,
+       3600 * (SELECT count(*) FROM working_hours WHERE hour_ts >= query_posted_ts AND hour_ts <  first_open_ts) AS duration_to_first_response
 
 FROM (SELECT t.ticket_id,
              query_posted_ts,
@@ -92,7 +95,7 @@ FROM (SELECT t.ticket_id,
 DROP VIEW IF EXISTS escalation_working_hours_summary;
 CREATE VIEW escalation_working_hours_summary AS
 SELECT escalation_id,
-       3600 * (SELECT count(*) FROM support_calendar sc WHERE sc.work_hour IS TRUE AND sc.hour_ts >= open_ts AND sc.hour_ts <  COALESCE(resolved_ts, now())) AS escalation_duration
+       3600 * (SELECT count(*) FROM working_hours WHERE hour_ts >= open_ts AND hour_ts <  COALESCE(resolved_ts, now())) AS escalation_duration
 FROM (SELECT escalation_id,
              open_ts,
              resolved_ts
