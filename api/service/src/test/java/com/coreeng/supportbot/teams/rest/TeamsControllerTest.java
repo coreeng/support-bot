@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.teams.rest;
 
+import com.coreeng.supportbot.config.SupportLeadershipTeamProps;
+import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
@@ -13,13 +15,15 @@ import static org.mockito.Mockito.*;
 class TeamsControllerTest {
 
     private TeamService teamService;
+    private SupportLeadershipTeamProps leadershipTeamProps;
+    private SupportTeamService supportTeamService;
     private TeamsController controller;
 
     @BeforeEach
     void setUp() {
         teamService = mock(TeamService.class);
         TeamUIMapper mapper = new TeamUIMapper(); // real mapper is simple and stateless
-        controller = new TeamsController(teamService, mapper);
+        controller = new TeamsController(teamService, mapper, leadershipTeamProps, supportTeamService);
     }
 
     @Test
