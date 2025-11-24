@@ -8,10 +8,10 @@ CREATE TABLE support_calendar (
 
 INSERT INTO support_calendar (hour_ts)
 SELECT generate_series(
-               '2023-01-01 00:00:00 Europe/London'::timestamptz,
-               '2026-12-31 23:00:00 Europe/London'::timestamptz,
-               '1 hour'::interval
-       );
+   '2023-01-01 00:00:00 Europe/London'::timestamptz,
+   '2026-12-31 23:00:00 Europe/London'::timestamptz,
+   '1 hour'::interval
+);
 
 UPDATE support_calendar
 SET    work_hour = FALSE,
@@ -20,15 +20,11 @@ WHERE  NOT (
     EXTRACT(DOW FROM hour_ts AT TIME ZONE 'Europe/London') BETWEEN 1 AND 5
         AND (hour_ts AT TIME ZONE 'Europe/London')::time >= TIME '08:00'
         AND (hour_ts AT TIME ZONE 'Europe/London')::time <  TIME '18:00'
-    );
-
-DROP VIEW IF EXISTS working_hours;
-CREATE VIEW working_hours AS
-SELECT hour_ts FROM support_calendar WHERE work_hour is TRUE;
+);
 
 CREATE TABLE bank_holidays (
-                               holiday_date DATE PRIMARY KEY,
-                               name TEXT
+   holiday_date DATE PRIMARY KEY,
+   name TEXT
 );
 
 INSERT INTO bank_holidays (holiday_date, name) VALUES
