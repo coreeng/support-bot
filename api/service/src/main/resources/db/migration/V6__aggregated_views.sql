@@ -73,17 +73,26 @@ SELECT date_trunc('week', first_open_ts) AS week,
 FROM aggregated_ticket_data
 GROUP BY week, tags;
 
-DROP VIEW IF EXISTS working_hours;
-CREATE VIEW working_hours AS
-SELECT hour_ts FROM support_calendar WHERE work_hour is TRUE;
 
 DROP VIEW IF EXISTS ticket_working_hours_summary;
 CREATE VIEW ticket_working_hours_summary AS
 SELECT ticket_id,
-       3600 * (SELECT count(*) FROM working_hours WHERE hour_ts >= first_open_ts AND hour_ts <  last_closed_ts) AS duration,
-       3600 * (SELECT count(*) FROM working_hours WHERE hour_ts >= escalation_open_ts AND hour_ts <  COALESCE(last_closed_ts, now())) AS escalation_duration,
-       3600 * (SELECT count(*) FROM working_hours WHERE hour_ts >= query_posted_ts AND hour_ts <  first_open_ts) AS duration_to_first_response
+       EXTRACT('epoch' FROM last_closed_ts - first_open_ts)
+           - 14 * 60 * 60 * (EXTRACT('days' FROM DATE_TRUNC('day', last_closed_ts) - DATE_TRUNC('day', first_open_ts))) -- 14 non-working hours (1800-0800) between each working day
+           - 20 * 60 * 60 * (EXTRACT('days' FROM DATE_TRUNC('week', last_closed_ts) - DATE_TRUNC('week', first_open_ts)) / 7) -- extra 20 non-working hours each weekend
+           AS duration,
 
+       EXTRACT('epoch' FROM COALESCE(last_closed_ts, now()) - escalation_open_ts)
+           - 14 * 60 * 60 * (EXTRACT('days' FROM DATE_TRUNC('day', COALESCE(last_closed_ts, now())) -
+                                                 DATE_TRUNC('day', escalation_open_ts)))
+           - 20 * 60 * 60 * (EXTRACT('days' FROM DATE_TRUNC('week', COALESCE(last_closed_ts, now())) -
+                                                 DATE_TRUNC('week', escalation_open_ts)) / 7)
+           AS escalation_duration,
+
+       EXTRACT('epoch' FROM first_open_ts - query_posted_ts)
+           - 14 * 60 * 60 * (EXTRACT('days' FROM DATE_TRUNC('day', first_open_ts) - DATE_TRUNC('day', query_posted_ts)))
+           - 20 * 60 * 60 * (EXTRACT('days' FROM DATE_TRUNC('week', first_open_ts) - DATE_TRUNC('week', query_posted_ts)) / 7)
+           AS duration_to_first_response
 FROM (SELECT t.ticket_id,
              query_posted_ts,
              first_open_ts,
@@ -95,7 +104,12 @@ FROM (SELECT t.ticket_id,
 DROP VIEW IF EXISTS escalation_working_hours_summary;
 CREATE VIEW escalation_working_hours_summary AS
 SELECT escalation_id,
-       3600 * (SELECT count(*) FROM working_hours WHERE hour_ts >= open_ts AND hour_ts <  COALESCE(resolved_ts, now())) AS escalation_duration
+       EXTRACT('epoch' FROM COALESCE(resolved_ts, now()) - open_ts)
+           - 14 * 60 * 60 *
+             (EXTRACT('days' FROM DATE_TRUNC('day', COALESCE(resolved_ts, now())) - DATE_TRUNC('day', open_ts)))
+           - 20 * 60 * 60 *
+             (EXTRACT('days' FROM DATE_TRUNC('week', COALESCE(resolved_ts, now())) - DATE_TRUNC('week', open_ts)) / 7)
+           AS escalation_duration
 FROM (SELECT escalation_id,
              open_ts,
              resolved_ts
