@@ -1,6 +1,31 @@
+CREATE TABLE support_calendar (
+    hour_ts    TIMESTAMPTZ NOT NULL,
+    work_hour  BOOLEAN NOT NULL DEFAULT TRUE,
+    type       TEXT DEFAULT 'business hour',
+
+    CONSTRAINT working_hours_pkey PRIMARY KEY (hour_ts)
+);
+
+INSERT INTO support_calendar (hour_ts)
+SELECT generate_series(
+               '2023-01-01 00:00:00 Europe/London'::timestamptz,
+               '2026-12-31 23:00:00 Europe/London'::timestamptz,
+               '1 hour'::interval
+       );
+
+UPDATE support_calendar
+SET    work_hour = FALSE,
+       type      = 'off hour'
+WHERE  NOT (
+    EXTRACT(DOW FROM hour_ts AT TIME ZONE 'Europe/London') BETWEEN 1 AND 5
+        AND (hour_ts AT TIME ZONE 'Europe/London')::time >= TIME '08:00'
+        AND (hour_ts AT TIME ZONE 'Europe/London')::time <  TIME '18:00'
+    );
+
+
 CREATE TABLE bank_holidays (
-  holiday_date DATE PRIMARY KEY,
-  name TEXT
+                               holiday_date DATE PRIMARY KEY,
+                               name TEXT
 );
 
 INSERT INTO bank_holidays (holiday_date, name) VALUES
@@ -43,31 +68,8 @@ INSERT INTO bank_holidays (holiday_date, name) VALUES
 ('2026-05-25', 'Spring Bank'),
 ('2026-08-31', 'Summer Bank'),
 ('2026-12-25', 'Christmas'),
-('2026-12-28', 'Boxing Day (Substitute)');
-
-CREATE TABLE support_calendar (
-    hour_ts    TIMESTAMPTZ NOT NULL,
-    work_hour  BOOLEAN NOT NULL DEFAULT TRUE,
-    type       TEXT DEFAULT 'business hour',
-
-    CONSTRAINT working_hours_pkey PRIMARY KEY (hour_ts)
-);
-
-INSERT INTO support_calendar (hour_ts)
-SELECT generate_series(
-   '2023-01-01 00:00:00 Europe/London'::timestamptz,
-   '2027-01-01 00:00:00 Europe/London'::timestamptz,
-   '1 hour'::interval
-);
-
-UPDATE support_calendar
-SET    work_hour = FALSE,
-       type      = 'off hour'
-WHERE  NOT (
-    EXTRACT(DOW FROM hour_ts AT TIME ZONE 'Europe/London') BETWEEN 1 AND 5
-    AND (hour_ts AT TIME ZONE 'Europe/London')::time >= TIME '08:00'
-    AND (hour_ts AT TIME ZONE 'Europe/London')::time <  TIME '18:00'
-);
+('2026-12-28', 'Boxing Day (Substitute)')
+;
 
 UPDATE support_calendar
 SET    work_hour = FALSE,
