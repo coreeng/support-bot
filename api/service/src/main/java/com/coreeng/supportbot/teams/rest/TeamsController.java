@@ -20,7 +20,6 @@ public class TeamsController {
     private final TeamService teamService;
     private final TeamUIMapper mapper;
     private final SupportLeadershipTeamProps leadershipTeamProps;
-    private final StaticSupportTeamProps staticSupportTeamProps;
     private final SupportTeamService supportTeamService;
 
     @GetMapping

@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.user_info;
 
-import com.coreeng.supportbot.config.SupportLeadershipTeamProps;
 import com.coreeng.supportbot.teams.PlatformTeamsService;
 import com.coreeng.supportbot.teams.PlatformUser;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +16,7 @@ import java.util.stream.Collectors;
 public class UserInfoController {
     private final PlatformTeamsService platformTeamsService;
 
-    public UserInfoController(PlatformTeamsService platformTeamsService, SupportLeadershipTeamProps supportLeadershipTeamProps) {
+    public UserInfoController(PlatformTeamsService platformTeamsService) {
         this.platformTeamsService = platformTeamsService;
     }
 
@@ -38,6 +37,5 @@ public class UserInfoController {
 
         UserInfoResponse response = new UserInfoResponse(user.email(), teamDtos);
         return ResponseEntity.ok(response);
-
     }
 }

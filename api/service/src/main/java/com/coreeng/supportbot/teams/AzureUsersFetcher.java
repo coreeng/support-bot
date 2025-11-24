@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.teams;
 
-import com.microsoft.graph.models.GroupCollectionResponse;
 import com.microsoft.graph.models.UserCollectionResponse;
 import com.microsoft.graph.serviceclient.GraphServiceClient;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 /**
  * Requires Azure permissions: GroupMember.Read.All, User.ReadBasic.All
@@ -30,7 +30,7 @@ public class AzureUsersFetcher implements PlatformUsersFetcher {
         return response.getValue().stream()
             .filter(v -> v.getDeletedDateTime() == null
                 && v.getAccountEnabled() != null && v.getAccountEnabled()
-                && v.getMail() != null && !v.getMail().isBlank())
+                && (!isBlank(v.getMail()) || !isBlank(v.getUserPrincipalName())))
             .map(v -> new Membership(v.getMail() != null ? v.getMail() : v.getUserPrincipalName()))
             .toList();
     }

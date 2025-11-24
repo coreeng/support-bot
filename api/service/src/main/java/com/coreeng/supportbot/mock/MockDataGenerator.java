@@ -37,6 +37,7 @@ import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -73,6 +74,8 @@ public class MockDataGenerator implements ApplicationRunner {
     private final SlackTicketsProps ticketsProps;
     private final TicketRepository ticketRepository;
     private final EscalationRepository escalationRepository;
+    @Nullable
+    @org.springframework.lang.Nullable
     private final SentimentRepository sentimentRepository;
     private final PlatformTeamsService platformTeamsService;
     private final ImpactsRegistry impactsRegistry;
@@ -206,11 +209,17 @@ public class MockDataGenerator implements ApplicationRunner {
     private Ticket generateEscalatedTicket(Random random, LocalDate date) {
         Ticket ticket = generateFilledTicket(random, date);
         long escalationsAmount = random.nextLong(1, maxNumberOfEscalations + 1);
-        for (int i = 0; i < escalationsAmount; i++) {
+        ImmutableList<EscalationTeam> escalationTeams = escalationTeamsRegistry.listAllEscalationTeams();
+        Set<EscalationTeam> escalationTeamsToUse = new HashSet<>();
+        while (escalationTeamsToUse.size() < escalationsAmount) {
+            escalationTeamsToUse.add(escalationTeams.get(random.nextInt(0, escalationTeams.size())));
+        }
+        for (EscalationTeam escalationTeam: escalationTeamsToUse) {
             generateEscalation(
                 random,
                 ticket.statusLog().getFirst().date(),
-                ticket
+                ticket,
+                escalationTeam
             );
         }
         return ticket;
@@ -218,7 +227,8 @@ public class MockDataGenerator implements ApplicationRunner {
 
     private void generateEscalation(Random random,
                                     Instant afterDate,
-                                    Ticket ticket) {
+                                    Ticket ticket,
+                                    EscalationTeam escalationTeam) {
         MessageTs escalationTs = generateMessageTsAfter(
             random,
             afterDate,
@@ -227,17 +237,16 @@ public class MockDataGenerator implements ApplicationRunner {
         );
         MessageTs createdMessageTs = messageTsFromInstant(random, escalationTs.getDate());
 
-        ImmutableList<EscalationTeam> escalationTeams = escalationTeamsRegistry.listAllEscalationTeams();
-        int teamI = random.nextInt(0, escalationTeams.size());
 
         Set<Tag> pickedTags = generatePickedTags(random);
 
         Escalation escalation = Escalation.createNew(
             ticket.id(),
-            escalationTeams.get(teamI).label(),
+            escalationTeam.code(),
             pickedTags.stream()
                 .map(Tag::code)
-                .collect(toImmutableList())
+                .collect(toImmutableList()),
+            ticket.queryRef()
         );
         escalation = escalation.toBuilder()
             .openedAt(escalationTs.getDate())
@@ -307,6 +316,9 @@ public class MockDataGenerator implements ApplicationRunner {
     }
 
     private void generateSentimentForTicket(Random random, Ticket ticket) {
+        if (sentimentRepository == null) {
+            return;
+        }
         sentimentRepository.save(ticket.id(),
             TicketSentimentResults.builder()
                 .ticketId(ticket.id())
