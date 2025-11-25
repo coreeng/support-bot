@@ -88,15 +88,9 @@ WITH bounds AS (
      ),
      work_spans AS (
          SELECT
-             GREATEST(
-                     (d + work_start)::timestamp,
-                     (SELECT s FROM bounds)
-             ) AS s,
-             LEAST(
-                     (d + work_end)::timestamp,
-                     (SELECT e FROM bounds)
-             ) AS e
-         FROM days
+             GREATEST(d + work_start, b.s) AS s,
+             LEAST(d + work_end, b.e) AS e
+         FROM days, bounds b
          WHERE EXTRACT(ISODOW FROM d) BETWEEN 1 AND 5
      ),
      valid_spans AS (
