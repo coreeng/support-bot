@@ -5,6 +5,8 @@ import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.MethodsClient;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.SlackApiTextResponse;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import com.slack.api.methods.request.chat.ChatGetPermalinkRequest;
 import com.slack.api.methods.request.conversations.ConversationsHistoryRequest;
 import com.slack.api.methods.request.conversations.ConversationsRepliesRequest;
@@ -47,20 +49,22 @@ public class SlackClientImpl implements SlackClient {
     private final MethodsClient client;
     private final Cache permalinkCache;
     private final Cache userProfileCache;
+    private final MeterRegistry meterRegistry;
 
     @Override
     public ReactionsAddResponse addReaction(ReactionsAddRequest request) {
-        return doRequest(() -> client.reactionsAdd(request), null);
+        return doRequest("reactions.add", () -> client.reactionsAdd(request), null);
     }
 
     @Override
     public ReactionsRemoveResponse removeReaction(ReactionsRemoveRequest request) {
-        return doRequest(() -> client.reactionsRemove(request), null);
+        return doRequest("reactions.remove", () -> client.reactionsRemove(request), null);
     }
 
     @Override
     public ChatPostMessageResponse postMessage(SlackPostMessageRequest request) {
         return doRequest(
+            "chat.postMessage",
             () -> client.chatPostMessage(request.toSlackRequest()),
             response -> ImmutableList.<String>builder()
                 .addAll(errorDetailsOrEmpty(response.getResponseMetadata()))
@@ -72,6 +76,7 @@ public class SlackClientImpl implements SlackClient {
     @Override
     public ChatPostEphemeralResponse postEphemeralMessage(SlackPostEphemeralMessageRequest request) {
         return doRequest(
+            "chat.postEphemeral",
             () -> client.chatPostEphemeral(request.toSlackRequest()),
             response -> ImmutableList.of(response.getError())
         );
@@ -80,6 +85,7 @@ public class SlackClientImpl implements SlackClient {
     @Override
     public ChatUpdateResponse editMessage(SlackEditMessageRequest request) {
         return doRequest(
+            "chat.update",
             () -> client.chatUpdate(request.toSlackRequest()),
             response -> errorDetailsOrEmpty(response.getResponseMetadata())
         );
@@ -87,7 +93,9 @@ public class SlackClientImpl implements SlackClient {
 
     @Override
     public Message getMessageByTs(SlackGetMessageByTsRequest request) {
-        ConversationsHistoryResponse response = doRequest(() -> client.conversationsHistory(ConversationsHistoryRequest.builder()
+        ConversationsHistoryResponse response = doRequest(
+            "conversations.history",
+            () -> client.conversationsHistory(ConversationsHistoryRequest.builder()
                 .channel(request.channelId())
                 .oldest(request.ts().ts())
                 .limit(1)
@@ -103,10 +111,13 @@ public class SlackClientImpl implements SlackClient {
             if (request.ts().mocked()) {
                 return "https://slack.com/" + request.channelId() + "/" + request.ts().ts();
             }
-            ChatGetPermalinkResponse response = doRequest(() -> client.chatGetPermalink(ChatGetPermalinkRequest.builder()
-                .channel(request.channelId())
-                .messageTs(request.ts().ts())
-                .build()), null);
+            ChatGetPermalinkResponse response = doRequest(
+                "chat.getPermalink",
+                () -> client.chatGetPermalink(ChatGetPermalinkRequest.builder()
+                    .channel(request.channelId())
+                    .messageTs(request.ts().ts())
+                    .build()),
+                null);
             return response.getPermalink();
         });
     }
@@ -114,6 +125,7 @@ public class SlackClientImpl implements SlackClient {
     @Override
     public ConversationsRepliesResponse getThreadPage(ConversationsRepliesRequest request) {
         return doRequest(
+            "conversations.replies",
             () -> client.conversationsReplies(request),
             response -> errorDetailsOrEmpty(response.getResponseMetadata())
         );
@@ -122,6 +134,7 @@ public class SlackClientImpl implements SlackClient {
     @Override
     public ViewsOpenResponse viewsOpen(ViewsOpenRequest request) {
         return doRequest(
+            "views.open",
             () -> client.viewsOpen(request),
             response -> errorDetailsOrEmpty(response.getResponseMetadata())
         );
@@ -130,6 +143,7 @@ public class SlackClientImpl implements SlackClient {
     @Override
     public ViewsPublishResponse updateHomeView(String userId, SlackView view) {
         return doRequest(
+            "views.publish",
             () -> client.viewsPublish(ViewsPublishRequest.builder()
                 .userId(userId)
                 .view(View.builder()
@@ -145,6 +159,7 @@ public class SlackClientImpl implements SlackClient {
     @Override
     public User.Profile getUserById(String userId) {
         return userProfileCache.get(userId, () -> doRequest(
+            "users.profile.get",
             () -> client.usersProfileGet(UsersProfileGetRequest.builder()
                 .user(userId)
                 .build()),
@@ -155,6 +170,7 @@ public class SlackClientImpl implements SlackClient {
     @Override
     public ImmutableList<String> getGroupMembers(String groupId) {
         List<String> users = doRequest(
+            "usergroups.users.list",
             () -> client.usergroupsUsersList(UsergroupsUsersListRequest.builder()
                 .usergroup(groupId)
                 .build()),
@@ -164,12 +180,18 @@ public class SlackClientImpl implements SlackClient {
     }
 
     private <V extends SlackApiTextResponse> V doRequest(
+        String methodName,
         SlackRequestCallable<V> doRequest,
         @Nullable Function<V, ImmutableList<String>> errorMetadataExtractor
     ) {
+        Timer.Sample sample = Timer.start(meterRegistry);
         try {
             V response = doRequest.call();
             if (!response.isOk()) {
+                meterRegistry.counter("slack_api_calls_errors_total",
+                    "method", methodName,
+                    "error_code", response.getError() != null ? response.getError() : "unknown"
+                ).increment();
                 throw new SlackException(
                     response,
                     errorMetadataExtractor != null
@@ -177,9 +199,16 @@ public class SlackClientImpl implements SlackClient {
                         : ImmutableList.of()
                 );
             }
+            meterRegistry.counter("slack_api_calls_success_total", "method", methodName).increment();
             return response;
         } catch (IOException | SlackApiException e) {
+            meterRegistry.counter("slack_api_calls_errors_total",
+                "method", methodName,
+                "error_code", e.getClass().getSimpleName()
+            ).increment();
             throw new SlackException(e);
+        } finally {
+            sample.stop(meterRegistry.timer("slack_api_calls_duration_seconds", "method", methodName));
         }
     }
 

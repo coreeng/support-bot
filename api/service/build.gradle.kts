@@ -44,6 +44,11 @@ pmd {
     toolVersion = "7.9.0"
 }
 
+tasks.withType<Pmd> {
+    // Exclude the generated package
+    exclude("**/com/coreeng/supportbot/dbschema/**")
+}
+
 configurations {
     compileOnly {
         extendsFrom(configurations.annotationProcessor.get())
