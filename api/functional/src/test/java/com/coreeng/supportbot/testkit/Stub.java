@@ -25,4 +25,11 @@ public class Stub {
             .as("%s: stub was called exactly once", message)
             .hasSize(1);
     }
+
+    public void assertIsNotCalled(String message) {
+        GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
+        assertThat(serveEvents.getServeEvents())
+            .as("%s: stub should not have been called", message)
+            .isEmpty();
+    }
 }

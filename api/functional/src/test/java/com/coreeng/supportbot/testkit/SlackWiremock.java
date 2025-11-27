@@ -3,6 +3,7 @@ package com.coreeng.supportbot.testkit;
 import java.util.Map;
 
 import org.apache.commons.text.StringSubstitutor;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -233,6 +234,39 @@ public class SlackWiremock extends WireMockServer {
                         "blocks", message.blocksJson(),
                         "ts", message.ts(),
                         "threadTs", message.threadTs()
+                    )))
+        ));
+        return Stub.builder()
+            .mapping(stubMapping)
+            .wireMockServer(this)
+            .build();
+    }
+
+    /**
+     * Stub the conversations.replies API to return message info with thread context.
+     * This is used to check if a message is a thread reply.
+     */
+    public Stub stubConversationsReplies(String channelId, MessageTs ts, @Nullable MessageTs threadTs) {
+        String threadTsValue = threadTs != null
+            ? "\"" + threadTs + "\""
+            : "null";
+        StubMapping stubMapping = givenThat(post("/api/conversations.replies")
+            .withFormParam("channel", equalTo(channelId))
+            .withFormParam("ts", equalTo(ts.toString()))
+            .willReturn(okJson(StringSubstitutor.replace("""
+                    {
+                        "ok": true,
+                        "messages": [
+                            {
+                                "type": "message",
+                                "ts": "${ts}",
+                                "thread_ts": ${threadTsValue}
+                            }
+                        ]
+                    }
+                    """, Map.of(
+                        "ts", ts.toString(),
+                        "threadTsValue", threadTsValue
                     )))
         ));
         return Stub.builder()
