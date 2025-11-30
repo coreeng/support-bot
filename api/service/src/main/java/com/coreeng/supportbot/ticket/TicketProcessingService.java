@@ -196,7 +196,11 @@ public class TicketProcessingService {
             return;
         }
 
-        log.info("Marking ticket {} as stale", ticketId);
+        log.atInfo()
+            .addArgument(() -> logEnricher.kv("action", "ticket_stale"))
+            .addArgument(() -> logEnricher.kv("id", ticket.id().id()))
+            .addArgument(() -> logEnricher.kv("status", "stale"))
+            .log("Marking ticket as stale {} {} {}");
         slackService.warnStaleness(ticket.queryRef());
         Ticket updatedTicket = repository.updateTicket(
             ticket.toBuilder()
