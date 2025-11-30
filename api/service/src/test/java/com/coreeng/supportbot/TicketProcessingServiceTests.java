@@ -1,5 +1,7 @@
 package com.coreeng.supportbot;
 
+import com.coreeng.supportbot.config.LogEnricher;
+import com.coreeng.supportbot.config.MetricsLoggingProps;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.escalation.EscalationInMemoryRepository;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
@@ -56,12 +58,14 @@ public class TicketProcessingServiceTests {
             "white_check_mark",
             "rocket"
         );
+        LogEnricher logEnricher = new LogEnricher(new MetricsLoggingProps(true, "support_bot_ticket_"));
         ticketProcessingService = new TicketProcessingService(
             ticketRepository,
             slackService,
             escalationQueryService,
             slackTicketsProps,
-            publisher
+            publisher,
+            logEnricher
         );
     }
 

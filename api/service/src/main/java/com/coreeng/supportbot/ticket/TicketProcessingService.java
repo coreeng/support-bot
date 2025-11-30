@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
+import com.coreeng.supportbot.config.LogEnricher;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
@@ -24,6 +25,7 @@ public class TicketProcessingService {
     private final EscalationQueryService escalationQueryService;
     private final SlackTicketsProps slackTicketsProps;
     private final ApplicationEventPublisher publisher;
+    private final LogEnricher logEnricher;
 
     public void handleMessagePosted(MessagePosted e) {
         if (isQueryEvent(e)) {
@@ -75,7 +77,11 @@ public class TicketProcessingService {
         Ticket newTicket = repository.createTicketIfNotExists(Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
         log.atInfo()
             .addArgument(() -> e.messageRef().actualThreadTs())
-            .log("Ticket is created on reaction to message({})");
+            .addArgument(() -> logEnricher.kv("action", "ticket_created"))
+            .addArgument(() -> logEnricher.kv("id", newTicket.id().id()))
+            .addArgument(() -> logEnricher.kv("status", newTicket.status()))
+            .addArgument(() -> logEnricher.kv("channel_id", e.messageRef().channelId()))
+            .log("Ticket created on reaction to message({}) {} {} {} {}");
 
         slackService.markPostTracked(new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
 
@@ -131,6 +137,15 @@ public class TicketProcessingService {
                 .build()
         );
 
+        log.atInfo()
+            .addArgument(() -> logEnricher.kv("action", "ticket_updated"))
+            .addArgument(() -> logEnricher.kv("id", updatedTicket.id().id()))
+            .addArgument(() -> logEnricher.kv("status", updatedTicket.status()))
+            .addArgument(() -> logEnricher.kv("team", updatedTicket.team()))
+            .addArgument(() -> logEnricher.kv("impact", updatedTicket.impact()))
+            .addArgument(() -> logEnricher.kv("tags", updatedTicket.tags()))
+            .log("Ticket submitted {} {} {} {} {} {}");
+
         if (ticket.status() != updatedTicket.status()) {
             onStatusUpdate(updatedTicket);
         }
@@ -158,6 +173,13 @@ public class TicketProcessingService {
             request.threadPermalink(),
             request.tags()
         ));
+        log.atInfo()
+            .addArgument(() -> logEnricher.kv("action", "ticket_escalated"))
+            .addArgument(() -> logEnricher.kv("id", ticket.id().id()))
+            .addArgument(() -> logEnricher.kv("escalation_team", request.team()))
+            .addArgument(() -> logEnricher.kv("team", ticket.team()))
+            .addArgument(() -> logEnricher.kv("tags", request.tags()))
+            .log("Ticket escalated {} {} {} {} {}");
         slackService.markTicketEscalated(ticket.queryRef());
     }
 
@@ -210,6 +232,14 @@ public class TicketProcessingService {
             ticket.status()
         ));
         Ticket updatedTicket = repository.insertStatusLog(ticket, Instant.now());
+        log.atInfo()
+            .addArgument(() -> logEnricher.kv("action", "ticket_changed"))
+            .addArgument(() -> logEnricher.kv("id", updatedTicket.id().id()))
+            .addArgument(() -> logEnricher.kv("status", updatedTicket.status()))
+            .addArgument(() -> logEnricher.kv("team", updatedTicket.team()))
+            .addArgument(() -> logEnricher.kv("impact", updatedTicket.impact()))
+            .addArgument(() -> logEnricher.kv("tags", updatedTicket.tags()))
+            .log("Ticket status changed {} {} {} {} {} {}");
         slackService.editTicketForm(
             new MessageRef(updatedTicket.createdMessageTs(), updatedTicket.channelId()),
             new TicketCreatedMessage(
