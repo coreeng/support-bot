@@ -111,6 +111,8 @@ dependencies {
     implementation("com.microsoft.graph:microsoft-graph:6.36.0")
     implementation("com.azure.spring:spring-cloud-azure-starter:5.22.0")
 
+    implementation("net.logstash.logback:logstash-logback-encoder:8.0")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 

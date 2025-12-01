@@ -182,7 +182,5 @@ rbac:
   enabled: true
 
 logging:
-  metrics:
-    enabled: false
-    # When enabled, each log entry will have this prefix attached for fields
-    prefix: "support_bot_ticket_"
+  config: logging.xml
+
