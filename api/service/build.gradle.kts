@@ -5,6 +5,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.containers.wait.strategy.WaitAllStrategy
+import org.gradle.api.plugins.quality.Pmd
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -44,7 +45,7 @@ pmd {
     toolVersion = "7.9.0"
 }
 
-tasks.withType<Pmd> {
+tasks.withType<Pmd>().configureEach {
     // Exclude the generated package
     exclude("**/com/coreeng/supportbot/dbschema/**")
 }

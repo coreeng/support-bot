@@ -42,6 +42,13 @@ public class StubWithResult<T> {
         resultCalculated = true;
     }
 
+    public void assertIsNotCalled(String message) {
+        GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
+        assertThat(serveEvents.getServeEvents())
+            .as("%s: stub should not have been called", message)
+            .isEmpty();
+    }
+
     public T result() {
         assertThat(resultCalculated).isTrue();
         return result;
