@@ -18,4 +18,10 @@ public class MessageToPost {
     private final String message;
     @NonNull
     private final MessageTs ts;
+    /**
+     * Thread timestamp - set when posting a reply within a thread.
+     * When set, the message is posted as a reply to the thread.
+     */
+    @Nullable
+    private final MessageTs threadTs;
 }

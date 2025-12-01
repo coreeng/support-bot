@@ -21,6 +21,9 @@ public class SupportBotSlackClient {
     private final SlackWiremock slackWiremock;
 
     public SlackMessage notifyMessagePosted(MessageToPost message) {
+        String threadTsField = message.threadTs() != null
+            ? "\"thread_ts\": \"" + message.threadTs() + "\","
+            : "";
         String body = StringSubstitutor.replace(
             """
                 {
@@ -32,6 +35,7 @@ public class SupportBotSlackClient {
                     "user": "${userId}",
                     "type": "message",
                     "ts": "${ts}",
+                    ${threadTsField}
                     "client_msg_id": "03ede034-b608-4428-baca-926730014431",
                     "text": "${message}",
                     "team": "${teamId}",
@@ -77,7 +81,8 @@ public class SupportBotSlackClient {
                 "userId", message.userId(),
                 "message", message.message(),
                 "channelId", message.channelId(),
-                "ts", message.ts().toString()
+                "ts", message.ts().toString(),
+                "threadTsField", threadTsField
             )
         );
         given()
