@@ -18,6 +18,25 @@ public class SlackTestKit {
             .build());
     }
 
+    /**
+     * Post a reply in a thread.
+     *
+     * @param ts       Timestamp of the reply message
+     * @param threadTs Timestamp of the parent thread (original message)
+     * @param message  The message content
+     * @return The posted SlackMessage representing the reply
+     */
+    public SlackMessage postThreadReply(MessageTs ts, MessageTs threadTs, String message) {
+        return supportBotSlackClient.notifyMessagePosted(MessageToPost.builder()
+            .userId(testKit.userId())
+            .teamId(testKit.teamId())
+            .channelId(testKit.channelId())
+            .message(message)
+            .ts(ts)
+            .threadTs(threadTs)
+            .build());
+    }
+
     public void addReactionTo(SlackMessage targetMessage, String reaction) {
         slackWiremock.stubAuthTest();
         supportBotSlackClient.notifyReactionAdded(ReactionToAdd.builder()

@@ -129,6 +129,58 @@ public class TicketManagementTests {
     }
 
     @Test
+    public void whenSupportReactedWithEyesToThreadReply_noAdditionalTicketFormIsCreated() {
+        // given
+        TestKit.RoledTestKit asTenant = testKit.as(tenant);
+        SlackTestKit asTenantSlack = asTenant.slack();
+        SlackTestKit asSupportSlack = testKit.as(support).slack();
+
+        // Step 1: Post a query
+        MessageTs queryTs = MessageTs.now();
+        SlackMessage tenantsQuery = asTenantSlack.postMessage(
+            queryTs,
+            "Please, help me with my query"
+        );
+
+        // Step 2: Support reacts with eyes to create a ticket
+        MessageTs ticketMessageTs = MessageTs.now();
+        var creationStubs = tenantsQuery.stubTicketCreationFlow(ticketMessageTs);
+        asSupportSlack.addReactionTo(tenantsQuery, "eyes");
+        creationStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket created");
+
+        // Verify the original ticket form was created
+        TicketMessage ticketMessage = creationStubs.ticketMessagePosted().result();
+        assertThat(ticketMessage).isNotNull();
+
+        // Step 3: Post a message in the query thread (a reply)
+        MessageTs replyTs = MessageTs.now();
+        SlackMessage threadReply = asTenantSlack.postThreadReply(
+            replyTs,
+            queryTs,
+            "Here is some additional information about my issue"
+        );
+
+        // Step 4: Support reacts with eyes to the thread reply
+        MessageTs secondTicketMessageTs = MessageTs.now();
+        var buggyCreationStubs = threadReply.stubTicketCreationFlow(secondTicketMessageTs);
+
+        // Override the conversations.replies stub to indicate this IS a thread reply (thread_ts != ts)
+        threadReply.stubAsThreadReply(queryTs);
+
+        // Slack doesn't provide thread context when notifies about added reaction
+        asSupportSlack.addReactionTo(threadReply, "eyes");
+
+        await().pollDelay(Duration.ofSeconds(1)).untilAsserted(() -> {
+            buggyCreationStubs.reactionAdded().assertIsNotCalled(
+                "Reaction added event is received for eyes reaction on thread reply"
+            );
+            buggyCreationStubs.ticketMessagePosted().assertIsNotCalled(
+                "No ticket form should be created for eyes reaction on thread reply"
+            );
+        });
+    }
+
+    @Test
     public void whenTicketIsEditedByUsingFullSummaryForm_changesAreSavedToADatabase() {
         // given
         TestKit.RoledTestKit asSupport = testKit.as(support);
