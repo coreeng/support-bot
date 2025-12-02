@@ -76,8 +76,6 @@ public class TicketProcessingService {
         log.atInfo()
             .addKeyValue("action", "ticket_created")
             .addKeyValue("id", newTicket.id().id())
-            .addKeyValue("status", newTicket.status())
-            .addKeyValue("channel_id", e.messageRef().channelId())
             .log("Ticket created on reaction to message({})", e.messageRef().actualThreadTs());
 
         slackService.markPostTracked(new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()));

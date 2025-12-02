@@ -11,7 +11,7 @@ class LoggingConfigurationTest {
 
     @Test
     void shouldParseJsonLoggingConfiguration() {
-        assertDoesNotThrow(() -> loadLogbackConfig("logback-json.xml"));
+        assertDoesNotThrow(() -> loadLogbackConfig("logback.xml"));
     }
 
     @Test
