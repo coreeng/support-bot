@@ -72,6 +72,15 @@ public class TicketProcessingService {
             return;
         }
 
+        // For reaction events, the Slack doesn't provide thread context.
+        // We need to fetch the message to check if it's a thread reply.
+        if (slackService.isThreadReply(e.messageRef())) {
+            log.atDebug()
+                .addArgument(e.messageRef()::ts)
+                .log("Skipping reaction on thread reply message({})");
+            return;
+        }
+
         Ticket newTicket = repository.createTicketIfNotExists(Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
         log.atInfo()
             .addArgument(() -> e.messageRef().actualThreadTs())
@@ -230,13 +239,6 @@ public class TicketProcessingService {
             ));
         }
         return updatedTicket;
-    }
-
-    /**
-     * Check if a ticket can be rated (i.e., hasn't been rated yet)
-     */
-    public boolean canRateTicket(TicketId ticketId) {
-        return !repository.isTicketRated(ticketId);
     }
 
     private boolean isQueryEvent(SlackEvent event) {
