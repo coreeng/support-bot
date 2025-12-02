@@ -181,6 +181,3 @@ mock-data:
 rbac:
   enabled: true
 
-logging:
-  config: logback.xml
-
