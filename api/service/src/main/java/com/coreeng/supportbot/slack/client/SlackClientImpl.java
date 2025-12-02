@@ -208,7 +208,10 @@ public class SlackClientImpl implements SlackClient {
             ).increment();
             throw new SlackException(e);
         } finally {
-            sample.stop(meterRegistry.timer("slack_api_calls_duration_seconds", "method", methodName));
+            sample.stop(Timer.builder("slack_api_calls_duration_seconds")
+                .tag("method", methodName)
+                .publishPercentileHistogram()
+                .register(meterRegistry));
         }
     }
 

@@ -69,6 +69,7 @@ public class SlackAppInit implements InitializingBean {
             .description("Slack notification processing duration")
             .tag("type", type)
             .tag("handler", handler)
+            .publishPercentileHistogram()
             .register(meterRegistry);
     }
 
