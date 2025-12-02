@@ -15,6 +15,7 @@ import org.springframework.cache.Cache;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import io.micrometer.core.instrument.MeterRegistry;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
@@ -57,16 +58,18 @@ public class SlackAppConfig {
     )
     public SlackSocketController slackSocketController(
         App app,
-        SlackProps slackCreds
+        SlackProps slackCreds,
+        MeterRegistry meterRegistry
     ) throws IOException {
-        return new SlackSocketController(app, slackCreds);
+        return new SlackSocketController(app, slackCreds, meterRegistry);
     }
 
     @Bean
     public SlackClient slackClient(App slackApp,
                                    @Qualifier("permalink-cache") Cache permalinkCache,
-                                   @Qualifier("slack-user-cache") Cache userCache) {
-        return new SlackClientImpl(slackApp.client(), permalinkCache, userCache);
+                                   @Qualifier("slack-user-cache") Cache userCache,
+                                   MeterRegistry meterRegistry) {
+        return new SlackClientImpl(slackApp.client(), permalinkCache, userCache, meterRegistry);
     }
 
     /**
