@@ -26,7 +26,7 @@ public class RatingService {
     @Transactional
     @Nullable
     public Rating save(TicketId ticketId, int rating) {
-        log.info("Submitted rating {} for ticket {}", rating, ticketId);
+        log.info("Attempt to submit rating for ticket {}", ticketId);
 
         if (ticketRepository.isTicketRated(ticketId)) {
             log.info("Ticket {} has already been rated - ignoring duplicate", ticketId);
@@ -55,7 +55,7 @@ public class RatingService {
         UUID ratingId = repository.insertRating(ratingRecord);
         ticketRepository.markTicketAsRated(ticketId);
 
-        log.info("Successfully recorded rating {} for ticket {} with ratingId {}", rating, ticketId, ratingId);
+        log.info("Successfully recorded rating for ticket {}", ticketId);
         return ratingRecord.toBuilder()
             .id(ratingId)
             .build();
