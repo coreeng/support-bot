@@ -16,15 +16,20 @@ import com.coreeng.supportbot.ticket.TicketCreatedMessage;
 import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
 import com.coreeng.supportbot.ticket.TicketWentStaleMessage;
 import com.coreeng.supportbot.ticket.TicketId;
+import com.slack.api.methods.request.conversations.ConversationsRepliesRequest;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
+import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
 import com.slack.api.model.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Objects;
+
+import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Service
 @RequiredArgsConstructor
@@ -213,6 +218,48 @@ public class TicketSlackServiceImpl implements TicketSlackService {
             } else {
                 throw e;
             }
+        }
+    }
+
+    @Override
+    public boolean isThreadReply(MessageRef messageRef) {
+        if (messageRef.ts().mocked()) {
+            return messageRef.isReply();
+        }
+
+        try {
+            ConversationsRepliesResponse response = slackClient.getThreadPage(
+                ConversationsRepliesRequest.builder()
+                    .channel(messageRef.channelId())
+                    .ts(messageRef.ts().ts())
+                    .limit(1)
+                    .inclusive(true)
+                    .build()
+            );
+
+            List<Message> messages = response.getMessages();
+            if (isEmpty(messages)) {
+                log.atDebug()
+                    .addArgument(messageRef::ts)
+                    .log("No messages found for ts({}). Assuming it's not a thread reply.");
+                return false;
+            }
+
+            Message message = messages.getFirst();
+            boolean isReply = message.getThreadTs() != null;
+            if (isReply) {
+                log.atDebug()
+                    .addArgument(messageRef::ts)
+                    .addArgument(message::getThreadTs)
+                    .log("Message({}) is a thread reply (thread_ts={})");
+            }
+            return isReply;
+        } catch (Exception ex) {
+            log.atWarn()
+                .addArgument(messageRef::ts)
+                .setCause(ex)
+                .log("Failed to fetch message({}) to check if it's a thread reply. Assuming it's not.");
+            return false;
         }
     }
 }
