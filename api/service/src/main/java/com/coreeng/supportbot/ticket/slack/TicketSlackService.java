@@ -14,4 +14,6 @@ public interface TicketSlackService {
     void editTicketForm(MessageRef threadRef, TicketCreatedMessage message);
     void warnStaleness(MessageRef queryRef);
     void postRatingRequest(MessageRef queryRef, TicketId ticketId, String userId);
+
+    boolean isThreadReply(MessageRef messageRef);
 }

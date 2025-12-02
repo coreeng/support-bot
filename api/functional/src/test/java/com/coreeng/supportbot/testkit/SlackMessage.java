@@ -29,6 +29,15 @@ public class SlackMessage {
         );
     }
 
+    /**
+     * Stub conversations.replies to indicate this message is a thread reply.
+     *
+     * @param threadTs The parent thread timestamp (indicates this message is a reply in that thread)
+     */
+    public Stub stubAsThreadReply(MessageTs threadTs) {
+        return slackWiremock.stubConversationsReplies(channelId, ts, threadTs);
+    }
+
     public StubWithResult<TicketMessage> expectThreadMessagePosted(ThreadMessagePostedExpectation<TicketMessage> expectation) {
         return slackWiremock.stubMessagePosted(expectation.toBuilder()
             .threadTs(ts)
@@ -37,6 +46,10 @@ public class SlackMessage {
     }
 
     public TicketCreationFlowStubs stubTicketCreationFlow(MessageTs newTicketMessageTs) {
+        // Stub conversations.replies to indicate this is NOT a thread reply
+        // This is needed because the service checks if the message is a thread reply before creating a ticket
+        slackWiremock.stubConversationsReplies(channelId, ts, null);
+
         Stub reaction = expectReactionAdded("ticket");
         StubWithResult<TicketMessage> posted = expectThreadMessagePosted(
             ThreadMessagePostedExpectation.<TicketMessage>builder()
