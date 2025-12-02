@@ -1,6 +1,8 @@
 package com.coreeng.supportbot.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micrometer.core.instrument.binder.MeterBinder;
+import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCache;
@@ -8,6 +10,7 @@ import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
@@ -39,5 +42,16 @@ public class CacheConfig {
                 .recordStats()
                 .build()
         );
+    }
+
+    @Bean
+    public MeterBinder slackCacheMetrics(
+        List<CaffeineCache> caches
+    ) {
+        return registry -> {
+            for (var cache : caches) {
+                CaffeineCacheMetrics.monitor(registry, cache.getNativeCache(), cache.getName());
+            }
+        };
     }
 }
