@@ -182,5 +182,5 @@ rbac:
   enabled: true
 
 logging:
-  config: logging.xml
+  config: logback.xml
 
