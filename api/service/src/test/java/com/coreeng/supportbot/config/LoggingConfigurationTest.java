@@ -11,12 +11,13 @@ class LoggingConfigurationTest {
 
     @Test
     void shouldParseJsonLoggingConfiguration() {
-        assertDoesNotThrow(() -> loadLogbackConfig("logback.xml"));
+        assertDoesNotThrow(() -> loadLogbackConfig("logback-json.xml"));
     }
 
     @Test
     void shouldParsePlainTextLoggingConfiguration() {
-        assertDoesNotThrow(() -> loadLogbackConfig("logback-plain.xml"));
+        assertDoesNotThrow(() -> loadLogbackConfig("logback.xml"));
+
     }
 
     private void loadLogbackConfig(String configFile) throws Exception {
