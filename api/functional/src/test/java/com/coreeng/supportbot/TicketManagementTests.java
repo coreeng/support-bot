@@ -129,6 +129,43 @@ public class TicketManagementTests {
     }
 
     @Test
+    public void whenQueryHasThreadReplyAndSupportReactsWithEyesToQuery_ticketIsCreated() {
+        // given
+        TestKit.RoledTestKit asTenant = testKit.as(tenant);
+        SlackTestKit asTenantSlack = asTenant.slack();
+        SlackTestKit asSupportSlack = testKit.as(support).slack();
+
+        // Step 1: Post a query
+        MessageTs queryTs = MessageTs.now();
+        SlackMessage tenantsQuery = asTenantSlack.postMessage(
+            queryTs,
+            "Please, help me with my query"
+        );
+
+        // Step 2: Post a thread reply to the query
+        MessageTs replyTs = MessageTs.now();
+        asTenantSlack.postThreadReply(
+            replyTs,
+            queryTs,
+            "Here is some additional information about my issue"
+        );
+
+        // Step 3: Set up stubs for ticket creation on the query message
+        MessageTs ticketMessageTs = MessageTs.now();
+        var creationStubs = tenantsQuery.stubTicketCreationFlow(ticketMessageTs);
+
+        // Step 4: Support reacts with eyes to the query message (not the thread reply)
+        asSupportSlack.addReactionTo(tenantsQuery, "eyes");
+
+        // then: verify ticket was created successfully
+        creationStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket created");
+        TicketMessage ticketMessage = creationStubs.ticketMessagePosted().result();
+        assertThat(ticketMessage).isNotNull();
+        var ticketResponse = supportBotClient.assertTicketExists(ticketMessage);
+        ticketMessage.assertMatches(ticketResponse);
+    }
+
+    @Test
     public void whenSupportReactedWithEyesToThreadReply_noAdditionalTicketFormIsCreated() {
         // given
         TestKit.RoledTestKit asTenant = testKit.as(tenant);
