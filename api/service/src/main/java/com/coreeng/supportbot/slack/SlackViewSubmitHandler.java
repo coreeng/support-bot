@@ -8,5 +8,6 @@ import java.util.regex.Pattern;
 
 public interface SlackViewSubmitHandler {
     Pattern getPattern();
+
     ViewSubmissionResponse apply(ViewSubmissionRequest request, ViewSubmissionContext context);
 }
