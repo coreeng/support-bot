@@ -1,6 +1,6 @@
 package com.coreeng.supportbot.teams.rest;
 
-import com.coreeng.supportbot.config.SupportLeadershipTeamProps;
+import com.coreeng.supportbot.teams.SupportLeadershipTeamProps;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
@@ -23,7 +23,7 @@ class TeamsControllerTest {
     void setUp() {
         teamService = mock(TeamService.class);
         TeamUIMapper mapper = new TeamUIMapper(); // real mapper is simple and stateless
-        controller = new TeamsController(teamService, mapper, leadershipTeamProps, supportTeamService);
+        controller = new TeamsController(teamService, mapper);
     }
 
     @Test

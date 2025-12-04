@@ -171,6 +171,11 @@ support-team:
       - email: jean.kristijan@company.com
         slack-id: U0123456783
 
+support-leadership-team:
+  enabled: false
+  memberEmails:
+    - leader@email.com
+
 ai:
   sentiment-analysis:
     enabled: false
