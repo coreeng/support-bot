@@ -16,6 +16,8 @@ import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.stubbing.StubMapping;
 
@@ -246,27 +248,54 @@ public class SlackWiremock extends WireMockServer {
      * Stub the conversations.replies API to return message info with thread context.
      * This is used to check if a message is a thread reply.
      */
-    public Stub stubConversationsReplies(String channelId, MessageTs ts, @Nullable MessageTs threadTs) {
-        String threadTsValue = threadTs != null
-            ? "\"" + threadTs + "\""
-            : "null";
+    public Stub stubConversationsReplies(ConversationRepliesToGet conversationReplies) {
+        String messages;
+        // Slack doesn't set thread_ts in case it's a single message in the thread,
+        // But in case there are multiple messages, it sets it for all of them,
+        if (conversationReplies.reply() != null) {
+            assertThat(conversationReplies.threadTs()).isNotNull();
+            messages = StringSubstitutor.replace("""
+                [
+                    {
+                        "type": "message",
+                        "ts": "${ts}",
+                        "thread_ts": ${threadTsValue}
+                    },
+                    {
+                        "type": "message",
+                        "ts": "${replyTs}",
+                        "thread_ts": ${threadTsValue}
+                    }
+                ]
+                """, Map.of(
+                    "ts", conversationReplies.ts().toString(),
+                    "threadTsValue", conversationReplies.threadTs().toString(),
+                    "replyTs", conversationReplies.reply().toString()
+            ));
+        } else {
+            messages = StringSubstitutor.replace("""
+                [
+                    {
+                        "type": "message",
+                        "ts": "${ts}",
+                        "thread_ts": null
+                    }
+                ]
+                """, Map.of(
+                "ts", conversationReplies.ts().toString()
+            ));
+        }
         StubMapping stubMapping = givenThat(post("/api/conversations.replies")
-            .withFormParam("channel", equalTo(channelId))
-            .withFormParam("ts", equalTo(ts.toString()))
+            .withFormParam("channel", equalTo(conversationReplies.channelId()))
+            .withFormParam("ts", equalTo(conversationReplies.ts().toString()))
+            .withFormParam("limit", equalTo("1"))
             .willReturn(okJson(StringSubstitutor.replace("""
                     {
                         "ok": true,
-                        "messages": [
-                            {
-                                "type": "message",
-                                "ts": "${ts}",
-                                "thread_ts": ${threadTsValue}
-                            }
-                        ]
+                        "messages": ${messages}
                     }
                     """, Map.of(
-                        "ts", ts.toString(),
-                        "threadTsValue", threadTsValue
+                        "messages", messages
                     )))
         ));
         return Stub.builder()

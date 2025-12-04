@@ -3,10 +3,12 @@ package com.coreeng.supportbot.testkit;
 import java.time.Duration;
 
 import static org.awaitility.Awaitility.await;
+
 import org.jspecify.annotations.NonNull;
 
 import lombok.Builder;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 
 @Builder
 @Getter
@@ -35,7 +37,12 @@ public class SlackMessage {
      * @param threadTs The parent thread timestamp (indicates this message is a reply in that thread)
      */
     public Stub stubAsThreadReply(MessageTs threadTs) {
-        return slackWiremock.stubConversationsReplies(channelId, ts, threadTs);
+        return slackWiremock.stubConversationsReplies(ConversationRepliesToGet.builder()
+            .channelId(channelId)
+            .ts(ts)
+            .threadTs(threadTs)
+            .reply(ts)
+            .build());
     }
 
     public StubWithResult<TicketMessage> expectThreadMessagePosted(ThreadMessagePostedExpectation<TicketMessage> expectation) {
@@ -46,9 +53,18 @@ public class SlackMessage {
     }
 
     public TicketCreationFlowStubs stubTicketCreationFlow(MessageTs newTicketMessageTs) {
+        return stubTicketCreationFlow(newTicketMessageTs, null);
+    }
+
+    public TicketCreationFlowStubs stubTicketCreationFlow(MessageTs newTicketMessageTs, @Nullable MessageTs replyTs) {
         // Stub conversations.replies to indicate this is NOT a thread reply
         // This is needed because the service checks if the message is a thread reply before creating a ticket
-        slackWiremock.stubConversationsReplies(channelId, ts, null);
+        slackWiremock.stubConversationsReplies(ConversationRepliesToGet.builder()
+            .channelId(channelId)
+            .ts(ts)
+            .threadTs(ts)
+            .reply(replyTs)
+            .build());
 
         Stub reaction = expectReactionAdded("ticket");
         StubWithResult<TicketMessage> posted = expectThreadMessagePosted(
