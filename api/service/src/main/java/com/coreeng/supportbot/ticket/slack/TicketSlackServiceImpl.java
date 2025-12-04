@@ -232,6 +232,8 @@ public class TicketSlackServiceImpl implements TicketSlackService {
                 ConversationsRepliesRequest.builder()
                     .channel(messageRef.channelId())
                     .ts(messageRef.ts().ts())
+                    // despite limit 1, Slack will send 2 messages if it's a thread reply
+                    // first one is the original message, the second one is the reply
                     .limit(1)
                     .inclusive(true)
                     .build()
@@ -245,15 +247,26 @@ public class TicketSlackServiceImpl implements TicketSlackService {
                 return false;
             }
 
-            Message message = messages.getFirst();
-            boolean isReply = message.getThreadTs() != null;
-            if (isReply) {
-                log.atDebug()
-                    .addArgument(messageRef::ts)
-                    .addArgument(message::getThreadTs)
-                    .log("Message({}) is a thread reply (thread_ts={})");
-            }
-            return isReply;
+            return messages.stream()
+                .filter(m -> m.getTs() != null && m.getTs().equals(messageRef.ts().ts()))
+                .findAny()
+                .map(m -> {
+                    // Slack doesn't set thread_ts in case it's a single message in the thread,
+                    // But in case there are multiple messages, it sets it for all of them,
+                    // So we can assume it's a thread reply if thread_ts == ts
+                    boolean isReply = m.getThreadTs() != null && !m.getThreadTs().equals(m.getTs());
+                    if (isReply) {
+                        log.atDebug()
+                            .addKeyValue("ts", m.getTs())
+                            .log("Message is a thread reply");
+                    } else {
+                        log.atDebug()
+                            .addKeyValue("ts", m.getTs())
+                            .log("Message is not a thread reply");
+                    }
+                    return isReply;
+                })
+                .orElse(false);
         } catch (Exception ex) {
             log.atWarn()
                 .addArgument(messageRef::ts)
