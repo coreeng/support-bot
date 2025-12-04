@@ -1,4 +1,4 @@
-package com.coreeng.supportbot.user_info;
+package com.coreeng.supportbot.teams.rest;
 
 import lombok.Getter;
 import lombok.Setter;
