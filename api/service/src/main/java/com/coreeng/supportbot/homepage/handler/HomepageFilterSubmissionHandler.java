@@ -6,6 +6,7 @@ import com.coreeng.supportbot.homepage.HomepageOperation;
 import com.coreeng.supportbot.homepage.HomepageService;
 import com.coreeng.supportbot.homepage.HomepageView;
 import com.coreeng.supportbot.homepage.HomepageViewMapper;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.SlackViewSubmitHandler;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.slack.api.app_backend.views.response.ViewSubmissionResponse;
@@ -38,7 +39,7 @@ public class HomepageFilterSubmissionHandler implements SlackViewSubmitHandler {
                 .build()
         );
         slackClient.updateHomeView(
-            request.getPayload().getUser().getId(),
+            new SlackId.User(request.getPayload().getUser().getId()),
             viewMapper.render(view)
         );
         return new ViewSubmissionResponse();

@@ -79,7 +79,7 @@ public class TicketSummaryViewMapper {
                             .text(format("""
                                     Sent by <@%s> | %s | <%s|View Message>
                                     """,
-                                summaryView.query().senderId(),
+                                summaryView.query().senderId().id(),
                                 formatSlackDate(summaryView.query().messageTs().getDate()),
                                 summaryView.query().permalink()
                             )))

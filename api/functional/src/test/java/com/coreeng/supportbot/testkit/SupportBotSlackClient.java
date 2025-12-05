@@ -32,7 +32,8 @@ public class SupportBotSlackClient {
                   "context_team_id": "${teamId}",
                   "api_app_id": "UNSET_BY_TESTS",
                   "event": {
-                    "user": "${userId}",
+                    ${userField}
+                    ${botField}
                     "type": "message",
                     "ts": "${ts}",
                     ${threadTsField}
@@ -78,7 +79,8 @@ public class SupportBotSlackClient {
             Map.of(
                 "token", config.supportBot().token(),
                 "teamId", message.teamId(),
-                "userId", message.userId(),
+                "userField", message.userId() != null ? "\"user\": \"" + message.userId() + "\"," : "",
+                "botField", message.botId() != null ? "\"bot_id\": \"" + message.botId() + "\"," : "",
                 "message", message.message(),
                 "channelId", message.channelId(),
                 "ts", message.ts().toString(),
@@ -109,7 +111,8 @@ public class SupportBotSlackClient {
                   "context_team_id": "${teamId}",
                   "api_app_id": "UNSET_BY_TESTS",
                   "event": {
-                    "user": "${userId}",
+                    ${userField}
+                    ${botField}
                     "type": "reaction_added",
                     "reaction": "${reaction}",
                     "item": {
@@ -138,7 +141,8 @@ public class SupportBotSlackClient {
             Map.of(
                 "token", config.supportBot().token(),
                 "teamId", reaction.teamId(),
-                "userId", reaction.userId(),
+                "userField", reaction.userId() != null ? "\"user\": \"" + reaction.userId() + "\"," : "",
+                "botField", reaction.botId() != null ? "\"bot_id\": \"" + reaction.botId() + "\"," : "",
                 "reaction", reaction.reaction(),
                 "channelId", reaction.channelId(),
                 "ts", reaction.ts().toString()
@@ -257,5 +261,45 @@ public class SupportBotSlackClient {
                 "valuesJson", valuesJson
             )
         );
+    }
+
+    public ValidatableResponse notifyBlockSuggestion(RawBlockSuggestion blockSuggestion) {
+        String payload = StringSubstitutor.replace(
+            """
+                {
+                  "type": "block_suggestion",
+                  "user": {
+                    "id": "${userId}",
+                    "team_id": "${teamId}"
+                  },
+                  "token": "${token}",
+                  "action_id": "${actionId}",
+                  "value": "${value}",
+                  "view": {
+                    "id": "VIEW_ID",
+                    "team_id": "${teamId}",
+                    "type": "${viewType}",
+                    "private_metadata": "${privateMetadata}",
+                    "callback_id": "${callbackId}"
+                  }
+                }
+                """,
+            Map.of(
+                "token", config.supportBot().token(),
+                "teamId", blockSuggestion.teamId(),
+                "userId", blockSuggestion.userId(),
+                "actionId", blockSuggestion.actionId(),
+                "value", blockSuggestion.value(),
+                "viewType", blockSuggestion.viewType(),
+                "privateMetadata", StringEscapeUtils.escapeJson(blockSuggestion.privateMetadata().trim()),
+                "callbackId", blockSuggestion.callbackId()
+            )
+        );
+        return given()
+            .when()
+            .formParam("payload", payload)
+            .post(config.supportBot().baseUrl() + "/slack/events")
+            .then()
+            .log().ifValidationFails(LogDetail.ALL, true);
     }
 }

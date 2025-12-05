@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.testkit;
 
+import io.restassured.response.ValidatableResponse;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
@@ -11,6 +12,7 @@ public class SlackTestKit {
     public SlackMessage postMessage(MessageTs ts, String message) {
         return supportBotSlackClient.notifyMessagePosted(MessageToPost.builder()
             .userId(testKit.userId())
+            .botId(testKit.botId())
             .teamId(testKit.teamId())
             .channelId(testKit.channelId())
             .message(message)
@@ -29,6 +31,7 @@ public class SlackTestKit {
     public SlackMessage postThreadReply(MessageTs ts, MessageTs threadTs, String message) {
         return supportBotSlackClient.notifyMessagePosted(MessageToPost.builder()
             .userId(testKit.userId())
+            .botId(testKit.botId())
             .teamId(testKit.teamId())
             .channelId(testKit.channelId())
             .message(message)
@@ -82,5 +85,17 @@ public class SlackTestKit {
             .viewType(viewSubmission.viewType())
             .build());
         return receiver.parse(responseBody);
+    }
+
+    public ValidatableResponse requestBlockSuggestion(BlockSuggestionRequest request) {
+        return supportBotSlackClient.notifyBlockSuggestion(RawBlockSuggestion.builder()
+            .teamId(testKit.teamId())
+            .userId(testKit.userId())
+            .actionId(request.actionId())
+            .value(request.value())
+            .viewType(request.viewType())
+            .privateMetadata(request.privateMetadata())
+            .callbackId(request.callbackId())
+            .build());
     }
 }

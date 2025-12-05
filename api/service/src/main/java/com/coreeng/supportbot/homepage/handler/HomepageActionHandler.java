@@ -6,6 +6,7 @@ import com.coreeng.supportbot.homepage.HomepageService;
 import com.coreeng.supportbot.homepage.HomepageView;
 import com.coreeng.supportbot.homepage.HomepageViewMapper;
 import com.coreeng.supportbot.slack.SlackBlockActionHandler;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.slack.api.app_backend.interactive_components.payload.BlockActionPayload;
 import com.slack.api.bolt.context.builtin.ActionContext;
@@ -45,7 +46,7 @@ public class HomepageActionHandler implements SlackBlockActionHandler {
                     HomepageView.State currentState = viewMapper.parseMetadataOrDefault(metadataJson);
                     HomepageView homepageView = homepageService.getTicketsView(currentState);
                     slackClient.updateHomeView(
-                        req.getPayload().getUser().getId(),
+                        new SlackId.User(req.getPayload().getUser().getId()),
                         viewMapper.render(homepageView)
                     );
                 }
@@ -58,7 +59,7 @@ public class HomepageActionHandler implements SlackBlockActionHandler {
                             .build()
                     );
                     slackClient.updateHomeView(
-                        req.getPayload().getUser().getId(),
+                        new SlackId.User(req.getPayload().getUser().getId()),
                         viewMapper.render(homepageView)
                     );
                 }
@@ -70,7 +71,7 @@ public class HomepageActionHandler implements SlackBlockActionHandler {
                             .page(currentState.page() - 1)
                             .build());
                     slackClient.updateHomeView(
-                        req.getPayload().getUser().getId(),
+                        new SlackId.User(req.getPayload().getUser().getId()),
                         viewMapper.render(homepageView)
                     );
                 }
