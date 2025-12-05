@@ -19,7 +19,7 @@ class UserInfoControllerTest {
     private PlatformTeamsService platformTeamsService;
 
     @Mock
-    private SupportLeadershipTeamProps supportLeadershipTeamProps;
+    private SupportLeadershipTeamProps leadershipTeamProps;
 
     @Mock
     private SupportTeamService supportTeamService;
@@ -30,7 +30,7 @@ class UserInfoControllerTest {
     void setUp() {
         controller = new UserInfoController(
                 platformTeamsService,
-                supportLeadershipTeamProps,
+                leadershipTeamProps,
                 supportTeamService
         );
     }
@@ -44,7 +44,7 @@ class UserInfoControllerTest {
         PlatformUser user = new PlatformUser(email, ImmutableSet.of(team1, team2));
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(false);
+        when(leadershipTeamProps.enabled()).thenReturn(false);
         when(supportTeamService.members()).thenReturn(ImmutableList.of());
 
         // when
@@ -68,9 +68,9 @@ class UserInfoControllerTest {
         assertThat(teamDto2.groupRefs()).containsExactlyInAnyOrder("group-ref-2", "group-ref-3");
 
         verify(platformTeamsService).findUserByEmail(email);
-        verify(supportLeadershipTeamProps).enabled();
+        verify(leadershipTeamProps).enabled();
         verify(supportTeamService).members();
-        verifyNoMoreInteractions(platformTeamsService, supportLeadershipTeamProps, supportTeamService);
+        verifyNoMoreInteractions(platformTeamsService, leadershipTeamProps, supportTeamService);
     }
 
     @Test
@@ -87,7 +87,7 @@ class UserInfoControllerTest {
         assertThat(response.getBody()).isNull();
 
         verify(platformTeamsService).findUserByEmail(email);
-        verifyNoInteractions(supportLeadershipTeamProps, supportTeamService);
+        verifyNoInteractions(leadershipTeamProps, supportTeamService);
     }
 
     @Test
@@ -98,8 +98,8 @@ class UserInfoControllerTest {
         ImmutableList<String> leadershipEmails = ImmutableList.of("leader@example.com", "other@example.com");
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(true);
-        when(supportLeadershipTeamProps.memberEmails()).thenReturn(leadershipEmails);
+        when(leadershipTeamProps.enabled()).thenReturn(true);
+        when(leadershipTeamProps.memberEmails()).thenReturn(leadershipEmails);
         when(supportTeamService.members()).thenReturn(ImmutableList.of());
 
         // when
@@ -113,10 +113,10 @@ class UserInfoControllerTest {
         assertThat(body.isSupportEngineer()).isFalse();
 
         verify(platformTeamsService).findUserByEmail(email);
-        verify(supportLeadershipTeamProps).enabled();
-        verify(supportLeadershipTeamProps, times(2)).memberEmails(); // Changed: expects 2 calls
+        verify(leadershipTeamProps).enabled();
+        verify(leadershipTeamProps, times(2)).memberEmails(); // Changed: expects 2 calls
         verify(supportTeamService).members();
-        verifyNoMoreInteractions(platformTeamsService, supportLeadershipTeamProps, supportTeamService);
+        verifyNoMoreInteractions(platformTeamsService, leadershipTeamProps, supportTeamService);
     }
 
     @Test
@@ -127,8 +127,8 @@ class UserInfoControllerTest {
         ImmutableList<String> leadershipEmails = ImmutableList.of("leader@example.com");
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(true);
-        when(supportLeadershipTeamProps.memberEmails()).thenReturn(leadershipEmails);
+        when(leadershipTeamProps.enabled()).thenReturn(true);
+        when(leadershipTeamProps.memberEmails()).thenReturn(leadershipEmails);
         when(supportTeamService.members()).thenReturn(ImmutableList.of());
 
         // when
@@ -140,7 +140,7 @@ class UserInfoControllerTest {
         assertThat(body).isNotNull();
         assertThat(body.isLeadership()).isTrue();
 
-        verify(supportLeadershipTeamProps, times(2)).memberEmails(); // Add this verification
+        verify(leadershipTeamProps, times(2)).memberEmails(); // Add this verification
     }
 
     @Test
@@ -148,10 +148,9 @@ class UserInfoControllerTest {
         // given
         String email = "leader@example.com";
         PlatformUser user = new PlatformUser(email, ImmutableSet.of());
-        ImmutableList<String> leadershipEmails = ImmutableList.of("leader@example.com");
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(false);
+        when(leadershipTeamProps.enabled()).thenReturn(false);
         when(supportTeamService.members()).thenReturn(ImmutableList.of());
 
         // when
@@ -163,8 +162,8 @@ class UserInfoControllerTest {
         assertThat(body).isNotNull();
         assertThat(body.isLeadership()).isFalse();
 
-        verify(supportLeadershipTeamProps).enabled();
-        verify(supportLeadershipTeamProps, never()).memberEmails();
+        verify(leadershipTeamProps).enabled();
+        verify(leadershipTeamProps, never()).memberEmails();
     }
 
     @Test
@@ -175,8 +174,8 @@ class UserInfoControllerTest {
         ImmutableList<String> leadershipEmails = ImmutableList.of("leader@example.com", "other@example.com");
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(true);
-        when(supportLeadershipTeamProps.memberEmails()).thenReturn(leadershipEmails);
+        when(leadershipTeamProps.enabled()).thenReturn(true);
+        when(leadershipTeamProps.memberEmails()).thenReturn(leadershipEmails);
         when(supportTeamService.members()).thenReturn(ImmutableList.of());
 
         // when
@@ -188,7 +187,7 @@ class UserInfoControllerTest {
         assertThat(body).isNotNull();
         assertThat(body.isLeadership()).isFalse();
 
-        verify(supportLeadershipTeamProps, times(2)).memberEmails(); // Add this verification
+        verify(leadershipTeamProps, times(2)).memberEmails(); // Add this verification
     }
 
     @Test
@@ -198,8 +197,8 @@ class UserInfoControllerTest {
         PlatformUser user = new PlatformUser(email, ImmutableSet.of());
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(true);
-        when(supportLeadershipTeamProps.memberEmails()).thenReturn(null);
+        when(leadershipTeamProps.enabled()).thenReturn(true);
+        when(leadershipTeamProps.memberEmails()).thenReturn(null);
         when(supportTeamService.members()).thenReturn(ImmutableList.of());
 
         // when
@@ -223,7 +222,7 @@ class UserInfoControllerTest {
         );
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(false);
+        when(leadershipTeamProps.enabled()).thenReturn(false);
         when(supportTeamService.members()).thenReturn(ImmutableList.of(supportMember));
 
         // when
@@ -248,7 +247,7 @@ class UserInfoControllerTest {
         );
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(false);
+        when(leadershipTeamProps.enabled()).thenReturn(false);
         when(supportTeamService.members()).thenReturn(ImmutableList.of(supportMember));
 
         // when
@@ -272,7 +271,7 @@ class UserInfoControllerTest {
         );
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(false);
+        when(leadershipTeamProps.enabled()).thenReturn(false);
         when(supportTeamService.members()).thenReturn(ImmutableList.of(supportMember));
 
         // when
@@ -297,8 +296,8 @@ class UserInfoControllerTest {
         );
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(true);
-        when(supportLeadershipTeamProps.memberEmails()).thenReturn(leadershipEmails);
+        when(leadershipTeamProps.enabled()).thenReturn(true);
+        when(leadershipTeamProps.memberEmails()).thenReturn(leadershipEmails);
         when(supportTeamService.members()).thenReturn(ImmutableList.of(supportMember));
 
         // when
@@ -311,7 +310,7 @@ class UserInfoControllerTest {
         assertThat(body.isLeadership()).isTrue();
         assertThat(body.isSupportEngineer()).isTrue();
 
-        verify(supportLeadershipTeamProps, times(2)).memberEmails(); // Add this verification
+        verify(leadershipTeamProps, times(2)).memberEmails(); // Add this verification
     }
 
     @Test
@@ -321,7 +320,7 @@ class UserInfoControllerTest {
         PlatformUser user = new PlatformUser(email, ImmutableSet.of());
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(false);
+        when(leadershipTeamProps.enabled()).thenReturn(false);
         when(supportTeamService.members()).thenReturn(ImmutableList.of());
 
         // when
@@ -346,7 +345,7 @@ class UserInfoControllerTest {
         PlatformUser user = new PlatformUser(email, ImmutableSet.of(team1, team2, team3));
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(false);
+        when(leadershipTeamProps.enabled()).thenReturn(false);
         when(supportTeamService.members()).thenReturn(ImmutableList.of());
 
         // when
@@ -380,7 +379,7 @@ class UserInfoControllerTest {
         );
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(false);
+        when(leadershipTeamProps.enabled()).thenReturn(false);
         when(supportTeamService.members()).thenReturn(ImmutableList.of(member1, member2, member3));
 
         // when
@@ -401,7 +400,7 @@ class UserInfoControllerTest {
         PlatformUser user = new PlatformUser(email, ImmutableSet.of(team));
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
-        when(supportLeadershipTeamProps.enabled()).thenReturn(false);
+        when(leadershipTeamProps.enabled()).thenReturn(false);
         when(supportTeamService.members()).thenReturn(ImmutableList.of());
 
         // when
