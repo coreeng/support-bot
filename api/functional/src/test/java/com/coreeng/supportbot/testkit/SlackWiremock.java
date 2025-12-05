@@ -3,7 +3,6 @@ package com.coreeng.supportbot.testkit;
 import java.util.Map;
 
 import org.apache.commons.text.StringSubstitutor;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,8 +60,8 @@ public class SlackWiremock extends WireMockServer {
                 "url", config.serverUrl(),
                 "team", config.team(),
                 "teamId", config.teamId(),
-                "userId", config.userId(),
-                "botId", config.botId()
+                "userId", config.supportBotUserId(),
+                "botId", config.supportBotId()
             )).replace("""
                 {
                   "ok":true,
@@ -209,35 +208,42 @@ public class SlackWiremock extends WireMockServer {
     }
 
     public Stub stubGetMessage(MessageToGet message) {
+        String responseJson = StringSubstitutor.replace("""
+            {
+                "ok": true,
+                "oldest": "${ts}",
+                "messages": [
+                    {
+                        "user": ${userId},
+                        "bot_id": ${botId},
+                        "team": "${team}",
+                        "type": "message",
+                        "ts": "${ts}",
+                        "thread_ts": "${threadTs}",
+                        "blocks": ${blocks}
+                    }
+                ]
+            }
+            """, Map.of(
+            "userId", message.userId() != null
+                ? "\"" + message.userId() + "\""
+                : "null",
+            "botId", message.botId() != null
+                ? "\"" + message.botId() + "\""
+                : "null",
+            "team", message.team(),
+            "blocks", message.blocksJson(),
+            "ts", message.ts(),
+            "threadTs", message.threadTs()
+        ));
         StubMapping stubMapping = givenThat(post("/api/conversations.history")
             .withFormParam("channel", equalTo(message.channelId()))
             .withFormParam("limit", equalTo("1"))
             .withFormParam("oldest", equalTo(message.ts().toString()))
             .withFormParam("inclusive", equalTo("1"))
             .withFormParam("include_all_metadata", equalTo("0"))
-            .willReturn(okJson(StringSubstitutor.replace("""
-                    {
-                        "ok": true,
-                        "oldest": "${ts}",
-                        "messages": [
-                            {
-                                "user": "${user}",
-                                "team": "${team}",
-                                "type": "message",
-                                "ts": "${ts}",
-                                "thread_ts": "${threadTs}",
-                                "blocks": ${blocks}
-                            }
-                        ]
-                    }
-                    """, Map.of(
-                        "user", message.user(),
-                        "team", message.team(),
-                        "blocks", message.blocksJson(),
-                        "ts", message.ts(),
-                        "threadTs", message.threadTs()
-                    )))
-        ));
+            .willReturn(okJson(responseJson))
+        );
         return Stub.builder()
             .mapping(stubMapping)
             .wireMockServer(this)

@@ -6,7 +6,8 @@ mocks:
     team: "CECG"
     teamId: T0123456789
     userId: U0123456789
-    botId: B0123456789
+    supportBotUserId: USUPPORT123
+    supportBotId: B0123456789
     supportGroupId: S01234567ST
     supportChannelId: C1234567891
     supportMembers:

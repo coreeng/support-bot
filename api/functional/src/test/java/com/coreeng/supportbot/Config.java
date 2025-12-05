@@ -1,6 +1,5 @@
 package com.coreeng.supportbot;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
@@ -28,14 +27,6 @@ public record Config(
                 .toList();
     }
 
-    @Nullable
-    public User userById(@NonNull String userId) {
-        return users.stream()
-                .filter(u -> u.slackUserId.equals(userId))
-                .findAny()
-                .orElse(null);
-    }
-
     public record Mocks(
             SlackMock slack,
             KubernetesMock kubernetes,
@@ -49,8 +40,8 @@ public record Config(
             String serverUrl,
             String team,
             String teamId,
-            String userId,
-            String botId,
+            String supportBotUserId,
+            String supportBotId,
             String supportGroupId,
             String supportChannelId,
             List<SlackSupportMember> supportMembers
@@ -87,9 +78,17 @@ public record Config(
     }
 
     public record User(
-            String email,
-            String slackUserId
+            @Nullable String email,
+            @Nullable String slackUserId,
+            @Nullable String slackBotId
     ) {
+        public boolean isHuman() {
+            return email != null && slackUserId != null;
+        }
+
+        public boolean isBot() {
+            return slackBotId != null;
+        }
     }
 
     public record SupportBot(
