@@ -1,7 +1,5 @@
 package com.coreeng.supportbot.teams.rest;
 
-import com.coreeng.supportbot.teams.SupportLeadershipTeamProps;
-import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
@@ -15,8 +13,6 @@ import static org.mockito.Mockito.*;
 class TeamsControllerTest {
 
     private TeamService teamService;
-    private SupportLeadershipTeamProps leadershipTeamProps;
-    private SupportTeamService supportTeamService;
     private TeamsController controller;
 
     @BeforeEach
