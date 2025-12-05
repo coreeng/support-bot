@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.teams.PlatformTeam;
 import com.coreeng.supportbot.teams.PlatformTeamsService;
@@ -16,15 +17,24 @@ public class TicketTeamSuggestionsService {
     private final SlackClient slackClient;
     private final PlatformTeamsService platformTeamsService;
 
-    public TicketTeamsSuggestion getTeamSuggestions(String filterValue, String slackUserId) {
+    public TicketTeamsSuggestion getTeamSuggestions(String filterValue, SlackId entityId) {
         String normalisedFilterValue = filterValue.toLowerCase();
-        User.Profile userProfile = slackClient.getUserById(slackUserId);
-        String userEmail = userProfile.getEmail();
 
         ImmutableList<String> allTeams = platformTeamsService.listTeams().stream()
             .map(PlatformTeam::name)
             .filter(t -> t.toLowerCase().contains(normalisedFilterValue))
             .collect(toImmutableList());
+
+        if (!(entityId instanceof SlackId.User userId)) {
+            return new TicketTeamsSuggestion(
+                ImmutableList.of(),
+                allTeams
+            );
+        }
+
+        User.Profile userProfile = slackClient.getUserById(userId);
+        String userEmail = userProfile.getEmail();
+
         ImmutableList<String> authorTeams = platformTeamsService.listTeamsByUserEmail(userEmail).stream()
             .map(PlatformTeam::name)
             .filter(t -> t.toLowerCase().contains(normalisedFilterValue))

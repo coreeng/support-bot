@@ -8,6 +8,7 @@ import com.coreeng.supportbot.enums.TicketImpact;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.google.common.collect.ImmutableList;
@@ -80,10 +81,13 @@ public class TicketSummaryService {
             ticket.queryTs()
         );
         String permalink = slackClient.getPermalink(messageRequest);
+        SlackId senderId = SlackId.of(queryMessage.getUser() != null
+            ? queryMessage.getUser()
+            : queryMessage.getBotId());
         return new TicketSummaryView.QuerySummaryView(
             ImmutableList.copyOf(queryMessage.getBlocks()),
             new MessageTs(queryMessage.getTs()),
-            queryMessage.getUser(),
+            senderId,
             permalink
         );
     }

@@ -4,6 +4,7 @@ import com.coreeng.supportbot.homepage.HomepageService;
 import com.coreeng.supportbot.homepage.HomepageView;
 import com.coreeng.supportbot.homepage.HomepageViewMapper;
 import com.coreeng.supportbot.slack.SlackEventHandler;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.slack.api.app_backend.events.payload.EventsApiPayload;
 import com.slack.api.bolt.context.builtin.EventContext;
@@ -31,6 +32,6 @@ public class HomeOpenedEventHandler implements SlackEventHandler<AppHomeOpenedEv
             return;
         }
         HomepageView homepageView = homepageService.getTicketsView(HomepageView.State.getDefault());
-        slackClient.updateHomeView(event.getEvent().getUser(), viewMapper.render(homepageView));
+        slackClient.updateHomeView(new SlackId.User(event.getEvent().getUser()), viewMapper.render(homepageView));
     }
 }

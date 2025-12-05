@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.ticket.handler;
 
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.teams.PlatformTeam;
 import com.coreeng.supportbot.teams.PlatformTeamsService;
@@ -62,7 +63,7 @@ class TicketTeamSuggestionHandlerTest {
         // then
         assertNotNull(resp);
         assertTrue(resp.getOptionGroups().isEmpty());
-        verify(slackClient).getUserById("U123");
+        verify(slackClient).getUserById(new SlackId.User("U123"));
     }
 
     @Test
@@ -197,13 +198,13 @@ class TicketTeamSuggestionHandlerTest {
     private void mockSlackUserEmail(String userId, String email) {
         User.Profile profile = new User.Profile();
         profile.setEmail(email);
-        when(slackClient.getUserById(userId)).thenReturn(profile);
+        when(slackClient.getUserById(new SlackId.User(userId))).thenReturn(profile);
     }
 
     private BlockSuggestionRequest mockSuggestionRequest(String value, String metadataAuthorId) {
         BlockSuggestionRequest req = mock(BlockSuggestionRequest.class, RETURNS_DEEP_STUBS);
         when(req.getPayload().getValue()).thenReturn(value);
-        String metaJson = jsonMapper.toJsonString(new TicketSummaryView.Metadata(42L, metadataAuthorId));
+        String metaJson = jsonMapper.toJsonString(new TicketSummaryView.Metadata(42L, new SlackId.User(metadataAuthorId)));
         View view = View.builder()
             .privateMetadata(metaJson)
             .build();

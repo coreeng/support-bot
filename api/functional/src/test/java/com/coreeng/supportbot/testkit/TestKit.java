@@ -18,21 +18,32 @@ public class TestKit {
 
     @RequiredArgsConstructor
     public class RoledTestKit {
+        private final static String workflowBotId = "B0123456789";
+
         private final UserRole role;
 
         public SlackTestKit slack() {
             return new SlackTestKit(this, slackWiremock, supportBotSlackClient);
         }
-        
+
         public TicketTestKit ticket() {
             return new TicketTestKit(this, supportBotClient, slackWiremock, config);
         }
-        
+
         public String userId() {
             return switch (role) {
                 case tenant -> config.nonSupportUsers().getFirst().slackUserId();
                 case support -> config.supportUsers().getFirst().slackUserId();
-                case supportBot -> config.mocks().slack().botId();
+                case supportBot -> config.mocks().slack().supportBotUserId();
+                case workflow -> null;
+            };
+        }
+
+        public String botId() {
+            return switch (role) {
+                case tenant, support -> null;
+                case supportBot -> config.mocks().slack().supportBotId();
+                case workflow -> workflowBotId;
             };
         }
 
@@ -40,7 +51,12 @@ public class TestKit {
             return switch (role) {
                 case tenant -> config.nonSupportUsers().getFirst();
                 case support -> config.supportUsers().getFirst();
-                case supportBot -> new Config.User(config.mocks().slack().botId(), "support.bot@cecg.io");
+                case supportBot -> new Config.User(
+                    "support.bot@cecg.io",
+                    config.mocks().slack().supportBotUserId(),
+                    config.mocks().slack().supportBotId()
+                );
+                case workflow -> new Config.User(null, null, workflowBotId);
             };
         }
 

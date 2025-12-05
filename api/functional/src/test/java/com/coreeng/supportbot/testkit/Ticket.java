@@ -101,6 +101,21 @@ public class Ticket implements SearchableForTicket {
             .build();
     }
 
+    public TeamSuggestionRequest teamSuggestionRequest() {
+        return TeamSuggestionRequest.builder()
+            .ticketId(id)
+            .authorId(user.slackUserId())
+            .build();
+    }
+
+    public TeamSuggestionRequest teamSuggestionRequest(String filterValue) {
+        return TeamSuggestionRequest.builder()
+            .ticketId(id)
+            .authorId(user.slackUserId())
+            .filterValue(filterValue)
+            .build();
+    }
+
     public TicketUpdater applyChangesLocally() {
         return new TicketUpdater();
     }

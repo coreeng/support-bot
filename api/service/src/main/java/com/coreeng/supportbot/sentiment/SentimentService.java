@@ -5,6 +5,7 @@ import com.coreeng.supportbot.sentiment.client.Messages;
 import com.coreeng.supportbot.sentiment.client.Sentiment;
 import com.coreeng.supportbot.sentiment.client.SentimentAIClient;
 import com.coreeng.supportbot.sentiment.client.SentimentResponse;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.Team;
@@ -51,7 +52,7 @@ public class SentimentService {
             .map(com.slack.api.model.Message::getUser)
             .distinct()
             .map(userId -> {
-                User.Profile profile = slackClient.getUserById(userId);
+                User.Profile profile = slackClient.getUserById(new SlackId.User(userId));
                 if (profile == null
                     || profile.getEmail() == null
                     || profile.getBotId() != null) {

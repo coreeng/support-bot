@@ -8,8 +8,11 @@ import org.jspecify.annotations.Nullable;
 @Builder
 @Getter
 public class MessageToPost {
-    @NonNull
+    @Nullable
     private final String userId;
+    @Nullable
+    private final String botId;
+
     @NonNull
     private final String teamId;
     @NonNull

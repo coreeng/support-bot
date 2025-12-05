@@ -5,6 +5,8 @@ import org.jspecify.annotations.NonNull;
 import lombok.Builder;
 import lombok.Getter;
 
+import static java.util.Objects.requireNonNull;
+
 @Builder
 @Getter
 public class FullSummaryButtonClick implements MessageButtonClick {
@@ -21,7 +23,7 @@ public class FullSummaryButtonClick implements MessageButtonClick {
     @Override
     public String privateMetadata() {
         return String.format("""
-                {"ticketId": %d}""", ticket.id());
+            {"ticketId": %d}""", ticket.id());
     }
 
     @Override
@@ -32,12 +34,17 @@ public class FullSummaryButtonClick implements MessageButtonClick {
             .ts(ticket.queryTs())
             .threadTs(ticket.queryTs())
             .blocksJson(ticket.queryBlocksJson())
-            .user(ticket.user().slackUserId())
+            .userId(ticket.user().slackUserId())
+            .botId(ticket.user().slackBotId())
             .team(ticket.teamId())
             .build());
-        slackWiremock.stubGetUserProfileById(UserProfileToGet.builder()
-            .userId(ticket.user().slackUserId())
-            .email(ticket.user().email())
-            .build());
+
+        // Only stub user profile if user is not a bot
+        if (ticket.user().isHuman()) {
+            slackWiremock.stubGetUserProfileById(UserProfileToGet.builder()
+                .userId(requireNonNull(ticket.user().slackUserId()))
+                .email(requireNonNull(ticket.user().email()))
+                .build());
+        }
     }
 }

@@ -6,6 +6,7 @@ import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationStatus;
 import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackId;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.block.LayoutBlock;
 import org.jspecify.annotations.Nullable;
@@ -55,7 +56,7 @@ public record TicketSummaryView(
     public record QuerySummaryView(
         ImmutableList<LayoutBlock> blocks,
         MessageTs messageTs,
-        String senderId,
+        SlackId senderId,
         String permalink
     ) {
     }
@@ -82,7 +83,7 @@ public record TicketSummaryView(
 
     public record Metadata(
         long ticketId,
-        String authorId
+        SlackId authorId
     ) {
     }
 }

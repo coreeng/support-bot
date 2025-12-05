@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.slack.client;
 
 import com.coreeng.supportbot.slack.SlackException;
+import com.coreeng.supportbot.slack.SlackId;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.MethodsClient;
 import com.slack.api.methods.SlackApiException;
@@ -141,11 +142,11 @@ public class SlackClientImpl implements SlackClient {
     }
 
     @Override
-    public ViewsPublishResponse updateHomeView(String userId, SlackView view) {
+    public ViewsPublishResponse updateHomeView(SlackId.User userId, SlackView view) {
         return doRequest(
             "views.publish",
             () -> client.viewsPublish(ViewsPublishRequest.builder()
-                .userId(userId)
+                .userId(userId.id())
                 .view(View.builder()
                     .type("home")
                     .blocks(view.renderBlocks())
@@ -157,22 +158,22 @@ public class SlackClientImpl implements SlackClient {
     }
 
     @Override
-    public User.Profile getUserById(String userId) {
-        return userProfileCache.get(userId, () -> doRequest(
+    public User.Profile getUserById(SlackId.User userId) {
+        return userProfileCache.get(userId.id(), () -> doRequest(
             "users.profile.get",
             () -> client.usersProfileGet(UsersProfileGetRequest.builder()
-                .user(userId)
+                .user(userId.id())
                 .build()),
             null
         ).getProfile());
     }
 
     @Override
-    public ImmutableList<String> getGroupMembers(String groupId) {
+    public ImmutableList<String> getGroupMembers(SlackId.Group groupId) {
         List<String> users = doRequest(
             "usergroups.users.list",
             () -> client.usergroupsUsersList(UsergroupsUsersListRequest.builder()
-                .usergroup(groupId)
+                .usergroup(groupId.id())
                 .build()),
             null
         ).getUsers();

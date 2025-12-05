@@ -20,6 +20,7 @@ import com.coreeng.supportbot.testkit.SupportBotClient;
 import com.coreeng.supportbot.testkit.TestKit;
 import com.coreeng.supportbot.testkit.Ticket;
 import com.coreeng.supportbot.testkit.TicketMessage;
+import static com.coreeng.supportbot.testkit.UserRole.workflow;
 import static com.coreeng.supportbot.testkit.UserRole.support;
 import static com.coreeng.supportbot.testkit.UserRole.tenant;
 import com.google.common.collect.ImmutableList;
@@ -408,5 +409,32 @@ public class TicketManagementTests {
         var ticketResponse = supportBotClient.assertTicketExists(ticket);
         ticket.assertMatches(ticketResponse);
         reopenStubs.messageUpdated().result().assertMatches(ticketResponse);
+    }
+
+    @Test
+    public void whenQueryAuthorIsBot_teamSuggestionsStillWork() {
+        // given: Create a ticket where the author is a bot
+        TestKit.RoledTestKit asBot = testKit.as(workflow);
+        Ticket ticket = asBot.ticket().create(t -> t
+            .queryTs(MessageTs.now())
+            .createdMessageTs(MessageTs.now())
+            .message("Automated alert from bot")
+        );
+
+        SlackTestKit asSupportSlack = testKit.as(support).slack();
+
+        // when: Open the full summary form
+        String triggerId = "summary_open_bot";
+        StubWithResult<FullSummaryForm> summaryFormOpened = ticket.expectFullSummaryFormOpened(triggerId);
+        asSupportSlack.clickMessageButton(ticket.fullSummaryButtonClick(triggerId));
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+            summaryFormOpened.assertIsCalled("full summary form opened")
+        );
+
+        // when: Request team suggestions
+        var response = asSupportSlack.requestBlockSuggestion(ticket.teamSuggestionRequest());
+
+        // then: Should return 200 with team options
+        response.statusCode(200);
     }
 }

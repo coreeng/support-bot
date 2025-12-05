@@ -6,8 +6,6 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.function.UnaryOperator;
 
-import static java.util.Objects.requireNonNull;
-
 @RequiredArgsConstructor
 public class TicketTestKit {
     private final TestKit.@NonNull RoledTestKit testKit;
@@ -37,7 +35,7 @@ public class TicketTestKit {
             .build());
 
         return Ticket.fromResponse(response)
-            .user(requireNonNull(config.userById(testKit.userId())))
+            .user(testKit.user())
             .config(config)
             .teamId(testKit.teamId())
             .slackWiremock(slackWiremock)
