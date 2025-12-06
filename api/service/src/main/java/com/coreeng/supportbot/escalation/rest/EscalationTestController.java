@@ -34,10 +34,9 @@ public class EscalationTestController {
         Escalation escalation = Escalation.createNew(
                 ticketId,
                 req.team(),
-                ImmutableList.copyOf(req.tags())
+                ImmutableList.copyOf(req.tags()),
+                ticket.queryRef()
             ).toBuilder()
-            .channelId(ticket.channelId())
-            .threadTs(ticket.queryTs())
             .createdMessageTs(MessageTs.of(req.createdMessageTs()))
             .build();
         escalationRepository.createIfNotExists(escalation);

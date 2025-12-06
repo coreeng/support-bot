@@ -1,8 +1,6 @@
 package com.coreeng.supportbot.teams.rest;
 
-import com.coreeng.supportbot.teams.Team;
-import com.coreeng.supportbot.teams.TeamService;
-import com.coreeng.supportbot.teams.TeamType;
+import com.coreeng.supportbot.teams.*;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +19,7 @@ public class TeamsController {
 
     @GetMapping
     public ImmutableList<TeamUI> listTeams(
-        @RequestParam(name = "type", required = false) TeamType type
+            @RequestParam(name = "type", required = false) TeamType type
     ) {
         ImmutableList<Team> teams;
         if (type == null) {
@@ -30,7 +28,7 @@ public class TeamsController {
             teams = teamService.listTeamsByType(type);
         }
         return teams.stream()
-            .map(mapper::mapToUI)
-            .collect(toImmutableList());
+                .map(mapper::mapToUI)
+                .collect(toImmutableList());
     }
 }

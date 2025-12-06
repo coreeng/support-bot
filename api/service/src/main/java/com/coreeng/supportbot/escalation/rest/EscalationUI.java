@@ -22,4 +22,5 @@ public class EscalationUI {
     private Instant resolvedAt;
     private TeamUI team;
     private ImmutableList<String> tags;
+    private String impact;
 }

@@ -4,8 +4,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
 
-@ConfigurationProperties("team.support.static")
-public record StaticSupportTeamProps(
+@ConfigurationProperties("team.leadership.static")
+public record StaticLeadershipTeamProps(
     boolean enabled,
     List<StaticSupportMember> members
 ) {

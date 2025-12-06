@@ -16,30 +16,41 @@ public class SlackSupportMemberFetcher implements SupportMemberFetcher {
     private final ExecutorService executor;
 
     @Override
-    public ImmutableList<SupportMemberFetcher.SupportMember> loadInitialMembers(String groupId) {
+    public ImmutableList<SupportMember> loadInitialSupportMembers(String groupId) {
         ImmutableList<String> supportTeamMembers = slackClient.getGroupMembers(groupId);
         return loadMembersFromUserIds(supportTeamMembers);
     }
 
     @Override
-    public ImmutableList<SupportMemberFetcher.SupportMember> handleMembershipUpdate(String groupId, ImmutableList<String> teamUsers) {
+    public ImmutableList<SupportMember> handleSupportMembershipUpdate(String groupId, ImmutableList<String> teamUsers) {
         return loadMembersFromUserIds(teamUsers);
     }
 
-    private ImmutableList<SupportMemberFetcher.SupportMember> loadMembersFromUserIds(ImmutableList<String> teamUserIds) {
-        ExecutorCompletionService<SupportMemberFetcher.SupportMember> completionService = new ExecutorCompletionService<>(executor);
+    @Override
+    public ImmutableList<SupportMember> loadInitialLeadershipMembers(String groupId) {
+        ImmutableList<String> leadershipMembers = slackClient.getGroupMembers(groupId);
+        return loadMembersFromUserIds(leadershipMembers);
+    }
+
+    @Override
+    public ImmutableList<SupportMember> handleLeadershipMembershipUpdate(String groupId, ImmutableList<String> teamUsers) {
+        return loadMembersFromUserIds(teamUsers);
+    }
+
+    private ImmutableList<SupportMember> loadMembersFromUserIds(ImmutableList<String> teamUserIds) {
+        ExecutorCompletionService<SupportMember> completionService = new ExecutorCompletionService<>(executor);
         long totalTasks = 0;
         for (String userId : teamUserIds) {
-            completionService.submit(() -> new SupportMemberFetcher.SupportMember(
-                slackClient.getUserById(userId).getEmail(),
-                userId
+            completionService.submit(() -> new SupportMember(
+                    slackClient.getUserById(userId).getEmail(),
+                    userId
             ));
             totalTasks += 1;
         }
-        ImmutableList.Builder<SupportMemberFetcher.SupportMember> result = ImmutableList.builder();
+        ImmutableList.Builder<SupportMember> result = ImmutableList.builder();
         for (int i = 0; i < totalTasks; i++) {
             try {
-                SupportMemberFetcher.SupportMember userInfo = completionService.take().get();
+                SupportMember userInfo = completionService.take().get();
                 result.add(userInfo);
             } catch (InterruptedException | ExecutionException e) {
                 throw new RuntimeException(e);

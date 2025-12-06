@@ -68,6 +68,7 @@ public class EscalationController {
                             .escalatingTeam(ticket != null && ticket.team() != null
                                     ? ticket.team()
                                     : null)
+                            .impact(ticket != null ? ticket.impact() : null)
                             .build();
                 })
                 .collect(toImmutableList());
