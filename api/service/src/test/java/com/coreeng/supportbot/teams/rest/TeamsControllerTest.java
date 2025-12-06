@@ -36,7 +36,7 @@ class TeamsControllerTest {
 
         Team l2support = mock(Team.class);
         when(l2support.label()).thenReturn("l2support");
-        when(l2support.types()).thenReturn(ImmutableList.of(TeamType.l2Support));
+        when(l2support.types()).thenReturn(ImmutableList.of(TeamType.escalation));
 
         when(teamService.listTeams()).thenReturn(ImmutableList.of(support, tenant, l2support));
 
@@ -50,7 +50,7 @@ class TeamsControllerTest {
         assertThat(result.get(1).label()).isEqualTo("tenant");
         assertThat(result.get(1).types()).containsExactly(TeamType.tenant);
         assertThat(result.get(2).label()).isEqualTo("l2support");
-        assertThat(result.get(2).types()).containsExactly(TeamType.l2Support);
+        assertThat(result.get(2).types()).containsExactly(TeamType.escalation);
 
         verify(teamService).listTeams();
         verifyNoMoreInteractions(teamService);

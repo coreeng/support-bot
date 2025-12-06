@@ -21,14 +21,18 @@ public class TeamService {
 
     public ImmutableList<Team> listTeamsByUserEmail(String email) {
         ImmutableList<PlatformTeam> platformTeams = platformTeamsService.listTeamsByUserEmail(email);
-        ImmutableList<Team> teams = mapPlatformTeams(platformTeams);
+        ImmutableList.Builder<Team> teamsBuilder = ImmutableList.<Team>builder()
+                .addAll(mapPlatformTeams(platformTeams));
+
         if (supportTeamService.isMemberByUserEmail(email)) {
-            return ImmutableList.<Team>builder()
-                .addAll(teams)
-                .add(supportTeamService.getTeam())
-                .build();
+            teamsBuilder.add(supportTeamService.getTeam());
         }
-        return teams;
+
+        if (supportTeamService.isLeadershipMemberByUserEmail(email)) {
+            teamsBuilder.add(supportTeamService.getLeadershipTeam());
+        }
+
+        return teamsBuilder.build();
     }
 
     public ImmutableList<Team> listTeams() {
@@ -41,16 +45,17 @@ public class TeamService {
     public ImmutableList<Team> listTeamsByType(TeamType type) {
         return switch (type) {
             case tenant -> mapPlatformTeams(platformTeamsService.listTeams());
-            case l2Support -> escalationTeamsRegistry.listAllEscalationTeams().stream()
+            case escalation -> escalationTeamsRegistry.listAllEscalationTeams().stream()
                     .map(t -> {
                         PlatformTeam platformTeam = platformTeamsService.findTeamByName(t.code());
                         if (platformTeam != null) {
-                            return new Team(t.label(), t.code(), ImmutableList.of(TeamType.tenant, TeamType.l2Support));
+                            return new Team(t.label(), t.code(), ImmutableList.of(TeamType.tenant, TeamType.escalation));
                         }
-                        return new Team(t.label(), t.code(), ImmutableList.of(TeamType.l2Support));
+                        return new Team(t.label(), t.code(), ImmutableList.of(TeamType.escalation));
                     })
                     .collect(toImmutableList());
             case support -> ImmutableList.of(supportTeamService.getTeam());
+            case leadership -> ImmutableList.of(supportTeamService.getLeadershipTeam());
         };
     }
 
@@ -68,7 +73,7 @@ public class TeamService {
 
         EscalationTeam escalationTeam = escalationTeamsRegistry.findEscalationTeamByCode(code);
         if (escalationTeam != null) {
-            return new Team(escalationTeam.label(), escalationTeam.code(), ImmutableList.of(TeamType.l2Support));
+            return new Team(escalationTeam.label(), escalationTeam.code(), ImmutableList.of(TeamType.escalation));
         }
 
         return null;
@@ -87,7 +92,7 @@ public class TeamService {
             return new Team(
                 escalationTeam.label(),
                 escalationTeam.code(),
-                ImmutableList.of(TeamType.tenant, TeamType.l2Support)
+                ImmutableList.of(TeamType.tenant, TeamType.escalation)
             );
         }
         return new Team(

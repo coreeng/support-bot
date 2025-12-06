@@ -157,24 +157,34 @@ platform-integration:
         groupRef:
           jq-expression: .metadata.uid
 
-support-team:
-  name: Core Support
-  code: support
-  slack-group-id: S08948NBMED
-  static:
-    enabled: false
-    members:
-      - email: coby.ivona@company.com
-        slack-id: U0123456781
-      - email: sana.chernobog@company.com
-        slack-id: U0123456782
-      - email: jean.kristijan@company.com
-        slack-id: U0123456783
+team:
+  support:
+    name: Core Support
+    code: support
+    slack-group-id: S08948NBMED
+    static:
+      enabled: false
+      members:
+        - email: coby.ivona@company.com
+          slack-id: U0123456781
+        - email: sana.chernobog@company.com
+          slack-id: U0123456782
+        - email: jean.kristijan@company.com
+          slack-id: U0123456783
+  leadership:
+    name: Support Leadership
+    code: support-leadership
+    slack-group-id: S08948NBMED
+    static:
+      enabled: false
+      members:
+        - email: coby.ivona@company.com
+          slack-id: U0123456781
+        - email: sana.chernobog@company.com
+          slack-id: U0123456782
+        - email: jean.kristijan@company.com
+          slack-id: U0123456783
 
-support-leadership-team:
-  enabled: false
-  memberEmails:
-    - leader@email.com
 
 ai:
   sentiment-analysis:
