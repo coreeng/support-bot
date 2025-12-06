@@ -42,7 +42,7 @@ class TeamServiceTest {
     }
 
     @Test
-    void listTeamsByType_l2Support_returnsEscalationOnlyTeams() {
+    void listTeamsByType_escalation_returnsEscalationOnlyTeams() {
         // given
         PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
 
@@ -73,7 +73,7 @@ class TeamServiceTest {
     }
 
     @Test
-    void listTeamsByType_l2Support_returnsTeamsWithBothTypesWhenAlsoPlatformTeam() {
+    void listTeamsByType_escalation_returnsTeamsWithBothTypesWhenAlsoPlatformTeam() {
         // given
         PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
 
@@ -293,7 +293,7 @@ class TeamServiceTest {
         assertEquals("platform1", platformTeam.label());
         assertEquals(ImmutableList.of(TeamType.tenant), platformTeam.types());
 
-        // Verify team with both types has both tenant and l2Support
+        // Verify team with both types has both tenant and escalation
         Team bothTeam = result.stream().filter(t -> "both1".equals(t.code())).findFirst().orElse(null);
         assertNotNull(bothTeam);
         assertEquals("Both Team", bothTeam.label());
@@ -430,7 +430,7 @@ class TeamServiceTest {
             .filter(t -> "team1".equals(t.code()))
             .findFirst()
             .orElse(null);
-        Team fromListByTypeL2Support = teamService.listTeamsByType(TeamType.escalation).stream()
+        Team fromListByTypeEscalation = teamService.listTeamsByType(TeamType.escalation).stream()
             .filter(t -> "team1".equals(t.code()))
             .findFirst()
             .orElse(null);
@@ -448,15 +448,15 @@ class TeamServiceTest {
         assertNotNull(fromListByTypeTenant);
         assertEquals(expectedTypes, fromListByTypeTenant.types());
 
-        assertNotNull(fromListByTypeL2Support);
-        assertEquals(expectedTypes, fromListByTypeL2Support.types());
+        assertNotNull(fromListByTypeEscalation);
+        assertEquals(expectedTypes, fromListByTypeEscalation.types());
 
         assertNotNull(fromListTeams);
         assertEquals(expectedTypes, fromListTeams.types());
     }
 
     @Test
-    void consistency_escalationOnlyTeamHasOnlyL2SupportType() {
+    void consistency_escalationOnlyTeamHasOnlyescalationType() {
         // given - escalation team that is NOT a platform team
         PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
         when(platformTeamsService.listTeams()).thenReturn(ImmutableList.of());
@@ -471,19 +471,19 @@ class TeamServiceTest {
 
         // when - query the same team in different ways
         Team fromFindByCode = teamService.findTeamByCode("esc1");
-        Team fromListByTypeL2Support = teamService.listTeamsByType(TeamType.escalation).stream()
+        Team fromListByTypeEscalation = teamService.listTeamsByType(TeamType.escalation).stream()
             .filter(t -> "esc1".equals(t.code()))
             .findFirst()
             .orElse(null);
 
-        // then - both should have only l2Support type
+        // then - both should have only escalation type
         ImmutableList<TeamType> expectedTypes = ImmutableList.of(TeamType.escalation);
 
         assertNotNull(fromFindByCode);
         assertEquals(expectedTypes, fromFindByCode.types());
 
-        assertNotNull(fromListByTypeL2Support);
-        assertEquals(expectedTypes, fromListByTypeL2Support.types());
+        assertNotNull(fromListByTypeEscalation);
+        assertEquals(expectedTypes, fromListByTypeEscalation.types());
 
         // Should NOT appear in tenant list
         ImmutableList<Team> tenantTeams = teamService.listTeamsByType(TeamType.tenant);
