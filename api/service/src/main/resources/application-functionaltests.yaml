@@ -46,17 +46,26 @@ enums:
     - label: Abnormal Behaviour
       code: abnormalBehaviour
 
-support-team:
-  name: Core Support
-  static:
-    enabled: true
-    members:
-      - email: coby.ivona@company.com
-        slack-id: U0123456781
-      - email: sana.chernobog@company.com
-        slack-id: U0123456782
-      - email: jean.kristijan@company.com
-        slack-id: U0123456783
+team:
+  support:
+    name: Core Support
+    static:
+      enabled: true
+      members:
+        - email: coby.ivona@company.com
+          slack-id: U0123456781
+        - email: sana.chernobog@company.com
+          slack-id: U0123456782
+        - email: jean.kristijan@company.com
+          slack-id: U0123456783
+  leadership:
+    name: Support Leadership
+    code: support-leadership
+    static:
+      enabled: true
+      members:
+        - email: brian@company.com
+          slack-id: U0124556781
 
 platform-integration:
   enabled: true
