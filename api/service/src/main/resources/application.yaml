@@ -185,7 +185,6 @@ team:
         - email: jean.kristijan@company.com
           slack-id: U0123456783
 
-
 ai:
   sentiment-analysis:
     enabled: false
