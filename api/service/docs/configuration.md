@@ -134,10 +134,14 @@ platform-integration: # Whether to enable platform integration to automatically 
           jq-expression: .metadata.uid
 
 
-support-team:
-  name: Core Support # Label showed on the UI
-  slack-group-id: S08948NBMED # Slack group ID of the support team
-
+team:
+  support:
+    name: Core Support # Label showed on the UI
+    slack-group-id: S08948NBMED # Slack group ID of the support team
+  leadership:
+    name: Support Leadership # Label showed on the UI
+    code: support-leadership # Slack group ID of the support leadership team
+  
 ai: # AI powered features
   sentiment-analysis: # Analyze tenant and support sentiment per ticket
     enabled: false
