@@ -100,7 +100,7 @@ public class ServiceStartupTest {
             .isEqualTo(testTeamName);
         assertThat(coreTeam.types())
             .as("Team types should contain expected values")
-            .containsExactlyInAnyOrder("tenant", "l2Support");
+            .containsExactlyInAnyOrder("tenant", "escalation");
         assertThat(teams)
             .as("Response should contain at least one team")
             .isNotEmpty();

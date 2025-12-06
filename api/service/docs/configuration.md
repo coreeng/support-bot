@@ -109,7 +109,7 @@ platform-integration: # Whether to enable platform integration to automatically 
     timeout: 30s # Timeout for fetching all team data
     ignore-unknown-teams: false # Whether to allow escalation teams that don't exist in platform teams.
                                  # If false, startup will fail if any escalation team is not found in platform teams.
-                                 # If true, escalation-only teams are allowed (they will have only 'l2Support' type).
+                                 # If true, escalation-only teams are allowed (they will have only 'escalation' type).
   gcp:
     app-name: Support Bot # Used by GCP client
     enabled: true
