@@ -3,7 +3,6 @@ package com.coreeng.supportbot.stats.rest;
 import com.coreeng.supportbot.stats.StatsRequest;
 import com.coreeng.supportbot.stats.StatsResult;
 import com.coreeng.supportbot.stats.StatsService;
-import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
