@@ -19,13 +19,13 @@ spring:
   application:
     name: support-bot
   cloud:
-# Uncomment in case you require Azure integration
-#    azure:
-#      profile:
-#        tenant-id: ${AZURE_TENANT_ID}
-#      credential:
-#        client-id: ${AZURE_CLIENT_ID}
-#        client-secret: ${AZURE_CLIENT_SECRET}
+    # Uncomment in case you require Azure integration
+    azure:
+      profile:
+        tenant-id: ${AZURE_TENANT_ID}
+      credential:
+        client-id: ${AZURE_CLIENT_ID}
+        client-secret: ${AZURE_CLIENT_SECRET}
     gcp:
       core:
         enabled: false
@@ -65,14 +65,11 @@ ticket:
 
 enums:
   escalation-teams:
-    - label: wow
-      code: wow
+    - label: Escalation Team 1 Test
+      code: Escalation Team 1 Test
       slack-group-id: S08948NBMED
-    - label: infra-integration
-      code: infra-integration
-      slack-group-id: S08948NBMED
-    - label: connected-app
-      code: connected-app
+    - label: Escalation Team 2 Test
+      code: Escalation Team 2 Test
       slack-group-id: S08948NBMED
   tags:
     - label: Ingresses
@@ -114,7 +111,7 @@ platform-integration:
     client:
       base-url: ""
   static-user:
-    enabled: true
+    enabled: false
     users:
       wow-group:
         - wow1@test.com
@@ -127,19 +124,26 @@ platform-integration:
         - connected-app2@test.com
         - connected-app3@test.com
   azure:
-    enabled: false
+    enabled: true
     client:
       base-url: ""
   teams-scraping:
     static:
       enabled: true
       teams:
-        - name: wow
-          group-ref: wow-group
-        - name: infra-integration
-          group-ref: infra-group
+        - name: CECG Support Tenants
+          group-ref: 833843f4-7430-410f-b141-bcf18f807232
         - name: connected-app
-          group-ref: connected-app-group
+          group-ref: 55ca82ca-2877-4a8f-896d-f48d03ce35bb
+        - name: infra-integration
+          group-ref: 55ca82ca-2877-4a8f-896d-f48d03ce35bb
+        - name: wow
+          group-ref: 55ca82ca-2877-4a8f-896d-f48d03ce35bb
+        - name: Escalation Team 1 Test
+          group-ref: 10076c78-37d7-455d-a873-9edb0c2eacdc
+        - name: Escalation Team 2 Test
+          group-ref: 016e17a8-cdaa-4abb-872d-fe4326a13af2
+
     core-platform:
       enabled: false
     k8s-generic:
@@ -194,4 +198,3 @@ mock-data:
 
 rbac:
   enabled: true
-
