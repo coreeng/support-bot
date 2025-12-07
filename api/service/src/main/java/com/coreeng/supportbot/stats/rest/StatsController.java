@@ -24,9 +24,8 @@ public class StatsController {
 
     @PostMapping
     public List<StatsResult> stats(@RequestBody List<StatsRequest> request) {
-        ImmutableList<StatsResult> collect = request.stream()
+        return request.stream()
                 .map(statsService::calculate)
                 .collect(toImmutableList());
-        return collect;
     }
 }
