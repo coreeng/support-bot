@@ -8,10 +8,12 @@ import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import jakarta.validation.constraints.NotNull;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -29,8 +31,10 @@ public class TicketProcessingService {
         if (isQueryEvent(e)) {
             repository.createQueryIfNotExists(e.messageRef());
             log.atInfo()
-                .addArgument(e::messageRef)
-                .log("Query is created on message({})");
+                .addKeyValue("action", "query_created")
+                .addKeyValue("channel_id", e.messageRef().channelId())
+                .addKeyValue("message_ts", e.messageRef().ts().ts())
+                .log("Query created");
             return;
         }
 
@@ -141,9 +145,11 @@ public class TicketProcessingService {
                 .build()
         );
 
+        Long firstResponseTimeSecs = calculateSecondsSinceCreation(updatedTicket);
         log.atInfo()
             .addKeyValue("action", "ticket_updated")
             .addKeyValue("id", updatedTicket.id().id())
+            .addKeyValue("first_response_time_seconds", firstResponseTimeSecs)
             .addKeyValue("status", updatedTicket.status())
             .addKeyValue("team", updatedTicket.team())
             .addKeyValue("impact", updatedTicket.impact())
@@ -177,11 +183,14 @@ public class TicketProcessingService {
             request.threadPermalink(),
             request.tags()
         ));
+        Long escalationTimeSecs = calculateSecondsSinceCreation(ticket);
         log.atInfo()
             .addKeyValue("action", "ticket_escalated")
             .addKeyValue("id", ticket.id().id())
+            .addKeyValue("escalation_time_seconds", escalationTimeSecs)
             .addKeyValue("escalation_team", request.team())
             .addKeyValue("team", ticket.team())
+            .addKeyValue("impact", ticket.impact())
             .addKeyValue("tags", request.tags())
             .log("Ticket escalated");
         slackService.markTicketEscalated(ticket.queryRef());
@@ -240,10 +249,14 @@ public class TicketProcessingService {
             ticket.status()
         ));
         Ticket updatedTicket = repository.insertStatusLog(ticket, Instant.now());
+        Long resolutionTimeSecs = updatedTicket.status() == TicketStatus.closed
+            ? calculateSecondsSinceCreation(updatedTicket)
+            : null;
         log.atInfo()
             .addKeyValue("action", "ticket_changed")
             .addKeyValue("id", updatedTicket.id().id())
             .addKeyValue("status", updatedTicket.status())
+            .addKeyValue("resolution_time_seconds", resolutionTimeSecs)
             .addKeyValue("team", updatedTicket.team())
             .addKeyValue("impact", updatedTicket.impact())
             .addKeyValue("tags", updatedTicket.tags())
@@ -273,5 +286,23 @@ public class TicketProcessingService {
     private boolean isQueryEvent(SlackEvent event) {
         return Objects.equals(slackTicketsProps.channelId(), event.messageRef().channelId())
             && !event.messageRef().isReply();
+    }
+
+    /**
+     * Calculates seconds elapsed since ticket creation for SLA metrics.
+     * Returns null if calculation fails to ensure logging never interrupts ticket our ticket journeys.
+     * We Consider refactoring TicketsGeneralStatsCollector to expose shared duration calculation methods that can be reused here.
+    */
+    @Nullable
+    public Long calculateSecondsSinceCreation(Ticket ticket) {
+        try {
+            Instant createdAt = ticket.queryTs().getDate();
+            return Duration.between(createdAt, Instant.now()).toSeconds();
+        } catch (Exception e) {
+            log.atDebug()
+                .setCause(e)
+                .log("Could not calculate duration for ticket");
+            return null;
+        }
     }
 }
