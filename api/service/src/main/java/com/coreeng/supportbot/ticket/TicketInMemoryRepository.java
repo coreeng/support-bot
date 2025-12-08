@@ -51,6 +51,15 @@ public class TicketInMemoryRepository implements TicketRepository {
     }
 
     @Override
+    public boolean deleteQueryIfNoTicket(MessageRef queryRef) {
+        checkNotNull(queryRef);
+        if (ticketsByQuery.containsKey(queryRef)) {
+            return false;
+        }
+        return queries.remove(queryRef);
+    }
+
+    @Override
     public Ticket createTicketIfNotExists(Ticket ticket) {
         checkNotNull(ticket);
         checkArgument(ticket.id() == null);
@@ -200,9 +209,7 @@ public class TicketInMemoryRepository implements TicketRepository {
             if (ticket.team() == null) {
                 return false;
             }
-            if (!query.teams().contains(ticket.team())) {
-                return false;
-            }
+            return query.teams().contains(ticket.team());
         }
         return true;
     }

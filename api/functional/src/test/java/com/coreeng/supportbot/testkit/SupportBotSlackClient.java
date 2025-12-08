@@ -102,6 +102,69 @@ public class SupportBotSlackClient {
             .build();
     }
 
+    public void notifyMessageDeleted(MessageToDelete message) {
+        String threadTsField = message.threadTs() != null
+            ? "\"thread_ts\": \"" + message.threadTs() + "\","
+            : "";
+        String body = StringSubstitutor.replace(
+            """
+                {
+                  "token": "${token}",
+                  "team_id": "${teamId}",
+                  "context_team_id": "${teamId}",
+                  "api_app_id": "UNSET_BY_TESTS",
+                  "event": {
+                    "type": "message",
+                    "subtype": "message_deleted",
+                    "hidden": true,
+                    "deleted_ts": "${deletedTs}",
+                    "channel": "${channelId}",
+                    "previous_message": {
+                      "type": "message",
+                      "user": "${userId}",
+                      "text": "deleted message",
+                      ${threadTsField}
+                      "ts": "${deletedTs}"
+                    },
+                    "event_ts": "UNSET_BY_TESTS",
+                    "ts": "${eventTs}",
+                    "channel_type": "group"
+                  },
+                  "type": "event_callback",
+                  "event_id": "Ev093QB18551",
+                  "event_time": 1751299903,
+                  "authorizations": [
+                    {
+                      "team_id": "${teamId}",
+                      "user_id": "${userId}",
+                      "is_bot": false,
+                      "is_enterprise_install": false
+                    }
+                  ],
+                  "is_ext_shared_channel": false,
+                  "event_context": "4-eyJldCI6Im1lc3NhZ2UiLCJ0aWQiOiJUMDE0R0dHUkRVSyIsImFpZCI6IkEwOEM2S01LMEpIIiwiY2lkIjoiQzA4Q0MzTUNCS04ifQ"
+                }
+                """,
+            Map.of(
+                "token", config.supportBot().token(),
+                "teamId", message.teamId(),
+                "userId", message.userId(),
+                "channelId", message.channelId(),
+                "deletedTs", message.deletedTs().toString(),
+                "eventTs", MessageTs.now().toString(),
+                "threadTsField", threadTsField
+            )
+        );
+        given()
+            .when()
+            .contentType(ContentType.JSON)
+            .body(body)
+            .post(config.supportBot().baseUrl() + "/slack/events")
+            .then()
+            .log().ifValidationFails(LogDetail.ALL, true)
+            .statusCode(200);
+    }
+
     public void notifyReactionAdded(ReactionToAdd reaction) {
         String body = StringSubstitutor.replace(
             """

@@ -6,11 +6,22 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 public record MessageRef(
     MessageTs ts,
     MessageTs threadTs,
     String channelId
 ) {
+    public MessageRef {
+        checkNotNull(ts);
+        checkNotNull(channelId);
+        // In some cases Slack returns thread_ts == ts, even though it's a top level message
+        if (threadTs != null && threadTs.equals(ts)) {
+            threadTs = null;
+        }
+    }
+
     public MessageRef(MessageTs ts, String channelId) {
         this(ts, null, channelId);
     }
