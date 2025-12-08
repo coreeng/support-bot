@@ -84,6 +84,20 @@ public class JdbcTicketRepository implements TicketRepository {
     }
 
     @Override
+    public boolean deleteQueryIfNoTicket(MessageRef queryRef) {
+        int deleted = dsl.deleteFrom(QUERY)
+            .where(QUERY.TS.eq(queryRef.ts().ts())
+                .and(QUERY.CHANNEL_ID.eq(queryRef.channelId()))
+                .andNotExists(
+                    dsl.selectOne()
+                        .from(TICKET)
+                        .where(TICKET.QUERY_ID.eq(QUERY.ID))
+                ))
+            .execute();
+        return deleted > 0;
+    }
+
+    @Override
     public Ticket createTicketIfNotExists(Ticket ticket) {
         checkNotNull(ticket);
         checkArgument(ticket.id() == null);

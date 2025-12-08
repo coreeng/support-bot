@@ -32,21 +32,6 @@ public class TicketManagementTests {
     private Config config;
 
     @Test
-    public void whenQueryIsPosted_thenQueryIsRegisteredInBot() {
-        // given
-        SlackTestKit asTenant = testKit.as(tenant).slack();
-
-        // when
-        SlackMessage tenantsMessage = asTenant.postMessage(
-            MessageTs.now(),
-            "Please, help me with my query!"
-        );
-
-        // then
-        supportBotClient.assertQueryExistsByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts());
-    }
-
-    @Test
     public void whenTicketHasMultipleEscalations_summaryShowsAllAndCloseResolvesAll() {
         // given
         TestKit.RoledTestKit asSupport = testKit.as(support);

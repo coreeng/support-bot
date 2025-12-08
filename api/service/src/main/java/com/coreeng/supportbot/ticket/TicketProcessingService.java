@@ -3,6 +3,7 @@ package com.coreeng.supportbot.ticket;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
+import com.coreeng.supportbot.slack.events.MessageDeleted;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
@@ -53,6 +54,27 @@ public class TicketProcessingService {
             onStatusUpdate(updatedTicket);
         } else {
             repository.touchTicketById(ticket.id(), Instant.now());
+        }
+    }
+
+    public void handleMessageDeleted(MessageDeleted e) {
+        if (!isQueryMessageRef(e.messageRef())) {
+            log.atDebug()
+                .addArgument(e::messageRef)
+                .log("Ignoring message deletion for non-query message({})");
+            return;
+        }
+
+        boolean deleted = repository.deleteQueryIfNoTicket(e.messageRef());
+        if (deleted) {
+            log.atInfo()
+                .addKeyValue("action", "query_deleted")
+                .addArgument(e::messageRef)
+                .log("Query deleted because message was deleted and no ticket exists({})");
+        } else {
+            log.atInfo()
+                .addArgument(e::messageRef)
+                .log("Message deleted but query kept because ticket exists({})");
         }
     }
 
@@ -271,7 +293,11 @@ public class TicketProcessingService {
     }
 
     private boolean isQueryEvent(SlackEvent event) {
-        return Objects.equals(slackTicketsProps.channelId(), event.messageRef().channelId())
-            && !event.messageRef().isReply();
+        return isQueryMessageRef(event.messageRef());
+    }
+
+    private boolean isQueryMessageRef(MessageRef messageRef) {
+        return Objects.equals(slackTicketsProps.channelId(), messageRef.channelId())
+            && !messageRef.isReply();
     }
 }

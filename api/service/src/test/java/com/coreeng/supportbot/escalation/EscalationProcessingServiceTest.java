@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
+import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
@@ -44,7 +45,11 @@ class EscalationProcessingServiceTest {
     // given
     CreateEscalationRequest escalationRequest =
         CreateEscalationRequest.builder()
-            .ticket(Ticket.builder().id(new TicketId(1)).build())
+            .ticket(Ticket.builder()
+                .id(new TicketId(1))
+                .queryTs(MessageTs.of("1234567890.123456"))
+                .channelId("test-channel")
+                .build())
             .team("some-team")
             .tags(ImmutableList.of("tag-1", "tag-2"))
             .build();
@@ -65,7 +70,11 @@ class EscalationProcessingServiceTest {
     // given
     CreateEscalationRequest escalationRequest =
         CreateEscalationRequest.builder()
-            .ticket(Ticket.builder().id(new TicketId(1)).build())
+            .ticket(Ticket.builder()
+                .id(new TicketId(1))
+                .queryTs(MessageTs.of("1234567890.123456"))
+                .channelId("test-channel")
+                .build())
             .team("some-team")
             .tags(ImmutableList.of("tag-1", "tag-2"))
             .build();
