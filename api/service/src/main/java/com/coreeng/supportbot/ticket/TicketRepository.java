@@ -11,6 +11,7 @@ import java.time.Instant;
 public interface TicketRepository {
     void createQueryIfNotExists(MessageRef queryRef);
     boolean queryExists(MessageRef queryRef);
+    boolean deleteQueryIfNoTicket(MessageRef queryRef);
 
     Ticket createTicketIfNotExists(Ticket ticket);
     Ticket updateTicket(Ticket ticket);

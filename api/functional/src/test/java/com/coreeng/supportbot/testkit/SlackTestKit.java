@@ -40,6 +40,36 @@ public class SlackTestKit {
             .build());
     }
 
+    /**
+     * Delete a message (top-level message, not a thread reply).
+     *
+     * @param message The message to delete
+     */
+    public void deleteMessage(SlackMessage message) {
+        supportBotSlackClient.notifyMessageDeleted(MessageToDelete.builder()
+            .userId(testKit.userId())
+            .teamId(testKit.teamId())
+            .channelId(message.channelId())
+            .deletedTs(message.ts())
+            .build());
+    }
+
+    /**
+     * Delete a thread reply message.
+     *
+     * @param message  The thread reply message to delete
+     * @param threadTs Timestamp of the parent thread (original query message)
+     */
+    public void deleteThreadReply(SlackMessage message, MessageTs threadTs) {
+        supportBotSlackClient.notifyMessageDeleted(MessageToDelete.builder()
+            .userId(testKit.userId())
+            .teamId(testKit.teamId())
+            .channelId(message.channelId())
+            .deletedTs(message.ts())
+            .threadTs(threadTs)
+            .build());
+    }
+
     public void addReactionTo(SlackMessage targetMessage, String reaction) {
         slackWiremock.stubAuthTest();
         supportBotSlackClient.notifyReactionAdded(ReactionToAdd.builder()

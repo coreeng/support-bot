@@ -55,6 +55,17 @@ public class SupportBotClient {
             .statusCode(200);
     }
 
+    public void assertQueryDoesNotExistByMessageRef(@NonNull String channelId, @NonNull MessageTs ts) {
+        given()
+            .when()
+            .queryParam("channelId", channelId)
+            .queryParam("messageTs", ts.toString())
+            .get(baseUrl + "/query")
+            .then()
+            .log().ifValidationFails(LogDetail.ALL, true)
+            .statusCode(404);
+    }
+
     public TicketResponse assertTicketExists(SearchableForTicket ticket) {
         slackWiremock.stubGetPermalink(ticket.channelId(), ticket.queryTs());
         return given()

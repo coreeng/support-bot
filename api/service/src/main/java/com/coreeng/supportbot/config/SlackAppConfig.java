@@ -32,6 +32,9 @@ public class SlackAppConfig {
         config.setSigningSecret(slackProps.creds().signingSecret());
         config.setExecutorServiceProvider(new ConcurrentExecutorServiceProvider());
         config.setRequestVerificationEnabled(slackProps.enableRequestVerification());
+        // Auto-acknowledge all events that don't have explicit handlers to prevent
+        // "no handler found" warnings from SocketModeApp for events we don't care about
+        config.setAllEventsApiAutoAckEnabled(true);
         if (Strings.isNotBlank(slackProps.client().methodsBaseUrl())) {
             config.getSlack().getConfig().setMethodsEndpointUrlPrefix(slackProps.client().methodsBaseUrl());
             config.getSlack().getConfig().setPrettyResponseLoggingEnabled(true);
