@@ -25,7 +25,7 @@ public class Ticket {
     @Builder.Default
     private ImmutableList<StatusLog> statusLog = ImmutableList.of();
     @Builder.Default
-    ImmutableList<String> tags = ImmutableList.of();
+    private ImmutableList<String> tags = ImmutableList.of();
     @Nullable
     private String impact;
     private Instant lastInteractedAt;

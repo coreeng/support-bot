@@ -104,14 +104,14 @@ public class Ticket implements SearchableForTicket {
     public TeamSuggestionRequest teamSuggestionRequest() {
         return TeamSuggestionRequest.builder()
             .ticketId(id)
-            .authorId(user.slackUserId())
+            .authorId(user.isHuman() ? user.slackUserId() : user.slackBotId())
             .build();
     }
 
     public TeamSuggestionRequest teamSuggestionRequest(String filterValue) {
         return TeamSuggestionRequest.builder()
             .ticketId(id)
-            .authorId(user.slackUserId())
+            .authorId(user.isHuman() ? user.slackUserId() : user.slackBotId())
             .filterValue(filterValue)
             .build();
     }

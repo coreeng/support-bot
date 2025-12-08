@@ -311,13 +311,17 @@ public class SlackWiremock extends WireMockServer {
     }
 
     public Stub stubGetUserProfileById(UserProfileToGet userProfile) {
-        StubMapping stubMapping = givenThat(post("/api/users.profile.get")
+        StubMapping stubMapping = givenThat(post("/api/users.info")
             .withFormParam("user", equalTo(userProfile.userId()))
             .willReturn(okJson(StringSubstitutor.replace("""
                 {
                     "ok": true,
-                    "profile": {
-                        "email": "${email}"
+                    "user": {
+                        "id": "${userId}",
+                        "is_bot": false,
+                        "profile": {
+                            "email": "${email}"
+                        }
                     }
                 }
                 """, Map.of(

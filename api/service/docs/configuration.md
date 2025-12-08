@@ -182,7 +182,7 @@ oauth_config:
       - reactions:write
       # User scopes are used for mapping users to teams
       - usergroups:read
-      - users.profile:read
+      - users:read
 settings:
   event_subscriptions:
     bot_events:
