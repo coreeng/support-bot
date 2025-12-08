@@ -32,7 +32,7 @@ public class SlackSupportMemberFetcher implements SupportMemberFetcher {
         long totalTasks = 0;
         for (String userId : teamUserIds) {
             completionService.submit(() -> new SupportMemberFetcher.SupportMember(
-                slackClient.getUserById(new SlackId.User(userId)).getEmail(),
+                slackClient.getUserById(new SlackId.User(userId)).getProfile().getEmail(),
                 userId
             ));
             totalTasks += 1;

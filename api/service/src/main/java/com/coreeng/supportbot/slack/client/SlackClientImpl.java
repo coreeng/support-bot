@@ -14,7 +14,7 @@ import com.slack.api.methods.request.conversations.ConversationsRepliesRequest;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
 import com.slack.api.methods.request.usergroups.users.UsergroupsUsersListRequest;
-import com.slack.api.methods.request.users.profile.UsersProfileGetRequest;
+import com.slack.api.methods.request.users.UsersInfoRequest;
 import com.slack.api.methods.request.views.ViewsOpenRequest;
 import com.slack.api.methods.request.views.ViewsPublishRequest;
 import com.slack.api.methods.response.chat.ChatGetPermalinkResponse;
@@ -158,14 +158,14 @@ public class SlackClientImpl implements SlackClient {
     }
 
     @Override
-    public User.Profile getUserById(SlackId.User userId) {
+    public User getUserById(SlackId.User userId) {
         return userProfileCache.get(userId.id(), () -> doRequest(
-            "users.profile.get",
-            () -> client.usersProfileGet(UsersProfileGetRequest.builder()
+            "users.info",
+            () -> client.usersInfo(UsersInfoRequest.builder()
                 .user(userId.id())
                 .build()),
             null
-        ).getProfile());
+        ).getUser());
     }
 
     @Override

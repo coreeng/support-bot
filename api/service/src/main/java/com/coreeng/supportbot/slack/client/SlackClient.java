@@ -38,7 +38,7 @@ public interface SlackClient {
 
     ViewsPublishResponse updateHomeView(SlackId.User userId, SlackView view);
 
-    User.Profile getUserById(SlackId.User userId);
+    User getUserById(SlackId.User userId);
 
     ImmutableList<String> getGroupMembers(SlackId.Group groupId);
 }
