@@ -198,7 +198,9 @@ class TicketTeamSuggestionHandlerTest {
     private void mockSlackUserEmail(String userId, String email) {
         User.Profile profile = new User.Profile();
         profile.setEmail(email);
-        when(slackClient.getUserById(new SlackId.User(userId))).thenReturn(profile);
+        User user = new User();
+        user.setProfile(profile);
+        when(slackClient.getUserById(new SlackId.User(userId))).thenReturn(user);
     }
 
     private BlockSuggestionRequest mockSuggestionRequest(String value, String metadataAuthorId) {

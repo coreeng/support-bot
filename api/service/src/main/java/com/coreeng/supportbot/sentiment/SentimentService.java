@@ -52,13 +52,14 @@ public class SentimentService {
             .map(com.slack.api.model.Message::getUser)
             .distinct()
             .map(userId -> {
-                User.Profile profile = slackClient.getUserById(new SlackId.User(userId));
-                if (profile == null
-                    || profile.getEmail() == null
-                    || profile.getBotId() != null) {
+                User user = slackClient.getUserById(new SlackId.User(userId));
+                if (user == null
+                    || user.getProfile() == null
+                    || user.getProfile().getEmail() == null
+                    || Boolean.TRUE.equals(user.isBot())) {
                     return null;
                 }
-                return new UserIdToEmail(userId, profile.getEmail());
+                return new UserIdToEmail(userId, user.getProfile().getEmail());
             })
             .filter(Objects::nonNull)
             .collect(toImmutableMap(
