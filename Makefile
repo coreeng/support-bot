@@ -59,8 +59,8 @@ build-integration:
 	docker buildx build --platform linux/amd64 "$(p2p_image_cache)" --tag "$(p2p_image_tag)" --file api/integration-tests/Dockerfile api --load
 
 .PHONY: build-extended-test
-build-extended-test: lint-app ## Build app for extended test
-	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --build-arg P2P_VERSION="$(p2p_version)" api
+build-extended-test:
+	@echo "NOOP"
 
 ##@ Push targets
 
@@ -81,8 +81,8 @@ push-integration: ## Push integration test docker image
 	docker image push "$(p2p_image_tag)"
 
 .PHONY: push-extended-test
-push-extended-test: ## Push extended-test docker image
-	docker image push "$(p2p_image_tag)"
+push-extended-test: ## Uses promoted image (no push needed)
+	@echo "NOOP"
 
 ##@ Deploy targets
 
@@ -113,7 +113,6 @@ deploy-functional: ## Deploy service and DB for functional tests, then run tests
 	DB_RELEASE="$(p2p_app_name)-db" \
 	SERVICE_RELEASE="$(p2p_app_name)" \
 	ACTION=deploy \
-	DELETE_DB=false \
 	VALUES_FILE=api/k8s/service/values-functional.yaml \
 	./api/scripts/deploy-service.sh
 ##@ Run targets
