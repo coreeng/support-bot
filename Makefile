@@ -113,6 +113,7 @@ deploy-functional: ## Deploy service and DB for functional tests, then run tests
 	DB_RELEASE="$(p2p_app_name)-db" \
 	SERVICE_RELEASE="$(p2p_app_name)" \
 	ACTION=deploy \
+	DELETE_DB=false \
 	VALUES_FILE=api/k8s/service/values-functional.yaml \
 	./api/scripts/deploy-service.sh
 ##@ Run targets
