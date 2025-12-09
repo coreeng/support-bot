@@ -12,7 +12,8 @@ class SupportTeamServiceTest {
 
     private SupportTeamProps supportProps;
     private SupportLeadershipTeamProps leadershipProps;
-    private SupportMemberFetcher memberFetcher;
+    private TeamMemberFetcher supportMemberFetcher;
+    private TeamMemberFetcher leadershipMemberFetcher;
 
     private SupportTeamService service;
 
@@ -20,36 +21,37 @@ class SupportTeamServiceTest {
     void setUp() {
         supportProps = new SupportTeamProps("Support Team", "support", "SUPPORT_ID");
         leadershipProps = new SupportLeadershipTeamProps("Leadership Team", "leadership", "LEADERSHIP_ID");
-        memberFetcher = mock(SupportMemberFetcher.class);
+        supportMemberFetcher = mock(TeamMemberFetcher.class);
+        leadershipMemberFetcher = mock(TeamMemberFetcher.class);
 
-        service = new SupportTeamService(supportProps, leadershipProps, memberFetcher);
+        service = new SupportTeamService(supportProps, leadershipProps, supportMemberFetcher, leadershipMemberFetcher);
     }
 
     @Test
     void initLoadsSupportAndLeadershipMembers() {
-        ImmutableList<SupportMemberFetcher.SupportMember> supportMembers = ImmutableList.of(
-            new SupportMemberFetcher.SupportMember("a@c.com", "U1")
+        ImmutableList<TeamMemberFetcher.TeamMember> supportMembers = ImmutableList.of(
+            new TeamMemberFetcher.TeamMember("a@c.com", "U1")
         );
-        ImmutableList<SupportMemberFetcher.SupportMember> leadershipMembers = ImmutableList.of(
-            new SupportMemberFetcher.SupportMember("b@c.com", "U2")
+        ImmutableList<TeamMemberFetcher.TeamMember> leadershipMembers = ImmutableList.of(
+            new TeamMemberFetcher.TeamMember("b@c.com", "U2")
         );
-        when(memberFetcher.loadInitialSupportMembers("SUPPORT_ID")).thenReturn(supportMembers);
-        when(memberFetcher.loadInitialLeadershipMembers("LEADERSHIP_ID")).thenReturn(leadershipMembers);
+        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(supportMembers);
+        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(leadershipMembers);
 
         service.init(); // package-private, ok in same package
 
         assertThat(service.members()).containsExactlyElementsOf(supportMembers);
         assertThat(service.leadershipMembers()).containsExactlyElementsOf(leadershipMembers);
-        verify(memberFetcher).loadInitialSupportMembers("SUPPORT_ID");
-        verify(memberFetcher).loadInitialLeadershipMembers("LEADERSHIP_ID");
+        verify(supportMemberFetcher).loadInitialMembers("SUPPORT_ID");
+        verify(leadershipMemberFetcher).loadInitialMembers("LEADERSHIP_ID");
     }
 
     @Test
     void isMemberChecksCaseInsensitive() {
-        when(memberFetcher.loadInitialSupportMembers("SUPPORT_ID")).thenReturn(
-            ImmutableList.of(new SupportMemberFetcher.SupportMember("USER@c.com", "U1"))
+        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(
+            ImmutableList.of(new TeamMemberFetcher.TeamMember("USER@c.com", "U1"))
         );
-        when(memberFetcher.loadInitialLeadershipMembers("LEADERSHIP_ID")).thenReturn(ImmutableList.of());
+        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(ImmutableList.of());
 
         service.init();
 
@@ -58,9 +60,9 @@ class SupportTeamServiceTest {
 
     @Test
     void isLeadershipMemberChecksCaseInsensitive() {
-        when(memberFetcher.loadInitialSupportMembers("SUPPORT_ID")).thenReturn(ImmutableList.of());
-        when(memberFetcher.loadInitialLeadershipMembers("LEADERSHIP_ID")).thenReturn(
-            ImmutableList.of(new SupportMemberFetcher.SupportMember("LEAD@c.com", "U2"))
+        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(ImmutableList.of());
+        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(
+            ImmutableList.of(new TeamMemberFetcher.TeamMember("LEAD@c.com", "U2"))
         );
 
         service.init();
@@ -70,14 +72,14 @@ class SupportTeamServiceTest {
 
     @Test
     void handleSupportMembershipUpdateUpdatesWhenNonEmpty() {
-        ImmutableList<SupportMemberFetcher.SupportMember> updated = ImmutableList.of(
-            new SupportMemberFetcher.SupportMember("x@y.com", "UX")
+        ImmutableList<TeamMemberFetcher.TeamMember> updated = ImmutableList.of(
+            new TeamMemberFetcher.TeamMember("x@y.com", "UX")
         );
-        when(memberFetcher.handleSupportMembershipUpdate("SUPPORT_ID", ImmutableList.of("u1")))
+        when(supportMemberFetcher.handleMembershipUpdate("SUPPORT_ID", ImmutableList.of("u1")))
             .thenReturn(updated);
 
-        when(memberFetcher.loadInitialSupportMembers("SUPPORT_ID")).thenReturn(ImmutableList.of());
-        when(memberFetcher.loadInitialLeadershipMembers("LEADERSHIP_ID")).thenReturn(ImmutableList.of());
+        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(ImmutableList.of());
+        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(ImmutableList.of());
         service.init();
 
         service.handleMembershipUpdate("SUPPORT_ID", ImmutableList.of("u1"));
@@ -87,12 +89,12 @@ class SupportTeamServiceTest {
 
     @Test
     void handleSupportMembershipUpdateIgnoresEmptyResults() {
-        ImmutableList<SupportMemberFetcher.SupportMember> initial = ImmutableList.of(
-            new SupportMemberFetcher.SupportMember("keep@y.com", "UO")
+        ImmutableList<TeamMemberFetcher.TeamMember> initial = ImmutableList.of(
+            new TeamMemberFetcher.TeamMember("keep@y.com", "UO")
         );
-        when(memberFetcher.loadInitialSupportMembers("SUPPORT_ID")).thenReturn(initial);
-        when(memberFetcher.loadInitialLeadershipMembers("LEADERSHIP_ID")).thenReturn(ImmutableList.of());
-        when(memberFetcher.handleSupportMembershipUpdate("SUPPORT_ID", ImmutableList.of("u1")))
+        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(initial);
+        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(ImmutableList.of());
+        when(supportMemberFetcher.handleMembershipUpdate("SUPPORT_ID", ImmutableList.of("u1")))
             .thenReturn(ImmutableList.of());
 
         service.init();
@@ -103,14 +105,14 @@ class SupportTeamServiceTest {
 
     @Test
     void handleLeadershipMembershipUpdateUpdatesWhenNonEmpty() {
-        ImmutableList<SupportMemberFetcher.SupportMember> updated = ImmutableList.of(
-            new SupportMemberFetcher.SupportMember("lead@y.com", "UL")
+        ImmutableList<TeamMemberFetcher.TeamMember> updated = ImmutableList.of(
+            new TeamMemberFetcher.TeamMember("lead@y.com", "UL")
         );
-        when(memberFetcher.handleLeadershipMembershipUpdate("LEADERSHIP_ID", ImmutableList.of("u2")))
+        when(leadershipMemberFetcher.handleMembershipUpdate("LEADERSHIP_ID", ImmutableList.of("u2")))
             .thenReturn(updated);
 
-        when(memberFetcher.loadInitialSupportMembers("SUPPORT_ID")).thenReturn(ImmutableList.of());
-        when(memberFetcher.loadInitialLeadershipMembers("LEADERSHIP_ID")).thenReturn(ImmutableList.of());
+        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(ImmutableList.of());
+        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(ImmutableList.of());
         service.init();
 
         service.handleMembershipUpdate("LEADERSHIP_ID", ImmutableList.of("u2"));
@@ -120,12 +122,12 @@ class SupportTeamServiceTest {
 
     @Test
     void handleLeadershipMembershipUpdateIgnoresEmptyResults() {
-        ImmutableList<SupportMemberFetcher.SupportMember> initial = ImmutableList.of(
-            new SupportMemberFetcher.SupportMember("keep@y.com", "UL")
+        ImmutableList<TeamMemberFetcher.TeamMember> initial = ImmutableList.of(
+            new TeamMemberFetcher.TeamMember("keep@y.com", "UL")
         );
-        when(memberFetcher.loadInitialSupportMembers("SUPPORT_ID")).thenReturn(ImmutableList.of());
-        when(memberFetcher.loadInitialLeadershipMembers("LEADERSHIP_ID")).thenReturn(initial);
-        when(memberFetcher.handleLeadershipMembershipUpdate("LEADERSHIP_ID", ImmutableList.of("u2")))
+        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(ImmutableList.of());
+        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(initial);
+        when(leadershipMemberFetcher.handleMembershipUpdate("LEADERSHIP_ID", ImmutableList.of("u2")))
             .thenReturn(ImmutableList.of());
 
         service.init();
