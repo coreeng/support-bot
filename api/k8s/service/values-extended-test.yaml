@@ -170,6 +170,16 @@ configMap:
           enabled: true
         k8s-generic:
           enabled: false
-    support-team:
-      name: Core Support
-      slack-group-id: S08948NBMED
+    team:
+      support:
+        name: Core Support
+        code: core-support
+        slack-group-id: S08948NBMED
+        static:
+          enabled: false
+      leadership:
+        name: Support Leadership
+        code: support-leadership
+        slack-group-id: S0A2CQB5YE9
+        static:
+          enabled: false
