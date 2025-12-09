@@ -30,7 +30,8 @@ public class EscalationProcessingService {
             Escalation.createNew(
                 request.ticket().id(),
                 request.team(),
-                request.tags()
+                request.tags(),
+                request.ticket().queryRef()
             )
         );
         if (escalation == null || escalation.id() == null) {
@@ -53,8 +54,6 @@ public class EscalationProcessingService {
         ));
 
         escalation = escalation.toBuilder()
-            .channelId(request.ticket().channelId())
-            .threadTs(request.ticket().queryTs())
             .createdMessageTs(MessageTs.of(messagePostResponse.getTs()))
             .build();
         escalation = repository.update(escalation);

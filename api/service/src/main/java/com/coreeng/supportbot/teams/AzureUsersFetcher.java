@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 /**
  * Requires Azure permissions: GroupMember.Read.All, User.ReadBasic.All
@@ -20,17 +21,17 @@ public class AzureUsersFetcher implements PlatformUsersFetcher {
     @Override
     public List<Membership> fetchMembershipsByGroupRef(String groupRef) {
         UserCollectionResponse response = graphClient.groups().byGroupId(groupRef)
-            .transitiveMembers().graphUser().get(req -> {
-                requireNonNull(req.queryParameters);
-                req.queryParameters.select = new String[]{"mail", "accountEnabled", "deletedDateTime"};
-            });
+                .transitiveMembers().graphUser().get(req -> {
+                    requireNonNull(req.queryParameters);
+                    req.queryParameters.select = new String[]{"mail", "accountEnabled", "deletedDateTime", "userPrincipalName"};
+                });
         requireNonNull(response);
         requireNonNull(response.getValue());
         return response.getValue().stream()
             .filter(v -> v.getDeletedDateTime() == null
                 && v.getAccountEnabled() != null && v.getAccountEnabled()
-                && v.getMail() != null && !v.getMail().isBlank())
-            .map(v -> new Membership(v.getMail()))
+                && (!isBlank(v.getMail()) || !isBlank(v.getUserPrincipalName())))
+            .map(v -> new Membership(v.getMail() != null ? v.getMail() : v.getUserPrincipalName()))
             .toList();
     }
 }
