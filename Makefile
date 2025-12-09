@@ -59,8 +59,8 @@ build-integration:
 	docker buildx build --platform linux/amd64 "$(p2p_image_cache)" --tag "$(p2p_image_tag)" --file api/integration-tests/Dockerfile api --load
 
 .PHONY: build-extended-test
-build-extended-test:
-	@echo "WARNING: $@ not implemented"
+build-extended-test: lint-app ## Build app for extended test
+	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --build-arg P2P_VERSION="$(p2p_version)" api
 
 ##@ Push targets
 
@@ -81,8 +81,8 @@ push-integration: ## Push integration test docker image
 	docker image push "$(p2p_image_tag)"
 
 .PHONY: push-extended-test
-push-extended-test: ## Push extended-test test docker image
-	@echo "WARNING: $@ not implemented"
+push-extended-test: ## Push extended-test docker image
+	docker image push "$(p2p_image_tag)"
 
 ##@ Deploy targets
 
@@ -95,8 +95,15 @@ deploy-nft:
 	@echo "WARNING: $@ not implemented"
 
 .PHONY: deploy-extended-test
-deploy-extended-test:
-	@echo "WARNING: $@ not implemented"
+deploy-extended-test: ## Deploy service and DB for extended test environment
+	NAMESPACE="$(p2p_namespace)" \
+	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
+	SERVICE_IMAGE_TAG="$(p2p_version)" \
+	DB_RELEASE="$(p2p_app_name)-db" \
+	SERVICE_RELEASE="$(p2p_app_name)" \
+	ACTION=deploy \
+	VALUES_FILE=api/k8s/service/values-extended-test.yaml \
+	./api/scripts/deploy-service.sh
 
 .PHONY: deploy-functional
 deploy-functional: ## Deploy service and DB for functional tests, then run tests
@@ -108,7 +115,6 @@ deploy-functional: ## Deploy service and DB for functional tests, then run tests
 	ACTION=deploy \
 	VALUES_FILE=api/k8s/service/values-functional.yaml \
 	./api/scripts/deploy-service.sh
-
 ##@ Run targets
 
 .PHONY: run-app
