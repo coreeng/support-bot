@@ -60,6 +60,17 @@ public class StatsResult {
         @JsonUnwrapped
         private StatsRequest.Ratings request;
         private RatingsValues values;
+        private ImmutableList<WeeklyRating> weekly;
+
+    }
+
+    @Getter
+    @SuperBuilder
+    @Jacksonized
+    public static class WeeklyRating {
+        private LocalDate weekStart;
+        private Double average;
+        private Integer count;
     }
 
     @Getter

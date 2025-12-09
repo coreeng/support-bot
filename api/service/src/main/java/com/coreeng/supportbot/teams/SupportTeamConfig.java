@@ -13,27 +13,31 @@ import java.util.concurrent.ExecutorService;
 @Configuration
 @EnableConfigurationProperties({
         SupportTeamProps.class,
-        StaticSupportTeamProps.class
+        SupportLeadershipTeamProps.class,
+        StaticSupportTeamProps.class,
+        StaticLeadershipTeamProps.class
 })
 @RequiredArgsConstructor
 public class SupportTeamConfig {
     private final SupportTeamProps supportTeamProps;
-    private final StaticSupportTeamProps staticSupportTeamProps;
+    private final SupportLeadershipTeamProps leadershipTeamProps;
+    private final StaticSupportTeamProps staticSupportProps;
+    private final StaticLeadershipTeamProps staticLeadershipProps;
 
     @Bean
-    @ConditionalOnProperty(value = "support-team.static.enabled", havingValue = "false", matchIfMissing = true)
-    public SupportMemberFetcher slackSupportMemberUpdater(SlackClient slackClient, ExecutorService executor) {
+    @ConditionalOnProperty(value = "team.support.static.enabled", havingValue = "false", matchIfMissing = true)
+    public SupportMemberFetcher slackSupportMemberFetcher(SlackClient slackClient, ExecutorService executor) {
         return new SlackSupportMemberFetcher(slackClient, executor);
     }
 
     @Bean
-    @ConditionalOnProperty("support-team.static.enabled")
-    public SupportMemberFetcher staticSupportMemberUpdater() {
-        return new StaticSupportMemberFetcher(staticSupportTeamProps);
+    @ConditionalOnProperty("team.support.static.enabled")
+    public SupportMemberFetcher staticSupportMemberFetcher() {
+        return new StaticSupportMemberFetcher(staticSupportProps, staticLeadershipProps);
     }
 
     @Bean
-    public SupportTeamService supportTeamService(SupportMemberFetcher memberUpdater) {
-        return new SupportTeamService(supportTeamProps, memberUpdater);
+    public SupportTeamService supportTeamService(SupportMemberFetcher memberFetcher) {
+        return new SupportTeamService(supportTeamProps, leadershipTeamProps, memberFetcher);
     }
 }

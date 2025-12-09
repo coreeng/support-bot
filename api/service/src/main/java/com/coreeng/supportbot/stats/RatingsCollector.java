@@ -6,7 +6,12 @@ import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -21,29 +26,29 @@ public class RatingsCollector implements StatsCollector<StatsRequest.Ratings> {
     @Override
     public StatsResult calculateResults(StatsRequest.Ratings request) {
         ImmutableList<Rating> allRatings = ratingService.getAllRatings();
-        ImmutableList<Rating> filteredRatings;
+        ImmutableList<Rating> filtered = filterByRange(allRatings, request);
 
-        if (request.from() != null && request.to() != null) {
-            long fromEpochSecond = request.from().atStartOfDay(ZoneOffset.UTC).toEpochSecond();
-            long toEpochSecond = request.to().plusDays(1).atStartOfDay(ZoneOffset.UTC).toEpochSecond();
-
-            filteredRatings = allRatings.stream()
-                    .filter(rating -> {
-                        long submittedEpoch = Long.parseLong(rating.submittedTs());
-                        return submittedEpoch >= fromEpochSecond && submittedEpoch < toEpochSecond;
-                    })
-                    .collect(ImmutableList.toImmutableList());
-        } else {
-            filteredRatings = allRatings;
-        }
-
-        int count = filteredRatings.size();
+        int count = filtered.size();
         Double average = count > 0
-                ? filteredRatings.stream()
-                    .mapToInt(Rating::rating)
-                    .average()
-                    .orElse(0.0)
+                ? filtered.stream().mapToInt(Rating::rating).average().orElse(0.0)
                 : null;
+
+        // group by week start (Monday)
+        Map<LocalDate, List<Rating>> byWeek = filtered.stream()
+                .collect(Collectors.groupingBy(r -> weekStartOf(r.submittedTs())));
+
+        ImmutableList<StatsResult.WeeklyRating> weekly = byWeek.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> {
+                    List<Rating> rs = e.getValue();
+                    double avg = rs.stream().mapToInt(Rating::rating).average().orElse(0.0);
+                    return StatsResult.WeeklyRating.builder()
+                            .weekStart(e.getKey())
+                            .average(avg)
+                            .count(rs.size())
+                            .build();
+                })
+                .collect(ImmutableList.toImmutableList());
 
         StatsResult.RatingsValues values = StatsResult.RatingsValues.builder()
                 .average(average)
@@ -53,7 +58,27 @@ public class RatingsCollector implements StatsCollector<StatsRequest.Ratings> {
         return StatsResult.Ratings.builder()
                 .request(request)
                 .values(values)
+                .weekly(weekly)
                 .build();
     }
-}
 
+    private ImmutableList<Rating> filterByRange(ImmutableList<Rating> ratings, StatsRequest.Ratings req) {
+        if (req.from() == null || req.to() == null) {
+            return ratings;
+        }
+        long fromEpoch = req.from().atStartOfDay(ZoneOffset.UTC).toEpochSecond();
+        long toEpoch = req.to().plusDays(1).atStartOfDay(ZoneOffset.UTC).toEpochSecond();
+        return ratings.stream()
+                .filter(r -> {
+                    long submittedEpoch = Long.parseLong(r.submittedTs());
+                    return submittedEpoch >= fromEpoch && submittedEpoch < toEpoch;
+                })
+                .collect(ImmutableList.toImmutableList());
+    }
+
+    private LocalDate weekStartOf(String submittedTs) {
+        long epoch = Long.parseLong(submittedTs);
+        LocalDate date = Instant.ofEpochSecond(epoch).atZone(ZoneOffset.UTC).toLocalDate();
+        return date.with(java.time.DayOfWeek.MONDAY);
+    }
+}
