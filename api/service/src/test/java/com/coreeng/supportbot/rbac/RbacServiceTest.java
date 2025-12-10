@@ -3,6 +3,7 @@ package com.coreeng.supportbot.rbac;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,7 +22,7 @@ class RbacServiceTest {
     void isSupportBySlackId_whenRbacDisabled_returnsTrue() {
         // given
         RbacService rbacService = new RbacService(new RbacProps(false), supportTeamService);
-        String slackId = "U123456";
+        SlackId.User slackId = SlackId.user("U123456");
 
         // when
         boolean result = rbacService.isSupportBySlackId(slackId);
@@ -35,7 +36,7 @@ class RbacServiceTest {
     void isSupportBySlackId_whenRbacEnabledAndUserIsSupport_returnsTrue() {
         // given
         RbacService rbacService = new RbacService(new RbacProps(true), supportTeamService);
-        String slackId = "U123456";
+        SlackId.User slackId = SlackId.user("U123456");
         when(supportTeamService.isMemberByUserId(slackId)).thenReturn(true);
 
         // whe
@@ -50,7 +51,7 @@ class RbacServiceTest {
     void isSupportBySlackId_whenRbacEnabledAndUserIsNotSupport_returnsFalse() {
         // given
         RbacService rbacService = new RbacService(new RbacProps(true), supportTeamService);
-        String slackId = "U123456";
+        SlackId.User slackId = SlackId.user("U123456");
         when(supportTeamService.isMemberByUserId(slackId)).thenReturn(false);
 
         // whe

@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.teams;
 
 import com.coreeng.supportbot.config.SupportTeamProps;
+import com.coreeng.supportbot.slack.SlackId;
 import com.google.common.collect.ImmutableList;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
@@ -22,8 +23,8 @@ public class SupportTeamService {
 
     @PostConstruct
     void init() {
-        this.members = supportTeamFetcher.loadInitialMembers(supportTeamProps.slackGroupId());
-        this.leadershipMembers = leadershipTeamFetcher.loadInitialMembers(leadershipTeamProps.slackGroupId());
+        this.members = supportTeamFetcher.loadInitialMembers(SlackId.group(supportTeamProps.slackGroupId()));
+        this.leadershipMembers = leadershipTeamFetcher.loadInitialMembers(SlackId.group(leadershipTeamProps.slackGroupId()));
     }
 
     public Team getTeam() {
@@ -46,7 +47,7 @@ public class SupportTeamService {
         return members.stream().anyMatch(member -> member.email().equalsIgnoreCase(email));
     }
 
-    public boolean isMemberByUserId(String userId) {
+    public boolean isMemberByUserId(SlackId.User userId) {
         return members.stream().anyMatch(member -> member.slackId().equals(userId));
     }
 
@@ -54,8 +55,8 @@ public class SupportTeamService {
         return leadershipMembers.stream().anyMatch(member -> member.email().equalsIgnoreCase(email));
     }
 
-    public void handleMembershipUpdate(String groupId, ImmutableList<String> teamUsers) {
-        if (supportTeamProps.slackGroupId().equals(groupId)) {
+    public void handleMembershipUpdate(SlackId.Group groupId, ImmutableList<SlackId.User> teamUsers) {
+        if (supportTeamProps.slackGroupId().equals(groupId.id())) {
             ImmutableList<TeamMemberFetcher.TeamMember> updatedMembers =
                     supportTeamFetcher.handleMembershipUpdate(groupId, teamUsers);
             if (!updatedMembers.isEmpty()) {
@@ -64,7 +65,7 @@ public class SupportTeamService {
                         .addArgument(updatedMembers::size)
                         .log("Updated support team members to {} entries");
             }
-        } else if (leadershipTeamProps.slackGroupId().equals(groupId)) {
+        } else if (leadershipTeamProps.slackGroupId().equals(groupId.id())) {
             ImmutableList<TeamMemberFetcher.TeamMember> updatedMembers =
                     leadershipTeamFetcher.handleMembershipUpdate(groupId, teamUsers);
             if (!updatedMembers.isEmpty()) {

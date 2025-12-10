@@ -16,6 +16,7 @@ import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.coreeng.supportbot.rbac.RbacService;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.ticket.EscalateViewMapper;
 import com.coreeng.supportbot.ticket.TicketConfirmSubmissionMapper;
 import com.coreeng.supportbot.ticket.TicketProcessingService;
@@ -63,14 +64,14 @@ class TicketViewsSubmissionHandlerTest {
         ViewSubmissionRequest request = mock(ViewSubmissionRequest.class);
 
         when(context.getRequestUserId()).thenReturn(userId);
-        when(rbacService.isSupportBySlackId(userId)).thenReturn(false);
+        when(rbacService.isSupportBySlackId(SlackId.user(userId))).thenReturn(false);
 
         // when
         ViewSubmissionResponse response = handler.apply(request, context);
 
         // then
         assertEquals(new ViewSubmissionResponse(), response);
-        verify(rbacService).isSupportBySlackId(userId);
+        verify(rbacService).isSupportBySlackId(SlackId.user(userId));
         verifyNoInteractions(ticketProcessingService, ticketSummaryViewMapper, escalateViewMapper, confirmSubmissionMapper);
     }
 
@@ -89,14 +90,14 @@ class TicketViewsSubmissionHandlerTest {
             .build();
 
         when(context.getRequestUserId()).thenReturn(userId);
-        when(rbacService.isSupportBySlackId(userId)).thenReturn(true);
+        when(rbacService.isSupportBySlackId(SlackId.user(userId))).thenReturn(true);
         when(request.getPayload()).thenReturn(payload);
 
         // when
         ViewSubmissionResponse response = handler.apply(request, context);
 
         // then
-        verify(rbacService).isSupportBySlackId(userId);
+        verify(rbacService).isSupportBySlackId(SlackId.user(userId));
         assertFalse(response.getErrors().isEmpty());
         assertNull(response.getView());
     }

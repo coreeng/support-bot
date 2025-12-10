@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.teams;
 
 import com.coreeng.supportbot.config.SupportTeamProps;
+import com.coreeng.supportbot.slack.SlackId;
 import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,28 +31,28 @@ class SupportTeamServiceTest {
     @Test
     void initLoadsSupportAndLeadershipMembers() {
         ImmutableList<TeamMemberFetcher.TeamMember> supportMembers = ImmutableList.of(
-            new TeamMemberFetcher.TeamMember("a@c.com", "U1")
+            new TeamMemberFetcher.TeamMember("a@c.com", SlackId.user("U1"))
         );
         ImmutableList<TeamMemberFetcher.TeamMember> leadershipMembers = ImmutableList.of(
-            new TeamMemberFetcher.TeamMember("b@c.com", "U2")
+            new TeamMemberFetcher.TeamMember("b@c.com", SlackId.user("U2"))
         );
-        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(supportMembers);
-        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(leadershipMembers);
+        when(supportMemberFetcher.loadInitialMembers(SlackId.group("SUPPORT_ID"))).thenReturn(supportMembers);
+        when(leadershipMemberFetcher.loadInitialMembers(SlackId.group("LEADERSHIP_ID"))).thenReturn(leadershipMembers);
 
         service.init(); // package-private, ok in same package
 
         assertThat(service.members()).containsExactlyElementsOf(supportMembers);
         assertThat(service.leadershipMembers()).containsExactlyElementsOf(leadershipMembers);
-        verify(supportMemberFetcher).loadInitialMembers("SUPPORT_ID");
-        verify(leadershipMemberFetcher).loadInitialMembers("LEADERSHIP_ID");
+        verify(supportMemberFetcher).loadInitialMembers(SlackId.group("SUPPORT_ID"));
+        verify(leadershipMemberFetcher).loadInitialMembers(SlackId.group("LEADERSHIP_ID"));
     }
 
     @Test
     void isMemberChecksCaseInsensitive() {
-        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(
-            ImmutableList.of(new TeamMemberFetcher.TeamMember("USER@c.com", "U1"))
+        when(supportMemberFetcher.loadInitialMembers(SlackId.group("SUPPORT_ID"))).thenReturn(
+            ImmutableList.of(new TeamMemberFetcher.TeamMember("USER@c.com", SlackId.user("U1")))
         );
-        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(ImmutableList.of());
+        when(leadershipMemberFetcher.loadInitialMembers(SlackId.group("LEADERSHIP_ID"))).thenReturn(ImmutableList.of());
 
         service.init();
 
@@ -60,9 +61,9 @@ class SupportTeamServiceTest {
 
     @Test
     void isLeadershipMemberChecksCaseInsensitive() {
-        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(ImmutableList.of());
-        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(
-            ImmutableList.of(new TeamMemberFetcher.TeamMember("LEAD@c.com", "U2"))
+        when(supportMemberFetcher.loadInitialMembers(SlackId.group("SUPPORT_ID"))).thenReturn(ImmutableList.of());
+        when(leadershipMemberFetcher.loadInitialMembers(SlackId.group("LEADERSHIP_ID"))).thenReturn(
+            ImmutableList.of(new TeamMemberFetcher.TeamMember("LEAD@c.com", SlackId.user("U2")))
         );
 
         service.init();
@@ -73,16 +74,16 @@ class SupportTeamServiceTest {
     @Test
     void handleSupportMembershipUpdateUpdatesWhenNonEmpty() {
         ImmutableList<TeamMemberFetcher.TeamMember> updated = ImmutableList.of(
-            new TeamMemberFetcher.TeamMember("x@y.com", "UX")
+            new TeamMemberFetcher.TeamMember("x@y.com", SlackId.user("UX"))
         );
-        when(supportMemberFetcher.handleMembershipUpdate("SUPPORT_ID", ImmutableList.of("u1")))
+        when(supportMemberFetcher.handleMembershipUpdate(SlackId.group("SUPPORT_ID"), ImmutableList.of(SlackId.user("u1"))))
             .thenReturn(updated);
 
-        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(ImmutableList.of());
-        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(ImmutableList.of());
+        when(supportMemberFetcher.loadInitialMembers(SlackId.group("SUPPORT_ID"))).thenReturn(ImmutableList.of());
+        when(leadershipMemberFetcher.loadInitialMembers(SlackId.group("LEADERSHIP_ID"))).thenReturn(ImmutableList.of());
         service.init();
 
-        service.handleMembershipUpdate("SUPPORT_ID", ImmutableList.of("u1"));
+        service.handleMembershipUpdate(SlackId.group("SUPPORT_ID"), ImmutableList.of(SlackId.user("u1")));
 
         assertThat(service.members()).containsExactlyElementsOf(updated);
     }
@@ -90,15 +91,15 @@ class SupportTeamServiceTest {
     @Test
     void handleSupportMembershipUpdateIgnoresEmptyResults() {
         ImmutableList<TeamMemberFetcher.TeamMember> initial = ImmutableList.of(
-            new TeamMemberFetcher.TeamMember("keep@y.com", "UO")
+            new TeamMemberFetcher.TeamMember("keep@y.com", SlackId.user("UO"))
         );
-        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(initial);
-        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(ImmutableList.of());
-        when(supportMemberFetcher.handleMembershipUpdate("SUPPORT_ID", ImmutableList.of("u1")))
+        when(supportMemberFetcher.loadInitialMembers(SlackId.group("SUPPORT_ID"))).thenReturn(initial);
+        when(leadershipMemberFetcher.loadInitialMembers(SlackId.group("LEADERSHIP_ID"))).thenReturn(ImmutableList.of());
+        when(supportMemberFetcher.handleMembershipUpdate(SlackId.group("SUPPORT_ID"), ImmutableList.of(SlackId.user("u1"))))
             .thenReturn(ImmutableList.of());
 
         service.init();
-        service.handleMembershipUpdate("SUPPORT_ID", ImmutableList.of("u1"));
+        service.handleMembershipUpdate(SlackId.group("SUPPORT_ID"), ImmutableList.of(SlackId.user("u1")));
 
         assertThat(service.members()).containsExactlyElementsOf(initial);
     }
@@ -106,16 +107,16 @@ class SupportTeamServiceTest {
     @Test
     void handleLeadershipMembershipUpdateUpdatesWhenNonEmpty() {
         ImmutableList<TeamMemberFetcher.TeamMember> updated = ImmutableList.of(
-            new TeamMemberFetcher.TeamMember("lead@y.com", "UL")
+            new TeamMemberFetcher.TeamMember("lead@y.com", SlackId.user("UL"))
         );
-        when(leadershipMemberFetcher.handleMembershipUpdate("LEADERSHIP_ID", ImmutableList.of("u2")))
+        when(leadershipMemberFetcher.handleMembershipUpdate(SlackId.group("LEADERSHIP_ID"), ImmutableList.of(SlackId.user("u2"))))
             .thenReturn(updated);
 
-        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(ImmutableList.of());
-        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(ImmutableList.of());
+        when(supportMemberFetcher.loadInitialMembers(SlackId.group("SUPPORT_ID"))).thenReturn(ImmutableList.of());
+        when(leadershipMemberFetcher.loadInitialMembers(SlackId.group("LEADERSHIP_ID"))).thenReturn(ImmutableList.of());
         service.init();
 
-        service.handleMembershipUpdate("LEADERSHIP_ID", ImmutableList.of("u2"));
+        service.handleMembershipUpdate(SlackId.group("LEADERSHIP_ID"), ImmutableList.of(SlackId.user("u2")));
 
         assertThat(service.leadershipMembers()).containsExactlyElementsOf(updated);
     }
@@ -123,15 +124,15 @@ class SupportTeamServiceTest {
     @Test
     void handleLeadershipMembershipUpdateIgnoresEmptyResults() {
         ImmutableList<TeamMemberFetcher.TeamMember> initial = ImmutableList.of(
-            new TeamMemberFetcher.TeamMember("keep@y.com", "UL")
+            new TeamMemberFetcher.TeamMember("keep@y.com", SlackId.user("UL"))
         );
-        when(supportMemberFetcher.loadInitialMembers("SUPPORT_ID")).thenReturn(ImmutableList.of());
-        when(leadershipMemberFetcher.loadInitialMembers("LEADERSHIP_ID")).thenReturn(initial);
-        when(leadershipMemberFetcher.handleMembershipUpdate("LEADERSHIP_ID", ImmutableList.of("u2")))
+        when(supportMemberFetcher.loadInitialMembers(SlackId.group("SUPPORT_ID"))).thenReturn(ImmutableList.of());
+        when(leadershipMemberFetcher.loadInitialMembers(SlackId.group("LEADERSHIP_ID"))).thenReturn(initial);
+        when(leadershipMemberFetcher.handleMembershipUpdate(SlackId.group("LEADERSHIP_ID"), ImmutableList.of(SlackId.user("u2"))))
             .thenReturn(ImmutableList.of());
 
         service.init();
-        service.handleMembershipUpdate("LEADERSHIP_ID", ImmutableList.of("u2"));
+        service.handleMembershipUpdate(SlackId.group("LEADERSHIP_ID"), ImmutableList.of(SlackId.user("u2")));
 
         assertThat(service.leadershipMembers()).containsExactlyElementsOf(initial);
     }

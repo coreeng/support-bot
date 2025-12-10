@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.teams;
 
+import com.coreeng.supportbot.slack.SlackId;
 import com.google.common.collect.ImmutableList;
 import lombok.extern.slf4j.Slf4j;
 
@@ -25,18 +26,18 @@ public class GenericStaticMemberFetcher<T> implements TeamMemberFetcher {
     }
 
     @Override
-    public ImmutableList<TeamMember> loadInitialMembers(String groupId) {
+    public ImmutableList<TeamMember> loadInitialMembers(SlackId.Group groupId) {
         if (staticMembers == null) {
             log.debug("No static {} team members configured", teamName);
             return ImmutableList.of();
         }
         return staticMembers.stream()
-                .map(member -> new TeamMember(emailExtractor.apply(member), slackIdExtractor.apply(member)))
+                .map(member -> new TeamMember(emailExtractor.apply(member), SlackId.user(slackIdExtractor.apply(member))))
                 .collect(ImmutableList.toImmutableList());
     }
 
     @Override
-    public ImmutableList<TeamMember> handleMembershipUpdate(String groupId, ImmutableList<String> teamUsers) {
+    public ImmutableList<TeamMember> handleMembershipUpdate(SlackId.Group groupId, ImmutableList<SlackId.User> teamUsers) {
         log.info("Ignoring membership update for static {} team", teamName);
         return ImmutableList.of();
     }
