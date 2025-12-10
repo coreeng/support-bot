@@ -81,9 +81,9 @@ public class TicketSummaryService {
             ticket.queryTs()
         );
         String permalink = slackClient.getPermalink(messageRequest);
-        SlackId senderId = SlackId.of(queryMessage.getUser() != null
-            ? queryMessage.getUser()
-            : queryMessage.getBotId());
+        SlackId senderId = queryMessage.getUser() != null
+            ? SlackId.user(queryMessage.getUser())
+            : SlackId.bot(queryMessage.getBotId());
         return new TicketSummaryView.QuerySummaryView(
             ImmutableList.copyOf(queryMessage.getBlocks()),
             new MessageTs(queryMessage.getTs()),

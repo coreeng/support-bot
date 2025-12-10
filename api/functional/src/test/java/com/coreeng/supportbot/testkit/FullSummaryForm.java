@@ -58,16 +58,16 @@ public class FullSummaryForm {
                     }
                     """
             );
+            String authorType = ticket.user().isHuman() ? "user" : "bot";
+            String authorId = ticket.user().isHuman()
+                ? ticket.user().slackUserId()
+                : ticket.user().slackBotId();
             String expectedMetadata = String.format("""
                     {
                       "ticketId": %d,
-                      "authorId": "%s"
+                      "authorId": {"type": "%s", "id": "%s"}
                     }
-                    """, ticket.id(),
-                ticket.user().isHuman()
-                    ? ticket.user().slackUserId()
-                    : ticket.user().slackBotId()
-            );
+                    """, ticket.id(), authorType, authorId);
             assertThatJson(view.get("private_metadata").asText()).isEqualTo(expectedMetadata);
             String expectedBlocks = buildExpectedBlocksJson();
             assertThatJson(view.get("blocks").toString())
