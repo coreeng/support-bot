@@ -3,6 +3,7 @@ package com.coreeng.supportbot.ticket.handler;
 import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackBlockActionHandler;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.coreeng.supportbot.ticket.EscalateViewMapper;
@@ -44,7 +45,7 @@ public class TicketActionsHandler implements SlackBlockActionHandler {
     @Override
     public void apply(BlockActionRequest req, ActionContext context) {
         BlockActionPayload payload = req.getPayload();
-        if (!rbacService.isSupportBySlackId(context.getRequestUserId())) {
+        if (!rbacService.isSupportBySlackId(SlackId.user(context.getRequestUserId()))) {
             log.atInfo()
                 .addArgument(context::getRequestUserId)
                 .log("Rejecting escalation request. User({}) is not a support team member");

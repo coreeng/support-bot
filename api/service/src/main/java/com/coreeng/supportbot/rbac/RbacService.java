@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.rbac;
 
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.teams.SupportTeamService;
 
 import lombok.RequiredArgsConstructor;
@@ -13,7 +14,7 @@ public class RbacService {
         return rbacProps.enabled();
     }
 
-    public boolean isSupportBySlackId(String slackId) {
+    public boolean isSupportBySlackId(SlackId.User slackId) {
         if (!isEnabled()) {
             return true;
         }

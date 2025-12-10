@@ -9,6 +9,7 @@ import javax.annotation.Nullable;
 import org.springframework.stereotype.Component;
 
 import com.coreeng.supportbot.rbac.RbacService;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.SlackViewSubmitHandler;
 import com.coreeng.supportbot.ticket.EscalateViewMapper;
 import com.coreeng.supportbot.ticket.TicketConfirmSubmissionMapper;
@@ -43,7 +44,7 @@ public class TicketViewsSubmissionHandler implements SlackViewSubmitHandler {
 
     @Override
     public ViewSubmissionResponse apply(ViewSubmissionRequest request, ViewSubmissionContext context) {
-        if (!rbacService.isSupportBySlackId(context.getRequestUserId())) {
+        if (!rbacService.isSupportBySlackId(SlackId.user(context.getRequestUserId()))) {
             log.atInfo()
                 .addArgument(context.getRequestUserId())
                 .log("Edit operation is not permitted for user({}), since it's not part of the support team");

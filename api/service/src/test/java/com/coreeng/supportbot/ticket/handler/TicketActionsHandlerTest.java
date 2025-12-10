@@ -2,6 +2,7 @@ package com.coreeng.supportbot.ticket.handler;
 
 import com.coreeng.supportbot.rbac.RbacRestrictionMessage;
 import com.coreeng.supportbot.rbac.RbacService;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.coreeng.supportbot.ticket.EscalateViewMapper;
@@ -69,7 +70,7 @@ class TicketActionsHandlerTest {
             .message(message)
             .build();
 
-        when(rbacService.isSupportBySlackId(userId)).thenReturn(false);
+        when(rbacService.isSupportBySlackId(SlackId.user(userId))).thenReturn(false);
         when(context.getRequestUserId()).thenReturn(userId);
         when(request.getPayload()).thenReturn(payload);
 
@@ -77,7 +78,7 @@ class TicketActionsHandlerTest {
         handler.apply(request, context);
 
         // then
-        verify(rbacService).isSupportBySlackId(userId);
+        verify(rbacService).isSupportBySlackId(SlackId.user(userId));
 
         ArgumentCaptor<SlackPostEphemeralMessageRequest> messageRequestCaptor = ArgumentCaptor.captor();
         verify(slackClient).postEphemeralMessage(messageRequestCaptor.capture());
@@ -104,14 +105,14 @@ class TicketActionsHandlerTest {
             .build();
 
         when(context.getRequestUserId()).thenReturn(userId);
-        when(rbacService.isSupportBySlackId(userId)).thenReturn(true);
+        when(rbacService.isSupportBySlackId(SlackId.user(userId))).thenReturn(true);
         when(request.getPayload()).thenReturn(payload);
 
         // when
         handler.apply(request, context);
 
         // then
-        verify(rbacService).isSupportBySlackId(userId);
+        verify(rbacService).isSupportBySlackId(SlackId.user(userId));
         verifyNoInteractions(summaryViewMapper, escalateViewMapper, ticketSummaryService, slackClient);
     }
 } 

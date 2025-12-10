@@ -3,6 +3,7 @@ package com.coreeng.supportbot.ticket.handler;
 import org.springframework.stereotype.Component;
 
 import com.coreeng.supportbot.slack.SlackEventHandler;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.ticket.TicketProcessingService;
@@ -27,7 +28,7 @@ public class ReactionAddedHandler implements SlackEventHandler<ReactionAddedEven
 
     @Override
     public void apply(EventsApiPayload<ReactionAddedEvent> event, EventContext context) {
-        if (!rbacService.isSupportBySlackId(event.getEvent().getUser())) {
+        if (!rbacService.isSupportBySlackId(SlackId.user(event.getEvent().getUser()))) {
             log.atInfo()
                 .addArgument(() -> event.getEvent().getReaction())
                 .addArgument(() -> event.getEvent().getUser())
