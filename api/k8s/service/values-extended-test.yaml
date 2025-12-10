@@ -1,0 +1,185 @@
+env:
+  - name: DB_HOST
+    valueFrom:
+      secretKeyRef:
+        name: support-bot
+        key: DB_HOST
+  - name: DB_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: support-bot
+        key: DB_USERNAME
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: support-bot
+        key: DB_PASSWORD
+  - name: SLACK_TICKET_CHANNEL_ID
+    value: "C0A29DPJPL3"
+  - name: SLACK_ESCALATION_CHANNEL_ID
+    value: "C0A29DPJPL3"
+  - name: SLACK_SUPPORT_GROUP_ID
+    value: "S08948NBMED"
+  - name: SLACK_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: support-bot
+        key: SLACK_TOKEN
+  - name: SLACK_SOCKET_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: support-bot
+        key: SLACK_SOCKET_TOKEN
+  - name: SLACK_SIGNING_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: support-bot
+        key: SLACK_SIGNING_SECRET
+  - name: AZURE_TENANT_ID
+    valueFrom:
+      secretKeyRef:
+        name: azure
+        key: AZURE_TENANT_ID
+  - name: AZURE_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: azure
+        key: AZURE_CLIENT_ID
+  - name: AZURE_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: azure
+        key: AZURE_CLIENT_SECRET
+
+configMap:
+  create: true
+  name: ""
+  annotations: {}
+  config:
+    logging:
+      config: classpath:logback-json.xml
+    spring:
+      datasource:
+        url: "jdbc:postgresql://${DB_HOST}:5432/supportbot"
+      cloud:
+        azure:
+          profile:
+            tenant-id: ${AZURE_TENANT_ID}
+          credential:
+            client-id: ${AZURE_CLIENT_ID}
+            client-secret: ${AZURE_CLIENT_SECRET}
+        gcp:
+          core:
+            enabled: true
+          credentials:
+            scopes: [ "https://www.googleapis.com/auth/cloud-identity.groups.readonly" ]
+    slack:
+      mode: socket
+      ticket:
+        channel-id: C0A29DPJPL3
+    ticket:
+      staleness-check-job:
+        enabled: true
+        find-stale-cron: 0 0 9 * * 1-5
+        time-to-stale: 7d
+        remind-about-stale-cron: 0 10 9 * * 1-5
+        stale-reminder-interval: 1d
+    enums:
+      escalationTeams:
+        - label: Core Platform Escalations
+          code: core-platform-escalations
+          slack-group-id: S0A2CEZ0QMT
+        - label: Core Community Escalations
+          code: core-community-escalations
+          slack-group-id: S0A2DSQGQ6A
+        - label: Core General Escalations
+          code: core-general-escalations
+          slack-group-id: S0A2CF78M3P
+      tags:
+        - label: Alerting/Callouts
+          code: alerting-callouts
+        - label: Azure Groups
+          code: azure-groups
+        - label: CDN
+          code: cdn
+        - label: DNS
+          code: dns
+        - label: Docker Images
+          code: docker-images
+        - label: Feature Request
+          code: feature-request
+        - label: Git
+          code: git
+        - label: Github Actions
+          code: github-actions
+        - label: Kubernetes Resources
+          code: kubernetes-resources
+        - label: Ingresses
+          code: ingresses
+        - label: Logging
+          code: logging
+        - label: Metrics
+          code: metrics
+        - label: Test Failures
+          code: test-failures
+        - label: Networking
+          code: networking
+        - label: Observability
+          code: observability
+        - label: Miscellaneous
+          code: miscellaneous
+        - label: PR Review
+          code: pr-review
+        - label: Security
+          code: security
+        - label: Tooling
+          code: tooling
+        - label: Insights
+          code: insights
+        - label: Compass
+          code: compass
+        - label: Core Platform
+          code: core-platform
+        - label: Core Community
+          code: core-community
+        - label: Core General
+          code: core-general
+      impacts:
+        - label: Production Blocking
+          code: production-blocking
+        - label: BAU Blocking
+          code: bau-blocking
+        - label: Abnormal Behaviour
+          code: abnormal-behaviour
+        - label: Information Request
+          code: information-request
+        - label: Enhancement Suggestion
+          code: enhancement-suggestion
+    platform-integration:
+      enabled: true
+      fetch:
+        ignore-unknown-teams: true
+      azure:
+        enabled: true
+      static-user:
+        enabled: false
+      teams-scraping:
+        static:
+          enabled: false
+        core-platform:
+          enabled: true
+        k8s-generic:
+          enabled: false
+    team:
+      support:
+        name: Core Support
+        code: core-support
+        slack-group-id: S08948NBMED
+        static:
+          enabled: false
+      leadership:
+        name: Support Leadership
+        code: support-leadership
+        slack-group-id: S0A2CQB5YE9
+        static:
+          enabled: false
