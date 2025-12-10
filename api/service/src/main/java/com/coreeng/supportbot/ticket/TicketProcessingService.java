@@ -86,9 +86,11 @@ public class TicketProcessingService {
         }
 
         Ticket newTicket = repository.createTicketIfNotExists(Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
+        Long firstResponseTimeSecs = calculateFirstResponseTime(newTicket);
         log.atInfo()
             .addKeyValue("action", "ticket_created")
             .addKeyValue("id", newTicket.id().id())
+            .addKeyValue("first_response_time_seconds", firstResponseTimeSecs)
             .log("Ticket created on reaction to message({})", e.messageRef().actualThreadTs());
 
         slackService.markPostTracked(new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
@@ -145,11 +147,9 @@ public class TicketProcessingService {
                 .build()
         );
 
-        Long firstResponseTimeSecs = calculateSecondsSinceCreation(updatedTicket);
         log.atInfo()
             .addKeyValue("action", "ticket_updated")
             .addKeyValue("id", updatedTicket.id().id())
-            .addKeyValue("first_response_time_seconds", firstResponseTimeSecs)
             .addKeyValue("status", updatedTicket.status())
             .addKeyValue("team", updatedTicket.team())
             .addKeyValue("impact", updatedTicket.impact())
@@ -289,20 +289,36 @@ public class TicketProcessingService {
     }
 
     /**
-     * Calculates seconds elapsed since ticket creation for SLA metrics.
-     * Returns null if calculation fails to ensure logging never interrupts ticket our ticket journeys.
-     * We Consider refactoring TicketsGeneralStatsCollector to expose shared duration calculation methods that can be reused here.
-    */
+     * Calculates seconds elapsed from queryTs to when ticket was first opened.
+     * Used for first_response_time_seconds metric.
+     */
     @Nullable
-    public Long calculateSecondsSinceCreation(Ticket ticket) {
+    public Long calculateFirstResponseTime(Ticket ticket) {
         try {
-            Instant createdAt = ticket.queryTs().getDate();
-            return Duration.between(createdAt, Instant.now()).toSeconds();
+            return ticket.statusLog().stream()
+                .filter(statusLog -> statusLog.status() == TicketStatus.opened)
+                .findFirst()
+                .map(statusLog -> Duration.between(ticket.queryTs().getDate(), statusLog.date()).toSeconds())
+                .orElse(null);
         } catch (Exception e) {
-            log.atDebug()
+            log.atWarn()
+                .addArgument(ticket::id)
                 .setCause(e)
-                .log("Could not calculate duration for ticket");
+                .log("Could not calculate first response time for ticket {}");
             return null;
         }
+    }
+
+    /**
+     * Calculates seconds elapsed from when ticket was first opened to now.
+     * Used for escalation_time_seconds and resolution_time_seconds metrics.
+     */
+    @Nullable
+    public Long calculateSecondsSinceCreation(Ticket ticket) {
+        return ticket.statusLog().stream()
+            .filter(log -> log.status() == TicketStatus.opened)
+            .findFirst()
+            .map(log -> Duration.between(log.date(), Instant.now()).toSeconds())
+            .orElse(null);
     }
 }

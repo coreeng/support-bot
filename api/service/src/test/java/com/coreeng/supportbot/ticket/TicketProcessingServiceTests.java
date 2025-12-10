@@ -23,7 +23,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Instant;
 import java.time.ZoneId;
+
+import com.google.common.collect.ImmutableList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
@@ -205,13 +208,19 @@ public class TicketProcessingServiceTests {
 
     @Test
     void ticketOperations_continueWhenDurationCalculationFails() {
-        // given
-        MessageTs invalidTs = MessageTs.of("invalid-timestamp-format");
+        // given - ticket with empty statusLog (no 'opened' status)
+        MessageTs queryTs = MessageTs.of(String.valueOf(System.currentTimeMillis() / 1000.0));
         Ticket ticket = ticketRepository.createTicketIfNotExists(
-            Ticket.createNew(invalidTs, slackTicketsProps.channelId())
+            Ticket.builder()
+                .channelId(slackTicketsProps.channelId())
+                .queryTs(queryTs)
+                .status(TicketStatus.opened)
+                .statusLog(ImmutableList.of())
+                .lastInteractedAt(Instant.now())
+                .build()
         );
 
-        // Force duration to fail e.g. cannot parse invalid ts
+        // Duration returns null when no 'opened' status in statusLog
         Long duration = ticketProcessingService.calculateSecondsSinceCreation(ticket);
         assertThat(duration).isNull();
 
