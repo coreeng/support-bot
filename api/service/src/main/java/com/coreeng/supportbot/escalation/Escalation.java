@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.escalation;
 
+import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
@@ -31,7 +32,8 @@ public class Escalation {
     public static Escalation createNew(
         TicketId ticketId,
         @Nullable String team,
-        ImmutableList<String> tags
+        ImmutableList<String> tags,
+        MessageRef queryRef
     ) {
         return Escalation.builder()
             .ticketId(ticketId)
@@ -39,6 +41,8 @@ public class Escalation {
             .openedAt(Instant.now())
             .team(team)
             .tags(tags)
+            .channelId(queryRef.channelId())
+            .threadTs(queryRef.ts())
             .build();
     }
 

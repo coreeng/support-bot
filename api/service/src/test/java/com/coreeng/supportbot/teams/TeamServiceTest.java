@@ -42,7 +42,7 @@ class TeamServiceTest {
     }
 
     @Test
-    void listTeamsByType_l2Support_returnsEscalationOnlyTeams() {
+    void listTeamsByType_escalation_returnsEscalationOnlyTeams() {
         // given
         PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
 
@@ -60,20 +60,20 @@ class TeamServiceTest {
         TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
 
         // when
-        ImmutableList<Team> result = teamService.listTeamsByType(TeamType.l2Support);
+        ImmutableList<Team> result = teamService.listTeamsByType(TeamType.escalation);
 
         // then
         assertEquals(2, result.size());
         assertEquals("Escalation Team 1", result.get(0).label());
         assertEquals("esc1", result.get(0).code());
-        assertEquals(ImmutableList.of(TeamType.l2Support), result.get(0).types());
+        assertEquals(ImmutableList.of(TeamType.escalation), result.get(0).types());
         assertEquals("Escalation Team 2", result.get(1).label());
         assertEquals("esc2", result.get(1).code());
-        assertEquals(ImmutableList.of(TeamType.l2Support), result.get(1).types());
+        assertEquals(ImmutableList.of(TeamType.escalation), result.get(1).types());
     }
 
     @Test
-    void listTeamsByType_l2Support_returnsTeamsWithBothTypesWhenAlsoPlatformTeam() {
+    void listTeamsByType_escalation_returnsTeamsWithBothTypesWhenAlsoPlatformTeam() {
         // given
         PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
 
@@ -93,7 +93,7 @@ class TeamServiceTest {
         TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
 
         // when
-        ImmutableList<Team> result = teamService.listTeamsByType(TeamType.l2Support);
+        ImmutableList<Team> result = teamService.listTeamsByType(TeamType.escalation);
 
         // then
         assertEquals(2, result.size());
@@ -101,12 +101,12 @@ class TeamServiceTest {
         // First team is both platform and escalation
         assertEquals("Escalation Team 1", result.get(0).label());
         assertEquals("esc1", result.get(0).code());
-        assertEquals(ImmutableList.of(TeamType.tenant, TeamType.l2Support), result.get(0).types());
+        assertEquals(ImmutableList.of(TeamType.tenant, TeamType.escalation), result.get(0).types());
 
         // Second team is escalation only
         assertEquals("Escalation Team 2", result.get(1).label());
         assertEquals("esc2", result.get(1).code());
-        assertEquals(ImmutableList.of(TeamType.l2Support), result.get(1).types());
+        assertEquals(ImmutableList.of(TeamType.escalation), result.get(1).types());
     }
 
     @Test
@@ -126,6 +126,25 @@ class TeamServiceTest {
         assertEquals("Support Team", result.get(0).label());
         assertEquals("support", result.get(0).code());
         assertEquals(ImmutableList.of(TeamType.support), result.get(0).types());
+    }
+
+    @Test
+    void listTeamsByType_leadership_returnsLeadershipTeam() {
+        // given
+        PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
+        EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of());
+        SupportTeamService supportTeamService = mockSupportTeamService();
+
+        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+
+        // when
+        ImmutableList<Team> result = teamService.listTeamsByType(TeamType.leadership);
+
+        // then
+        assertEquals(1, result.size());
+        assertEquals("Leadership Team", result.get(0).label());
+        assertEquals("leadership", result.get(0).code());
+        assertEquals(ImmutableList.of(TeamType.leadership), result.get(0).types());
     }
 
     @Test
@@ -198,7 +217,7 @@ class TeamServiceTest {
         assertNotNull(result);
         assertEquals("Team 1", result.label());
         assertEquals("team1", result.code());
-        assertEquals(ImmutableList.of(TeamType.tenant, TeamType.l2Support), result.types());
+        assertEquals(ImmutableList.of(TeamType.tenant, TeamType.escalation), result.types());
     }
 
     @Test
@@ -226,7 +245,7 @@ class TeamServiceTest {
         assertNotNull(result);
         assertEquals("Escalation Team 1", result.label());
         assertEquals("esc1", result.code());
-        assertEquals(ImmutableList.of(TeamType.l2Support), result.types());
+        assertEquals(ImmutableList.of(TeamType.escalation), result.types());
     }
 
     @Test
@@ -274,11 +293,11 @@ class TeamServiceTest {
         assertEquals("platform1", platformTeam.label());
         assertEquals(ImmutableList.of(TeamType.tenant), platformTeam.types());
 
-        // Verify team with both types has both tenant and l2Support
+        // Verify team with both types has both tenant and escalation
         Team bothTeam = result.stream().filter(t -> "both1".equals(t.code())).findFirst().orElse(null);
         assertNotNull(bothTeam);
         assertEquals("Both Team", bothTeam.label());
-        assertEquals(ImmutableList.of(TeamType.tenant, TeamType.l2Support), bothTeam.types());
+        assertEquals(ImmutableList.of(TeamType.tenant, TeamType.escalation), bothTeam.types());
 
         // Verify support team has only support type
         Team supportTeam = result.stream().filter(t -> "support".equals(t.code())).findFirst().orElse(null);
@@ -288,7 +307,7 @@ class TeamServiceTest {
 
         // Verify we have exactly one of each type
         long platformOnlyCount = result.stream().filter(t -> t.types().equals(ImmutableList.of(TeamType.tenant))).count();
-        long bothTypesCount = result.stream().filter(t -> t.types().equals(ImmutableList.of(TeamType.tenant, TeamType.l2Support))).count();
+        long bothTypesCount = result.stream().filter(t -> t.types().equals(ImmutableList.of(TeamType.tenant, TeamType.escalation))).count();
         long supportOnlyCount = result.stream().filter(t -> t.types().equals(ImmutableList.of(TeamType.support))).count();
 
         assertEquals(1, platformOnlyCount, "Should have exactly 1 platform-only team");
@@ -345,6 +364,52 @@ class TeamServiceTest {
     }
 
     @Test
+    void listTeamsByUserEmail_includesLeadershipTeamForLeadershipMembers() {
+        // given
+        PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
+        PlatformTeam platformTeam = new PlatformTeam("team1", Set.of(), Set.of());
+        when(platformTeamsService.listTeamsByUserEmail("leader@test.com")).thenReturn(ImmutableList.of(platformTeam));
+
+        EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of());
+        SupportTeamService supportTeamService = mockSupportTeamService();
+        when(supportTeamService.isLeadershipMemberByUserEmail("leader@test.com")).thenReturn(true);
+
+        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+
+        // when
+        ImmutableList<Team> result = teamService.listTeamsByUserEmail("leader@test.com");
+
+        // then
+        assertEquals(2, result.size());
+        assertEquals("team1", result.get(0).code());
+        assertEquals("leadership", result.get(1).code());
+    }
+
+    @Test
+    void listTeamsByUserEmail_includesBothSupportAndLeadershipWhenMemberOfBoth() {
+        // given
+        PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
+        PlatformTeam platformTeam = new PlatformTeam("team1", Set.of(), Set.of());
+        when(platformTeamsService.listTeamsByUserEmail("both@test.com")).thenReturn(ImmutableList.of(platformTeam));
+
+        EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of());
+        SupportTeamService supportTeamService = mockSupportTeamService();
+        when(supportTeamService.isMemberByUserEmail("both@test.com")).thenReturn(true);
+        when(supportTeamService.isLeadershipMemberByUserEmail("both@test.com")).thenReturn(true);
+
+        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+
+        // when
+        ImmutableList<Team> result = teamService.listTeamsByUserEmail("both@test.com");
+
+        // then
+        assertEquals(3, result.size());
+        assertEquals("team1", result.get(0).code());
+        assertTrue(result.stream().anyMatch(t -> "support".equals(t.code())));
+        assertTrue(result.stream().anyMatch(t -> "leadership".equals(t.code())));
+    }
+
+    @Test
     void consistency_teamHasSameTypesRegardlessOfHowItsQueried() {
         // given - team that is both platform and escalation
         PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
@@ -365,7 +430,7 @@ class TeamServiceTest {
             .filter(t -> "team1".equals(t.code()))
             .findFirst()
             .orElse(null);
-        Team fromListByTypeL2Support = teamService.listTeamsByType(TeamType.l2Support).stream()
+        Team fromListByTypeEscalation = teamService.listTeamsByType(TeamType.escalation).stream()
             .filter(t -> "team1".equals(t.code()))
             .findFirst()
             .orElse(null);
@@ -375,7 +440,7 @@ class TeamServiceTest {
             .orElse(null);
 
         // then - all should have the same types
-        ImmutableList<TeamType> expectedTypes = ImmutableList.of(TeamType.tenant, TeamType.l2Support);
+        ImmutableList<TeamType> expectedTypes = ImmutableList.of(TeamType.tenant, TeamType.escalation);
 
         assertNotNull(fromFindByCode);
         assertEquals(expectedTypes, fromFindByCode.types());
@@ -383,15 +448,15 @@ class TeamServiceTest {
         assertNotNull(fromListByTypeTenant);
         assertEquals(expectedTypes, fromListByTypeTenant.types());
 
-        assertNotNull(fromListByTypeL2Support);
-        assertEquals(expectedTypes, fromListByTypeL2Support.types());
+        assertNotNull(fromListByTypeEscalation);
+        assertEquals(expectedTypes, fromListByTypeEscalation.types());
 
         assertNotNull(fromListTeams);
         assertEquals(expectedTypes, fromListTeams.types());
     }
 
     @Test
-    void consistency_escalationOnlyTeamHasOnlyL2SupportType() {
+    void consistency_escalationOnlyTeamHasOnlyescalationType() {
         // given - escalation team that is NOT a platform team
         PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
         when(platformTeamsService.listTeams()).thenReturn(ImmutableList.of());
@@ -406,19 +471,19 @@ class TeamServiceTest {
 
         // when - query the same team in different ways
         Team fromFindByCode = teamService.findTeamByCode("esc1");
-        Team fromListByTypeL2Support = teamService.listTeamsByType(TeamType.l2Support).stream()
+        Team fromListByTypeEscalation = teamService.listTeamsByType(TeamType.escalation).stream()
             .filter(t -> "esc1".equals(t.code()))
             .findFirst()
             .orElse(null);
 
-        // then - both should have only l2Support type
-        ImmutableList<TeamType> expectedTypes = ImmutableList.of(TeamType.l2Support);
+        // then - both should have only escalation type
+        ImmutableList<TeamType> expectedTypes = ImmutableList.of(TeamType.escalation);
 
         assertNotNull(fromFindByCode);
         assertEquals(expectedTypes, fromFindByCode.types());
 
-        assertNotNull(fromListByTypeL2Support);
-        assertEquals(expectedTypes, fromListByTypeL2Support.types());
+        assertNotNull(fromListByTypeEscalation);
+        assertEquals(expectedTypes, fromListByTypeEscalation.types());
 
         // Should NOT appear in tenant list
         ImmutableList<Team> tenantTeams = teamService.listTeamsByType(TeamType.tenant);
@@ -428,8 +493,11 @@ class TeamServiceTest {
     private SupportTeamService mockSupportTeamService() {
         SupportTeamService supportTeamService = mock(SupportTeamService.class);
         Team supportTeam = new Team("Support Team", "support", ImmutableList.of(TeamType.support));
+        Team leadershipTeam = new Team("Leadership Team", "leadership", ImmutableList.of(TeamType.leadership));
         when(supportTeamService.getTeam()).thenReturn(supportTeam);
+        when(supportTeamService.getLeadershipTeam()).thenReturn(leadershipTeam);
         when(supportTeamService.isMemberByUserEmail(anyString())).thenReturn(false);
+        when(supportTeamService.isLeadershipMemberByUserEmail(anyString())).thenReturn(false);
         return supportTeamService;
     }
 }

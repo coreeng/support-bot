@@ -80,8 +80,8 @@ class AzureUsersFetcherTest {
         var requestConfigurationMock = mock(GraphUserRequestBuilder.GetRequestConfiguration.class);
         requestConfigurationMock.queryParameters = mock(GraphUserRequestBuilder.GetQueryParameters.class);
         reqConfigCaptor.getValue().accept(requestConfigurationMock);
-        assertEquals(3, requestConfigurationMock.queryParameters.select.length);
-        assertArrayEquals(new String[]{"mail", "accountEnabled", "deletedDateTime"},
+        assertEquals(4, requestConfigurationMock.queryParameters.select.length);
+        assertArrayEquals(new String[]{"mail", "accountEnabled", "deletedDateTime", "userPrincipalName"},
             requestConfigurationMock.queryParameters.select);
     }
 }
