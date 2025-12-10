@@ -71,10 +71,36 @@ class UsersControllerTest {
     }
 
     @Test
-    void shouldReturnNotFoundWhenUserMissing() {
+    void shouldReturnSupportOnlyUserWhenNoPlatformUser() {
+        // given
+        String email = "support-only@test.com";
+        Team supportTeam = new Team("Support Team", "support", ImmutableList.of(TeamType.support));
+
+        when(platformTeamsService.findUserByEmail(email)).thenReturn(null);
+        when(teamService.listTeamsByUserEmail(email)).thenReturn(ImmutableList.of(supportTeam));
+
+        // when
+        ResponseEntity<UserUI> response = controller.findByEmail(email);
+
+        // then
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        UserUI body = response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.email()).isEqualTo(email);
+        assertThat(body.teams()).hasSize(1);
+        assertThat(body.teams().get(0).code()).isEqualTo("support");
+
+        verify(platformTeamsService).findUserByEmail(email);
+        verify(teamService).listTeamsByUserEmail(email);
+        verifyNoMoreInteractions(platformTeamsService, teamService);
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenUserAndTeamsMissing() {
         // given
         String email = "missing@test.com";
         when(platformTeamsService.findUserByEmail(email)).thenReturn(null);
+        when(teamService.listTeamsByUserEmail(email)).thenReturn(ImmutableList.of());
 
         // when
         ResponseEntity<UserUI> response = controller.findByEmail(email);
@@ -84,7 +110,8 @@ class UsersControllerTest {
         assertThat(response.getBody()).isNull();
 
         verify(platformTeamsService).findUserByEmail(email);
-        verifyNoInteractions(teamService);
+        verify(teamService).listTeamsByUserEmail(email);
+        verifyNoMoreInteractions(platformTeamsService, teamService);
     }
 }
 
