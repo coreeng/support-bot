@@ -13,7 +13,9 @@ import org.jspecify.annotations.Nullable;
 public class TeamSuggestionRequest implements BlockSuggestionRequest {
     private final long ticketId;
     @Nullable
-    private final String authorId;
+    private final String userId;
+    @Nullable
+    private final String botId;
     @Builder.Default
     private final String filterValue = "";
 
@@ -34,14 +36,17 @@ public class TeamSuggestionRequest implements BlockSuggestionRequest {
 
     @Override
     public String privateMetadata() {
-        if (authorId == null) {
+        if (userId == null && botId == null) {
             return String.format("""
                 {"ticketId": %d, "authorId": null}
                 """, ticketId);
         }
+
+        String authorType = userId == null ? "bot" : "user";
+        String authorId = userId == null ? botId : userId;
         return String.format("""
-            {"ticketId": %d, "authorId": "%s"}
-            """, ticketId, authorId);
+            {"ticketId": %d, "authorId": {"type": "%s", "id": "%s"}}
+            """, ticketId, authorType, authorId);
     }
 
     @Override
