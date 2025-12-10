@@ -1,3 +1,7 @@
+serviceAccount:
+  annotations:
+    iam.gke.io/gcp-service-account: support-bot-ca@core-platform-efb3c84c.iam.gserviceaccount.com
+
 env:
   - name: DB_HOST
     valueFrom:
@@ -158,16 +162,29 @@ configMap:
     platform-integration:
       enabled: true
       fetch:
-        ignore-unknown-teams: true
-      azure:
+        max-concurrency: 64
+        timeout: 30s
+        ignore-unknown-teams: true # Whether to check for unknown escalation teams and fail if any are found
+      kubernetes:
+        disable-http-proxy: false
+        base-url: ""
+      gcp:
         enabled: true
+        app-name: Support Bot
+        client:
+          base-url: ""
       static-user:
         enabled: false
+      azure:
+        enabled: false
+        client:
+          base-url: ""
       teams-scraping:
         static:
           enabled: false
         core-platform:
           enabled: true
+          context: gcp-dev
         k8s-generic:
           enabled: false
     team:
