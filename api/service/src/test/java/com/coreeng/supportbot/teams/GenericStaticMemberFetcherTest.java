@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.teams;
 
+import com.coreeng.supportbot.slack.SlackId;
 import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +23,7 @@ class GenericStaticMemberFetcherTest {
         );
 
         // When
-        ImmutableList<TeamMemberFetcher.TeamMember> result = fetcher.loadInitialMembers("GROUP_ID");
+        ImmutableList<TeamMemberFetcher.TeamMember> result = fetcher.loadInitialMembers(SlackId.group("GROUP_ID"));
 
         // Then
         assertThat(result).isEmpty();
@@ -43,14 +44,14 @@ class GenericStaticMemberFetcherTest {
         );
 
         // When
-        ImmutableList<TeamMemberFetcher.TeamMember> result = fetcher.loadInitialMembers("GROUP_ID");
+        ImmutableList<TeamMemberFetcher.TeamMember> result = fetcher.loadInitialMembers(SlackId.group("GROUP_ID"));
 
         // Then
         assertThat(result).hasSize(2);
         assertThat(result).extracting(TeamMemberFetcher.TeamMember::email)
                 .containsExactly("alice@example.com", "bob@example.com");
         assertThat(result).extracting(TeamMemberFetcher.TeamMember::slackId)
-                .containsExactly("U1", "U2");
+                .containsExactly(SlackId.user("U1"), SlackId.user("U2"));
     }
 
     @Test
@@ -65,8 +66,8 @@ class GenericStaticMemberFetcherTest {
         );
 
         // When
-        ImmutableList<TeamMemberFetcher.TeamMember> result1 = fetcher.loadInitialMembers("GROUP_A");
-        ImmutableList<TeamMemberFetcher.TeamMember> result2 = fetcher.loadInitialMembers("GROUP_B");
+        ImmutableList<TeamMemberFetcher.TeamMember> result1 = fetcher.loadInitialMembers(SlackId.group("GROUP_A"));
+        ImmutableList<TeamMemberFetcher.TeamMember> result2 = fetcher.loadInitialMembers(SlackId.group("GROUP_B"));
 
         // Then
         assertThat(result1).isEqualTo(result2);
@@ -85,8 +86,8 @@ class GenericStaticMemberFetcherTest {
         );
 
         // When
-        ImmutableList<TeamMemberFetcher.TeamMember> result = 
-                fetcher.handleMembershipUpdate("GROUP_ID", ImmutableList.of("U100", "U200"));
+        ImmutableList<TeamMemberFetcher.TeamMember> result =
+                fetcher.handleMembershipUpdate(SlackId.group("GROUP_ID"), ImmutableList.of(SlackId.user("U100"), SlackId.user("U200")));
 
         // Then
         assertThat(result).isEmpty();
@@ -104,8 +105,8 @@ class GenericStaticMemberFetcherTest {
         );
 
         // When
-        ImmutableList<TeamMemberFetcher.TeamMember> result = 
-                fetcher.handleMembershipUpdate("GROUP_ID", ImmutableList.of("NEW_USER"));
+        ImmutableList<TeamMemberFetcher.TeamMember> result =
+                fetcher.handleMembershipUpdate(SlackId.group("GROUP_ID"), ImmutableList.of(SlackId.user("NEW_USER")));
 
         // Then
         assertThat(result).isEmpty();
@@ -127,7 +128,7 @@ class GenericStaticMemberFetcherTest {
                 );
 
         // When
-        ImmutableList<TeamMemberFetcher.TeamMember> result = fetcher.loadInitialMembers("SUPPORT_GROUP");
+        ImmutableList<TeamMemberFetcher.TeamMember> result = fetcher.loadInitialMembers(SlackId.group("SUPPORT_GROUP"));
 
         // Then
         assertThat(result).hasSize(2);
@@ -151,7 +152,7 @@ class GenericStaticMemberFetcherTest {
                 );
 
         // When
-        ImmutableList<TeamMemberFetcher.TeamMember> result = fetcher.loadInitialMembers("LEADERSHIP_GROUP");
+        ImmutableList<TeamMemberFetcher.TeamMember> result = fetcher.loadInitialMembers(SlackId.group("LEADERSHIP_GROUP"));
 
         // Then
         assertThat(result).hasSize(2);
@@ -171,7 +172,7 @@ class GenericStaticMemberFetcherTest {
         );
 
         // When
-        ImmutableList<TeamMemberFetcher.TeamMember> result = fetcher.loadInitialMembers("GROUP_ID");
+        ImmutableList<TeamMemberFetcher.TeamMember> result = fetcher.loadInitialMembers(SlackId.group("GROUP_ID"));
 
         // Then
         assertThat(result).isEmpty();

@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.teams;
 
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
@@ -16,22 +17,24 @@ public class GenericSlackMemberFetcher implements TeamMemberFetcher {
     private final ExecutorService executor;
 
     @Override
-    public ImmutableList<TeamMember> loadInitialMembers(String groupId) {
+    public ImmutableList<TeamMember> loadInitialMembers(SlackId.Group groupId) {
         ImmutableList<String> teamMembers = slackClient.getGroupMembers(groupId);
-        return loadMembersFromUserIds(teamMembers);
+        return loadMembersFromUserIds(teamMembers.stream()
+                .map(SlackId::user)
+                .collect(ImmutableList.toImmutableList()));
     }
 
     @Override
-    public ImmutableList<TeamMember> handleMembershipUpdate(String groupId, ImmutableList<String> teamUsers) {
+    public ImmutableList<TeamMember> handleMembershipUpdate(SlackId.Group groupId, ImmutableList<SlackId.User> teamUsers) {
         return loadMembersFromUserIds(teamUsers);
     }
 
-    private ImmutableList<TeamMember> loadMembersFromUserIds(ImmutableList<String> teamUserIds) {
+    private ImmutableList<TeamMember> loadMembersFromUserIds(ImmutableList<SlackId.User> teamUserIds) {
         ExecutorCompletionService<TeamMember> completionService = new ExecutorCompletionService<>(executor);
         long totalTasks = 0;
-        for (String userId : teamUserIds) {
+        for (SlackId.User userId : teamUserIds) {
             completionService.submit(() -> new TeamMember(
-                    slackClient.getUserById(userId).getEmail(),
+                    slackClient.getUserById(userId).getProfile().getEmail(),
                     userId
             ));
             totalTasks += 1;

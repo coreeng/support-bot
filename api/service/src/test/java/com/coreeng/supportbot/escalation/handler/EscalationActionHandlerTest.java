@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.coreeng.supportbot.escalation.EscalationCreatedMessageMapper;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
 import com.coreeng.supportbot.rbac.RbacService;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.slack.api.app_backend.interactive_components.payload.BlockActionPayload;
@@ -75,13 +76,13 @@ class EscalationActionHandlerTest {
             .build();
 
         when(request.getPayload()).thenReturn(payload);
-        when(rbacService.isSupportBySlackId(userId)).thenReturn(false);
-        
+        when(rbacService.isSupportBySlackId(SlackId.user(userId))).thenReturn(false);
+
         // when
         handler.apply(request, context);
 
         // then
-        verify(rbacService).isSupportBySlackId(userId);
+        verify(rbacService).isSupportBySlackId(SlackId.user(userId));
 
         ArgumentCaptor<SlackPostEphemeralMessageRequest> messageRequestCaptor = ArgumentCaptor.captor();
         verify(slackClient).postEphemeralMessage(messageRequestCaptor.capture());
@@ -111,13 +112,13 @@ class EscalationActionHandlerTest {
             .build();
 
         when(request.getPayload()).thenReturn(payload);
-        when(rbacService.isSupportBySlackId(userId)).thenReturn(true);
-        
+        when(rbacService.isSupportBySlackId(SlackId.user(userId))).thenReturn(true);
+
         // when
         handler.apply(request, context);
 
         // then
-        verify(rbacService).isSupportBySlackId(userId);
+        verify(rbacService).isSupportBySlackId(SlackId.user(userId));
         verifyNoInteractions(slackClient);
     }
 } 

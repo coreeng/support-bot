@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.coreeng.supportbot.rbac.RbacService;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.ticket.TicketProcessingService;
 import com.slack.api.app_backend.events.payload.EventsApiPayload;
@@ -46,13 +47,13 @@ class ReactionAddedHandlerTest {
         eventPayload.setEvent(event);
         EventContext context = mock(EventContext.class);
 
-        when(rbacService.isSupportBySlackId(userId)).thenReturn(false);
-        
+        when(rbacService.isSupportBySlackId(SlackId.user(userId))).thenReturn(false);
+
         // when
         handler.apply(eventPayload, context);
 
         // then
-        verify(rbacService).isSupportBySlackId(userId);
+        verify(rbacService).isSupportBySlackId(SlackId.user(userId));
         verifyNoInteractions(ticketProcessingService);
     }
 
@@ -77,13 +78,13 @@ class ReactionAddedHandlerTest {
         EventContext context = mock(EventContext.class);
 
         when(context.getThreadTs()).thenReturn(threadTs);
-        when(rbacService.isSupportBySlackId(userId)).thenReturn(true);
+        when(rbacService.isSupportBySlackId(SlackId.user(userId))).thenReturn(true);
 
         // when
         handler.apply(eventPayload, context);
 
         // then
-        verify(rbacService).isSupportBySlackId(userId);
+        verify(rbacService).isSupportBySlackId(SlackId.user(userId));
         verify(ticketProcessingService).handleReactionAdded(any(ReactionAdded.class));
     }
 } 

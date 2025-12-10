@@ -7,6 +7,7 @@ import com.coreeng.supportbot.escalation.EscalationProcessingService;
 import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackBlockActionHandler;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.coreeng.supportbot.rbac.RbacRestrictionMessage;
@@ -39,7 +40,7 @@ public class EscalationActionHandler implements SlackBlockActionHandler {
     public void apply(BlockActionRequest req, ActionContext context) throws IOException, SlackApiException {
         BlockActionPayload payload = req.getPayload();
         String userId = payload.getUser().getId();
-        if (!rbacService.isSupportBySlackId(userId)) {
+        if (!rbacService.isSupportBySlackId(SlackId.user(userId))) {
             log.info("Skipping escalation action. User({}) is not a support team member", userId);
             slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
                 .message(new RbacRestrictionMessage())
