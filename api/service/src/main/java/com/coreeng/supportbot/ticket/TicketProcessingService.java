@@ -8,10 +8,12 @@ import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import jakarta.validation.constraints.NotNull;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -29,8 +31,10 @@ public class TicketProcessingService {
         if (isQueryEvent(e)) {
             repository.createQueryIfNotExists(e.messageRef());
             log.atInfo()
-                .addArgument(e::messageRef)
-                .log("Query is created on message({})");
+                .addKeyValue("action", "query_created")
+                .addKeyValue("channel_id", e.messageRef().channelId())
+                .addKeyValue("message_ts", e.messageRef().ts().ts())
+                .log("Query created");
             return;
         }
 
@@ -82,9 +86,11 @@ public class TicketProcessingService {
         }
 
         Ticket newTicket = repository.createTicketIfNotExists(Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
+        Long firstResponseTimeSecs = calculateFirstResponseTime(newTicket);
         log.atInfo()
             .addKeyValue("action", "ticket_created")
             .addKeyValue("id", newTicket.id().id())
+            .addKeyValue("first_response_time_seconds", firstResponseTimeSecs)
             .log("Ticket created on reaction to message({})", e.messageRef().actualThreadTs());
 
         slackService.markPostTracked(new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
@@ -177,11 +183,14 @@ public class TicketProcessingService {
             request.threadPermalink(),
             request.tags()
         ));
+        Long escalationTimeSecs = calculateSecondsSinceCreation(ticket);
         log.atInfo()
             .addKeyValue("action", "ticket_escalated")
             .addKeyValue("id", ticket.id().id())
+            .addKeyValue("escalation_time_seconds", escalationTimeSecs)
             .addKeyValue("escalation_team", request.team())
             .addKeyValue("team", ticket.team())
+            .addKeyValue("impact", ticket.impact())
             .addKeyValue("tags", request.tags())
             .log("Ticket escalated");
         slackService.markTicketEscalated(ticket.queryRef());
@@ -240,10 +249,14 @@ public class TicketProcessingService {
             ticket.status()
         ));
         Ticket updatedTicket = repository.insertStatusLog(ticket, Instant.now());
+        Long resolutionTimeSecs = updatedTicket.status() == TicketStatus.closed
+            ? calculateSecondsSinceCreation(updatedTicket)
+            : null;
         log.atInfo()
             .addKeyValue("action", "ticket_changed")
             .addKeyValue("id", updatedTicket.id().id())
             .addKeyValue("status", updatedTicket.status())
+            .addKeyValue("resolution_time_seconds", resolutionTimeSecs)
             .addKeyValue("team", updatedTicket.team())
             .addKeyValue("impact", updatedTicket.impact())
             .addKeyValue("tags", updatedTicket.tags())
@@ -273,5 +286,39 @@ public class TicketProcessingService {
     private boolean isQueryEvent(SlackEvent event) {
         return Objects.equals(slackTicketsProps.channelId(), event.messageRef().channelId())
             && !event.messageRef().isReply();
+    }
+
+    /**
+     * Calculates seconds elapsed from queryTs to when ticket was first opened.
+     * Used for first_response_time_seconds metric.
+     */
+    @Nullable
+    public Long calculateFirstResponseTime(Ticket ticket) {
+        try {
+            return ticket.statusLog().stream()
+                .filter(statusLog -> statusLog.status() == TicketStatus.opened)
+                .findFirst()
+                .map(statusLog -> Duration.between(ticket.queryTs().getDate(), statusLog.date()).toSeconds())
+                .orElse(null);
+        } catch (Exception e) {
+            log.atWarn()
+                .addArgument(ticket::id)
+                .setCause(e)
+                .log("Could not calculate first response time for ticket {}");
+            return null;
+        }
+    }
+
+    /**
+     * Calculates seconds elapsed from when ticket was first opened to now.
+     * Used for escalation_time_seconds and resolution_time_seconds metrics.
+     */
+    @Nullable
+    public Long calculateSecondsSinceCreation(Ticket ticket) {
+        return ticket.statusLog().stream()
+            .filter(log -> log.status() == TicketStatus.opened)
+            .findFirst()
+            .map(log -> Duration.between(log.date(), Instant.now()).toSeconds())
+            .orElse(null);
     }
 }

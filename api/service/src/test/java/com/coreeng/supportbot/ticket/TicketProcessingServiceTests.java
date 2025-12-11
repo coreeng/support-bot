@@ -23,8 +23,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Instant;
 import java.time.ZoneId;
 
+import com.google.common.collect.ImmutableList;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -153,5 +157,81 @@ public class TicketProcessingServiceTests {
         verify(slackService, description("Post is tracked")).markPostTracked(threadRef);
         verify(slackService, description("Ticket form is posted"))
             .postTicketForm(eq(threadRef), createdMessageCaptor.capture());
+    }
+
+    @Test
+    void calculateSecondsSinceCreation_returnsPositiveDuration() {
+        // given
+        MessageTs oneSecondAgo = MessageTs.of(String.valueOf(
+            (System.currentTimeMillis() / 1000.0) - 1
+        ));
+        Ticket ticket = Ticket.createNew(oneSecondAgo, slackTicketsProps.channelId());
+
+        // when
+        Long seconds = ticketProcessingService.calculateSecondsSinceCreation(ticket);
+
+        // then
+        assertThat(seconds).isNotNull();
+        assertThat(seconds).isGreaterThanOrEqualTo(0L);
+    }
+
+    @Test
+    void calculateSecondsSinceCreation_returnsNullForNullQueryTs() {
+        Ticket ticket = Ticket.builder()
+            .channelId(slackTicketsProps.channelId())
+            .status(TicketStatus.opened)
+            .queryTs(null)
+            .build();
+
+        // when
+        Long seconds = ticketProcessingService.calculateSecondsSinceCreation(ticket);
+
+        // then - should return null, not throw
+        assertThat(seconds).isNull();
+    }
+
+    @Test
+    void calculateSecondsSinceCreation_returnsNullForInvalidTimestamp() {
+        // given
+        Ticket ticket = Ticket.builder()
+            .channelId(slackTicketsProps.channelId())
+            .status(TicketStatus.opened)
+            .queryTs(MessageTs.of("invalid-timestamp"))
+            .build();
+
+        // when
+        Long seconds = ticketProcessingService.calculateSecondsSinceCreation(ticket);
+
+        // then
+        assertThat(seconds).isNull();
+    }
+
+    @Test
+    void ticketOperations_continueWhenDurationCalculationFails() {
+        // given - ticket with empty statusLog (no 'opened' status)
+        MessageTs queryTs = MessageTs.of(String.valueOf(System.currentTimeMillis() / 1000.0));
+        Ticket ticket = ticketRepository.createTicketIfNotExists(
+            Ticket.builder()
+                .channelId(slackTicketsProps.channelId())
+                .queryTs(queryTs)
+                .status(TicketStatus.opened)
+                .statusLog(ImmutableList.of())
+                .lastInteractedAt(Instant.now())
+                .build()
+        );
+
+        // Duration returns null when no 'opened' status in statusLog
+        Long duration = ticketProcessingService.calculateSecondsSinceCreation(ticket);
+        assertThat(duration).isNull();
+
+        // when
+        ticketProcessingService.markAsStale(ticket.id());
+
+        // then
+        // operation completed successfully even with duration cacl failures
+        Ticket updatedTicket = ticketRepository.findTicketById(ticket.id());
+        assertThat(updatedTicket.status()).isEqualTo(TicketStatus.stale);
+        verify(publisher).publishEvent(any(Object.class)); // Event was still published
+        verify(slackService).warnStaleness(any(MessageRef.class)); // Slack notification was still sent
     }
 }
