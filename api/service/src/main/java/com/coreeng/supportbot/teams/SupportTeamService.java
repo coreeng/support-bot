@@ -48,7 +48,7 @@ public class SupportTeamService {
     }
 
     public boolean isMemberByUserId(SlackId.User userId) {
-        return members.stream().anyMatch(member ->userId.equals(member.slackId()));
+        return members.stream().anyMatch(member -> userId.equals(member.slackId()));
     }
 
     public boolean isLeadershipMemberByUserEmail(String email) {
