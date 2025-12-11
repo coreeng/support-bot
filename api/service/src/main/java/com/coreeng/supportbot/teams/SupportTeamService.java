@@ -44,15 +44,15 @@ public class SupportTeamService {
     }
 
     public boolean isMemberByUserEmail(String email) {
-        return members.stream().anyMatch(member -> member.email().equalsIgnoreCase(email));
+        return members.stream().anyMatch(member -> email.equalsIgnoreCase(member.email()));
     }
 
     public boolean isMemberByUserId(SlackId.User userId) {
-        return members.stream().anyMatch(member -> member.slackId().equals(userId));
+        return members.stream().anyMatch(member ->userId.equals(member.slackId()));
     }
 
     public boolean isLeadershipMemberByUserEmail(String email) {
-        return leadershipMembers.stream().anyMatch(member -> member.email().equalsIgnoreCase(email));
+        return leadershipMembers.stream().anyMatch(member -> email.equalsIgnoreCase(member.email()));
     }
 
     public void handleMembershipUpdate(SlackId.Group groupId, ImmutableList<SlackId.User> teamUsers) {
