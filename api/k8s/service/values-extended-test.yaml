@@ -90,6 +90,15 @@ configMap:
         stale-reminder-interval: 1d
     enums:
       escalationTeams:
+        - code: core-platform
+          label: Core Platform
+          slack-group-id: S0A2CEZ0QMT
+        - code: core-elevate
+          label: Core Elevate
+          slack-group-id: S0A2CF78M3P
+        - code: core-community
+          label: Core Community
+          slack-group-id: S0A2DSQGQ6A
         - label: Core Platform Escalations
           code: core-platform-escalations
           slack-group-id: S0A2CEZ0QMT
