@@ -153,9 +153,9 @@ platform-integration:
           name-regexp: null
           label-selector: "root.tree.hnc.x-k8s.io/depth"
         teamName:
-          jq-expression: .metadata.name
+          cel-expression: resource.metadata.name
         groupRef:
-          jq-expression: .metadata.uid
+          cel-expression: resource.metadata.uid
 
 team:
   support:

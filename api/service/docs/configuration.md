@@ -128,10 +128,10 @@ platform-integration: # Whether to enable platform integration to automatically 
         filter:
           name-regexp: null # Regexp filter for namespace names
           label-selector: "root.tree.hnc.x-k8s.io/depth" # Label selector filter for namespace labels. Look [here](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) for syntax
-        teamName: # Will use the namespace name from .metadata.name as a team name
-          jq-expression: .metadata.name
-        groupRef: # Will use the namespace uid from .metadata.uid as a group reference. Supposed to be changed to a real configuration.
-          jq-expression: .metadata.uid
+        teamName: # Will use the namespace name from resource.metadata.name as a team name
+          cel-expression: resource.metadata.name
+        groupRef: # Will use the namespace uid from resource.metadata.uid as a group reference. Supposed to be changed to a real configuration.
+          cel-expression: resource.metadata.uid
 
 
 team:
