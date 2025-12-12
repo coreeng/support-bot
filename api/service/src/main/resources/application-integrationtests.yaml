@@ -32,6 +32,6 @@ platform-integration:
           name-regexp: ^tenant-.*
           label-selector: null
         teamName:
-          jq-expression: .data.name
+          cel-expression: resource.data.name
         groupRef:
-          jq-expression: .data.groupRef
+          cel-expression: resource.data.groupRef
