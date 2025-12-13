@@ -17,6 +17,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 @RequiredArgsConstructor
 public class TicketController {
     private final TicketQueryService queryService;
+    private final TicketUpdateService ticketUpdateService;
     private final TicketUIMapper mapper;
 
     @GetMapping
@@ -66,5 +67,15 @@ public class TicketController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(mapper.mapToUI(ticket));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<?> updateTicket(@PathVariable TicketId id, @RequestBody TicketUpdateRequest request) {
+        try {
+            TicketUI ticket = ticketUpdateService.update(id, request);
+            return ResponseEntity.ok(ticket);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }
