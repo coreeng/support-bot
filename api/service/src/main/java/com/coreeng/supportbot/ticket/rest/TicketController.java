@@ -5,7 +5,6 @@ import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -71,7 +70,6 @@ public class TicketController {
     }
 
     @PatchMapping("/{id}")
-    @Transactional
     public ResponseEntity<?> updateTicket(@PathVariable TicketId id, @RequestBody TicketUpdateRequest request) {
         try {
             TicketUI ticket = ticketUpdateService.update(id, request);
