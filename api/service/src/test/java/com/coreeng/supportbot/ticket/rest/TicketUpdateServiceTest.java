@@ -44,7 +44,7 @@ class TicketUpdateServiceTest {
     private TicketImpact validImpact;
 
     @BeforeEach
-    void setUp() {
+    public void setUp() {
         service = new TicketUpdateService(
             ticketProcessingService,
             queryService,
@@ -59,7 +59,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldUpdateTicketSuccessfully() {
+    public void shouldUpdateTicketSuccessfully() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
             TicketStatus.closed,
@@ -98,7 +98,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldRejectNullRequest() {
+    public void shouldRejectNullRequest() {
         // when/then
         assertThatThrownBy(() -> service.update(ticketId, null))
             .isInstanceOf(IllegalArgumentException.class)
@@ -108,7 +108,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldRejectNullStatus() {
+    public void shouldRejectNullStatus() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
             null,
@@ -125,7 +125,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldRejectNullAuthorsTeam() {
+    public void shouldRejectNullAuthorsTeam() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
             TicketStatus.closed,
@@ -142,7 +142,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldRejectBlankAuthorsTeam() {
+    public void shouldRejectBlankAuthorsTeam() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
             TicketStatus.closed,
@@ -159,7 +159,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldRejectInvalidAuthorsTeam() {
+    public void shouldRejectInvalidAuthorsTeam() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
             TicketStatus.closed,
@@ -180,7 +180,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldRejectNullTags() {
+    public void shouldRejectNullTags() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
             TicketStatus.closed,
@@ -199,7 +199,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldRejectEmptyTags() {
+    public void shouldRejectEmptyTags() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
             TicketStatus.closed,
@@ -218,7 +218,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldRejectNullImpact() {
+    public void shouldRejectNullImpact() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
             TicketStatus.closed,
@@ -237,7 +237,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldRejectBlankImpact() {
+    public void shouldRejectBlankImpact() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
             TicketStatus.closed,
@@ -256,7 +256,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldRejectInvalidImpact() {
+    public void shouldRejectInvalidImpact() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
             TicketStatus.closed,
@@ -278,7 +278,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldHandleMultipleTags() {
+    public void shouldHandleMultipleTags() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
             TicketStatus.opened,
@@ -311,7 +311,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldHandleAllValidTicketStatuses() {
+    public void shouldHandleAllValidTicketStatuses() {
         for (TicketStatus status : TicketStatus.values()) {
             TicketUpdateRequest request = new TicketUpdateRequest(
                 status,
@@ -340,7 +340,7 @@ class TicketUpdateServiceTest {
     }
 
     @Test
-    void shouldHandleConfirmedFalse() {
+    public void shouldHandleConfirmedFalse() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
             TicketStatus.closed,
