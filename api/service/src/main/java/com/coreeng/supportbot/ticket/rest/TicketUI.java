@@ -35,7 +35,8 @@ public class TicketUI {
     public record Query(
         String link,
         Instant date,
-        MessageTs ts
+        MessageTs ts,
+        @Nullable String text
     ) {}
     public record FormMessage(
         MessageTs ts

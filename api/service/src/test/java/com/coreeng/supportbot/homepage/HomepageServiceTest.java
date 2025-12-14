@@ -258,7 +258,8 @@ class HomepageServiceTest {
                 tickets.stream()
                         .map(t -> new DetailedTicket(
                                 t,
-                                ImmutableList.copyOf(escalationsByTicket.getOrDefault(t.id(), List.of()))
+                                ImmutableList.copyOf(escalationsByTicket.getOrDefault(t.id(), List.of())),
+                                null
                         ))
                         .collect(Collectors.toList())
         );
