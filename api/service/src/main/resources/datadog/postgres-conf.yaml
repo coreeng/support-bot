@@ -1,0 +1,538 @@
+## Support Bot - Datadog Metrics
+## ==============================
+##
+## Custom PostgreSQL queries that emit metrics to Datadog.
+## All times are in business hours (Europe/London timezone).
+##
+## Copy to: /opt/datadog-agent/etc/conf.d/postgres.d/conf.yaml
+
+init_config:
+
+instances:
+  - host: localhost
+    port: 5432
+    username: datadog
+    password: "%%env_DD_PG_PASSWORD%%"
+    dbname: postgres
+
+    min_collection_interval: 60
+
+    # Only collect custom queries, no default PostgreSQL metrics
+    collect_default_database: false
+    collect_activity_metrics: false
+    collect_database_size_metrics: false
+    collect_wal_metrics: false
+    collect_bloat_metrics: false
+    collect_count_metrics: false
+    relations: []
+
+    custom_queries:
+      # Time from query posted to first response (7 day window)
+      - metric_prefix: supportbot.response
+        query: |
+          WITH response_durations AS (
+              SELECT EXTRACT(EPOCH FROM business_time_between(
+                  query_posted_ts::timestamptz,
+                  first_open_ts::timestamptz,
+                  'Europe/London'
+              )) AS duration
+              FROM aggregated_ticket_data
+              WHERE first_open_ts IS NOT NULL
+                AND query_posted_ts IS NOT NULL
+                AND first_open_ts::timestamptz > query_posted_ts::timestamptz
+                AND first_open_ts >= NOW() - INTERVAL '7 days'
+          )
+          SELECT
+              COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY duration), 0) AS p50,
+              COALESCE(percentile_cont(0.9) WITHIN GROUP (ORDER BY duration), 0) AS p90
+          FROM response_durations
+          WHERE duration IS NOT NULL AND duration > 0
+        columns:
+          - name: p50_7d
+            type: gauge
+          - name: p90_7d
+            type: gauge
+
+      # Time from query posted to first response (30 day window)
+      - metric_prefix: supportbot.response
+        query: |
+          WITH response_durations AS (
+              SELECT EXTRACT(EPOCH FROM business_time_between(
+                  query_posted_ts::timestamptz,
+                  first_open_ts::timestamptz,
+                  'Europe/London'
+              )) AS duration
+              FROM aggregated_ticket_data
+              WHERE first_open_ts IS NOT NULL
+                AND query_posted_ts IS NOT NULL
+                AND first_open_ts::timestamptz > query_posted_ts::timestamptz
+                AND first_open_ts >= NOW() - INTERVAL '30 days'
+          )
+          SELECT
+              COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY duration), 0) AS p50,
+              COALESCE(percentile_cont(0.9) WITHIN GROUP (ORDER BY duration), 0) AS p90
+          FROM response_durations
+          WHERE duration IS NOT NULL AND duration > 0
+        columns:
+          - name: p50_30d
+            type: gauge
+          - name: p90_30d
+            type: gauge
+
+      # Queries that never got a ticket (unanswered)
+      - metric_prefix: supportbot.unattended
+        query: |
+          SELECT
+              COUNT(*) FILTER (WHERE query_posted_ts >= NOW() - INTERVAL '7 days') AS count_7d,
+              COUNT(*) FILTER (WHERE query_posted_ts >= NOW() - INTERVAL '30 days') AS count_30d
+          FROM aggregated_ticket_data
+          WHERE ticket_id IS NULL
+        columns:
+          - name: count_7d
+            type: gauge
+          - name: count_30d
+            type: gauge
+
+      # RESOLUTION TIME - How fast do we close tickets?
+
+      # Time from ticket open to close (7 day window)
+      - metric_prefix: supportbot.resolution
+        query: |
+          SELECT
+              COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY duration), 0) AS p50,
+              COALESCE(percentile_cont(0.75) WITHIN GROUP (ORDER BY duration), 0) AS p75,
+              COALESCE(percentile_cont(0.9) WITHIN GROUP (ORDER BY duration), 0) AS p90
+          FROM (
+              SELECT
+                  ticket_id,
+                  EXTRACT(EPOCH FROM business_time_between(
+                      first_open_ts::timestamptz,
+                      last_closed_ts::timestamptz,
+                      'Europe/London'
+                  )) AS duration
+              FROM aggregated_ticket_data
+              WHERE last_closed_ts IS NOT NULL
+                AND first_open_ts IS NOT NULL
+                AND last_closed_ts::timestamptz > first_open_ts::timestamptz
+                AND first_open_ts >= NOW() - INTERVAL '7 days'
+          ) sub
+          WHERE duration IS NOT NULL AND duration > 0
+        columns:
+          - name: p50_7d
+            type: gauge
+          - name: p75_7d
+            type: gauge
+          - name: p90_7d
+            type: gauge
+
+      # Time from ticket open to close (30 day window)
+      - metric_prefix: supportbot.resolution
+        query: |
+          SELECT
+              COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY duration), 0) AS p50,
+              COALESCE(percentile_cont(0.75) WITHIN GROUP (ORDER BY duration), 0) AS p75,
+              COALESCE(percentile_cont(0.9) WITHIN GROUP (ORDER BY duration), 0) AS p90
+          FROM (
+              SELECT
+                  ticket_id,
+                  EXTRACT(EPOCH FROM business_time_between(
+                      first_open_ts::timestamptz,
+                      last_closed_ts::timestamptz,
+                      'Europe/London'
+                  )) AS duration
+              FROM aggregated_ticket_data
+              WHERE last_closed_ts IS NOT NULL
+                AND first_open_ts IS NOT NULL
+                AND last_closed_ts::timestamptz > first_open_ts::timestamptz
+                AND first_open_ts >= NOW() - INTERVAL '30 days'
+          ) sub
+          WHERE duration IS NOT NULL AND duration > 0
+        columns:
+          - name: p50_30d
+            type: gauge
+          - name: p75_30d
+            type: gauge
+          - name: p90_30d
+            type: gauge
+
+      # How long have unresolved tickets been open?
+      - metric_prefix: supportbot.unresolved
+        query: |
+          WITH ages AS (
+              SELECT EXTRACT(EPOCH FROM (NOW() - first_open_ts::timestamptz)) AS age_seconds
+              FROM aggregated_ticket_data
+              WHERE last_closed_ts IS NULL
+                AND first_open_ts IS NOT NULL
+          )
+          SELECT
+              COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY age_seconds), 0) AS p50,
+              COALESCE(percentile_cont(0.9) WITHIN GROUP (ORDER BY age_seconds), 0) AS p90,
+              COUNT(*) AS count
+          FROM ages
+        columns:
+          - name: age_p50_seconds
+            type: gauge
+          - name: age_p90_seconds
+            type: gauge
+          - name: count
+            type: gauge
+
+      # Resolution time broken down by tag (30 day window)
+      - metric_prefix: supportbot.resolution
+        query: |
+          WITH tag_durations AS (
+              SELECT
+                  unnest(tags) AS tag,
+                  EXTRACT(EPOCH FROM business_time_between(
+                      first_open_ts,
+                      last_closed_ts,
+                      'Europe/London'
+                  )) AS duration
+              FROM aggregated_ticket_data
+              WHERE status = 'closed'
+                AND last_closed_ts IS NOT NULL
+                AND first_open_ts IS NOT NULL
+                AND first_open_ts >= NOW() - INTERVAL '30 days'
+          )
+          SELECT
+              tag,
+              COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY duration), 0) AS p50,
+              COALESCE(percentile_cont(0.9) WITHIN GROUP (ORDER BY duration), 0) AS p90
+          FROM tag_durations
+          WHERE duration IS NOT NULL AND duration > 0
+          GROUP BY tag
+          HAVING COUNT(*) > 0
+          ORDER BY p50 DESC
+          LIMIT 15
+        columns:
+          - name: tag
+            type: tag
+          - name: by_tag_p50
+            type: gauge
+          - name: by_tag_p90
+            type: gauge
+
+      # TICKETS - v2 multi-dimensional metric
+      # Query: sum:supportbot.tickets{status:opened,impact:production-blocking}
+
+      - metric_prefix: supportbot
+        query: |
+          SELECT
+            t.status,
+            COALESCE(t.impact, 'unknown') AS impact,
+            CASE
+              WHEN EXISTS (
+                SELECT 1 FROM aggregated_escalation_data e
+                WHERE e.ticket_id = t.ticket_id
+              ) THEN 'true'
+              ELSE 'false'
+            END AS escalated,
+            CASE
+              WHEN tk.rating_submitted THEN 'true'
+              ELSE 'false'
+            END AS rated,
+            COUNT(*) AS tickets
+          FROM aggregated_ticket_data t
+          JOIN ticket tk ON tk.id = t.ticket_id
+          WHERE t.ticket_id IS NOT NULL
+          GROUP BY t.status, t.impact, escalated, rated
+        columns:
+          - name: status
+            type: tag
+          - name: impact
+            type: tag
+          - name: escalated
+            type: tag
+          - name: rated
+            type: tag
+          - name: tickets
+            type: gauge
+
+      # WEEKLY COMPARISON - This week vs last week
+
+      # Tickets opened/closed/stale this week vs last week
+      - metric_prefix: supportbot.weekly
+        query: |
+          WITH current_week AS (
+              SELECT
+                  COUNT(DISTINCT ticket_id) FILTER (
+                      WHERE DATE_TRUNC('week', first_open_ts::timestamptz) = DATE_TRUNC('week', NOW())
+                  ) AS opened,
+                  COUNT(DISTINCT ticket_id) FILTER (
+                      WHERE DATE_TRUNC('week', last_closed_ts::timestamptz) = DATE_TRUNC('week', NOW())
+                  ) AS closed,
+                  COUNT(DISTINCT ticket_id) FILTER (
+                      WHERE status = 'stale'
+                        AND DATE_TRUNC('week', first_open_ts::timestamptz) = DATE_TRUNC('week', NOW())
+                  ) AS stale
+              FROM aggregated_ticket_data
+              WHERE ticket_id IS NOT NULL
+          ),
+          last_week AS (
+              SELECT
+                  COUNT(DISTINCT ticket_id) FILTER (
+                      WHERE DATE_TRUNC('week', first_open_ts::timestamptz) = DATE_TRUNC('week', NOW() - INTERVAL '1 week')
+                  ) AS opened,
+                  COUNT(DISTINCT ticket_id) FILTER (
+                      WHERE DATE_TRUNC('week', last_closed_ts::timestamptz) = DATE_TRUNC('week', NOW() - INTERVAL '1 week')
+                  ) AS closed,
+                  COUNT(DISTINCT ticket_id) FILTER (
+                      WHERE status = 'stale'
+                        AND DATE_TRUNC('week', first_open_ts::timestamptz) = DATE_TRUNC('week', NOW() - INTERVAL '1 week')
+                  ) AS stale
+              FROM aggregated_ticket_data
+              WHERE ticket_id IS NOT NULL
+          )
+          SELECT
+              cw.opened AS opened_current,
+              lw.opened AS opened_last,
+              cw.closed AS closed_current,
+              lw.closed AS closed_last,
+              cw.stale AS stale_current,
+              lw.stale AS stale_last
+          FROM current_week cw, last_week lw
+        columns:
+          - name: opened_current
+            type: gauge
+          - name: opened_last
+            type: gauge
+          - name: closed_current
+            type: gauge
+          - name: closed_last
+            type: gauge
+          - name: stale_current
+            type: gauge
+          - name: stale_last
+            type: gauge
+
+      # Escalations this week vs last week
+      - metric_prefix: supportbot.weekly.escalated
+        query: |
+          SELECT
+              COUNT(*) FILTER (
+                  WHERE DATE_TRUNC('week', open_ts::timestamptz) = DATE_TRUNC('week', NOW())
+              ) AS current,
+              COUNT(*) FILTER (
+                  WHERE DATE_TRUNC('week', open_ts::timestamptz) = DATE_TRUNC('week', NOW() - INTERVAL '1 week')
+              ) AS last
+          FROM aggregated_escalation_data
+          WHERE open_ts IS NOT NULL
+        columns:
+          - name: current
+            type: gauge
+          - name: last
+            type: gauge
+
+      # ESCALATIONS
+
+      # Escalations by tag (30 day window)
+      - metric_prefix: supportbot.escalations
+        query: |
+          SELECT
+              unnest(ed.tags) AS tag,
+              COUNT(*) AS count
+          FROM aggregated_escalation_data ed
+          WHERE ed.open_ts IS NOT NULL
+            AND ed.tags IS NOT NULL
+            AND ed.open_ts >= NOW() - INTERVAL '30 days'
+          GROUP BY tag
+          HAVING COUNT(*) > 0
+          ORDER BY count DESC
+          LIMIT 15
+        columns:
+          - name: tag
+            type: tag
+          - name: by_tag
+            type: gauge
+
+      # Average escalation duration by tag in hours (30 day window)
+      - metric_prefix: supportbot.escalation_duration
+        query: |
+          SELECT
+              unnest(ed.tags) AS tag,
+              AVG(EXTRACT(EPOCH FROM business_time_between(
+                  ed.open_ts,
+                  ed.resolved_ts,
+                  'Europe/London'
+              ))) / 3600 AS avg_hours
+          FROM aggregated_escalation_data ed
+          WHERE ed.open_ts IS NOT NULL
+            AND ed.resolved_ts IS NOT NULL
+            AND ed.tags IS NOT NULL
+            AND ed.open_ts >= NOW() - INTERVAL '30 days'
+          GROUP BY tag
+          HAVING AVG(EXTRACT(EPOCH FROM business_time_between(ed.open_ts, ed.resolved_ts, 'Europe/London'))) > 0
+          ORDER BY avg_hours DESC NULLS LAST
+          LIMIT 15
+        columns:
+          - name: tag
+            type: tag
+          - name: by_tag_hours
+            type: gauge
+
+      # Total escalations (7 and 30 day windows)
+      - metric_prefix: supportbot.escalations
+        query: |
+          SELECT
+              COUNT(*) FILTER (WHERE open_ts >= NOW() - INTERVAL '7 days') AS total_7d,
+              COUNT(*) FILTER (WHERE open_ts >= NOW() - INTERVAL '30 days') AS total_30d
+          FROM aggregated_escalation_data
+          WHERE open_ts IS NOT NULL
+        columns:
+          - name: total_7d
+            type: gauge
+          - name: total_30d
+            type: gauge
+
+      # TICKETS BY TAG (no v2 equivalent - tags are arrays)
+
+      # Ticket count by tag (30 day window)
+      - metric_prefix: supportbot.tickets
+        query: |
+          SELECT
+              unnest(tags) AS tag,
+              COUNT(*) AS count
+          FROM aggregated_ticket_data
+          WHERE ticket_id IS NOT NULL
+            AND first_open_ts >= NOW() - INTERVAL '30 days'
+            AND tags IS NOT NULL
+          GROUP BY tag
+          ORDER BY count DESC
+          LIMIT 15
+        columns:
+          - name: tag
+            type: tag
+          - name: by_tag
+            type: gauge
+
+      # DAILY ACTIVITY - For time series graphs
+
+      # Incoming queries vs resolved tickets
+      - metric_prefix: supportbot.rate
+        query: |
+          SELECT
+              COUNT(DISTINCT query_id) FILTER (
+                  WHERE query_posted_ts::date = CURRENT_DATE
+              ) AS incoming_today,
+              COUNT(*) FILTER (
+                  WHERE last_closed_ts::date = CURRENT_DATE
+              ) AS resolved_today,
+              COUNT(DISTINCT query_id) FILTER (
+                  WHERE query_posted_ts >= NOW() - INTERVAL '7 days'
+              ) AS incoming_7d,
+              COUNT(*) FILTER (
+                  WHERE last_closed_ts >= NOW() - INTERVAL '7 days'
+              ) AS resolved_7d
+          FROM aggregated_ticket_data
+        columns:
+          - name: incoming_today
+            type: gauge
+          - name: resolved_today
+            type: gauge
+          - name: incoming_7d
+            type: gauge
+          - name: resolved_7d
+            type: gauge
+
+      # Escalations created today
+      - metric_prefix: supportbot.escalations
+        query: |
+          SELECT COUNT(*) AS today
+          FROM aggregated_escalation_data
+          WHERE open_ts IS NOT NULL
+            AND open_ts::date = CURRENT_DATE
+        columns:
+          - name: today
+            type: gauge
+
+      # Tickets opened/closed/stale today
+      - metric_prefix: supportbot.daily
+        query: |
+          SELECT
+              COUNT(DISTINCT ticket_id) FILTER (
+                  WHERE first_open_ts::date = CURRENT_DATE
+              ) AS opened,
+              COUNT(DISTINCT ticket_id) FILTER (
+                  WHERE last_closed_ts::date = CURRENT_DATE
+              ) AS closed,
+              COUNT(DISTINCT ticket_id) FILTER (
+                  WHERE status = 'stale' AND first_open_ts::date = CURRENT_DATE
+              ) AS stale
+          FROM aggregated_ticket_data
+          WHERE ticket_id IS NOT NULL
+        columns:
+          - name: opened
+            type: gauge
+          - name: closed
+            type: gauge
+          - name: stale
+            type: gauge
+
+      # ESCALATIONS - v2 multi-dimensional metric
+      # Query: sum:supportbot.escalations{status:ongoing,team:core-platform}
+
+      - metric_prefix: supportbot
+        query: |
+          SELECT
+            CASE WHEN ed.resolved_ts IS NULL THEN 'ongoing' ELSE 'resolved' END AS status,
+            COALESCE(ed.team_id, 'unassigned') AS team,
+            COALESCE(td.impact, 'unknown') AS impact,
+            COUNT(*) AS escalations
+          FROM aggregated_escalation_data ed
+          LEFT JOIN aggregated_ticket_data td ON ed.ticket_id = td.ticket_id
+          WHERE ed.open_ts IS NOT NULL
+          GROUP BY
+            CASE WHEN ed.resolved_ts IS NULL THEN 'ongoing' ELSE 'resolved' END,
+            ed.team_id,
+            td.impact
+        columns:
+          - name: status
+            type: tag
+          - name: team
+            type: tag
+          - name: impact
+            type: tag
+          - name: escalations
+            type: gauge
+
+      # RATINGS
+
+      # Average rating score and total count
+      - metric_prefix: supportbot.ratings
+        query: |
+          SELECT
+              COALESCE(AVG(rating), 0) AS average,
+              COUNT(*) FILTER (WHERE rating IS NOT NULL) AS count
+          FROM ratings
+        columns:
+          - name: average
+            type: gauge
+          - name: count
+            type: gauge
+
+      # HEALTH
+
+      # Average time to resolve closed tickets (seconds)
+      - metric_prefix: supportbot.health
+        query: |
+          SELECT
+              COALESCE(AVG(EXTRACT(EPOCH FROM (last_closed_ts - first_open_ts))), 0) AS avg_resolution_time_seconds
+          FROM aggregated_ticket_data
+          WHERE ticket_id IS NOT NULL
+            AND status = 'closed'
+            AND last_closed_ts IS NOT NULL
+        columns:
+          - name: avg_resolution_time_seconds
+            type: gauge
+
+      # Age of the oldest open ticket (seconds)
+      - metric_prefix: supportbot.health
+        query: |
+          SELECT
+              COALESCE(MAX(EXTRACT(EPOCH FROM (NOW() - first_open_ts))), 0) AS longest_active_ticket_seconds
+          FROM aggregated_ticket_data
+          WHERE ticket_id IS NOT NULL
+            AND status IN ('opened', 'stale')
+        columns:
+          - name: longest_active_ticket_seconds
+            type: gauge
