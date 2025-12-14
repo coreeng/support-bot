@@ -17,6 +17,8 @@ import com.slack.api.methods.response.views.ViewsPublishResponse;
 import com.slack.api.model.Message;
 import com.slack.api.model.User;
 
+import javax.annotation.Nullable;
+
 public interface SlackClient {
     ReactionsAddResponse addReaction(ReactionsAddRequest request);
 
@@ -41,4 +43,8 @@ public interface SlackClient {
     User getUserById(SlackId.User userId);
 
     ImmutableList<String> getGroupMembers(SlackId.Group groupId);
+
+    String getGroupName(SlackId.Group groupId);
+
+    String getChannelName(String channelId);
 }
