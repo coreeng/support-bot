@@ -8,22 +8,19 @@ Install the Datadog Agent: https://docs.datadoghq.com/agent/
 
 ## Setup
 
-1. Set password environment variable:
+1. Set password and run app to create datadog user (from `api/service/` directory):
 ```bash
-export DD_PG_PASSWORD=your_password
+export DATADOG_PASSWORD=your_password
+make run
 ```
 
-2. Run Flyway migration to create datadog user (from `api/` directory):
-```bash
-./gradlew :service:flywayMigrate -Dflyway.placeholders.DATADOG_PASSWORD=$DD_PG_PASSWORD
-```
-
-3. Copy config:
+2. Copy config and set agent password:
 ```bash
 cp src/main/resources/datadog/postgres-conf.yaml /opt/datadog-agent/etc/conf.d/postgres.d/conf.yaml
+export DD_PG_PASSWORD=your_password  # same password as above
 ```
 
-4. Start agent:
+3. Start agent:
 ```bash
 /opt/datadog-agent/bin/agent/agent run > /tmp/datadog-agent.log 2>&1 &
 
@@ -33,7 +30,7 @@ cp src/main/resources/datadog/postgres-conf.yaml /opt/datadog-agent/etc/conf.d/p
 
 ## Metrics
 
-See `postgres-conf.yaml` for full list. Key metrics:
+Metrics are collected every 60 seconds. See `postgres-conf.yaml` for full list. Key metrics:
 
 - `supportbot.tickets{status,impact,escalated,rated}` - ticket counts
 - `supportbot.escalations{status,team,impact}` - escalation counts

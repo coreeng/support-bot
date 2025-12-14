@@ -165,6 +165,10 @@ tasks.withType<AbstractFlywayTask> {
         url = container?.jdbcUrl ?: "jdbc:postgresql://localhost:5432/flywaydb"
         user = container?.username ?: "postgres"
         password = container?.password ?: "fly"
+        val datadogPassword = System.getProperty("DATADOG_PASSWORD") ?: System.getenv("DATADOG_PASSWORD")
+        if (datadogPassword != null) {
+            placeholders = mapOf("DATADOG_PASSWORD" to datadogPassword)
+        }
     }
 }
 
