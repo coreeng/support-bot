@@ -17,8 +17,6 @@ import com.slack.api.methods.response.views.ViewsPublishResponse;
 import com.slack.api.model.Message;
 import com.slack.api.model.User;
 
-import javax.annotation.Nullable;
-
 public interface SlackClient {
     ReactionsAddResponse addReaction(ReactionsAddRequest request);
 

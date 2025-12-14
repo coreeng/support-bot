@@ -28,7 +28,7 @@ class SlackClientImplTest {
     private SlackClientImpl slackClient;
 
     @BeforeEach
-    void setUp() {
+    public void setUp() {
         methodsClient = mock(MethodsClient.class);
         permalinkCache = new ConcurrentMapCache("permalink");
         userCache = new ConcurrentMapCache("user");
@@ -39,7 +39,7 @@ class SlackClientImplTest {
     }
 
     @Test
-    void getGroupNameUsesCache() {
+    public void shouldUseCacheForGroupName() {
         // Given
         groupCache.put("S1", "cached-handle");
 
@@ -52,7 +52,7 @@ class SlackClientImplTest {
     }
 
     @Test
-    void getGroupNameFetchesAndCaches() throws Exception {
+    public void shouldFetchAndCacheGroupName() throws Exception {
         // Given
         Usergroup ug = new Usergroup();
         ug.setId("S1");
@@ -73,7 +73,7 @@ class SlackClientImplTest {
     }
 
     @Test
-    void getGroupNameReturnsNullOnError() throws Exception {
+    public void shouldReturnNullWhenGroupNameLookupFails() throws Exception {
         // Given
         when(methodsClient.usergroupsList(any(UsergroupsListRequest.class)))
             .thenThrow(new java.io.IOException("IO error"));
@@ -86,7 +86,7 @@ class SlackClientImplTest {
     }
 
     @Test
-    void getChannelNameUsesCache() {
+    public void shouldUseCacheForChannelName() {
         // Given
         channelCache.put("C1", "cached-channel");
 
@@ -99,7 +99,7 @@ class SlackClientImplTest {
     }
 
     @Test
-    void getChannelNameFetchesAndCaches() throws Exception {
+    public void shouldFetchAndCacheChannelName() throws Exception {
         // Given
         com.slack.api.model.Conversation channel = new com.slack.api.model.Conversation();
         channel.setName("general");
@@ -119,7 +119,7 @@ class SlackClientImplTest {
     }
 
     @Test
-    void getChannelNameReturnsNullOnError() throws Exception {
+    public void shouldReturnNullWhenChannelNameLookupFails() throws Exception {
         // Given
         when(methodsClient.conversationsInfo(any(ConversationsInfoRequest.class)))
             .thenThrow(new java.io.IOException("IO error"));
