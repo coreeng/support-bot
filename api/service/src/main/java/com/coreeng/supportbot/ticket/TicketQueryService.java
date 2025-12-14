@@ -4,6 +4,7 @@ import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationQuery;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
+import com.coreeng.supportbot.slack.SlackTextFormatter;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.util.Page;
@@ -28,6 +29,7 @@ public class TicketQueryService {
     private final TicketRepository repository;
     private final EscalationQueryService escalationQueryService;
     private final SlackClient slackClient;
+    private final SlackTextFormatter textFormatter;
 
     public Page<Ticket> findByQuery(TicketsQuery query) {
         return repository.listTickets(query);
@@ -94,9 +96,12 @@ public class TicketQueryService {
             Message message = slackClient.getMessageByTs(
                 new SlackGetMessageByTsRequest(ticket.channelId(), ticket.queryTs())
             );
-            return message.getText();
+            String rawText = message.getText();
+            return textFormatter.format(rawText);
         } catch (Exception e) {
-            log.warn("Failed to fetch query message for ticket {}: {}", ticket.id(), e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("Failed to fetch query message for ticket {}: {}", ticket.id(), e.getMessage());
+            }
             return null;
         }
     }

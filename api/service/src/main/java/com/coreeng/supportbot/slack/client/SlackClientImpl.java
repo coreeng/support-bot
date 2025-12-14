@@ -13,6 +13,8 @@ import com.slack.api.methods.request.conversations.ConversationsHistoryRequest;
 import com.slack.api.methods.request.conversations.ConversationsRepliesRequest;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
+import com.slack.api.methods.request.conversations.ConversationsInfoRequest;
+import com.slack.api.methods.request.usergroups.UsergroupsListRequest;
 import com.slack.api.methods.request.usergroups.users.UsergroupsUsersListRequest;
 import com.slack.api.methods.request.users.UsersInfoRequest;
 import com.slack.api.methods.request.views.ViewsOpenRequest;
@@ -22,6 +24,7 @@ import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.chat.ChatUpdateResponse;
 import com.slack.api.methods.response.conversations.ConversationsHistoryResponse;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
+import com.slack.api.methods.response.usergroups.UsergroupsListResponse;
 import com.slack.api.methods.response.reactions.ReactionsAddResponse;
 import com.slack.api.methods.response.reactions.ReactionsRemoveResponse;
 import com.slack.api.methods.response.views.ViewsOpenResponse;
@@ -33,6 +36,7 @@ import com.slack.api.model.User;
 import com.slack.api.model.view.View;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.cache.Cache;
 
@@ -46,10 +50,13 @@ import static com.google.common.collect.Iterables.isEmpty;
 import com.slack.api.methods.response.chat.ChatPostEphemeralResponse;
 
 @RequiredArgsConstructor
+@Slf4j
 public class SlackClientImpl implements SlackClient {
     private final MethodsClient client;
     private final Cache permalinkCache;
     private final Cache userProfileCache;
+    private final Cache groupCache;
+    private final Cache channelCache;
     private final MeterRegistry meterRegistry;
 
     @Override
@@ -178,6 +185,62 @@ public class SlackClientImpl implements SlackClient {
             null
         ).getUsers();
         return ImmutableList.copyOf(users);
+    }
+
+    @Override
+    @Nullable
+    public String getGroupName(SlackId.Group groupId) {
+        Cache.ValueWrapper wrapper = groupCache.get(groupId.id());
+        if (wrapper != null) {
+            return (String) wrapper.get();
+        }
+        try {
+            UsergroupsListResponse response = doRequest(
+                "usergroups.list",
+                () -> client.usergroupsList(UsergroupsListRequest.builder().build()),
+                null
+            );
+            String handle = response.getUsergroups().stream()
+                .filter(ug -> groupId.id().equals(ug.getId()))
+                .map(com.slack.api.model.Usergroup::getHandle)
+                .findFirst()
+                .orElse(null);
+            if (handle != null) {
+                groupCache.put(groupId.id(), handle);
+            }
+            return handle;
+        } catch (SlackException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("Failed to resolve group {}: {}", groupId.id(), e.getMessage());
+            }
+            return null;
+        }
+    }
+
+    @Override
+    @Nullable
+    public String getChannelName(String channelId) {
+        Cache.ValueWrapper wrapper = channelCache.get(channelId);
+        if (wrapper != null) {
+            return (String) wrapper.get();
+        }
+        try {
+            var response = doRequest(
+                "conversations.info",
+                () -> client.conversationsInfo(ConversationsInfoRequest.builder()
+                    .channel(channelId)
+                    .build()),
+                null
+            );
+            String name = response.getChannel().getName();
+            channelCache.put(channelId, name);
+            return name;
+        } catch (SlackException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("Failed to resolve channel {}: {}", channelId, e.getMessage());
+            }
+            return null;
+        }
     }
 
     private <V extends SlackApiTextResponse> V doRequest(
