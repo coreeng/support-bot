@@ -30,7 +30,8 @@ public class TicketUIMapper {
                     ticket.ticket().queryTs()
                 )),
                 ticket.ticket().queryTs().getDate(),
-                ticket.ticket().queryTs()
+                ticket.ticket().queryTs(),
+                ticket.queryText()
             ))
             .formMessage(new TicketUI.FormMessage(
                 ticket.ticket().createdMessageTs()
