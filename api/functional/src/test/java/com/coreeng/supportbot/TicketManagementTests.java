@@ -115,6 +115,22 @@ public class TicketManagementTests {
     }
 
     @Test
+    public void whenTicketIsFetched_queryTextIsReturned() {
+        // given
+        TestKit.RoledTestKit asSupport = testKit.as(support);
+        String messageText = "Functional test query text";
+
+        // when
+        Ticket ticket = asSupport.ticket().create(builder -> builder
+            .message(messageText)
+        );
+
+        // then
+        var ticketResponse = supportBotClient.assertTicketExists(ticket);
+        assertThat(ticketResponse.query().text()).isEqualTo(messageText);
+    }
+
+    @Test
     public void whenQueryHasThreadReplyAndSupportReactsWithEyesToQuery_ticketIsCreated() {
         // given
         TestKit.RoledTestKit asTenant = testKit.as(tenant);

@@ -42,8 +42,7 @@ class TicketControllerTest {
             TicketStatus.closed,
             "core-support",
             ImmutableList.of("bug", "urgent"),
-            "production-blocking",
-            true
+            "production-blocking"
         );
 
         TicketUI mockTicketUI = mock(TicketUI.class);
@@ -65,8 +64,7 @@ class TicketControllerTest {
             null,
             "core-support",
             ImmutableList.of("bug"),
-            "production-blocking",
-            true
+            "production-blocking"
         );
 
         when(ticketUpdateService.update(ticketId, request))
@@ -88,8 +86,7 @@ class TicketControllerTest {
             TicketStatus.closed,
             "core-support",
             ImmutableList.of("bug"),
-            "production-blocking",
-            false
+            "production-blocking"
         );
 
         when(ticketUpdateService.update(ticketId, request))
