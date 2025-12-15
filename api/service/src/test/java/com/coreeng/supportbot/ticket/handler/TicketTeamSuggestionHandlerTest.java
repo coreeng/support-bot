@@ -88,7 +88,7 @@ class TicketTeamSuggestionHandlerTest {
     }
 
     @Test
-    void onlyOtherTeams_rendersOthersGroup() {
+    void onlyOtherTeams_rendersNotATenantAndOthersGroup() {
         // given
         BlockSuggestionRequest req = mockSuggestionRequest("", "U123");
         BlockSuggestionContext ctx = mock(BlockSuggestionContext.class);
@@ -103,9 +103,11 @@ class TicketTeamSuggestionHandlerTest {
 
         // then
         List<OptionGroup> groups = resp.getOptionGroups();
-        assertEquals(1, groups.size());
-        assertEquals("Others", groups.getFirst().getLabel().getText());
-        assertOptionsEqual(groups.getFirst().getOptions(), ImmutableList.of("Team A"));
+        assertEquals(2, groups.size());
+        assertEquals("Suggested teams", groups.get(0).getLabel().getText());
+        assertOptionsEqual(groups.get(0).getOptions(), ImmutableList.of("Not a Tenant"));
+        assertEquals("Others", groups.get(1).getLabel().getText());
+        assertOptionsEqual(groups.get(1).getOptions(), ImmutableList.of("Team A"));
     }
 
     @Test
@@ -130,6 +132,30 @@ class TicketTeamSuggestionHandlerTest {
         assertOptionsEqual(groups.get(0).getOptions(), ImmutableList.of("Team A"));
         assertEquals("Others", groups.get(1).getLabel().getText());
         assertOptionsEqual(groups.get(1).getOptions(), ImmutableList.of("Team B"));
+    }
+
+    @Test
+    void userHasNoTeams_suggestsNotATenant() {
+        // given
+        BlockSuggestionRequest req = mockSuggestionRequest("", "U123");
+        BlockSuggestionContext ctx = mock(BlockSuggestionContext.class);
+        mockSlackUserEmail("U123", "unknown@example.com");
+
+        PlatformTeam t1 = team("Team A");
+        PlatformTeam t2 = team("Team B");
+        when(platformTeamsService.listTeams()).thenReturn(ImmutableList.of(t1, t2));
+        when(platformTeamsService.listTeamsByUserEmail("unknown@example.com")).thenReturn(ImmutableList.of());
+
+        // when
+        BlockSuggestionResponse resp = handler.apply(req, ctx);
+
+        // then
+        List<OptionGroup> groups = resp.getOptionGroups();
+        assertEquals(2, groups.size());
+        assertEquals("Suggested teams", groups.get(0).getLabel().getText());
+        assertOptionsEqual(groups.get(0).getOptions(), ImmutableList.of("Not a Tenant"));
+        assertEquals("Others", groups.get(1).getLabel().getText());
+        assertOptionsEqual(groups.get(1).getOptions(), ImmutableList.of("Team A", "Team B"));
     }
 
     @Test
