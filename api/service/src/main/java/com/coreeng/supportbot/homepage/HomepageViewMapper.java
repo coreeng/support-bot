@@ -13,6 +13,7 @@ import javax.annotation.Nullable;
 
 import org.springframework.stereotype.Component;
 
+import com.coreeng.supportbot.config.SupportInsightsProps;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.slack.client.SimpleSlackView;
 import com.coreeng.supportbot.slack.client.SlackView;
@@ -32,6 +33,7 @@ import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.SectionBlock;
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
+import com.slack.api.model.block.composition.TextObject;
 import com.slack.api.model.block.element.BlockElement;
 import static com.slack.api.model.block.element.BlockElements.button;
 
@@ -44,6 +46,7 @@ import lombok.extern.slf4j.Slf4j;
 public class HomepageViewMapper {
     private final TicketSummaryViewMapper ticketSummaryViewMapper;
     private final JsonMapper jsonMapper;
+    private final SupportInsightsProps supportInsightsProps;
 
     public SlackView render(HomepageView homepage) {
         ImmutableList.Builder<LayoutBlock> blocks = ImmutableList.builder();
@@ -58,7 +61,18 @@ public class HomepageViewMapper {
                     .text(plainText("Refresh"))
                 ))
             ),
-            divider(),
+            divider()
+        );
+
+        // Support Insights section
+        List<LayoutBlock> supportInsights = renderSupportInsights();
+        if (!supportInsights.isEmpty()) {
+            blocks.add(header(h -> h.text(plainText(":bar_chart: Support Insights", true))));
+            blocks.addAll(supportInsights);
+            blocks.add(divider());
+        }
+
+        blocks.add(
             header(h -> h
                 .text(plainText(":ticket: Support Query Tickets Summary", true))
             ),
@@ -212,5 +226,34 @@ public class HomepageViewMapper {
 
     private String formatSlackDate(Instant instant) {
         return "<!date^" + instant.getEpochSecond() + "^{date_short_pretty} at {time}|" + instant.truncatedTo(ChronoUnit.MINUTES) + ">";
+    }
+
+    private List<LayoutBlock> renderSupportInsights() {
+        List<SupportInsightsProps.Dashboard> dashboards = supportInsightsProps.dashboards();
+        if (dashboards.isEmpty()) {
+            return List.of();
+        }
+
+        // Renders dashboards as two columns to not take up too much space
+        int columnsPerRow = 2;
+        ImmutableList.Builder<LayoutBlock> rows = ImmutableList.builder();
+        for (int i = 0; i < dashboards.size(); i += columnsPerRow) {
+            ImmutableList.Builder<TextObject> columns = ImmutableList.builder();
+            columns.add(markdownText(formatDashboard(dashboards.get(i))));
+            if (i + 1 < dashboards.size()) {
+                columns.add(markdownText(formatDashboard(dashboards.get(i + 1))));
+            }
+            rows.add(section(s -> s.fields(columns.build())));
+        }
+        return rows.build();
+    }
+
+    private String formatDashboard(SupportInsightsProps.Dashboard dashboard) {
+        String link = format("*<%s|%s>*", dashboard.url(), dashboard.title());
+        String description = dashboard.description();
+        if (description == null || description.isBlank()) {
+            return link;
+        }
+        return link + "\n" + description;
     }
 }
