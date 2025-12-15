@@ -11,6 +11,7 @@ import org.jspecify.annotations.NonNull;
 
 import com.coreeng.supportbot.Config;
 import com.google.common.collect.ImmutableList;
+import com.coreeng.supportbot.testkit.MessageToGet;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -162,6 +163,19 @@ public class Ticket implements SearchableForTicket {
                 .build()
         );
         return new ReopenFlowStubs(updated, uncheck);
+    }
+
+    public void stubQueryMessageFetch() {
+        slackWiremock.stubGetMessage(MessageToGet.builder()
+            .channelId(channelId)
+            .ts(queryTs)
+            .threadTs(queryTs)
+            .text(queryText)
+            .blocksJson(queryBlocksJson)
+            .userId(user.slackUserId())
+            .botId(user.slackBotId())
+            .team(teamId)
+            .build());
     }
 
     public void openSummaryAndSubmit(SlackTestKit asSupportSlack, String triggerId, FullSummaryFormSubmission.Values values) {
