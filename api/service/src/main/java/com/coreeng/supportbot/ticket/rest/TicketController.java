@@ -66,7 +66,8 @@ public class TicketController {
         if (ticket == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(mapper.mapToUI(ticket));
+        String queryText = queryService.fetchQueryText(ticket.ticket());
+        return ResponseEntity.ok(mapper.mapToUI(ticket, queryText));
     }
 
     @PatchMapping("/{id}")

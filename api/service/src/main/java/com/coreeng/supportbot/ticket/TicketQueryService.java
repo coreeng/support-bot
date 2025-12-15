@@ -57,8 +57,7 @@ public class TicketQueryService {
         ImmutableList<DetailedTicket> detailedTickets = ticketsPage.content().stream()
                 .map(ticket -> new DetailedTicket(
                         ticket,
-                        ImmutableList.copyOf(escalationsByTicket.get(ticket.id())),
-                        null // Don't fetch query text for list views - only for single ticket fetches
+                        ImmutableList.copyOf(escalationsByTicket.get(ticket.id()))
                 ))
                 .collect(toImmutableList());
 
@@ -82,8 +81,7 @@ public class TicketQueryService {
             return null;
         }
         ImmutableList<Escalation> escalations = escalationQueryService.listByTicketId(id);
-        String queryText = fetchQueryText(ticket);
-        return new DetailedTicket(ticket, escalations, queryText);
+        return new DetailedTicket(ticket, escalations);
     }
 
     public boolean queryExists(MessageRef queryRef) {
@@ -91,7 +89,7 @@ public class TicketQueryService {
     }
 
     @Nullable
-    private String fetchQueryText(Ticket ticket) {
+    public String fetchQueryText(Ticket ticket) {
         try {
             Message message = slackClient.getMessageByTs(
                 new SlackGetMessageByTsRequest(ticket.channelId(), ticket.queryTs())
