@@ -40,7 +40,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.cache.Cache;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.List;

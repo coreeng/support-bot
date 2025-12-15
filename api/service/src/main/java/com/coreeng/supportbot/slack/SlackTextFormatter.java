@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.slack;
 
 import com.coreeng.supportbot.slack.client.SlackClient;
+import com.slack.api.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -56,15 +57,7 @@ public class SlackTextFormatter {
         String userId = matcher.group(1);
         try {
             var user = slackClient.getUserById(SlackId.user(userId));
-            String display =
-                user != null && user.getProfile() != null && user.getProfile().getDisplayName() != null
-                    ? user.getProfile().getDisplayName()
-                    : user != null && user.getProfile() != null && user.getProfile().getRealName() != null
-                        ? user.getProfile().getRealName()
-                        : user != null && user.getName() != null
-                            ? user.getName()
-                            : userId;
-            return "@" + display;
+            return "@" + resolveUserDisplay(user, userId);
         } catch (Exception e) {
             if (log.isDebugEnabled()) {
                 log.debug("Failed to resolve user {}: {}", userId, e.getMessage());
@@ -115,6 +108,23 @@ public class SlackTextFormatter {
         String url = matcher.group(1);
         String text = matcher.group(2);
         return text != null ? text + " (" + url + ")" : url;
+    }
+
+    private String resolveUserDisplay(User user, String fallbackId) {
+        if (user == null) {
+            return fallbackId;
+        }
+        var profile = user.getProfile();
+        if (profile != null && profile.getDisplayName() != null) {
+            return profile.getDisplayName();
+        }
+        if (profile != null && profile.getRealName() != null) {
+            return profile.getRealName();
+        }
+        if (user.getName() != null) {
+            return user.getName();
+        }
+        return fallbackId;
     }
 }
 

@@ -77,7 +77,7 @@ class TicketUpdateServiceTest {
         when(ticketProcessingService.submit(any(TicketSubmission.class)))
             .thenReturn(new TicketSubmitResult.Success());
         when(queryService.findDetailedById(ticketId)).thenReturn(mockDetailedTicket);
-        when(mapper.mapToUI(mockDetailedTicket)).thenReturn(mockTicketUI);
+        when(mapper.mapToUI(any(DetailedTicket.class))).thenReturn(mockTicketUI);
 
         // when
         TicketUI result = service.update(ticketId, request);
@@ -296,7 +296,7 @@ class TicketUpdateServiceTest {
         when(ticketProcessingService.submit(any(TicketSubmission.class)))
             .thenReturn(new TicketSubmitResult.Success());
         when(queryService.findDetailedById(ticketId)).thenReturn(mockDetailedTicket);
-        when(mapper.mapToUI(mockDetailedTicket)).thenReturn(mockTicketUI);
+        when(mapper.mapToUI(any(DetailedTicket.class))).thenReturn(mockTicketUI);
 
         // when
         TicketUI result = service.update(ticketId, request);
@@ -329,7 +329,7 @@ class TicketUpdateServiceTest {
             when(ticketProcessingService.submit(any(TicketSubmission.class)))
                 .thenReturn(new TicketSubmitResult.Success());
             when(queryService.findDetailedById(ticketId)).thenReturn(mockDetailedTicket);
-            when(mapper.mapToUI(mockDetailedTicket)).thenReturn(mockTicketUI);
+            when(mapper.mapToUI(any(DetailedTicket.class))).thenReturn(mockTicketUI);
 
             TicketUI result = service.update(ticketId, request);
 
@@ -358,7 +358,7 @@ class TicketUpdateServiceTest {
         when(ticketProcessingService.submit(any(TicketSubmission.class)))
             .thenReturn(new TicketSubmitResult.Success());
         when(queryService.findDetailedById(ticketId)).thenReturn(mockDetailedTicket);
-        when(mapper.mapToUI(mockDetailedTicket)).thenReturn(mockTicketUI);
+        when(mapper.mapToUI(any(DetailedTicket.class))).thenReturn(mockTicketUI);
 
         // when
         TicketUI result = service.update(ticketId, request);
