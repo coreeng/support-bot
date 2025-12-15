@@ -14,8 +14,6 @@ public class TicketToCreate {
     private final MessageTs queryTs;
     @NonNull
     private final MessageTs createdMessageTs;
-
-    @Getter
     @Builder.Default
     private final String message = "I have a problem";
 }

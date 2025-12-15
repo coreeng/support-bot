@@ -125,6 +125,8 @@ public class TicketManagementTests {
             .message(messageText)
         );
 
+        ticket.stubQueryMessageFetch();
+
         // then
         var ticketResponse = supportBotClient.assertTicketExists(ticket);
         assertThat(ticketResponse.query().text()).isEqualTo(messageText);
