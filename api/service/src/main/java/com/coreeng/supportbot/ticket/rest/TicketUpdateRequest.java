@@ -8,8 +8,7 @@ public record TicketUpdateRequest(
     TicketStatus status,
     String authorsTeam,
     List<String> tags,
-    String impact,
-    boolean confirmed
+    String impact
 ) {
 }
 

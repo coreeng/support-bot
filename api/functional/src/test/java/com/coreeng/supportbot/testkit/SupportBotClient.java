@@ -134,7 +134,7 @@ public class SupportBotClient {
         private ImmutableList<@NonNull Escalation> escalations;
     }
 
-    public record QueryResponse(String link, Instant date, MessageTs ts) {}
+    public record QueryResponse(String link, Instant date, MessageTs ts, String text) {}
     public record TicketFormMessage(MessageTs ts) {}
     public record Team(String label, String code, ImmutableList<@NonNull String> types) {}
     @Builder

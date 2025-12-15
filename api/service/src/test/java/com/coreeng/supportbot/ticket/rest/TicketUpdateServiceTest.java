@@ -2,9 +2,8 @@ package com.coreeng.supportbot.ticket.rest;
 
 import com.coreeng.supportbot.enums.ImpactsRegistry;
 import com.coreeng.supportbot.enums.TicketImpact;
-import com.coreeng.supportbot.teams.Team;
-import com.coreeng.supportbot.teams.TeamService;
-import com.coreeng.supportbot.teams.TeamType;
+import com.coreeng.supportbot.teams.PlatformTeam;
+import com.coreeng.supportbot.teams.PlatformTeamsService;
 import com.coreeng.supportbot.ticket.*;
 import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +28,7 @@ class TicketUpdateServiceTest {
     private TicketQueryService queryService;
 
     @Mock
-    private TeamService teamService;
+    private PlatformTeamsService platformTeamsService;
 
     @Mock
     private ImpactsRegistry impactsRegistry;
@@ -40,7 +39,7 @@ class TicketUpdateServiceTest {
     private TicketUpdateService service;
 
     private TicketId ticketId;
-    private Team validTeam;
+    private PlatformTeam validTeam;
     private TicketImpact validImpact;
 
     @BeforeEach
@@ -48,13 +47,13 @@ class TicketUpdateServiceTest {
         service = new TicketUpdateService(
             ticketProcessingService,
             queryService,
-            teamService,
             impactsRegistry,
-            mapper
+            mapper,
+            platformTeamsService
         );
 
         ticketId = new TicketId(123L);
-        validTeam = new Team("Core Support", "core-support", ImmutableList.of(TeamType.support));
+        validTeam = new PlatformTeam("Core Support", java.util.Set.of(), java.util.Set.of());
         validImpact = new TicketImpact("Production Blocking", "production-blocking");
     }
 
@@ -65,14 +64,13 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "core-support",
             ImmutableList.of("bug", "urgent"),
-            "production-blocking",
-            true
+            "production-blocking"
         );
 
         DetailedTicket mockDetailedTicket = mock(DetailedTicket.class);
         TicketUI mockTicketUI = mock(TicketUI.class);
 
-        when(teamService.findTeamByCode("core-support")).thenReturn(validTeam);
+        when(platformTeamsService.findTeamByName("core-support")).thenReturn(validTeam);
         when(impactsRegistry.findImpactByCode("production-blocking")).thenReturn(validImpact);
         when(ticketProcessingService.submit(any(TicketSubmission.class)))
             .thenReturn(new TicketSubmitResult.Success());
@@ -114,8 +112,7 @@ class TicketUpdateServiceTest {
             null,
             "core-support",
             ImmutableList.of("bug"),
-            "production-blocking",
-            true
+            "production-blocking"
         );
 
         // when/then
@@ -131,8 +128,7 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             null,
             ImmutableList.of("bug"),
-            "production-blocking",
-            true
+            "production-blocking"
         );
 
         // when/then
@@ -148,8 +144,7 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "  ",
             ImmutableList.of("bug"),
-            "production-blocking",
-            true
+            "production-blocking"
         );
 
         // when/then
@@ -165,18 +160,17 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "invalid-team",
             ImmutableList.of("bug"),
-            "production-blocking",
-            true
+            "production-blocking"
         );
 
-        when(teamService.findTeamByCode("invalid-team")).thenReturn(null);
+        when(platformTeamsService.findTeamByName("invalid-team")).thenReturn(null);
 
         // when/then
         assertThatThrownBy(() -> service.update(ticketId, request))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("authorsTeam must be a valid team code");
 
-        verify(teamService).findTeamByCode("invalid-team");
+        verify(platformTeamsService).findTeamByName("invalid-team");
     }
 
     @Test
@@ -186,11 +180,10 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "core-support",
             null,
-            "production-blocking",
-            true
+            "production-blocking"
         );
 
-        when(teamService.findTeamByCode("core-support")).thenReturn(validTeam);
+        when(platformTeamsService.findTeamByName("core-support")).thenReturn(validTeam);
 
         // when/then
         assertThatThrownBy(() -> service.update(ticketId, request))
@@ -205,11 +198,10 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "core-support",
             ImmutableList.of(),
-            "production-blocking",
-            true
+            "production-blocking"
         );
 
-        when(teamService.findTeamByCode("core-support")).thenReturn(validTeam);
+        when(platformTeamsService.findTeamByName("core-support")).thenReturn(validTeam);
 
         // when/then
         assertThatThrownBy(() -> service.update(ticketId, request))
@@ -224,11 +216,10 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "core-support",
             ImmutableList.of("bug"),
-            null,
-            true
+            null
         );
 
-        when(teamService.findTeamByCode("core-support")).thenReturn(validTeam);
+        when(platformTeamsService.findTeamByName("core-support")).thenReturn(validTeam);
 
         // when/then
         assertThatThrownBy(() -> service.update(ticketId, request))
@@ -243,11 +234,10 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "core-support",
             ImmutableList.of("bug"),
-            "  ",
-            true
+            "  "
         );
 
-        when(teamService.findTeamByCode("core-support")).thenReturn(validTeam);
+        when(platformTeamsService.findTeamByName("core-support")).thenReturn(validTeam);
 
         // when/then
         assertThatThrownBy(() -> service.update(ticketId, request))
@@ -262,11 +252,10 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "core-support",
             ImmutableList.of("bug"),
-            "invalid-impact",
-            true
+            "invalid-impact"
         );
 
-        when(teamService.findTeamByCode("core-support")).thenReturn(validTeam);
+        when(platformTeamsService.findTeamByName("core-support")).thenReturn(validTeam);
         when(impactsRegistry.findImpactByCode("invalid-impact")).thenReturn(null);
 
         // when/then
@@ -284,14 +273,13 @@ class TicketUpdateServiceTest {
             TicketStatus.opened,
             "core-support",
             ImmutableList.of("bug", "urgent", "customer-impacting", "security"),
-            "production-blocking",
-            true
+            "production-blocking"
         );
 
         DetailedTicket mockDetailedTicket = mock(DetailedTicket.class);
         TicketUI mockTicketUI = mock(TicketUI.class);
 
-        when(teamService.findTeamByCode("core-support")).thenReturn(validTeam);
+        when(platformTeamsService.findTeamByName("core-support")).thenReturn(validTeam);
         when(impactsRegistry.findImpactByCode("production-blocking")).thenReturn(validImpact);
         when(ticketProcessingService.submit(any(TicketSubmission.class)))
             .thenReturn(new TicketSubmitResult.Success());
@@ -317,14 +305,13 @@ class TicketUpdateServiceTest {
                 status,
                 "core-support",
                 ImmutableList.of("bug"),
-                "production-blocking",
-                true
+                "production-blocking"
             );
 
             DetailedTicket mockDetailedTicket = mock(DetailedTicket.class);
             TicketUI mockTicketUI = mock(TicketUI.class);
 
-            when(teamService.findTeamByCode("core-support")).thenReturn(validTeam);
+            when(platformTeamsService.findTeamByName("core-support")).thenReturn(validTeam);
             when(impactsRegistry.findImpactByCode("production-blocking")).thenReturn(validImpact);
             when(ticketProcessingService.submit(any(TicketSubmission.class)))
                 .thenReturn(new TicketSubmitResult.Success());
@@ -335,39 +322,7 @@ class TicketUpdateServiceTest {
 
             assertThat(result).isEqualTo(mockTicketUI);
 
-            clearInvocations(teamService, impactsRegistry, ticketProcessingService, queryService, mapper);
+            clearInvocations(platformTeamsService, impactsRegistry, ticketProcessingService, queryService, mapper);
         }
-    }
-
-    @Test
-    public void shouldHandleConfirmedFalse() {
-        // given
-        TicketUpdateRequest request = new TicketUpdateRequest(
-            TicketStatus.closed,
-            "core-support",
-            ImmutableList.of("bug"),
-            "production-blocking",
-            false
-        );
-
-        DetailedTicket mockDetailedTicket = mock(DetailedTicket.class);
-        TicketUI mockTicketUI = mock(TicketUI.class);
-
-        when(teamService.findTeamByCode("core-support")).thenReturn(validTeam);
-        when(impactsRegistry.findImpactByCode("production-blocking")).thenReturn(validImpact);
-        when(ticketProcessingService.submit(any(TicketSubmission.class)))
-            .thenReturn(new TicketSubmitResult.Success());
-        when(queryService.findDetailedById(ticketId)).thenReturn(mockDetailedTicket);
-        when(mapper.mapToUI(any(DetailedTicket.class))).thenReturn(mockTicketUI);
-
-        // when
-        TicketUI result = service.update(ticketId, request);
-
-        // then
-        assertThat(result).isEqualTo(mockTicketUI);
-
-        ArgumentCaptor<TicketSubmission> submissionCaptor = ArgumentCaptor.forClass(TicketSubmission.class);
-        verify(ticketProcessingService).submit(submissionCaptor.capture());
-        assertThat(submissionCaptor.getValue().confirmed()).isFalse();
     }
 }

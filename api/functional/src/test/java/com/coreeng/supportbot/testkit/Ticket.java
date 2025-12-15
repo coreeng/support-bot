@@ -36,6 +36,9 @@ public class Ticket implements SearchableForTicket {
     @NonNull
     private final String queryBlocksJson;
     @NonNull
+    @Builder.Default
+    private final String queryText = "";
+    @NonNull
     private final String queryPermalink;
     private Ticket.@NonNull Status status;
     private String team;
@@ -57,6 +60,7 @@ public class Ticket implements SearchableForTicket {
             .queryTs(ticketResponse.query().ts())
             .formMessageTs(ticketResponse.formMessage().ts())
             .channelId(ticketResponse.channelId())
+            .queryText(ticketResponse.query().text() != null ? ticketResponse.query().text() : "")
             .status(Ticket.Status.fromCode(ticketResponse.status()))
             .team(
                 ticketResponse.team() != null
@@ -187,9 +191,13 @@ public class Ticket implements SearchableForTicket {
         asSupportSlack.submitView(escalationFormSubmit(triggerId, values));
     }
 
+
     public void assertMatches(SupportBotClient.TicketResponse response) {
         assertThat(response.id()).isEqualTo(id);
         assertThat(response.query().ts()).isEqualTo(queryTs);
+        if (response.query().text() != null) {
+            assertThat(response.query().text()).isEqualTo(queryText);
+        }
         assertThat(response.formMessage().ts()).isEqualTo(formMessageTs);
         assertThat(response.channelId()).isEqualTo(channelId);
         assertThat(response.status()).isEqualTo(status.code());

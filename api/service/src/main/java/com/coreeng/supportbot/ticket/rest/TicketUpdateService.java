@@ -2,8 +2,8 @@ package com.coreeng.supportbot.ticket.rest;
 
 import com.coreeng.supportbot.enums.ImpactsRegistry;
 import com.coreeng.supportbot.enums.TicketImpact;
-import com.coreeng.supportbot.teams.Team;
-import com.coreeng.supportbot.teams.TeamService;
+import com.coreeng.supportbot.teams.PlatformTeam;
+import com.coreeng.supportbot.teams.PlatformTeamsService;
 import com.coreeng.supportbot.ticket.*;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
@@ -16,9 +16,9 @@ import static java.util.Objects.requireNonNull;
 public class TicketUpdateService {
     private final TicketProcessingService ticketProcessingService;
     private final TicketQueryService queryService;
-    private final TeamService teamService;
     private final ImpactsRegistry impactsRegistry;
     private final TicketUIMapper mapper;
+    private final PlatformTeamsService platformTeamsService;
 
     public TicketUI update(TicketId ticketId, TicketUpdateRequest request) {
         ValidationResult validationResult = validate(request);
@@ -44,7 +44,7 @@ public class TicketUpdateService {
             .authorsTeam(request.authorsTeam())
             .tags(ImmutableList.copyOf(request.tags()))
             .impact(request.impact())
-            .confirmed(request.confirmed())
+            .confirmed(true)
             .build();
     }
 
@@ -58,7 +58,7 @@ public class TicketUpdateService {
         if (request.authorsTeam() == null || request.authorsTeam().isBlank()) {
             return ValidationResult.invalid("authorsTeam is required");
         }
-        Team team = teamService.findTeamByCode(request.authorsTeam());
+        PlatformTeam team = platformTeamsService.findTeamByName(request.authorsTeam());
         if (team == null) {
             return ValidationResult.invalid("authorsTeam must be a valid team code");
         }
