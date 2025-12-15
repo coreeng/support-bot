@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.homepage;
 
+import com.coreeng.supportbot.config.SupportInsightsProps;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.coreeng.supportbot.util.JsonMapper;
@@ -40,5 +41,24 @@ class HomepageViewTest {
         assertThat(ticketsQuery.tags().get(0)).isEqualTo("tag-a");
         assertThat(ticketsQuery.tags().get(1)).isEqualTo("tag-b");
         assertThat(ticketsQuery.status()).isEqualTo(TicketStatus.opened);
+    }
+
+    @Test
+    void supportInsightsPropsHandlesNullDashboards() {
+        SupportInsightsProps props = new SupportInsightsProps(null);
+        assertThat(props.dashboards()).isEqualTo(java.util.List.of());
+    }
+
+    @Test
+    void supportInsightsPropsReturnsDashboardsWhenConfigured() {
+        var dashboards = java.util.List.of(
+            new SupportInsightsProps.Dashboard("Weekly", "https://example.com/weekly", "Weekly overview"),
+            new SupportInsightsProps.Dashboard("Escalations", "https://example.com/escalations", null)
+        );
+        SupportInsightsProps props = new SupportInsightsProps(dashboards);
+
+        assertThat(props.dashboards().size()).isEqualTo(2);
+        assertThat(props.dashboards().get(0).title()).isEqualTo("Weekly");
+        assertThat(props.dashboards().get(1).description()).isNull();
     }
 }
