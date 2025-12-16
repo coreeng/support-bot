@@ -104,6 +104,19 @@ public class SupportBotClient {
                 .log().ifValidationFails(LogDetail.ALL, true)
                 .statusCode(200);
         }
+
+        public TicketResponse updateTicket(long ticketId, UpdateTicketRequest request) {
+            return given()
+                .config(restAssuredConfig)
+                .when()
+                .contentType(ContentType.JSON)
+                .body(request)
+                .patch(baseUrl + "/ticket/{id}", ticketId)
+                .then()
+                .log().ifValidationFails(LogDetail.ALL, true)
+                .statusCode(200)
+                .extract().as(TicketResponse.class);
+        }
     }
 
     @Builder
@@ -156,5 +169,15 @@ public class SupportBotClient {
         private String team;
         private MessageTs createdMessageTs;
         private ImmutableList<@NonNull String> tags;
+    }
+
+    @Builder
+    @Getter
+    @Jacksonized
+    public static class UpdateTicketRequest {
+        private final String status;
+        private final String authorsTeam;
+        private final ImmutableList<@NonNull String> tags;
+        private final String impact;
     }
 }
