@@ -78,6 +78,19 @@ public class SupportBotClient {
             .extract().as(TicketResponse.class);
     }
 
+    public TicketResponse updateTicket(long ticketId, UpdateTicketRequest request) {
+        return given()
+            .config(restAssuredConfig)
+            .when()
+            .contentType(ContentType.JSON)
+            .body(request)
+            .patch(baseUrl + "/ticket/{id}", ticketId)
+            .then()
+            .log().ifValidationFails(LogDetail.ALL, true)
+            .statusCode(200)
+            .extract().as(TicketResponse.class);
+    }
+
     public class TestMethods {
         public TicketResponse createTicket(TicketToCreateRequest request) {
             return given()
@@ -103,19 +116,6 @@ public class SupportBotClient {
                 .then()
                 .log().ifValidationFails(LogDetail.ALL, true)
                 .statusCode(200);
-        }
-
-        public TicketResponse updateTicket(long ticketId, UpdateTicketRequest request) {
-            return given()
-                .config(restAssuredConfig)
-                .when()
-                .contentType(ContentType.JSON)
-                .body(request)
-                .patch(baseUrl + "/ticket/{id}", ticketId)
-                .then()
-                .log().ifValidationFails(LogDetail.ALL, true)
-                .statusCode(200)
-                .extract().as(TicketResponse.class);
         }
     }
 

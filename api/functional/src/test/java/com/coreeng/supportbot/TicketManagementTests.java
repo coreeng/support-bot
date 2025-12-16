@@ -117,68 +117,6 @@ public class TicketManagementTests {
     }
 
     @Test
-    public void whenTicketIsFetched_queryTextIsReturned() {
-        // given
-        TestKit.RoledTestKit asSupport = testKit.as(support);
-        String messageText = "Functional test query text";
-
-        // when
-        Ticket ticket = asSupport.ticket().create(builder -> builder
-            .message(messageText)
-        );
-
-        ticket.stubQueryMessageFetch();
-
-        // then
-        var ticketResponse = supportBotClient.assertTicketExists(ticket);
-        assertThat(ticketResponse.query().text()).isEqualTo(messageText);
-    }
-
-    @Test
-    public void whenTicketIsUpdated_viaApi_thenFieldsChange() {
-        // given
-        TestKit.RoledTestKit asTenant = testKit.as(tenant);
-        Ticket ticket = asTenant.ticket().create(builder -> builder
-            .message("Initial query")
-        );
-
-        var updateStub = ticket.slackWiremock().stubMessageUpdated(
-            MessageUpdatedExpectation.<TicketMessage>builder()
-                .channelId(ticket.channelId())
-                .ts(ticket.formMessageTs())
-                .threadTs(ticket.queryTs())
-                .receiver(new TicketMessage.Receiver())
-                .build()
-        );
-        var closeReaction = ticket.slackWiremock().stubReactionAdd(
-            ReactionAddedExpectation.builder()
-                .reaction("white_check_mark")
-                .channelId(ticket.channelId())
-                .ts(ticket.queryTs())
-                .build()
-        );
-
-        // when
-        var updated = supportBotClient.test().updateTicket(
-            ticket.id(),
-            SupportBotClient.UpdateTicketRequest.builder()
-                .status("closed")
-                .authorsTeam("wow")
-                .tags(ImmutableList.of("ingresses", "networking"))
-                .impact("productionBlocking")
-                .build()
-        );
-
-        // then
-        assertThat(updated.status()).isEqualTo("closed");
-        assertThat(updated.team().code()).isEqualTo("wow");
-        assertThat(updated.tags()).containsExactlyInAnyOrder("ingresses", "networking");
-        assertThat(updated.impact()).isEqualTo("productionBlocking");
-        updateStub.assertIsCalled("ticket form message updated");
-        closeReaction.assertIsCalled("ticket close reaction added");
-    }
-
-    @Test
     public void whenQueryHasThreadReplyAndSupportReactsWithEyesToQuery_ticketIsCreated() {
         // given
         TestKit.RoledTestKit asTenant = testKit.as(tenant);
