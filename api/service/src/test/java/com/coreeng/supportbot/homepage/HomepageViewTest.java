@@ -79,7 +79,7 @@ class HomepageViewTest {
         boolean hasInsightsHeader = view.renderBlocks().stream()
             .filter(block -> block instanceof HeaderBlock)
             .map(block -> (HeaderBlock) block)
-            .anyMatch(header -> header.getText().getText().contains("Support Insights"));
+            .anyMatch(header -> header.getText().getText().contains("Useful Links"));
 
         assertThat(hasInsightsHeader).isFalse();
     }
@@ -114,7 +114,7 @@ class HomepageViewTest {
         boolean hasInsightsHeader = view.renderBlocks().stream()
             .filter(block -> block instanceof HeaderBlock)
             .map(block -> (HeaderBlock) block)
-            .anyMatch(header -> header.getText().getText().contains("Support Insights"));
+            .anyMatch(header -> header.getText().getText().contains("Useful Links"));
 
         assertThat(hasInsightsHeader).isTrue();
         assertThat(view.renderBlocks().toString()).contains("Weekly Trends", "Weekly overview", "Escalations");
