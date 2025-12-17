@@ -142,7 +142,7 @@ team:
     name: Support Leadership # Label showed on the UI
     code: support-leadership # Slack group ID of the support leadership team
   
-useful-links: # Adds a "Useful Links" section to the Slack Home tab with links to dashboards
+support-insights: # Adds a "Useful Links" section to the Slack Home tab with links to dashboards
   dashboards:
     - title: Weekly Trends # Dashboard title
       url: https://grafana.example.com/d/support-weekly-trends # Dashboard URL
