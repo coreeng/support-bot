@@ -2,13 +2,17 @@ package com.coreeng.supportbot.homepage;
 
 import com.coreeng.supportbot.config.SupportInsightsProps;
 import com.coreeng.supportbot.ticket.TicketStatus;
+import com.coreeng.supportbot.ticket.TicketSummaryViewMapper;
 import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.coreeng.supportbot.util.JsonMapper;
 import com.google.common.collect.ImmutableList;
+import com.slack.api.model.block.HeaderBlock;
+
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.time.Instant;
 
 class HomepageViewTest {
     private final JsonMapper jsonMapper = new JsonMapper();
@@ -50,15 +54,70 @@ class HomepageViewTest {
     }
 
     @Test
-    void supportInsightsPropsReturnsDashboardsWhenConfigured() {
-        var dashboards = java.util.List.of(
-            new SupportInsightsProps.Dashboard("Weekly", "https://example.com/weekly", "Weekly overview"),
-            new SupportInsightsProps.Dashboard("Escalations", "https://example.com/escalations", null)
+    void renderSupportInsightsNoDashboards() {
+        // given
+        SupportInsightsProps props = new SupportInsightsProps(null);
+        HomepageViewMapper mapper = new HomepageViewMapper(
+            new TicketSummaryViewMapper(jsonMapper),
+            jsonMapper,
+            props
+        );
+        HomepageView homepage = HomepageView.builder()
+            .tickets(ImmutableList.of())
+            .page(0)
+            .totalPages(1)
+            .totalTickets(20)
+            .channelId("C123")
+            .timestamp(Instant.now())
+            .state(HomepageView.State.getDefault())
+            .build();
+
+        // when
+        var view = mapper.render(homepage);
+
+        // then
+        boolean hasInsightsHeader = view.renderBlocks().stream()
+            .filter(block -> block instanceof HeaderBlock)
+            .map(block -> (HeaderBlock) block)
+            .anyMatch(header -> header.getText().getText().contains("Support Insights"));
+
+        assertThat(hasInsightsHeader).isFalse();
+    }
+
+    @Test
+    void renderSupportInsightsDashboardsPresent() {
+        // given
+        var dashboards = ImmutableList.of(
+          new SupportInsightsProps.Dashboard("Weekly Trends", "https://grafana.example.com/weekly", "Weekly overview"),
+          new SupportInsightsProps.Dashboard("Escalations", "https://grafana.example.com/escalations", null)
         );
         SupportInsightsProps props = new SupportInsightsProps(dashboards);
+        HomepageViewMapper mapper = new HomepageViewMapper(
+            new TicketSummaryViewMapper(jsonMapper),
+            jsonMapper,
+            props
+        );
+        HomepageView homepage = HomepageView.builder()
+            .tickets(ImmutableList.of())
+            .page(0)
+            .totalPages(1)
+            .totalTickets(20)
+            .channelId("C123")
+            .timestamp(Instant.now())
+            .state(HomepageView.State.getDefault())
+            .build();
 
-        assertThat(props.dashboards().size()).isEqualTo(2);
-        assertThat(props.dashboards().get(0).title()).isEqualTo("Weekly");
-        assertThat(props.dashboards().get(1).description()).isNull();
-    }
+        // when
+        var view = mapper.render(homepage);
+
+        // then
+        boolean hasInsightsHeader = view.renderBlocks().stream()
+            .filter(block -> block instanceof HeaderBlock)
+            .map(block -> (HeaderBlock) block)
+            .anyMatch(header -> header.getText().getText().contains("Support Insights"));
+
+        assertThat(hasInsightsHeader).isTrue();
+        assertThat(view.renderBlocks().toString()).contains("Weekly Trends", "Weekly overview", "Escalations");
+}
+
 }
