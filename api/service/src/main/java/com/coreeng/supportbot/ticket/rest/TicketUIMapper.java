@@ -22,6 +22,10 @@ public class TicketUIMapper {
     private final TeamUIMapper teamUIMapper;
 
     public TicketUI mapToUI(DetailedTicket ticket) {
+        return mapToUI(ticket, null);
+    }
+
+    public TicketUI mapToUI(DetailedTicket ticket, String queryText) {
         return TicketUI.builder()
             .id(ticket.ticket().id())
             .query(new TicketUI.Query(
@@ -30,7 +34,8 @@ public class TicketUIMapper {
                     ticket.ticket().queryTs()
                 )),
                 ticket.ticket().queryTs().getDate(),
-                ticket.ticket().queryTs()
+                ticket.ticket().queryTs(),
+                queryText
             ))
             .formMessage(new TicketUI.FormMessage(
                 ticket.ticket().createdMessageTs()
