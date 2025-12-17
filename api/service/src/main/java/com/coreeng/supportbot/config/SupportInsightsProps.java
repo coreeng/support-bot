@@ -5,7 +5,7 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@ConfigurationProperties("useful-links")
+@ConfigurationProperties("support-insights")
 public record SupportInsightsProps(List<Dashboard> dashboards) {
     public SupportInsightsProps(List<Dashboard> dashboards) {
         this.dashboards = dashboards == null ? List.of() : List.copyOf(dashboards);
