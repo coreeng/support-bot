@@ -2,7 +2,7 @@ package com.coreeng.supportbot.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.List;
 
 @ConfigurationProperties("support-insights")
