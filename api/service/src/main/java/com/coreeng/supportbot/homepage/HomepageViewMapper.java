@@ -64,10 +64,10 @@ public class HomepageViewMapper {
             divider()
         );
 
-        // Support Insights section
+        // Useful Links section
         List<LayoutBlock> supportInsights = renderSupportInsights();
         if (!supportInsights.isEmpty()) {
-            blocks.add(header(h -> h.text(plainText(":bar_chart: Support Insights", true))));
+            blocks.add(header(h -> h.text(plainText(":bar_chart: Useful Links", true))));
             blocks.addAll(supportInsights);
             blocks.add(divider());
         }
