@@ -11,6 +11,7 @@ import org.jspecify.annotations.NonNull;
 
 import com.coreeng.supportbot.Config;
 import com.google.common.collect.ImmutableList;
+import com.coreeng.supportbot.testkit.MessageToGet;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -36,6 +37,9 @@ public class Ticket implements SearchableForTicket {
     @NonNull
     private final String queryBlocksJson;
     @NonNull
+    @Builder.Default
+    private final String queryText = "";
+    @NonNull
     private final String queryPermalink;
     private Ticket.@NonNull Status status;
     private String team;
@@ -57,6 +61,7 @@ public class Ticket implements SearchableForTicket {
             .queryTs(ticketResponse.query().ts())
             .formMessageTs(ticketResponse.formMessage().ts())
             .channelId(ticketResponse.channelId())
+            .queryText(ticketResponse.query().text() != null ? ticketResponse.query().text() : "")
             .status(Ticket.Status.fromCode(ticketResponse.status()))
             .team(
                 ticketResponse.team() != null
@@ -160,6 +165,19 @@ public class Ticket implements SearchableForTicket {
         return new ReopenFlowStubs(updated, uncheck);
     }
 
+    public void stubQueryMessageFetch() {
+        slackWiremock.stubGetMessage(MessageToGet.builder()
+            .channelId(channelId)
+            .ts(queryTs)
+            .threadTs(queryTs)
+            .text(queryText)
+            .blocksJson(queryBlocksJson)
+            .userId(user.slackUserId())
+            .botId(user.slackBotId())
+            .team(teamId)
+            .build());
+    }
+
     public void openSummaryAndSubmit(SlackTestKit asSupportSlack, String triggerId, FullSummaryFormSubmission.Values values) {
         StubWithResult<FullSummaryForm> opened = expectFullSummaryFormOpened(triggerId);
         asSupportSlack.clickMessageButton(fullSummaryButtonClick(triggerId));
@@ -187,9 +205,13 @@ public class Ticket implements SearchableForTicket {
         asSupportSlack.submitView(escalationFormSubmit(triggerId, values));
     }
 
+
     public void assertMatches(SupportBotClient.TicketResponse response) {
         assertThat(response.id()).isEqualTo(id);
         assertThat(response.query().ts()).isEqualTo(queryTs);
+        if (response.query().text() != null) {
+            assertThat(response.query().text()).isEqualTo(queryText);
+        }
         assertThat(response.formMessage().ts()).isEqualTo(formMessageTs);
         assertThat(response.channelId()).isEqualTo(channelId);
         assertThat(response.status()).isEqualTo(status.code());

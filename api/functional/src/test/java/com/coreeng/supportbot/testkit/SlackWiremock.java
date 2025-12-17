@@ -214,6 +214,7 @@ public class SlackWiremock extends WireMockServer {
                 "oldest": "${ts}",
                 "messages": [
                     {
+                        "text": "${text}",
                         "user": ${userId},
                         "bot_id": ${botId},
                         "team": "${team}",
@@ -231,6 +232,7 @@ public class SlackWiremock extends WireMockServer {
             "botId", message.botId() != null
                 ? "\"" + message.botId() + "\""
                 : "null",
+            "text", message.text().replace("\"", "\\\""),
             "team", message.team(),
             "blocks", message.blocksJson(),
             "ts", message.ts(),

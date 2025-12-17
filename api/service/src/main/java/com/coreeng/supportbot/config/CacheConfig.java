@@ -44,6 +44,30 @@ public class CacheConfig {
         );
     }
 
+    @Bean("slack-group-cache")
+    public Cache slackGroupCache() {
+        return new CaffeineCache(
+            "slack-group",
+            Caffeine.newBuilder()
+                .expireAfterAccess(1, TimeUnit.DAYS)
+                .maximumSize(1_000)
+                .recordStats()
+                .build()
+        );
+    }
+
+    @Bean("slack-channel-cache")
+    public Cache slackChannelCache() {
+        return new CaffeineCache(
+            "slack-channel",
+            Caffeine.newBuilder()
+                .expireAfterAccess(1, TimeUnit.DAYS)
+                .maximumSize(1_000)
+                .recordStats()
+                .build()
+        );
+    }
+
     @Bean
     public MeterBinder slackCacheMetrics(
         List<CaffeineCache> caches

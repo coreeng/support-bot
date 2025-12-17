@@ -14,6 +14,9 @@ public class MessageToGet {
     private final MessageTs ts;
     @NonNull
     private final MessageTs threadTs;
+    @NonNull
+    @Builder.Default
+    private final String text = "";
 
     // Either userId or botId is not null
     @Nullable
