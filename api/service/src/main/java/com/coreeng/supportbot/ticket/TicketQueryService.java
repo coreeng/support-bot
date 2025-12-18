@@ -4,10 +4,14 @@ import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationQuery;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
+import com.coreeng.supportbot.slack.SlackTextFormatter;
+import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
+import com.slack.api.model.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +28,8 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 public class TicketQueryService {
     private final TicketRepository repository;
     private final EscalationQueryService escalationQueryService;
+    private final SlackClient slackClient;
+    private final SlackTextFormatter textFormatter;
 
     public Page<Ticket> findByQuery(TicketsQuery query) {
         return repository.listTickets(query);
@@ -80,5 +86,21 @@ public class TicketQueryService {
 
     public boolean queryExists(MessageRef queryRef) {
         return repository.queryExists(queryRef);
+    }
+
+    @Nullable
+    public String fetchQueryText(Ticket ticket) {
+        try {
+            Message message = slackClient.getMessageByTs(
+                new SlackGetMessageByTsRequest(ticket.channelId(), ticket.queryTs())
+            );
+            String rawText = message.getText();
+            return textFormatter.format(rawText);
+        } catch (Exception e) {
+            if (log.isWarnEnabled()) {
+                log.warn("Failed to fetch query message for ticket {}: {}", ticket.id(), e.getMessage());
+            }
+            return null;
+        }
     }
 }

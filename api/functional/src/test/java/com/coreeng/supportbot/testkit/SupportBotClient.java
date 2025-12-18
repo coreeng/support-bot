@@ -78,6 +78,19 @@ public class SupportBotClient {
             .extract().as(TicketResponse.class);
     }
 
+    public TicketResponse updateTicket(long ticketId, UpdateTicketRequest request) {
+        return given()
+            .config(restAssuredConfig)
+            .when()
+            .contentType(ContentType.JSON)
+            .body(request)
+            .patch(baseUrl + "/ticket/{id}", ticketId)
+            .then()
+            .log().ifValidationFails(LogDetail.ALL, true)
+            .statusCode(200)
+            .extract().as(TicketResponse.class);
+    }
+
     public class TestMethods {
         public TicketResponse createTicket(TicketToCreateRequest request) {
             return given()
@@ -134,7 +147,7 @@ public class SupportBotClient {
         private ImmutableList<@NonNull Escalation> escalations;
     }
 
-    public record QueryResponse(String link, Instant date, MessageTs ts) {}
+    public record QueryResponse(String link, Instant date, MessageTs ts, String text) {}
     public record TicketFormMessage(MessageTs ts) {}
     public record Team(String label, String code, ImmutableList<@NonNull String> types) {}
     @Builder
@@ -156,5 +169,15 @@ public class SupportBotClient {
         private String team;
         private MessageTs createdMessageTs;
         private ImmutableList<@NonNull String> tags;
+    }
+
+    @Builder
+    @Getter
+    @Jacksonized
+    public static class UpdateTicketRequest {
+        private final String status;
+        private final String authorsTeam;
+        private final ImmutableList<@NonNull String> tags;
+        private final String impact;
     }
 }

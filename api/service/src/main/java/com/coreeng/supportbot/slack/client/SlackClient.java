@@ -41,4 +41,8 @@ public interface SlackClient {
     User getUserById(SlackId.User userId);
 
     ImmutableList<String> getGroupMembers(SlackId.Group groupId);
+
+    String getGroupName(SlackId.Group groupId);
+
+    String getChannelName(String channelId);
 }

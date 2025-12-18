@@ -33,6 +33,7 @@ public class FullSummaryButtonClick implements MessageButtonClick {
             .channelId(ticket.channelId())
             .ts(ticket.queryTs())
             .threadTs(ticket.queryTs())
+            .text(ticket.queryText())
             .blocksJson(ticket.queryBlocksJson())
             .userId(ticket.user().slackUserId())
             .botId(ticket.user().slackBotId())
