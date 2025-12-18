@@ -4,6 +4,7 @@ import com.coreeng.supportbot.escalation.rest.EscalationUIMapper;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.teams.TeamService;
+import com.coreeng.supportbot.teams.rest.TeamUI;
 import com.coreeng.supportbot.teams.rest.TeamUIMapper;
 import com.coreeng.supportbot.ticket.DetailedTicket;
 import com.coreeng.supportbot.ticket.TicketTeam;
@@ -46,7 +47,11 @@ public class TicketUIMapper {
             .team(
                 switch (ticket.ticket().team()) {
                     case null -> null;
-                    case TicketTeam.UnknownTeam u -> null;
+                    case TicketTeam.UnknownTeam u -> new TeamUI(
+                        TicketTeam.notATenantCode,
+                        TicketTeam.notATenantCode,
+                        ImmutableList.of()
+                    );
                     case TicketTeam.KnownTeam k -> teamUIMapper.mapToUI(
                         checkNotNull(teamService.findTeamByCode(k.code()))
                     );
