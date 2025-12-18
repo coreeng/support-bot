@@ -1,18 +1,15 @@
 package com.coreeng.supportbot.ticket;
 
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
-@JsonSubTypes({
-    @JsonSubTypes.Type(value = TicketTeam.KnownTeam.class, name = "known"),
-    @JsonSubTypes.Type(value = TicketTeam.UnknownTeam.class, name = "unknown")
-})
 public sealed interface TicketTeam {
     String notATenantCode = "Not a Tenant";
 
+    @JsonValue
     String toCode();
 
+    @JsonCreator
     static TicketTeam fromCode(String code) {
         if (code == null) {
             return null;
