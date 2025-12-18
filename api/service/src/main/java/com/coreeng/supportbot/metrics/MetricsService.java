@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -19,11 +20,11 @@ import java.util.concurrent.atomic.AtomicLong;
 @Slf4j
 @RequiredArgsConstructor
 public class MetricsService {
-    private static final String METRIC_NAME = "supportbot_tickets";
+    private static final String metricName = "supportbot_tickets";
 
     private final TicketQueryService queryService;
     private final MeterRegistry meterRegistry;
-    private final ConcurrentHashMap<String, AtomicLong> ticketMetrics = new ConcurrentHashMap<>();
+    private final Map<String, AtomicLong> ticketMetrics = new ConcurrentHashMap<>();
 
     @Scheduled(fixedRateString = "${metrics.refreshIntervalMs:60000}")
     public void refreshMetrics() {
@@ -52,7 +53,7 @@ public class MetricsService {
 
         ticketMetrics.computeIfAbsent(ticketId, k -> {
             AtomicLong value = new AtomicLong(1);
-            Gauge.builder(METRIC_NAME, value, AtomicLong::doubleValue)
+            Gauge.builder(metricName, value, AtomicLong::doubleValue)
                 .tag("ticketId", ticketId)
                 .tag("status", status)
                 .tag("impact", impact)
