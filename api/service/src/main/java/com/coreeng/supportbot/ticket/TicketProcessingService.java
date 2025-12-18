@@ -105,8 +105,7 @@ public class TicketProcessingService {
 
         Ticket newTicket = repository.createTicketIfNotExists(Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
         log.atInfo()
-            .addKeyValue("action", "ticket_created")
-            .addKeyValue("id", newTicket.id().id())
+            .addKeyValue("ticketId", newTicket.id().id())
             .log("Ticket created on reaction to message({})", e.messageRef().actualThreadTs());
 
         slackService.markPostTracked(new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
@@ -164,12 +163,7 @@ public class TicketProcessingService {
         );
 
         log.atInfo()
-            .addKeyValue("action", "ticket_updated")
-            .addKeyValue("id", updatedTicket.id().id())
-            .addKeyValue("status", updatedTicket.status())
-            .addKeyValue("team", updatedTicket.team())
-            .addKeyValue("impact", updatedTicket.impact())
-            .addKeyValue("tags", updatedTicket.tags())
+            .addKeyValue("ticketId", updatedTicket.id().id())
             .log("Ticket submitted");
 
         if (ticket.status() != updatedTicket.status()) {
@@ -200,11 +194,7 @@ public class TicketProcessingService {
             request.tags()
         ));
         log.atInfo()
-            .addKeyValue("action", "ticket_escalated")
-            .addKeyValue("id", ticket.id().id())
-            .addKeyValue("escalation_team", request.team())
-            .addKeyValue("team", ticket.team())
-            .addKeyValue("tags", request.tags())
+            .addKeyValue("ticketId", ticket.id().id())
             .log("Ticket escalated");
         slackService.markTicketEscalated(ticket.queryRef());
     }
@@ -223,9 +213,7 @@ public class TicketProcessingService {
         }
 
         log.atInfo()
-            .addKeyValue("action", "ticket_stale")
-            .addKeyValue("id", ticket.id().id())
-            .addKeyValue("status", "stale")
+            .addKeyValue("ticketId", ticket.id().id())
             .log("Marking ticket as stale");
         slackService.warnStaleness(ticket.queryRef());
         Ticket updatedTicket = repository.updateTicket(
@@ -263,12 +251,7 @@ public class TicketProcessingService {
         ));
         Ticket updatedTicket = repository.insertStatusLog(ticket, Instant.now());
         log.atInfo()
-            .addKeyValue("action", "ticket_changed")
-            .addKeyValue("id", updatedTicket.id().id())
-            .addKeyValue("status", updatedTicket.status())
-            .addKeyValue("team", updatedTicket.team())
-            .addKeyValue("impact", updatedTicket.impact())
-            .addKeyValue("tags", updatedTicket.tags())
+            .addKeyValue("ticketId", updatedTicket.id().id())
             .log("Ticket status changed");
         slackService.editTicketForm(
             new MessageRef(updatedTicket.createdMessageTs(), updatedTicket.channelId()),
