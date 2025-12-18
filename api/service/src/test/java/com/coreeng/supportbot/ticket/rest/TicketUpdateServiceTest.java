@@ -89,7 +89,7 @@ class TicketUpdateServiceTest {
         TicketSubmission capturedSubmission = submissionCaptor.getValue();
         assertThat(capturedSubmission.ticketId()).isEqualTo(ticketId);
         assertThat(capturedSubmission.status()).isEqualTo(TicketStatus.closed);
-        assertThat(capturedSubmission.authorsTeam()).isEqualTo("core-support");
+        assertThat(capturedSubmission.authorsTeam()).isEqualTo(TicketTeam.fromCode("core-support"));
         assertThat(capturedSubmission.tags()).containsExactly("bug", "urgent");
         assertThat(capturedSubmission.impact()).isEqualTo("production-blocking");
         assertThat(capturedSubmission.confirmed()).isTrue();
