@@ -13,7 +13,7 @@ import javax.annotation.Nullable;
 
 import org.springframework.stereotype.Component;
 
-import com.coreeng.supportbot.config.SupportInsightsProps;
+import com.coreeng.supportbot.config.HomepageProps;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.slack.client.SimpleSlackView;
 import com.coreeng.supportbot.slack.client.SlackView;
@@ -46,7 +46,7 @@ import lombok.extern.slf4j.Slf4j;
 public class HomepageViewMapper {
     private final TicketSummaryViewMapper ticketSummaryViewMapper;
     private final JsonMapper jsonMapper;
-    private final SupportInsightsProps supportInsightsProps;
+    private final HomepageProps homepageProps;
 
     public SlackView render(HomepageView homepage) {
         ImmutableList.Builder<LayoutBlock> blocks = ImmutableList.builder();
@@ -65,10 +65,10 @@ public class HomepageViewMapper {
         );
 
         // Useful Links section
-        List<LayoutBlock> supportInsights = renderSupportInsights();
-        if (!supportInsights.isEmpty()) {
+        List<LayoutBlock> usefulLinks = renderUsefulLinks();
+        if (!usefulLinks.isEmpty()) {
             blocks.add(header(h -> h.text(plainText(":bar_chart: Useful Links", true))));
-            blocks.addAll(supportInsights);
+            blocks.addAll(usefulLinks);
             blocks.add(divider());
         }
 
@@ -228,32 +228,32 @@ public class HomepageViewMapper {
         return "<!date^" + instant.getEpochSecond() + "^{date_short_pretty} at {time}|" + instant.truncatedTo(ChronoUnit.MINUTES) + ">";
     }
 
-    private List<LayoutBlock> renderSupportInsights() {
-        List<SupportInsightsProps.Dashboard> dashboards = supportInsightsProps.dashboards();
-        if (dashboards.isEmpty()) {
+    private List<LayoutBlock> renderUsefulLinks() {
+        List<HomepageProps.UsefulLink> links = homepageProps.usefulLinks();
+        if (links.isEmpty()) {
             return List.of();
         }
 
-        // Renders dashboards as two columns to not take up too much space
+        // Renders links as two columns to not take up too much space
         int columnsPerRow = 2;
         ImmutableList.Builder<LayoutBlock> rows = ImmutableList.builder();
-        for (int i = 0; i < dashboards.size(); i += columnsPerRow) {
+        for (int i = 0; i < links.size(); i += columnsPerRow) {
             ImmutableList.Builder<TextObject> columns = ImmutableList.builder();
-            columns.add(markdownText(formatDashboard(dashboards.get(i))));
-            if (i + 1 < dashboards.size()) {
-                columns.add(markdownText(formatDashboard(dashboards.get(i + 1))));
+            columns.add(markdownText(formatUsefulLink(links.get(i))));
+            if (i + 1 < links.size()) {
+                columns.add(markdownText(formatUsefulLink(links.get(i + 1))));
             }
             rows.add(section(s -> s.fields(columns.build())));
         }
         return rows.build();
     }
 
-    private String formatDashboard(SupportInsightsProps.Dashboard dashboard) {
-        String link = format("*<%s|%s>*", dashboard.url(), dashboard.title());
-        String description = dashboard.description();
+    private String formatUsefulLink(HomepageProps.UsefulLink link) {
+        String formatted = format("*<%s|%s>*", link.url(), link.title());
+        String description = link.description();
         if (description == null || description.isBlank()) {
-            return link;
+            return formatted;
         }
-        return link + "\n" + description;
+        return formatted + "\n" + description;
     }
 }
