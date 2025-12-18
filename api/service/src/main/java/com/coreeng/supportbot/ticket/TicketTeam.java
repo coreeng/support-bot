@@ -9,13 +9,17 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @JsonSubTypes.Type(value = TicketTeam.UnknownTeam.class, name = "unknown")
 })
 public sealed interface TicketTeam {
-    String NOT_A_TENANT_CODE = "Not a Tenant";
+    String notATenantCode = "Not a Tenant";
 
     String toCode();
 
     static TicketTeam fromCode(String code) {
-        if (code == null) return null;
-        if (NOT_A_TENANT_CODE.equals(code)) return new UnknownTeam();
+        if (code == null) {
+            return null;
+        }
+        if (notATenantCode.equals(code)) {
+            return new UnknownTeam();
+        }
         return new KnownTeam(code);
     }
 
@@ -26,6 +30,6 @@ public sealed interface TicketTeam {
 
     record UnknownTeam() implements TicketTeam {
         @Override
-        public String toCode() { return NOT_A_TENANT_CODE; }
+        public String toCode() { return notATenantCode; }
     }
 }

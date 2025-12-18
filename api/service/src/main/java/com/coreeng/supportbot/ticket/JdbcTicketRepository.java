@@ -518,16 +518,22 @@ public class JdbcTicketRepository implements TicketRepository {
     }
 
     private String toDbTeam(TicketTeam team) {
-        if (team == null) return null;
+        if (team == null) {
+            return null;
+        }
         return switch (team) {
             case TicketTeam.KnownTeam known -> known.code();
-            case TicketTeam.UnknownTeam unknown -> "Not a Tenant";
+            case TicketTeam.UnknownTeam unknown -> TicketTeam.notATenantCode;
         };
     }
 
     private TicketTeam fromDbTeam(String team) {
-        if (team == null) return null;
-        if ("Not a Tenant".equals(team)) return new TicketTeam.UnknownTeam();
+        if (team == null) {
+            return null;
+        }
+        if (TicketTeam.notATenantCode.equals(team)) {
+            return new TicketTeam.UnknownTeam();
+        }
         return new TicketTeam.KnownTeam(team);
     }
 }
