@@ -45,7 +45,7 @@ public class TicketTeamSuggestionsService {
 
         if (authorTeams.isEmpty()) {
             return new TicketTeamsSuggestion(
-                ImmutableList.of(TicketTeam.NOT_A_TENANT_CODE),
+                ImmutableList.of(TicketTeam.notATenantCode),
                 allTeams
             );
         }
