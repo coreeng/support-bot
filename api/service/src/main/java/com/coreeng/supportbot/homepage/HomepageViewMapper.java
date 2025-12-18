@@ -13,6 +13,7 @@ import javax.annotation.Nullable;
 
 import org.springframework.stereotype.Component;
 
+import com.coreeng.supportbot.config.HomepageProps;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.slack.client.SimpleSlackView;
 import com.coreeng.supportbot.slack.client.SlackView;
@@ -32,6 +33,7 @@ import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.SectionBlock;
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
+import com.slack.api.model.block.composition.TextObject;
 import com.slack.api.model.block.element.BlockElement;
 import static com.slack.api.model.block.element.BlockElements.button;
 
@@ -44,6 +46,7 @@ import lombok.extern.slf4j.Slf4j;
 public class HomepageViewMapper {
     private final TicketSummaryViewMapper ticketSummaryViewMapper;
     private final JsonMapper jsonMapper;
+    private final HomepageProps homepageProps;
 
     public SlackView render(HomepageView homepage) {
         ImmutableList.Builder<LayoutBlock> blocks = ImmutableList.builder();
@@ -58,7 +61,18 @@ public class HomepageViewMapper {
                     .text(plainText("Refresh"))
                 ))
             ),
-            divider(),
+            divider()
+        );
+
+        // Useful Links section
+        List<LayoutBlock> usefulLinks = renderUsefulLinks();
+        if (!usefulLinks.isEmpty()) {
+            blocks.add(header(h -> h.text(plainText(":bar_chart: Useful Links", true))));
+            blocks.addAll(usefulLinks);
+            blocks.add(divider());
+        }
+
+        blocks.add(
             header(h -> h
                 .text(plainText(":ticket: Support Query Tickets Summary", true))
             ),
@@ -212,5 +226,34 @@ public class HomepageViewMapper {
 
     private String formatSlackDate(Instant instant) {
         return "<!date^" + instant.getEpochSecond() + "^{date_short_pretty} at {time}|" + instant.truncatedTo(ChronoUnit.MINUTES) + ">";
+    }
+
+    private List<LayoutBlock> renderUsefulLinks() {
+        List<HomepageProps.UsefulLink> links = homepageProps.usefulLinks();
+        if (links.isEmpty()) {
+            return List.of();
+        }
+
+        // Renders links as two columns to not take up too much space
+        int columnsPerRow = 2;
+        ImmutableList.Builder<LayoutBlock> rows = ImmutableList.builder();
+        for (int i = 0; i < links.size(); i += columnsPerRow) {
+            ImmutableList.Builder<TextObject> columns = ImmutableList.builder();
+            columns.add(markdownText(formatUsefulLink(links.get(i))));
+            if (i + 1 < links.size()) {
+                columns.add(markdownText(formatUsefulLink(links.get(i + 1))));
+            }
+            rows.add(section(s -> s.fields(columns.build())));
+        }
+        return rows.build();
+    }
+
+    private String formatUsefulLink(HomepageProps.UsefulLink link) {
+        String formatted = format("*<%s|%s>*", link.url(), link.title());
+        String description = link.description();
+        if (description == null || description.isBlank()) {
+            return formatted;
+        }
+        return formatted + "\n" + description;
     }
 }
