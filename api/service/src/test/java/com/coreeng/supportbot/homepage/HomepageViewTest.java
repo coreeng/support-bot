@@ -1,6 +1,6 @@
 package com.coreeng.supportbot.homepage;
 
-import com.coreeng.supportbot.config.SupportInsightsProps;
+import com.coreeng.supportbot.config.HomepageProps;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketSummaryViewMapper;
 import com.coreeng.supportbot.ticket.TicketsQuery;
@@ -48,15 +48,15 @@ class HomepageViewTest {
     }
 
     @Test
-    void supportInsightsPropsHandlesNullDashboards() {
-        SupportInsightsProps props = new SupportInsightsProps(null);
-        assertThat(props.dashboards()).isEqualTo(java.util.List.of());
+    void homepagePropsHandlesNullUsefulLinks() {
+        HomepageProps props = new HomepageProps(null);
+        assertThat(props.usefulLinks()).isEqualTo(java.util.List.of());
     }
 
     @Test
-    void renderSupportInsightsNoDashboards() {
+    void renderUsefulLinksEmpty() {
         // given
-        SupportInsightsProps props = new SupportInsightsProps(null);
+        HomepageProps props = new HomepageProps(null);
         HomepageViewMapper mapper = new HomepageViewMapper(
             new TicketSummaryViewMapper(jsonMapper),
             jsonMapper,
@@ -76,22 +76,22 @@ class HomepageViewTest {
         var view = mapper.render(homepage);
 
         // then
-        boolean hasInsightsHeader = view.renderBlocks().stream()
+        boolean hasUsefulLinksHeader = view.renderBlocks().stream()
             .filter(block -> block instanceof HeaderBlock)
             .map(block -> (HeaderBlock) block)
             .anyMatch(header -> header.getText().getText().contains("Useful Links"));
 
-        assertThat(hasInsightsHeader).isFalse();
+        assertThat(hasUsefulLinksHeader).isFalse();
     }
 
     @Test
-    void renderSupportInsightsDashboardsPresent() {
+    void renderUsefulLinksPresent() {
         // given
-        var dashboards = ImmutableList.of(
-          new SupportInsightsProps.Dashboard("Weekly Trends", "https://grafana.example.com/weekly", "Weekly overview"),
-          new SupportInsightsProps.Dashboard("Escalations", "https://grafana.example.com/escalations", null)
+        var links = ImmutableList.of(
+          new HomepageProps.UsefulLink("Weekly Trends", "https://grafana.example.com/weekly", "Weekly overview"),
+          new HomepageProps.UsefulLink("Escalations", "https://grafana.example.com/escalations", null)
         );
-        SupportInsightsProps props = new SupportInsightsProps(dashboards);
+        HomepageProps props = new HomepageProps(links);
         HomepageViewMapper mapper = new HomepageViewMapper(
             new TicketSummaryViewMapper(jsonMapper),
             jsonMapper,
@@ -111,12 +111,12 @@ class HomepageViewTest {
         var view = mapper.render(homepage);
 
         // then
-        boolean hasInsightsHeader = view.renderBlocks().stream()
+        boolean hasUsefulLinksHeader = view.renderBlocks().stream()
             .filter(block -> block instanceof HeaderBlock)
             .map(block -> (HeaderBlock) block)
             .anyMatch(header -> header.getText().getText().contains("Useful Links"));
 
-        assertThat(hasInsightsHeader).isTrue();
+        assertThat(hasUsefulLinksHeader).isTrue();
         assertThat(view.renderBlocks().toString()).contains("Weekly Trends", "Weekly overview", "Escalations");
 }
 
