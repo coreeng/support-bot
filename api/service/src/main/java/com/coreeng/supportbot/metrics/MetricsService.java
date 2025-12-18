@@ -54,7 +54,7 @@ public class MetricsService {
         ticketMetrics.computeIfAbsent(ticketId, k -> {
             AtomicLong value = new AtomicLong(1);
             Gauge.builder(metricName, value, AtomicLong::doubleValue)
-                .tag("ticketId", ticketId)
+                .tag("ticket_id", ticketId)
                 .tag("status", status)
                 .tag("impact", impact)
                 .tag("team", team)

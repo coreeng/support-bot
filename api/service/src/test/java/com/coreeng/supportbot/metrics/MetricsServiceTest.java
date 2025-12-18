@@ -62,7 +62,7 @@ class MetricsServiceTest {
         metricsService.refreshMetrics();
 
         Gauge metric = meterRegistry.find("supportbot_tickets")
-            .tag("ticketId", "1")
+            .tag("ticket_id", "1")
             .tag("status", "opened")
             .tag("impact", "productionBlocking")
             .tag("team", "corePlatform")
