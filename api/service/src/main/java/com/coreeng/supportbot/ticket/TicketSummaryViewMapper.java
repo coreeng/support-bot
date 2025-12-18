@@ -258,7 +258,7 @@ public class TicketSummaryViewMapper {
         return TicketSubmission.builder()
             .ticketId(new TicketId(metadata.ticketId()))
             .status(TicketStatus.valueOf(statusValue.getSelectedOption().getValue()))
-            .authorsTeam(teamValue.getSelectedOption().getValue())
+            .authorsTeam(TicketTeam.fromCode(teamValue.getSelectedOption().getValue()))
             .tags(
                 tagsValue != null && !isEmpty(tagsValue.getSelectedOptions())
                     ? tagsValue.getSelectedOptions().stream()

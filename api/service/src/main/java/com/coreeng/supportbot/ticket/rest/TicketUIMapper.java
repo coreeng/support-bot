@@ -6,6 +6,7 @@ import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.rest.TeamUIMapper;
 import com.coreeng.supportbot.ticket.DetailedTicket;
+import com.coreeng.supportbot.ticket.TicketTeam;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -43,9 +44,13 @@ public class TicketUIMapper {
             .channelId(ticket.ticket().channelId())
             .status(ticket.ticket().status())
             .team(
-                ticket.ticket().team() != null
-                    ? teamUIMapper.mapToUI(checkNotNull(teamService.findTeamByCode(ticket.ticket().team())))
-                    : null
+                switch (ticket.ticket().team()) {
+                    case null -> null;
+                    case TicketTeam.UnknownTeam u -> null;
+                    case TicketTeam.KnownTeam k -> teamUIMapper.mapToUI(
+                        checkNotNull(teamService.findTeamByCode(k.code()))
+                    );
+                }
             )
             .impact(ticket.ticket().impact())
             .tags(ticket.ticket().tags())

@@ -11,7 +11,7 @@ import lombok.extern.jackson.Jacksonized;
 public class TicketSubmission {
     private TicketId ticketId;
     private TicketStatus status;
-    private String authorsTeam;
+    private TicketTeam authorsTeam;
     private ImmutableList<String> tags;
     private String impact;
     private boolean confirmed;

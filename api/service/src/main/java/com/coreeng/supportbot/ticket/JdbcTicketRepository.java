@@ -118,7 +118,7 @@ public class JdbcTicketRepository implements TicketRepository {
                     ? ticket.createdMessageTs().ts()
                     : null,
                 com.coreeng.supportbot.dbschema.enums.TicketStatus.lookupLiteral(ticket.status().name()),
-                ticket.team(),
+                toDbTeam(ticket.team()),
                 ticket.impact(),
                 ticket.lastInteractedAt()
             )
@@ -155,7 +155,7 @@ public class JdbcTicketRepository implements TicketRepository {
         int updatedTickets = dsl.update(TICKET)
             .set(TICKET.CREATED_MESSAGE_TS, ticket.createdMessageTs() != null ? ticket.createdMessageTs().ts() : null)
             .set(TICKET.STATUS, com.coreeng.supportbot.dbschema.enums.TicketStatus.lookupLiteral(ticket.status().name()))
-            .set(TICKET.TEAM, ticket.team())
+            .set(TICKET.TEAM, toDbTeam(ticket.team()))
             .set(TICKET.IMPACT_CODE, ticket.impact())
             .set(TICKET.LAST_INTERACTED_AT, ticket.lastInteractedAt())
             .where(TICKET.ID.eq(ticket.id().id()))
@@ -491,7 +491,7 @@ public class JdbcTicketRepository implements TicketRepository {
             .channelId(r.get(QUERY.CHANNEL_ID))
             .createdMessageTs(MessageTs.ofOrNull(r.get(TICKET.CREATED_MESSAGE_TS)))
             .status(TicketStatus.valueOf(r.get(TICKET.STATUS).getLiteral()))
-            .team(r.get(TICKET.TEAM))
+            .team(fromDbTeam(r.get(TICKET.TEAM)))
             .impact(r.get(TICKET.IMPACT_CODE))
             .ratingSubmitted(r.get(TICKET.RATING_SUBMITTED))
             .build();
@@ -516,5 +516,20 @@ public class JdbcTicketRepository implements TicketRepository {
             .where(TICKET.ID.eq(ticketId.id()))
             .execute();
     }
+
+    private String toDbTeam(TicketTeam team) {
+        if (team == null) return null;
+        return switch (team) {
+            case TicketTeam.KnownTeam known -> known.code();
+            case TicketTeam.UnknownTeam unknown -> "Not a Tenant";
+        };
+    }
+
+    private TicketTeam fromDbTeam(String team) {
+        if (team == null) return null;
+        if ("Not a Tenant".equals(team)) return new TicketTeam.UnknownTeam();
+        return new TicketTeam.KnownTeam(team);
+    }
 }
+
 
