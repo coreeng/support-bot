@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -81,7 +82,7 @@ public class TicketUIMapperTest {
     }
 
     @Test
-    void mapToUIReturnsNotATenantTeamNull() {
+    void mapToUIReturnsNotATenantTeam() {
         // given
         Ticket ticket = Ticket.builder()
                 .id(new TicketId(1))
@@ -103,7 +104,9 @@ public class TicketUIMapperTest {
 
         // then
         TicketUI result = assertDoesNotThrow(() -> ticketUIMapper.mapToUI(detailedTicket));
-        assertNull(result.team());
+        assertEquals(TicketTeam.notATenantCode, result.team().label());
+        assertEquals(TicketTeam.notATenantCode, result.team().code());
+        assertTrue(result.team().types().isEmpty());
     }
 
     @Test
