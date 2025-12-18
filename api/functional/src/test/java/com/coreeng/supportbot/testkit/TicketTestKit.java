@@ -25,9 +25,21 @@ public class TicketTestKit {
     public Ticket create(UnaryOperator<TicketToCreate.TicketToCreateBuilder> updateTicketToCreate) {
         TicketToCreate ticketToCreate = updateTicketToCreate.apply(TicketToCreate.builder()
             .channelId(testKit.channelId())
+            .queryTs(MessageTs.now())
+            .createdMessageTs(MessageTs.now())
         ).build();
 
         slackWiremock.stubGetPermalink(ticketToCreate.channelId(), ticketToCreate.queryTs());
+        slackWiremock.stubGetMessage(MessageToGet.builder()
+            .channelId(ticketToCreate.channelId())
+            .ts(ticketToCreate.queryTs())
+            .threadTs(ticketToCreate.queryTs())
+            .text(ticketToCreate.message())
+            .blocksJson(messageToBlocksJson(ticketToCreate.message()))
+            .userId(testKit.user().slackUserId())
+            .botId(testKit.user().slackBotId())
+            .team(testKit.teamId())
+            .build());
         SupportBotClient.TicketResponse response = supportBotClient.test().createTicket(SupportBotClient.TicketToCreateRequest.builder()
             .channelId(ticketToCreate.channelId())
             .queryTs(ticketToCreate.queryTs())
@@ -41,6 +53,7 @@ public class TicketTestKit {
             .slackWiremock(slackWiremock)
             .supportBotClient(supportBotClient)
             .queryBlocksJson(messageToBlocksJson(ticketToCreate.message()))
+            .queryText(ticketToCreate.message())
             .queryPermalink("https://slack.com/messages/" + testKit.channelId() + "/" + ticketToCreate.queryTs())
             .build();
     }

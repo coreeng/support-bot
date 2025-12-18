@@ -71,8 +71,10 @@ public class SlackAppConfig {
     public SlackClient slackClient(App slackApp,
                                    @Qualifier("permalink-cache") Cache permalinkCache,
                                    @Qualifier("slack-user-cache") Cache userCache,
+                                   @Qualifier("slack-group-cache") Cache groupCache,
+                                   @Qualifier("slack-channel-cache") Cache channelCache,
                                    MeterRegistry meterRegistry) {
-        return new SlackClientImpl(slackApp.client(), permalinkCache, userCache, meterRegistry);
+        return new SlackClientImpl(slackApp.client(), permalinkCache, userCache, groupCache, channelCache, meterRegistry);
     }
 
     /**
