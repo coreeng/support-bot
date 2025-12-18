@@ -43,9 +43,9 @@ public class TicketTeamSuggestionsService {
             .filter(t -> t.toLowerCase().contains(normalisedFilterValue))
             .collect(toImmutableList());
 
-        if (authorTeams.isEmpty() && !allTeams.isEmpty()) {
+        if (authorTeams.isEmpty()) {
             return new TicketTeamsSuggestion(
-                ImmutableList.of("Not a Tenant"),
+                ImmutableList.of(TicketTeam.NOT_A_TENANT_CODE),
                 allTeams
             );
         }

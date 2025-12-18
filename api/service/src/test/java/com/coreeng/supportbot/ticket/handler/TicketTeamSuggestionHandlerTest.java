@@ -49,7 +49,7 @@ class TicketTeamSuggestionHandlerTest {
     }
 
     @Test
-    void emptySuggestions_returnsNoOptionGroups() {
+    void noTeamsExist_returnsNotATenantOnly() {
         // given
         BlockSuggestionRequest req = mockSuggestionRequest("", "U123");
         BlockSuggestionContext ctx = mock(BlockSuggestionContext.class);
@@ -61,8 +61,10 @@ class TicketTeamSuggestionHandlerTest {
         BlockSuggestionResponse resp = handler.apply(req, ctx);
 
         // then
-        assertNotNull(resp);
-        assertTrue(resp.getOptionGroups().isEmpty());
+        List<OptionGroup> groups = resp.getOptionGroups();
+        assertEquals(1, groups.size());
+        assertEquals("Suggested teams", groups.get(0).getLabel().getText());
+        assertOptionsEqual(groups.get(0).getOptions(), ImmutableList.of("Not a Tenant"));
         verify(slackClient).getUserById(new SlackId.User("U123"));
     }
 

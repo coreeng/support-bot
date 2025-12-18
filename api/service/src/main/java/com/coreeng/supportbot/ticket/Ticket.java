@@ -21,7 +21,7 @@ public class Ticket {
     private MessageTs createdMessageTs;
     private TicketStatus status;
     @Nullable
-    private String team;
+    private TicketTeam team;
     @Builder.Default
     private ImmutableList<StatusLog> statusLog = ImmutableList.of();
     @Builder.Default

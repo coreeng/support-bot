@@ -36,7 +36,7 @@ public record TicketSummaryView(
             ticket.id(),
             query,
             ticket.status(),
-            ticket.team(),
+            ticket.team() != null ? ticket.team().toCode() : null,
             escalationViews,
             ticket.statusLog(),
             tags,
