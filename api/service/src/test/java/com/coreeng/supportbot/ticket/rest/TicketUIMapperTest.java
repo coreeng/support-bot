@@ -110,6 +110,33 @@ public class TicketUIMapperTest {
     }
 
     @Test
+    void mapToUIReturnsNullWhenKnownTeamNotFound() {
+        // given
+        Ticket ticket = Ticket.builder()
+            .id(new TicketId(1))
+            .channelId("C123")
+            .queryTs(MessageTs.of("123.456"))
+            .createdMessageTs(MessageTs.of("123.457"))
+            .status(TicketStatus.opened)
+            .team(new TicketTeam.KnownTeam("deleted-team"))
+            .impact("production-blocking")
+            .tags(ImmutableList.of())
+            .lastInteractedAt(Instant.now())
+            .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+            .build();
+
+        DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
+
+        // when
+        when(slackClient.getPermalink(any())).thenReturn("https://slack.com/permalink");
+        when(teamService.findTeamByCode("deleted-team")).thenReturn(null);
+
+        // then
+        TicketUI result = assertDoesNotThrow(() -> ticketUIMapper.mapToUI(detailedTicket));
+        assertNull(result.team());
+    }
+
+    @Test
     void mapToUIReturnsValidTeam() {
         // given
         Ticket ticket = Ticket.builder()

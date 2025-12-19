@@ -3,6 +3,7 @@ package com.coreeng.supportbot.ticket.rest;
 import com.coreeng.supportbot.escalation.rest.EscalationUIMapper;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.rest.TeamUI;
 import com.coreeng.supportbot.teams.rest.TeamUIMapper;
@@ -12,7 +13,6 @@ import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 @Component
@@ -52,9 +52,7 @@ public class TicketUIMapper {
                         TicketTeam.notATenantCode,
                         ImmutableList.of()
                     );
-                    case TicketTeam.KnownTeam k -> teamUIMapper.mapToUI(
-                        checkNotNull(teamService.findTeamByCode(k.code()))
-                    );
+                    case TicketTeam.KnownTeam k -> mapKnownTeamToUI(k.code());
                 }
             )
             .impact(ticket.ticket().impact())
@@ -81,5 +79,10 @@ public class TicketUIMapper {
             )
             .ratingSubmitted(ticket.ticket().ratingSubmitted())
             .build();
+    }
+
+    private TeamUI mapKnownTeamToUI(String code) {
+        Team team = teamService.findTeamByCode(code);
+        return team != null ? teamUIMapper.mapToUI(team) : null;
     }
 }
