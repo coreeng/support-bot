@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.teams;
 
 import com.coreeng.supportbot.util.JsonMapper;
+import com.google.common.collect.ImmutableList;
 import dev.cel.common.CelAbstractSyntaxTree;
 import dev.cel.common.CelOptions;
 import dev.cel.common.CelValidationException;
@@ -25,6 +26,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -86,16 +88,23 @@ public class GenericPlatformTeamsFetcher implements PlatformTeamsFetcher {
             items = resourceList.getItems();
         }
 
-        return items.stream()
-            .map(r -> {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> resourceMap = jsonMapper.getObjectMapper().convertValue(r, Map.class);
-                String teamName = evaluateExpression("teamName", r, teamNameProgram, resourceMap);
-                String groupRef = evaluateExpression("groupRef", r, groupRefProgram, resourceMap);
+        ImmutableList.Builder<TeamAndGroupTuple> teams = ImmutableList.builderWithExpectedSize(items.size());
+        for (GenericKubernetesResource item : items) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> resourceMap = jsonMapper.getObjectMapper().convertValue(item, Map.class);
+            try {
+                String teamName = evaluateExpression("teamName", item, teamNameProgram, resourceMap);
+                String groupRef = evaluateExpression("groupRef", item, groupRefProgram, resourceMap);
 
-                return new TeamAndGroupTuple(teamName, groupRef);
-            })
-            .toList();
+                TeamAndGroupTuple apply = new TeamAndGroupTuple(teamName, groupRef);
+                teams.add(apply);
+            } catch (PropertyExtractionException e) {
+                log.atWarn()
+                    .setCause(e)
+                    .log("Failed to extract teamName or groupRef. Skipping the team");
+            }
+        }
+        return teams.build();
     }
 
     @NonNull
@@ -189,7 +198,7 @@ public class GenericPlatformTeamsFetcher implements PlatformTeamsFetcher {
             return format(
                 "Couldn't extract %s from %s using CEL expression '%s': %s",
                 propertyType,
-                resource.getKind() + "." + resource.getApiVersion() + ":" + resource.getMetadata().getNamespace() + "/" + resource.getMetadata().getName(),
+                resource.getApiVersion() + "/" + resource.getKind() + ":" + resource.getMetadata().getNamespace() + "/" + resource.getMetadata().getName(),
                 celExpression,
                 super.getMessage()
             );
