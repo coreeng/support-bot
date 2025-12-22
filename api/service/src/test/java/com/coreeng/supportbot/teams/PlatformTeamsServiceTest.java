@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -20,9 +19,9 @@ class PlatformTeamsServiceTest {
         PlatformTeamsFetcher teamsFetcher = new FakeTeamsFetcher(List.of(
             new PlatformTeamsFetcher.TeamAndGroupTuple("wow", "wow-group")
         ));
-        PlatformUsersFetcher usersFetcher = new FakeUsersFetcher(
-            Map.of("wow-group", List.of(new PlatformUsersFetcher.Membership("WOW1@TEST.COM")))
-        );
+        PlatformUsersFetcher usersFetcher = FakeUsersFetcher.builder()
+            .memberships("wow-group", List.of(new PlatformUsersFetcher.Membership("WOW1@TEST.COM")))
+            .build();
 
         EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(List.of(
             new EscalationTeam("wow", "wow", "SOME")
@@ -52,12 +51,12 @@ class PlatformTeamsServiceTest {
             new PlatformTeamsFetcher.TeamAndGroupTuple("A", "shared"),
             new PlatformTeamsFetcher.TeamAndGroupTuple("B", "shared")
         ));
-        FakeUsersFetcher usersFetcher = new FakeUsersFetcher(
-            Map.of("shared", List.of(
+        FakeUsersFetcher usersFetcher = FakeUsersFetcher.builder()
+            .memberships("shared", List.of(
                 new PlatformUsersFetcher.Membership("u1@test.com"),
                 new PlatformUsersFetcher.Membership("u2@test.com")
             ))
-        );
+            .build();
 
         EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(List.of(
             new EscalationTeam("A", "A", "SOME"),
@@ -88,12 +87,10 @@ class PlatformTeamsServiceTest {
             new PlatformTeamsFetcher.TeamAndGroupTuple("T1", "G1"),
             new PlatformTeamsFetcher.TeamAndGroupTuple("T1", "G2")
         ));
-        PlatformUsersFetcher usersFetcher = new FakeUsersFetcher(
-            Map.of(
-                "G1", List.of(new PlatformUsersFetcher.Membership("a@test.com")),
-                "G2", List.of(new PlatformUsersFetcher.Membership("b@test.com"))
-            )
-        );
+        PlatformUsersFetcher usersFetcher = FakeUsersFetcher.builder()
+            .memberships("G1", List.of(new PlatformUsersFetcher.Membership("a@test.com")))
+            .memberships("G2", List.of(new PlatformUsersFetcher.Membership("b@test.com")))
+            .build();
 
         EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(List.of(
             new EscalationTeam("T1", "T1", "SOME")
@@ -116,7 +113,7 @@ class PlatformTeamsServiceTest {
         PlatformTeamsFetcher teamsFetcher = new FakeTeamsFetcher(List.of(
             new PlatformTeamsFetcher.TeamAndGroupTuple("wow", "G")
         ));
-        PlatformUsersFetcher usersFetcher = new FakeUsersFetcher(Map.of());
+        PlatformUsersFetcher usersFetcher = FakeUsersFetcher.builder().build();
 
         EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(List.of(
             new EscalationTeam("wow", "wow", "SOME"),
@@ -135,9 +132,9 @@ class PlatformTeamsServiceTest {
         PlatformTeamsFetcher teamsFetcher = new FakeTeamsFetcher(List.of(
             new PlatformTeamsFetcher.TeamAndGroupTuple("wow", "G")
         ));
-        PlatformUsersFetcher usersFetcher = new FakeUsersFetcher(
-            Map.of("G", List.of(new PlatformUsersFetcher.Membership("user@test.com")))
-        );
+        PlatformUsersFetcher usersFetcher = FakeUsersFetcher.builder()
+            .memberships("G", List.of(new PlatformUsersFetcher.Membership("user@test.com")))
+            .build();
 
         EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(List.of(
             new EscalationTeam("wow", "wow", "SOME"),
@@ -179,7 +176,7 @@ class PlatformTeamsServiceTest {
     @Test
     void noTeams_resultsInEmptyState_andNoUserFetchCalls() {
         PlatformTeamsFetcher teamsFetcher = new FakeTeamsFetcher(List.of());
-        FakeUsersFetcher usersFetcher = new FakeUsersFetcher(Map.of());
+        FakeUsersFetcher usersFetcher = FakeUsersFetcher.builder().build();
         EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(List.of());
 
         PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(2, Duration.ofSeconds(1), false);
@@ -197,9 +194,9 @@ class PlatformTeamsServiceTest {
             new PlatformTeamsFetcher.TeamAndGroupTuple("T", "G"),
             new PlatformTeamsFetcher.TeamAndGroupTuple("T", "G")
         ));
-        FakeUsersFetcher usersFetcher = new FakeUsersFetcher(
-            Map.of("G", List.of(new PlatformUsersFetcher.Membership("u@test.com")))
-        );
+        FakeUsersFetcher usersFetcher = FakeUsersFetcher.builder()
+            .memberships("G", List.of(new PlatformUsersFetcher.Membership("u@test.com")))
+            .build();
 
         EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(List.of(
             new EscalationTeam("T", "T", "SOME")
@@ -217,5 +214,87 @@ class PlatformTeamsServiceTest {
         assertTrue(t.groupRefs().contains("G"));
         assertEquals(1, t.users().size());
         assertEquals(1, service.listTeamsByUserEmail("u@test.com").size());
+    }
+
+    @Test
+    void fetchingGroupMembers_failsForOneGroup_serviceInitializesWithPartialData() {
+        PlatformTeamsFetcher teamsFetcher = new FakeTeamsFetcher(List.of(
+            new PlatformTeamsFetcher.TeamAndGroupTuple("TeamA", "working-group"),
+            new PlatformTeamsFetcher.TeamAndGroupTuple("TeamB", "failing-group")
+        ));
+        FakeUsersFetcher usersFetcher = FakeUsersFetcher.builder()
+            .memberships("working-group", List.of(
+                new PlatformUsersFetcher.Membership("user1@test.com"),
+                new PlatformUsersFetcher.Membership("user2@test.com")
+            ))
+            .failingGroup("failing-group", new RuntimeException("Simulated API failure"))
+            .build();
+
+        EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(List.of(
+            new EscalationTeam("TeamA", "TeamA", "SOME"),
+            new EscalationTeam("TeamB", "TeamB", "SOME")
+        ));
+
+        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(4, Duration.ofSeconds(2), false);
+        PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, usersFetcher, registry, props);
+
+        // Should not throw - the catch-all handles the failure gracefully
+        service.init();
+
+        // Both teams should exist
+        assertEquals(2, service.listTeams().size());
+
+        // TeamA with working group should have its users
+        var teamA = service.findTeamByName("TeamA");
+        assertNotNull(teamA);
+        assertEquals(2, teamA.users().size());
+
+        // TeamB with failing group should have zero users
+        var teamB = service.findTeamByName("TeamB");
+        assertNotNull(teamB);
+        assertEquals(0, teamB.users().size());
+
+        // Users from working group should be queryable
+        assertNotNull(service.findUserByEmail("user1@test.com"));
+        assertNotNull(service.findUserByEmail("user2@test.com"));
+        assertEquals(1, service.listTeamsByUserEmail("user1@test.com").size());
+    }
+
+    @Test
+    void fetchingGroupMembers_failsForAllGroups_serviceInitializesWithEmptyUsers() {
+        PlatformTeamsFetcher teamsFetcher = new FakeTeamsFetcher(List.of(
+            new PlatformTeamsFetcher.TeamAndGroupTuple("TeamA", "failing-group-1"),
+            new PlatformTeamsFetcher.TeamAndGroupTuple("TeamB", "failing-group-2")
+        ));
+        FakeUsersFetcher usersFetcher = FakeUsersFetcher.builder()
+            .failingGroup("failing-group-1", new RuntimeException("API error 1"))
+            .failingGroup("failing-group-2", new IllegalStateException("API error 2"))
+            .build();
+
+        EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(List.of(
+            new EscalationTeam("TeamA", "TeamA", "SOME"),
+            new EscalationTeam("TeamB", "TeamB", "SOME")
+        ));
+
+        PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(4, Duration.ofSeconds(2), false);
+        PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, usersFetcher, registry, props);
+
+        // Should not throw - the catch-all handles all failures gracefully
+        service.init();
+
+        // Teams should exist but with no users
+        assertEquals(2, service.listTeams().size());
+
+        var teamA = service.findTeamByName("TeamA");
+        assertNotNull(teamA);
+        assertEquals(0, teamA.users().size());
+
+        var teamB = service.findTeamByName("TeamB");
+        assertNotNull(teamB);
+        assertEquals(0, teamB.users().size());
+
+        // No users should be found
+        assertNull(service.findUserByEmail("any@test.com"));
+        assertTrue(service.listTeamsByUserEmail("any@test.com").isEmpty());
     }
 }
