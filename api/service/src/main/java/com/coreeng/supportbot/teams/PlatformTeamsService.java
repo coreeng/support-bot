@@ -130,6 +130,12 @@ public class PlatformTeamsService {
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                             throw new RuntimeException(e);
+                        } catch (Exception e) {
+                            log.atWarn()
+                                .addKeyValue("groupRef", groupRef)
+                                .addKeyValue("error", e)
+                                .log("Failed to fetch group members");
+                            return ImmutableList.of();
                         } finally {
                             if (acquired) {
                                 gate.release();
