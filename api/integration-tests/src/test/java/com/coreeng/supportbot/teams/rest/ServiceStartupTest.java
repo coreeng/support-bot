@@ -22,10 +22,14 @@ public class ServiceStartupTest {
     private static final Logger logger = LoggerFactory.getLogger(ServiceStartupTest.class);
 
     // Test data constants
-    private static final String testConfigMapName = "tenant-core-test";
+    private static final String testTeamCMName = "tenant-core-test";
     private static final String testTeamName = "core";
     private static final String testGroupRef = "2d5ac5ab-4acc-457e-af4d-117bd135671c";
-    
+
+    private static final String testBadRefTeamCMName = "tenant-bad-ref-test";
+    private static final String testBadRefTeamName = "bad-ref";
+    private static final String testBadGroupRef = "bad ref";
+
     private static Config config;
     private static KubernetesTestClient kubernetesClient;
 
@@ -37,7 +41,9 @@ public class ServiceStartupTest {
             kubernetesClient = new KubernetesTestClient();
 
             ConfigMapTeamData teamData = new ConfigMapTeamData(testTeamName, testGroupRef);
-            kubernetesClient.createOrUpdateConfigMap(testConfigMapName, config.namespace(), teamData);
+            kubernetesClient.createOrUpdateConfigMap(testTeamCMName, config.namespace(), teamData);
+            ConfigMapTeamData notExistingTeamData = new ConfigMapTeamData(testBadRefTeamName, testBadGroupRef);
+            kubernetesClient.createOrUpdateConfigMap(testBadRefTeamCMName, config.namespace(), notExistingTeamData);
 
             runServiceScript("deploy");
             kubernetesClient.waitUntilDeploymentReady(config.service().deployment().name(), config.namespace());
@@ -70,11 +76,12 @@ public class ServiceStartupTest {
 
         try {
             if (kubernetesClient != null) {
-                kubernetesClient.deleteConfigMap(testConfigMapName, config.namespace());
+                kubernetesClient.deleteConfigMap(testTeamCMName, config.namespace());
+                kubernetesClient.deleteConfigMap(testBadRefTeamCMName, config.namespace());
                 kubernetesClient.close();
             }
         } catch (Exception e) {
-            logger.error("Error during cleanup, couldn't delete ConfigMap", e);
+            logger.error("Error during cleanup", e);
         }
     }
 
@@ -87,23 +94,25 @@ public class ServiceStartupTest {
             .log().body()
             .extract().body().jsonPath().getList("", TeamUI.class);
 
-        TeamUI coreTeam = teams.stream()
-            .filter(team -> testTeamName.equals(team.code()))
-            .findFirst()
-            .orElse(null);
-
-        assertThat(coreTeam)
-            .as("Team '%s' should be present in response", testTeamName)
-            .isNotNull();
-        assertThat(coreTeam.code())
-            .as("Team name should match expected value")
-            .isEqualTo(testTeamName);
-        assertThat(coreTeam.types())
-            .as("Team types should contain expected values")
-            .containsExactlyInAnyOrder("tenant", "escalation");
+        // Both teams should be present (including the one with malformed groupRef - service handles fetch failure gracefully)
         assertThat(teams)
-            .as("Response should contain at least one team")
-            .isNotEmpty();
+            .extracting(TeamUI::code)
+            .as("Both teams should be present in response")
+            .contains(testTeamName, testBadRefTeamName);
+
+        assertThat(findTeamByCode(teams, testTeamName).types())
+            .as("Team '%s' types should contain expected values", testTeamName)
+            .containsExactlyInAnyOrder("tenant", "escalation");
+        assertThat(findTeamByCode(teams, testBadRefTeamName).types())
+            .as("Team '%s' types should contain expected values", testTeamName)
+            .containsExactly("tenant");
+    }
+
+    private TeamUI findTeamByCode(List<TeamUI> teams, String code) {
+        return teams.stream()
+            .filter(team -> code.equals(team.code()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Team with code '" + code + "' not found"));
     }
 
     private static void runServiceScript(String action) throws Exception {
