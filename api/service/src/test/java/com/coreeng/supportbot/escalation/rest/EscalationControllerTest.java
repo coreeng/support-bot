@@ -5,6 +5,7 @@ import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketQueryService;
 import com.coreeng.supportbot.ticket.TicketsQuery;
+import com.coreeng.supportbot.ticket.TicketTeam;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.Test;
@@ -40,7 +41,7 @@ class EscalationControllerTest {
 
         Ticket ticket = mock(Ticket.class);
         when(ticket.id()).thenReturn(ticketId);
-        when(ticket.team()).thenReturn("TeamA");
+        when(ticket.team()).thenReturn(TicketTeam.fromCode("TeamA"));
 
         EscalationUI mapped = EscalationUI.builder().id(escalationId).build();
         when(mapper.mapToUI(escalation)).thenReturn(mapped);

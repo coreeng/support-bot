@@ -66,7 +66,7 @@ public class EscalationController {
 
                     return escalationUI.toBuilder()
                             .escalatingTeam(ticket != null && ticket.team() != null
-                                    ? ticket.team()
+                                    ? ticket.team().toCode()
                                     : null)
                             .impact(ticket != null ? ticket.impact() : null)
                             .build();

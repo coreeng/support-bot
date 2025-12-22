@@ -28,6 +28,7 @@ import com.coreeng.supportbot.sentiment.client.Sentiment;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.teams.PlatformTeam;
+import com.coreeng.supportbot.ticket.TicketTeam;
 import com.coreeng.supportbot.teams.PlatformTeamsService;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketRepository;
@@ -194,7 +195,7 @@ public class MockDataGenerator implements ApplicationRunner {
         }
 
         Ticket updatedTicket = ticket.toBuilder()
-            .team(teams.get(teamsI).name())
+            .team(TicketTeam.fromCode(teams.get(teamsI).name()))
             .tags(
                 pickedTags.stream()
                     .map(Tag::code)
