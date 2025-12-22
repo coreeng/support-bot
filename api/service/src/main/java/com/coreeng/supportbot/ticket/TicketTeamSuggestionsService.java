@@ -42,6 +42,14 @@ public class TicketTeamSuggestionsService {
             .map(PlatformTeam::name)
             .filter(t -> t.toLowerCase().contains(normalisedFilterValue))
             .collect(toImmutableList());
+
+        if (authorTeams.isEmpty()) {
+            return new TicketTeamsSuggestion(
+                ImmutableList.of(TicketTeam.notATenantCode),
+                allTeams
+            );
+        }
+
         ImmutableList<String> otherTeams = allTeams.stream()
             .filter(t -> !authorTeams.contains(t))
             .collect(toImmutableList());

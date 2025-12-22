@@ -209,7 +209,7 @@ public class TicketInMemoryRepository implements TicketRepository {
             if (ticket.team() == null) {
                 return false;
             }
-            return query.teams().contains(ticket.team());
+            return query.teams().contains(ticket.team().toCode());
         }
         return true;
     }

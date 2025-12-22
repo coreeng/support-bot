@@ -13,6 +13,7 @@ import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketQueryService;
 import com.coreeng.supportbot.ticket.TicketStatus;
+import com.coreeng.supportbot.ticket.TicketTeam;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.AfterEach;
@@ -240,7 +241,7 @@ class HomepageServiceTest {
                     .lastInteractedAt(Instant.now())
                     .status(TicketStatus.opened)
                     .queryTs(messageTs)
-                    .team("lions")
+                    .team(TicketTeam.fromCode("lions"))
                     .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
                     .build());
         }

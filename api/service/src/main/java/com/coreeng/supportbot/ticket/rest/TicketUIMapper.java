@@ -3,14 +3,16 @@ package com.coreeng.supportbot.ticket.rest;
 import com.coreeng.supportbot.escalation.rest.EscalationUIMapper;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
+import com.coreeng.supportbot.teams.rest.TeamUI;
 import com.coreeng.supportbot.teams.rest.TeamUIMapper;
 import com.coreeng.supportbot.ticket.DetailedTicket;
+import com.coreeng.supportbot.ticket.TicketTeam;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 @Component
@@ -43,9 +45,15 @@ public class TicketUIMapper {
             .channelId(ticket.ticket().channelId())
             .status(ticket.ticket().status())
             .team(
-                ticket.ticket().team() != null
-                    ? teamUIMapper.mapToUI(checkNotNull(teamService.findTeamByCode(ticket.ticket().team())))
-                    : null
+                switch (ticket.ticket().team()) {
+                    case null -> null;
+                    case TicketTeam.UnknownTeam u -> new TeamUI(
+                        TicketTeam.notATenantCode,
+                        TicketTeam.notATenantCode,
+                        ImmutableList.of()
+                    );
+                    case TicketTeam.KnownTeam k -> mapKnownTeamToUI(k.code());
+                }
             )
             .impact(ticket.ticket().impact())
             .tags(ticket.ticket().tags())
@@ -71,5 +79,11 @@ public class TicketUIMapper {
             )
             .ratingSubmitted(ticket.ticket().ratingSubmitted())
             .build();
+    }
+
+    // TODO: If team is deleted after ticket has been saved to to db, this returns null. We should potentially look at saving team info to database so deleted teams can still be displayed instead of returning null
+    private TeamUI mapKnownTeamToUI(String code) {
+        Team team = teamService.findTeamByCode(code);
+        return team != null ? teamUIMapper.mapToUI(team) : null;
     }
 }
