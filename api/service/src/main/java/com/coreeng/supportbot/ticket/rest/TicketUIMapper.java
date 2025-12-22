@@ -81,6 +81,7 @@ public class TicketUIMapper {
             .build();
     }
 
+    // TODO: If team is deleted after ticket has been saved to to db, this returns null. We should potentially look at saving team info to database so deleted teams can still be displayed instead of returning null
     private TeamUI mapKnownTeamToUI(String code) {
         Team team = teamService.findTeamByCode(code);
         return team != null ? teamUIMapper.mapToUI(team) : null;
