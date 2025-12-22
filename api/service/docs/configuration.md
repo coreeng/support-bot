@@ -130,9 +130,8 @@ platform-integration: # Whether to enable platform integration to automatically 
           label-selector: "root.tree.hnc.x-k8s.io/depth" # Label selector filter for namespace labels. Look [here](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) for syntax
         teamName: # Will use the namespace name from resource.metadata.name as a team name
           cel-expression: resource.metadata.name
-        groupRef: # Will use the namespace uid from resource.metadata.uid as a group reference. Supposed to be changed to a real configuration.
-          cel-expression: resource.metadata.uid
-
+        groupRef: # Will use the `group-id` annotation as a group reference, e.g. Azure group id, GCP Group email. Supposed to be changed to a real configuration.
+          cel-expression: resource.metadata.annotations.group-id
 
 team:
   support:
