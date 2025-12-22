@@ -98,7 +98,7 @@ public class HomepageService {
             .id(ticket.id())
             .status(ticket.status())
             .escalations(t.escalations())
-            .inquiringTeam(t.ticket().team())
+            .inquiringTeam(t.ticket().team() != null ? t.ticket().team().toCode() : null)
             .impact(impactsRegistry.findImpactByCode(ticket.impact()))
             .queryPermalink(permalink);
 

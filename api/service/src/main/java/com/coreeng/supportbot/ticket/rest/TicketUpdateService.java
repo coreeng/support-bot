@@ -41,7 +41,7 @@ public class TicketUpdateService {
         return TicketSubmission.builder()
             .ticketId(ticketId)
             .status(request.status())
-            .authorsTeam(request.authorsTeam())
+            .authorsTeam(TicketTeam.fromCode(request.authorsTeam()))
             .tags(ImmutableList.copyOf(request.tags()))
             .impact(request.impact())
             .confirmed(true)
@@ -58,8 +58,9 @@ public class TicketUpdateService {
         if (request.authorsTeam() == null || request.authorsTeam().isBlank()) {
             return ValidationResult.invalid("authorsTeam is required");
         }
+        boolean isNotATenant = TicketTeam.notATenantCode.equals(request.authorsTeam());
         PlatformTeam team = platformTeamsService.findTeamByName(request.authorsTeam());
-        if (team == null) {
+        if (!isNotATenant && team == null) {
             return ValidationResult.invalid("authorsTeam must be a valid team code");
         }
         if (request.tags() == null) {

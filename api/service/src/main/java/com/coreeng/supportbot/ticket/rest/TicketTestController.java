@@ -3,6 +3,7 @@ package com.coreeng.supportbot.ticket.rest;
 import static java.util.Objects.requireNonNull;
 
 import com.coreeng.supportbot.ticket.TicketQueryService;
+import com.coreeng.supportbot.ticket.TicketTeam;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,7 +61,7 @@ public class TicketTestController {
         TicketSubmission submission = TicketSubmission.builder()
             .ticketId(ticketId)
             .status(request.status())
-            .authorsTeam(request.authorsTeam())
+            .authorsTeam(TicketTeam.fromCode(request.authorsTeam()))
             .tags(ImmutableList.copyOf(request.tags()))
             .impact(request.impact())
             .confirmed(true)

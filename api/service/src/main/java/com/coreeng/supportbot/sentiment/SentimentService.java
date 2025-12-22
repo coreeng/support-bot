@@ -74,7 +74,7 @@ public class SentimentService {
                 String email = userIdToEmail.get(m.getUser());
                 String team = supportTeamService.isMemberByUserEmail(email)
                     ? supportTeam.code()
-                    : ticket.team();
+                    : ticket.team() != null ? ticket.team().toCode() : null;
                 return Message.builder()
                     .user(m.getUser())
                     .team(team)
