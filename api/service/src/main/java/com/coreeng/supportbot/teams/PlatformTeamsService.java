@@ -132,8 +132,8 @@ public class PlatformTeamsService {
                             throw new RuntimeException(e);
                         } catch (Exception e) {
                             log.atWarn()
+                                .setCause(e)
                                 .addKeyValue("groupRef", groupRef)
-                                .addKeyValue("error", e)
                                 .log("Failed to fetch group members");
                             return ImmutableList.of();
                         } finally {
