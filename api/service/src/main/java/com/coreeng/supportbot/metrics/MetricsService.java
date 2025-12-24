@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Component
 @Slf4j
 @RequiredArgsConstructor
+@ConditionalOnProperty(value = "metrics.enabled", havingValue = "true", matchIfMissing = false)
 public class MetricsService {
     private static final String metricName = "supportbot_tickets";
 
@@ -26,7 +28,7 @@ public class MetricsService {
     private final MeterRegistry meterRegistry;
     private final Map<String, AtomicLong> ticketMetrics = new ConcurrentHashMap<>();
 
-    @Scheduled(fixedRateString = "${metrics.refreshIntervalMs:60000}")
+    @Scheduled(fixedRateString = "${metrics.refresh-interval:60s}")
     public void refreshMetrics() {
         log.debug("Refreshing metrics");
         try {
