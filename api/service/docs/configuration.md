@@ -165,6 +165,9 @@ rbac: # Restrict ticket creation/editing for tenants
 
 mock-data: # Generate mock data in case DB is empty. Purely for testing/demo purposes
   enabled: false
+
+metrics: # Prometheus metrics populated from database
+  refreshIntervalMs: 15000 # How often to refresh ticket metrics (in milliseconds)
 ```
 
 # Integrations
