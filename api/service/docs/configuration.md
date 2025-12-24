@@ -167,7 +167,8 @@ mock-data: # Generate mock data in case DB is empty. Purely for testing/demo pur
   enabled: false
 
 metrics: # Prometheus metrics populated from database
-  refreshIntervalMs: 15000 # How often to refresh ticket metrics (in milliseconds)
+  enabled: true # Set to false to disable
+  refresh-interval: 60s # How often to refresh ticket metrics e.g. 60s
 ```
 
 # Integrations
