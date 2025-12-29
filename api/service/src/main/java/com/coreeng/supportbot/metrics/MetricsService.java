@@ -1,69 +1,63 @@
 package com.coreeng.supportbot.metrics;
 
-import com.coreeng.supportbot.ticket.DetailedTicket;
-import com.coreeng.supportbot.ticket.TicketQueryService;
-import com.coreeng.supportbot.ticket.TicketsQuery;
-import com.coreeng.supportbot.util.Page;
-import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.MultiGauge;
+import io.micrometer.core.instrument.Tags;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+import javax.annotation.PostConstruct;
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 @Slf4j
-@RequiredArgsConstructor
 @ConditionalOnProperty(value = "metrics.enabled", havingValue = "true", matchIfMissing = false)
 public class MetricsService {
     private static final String metricName = "supportbot_tickets";
 
-    private final TicketQueryService queryService;
+    private final MetricsRepository metricsRepository;
     private final MeterRegistry meterRegistry;
-    private final Map<String, AtomicLong> ticketMetrics = new ConcurrentHashMap<>();
+    private MultiGauge ticketGauge;
+
+    public MetricsService(MetricsRepository metricsRepository, MeterRegistry meterRegistry) {
+        this.metricsRepository = metricsRepository;
+        this.meterRegistry = meterRegistry;
+    }
+
+    @PostConstruct
+    void init() {
+        ticketGauge = MultiGauge.builder(metricName).register(meterRegistry);
+    }
 
     @Scheduled(fixedRateString = "${metrics.refresh-interval:60s}")
     public void refreshMetrics() {
         log.debug("Refreshing metrics");
         try {
-            Page<DetailedTicket> tickets = queryService.findDetailedTicketByQuery(
-                TicketsQuery.builder().unlimited(true).build()
-            );
+            List<MultiGauge.Row<Number>> rows = new ArrayList<>();
 
-            for (DetailedTicket dt : tickets.content()) {
-                registerTicketMetric(dt);
+            for (TicketMetricRow ticket : metricsRepository.getTicketMetrics()) {
+                rows.add(toRow(ticket));
             }
+
+            ticketGauge.register(rows, true);
         } catch (Exception e) {
             log.error("Error refreshing metrics", e);
         }
     }
 
-    // DetailedTicket includes escalation data needed for the escalated tag hence why we use
-    private void registerTicketMetric(DetailedTicket dt) {
-        String ticketId = String.valueOf(dt.ticket().id().id());
-        String status = dt.ticket().status().name();
-        String impact = Optional.ofNullable(dt.ticket().impact()).orElse("unknown");
-        String team = Optional.ofNullable(dt.ticket().team()).orElse("unassigned");
-        String escalated = String.valueOf(dt.escalated());
-        String rated = String.valueOf(dt.ticket().ratingSubmitted());
-
-        ticketMetrics.computeIfAbsent(ticketId, k -> {
-            AtomicLong value = new AtomicLong(1);
-            Gauge.builder(metricName, value, AtomicLong::doubleValue)
-                .tag("ticket_id", ticketId)
-                .tag("status", status)
-                .tag("impact", impact)
-                .tag("team", team)
-                .tag("escalated", escalated)
-                .tag("rated", rated)
-                .register(meterRegistry);
-            return value;
-        });
+    private MultiGauge.Row<Number> toRow(TicketMetricRow ticket) {
+        return MultiGauge.Row.of(
+            Tags.of(
+                "status", ticket.status(),
+                "impact", ticket.impact(),
+                "team", ticket.team(),
+                "escalated", String.valueOf(ticket.escalated()),
+                "rated", String.valueOf(ticket.rated())
+            ),
+            ticket.count()
+        );
     }
 }
