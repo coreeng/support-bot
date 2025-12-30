@@ -21,6 +21,7 @@ public class MetricsService {
     private final MetricsRepository metricsRepository;
     private final MeterRegistry meterRegistry;
     private MultiGauge ticketGauge;
+    private MultiGauge escalationGauge;
 
     public MetricsService(MetricsRepository metricsRepository, MeterRegistry meterRegistry) {
         this.metricsRepository = metricsRepository;
@@ -30,6 +31,7 @@ public class MetricsService {
     @PostConstruct
     void init() {
         ticketGauge = MultiGauge.builder(metricName).register(meterRegistry);
+        escalationGauge = MultiGauge.builder("supportbot_escalations").register(meterRegistry);
     }
 
     @Scheduled(fixedRateString = "${metrics.refresh-interval:60s}")
@@ -38,9 +40,15 @@ public class MetricsService {
         try {
             List<MultiGauge.Row<Number>> rows = new ArrayList<>();
 
-            for (TicketMetricRow ticket : metricsRepository.getTicketMetrics()) {
+            for (TicketMetric ticket : metricsRepository.getTicketMetrics()) {
                 rows.add(toRow(ticket));
             }
+
+            List<MultiGauge.Row<Number>> escalationRows = new ArrayList<>();
+            for (EscalationMetric escalation : metricsRepository.getEscalationMetrics()) {
+                escalationRows.add(toEscalationRow(escalation));
+            }
+            escalationGauge.register(escalationRows, true);
 
             ticketGauge.register(rows, true);
         } catch (Exception e) {
@@ -48,7 +56,7 @@ public class MetricsService {
         }
     }
 
-    private MultiGauge.Row<Number> toRow(TicketMetricRow ticket) {
+    private MultiGauge.Row<Number> toRow(TicketMetric ticket) {
         return MultiGauge.Row.of(
             Tags.of(
                 "status", ticket.status(),
@@ -58,6 +66,16 @@ public class MetricsService {
                 "rated", String.valueOf(ticket.rated())
             ),
             ticket.count()
+        );
+    }
+    private MultiGauge.Row<Number> toEscalationRow(EscalationMetric escalation) {
+        return MultiGauge.Row.of(
+                Tags.of(
+                        "status", escalation.status(),
+                        "team", escalation.team(),
+                        "impact", escalation.impact()
+                ),
+                escalation.count()
         );
     }
 }
