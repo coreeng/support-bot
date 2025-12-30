@@ -1,10 +1,8 @@
 package com.coreeng.supportbot.metrics;
 
-public record TicketMetricRow(
+public record EscalationMetric(
         String status,
-        String impact,
         String team,
-        boolean escalated,
-        boolean rated,
+        String impact,
         long count
 ) {}

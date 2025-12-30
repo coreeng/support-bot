@@ -25,28 +25,38 @@ public class JdbcMetricsRepository implements MetricsRepository {
     private final DSLContext dsl;
 
     @Override
-    public List<TicketMetricRow> getTicketMetrics() {
-        Field<String> status = TICKET.STATUS.cast(String.class).as("status");
-        Field<String> impact = TICKET.IMPACT_CODE.as("impact");
-        Field<String> team = TICKET.TEAM.as("team");
+    public List<TicketMetric> getTicketMetrics() {
         Field<Boolean> escalated = exists(
             selectOne()
                 .from(ESCALATION)
                 .where(ESCALATION.TICKET_ID.eq(TICKET.ID))
                 .and(ESCALATION.STATUS.ne(EscalationStatus.resolved))
         ).as("escalated");
-        Field<Boolean> rated = TICKET.RATING_SUBMITTED.as("rated");
 
-        return dsl.select(status, impact, team, escalated, rated, count().as("count"))
+        return dsl.select(TICKET.STATUS, TICKET.IMPACT_CODE, TICKET.TEAM, escalated, TICKET.RATING_SUBMITTED, count().as("count"))
             .from(TICKET)
-            .groupBy(status, impact, team, escalated, rated)
-            .fetch(r -> new TicketMetricRow(
-                r.get(status),
-                r.get(impact) != null ? r.get(impact) : "unknown",
-                r.get(team) != null ? r.get(team) : "unassigned",
+            .groupBy(TICKET.STATUS, TICKET.IMPACT_CODE, TICKET.TEAM, escalated, TICKET.RATING_SUBMITTED)
+            .fetch(r -> new TicketMetric(
+                r.get(TICKET.STATUS).getLiteral(),
+                r.get(TICKET.IMPACT_CODE) != null ? r.get(TICKET.IMPACT_CODE) : "unknown",
+                r.get(TICKET.TEAM) != null ? r.get(TICKET.TEAM) : "unassigned",
                 r.get(escalated),
-                r.get(rated),
+                r.get(TICKET.RATING_SUBMITTED),
                 r.get("count", Long.class)
             ));
+    }
+
+    @Override
+    public List<EscalationMetric> getEscalationMetrics() {
+        return dsl.select(ESCALATION.STATUS, ESCALATION.TEAM, TICKET.IMPACT_CODE, count().as("count"))
+                .from(ESCALATION)
+                .join(TICKET).on(ESCALATION.TICKET_ID.eq(TICKET.ID))
+                .groupBy(ESCALATION.STATUS, ESCALATION.TEAM, TICKET.IMPACT_CODE)
+                .fetch(r -> new EscalationMetric(
+                        r.get(ESCALATION.STATUS).getLiteral(),
+                        r.get(ESCALATION.TEAM) != null ? r.get(ESCALATION.TEAM) : "unknown",
+                        r.get(TICKET.IMPACT_CODE) != null ? r.get(TICKET.IMPACT_CODE) : "unknown",
+                        r.get("count", Long.class)
+                ));
     }
 }

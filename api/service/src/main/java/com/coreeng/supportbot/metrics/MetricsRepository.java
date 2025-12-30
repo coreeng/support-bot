@@ -3,5 +3,6 @@ package com.coreeng.supportbot.metrics;
 import java.util.List;
 
 public interface MetricsRepository {
-    List<TicketMetricRow> getTicketMetrics();
+    List<TicketMetric> getTicketMetrics();
+    List<EscalationMetric> getEscalationMetrics();
 }

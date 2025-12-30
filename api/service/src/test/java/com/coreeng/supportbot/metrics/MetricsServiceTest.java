@@ -34,7 +34,7 @@ class MetricsServiceTest {
     void registersMetricWithCorrectTags() {
         when(metricsRepository.getTicketMetrics())
             .thenReturn(List.of(
-                    new TicketMetricRow("opened", "productionBlocking", "infra-integration", true, false, 5)
+                    new TicketMetric("opened", "productionBlocking", "infra-integration", true, false, 5)
             ));
 
         metricsService.refreshMetrics();
@@ -49,5 +49,24 @@ class MetricsServiceTest {
 
         assertThat(metric).isNotNull();
         assertThat(metric.value()).isEqualTo(5.0);
+    }
+
+    @Test
+    void registersMetricEscalations() {
+        when(metricsRepository.getEscalationMetrics())
+                .thenReturn(List.of(
+                        new EscalationMetric("pending", "infra-integration", "productionBlocking", 3)
+                ));
+
+        metricsService.refreshMetrics();
+
+        Gauge metric = meterRegistry.find("supportbot_escalations")
+                .tag("status", "pending")
+                .tag("impact", "productionBlocking")
+                .tag("team", "infra-integration")
+                .gauge();
+
+        assertThat(metric).isNotNull();
+        assertThat(metric.value()).isEqualTo(3.0);
     }
 }
