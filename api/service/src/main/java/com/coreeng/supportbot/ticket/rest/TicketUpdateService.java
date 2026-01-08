@@ -19,6 +19,7 @@ public class TicketUpdateService {
     private final ImpactsRegistry impactsRegistry;
     private final TicketUIMapper mapper;
     private final PlatformTeamsService platformTeamsService;
+    private final TicketRepository ticketRepository;
 
     public TicketUI update(TicketId ticketId, TicketUpdateRequest request) {
         ValidationResult validationResult = validate(request);
@@ -33,6 +34,11 @@ public class TicketUpdateService {
             throw new IllegalStateException("Update failed: " + result);
         }
 
+        // Handle assignee change if provided
+        if (request.assignedTo() != null) {
+            ticketRepository.assign(ticketId, request.assignedTo());
+        }
+
         DetailedTicket ticket = queryService.findDetailedById(ticketId);
         return mapper.mapToUI(requireNonNull(ticket));
     }
@@ -44,6 +50,7 @@ public class TicketUpdateService {
             .authorsTeam(TicketTeam.fromCode(request.authorsTeam()))
             .tags(ImmutableList.copyOf(request.tags()))
             .impact(request.impact())
+            .assignedTo(request.assignedTo())
             .confirmed(true)
             .build();
     }

@@ -298,5 +298,140 @@ public class AssigneeCryptoTest {
         assertEquals(userId, decrypted1.get());
         assertEquals(userId, decrypted2.get());
     }
+
+    @Test
+    public void shouldComputeHmacHashWhenKeyIsPresent() {
+        // given
+        TicketAssignmentProps props = new TicketAssignmentProps(
+            true,
+            new TicketAssignmentProps.Encryption(true, "my-secret-key")
+        );
+        AssigneeCrypto crypto = new AssigneeCrypto(props);
+        String userId = "U123456";
+
+        // when
+        String hash = crypto.computeHash(userId);
+
+        // then
+        assertNotNull(hash, "Hash should be computed when key is present");
+        assertEquals(64, hash.length(), "HMAC-SHA256 should produce 64 hex chars");
+        assertNotEquals(userId, hash, "Hash should differ from input");
+    }
+
+    @Test
+    public void shouldReturnNullHashWhenKeyIsNull() {
+        // given
+        TicketAssignmentProps props = new TicketAssignmentProps(
+            true,
+            new TicketAssignmentProps.Encryption(false, null)
+        );
+        AssigneeCrypto crypto = new AssigneeCrypto(props);
+        String userId = "U123456";
+
+        // when
+        String hash = crypto.computeHash(userId);
+
+        // then
+        assertNull(hash, "Hash should be null when encryption key is null");
+    }
+
+    @Test
+    public void shouldReturnNullHashWhenKeyIsBlank() {
+        // given
+        TicketAssignmentProps props = new TicketAssignmentProps(
+            true,
+            new TicketAssignmentProps.Encryption(true, "   ")
+        );
+        AssigneeCrypto crypto = new AssigneeCrypto(props);
+        String userId = "U123456";
+
+        // when
+        String hash = crypto.computeHash(userId);
+
+        // then
+        assertNull(hash, "Hash should be null when encryption key is blank");
+    }
+
+    @Test
+    public void shouldReturnNullHashWhenUserIdIsNull() {
+        // given
+        TicketAssignmentProps props = new TicketAssignmentProps(
+            true,
+            new TicketAssignmentProps.Encryption(true, "my-secret-key")
+        );
+        AssigneeCrypto crypto = new AssigneeCrypto(props);
+
+        // when
+        String hash = crypto.computeHash(null);
+
+        // then
+        assertNull(hash, "Hash should be null when userId is null");
+    }
+
+    @Test
+    public void shouldProduceDeterministicHmacHash() {
+        // given
+        TicketAssignmentProps props = new TicketAssignmentProps(
+            true,
+            new TicketAssignmentProps.Encryption(true, "my-secret-key")
+        );
+        AssigneeCrypto crypto = new AssigneeCrypto(props);
+        String userId = "U123456";
+
+        // when
+        String hash1 = crypto.computeHash(userId);
+        String hash2 = crypto.computeHash(userId);
+
+        // then
+        assertNotNull(hash1);
+        assertNotNull(hash2);
+        assertEquals(hash1, hash2, "HMAC hash should be deterministic for same input and key");
+    }
+
+    @Test
+    public void shouldProduceDifferentHashesForDifferentInputs() {
+        // given
+        TicketAssignmentProps props = new TicketAssignmentProps(
+            true,
+            new TicketAssignmentProps.Encryption(true, "my-secret-key")
+        );
+        AssigneeCrypto crypto = new AssigneeCrypto(props);
+
+        // when
+        String hash1 = crypto.computeHash("U123456");
+        String hash2 = crypto.computeHash("U789012");
+
+        // then
+        assertNotNull(hash1);
+        assertNotNull(hash2);
+        assertNotEquals(hash1, hash2, "Different user IDs should produce different hashes");
+    }
+
+    @Test
+    public void shouldProduceDifferentHashesForDifferentKeys() {
+        // given
+        TicketAssignmentProps props1 = new TicketAssignmentProps(
+            true,
+            new TicketAssignmentProps.Encryption(true, "key-1")
+        );
+        AssigneeCrypto crypto1 = new AssigneeCrypto(props1);
+
+        TicketAssignmentProps props2 = new TicketAssignmentProps(
+            true,
+            new TicketAssignmentProps.Encryption(true, "key-2")
+        );
+        AssigneeCrypto crypto2 = new AssigneeCrypto(props2);
+        String userId = "U123456";
+
+        // when
+        String hash1 = crypto1.computeHash(userId);
+        String hash2 = crypto2.computeHash(userId);
+
+        // then
+        assertNotNull(hash1);
+        assertNotNull(hash2);
+        assertNotEquals(hash1, hash2, 
+            "HMAC should produce different hashes with different keys (prevents rainbow table attacks)");
+    }
 }
 

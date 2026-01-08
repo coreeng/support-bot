@@ -40,6 +40,8 @@ public class TicketsQuery {
     private ImmutableList<String> impacts = ImmutableList.of();
     @Builder.Default
     private ImmutableList<String> teams = ImmutableList.of();
+    @Nullable
+    private String assignedTo;
 
     @Getter
     public enum Order implements UIOption {

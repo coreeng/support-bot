@@ -244,6 +244,12 @@ public class TicketInMemoryRepository implements TicketRepository {
             }
             return query.teams().contains(ticket.team().toCode());
         }
+        if (query.assignedTo() != null) {
+            if (ticket.assignedTo() == null) {
+                return false;
+            }
+            return query.assignedTo().equals(ticket.assignedTo());
+        }
         return true;
     }
 

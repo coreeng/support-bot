@@ -68,6 +68,7 @@ public class HomepageView {
                         ? ImmutableList.of(filter.impact())
                         : ImmutableList.of()
                 )
+                .assignedTo(filter.assignedTo())
                 .build();
         }
     }

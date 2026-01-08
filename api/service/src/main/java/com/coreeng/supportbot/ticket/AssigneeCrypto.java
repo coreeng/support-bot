@@ -6,11 +6,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
+import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -145,6 +147,41 @@ public class AssigneeCrypto {
             return new SecretKeySpec(keyBytes, "AES");
         } catch (NoSuchAlgorithmException e) {
             log.warn("Failed to derive assignment encryption key: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Compute deterministic HMAC-SHA256 hash of user ID for filtering/indexing.
+     * Uses the encryption key to enhance security.
+     */
+    public String computeHash(String userId) {
+        if (userId == null) {
+            return null;
+        }
+        
+        String keyStr = props.encryption() != null ? props.encryption().key() : null;
+        if (keyStr == null || keyStr.isBlank()) {
+            log.warn("Cannot compute assignee hash without encryption key");
+            return null;
+        }
+        
+        try {
+            Mac hmac = Mac.getInstance("HmacSHA256");
+            SecretKeySpec keySpec = new SecretKeySpec(
+                keyStr.getBytes(StandardCharsets.UTF_8), 
+                "HmacSHA256"
+            );
+            hmac.init(keySpec);
+            byte[] hashBytes = hmac.doFinal(userId.getBytes(StandardCharsets.UTF_8));
+            
+            StringBuilder hex = new StringBuilder();
+            for (byte b : hashBytes) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            log.warn("Failed to compute assignee hash: {}", e.getMessage());
             return null;
         }
     }
