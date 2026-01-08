@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.events.MessageDeleted;
@@ -24,6 +25,7 @@ public class TicketProcessingService {
     private final TicketSlackService slackService;
     private final EscalationQueryService escalationQueryService;
     private final SlackTicketsProps slackTicketsProps;
+    private final TicketAssignmentProps assignmentProps;
     private final ApplicationEventPublisher publisher;
 
     public void handleMessagePosted(MessagePosted e) {
@@ -48,6 +50,7 @@ public class TicketProcessingService {
             Ticket updatedTicket = repository.updateTicket(
                 ticket.toBuilder()
                     .status(TicketStatus.opened)
+                    .assignedTo(null) // avoid rewriting assignment when not changing it
                     .lastInteractedAt(Instant.now())
                     .build()
             );
@@ -108,6 +111,18 @@ public class TicketProcessingService {
             .addKeyValue("ticketId", newTicket.id().id())
             .log("Ticket created on reaction to message({})", e.messageRef().actualThreadTs());
 
+        if (assignmentProps.enabled()) {
+            boolean assigned = repository.assignOnTicketCreation(Objects.requireNonNull(newTicket.id()), e.userId());
+            if (assigned) {
+                log.atInfo()
+                    .addKeyValue("ticketId", newTicket.id().id())
+                    .addKeyValue("assignee", e.userId())
+                    .log("Ticket assigned to first reactor");
+            }
+        } else {
+            log.atDebug().log("Assignment disabled by config; skipping assignment");
+        }
+
         slackService.markPostTracked(new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
 
         if (newTicket.createdMessageTs() == null) {
@@ -124,6 +139,7 @@ public class TicketProcessingService {
             repository.updateTicket(
                 newTicket.toBuilder()
                     .createdMessageTs(postedMessageRef.ts())
+                    .assignedTo(null) // do not rewrite assignment
                     .lastInteractedAt(Instant.now())
                     .build()
             );
@@ -158,6 +174,7 @@ public class TicketProcessingService {
                 .team(submission.authorsTeam())
                 .tags(submission.tags())
                 .impact(submission.impact())
+                .assignedTo(null) // leave assignment untouched unless explicitly set
                 .lastInteractedAt(Instant.now())
                 .build()
         );
@@ -219,6 +236,7 @@ public class TicketProcessingService {
         Ticket updatedTicket = repository.updateTicket(
             ticket.toBuilder()
                 .status(TicketStatus.stale)
+                .assignedTo(null) // leave assignment untouched
                 .lastInteractedAt(Instant.now())
                 .build()
         );

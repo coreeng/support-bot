@@ -1,6 +1,7 @@
 package com.coreeng.supportbot;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.EscalationInMemoryRepository;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
@@ -11,9 +12,12 @@ import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketCreatedMessage;
 import com.coreeng.supportbot.ticket.TicketInMemoryRepository;
 import com.coreeng.supportbot.ticket.TicketProcessingService;
+import com.coreeng.supportbot.ticket.TicketSubmission;
 import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
+import com.coreeng.supportbot.ticket.TicketTeam;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
+import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +42,7 @@ public class TicketProcessingServiceTests {
     @Mock
     private TicketSlackService slackService;
     private SlackTicketsProps slackTicketsProps;
+    private TicketAssignmentProps assignmentProps;
     @Mock
     private ApplicationEventPublisher publisher;
 
@@ -56,11 +61,13 @@ public class TicketProcessingServiceTests {
             "white_check_mark",
             "rocket"
         );
+        assignmentProps = new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(false, null));
         ticketProcessingService = new TicketProcessingService(
             ticketRepository,
             slackService,
             escalationQueryService,
             slackTicketsProps,
+            assignmentProps,
             publisher
         );
     }
@@ -153,5 +160,64 @@ public class TicketProcessingServiceTests {
         verify(slackService, description("Post is tracked")).markPostTracked(threadRef);
         verify(slackService, description("Ticket form is posted"))
             .postTicketForm(eq(threadRef), createdMessageCaptor.capture());
+    }
+
+    @Test
+    public void shouldAssignFirstReactorWhenEnabledAndPreserveOnSubmit() {
+        MessageRef threadRef = new MessageRef(messageTs, null, slackTicketsProps.channelId());
+        when(slackService.postTicketForm(eq(threadRef), any())).thenReturn(new MessageRef(MessageTs.of("form"), messageTs, slackTicketsProps.channelId()));
+
+        ticketProcessingService.handleReactionAdded(new ReactionAdded(
+            slackTicketsProps.expectedInitialReaction(),
+            userId,
+            threadRef
+        ));
+
+        Ticket ticket = ticketRepository.findTicketByQuery(threadRef);
+        assertNotNull(ticket);
+        assertEquals(userId, ticket.assignedTo());
+
+        TicketSubmission submission = TicketSubmission.builder()
+            .ticketId(ticket.id())
+            .status(TicketStatus.opened)
+            .authorsTeam(new TicketTeam.KnownTeam("platform"))
+            .tags(ImmutableList.of("tag1"))
+            .impact("low")
+            .confirmed(true)
+            .build();
+
+        ticketProcessingService.submit(submission);
+
+        Ticket afterSubmit = ticketRepository.findTicketById(ticket.id());
+        assertNotNull(afterSubmit);
+        assertEquals(userId, afterSubmit.assignedTo(), "Assignment is preserved when update uses assignedTo(null)");
+    }
+
+    @Test
+    public void shouldNotAssignWhenFeatureDisabled() {
+        assignmentProps = new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
+        ZoneId timezone = ZoneId.of("UTC");
+        EscalationQueryService escalationQueryService = new EscalationQueryService(new EscalationInMemoryRepository(timezone));
+        ticketRepository = new TicketInMemoryRepository(escalationQueryService, timezone);
+        ticketProcessingService = new TicketProcessingService(
+            ticketRepository,
+            slackService,
+            escalationQueryService,
+            slackTicketsProps,
+            assignmentProps,
+            publisher
+        );
+        MessageRef threadRef = new MessageRef(messageTs, null, slackTicketsProps.channelId());
+        when(slackService.postTicketForm(eq(threadRef), any())).thenReturn(new MessageRef(MessageTs.of("form"), messageTs, slackTicketsProps.channelId()));
+
+        ticketProcessingService.handleReactionAdded(new ReactionAdded(
+            slackTicketsProps.expectedInitialReaction(),
+            userId,
+            threadRef
+        ));
+
+        Ticket ticket = ticketRepository.findTicketByQuery(threadRef);
+        assertNotNull(ticket);
+        assertNull(ticket.assignedTo(), "Assignment is skipped when feature disabled");
     }
 }

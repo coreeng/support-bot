@@ -7,12 +7,9 @@ import java.util.List;
 
 import javax.annotation.Nullable;
 
-import org.jooq.CommonTableExpression;
-import org.jooq.Condition;
-import org.jooq.DSLContext;
-import org.jooq.Record;
-import org.jooq.SelectField;
-import org.jooq.SelectLimitPercentAfterOffsetStep;
+import com.coreeng.supportbot.dbschema.tables.records.TicketRecord;
+import org.jooq.*;
+
 import static org.jooq.impl.DSL.any;
 import static org.jooq.impl.DSL.arrayAgg;
 import static org.jooq.impl.DSL.cast;
@@ -25,6 +22,8 @@ import static org.jooq.impl.DSL.selectDistinct;
 import static org.jooq.impl.DSL.selectOne;
 import static org.jooq.impl.DSL.value;
 import static org.jooq.impl.SQLDataType.CLOB;
+
+import org.jooq.Record;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,6 +57,7 @@ import lombok.extern.slf4j.Slf4j;
 @Transactional
 public class JdbcTicketRepository implements TicketRepository {
     private final DSLContext dsl;
+    private final AssigneeCrypto assigneeCrypto;
 
     @Override
     public void createQueryIfNotExists(MessageRef queryRef) {
@@ -103,6 +103,7 @@ public class JdbcTicketRepository implements TicketRepository {
         checkArgument(ticket.id() == null);
 
         long queryId = getQueryIdOrCreate(ticket.queryRef());
+        AssigneeWrite assignee = toDbAssignee(ticket.assignedTo());
         Long ticketId = dsl.insertInto(
                 TICKET,
                 TICKET.QUERY_ID,
@@ -110,7 +111,10 @@ public class JdbcTicketRepository implements TicketRepository {
                 TICKET.STATUS,
                 TICKET.TEAM,
                 TICKET.IMPACT_CODE,
-                TICKET.LAST_INTERACTED_AT
+                TICKET.LAST_INTERACTED_AT,
+                TICKET.ASSIGNED_TO,
+                TICKET.ASSIGNED_TO_FORMAT,
+                TICKET.ASSIGNED_TO_ORPHANED
             )
             .values(
                 queryId,
@@ -120,7 +124,10 @@ public class JdbcTicketRepository implements TicketRepository {
                 com.coreeng.supportbot.dbschema.enums.TicketStatus.lookupLiteral(ticket.status().name()),
                 toDbTeam(ticket.team()),
                 ticket.impact(),
-                ticket.lastInteractedAt()
+                ticket.lastInteractedAt(),
+                assignee.value(),
+                assignee.format(),
+                assignee.orphaned()
             )
             .onConflictDoNothing()
             .returning(TICKET.ID)
@@ -152,12 +159,16 @@ public class JdbcTicketRepository implements TicketRepository {
         checkNotNull(ticket);
         checkArgument(ticket.id() != null);
 
-        int updatedTickets = dsl.update(TICKET)
+        var update = dsl.update(TICKET)
             .set(TICKET.CREATED_MESSAGE_TS, ticket.createdMessageTs() != null ? ticket.createdMessageTs().ts() : null)
             .set(TICKET.STATUS, com.coreeng.supportbot.dbschema.enums.TicketStatus.lookupLiteral(ticket.status().name()))
             .set(TICKET.TEAM, toDbTeam(ticket.team()))
             .set(TICKET.IMPACT_CODE, ticket.impact())
-            .set(TICKET.LAST_INTERACTED_AT, ticket.lastInteractedAt())
+            .set(TICKET.LAST_INTERACTED_AT, ticket.lastInteractedAt());
+
+        update = conditionallyUpdateAssignee(ticket, update);
+
+        int updatedTickets = update
             .where(TICKET.ID.eq(ticket.id().id()))
             .execute();
         if (updatedTickets == 0) {
@@ -172,6 +183,19 @@ public class JdbcTicketRepository implements TicketRepository {
         return ticket;
     }
 
+    private UpdateSetMoreStep<TicketRecord> conditionallyUpdateAssignee(Ticket ticket, UpdateSetMoreStep<TicketRecord> update) {
+        if (ticket.assignedTo() != null) {
+            AssigneeWrite assignee = toDbAssignee(ticket.assignedTo());
+            if (assignee.value() != null) {
+                update = update
+                    .set(TICKET.ASSIGNED_TO, assignee.value())
+                    .set(TICKET.ASSIGNED_TO_FORMAT, assignee.format())
+                    .set(TICKET.ASSIGNED_TO_ORPHANED, assignee.orphaned());
+            }
+        }
+        return update;
+    }
+
     @Override
     public boolean touchTicketById(TicketId id, Instant timestamp) {
         checkNotNull(id);
@@ -180,6 +204,40 @@ public class JdbcTicketRepository implements TicketRepository {
             .set(TICKET.LAST_INTERACTED_AT, timestamp)
             .where(TICKET.ID.eq(id.id()))
             .execute() > 0;
+    }
+
+    @Override
+    public boolean assignOnTicketCreation(TicketId ticketId, String slackUserId) {
+        return assignInternal(ticketId, slackUserId, true);
+    }
+
+    @Override
+    public boolean assign(TicketId ticketId, String slackUserId) {
+        return assignInternal(ticketId, slackUserId, false);
+    }
+
+    private boolean assignInternal(TicketId ticketId, String slackUserId, boolean newTicket) {
+        checkNotNull(ticketId);
+        checkNotNull(slackUserId);
+
+        AssigneeWrite assignee = toDbAssignee(slackUserId);
+        if (assignee.value() == null) {
+            return false;
+        }
+
+        UpdateConditionStep<TicketRecord> update = dsl.update(TICKET)
+                .set(TICKET.ASSIGNED_TO, assignee.value())
+                .set(TICKET.ASSIGNED_TO_FORMAT, assignee.format())
+                .set(TICKET.ASSIGNED_TO_ORPHANED, assignee.orphaned())
+                .where(TICKET.ID.eq(ticketId.id()));
+
+        if (newTicket) {
+            update = update.and(TICKET.ASSIGNED_TO.isNull());
+        }
+
+        int updated = update.execute();
+
+        return updated > 0;
     }
 
     private void updateTicketTags(Ticket ticket) {
@@ -480,11 +538,20 @@ public class JdbcTicketRepository implements TicketRepository {
             TICKET.STATUS,
             TICKET.TEAM,
             TICKET.IMPACT_CODE,
-            TICKET.RATING_SUBMITTED
+            TICKET.RATING_SUBMITTED,
+            TICKET.ASSIGNED_TO,
+            TICKET.ASSIGNED_TO_FORMAT,
+            TICKET.ASSIGNED_TO_ORPHANED,
+            TICKET.LAST_INTERACTED_AT
         );
     }
 
     private Ticket buildTicketFromRow(Record r) {
+        String assignedToFormat = r.get(TICKET.ASSIGNED_TO_FORMAT);
+        Boolean orphaned = r.get(TICKET.ASSIGNED_TO_ORPHANED);
+        String assignedPlain = decryptAssignee(r.get(TICKET.ASSIGNED_TO), assignedToFormat);
+        boolean orphanFlag = Boolean.TRUE.equals(orphaned) || (assignedPlain == null && r.get(TICKET.ASSIGNED_TO) != null);
+
         return Ticket.builder()
             .id(new TicketId(r.get(TICKET.ID)))
             .queryTs(MessageTs.of(r.get(QUERY.TS)))
@@ -494,7 +561,27 @@ public class JdbcTicketRepository implements TicketRepository {
             .team(fromDbTeam(r.get(TICKET.TEAM)))
             .impact(r.get(TICKET.IMPACT_CODE))
             .ratingSubmitted(r.get(TICKET.RATING_SUBMITTED))
+            .assignedTo(assignedPlain)
+            .assignedToFormat(assignedToFormat == null ? "plain" : assignedToFormat)
+            .assignedToOrphaned(orphanFlag)
+            .lastInteractedAt(r.get(TICKET.LAST_INTERACTED_AT))
             .build();
+    }
+
+    private AssigneeWrite toDbAssignee(String assigneePlain) {
+        if (assigneePlain == null) {
+            return new AssigneeWrite(null, "plain", false);
+        }
+        return assigneeCrypto.encrypt(assigneePlain)
+            .map(res -> new AssigneeWrite(res.value(), res.format(), false))
+            .orElseGet(() -> {
+                // encryption failed; skip assignment but do not break flow
+                return new AssigneeWrite(null, "plain", false);
+            });
+    }
+
+    private String decryptAssignee(String stored, String format) {
+        return assigneeCrypto.decrypt(stored, format == null ? "plain" : format).orElse(null);
     }
 
     @Override
