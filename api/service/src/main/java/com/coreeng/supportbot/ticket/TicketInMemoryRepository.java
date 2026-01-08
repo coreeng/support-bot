@@ -80,8 +80,13 @@ public class TicketInMemoryRepository implements TicketRepository {
         checkNotNull(updatedTicket.id());
 
         return ticketsByQuery.computeIfPresent(updatedTicket.queryRef(), (key, t) -> {
-            tickets.put(updatedTicket.id(), updatedTicket);
-            return updatedTicket;
+            Ticket newTicket = updatedTicket.toBuilder()
+                .assignedTo(updatedTicket.assignedTo() != null ? updatedTicket.assignedTo() : t.assignedTo())
+                .assignedToFormat(updatedTicket.assignedTo() != null ? updatedTicket.assignedToFormat() : t.assignedToFormat())
+                .assignedToOrphaned(updatedTicket.assignedTo() != null ? updatedTicket.assignedToOrphaned() : t.assignedToOrphaned())
+                .build();
+            tickets.put(newTicket.id(), newTicket);
+            return newTicket;
         });
     }
 
@@ -95,6 +100,34 @@ public class TicketInMemoryRepository implements TicketRepository {
                 .build();
             ticketsByQuery.put(t.queryRef(), touchedTicket);
             return touchedTicket;
+        }) != null;
+    }
+
+    @Override
+    public boolean assignOnTicketCreation(TicketId ticketId, String slackUserId) {
+        return assignInternal(ticketId, slackUserId, true);
+    }
+
+    @Override
+    public boolean assign(TicketId ticketId, String slackUserId) {
+        return assignInternal(ticketId, slackUserId, false);
+    }
+
+    private boolean assignInternal(TicketId ticketId, String slackUserId, boolean ticketCreated) {
+        checkNotNull(ticketId);
+        checkNotNull(slackUserId);
+
+        return tickets.computeIfPresent(ticketId, (id, t) -> {
+            if (ticketCreated && t.assignedTo() != null) {
+                return t; // already assigned
+            }
+            Ticket updated = t.toBuilder()
+                .assignedTo(slackUserId)
+                .assignedToFormat("plain")
+                .assignedToOrphaned(false)
+                .build();
+            ticketsByQuery.put(t.queryRef(), updated);
+            return updated;
         }) != null;
     }
 
