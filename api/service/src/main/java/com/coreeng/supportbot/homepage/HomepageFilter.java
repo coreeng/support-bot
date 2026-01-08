@@ -28,6 +28,8 @@ public class HomepageFilter {
     private String impact;
     @Nullable
     private String escalationTeam;
+    @Nullable
+    private String assignedTo;
 
     @Getter
     public enum Timeframe implements UIOption {

@@ -114,7 +114,8 @@ public class JdbcTicketRepository implements TicketRepository {
                 TICKET.LAST_INTERACTED_AT,
                 TICKET.ASSIGNED_TO,
                 TICKET.ASSIGNED_TO_FORMAT,
-                TICKET.ASSIGNED_TO_ORPHANED
+                TICKET.ASSIGNED_TO_ORPHANED,
+                TICKET.ASSIGNED_TO_HASH
             )
             .values(
                 queryId,
@@ -127,7 +128,8 @@ public class JdbcTicketRepository implements TicketRepository {
                 ticket.lastInteractedAt(),
                 assignee.value(),
                 assignee.format(),
-                assignee.orphaned()
+                assignee.orphaned(),
+                assignee.hash()
             )
             .onConflictDoNothing()
             .returning(TICKET.ID)
@@ -190,7 +192,8 @@ public class JdbcTicketRepository implements TicketRepository {
                 update = update
                     .set(TICKET.ASSIGNED_TO, assignee.value())
                     .set(TICKET.ASSIGNED_TO_FORMAT, assignee.format())
-                    .set(TICKET.ASSIGNED_TO_ORPHANED, assignee.orphaned());
+                    .set(TICKET.ASSIGNED_TO_ORPHANED, assignee.orphaned())
+                    .set(TICKET.ASSIGNED_TO_HASH, assignee.hash());
             }
         }
         return update;
@@ -229,6 +232,7 @@ public class JdbcTicketRepository implements TicketRepository {
                 .set(TICKET.ASSIGNED_TO, assignee.value())
                 .set(TICKET.ASSIGNED_TO_FORMAT, assignee.format())
                 .set(TICKET.ASSIGNED_TO_ORPHANED, assignee.orphaned())
+                .set(TICKET.ASSIGNED_TO_HASH, assignee.hash())
                 .where(TICKET.ID.eq(ticketId.id()));
 
         if (newTicket) {
@@ -476,6 +480,13 @@ public class JdbcTicketRepository implements TicketRepository {
                         .and(ESCALATION.TEAM.eq(query.escalationTeam()))
             )));
         }
+        if (!Strings.isNullOrEmpty(query.assignedTo())) {
+            // Filter by hash for efficient lookup (works with both plain and encrypted values)
+            String filterHash = assigneeCrypto.computeHash(query.assignedTo());
+            if (filterHash != null) {
+                condition = condition.and(TICKET.ASSIGNED_TO_HASH.eq(filterHash));
+            }
+        }
         return condition;
     }
 
@@ -570,13 +581,14 @@ public class JdbcTicketRepository implements TicketRepository {
 
     private AssigneeWrite toDbAssignee(String assigneePlain) {
         if (assigneePlain == null) {
-            return new AssigneeWrite(null, "plain", false);
+            return new AssigneeWrite(null, "plain", false, null);
         }
+        String hash = assigneeCrypto.computeHash(assigneePlain);
         return assigneeCrypto.encrypt(assigneePlain)
-            .map(res -> new AssigneeWrite(res.value(), res.format(), false))
+            .map(res -> new AssigneeWrite(res.value(), res.format(), false, hash))
             .orElseGet(() -> {
                 // encryption failed; skip assignment but do not break flow
-                return new AssigneeWrite(null, "plain", false);
+                return new AssigneeWrite(null, "plain", false, null);
             });
     }
 

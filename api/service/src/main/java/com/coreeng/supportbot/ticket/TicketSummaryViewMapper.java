@@ -142,6 +142,7 @@ public class TicketSummaryViewMapper {
                                 .toList())
                         )))
                 ))
+                .addAll(renderAssigneeInput(summaryView))
                 .build()
             );
     }
@@ -238,6 +239,39 @@ public class TicketSummaryViewMapper {
             .minQueryLength(0));
     }
 
+    private ImmutableList<LayoutBlock> renderAssigneeInput(TicketSummaryView summaryView) {
+        if (summaryView.availableAssignees().isEmpty()) {
+            return ImmutableList.of();
+        }
+
+        return ImmutableList.of(
+            input(i -> i
+                .label(plainText("Assigned To"))
+                .optional(true)
+                .hint(plainText("Select a support team member to assign this ticket to"))
+                .element(staticSelect(s -> s
+                    .actionId(TicketField.assignee.actionId())
+                    .placeholder(plainText("Unassigned"))
+                    .initialOption(summaryView.currentAssignee() != null
+                        ? summaryView.availableAssignees().stream()
+                            .filter(a -> a.userId().equals(summaryView.currentAssignee()))
+                            .findFirst()
+                            .map(a -> OptionObject.builder()
+                                .text(plainText(a.displayName()))
+                                .value(a.userId())
+                                .build())
+                            .orElse(null)
+                        : null)
+                    .options(summaryView.availableAssignees().stream()
+                        .map(a -> OptionObject.builder()
+                            .text(plainText(a.displayName()))
+                            .value(a.userId())
+                            .build())
+                        .toList())
+                )))
+        );
+    }
+
     public TicketSubmission extractSubmittedValues(View view) {
         checkNotNull(view);
 
@@ -254,6 +288,7 @@ public class TicketSummaryViewMapper {
         ViewState.Value statusValue = checkNotNull(passedValues.get(TicketField.status.actionId()));
         ViewState.Value tagsValue = passedValues.get(TicketField.tags.actionId());
         ViewState.Value impactValue = passedValues.get(TicketField.impact.actionId());
+        ViewState.Value assigneeValue = passedValues.get(TicketField.assignee.actionId());
 
         return TicketSubmission.builder()
             .ticketId(new TicketId(metadata.ticketId()))
@@ -269,6 +304,11 @@ public class TicketSummaryViewMapper {
             .impact(
                 impactValue != null && impactValue.getSelectedOption() != null
                     ? impactValue.getSelectedOption().getValue()
+                    : null
+            )
+            .assignedTo(
+                assigneeValue != null && assigneeValue.getSelectedOption() != null
+                    ? assigneeValue.getSelectedOption().getValue()
                     : null
             )
             .confirmed(false)

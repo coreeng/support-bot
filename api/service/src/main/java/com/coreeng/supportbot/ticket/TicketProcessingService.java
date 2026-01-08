@@ -179,6 +179,10 @@ public class TicketProcessingService {
                 .build()
         );
 
+        if (submission.assignedTo() != null) {
+            repository.assign(updatedTicket.id(), submission.assignedTo());
+        }
+
         log.atInfo()
             .addKeyValue("ticketId", updatedTicket.id().id())
             .log("Ticket submitted");

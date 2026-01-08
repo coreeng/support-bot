@@ -1,18 +1,24 @@
 package com.coreeng.supportbot.homepage;
 
+import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
 import com.coreeng.supportbot.enums.TagsRegistry;
 import com.coreeng.supportbot.slack.RenderingUtils;
+import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketsQuery;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.slack.api.model.block.LayoutBlock;
+import com.slack.api.model.block.composition.OptionObject;
 import com.slack.api.model.view.View;
 import com.slack.api.model.view.ViewState;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -33,23 +39,13 @@ public class HomepageFilterMapper {
     private final TagsRegistry tagsRegistry;
     private final ImpactsRegistry impactsRegistry;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
+    private final SupportTeamService supportTeamService;
+    private final TicketAssignmentProps assignmentProps;
 
     public View.ViewBuilder render(HomepageView.State state, View.ViewBuilder view) {
         HomepageFilter filter = state.filter();
-        return view
-            .title(viewTitle(t -> t
-                .type("plain_text")
-                .text("Tickets Filter")
-            ))
-            .submit(viewSubmit(s -> s
-                .type("plain_text")
-                .text("Apply Filters")
-            ))
-            .close(viewClose(c -> c
-                .type("plain_text")
-                .text("Cancel")
-            ))
-            .blocks(List.of(
+
+        List<LayoutBlock> filterBlocks = new ArrayList<>(List.of(
                 input(i -> i
                     .label(plainText("Status"))
                     .optional(true)
@@ -139,7 +135,50 @@ public class HomepageFilterMapper {
                         )
                     ))
                 )
-            ));
+        ));
+        
+        if (assignmentProps.enabled()) {
+            ImmutableList<OptionObject> assigneeOptions = supportTeamService.members().stream()
+                .map(member -> OptionObject.builder()
+                    .text(plainText(member.email()))
+                    .value(member.slackId().id())
+                    .build())
+                .collect(toImmutableList());
+            
+            filterBlocks.add(
+                input(i -> i
+                    .label(plainText("Assigned To"))
+                    .optional(true)
+                    .element(staticSelect(s -> s
+                        .actionId(FilterField.assignedTo.actionId())
+                        .initialOption(
+                            filter.assignedTo() == null
+                                ? null
+                                : assigneeOptions.stream()
+                                    .filter(opt -> opt.getValue().equals(filter.assignedTo()))
+                                    .findFirst()
+                                    .orElse(null)
+                        )
+                        .options(assigneeOptions)
+                    ))
+                )
+            );
+        }
+        
+        return view
+            .title(viewTitle(t -> t
+                .type("plain_text")
+                .text("Tickets Filter")
+            ))
+            .submit(viewSubmit(s -> s
+                .type("plain_text")
+                .text("Apply Filters")
+            ))
+            .close(viewClose(c -> c
+                .type("plain_text")
+                .text("Cancel")
+            ))
+            .blocks(filterBlocks);
     }
 
     public HomepageFilter extractSubmittedValues(View view) {
@@ -184,6 +223,11 @@ public class HomepageFilterMapper {
             builder.impact(impactValue.getSelectedOption().getValue());
         }
 
+        ViewState.Value assignedToValue = values.get(FilterField.assignedTo.actionId());
+        if (assignedToValue != null && assignedToValue.getSelectedOption() != null) {
+            builder.assignedTo(assignedToValue.getSelectedOption().getValue());
+        }
+
         return builder.build();
     }
 
@@ -196,7 +240,8 @@ public class HomepageFilterMapper {
         tags("homepage-filter-tags"),
         impact("homepage-filter-impact"),
         escalationTeam("homepage-filter-escalation-team"),
-        inquiringTeam("homepage-filter-inquiring-team");
+        inquiringTeam("homepage-filter-inquiring-team"),
+        assignedTo("homepage-filter-assigned-to");
 
         private final String actionId;
     }
