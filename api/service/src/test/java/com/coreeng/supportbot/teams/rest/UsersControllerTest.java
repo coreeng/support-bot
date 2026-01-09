@@ -1,9 +1,12 @@
 package com.coreeng.supportbot.teams.rest;
 
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.teams.PlatformTeam;
 import com.coreeng.supportbot.teams.PlatformTeamsService;
 import com.coreeng.supportbot.teams.PlatformUser;
+import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.Team;
+import com.coreeng.supportbot.teams.TeamMemberFetcher;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
 import com.google.common.collect.ImmutableList;
@@ -15,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,6 +33,9 @@ class UsersControllerTest {
     @Mock
     private TeamService teamService;
 
+    @Mock
+    private SupportTeamService supportTeamService;
+
     private TeamUIMapper mapper;
 
     @InjectMocks
@@ -37,7 +44,7 @@ class UsersControllerTest {
     @BeforeEach
     void setUp() {
         mapper = new TeamUIMapper();
-        controller = new UsersController(platformTeamsService, teamService, mapper);
+        controller = new UsersController(platformTeamsService, teamService, mapper, supportTeamService);
     }
 
     @Test
@@ -112,6 +119,68 @@ class UsersControllerTest {
         verify(platformTeamsService).findUserByEmail(email);
         verify(teamService).listTeamsByUserEmail(email);
         verifyNoMoreInteractions(platformTeamsService, teamService);
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenNoSupportMembers() {
+        // given
+        when(supportTeamService.members()).thenReturn(ImmutableList.of());
+
+        // when
+        ResponseEntity<List<UsersController.SupportMemberUI>> response = controller.listSupportMembers();
+
+        // then
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).isEmpty();
+
+        verify(supportTeamService).members();
+        verifyNoMoreInteractions(supportTeamService);
+    }
+
+    @Test
+    void shouldReturnSupportMembersList() {
+        // given
+        TeamMemberFetcher.TeamMember member1 = new TeamMemberFetcher.TeamMember(
+            "john.doe@example.com",
+            SlackId.user("U12345")
+        );
+        TeamMemberFetcher.TeamMember member2 = new TeamMemberFetcher.TeamMember(
+            "jane.smith@example.com",
+            SlackId.user("U67890")
+        );
+        TeamMemberFetcher.TeamMember member3 = new TeamMemberFetcher.TeamMember(
+            "bob.jones@example.com",
+            SlackId.user("U11111")
+        );
+
+        when(supportTeamService.members()).thenReturn(ImmutableList.of(member1, member2, member3));
+
+        // when
+        ResponseEntity<List<UsersController.SupportMemberUI>> response = controller.listSupportMembers();
+
+        // then
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).hasSize(3);
+
+        // Verify first member
+        UsersController.SupportMemberUI ui1 = response.getBody().get(0);
+        assertThat(ui1.userId()).isEqualTo("U12345");
+        assertThat(ui1.displayName()).isEqualTo("john.doe@example.com");
+
+        // Verify second member
+        UsersController.SupportMemberUI ui2 = response.getBody().get(1);
+        assertThat(ui2.userId()).isEqualTo("U67890");
+        assertThat(ui2.displayName()).isEqualTo("jane.smith@example.com");
+
+        // Verify third member
+        UsersController.SupportMemberUI ui3 = response.getBody().get(2);
+        assertThat(ui3.userId()).isEqualTo("U11111");
+        assertThat(ui3.displayName()).isEqualTo("bob.jones@example.com");
+
+        verify(supportTeamService).members();
+        verifyNoMoreInteractions(supportTeamService);
     }
 }
 
