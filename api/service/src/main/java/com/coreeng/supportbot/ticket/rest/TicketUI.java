@@ -30,6 +30,8 @@ public class TicketUI {
     private ImmutableList<Log> logs;
     private ImmutableList<EscalationUI> escalations;
     private boolean ratingSubmitted;
+    @Nullable
+    private String assignedTo;
 
 
     public record Query(

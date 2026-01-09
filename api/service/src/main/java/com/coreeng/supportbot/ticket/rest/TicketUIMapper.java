@@ -1,9 +1,12 @@
 package com.coreeng.supportbot.ticket.rest;
 
+import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.rest.EscalationUIMapper;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.Team;
+import com.coreeng.supportbot.teams.TeamMemberFetcher;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.rest.TeamUI;
 import com.coreeng.supportbot.teams.rest.TeamUIMapper;
@@ -22,6 +25,8 @@ public class TicketUIMapper {
     private final SlackClient slackClient;
     private final TeamService teamService;
     private final TeamUIMapper teamUIMapper;
+    private final SupportTeamService supportTeamService;
+    private final TicketAssignmentProps assignmentProps;
 
     public TicketUI mapToUI(DetailedTicket ticket) {
         return mapToUI(ticket, null);
@@ -78,6 +83,7 @@ public class TicketUIMapper {
                     .collect(toImmutableList())
             )
             .ratingSubmitted(ticket.ticket().ratingSubmitted())
+            .assignedTo(getAssigneeEmail(ticket.ticket().assignedTo(), ticket.ticket().assignedToOrphaned()))
             .build();
     }
 
@@ -85,5 +91,17 @@ public class TicketUIMapper {
     private TeamUI mapKnownTeamToUI(String code) {
         Team team = teamService.findTeamByCode(code);
         return team != null ? teamUIMapper.mapToUI(team) : null;
+    }
+
+    private String getAssigneeEmail(String assignedToUserId, boolean orphaned) {
+        if (assignedToUserId == null || orphaned || !assignmentProps.enabled()) {
+            return null;
+        }
+
+        return supportTeamService.members().stream()
+            .filter(member -> assignedToUserId.equals(member.slackId().id()))
+            .findFirst()
+            .map(TeamMemberFetcher.TeamMember::email)
+            .orElse(null);
     }
 }
