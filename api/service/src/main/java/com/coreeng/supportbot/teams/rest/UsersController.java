@@ -45,7 +45,7 @@ public class UsersController {
         return ResponseEntity.ok(mapper.mapToUI(user, teams));
     }
 
-    @GetMapping("/support-members")
+    @GetMapping("/support")
     public ResponseEntity<List<SupportMemberUI>> listSupportMembers() {
         ImmutableList<SupportMemberUI> members = supportTeamService.members().stream()
             .map(member -> new SupportMemberUI(
