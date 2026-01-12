@@ -10,6 +10,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import com.slack.api.methods.request.chat.ChatGetPermalinkRequest;
 import com.slack.api.methods.request.conversations.ConversationsHistoryRequest;
+import com.slack.api.methods.request.conversations.ConversationsOpenRequest;
 import com.slack.api.methods.request.conversations.ConversationsRepliesRequest;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
@@ -23,6 +24,7 @@ import com.slack.api.methods.response.chat.ChatGetPermalinkResponse;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.chat.ChatUpdateResponse;
 import com.slack.api.methods.response.conversations.ConversationsHistoryResponse;
+import com.slack.api.methods.response.conversations.ConversationsOpenResponse;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
 import com.slack.api.methods.response.usergroups.UsergroupsListResponse;
 import com.slack.api.methods.response.reactions.ReactionsAddResponse;
@@ -76,7 +78,7 @@ public class SlackClientImpl implements SlackClient {
             () -> client.chatPostMessage(request.toSlackRequest()),
             response -> ImmutableList.<String>builder()
                 .addAll(errorDetailsOrEmpty(response.getResponseMetadata()))
-                .addAll(response.getErrors())
+                .addAll(response.getErrors() == null ? List.of() : response.getErrors())
                 .build()
         );
     }
@@ -294,6 +296,17 @@ public class SlackClientImpl implements SlackClient {
         } else {
             return ImmutableList.of();
         }
+    }
+
+    @Override
+    public ConversationsOpenResponse openDmConversation(SlackId.User userId) {
+        return doRequest(
+            "conversations.open",
+            () -> client.conversationsOpen(ConversationsOpenRequest.builder()
+                .users(ImmutableList.of(userId.id()))
+                .build()),
+            response -> ImmutableList.of(response.getError())
+        );
     }
 
     @FunctionalInterface
