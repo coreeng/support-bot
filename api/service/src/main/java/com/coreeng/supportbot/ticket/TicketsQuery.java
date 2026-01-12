@@ -37,6 +37,8 @@ public class TicketsQuery {
     @Builder.Default
     private ImmutableList<String> tags = ImmutableList.of();
     @Builder.Default
+    private boolean includeNoTags = false;
+    @Builder.Default
     private ImmutableList<String> impacts = ImmutableList.of();
     @Builder.Default
     private ImmutableList<String> teams = ImmutableList.of();

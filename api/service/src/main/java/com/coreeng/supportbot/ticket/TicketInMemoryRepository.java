@@ -193,9 +193,13 @@ public class TicketInMemoryRepository implements TicketRepository {
                 return false;
             }
         }
-        if (!query.tags().isEmpty()
-            && !new HashSet<>(ticket.tags()).containsAll(query.tags())) {
-            return false;
+        if (query.includeNoTags() || !query.tags().isEmpty()) {
+            boolean matchesNoTags = query.includeNoTags() && ticket.tags().isEmpty();
+            boolean matchesSelectedTags = !query.tags().isEmpty()
+                && new HashSet<>(ticket.tags()).containsAll(query.tags());
+            if (!matchesNoTags && !matchesSelectedTags) {
+                return false;
+            }
         }
         if (!query.impacts().isEmpty()) {
             if (ticket.impact() == null) {

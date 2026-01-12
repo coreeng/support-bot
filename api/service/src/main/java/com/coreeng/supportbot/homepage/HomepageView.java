@@ -62,6 +62,7 @@ public class HomepageView {
                 .dateFrom(dateFrom)
                 .dateTo(dateTo)
                 .tags(filter.tags())
+                .includeNoTags(filter.includeNoTags())
                 .escalationTeam(filter.escalationTeam())
                 .impacts(
                     filter.impact() != null
