@@ -17,6 +17,7 @@ import static org.jooq.impl.DSL.any;
 import static org.jooq.impl.DSL.arrayAgg;
 import static org.jooq.impl.DSL.cast;
 import static org.jooq.impl.DSL.exists;
+import static org.jooq.impl.DSL.notExists;
 import static org.jooq.impl.DSL.name;
 import static org.jooq.impl.DSL.noCondition;
 import static org.jooq.impl.DSL.noField;
@@ -397,18 +398,34 @@ public class JdbcTicketRepository implements TicketRepository {
                     )))
             );
         }
-        if (!query.tags().isEmpty()) {
-            checkNotNull(taggedTicketsCTE);
-            var taggedTicketIds = checkNotNull(taggedTicketsCTE.field("id", Long.class));
-            var taggedTicketTags = checkNotNull(taggedTicketsCTE.field("tags", CLOB.array()));
-            condition = condition.and(exists(
-                selectOne()
-                    .from(taggedTicketsCTE)
-                    .where(TICKET.ID.eq(taggedTicketIds)
-                        .and(taggedTicketTags.contains(
-                            cast(query.tags().toArray(String[]::new), CLOB.array())
-                        )))
-            ));
+        if (query.includeNoTags() || !query.tags().isEmpty()) {
+            Condition tagCondition = noCondition();
+
+            if (query.includeNoTags()) {
+                // Tickets with no tags
+                tagCondition = tagCondition.or(notExists(
+                    selectOne()
+                        .from(TICKET_TO_TAG)
+                        .where(TICKET_TO_TAG.TICKET_ID.eq(TICKET.ID))
+                ));
+            }
+
+            if (!query.tags().isEmpty()) {
+                // Tickets that have all selected tags
+                checkNotNull(taggedTicketsCTE);
+                var taggedTicketIds = checkNotNull(taggedTicketsCTE.field("id", Long.class));
+                var taggedTicketTags = checkNotNull(taggedTicketsCTE.field("tags", CLOB.array()));
+                tagCondition = tagCondition.or(exists(
+                    selectOne()
+                        .from(taggedTicketsCTE)
+                        .where(TICKET.ID.eq(taggedTicketIds)
+                            .and(taggedTicketTags.contains(
+                                cast(query.tags().toArray(String[]::new), CLOB.array())
+                            )))
+                ));
+            }
+
+            condition = condition.and(tagCondition);
         }
         if (!Strings.isNullOrEmpty(query.escalationTeam())) {
             condition = condition.and(exists(
