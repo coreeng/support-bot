@@ -1,6 +1,13 @@
 package com.coreeng.supportbot.ticket.rest;
 
 import com.coreeng.supportbot.config.TicketAssignmentProps;
+import com.coreeng.supportbot.slack.SlackException;
+import com.coreeng.supportbot.slack.SlackId;
+import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.slack.client.SlackMessage;
+import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
+import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketRepository;
@@ -16,12 +23,15 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.function.Function;
 
+import static java.lang.String.format;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class BulkReassignmentService {
     private final TicketAssignmentProps assignmentProps;
     private final TicketRepository ticketRepository;
+    private final SlackClient slackClient;
 
     public BulkReassignResultUI bulkReassign(BulkReassignRequest request) {
         BulkReassignResultUI validationError = validateRequest(request);
@@ -36,10 +46,17 @@ public class BulkReassignmentService {
 
         processReassignments(request, ticketMap, successfulIds, skippedIds);
 
+        ImmutableList<TicketId> successfulTicketIds = successfulIds.build();
+        
+        // Send notification to assignee if any tickets were successfully assigned
+        if (!successfulTicketIds.isEmpty()) {
+            sendAssignmentNotification(request.assignedTo(), successfulTicketIds, ticketMap);
+        }
+
         return buildResult(
-                request.ticketIds().size(),
-                successfulIds.build(),
-                skippedIds.build()
+            request.ticketIds().size(),
+            successfulTicketIds,
+            skippedIds.build()
         );
     }
 
@@ -154,6 +171,59 @@ public class BulkReassignmentService {
 
     private BulkReassignResultUI createEmptyResult(String message) {
         return new BulkReassignResultUI(0, ImmutableList.of(), 0, ImmutableList.of(), message);
+    }
+
+    private void sendAssignmentNotification(
+        String assignedToUserId,
+        ImmutableList<TicketId> successfulTicketIds,
+        ImmutableMap<TicketId, Ticket> ticketMap
+    ) {
+        try {
+            // Open DM conversation with the assignee
+            var dmResponse = slackClient.openDmConversation(SlackId.user(assignedToUserId));
+            if (!dmResponse.isOk() || dmResponse.getChannel() == null) {
+                log.warn("Failed to open DM conversation with user {}: {}", assignedToUserId, dmResponse.getError());
+                return;
+            }
+
+            String dmChannelId = dmResponse.getChannel().getId();
+            
+            SlackMessage message = buildAssignmentNotificationMessage(successfulTicketIds, ticketMap);
+            
+            // Send the message to the DM channel
+            slackClient.postMessage(new SlackPostMessageRequest(message, dmChannelId, null));
+            log.info("Sent assignment notification to user {} for {} tickets", assignedToUserId, successfulTicketIds.size());
+        } catch (SlackException e) {
+            log.warn("Failed to send assignment notification to user {}: {}", assignedToUserId, e.getMessage(), e);
+        }
+    }
+
+    private SlackMessage buildAssignmentNotificationMessage(
+        ImmutableList<TicketId> ticketIds,
+        ImmutableMap<TicketId, Ticket> ticketMap
+    ) {
+        String header = format("*You have been assigned to %d ticket%s:*\n\n", 
+            ticketIds.size(), 
+            ticketIds.size() == 1 ? "" : "s");
+
+        StringBuilder ticketList = new StringBuilder(header);
+
+        ticketIds.forEach(ticketId -> {
+            Ticket ticket = ticketMap.get(ticketId);
+            if (ticket != null) {
+                String permalink = slackClient.getPermalink(new SlackGetMessageByTsRequest(
+                    ticket.channelId(),
+                    ticket.queryTs()
+                ));
+                ticketList.append(format("• <%s|Ticket %s>\n", permalink, ticketId.render()));
+            } else {
+                ticketList.append(format("• Ticket %s\n", ticketId.render()));
+            }
+        });
+
+        return SimpleSlackMessage.builder()
+            .text(ticketList.toString())
+            .build();
     }
 }
 

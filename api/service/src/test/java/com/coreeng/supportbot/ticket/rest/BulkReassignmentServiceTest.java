@@ -2,6 +2,11 @@ package com.coreeng.supportbot.ticket.rest;
 
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackException;
+import com.coreeng.supportbot.slack.SlackId;
+import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketRepository;
@@ -9,10 +14,13 @@ import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
+import com.slack.api.methods.response.conversations.ConversationsOpenResponse;
+import com.slack.api.model.Conversation;
 import org.jooq.exception.DataAccessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -33,12 +41,25 @@ class BulkReassignmentServiceTest {
     @Mock
     private TicketRepository ticketRepository;
 
+    @Mock
+    private com.coreeng.supportbot.slack.client.SlackClient slackClient;
+
     @InjectMocks
     private BulkReassignmentService service;
 
     @BeforeEach
     void setUp() {
-        service = new BulkReassignmentService(assignmentProps, ticketRepository);
+        service = new BulkReassignmentService(assignmentProps, ticketRepository, slackClient);
+        // Lenient stubbing for SlackClient - notifications are optional and shouldn't break tests
+        ConversationsOpenResponse dmResponse = 
+            mock(ConversationsOpenResponse.class);
+        Conversation channel = mock(Conversation.class);
+        lenient().when(channel.getId()).thenReturn("D12345");
+        lenient().when(dmResponse.isOk()).thenReturn(true);
+        lenient().when(dmResponse.getChannel()).thenReturn(channel);
+        lenient().when(slackClient.openDmConversation(any())).thenReturn(dmResponse);
+        lenient().when(slackClient.getPermalink(any())).thenReturn("https://slack.com/permalink");
+        lenient().when(slackClient.postMessage(any())).thenReturn(null);
     }
 
     @Test
@@ -261,6 +282,243 @@ class BulkReassignmentServiceTest {
         verify(ticketRepository).assign(ticket1, assignedTo);
         verify(ticketRepository, never()).assign(ticket2, assignedTo);
         verifyNoMoreInteractions(assignmentProps, ticketRepository);
+    }
+
+    @Test
+    void shouldSendNotificationWhenTicketsAreSuccessfullyAssigned() {
+        // given
+        TicketId ticket1 = new TicketId(1);
+        TicketId ticket2 = new TicketId(2);
+        String assignedTo = "U12345";
+
+        Ticket openTicket1 = createTicket(ticket1, TicketStatus.opened);
+        Ticket openTicket2 = createTicket(ticket2, TicketStatus.opened);
+
+        ConversationsOpenResponse dmResponse = 
+            mock(ConversationsOpenResponse.class);
+        Conversation channel = mock(Conversation.class);
+        when(channel.getId()).thenReturn("D12345");
+        when(dmResponse.isOk()).thenReturn(true);
+        when(dmResponse.getChannel()).thenReturn(channel);
+
+        when(assignmentProps.enabled()).thenReturn(true);
+        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+            .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2), 0, 1, 2));
+        when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
+        when(slackClient.getPermalink(ArgumentMatchers.any(SlackGetMessageByTsRequest.class)))
+            .thenReturn("https://slack.com/permalink1", "https://slack.com/permalink2");
+
+        BulkReassignRequest request = new BulkReassignRequest(
+            List.of(ticket1, ticket2),
+            assignedTo
+        );
+
+        // when
+        BulkReassignResultUI result = service.bulkReassign(request);
+
+        // then
+        assertThat(result.successCount()).isEqualTo(2);
+        
+        ArgumentCaptor<SlackPostMessageRequest> messageCaptor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
+        verify(slackClient).openDmConversation(SlackId.user(assignedTo));
+        verify(slackClient, times(2)).getPermalink(ArgumentMatchers.any(SlackGetMessageByTsRequest.class));
+        verify(slackClient).postMessage(messageCaptor.capture());
+        
+        SlackPostMessageRequest sentMessage = messageCaptor.getValue();
+        assertThat(sentMessage.channel()).isEqualTo("D12345");
+        String messageText = sentMessage.message().getText();
+        assertThat(messageText).contains("You have been assigned to 2 tickets");
+        assertThat(messageText).contains("Ticket ID-1");
+        assertThat(messageText).contains("Ticket ID-2");
+    }
+
+    @Test
+    void shouldNotSendNotificationWhenNoTicketsAreSuccessfullyAssigned() {
+        // given
+        TicketId ticket1 = new TicketId(1);
+        String assignedTo = "U12345";
+
+        Ticket closedTicket = createTicket(ticket1, TicketStatus.closed);
+
+        when(assignmentProps.enabled()).thenReturn(true);
+        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+            .thenReturn(new Page<>(ImmutableList.of(closedTicket), 0, 1, 1));
+
+        BulkReassignRequest request = new BulkReassignRequest(
+            List.of(ticket1),
+            assignedTo
+        );
+
+        // when
+        BulkReassignResultUI result = service.bulkReassign(request);
+
+        // then
+        assertThat(result.successCount()).isEqualTo(0);
+        verify(slackClient, never()).openDmConversation(any());
+        verify(slackClient, never()).postMessage(any());
+    }
+
+    @Test
+    void shouldNotSendNotificationWhenDmConversationFailsToOpen() {
+        // given
+        TicketId ticket1 = new TicketId(1);
+        String assignedTo = "U12345";
+
+        Ticket openTicket = createTicket(ticket1, TicketStatus.opened);
+
+        ConversationsOpenResponse dmResponse = 
+            mock(ConversationsOpenResponse.class);
+        when(dmResponse.isOk()).thenReturn(false);
+        when(dmResponse.getError()).thenReturn("messages_tab_disabled");
+
+        when(assignmentProps.enabled()).thenReturn(true);
+        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+            .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
+        when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
+
+        BulkReassignRequest request = new BulkReassignRequest(
+            List.of(ticket1),
+            assignedTo
+        );
+
+        // when
+        BulkReassignResultUI result = service.bulkReassign(request);
+
+        // then
+        assertThat(result.successCount()).isEqualTo(1);
+        verify(slackClient).openDmConversation(SlackId.user(assignedTo));
+        verify(slackClient, never()).postMessage(any());
+    }
+
+    @Test
+    void shouldNotSendNotificationWhenDmConversationReturnsNullChannel() {
+        // given
+        TicketId ticket1 = new TicketId(1);
+        String assignedTo = "U12345";
+
+        Ticket openTicket = createTicket(ticket1, TicketStatus.opened);
+
+        ConversationsOpenResponse dmResponse = 
+            mock(ConversationsOpenResponse.class);
+        when(dmResponse.isOk()).thenReturn(true);
+        when(dmResponse.getChannel()).thenReturn(null);
+
+        when(assignmentProps.enabled()).thenReturn(true);
+        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+            .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
+        when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
+
+        BulkReassignRequest request = new BulkReassignRequest(
+            List.of(ticket1),
+            assignedTo
+        );
+
+        // when
+        BulkReassignResultUI result = service.bulkReassign(request);
+
+        // then
+        assertThat(result.successCount()).isEqualTo(1);
+        verify(slackClient).openDmConversation(SlackId.user(assignedTo));
+        verify(slackClient, never()).postMessage(any());
+    }
+
+    @Test
+    void shouldHandleSlackExceptionWhenPostingMessage() {
+        // given
+        TicketId ticket1 = new TicketId(1);
+        String assignedTo = "U12345";
+
+        Ticket openTicket = createTicket(ticket1, TicketStatus.opened);
+
+        ConversationsOpenResponse dmResponse = 
+            mock(ConversationsOpenResponse.class);
+        Conversation channel = mock(Conversation.class);
+        when(channel.getId()).thenReturn("D12345");
+        when(dmResponse.isOk()).thenReturn(true);
+        when(dmResponse.getChannel()).thenReturn(channel);
+
+        when(assignmentProps.enabled()).thenReturn(true);
+        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+            .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
+        when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
+        when(slackClient.getPermalink(ArgumentMatchers.any(SlackGetMessageByTsRequest.class)))
+            .thenReturn("https://slack.com/permalink1");
+        when(slackClient.postMessage(ArgumentMatchers.any(SlackPostMessageRequest.class)))
+            .thenThrow(new SlackException(new RuntimeException("Failed to post message")));
+
+        BulkReassignRequest request = new BulkReassignRequest(
+            List.of(ticket1),
+            assignedTo
+        );
+
+        // when
+        BulkReassignResultUI result = service.bulkReassign(request);
+
+        // then
+        assertThat(result.successCount()).isEqualTo(1);
+        verify(slackClient).openDmConversation(SlackId.user(assignedTo));
+        verify(slackClient).postMessage(ArgumentMatchers.any(SlackPostMessageRequest.class));
+        // Should not throw exception, just log warning
+    }
+
+    @Test
+    void shouldIncludePermalinksInNotificationMessage() {
+        // given
+        TicketId ticket1 = new TicketId(1);
+        TicketId ticket2 = new TicketId(2);
+        String assignedTo = "U12345";
+
+        Ticket openTicket1 = createTicket(ticket1, TicketStatus.opened);
+        Ticket openTicket2 = Ticket.builder()
+            .id(ticket2)
+            .channelId("C456")
+            .queryTs(MessageTs.of("789.012"))
+            .createdMessageTs(MessageTs.of("789.013"))
+            .status(TicketStatus.opened)
+            .impact("medium")
+            .tags(ImmutableList.of())
+            .lastInteractedAt(Instant.now())
+            .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+            .build();
+
+        ConversationsOpenResponse dmResponse = 
+            mock(ConversationsOpenResponse.class);
+        Conversation channel = mock(Conversation.class);
+        when(channel.getId()).thenReturn("D12345");
+        when(dmResponse.isOk()).thenReturn(true);
+        when(dmResponse.getChannel()).thenReturn(channel);
+
+        when(assignmentProps.enabled()).thenReturn(true);
+        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+            .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2), 0, 1, 2));
+        when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
+        when(slackClient.getPermalink(ArgumentMatchers.any(SlackGetMessageByTsRequest.class)))
+            .thenReturn("https://slack.com/permalink1", "https://slack.com/permalink2");
+
+        BulkReassignRequest request = new BulkReassignRequest(
+            List.of(ticket1, ticket2),
+            assignedTo
+        );
+
+        // when
+        service.bulkReassign(request);
+
+        // then
+        ArgumentCaptor<SlackGetMessageByTsRequest> permalinkCaptor = 
+            ArgumentCaptor.forClass(SlackGetMessageByTsRequest.class);
+        verify(slackClient, times(2)).getPermalink(permalinkCaptor.capture());
+        
+        List<SlackGetMessageByTsRequest> permalinkRequests = permalinkCaptor.getAllValues();
+        assertThat(permalinkRequests.get(0).channelId()).isEqualTo("C123");
+        assertThat(permalinkRequests.get(0).ts().ts()).isEqualTo("123.456");
+        assertThat(permalinkRequests.get(1).channelId()).isEqualTo("C456");
+        assertThat(permalinkRequests.get(1).ts().ts()).isEqualTo("789.012");
+        
+        ArgumentCaptor<SlackPostMessageRequest> messageCaptor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
+        verify(slackClient).postMessage(messageCaptor.capture());
+        String messageText = messageCaptor.getValue().message().getText();
+        assertThat(messageText).contains("https://slack.com/permalink1");
+        assertThat(messageText).contains("https://slack.com/permalink2");
     }
 
     private Ticket createTicket(TicketId ticketId, TicketStatus status) {

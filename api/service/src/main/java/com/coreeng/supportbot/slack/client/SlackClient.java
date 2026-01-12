@@ -9,6 +9,7 @@ import com.slack.api.methods.request.views.ViewsOpenRequest;
 import com.slack.api.methods.response.chat.ChatPostEphemeralResponse;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.chat.ChatUpdateResponse;
+import com.slack.api.methods.response.conversations.ConversationsOpenResponse;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
 import com.slack.api.methods.response.reactions.ReactionsAddResponse;
 import com.slack.api.methods.response.reactions.ReactionsRemoveResponse;
@@ -45,4 +46,6 @@ public interface SlackClient {
     String getGroupName(SlackId.Group groupId);
 
     String getChannelName(String channelId);
+
+    ConversationsOpenResponse openDmConversation(SlackId.User userId);
 }
