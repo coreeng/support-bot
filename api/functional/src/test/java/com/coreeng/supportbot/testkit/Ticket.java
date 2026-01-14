@@ -142,11 +142,12 @@ public class Ticket {
                 .build()
         );
         // Stub the ephemeral rating request message
-        Stub ratingRequestStub = slackWiremock.stubEphemeralMessagePosted(
-            EphemeralMessageExpectation.builder()
+        StubWithResult<RatingRequestMessage> ratingRequestStub = slackWiremock.stubEphemeralMessagePosted(
+            EphemeralMessageExpectation.<RatingRequestMessage>builder()
                 .channelId(channelId)
                 .threadTs(queryTs)
                 .userId(user.slackUserId())
+                .receiver(new RatingRequestMessage.Receiver(id))
                 .build()
         );
         // Stub getting the original query message (needed for rating request to find user ID)
@@ -409,7 +410,7 @@ public class Ticket {
     public record CloseFlowStubs(
         StubWithResult<TicketMessage> messageUpdated,
         Stub whiteCheckMarkAdded,
-        Stub ratingRequestPosted,
+        StubWithResult<RatingRequestMessage> ratingRequestPosted,
         Stub getQueryMessage
     ) {
         public void awaitAllCalled(Duration timeout, String reason) {
