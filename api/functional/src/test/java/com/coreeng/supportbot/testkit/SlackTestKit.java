@@ -6,7 +6,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SlackTestKit {
     private final TestKit.RoledTestKit testKit;
-    private final SlackWiremock slackWiremock;
     private final SupportBotSlackClient supportBotSlackClient;
 
     public SlackMessage postMessage(MessageTs ts, String message) {
@@ -71,7 +70,6 @@ public class SlackTestKit {
     }
 
     public void addReactionTo(SlackMessage targetMessage, String reaction) {
-        slackWiremock.stubAuthTest();
         supportBotSlackClient.notifyReactionAdded(ReactionToAdd.builder()
             .userId(testKit.userId())
             .teamId(testKit.teamId())
