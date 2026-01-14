@@ -25,8 +25,12 @@ public class StubWithResult<T> {
 
     private T result;
     private boolean resultCalculated;
+    private boolean asserted;
 
     public void assertIsCalled(String message) {
+        if (asserted) {
+            return;
+        }
         GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
         assertThat(serveEvents.getServeEvents())
             .as("%s: stub was called exactly once", message)
@@ -40,18 +44,37 @@ public class StubWithResult<T> {
             .as("%s: stub returned a non-null result", message)
             .isNotNull();
         resultCalculated = true;
+        asserted = true;
+        clean(serveEvents);
     }
 
     public void assertIsNotCalled(String message) {
+        if (asserted) {
+            return;
+        }
         GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
         assertThat(serveEvents.getServeEvents())
             .as("%s: stub should not have been called", message)
             .isEmpty();
+        asserted = true;
+        clean(serveEvents);
     }
 
     public T result() {
         assertThat(resultCalculated).isTrue();
         return result;
+    }
+
+    public void clean() {
+        GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
+        clean(serveEvents);
+    }
+
+    private void clean(GetServeEventsResult serveEvents) {
+        wireMockServer.removeStubMapping(mapping);
+        for (ServeEvent serveEvent : serveEvents.getServeEvents()) {
+            wireMockServer.removeStubMapping(serveEvent.getStubMapping());
+        }
     }
 
     public interface Receiver<T> {
