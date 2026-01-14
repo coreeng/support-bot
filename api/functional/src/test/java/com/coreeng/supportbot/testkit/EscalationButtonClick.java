@@ -14,10 +14,6 @@ public class EscalationButtonClick implements MessageButtonClick {
     private final Ticket ticket;
 
     @Override
-    public void preSetupMocks() {
-    }
-
-    @Override
     public String actionId() {
         return TicketMessage.escalateButtonActionId;
     }

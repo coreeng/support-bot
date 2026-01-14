@@ -82,7 +82,6 @@ public class SlackTestKit {
     }
 
     public void clickMessageButton(MessageButtonClick click) {
-        click.preSetupMocks();
         supportBotSlackClient.notifyButtonClicked(RawButtonClick.builder()
             .teamId(testKit.teamId())
             .userId(testKit.userId())

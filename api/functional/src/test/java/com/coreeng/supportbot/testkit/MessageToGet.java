@@ -25,7 +25,5 @@ public class MessageToGet {
     private final String botId;
 
     @NonNull
-    private final String team;
-    @NonNull
     private final String blocksJson;
 }
