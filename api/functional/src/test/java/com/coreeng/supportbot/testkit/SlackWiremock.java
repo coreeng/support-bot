@@ -104,6 +104,31 @@ public class SlackWiremock extends WireMockServer {
         }
     }
 
+    /**
+     * Asserts that no unhandled requests were made during the test.
+     * All requests should be matched by a stub.
+     *
+     * @throws AssertionError if any requests were not matched
+     */
+    public void assertNoUnhandledRequests() {
+        var unmatchedRequests = findAllUnmatchedRequests();
+
+        if (!unmatchedRequests.isEmpty()) {
+            String details = unmatchedRequests.stream()
+                .map(req -> "  - " + req.getMethod().getName() + " " + req.getUrl())
+                .collect(Collectors.joining("\n"));
+            fail("Test had %d unhandled requests:\n%s".formatted(unmatchedRequests.size(), details));
+        }
+    }
+
+    /**
+     * Clears the request journal to prevent interference between tests.
+     */
+    public void clearRequestJournal() {
+        resetRequests();
+        logger.debug("Cleared request journal");
+    }
+
     public void stubAuthTest(String description) {
         givenThat(post("/api/auth.test")
             .willReturn(okJson(new StringSubstitutor(Map.of(

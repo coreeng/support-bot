@@ -59,9 +59,13 @@ public class TestKitExtension implements TestInstancePostProcessor, ParameterRes
             try {
                 // First, assert that no test stubs remain (this will fail the test if stubs are left)
                 slackWiremock.assertNoTestStubsRemaining();
+                // Then, assert that no unhandled requests were made
+                slackWiremock.assertNoUnhandledRequests();
             } finally {
                 // Always clean up remaining test stubs to prevent test interference
                 slackWiremock.cleanupTestStubs();
+                // Clear request journal to prevent interference between tests
+                slackWiremock.clearRequestJournal();
             }
         }
     }
