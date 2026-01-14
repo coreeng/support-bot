@@ -62,13 +62,13 @@ public class SlackMessage {
     public TicketCreationFlowStubs stubTicketCreationFlow(String reason, MessageTs newTicketMessageTs, @Nullable MessageTs replyTs) {
         // Stub conversations.replies to indicate this is NOT a thread reply
         // This is needed because the service checks if the message is a thread reply before creating a ticket
-        slackWiremock.stubConversationsReplies(ConversationRepliesToGet.builder()
+        Stub conversationsReplies = slackWiremock.stubConversationsReplies(ConversationRepliesToGet.builder()
             .description(reason + ": conversations.replies")
             .channelId(channelId)
             .ts(ts)
             .threadTs(ts)
             .reply(replyTs)
-            .build()).clean();
+            .build());
 
         Stub reaction = expectReactionAdded(reason + ": reaction added", "ticket");
         StubWithResult<TicketMessage> posted = expectThreadMessagePosted(
@@ -79,12 +79,17 @@ public class SlackMessage {
                 .newMessageTs(newTicketMessageTs)
                 .build()
         );
-        return new TicketCreationFlowStubs(reaction, posted);
+        return new TicketCreationFlowStubs(conversationsReplies, reaction, posted);
     }
 
-    public record TicketCreationFlowStubs(Stub reactionAdded, StubWithResult<TicketMessage> ticketMessagePosted) {
+    public record TicketCreationFlowStubs(
+        Stub conversationsReplies,
+        Stub reactionAdded,
+        StubWithResult<TicketMessage> ticketMessagePosted
+    ) {
         public void awaitAllCalled(Duration timeout) {
             await().atMost(timeout).untilAsserted(() -> {
+                conversationsReplies.assertIsCalled();
                 reactionAdded.assertIsCalled();
                 ticketMessagePosted.assertIsCalled();
             });

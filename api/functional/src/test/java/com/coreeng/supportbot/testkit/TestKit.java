@@ -23,7 +23,7 @@ public class TestKit {
         private final UserRole role;
 
         public SlackTestKit slack() {
-            return new SlackTestKit(this, slackWiremock, supportBotSlackClient);
+            return new SlackTestKit(this, supportBotSlackClient);
         }
 
         public TicketTestKit ticket() {
