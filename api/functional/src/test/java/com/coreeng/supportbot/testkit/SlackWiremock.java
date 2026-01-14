@@ -337,8 +337,8 @@ public class SlackWiremock extends WireMockServer {
             .build();
     }
 
-    public Stub stubEphemeralMessagePosted(EphemeralMessageExpectation expectation) {
-        StubMapping stubMapping = givenThat(post("/api/chat.postEphemeral")
+    public <T> StubWithResult<T> stubEphemeralMessagePosted(EphemeralMessageExpectation<T> expectation) {
+        StubMapping stubMapping = givenThat(expectation.receiver().configureStub(post("/api/chat.postEphemeral"))
             .withFormParam("channel", equalTo(expectation.channelId()))
             .withFormParam("thread_ts", equalTo(expectation.threadTs().toString()))
             .withFormParam("user", equalTo(expectation.userId()))
@@ -346,9 +346,10 @@ public class SlackWiremock extends WireMockServer {
                 {"ok": true, "message_ts": "1234567890.123456"}
                 """))
         );
-        return Stub.builder()
+        return StubWithResult.<T>builder()
             .mapping(stubMapping)
             .wireMockServer(this)
+            .receiver(expectation.receiver())
             .build();
     }
 
