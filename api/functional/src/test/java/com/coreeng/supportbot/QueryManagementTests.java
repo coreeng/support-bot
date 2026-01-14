@@ -4,6 +4,8 @@ import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+
+import com.coreeng.supportbot.testkit.TicketByIdQuery;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -100,10 +102,8 @@ public class QueryManagementTests {
 
         // when: post a query
         MessageTs queryTs = MessageTs.now();
-        SlackMessage tenantsMessage = asTenantSlack.postMessage(
-            queryTs,
-            "Please, help me with my query!"
-        );
+        String queryMessage = "Please, help me with my query!";
+        SlackMessage tenantsMessage = asTenantSlack.postMessage(queryTs, queryMessage);
 
         // then: query should exist
         supportBotClient.assertQueryExistsByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts());
@@ -117,7 +117,8 @@ public class QueryManagementTests {
         creationStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket created");
         TicketMessage ticketMessage = creationStubs.ticketMessagePosted().result();
         assertThat(ticketMessage).isNotNull();
-        var ticketResponse = supportBotClient.assertTicketExists(ticketMessage);
+        TicketByIdQuery ticketByIdQuery = TicketByIdQuery.fromTicketMessage(ticketMessage, queryMessage);
+        var ticketResponse = supportBotClient.assertTicketExists(ticketByIdQuery);
         ticketMessage.assertMatches(ticketResponse);
 
         // when: delete the query message
@@ -126,7 +127,7 @@ public class QueryManagementTests {
         // then: query and ticket should still exist (ticket was already created)
         await().pollDelay(Duration.ofMillis(500)).atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
             supportBotClient.assertQueryExistsByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts());
-            var ticketAfterDeletion = supportBotClient.assertTicketExists(ticketMessage);
+            var ticketAfterDeletion = supportBotClient.assertTicketExists(ticketByIdQuery);
             ticketMessage.assertMatches(ticketAfterDeletion);
         });
     }

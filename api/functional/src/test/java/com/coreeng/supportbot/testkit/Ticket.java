@@ -3,6 +3,7 @@ package com.coreeng.supportbot.testkit;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -11,14 +12,13 @@ import org.jspecify.annotations.NonNull;
 
 import com.coreeng.supportbot.Config;
 import com.google.common.collect.ImmutableList;
-import com.coreeng.supportbot.testkit.MessageToGet;
 
 import lombok.Builder;
 import lombok.Getter;
 
 @Builder
 @Getter
-public class Ticket implements SearchableForTicket {
+public class Ticket {
     private final long id;
     @NonNull
     private final MessageTs queryTs;
@@ -81,20 +81,18 @@ public class Ticket implements SearchableForTicket {
             .build();
     }
 
-    public StubWithResult<FullSummaryForm> expectFullSummaryFormOpened(String triggerId) {
-        var expectation = ViewsOpenExpectation.<FullSummaryForm>builder()
+    public FullSummaryFormOpenStubs expectFullSummaryFormOpened(String triggerId) {
+        var formOpenStub = slackWiremock.stubViewsOpen(ViewsOpenExpectation.<FullSummaryForm>builder()
             .viewCallbackId("ticket-summary")
             .viewType("modal")
             .triggerId(triggerId)
             .receiver(new FullSummaryForm.Receiver(this))
-            .build();
+            .build());
 
-        // Stub permalink for the ticket form message (used for escalation thread links in summary)
-        if (!escalations.isEmpty()) {
-            slackWiremock.stubGetPermalink(channelId, formMessageTs);
-        }
+        var queryPermalinkStub = slackWiremock.stubGetPermalink(channelId, queryTs);
+        var queryMessageStub = stubQueryMessageFetch();
 
-        return slackWiremock.stubViewsOpen(expectation);
+        return new FullSummaryFormOpenStubs(formOpenStub, queryPermalinkStub, queryMessageStub);
     }
 
     public FullSummaryFormSubmission fullSummaryFormSubmit(String triggerId, FullSummaryFormSubmission.Values values) {
@@ -127,31 +125,41 @@ public class Ticket implements SearchableForTicket {
         return new TicketUpdater();
     }
 
-    public CloseFlowStubs stubCloseFlow(MessageTs threadTs) {
-        StubWithResult<TicketMessage> updated = slackWiremock.stubMessageUpdated(
+    public CloseFlowStubs stubCloseFlow() {
+        StubWithResult<TicketMessage> messageUpdatedStub = slackWiremock.stubMessageUpdated(
             MessageUpdatedExpectation.<TicketMessage>builder()
                 .channelId(channelId)
                 .ts(formMessageTs)
-                .threadTs(threadTs)
+                .threadTs(queryTs)
                 .receiver(new TicketMessage.Receiver())
                 .build()
         );
-        Stub check = slackWiremock.stubReactionAdd(
+        Stub messageCheckedStub = slackWiremock.stubReactionAdd(
             ReactionAddedExpectation.builder()
                 .reaction("white_check_mark")
                 .channelId(channelId)
                 .ts(queryTs)
                 .build()
         );
-        return new CloseFlowStubs(updated, check);
+        // Stub the ephemeral rating request message
+        Stub ratingRequestStub = slackWiremock.stubEphemeralMessagePosted(
+            EphemeralMessageExpectation.builder()
+                .channelId(channelId)
+                .threadTs(queryTs)
+                .userId(user.slackUserId())
+                .build()
+        );
+        // Stub getting the original query message (needed for rating request to find user ID)
+        Stub getQueryMessageStub = stubQueryMessageFetch();
+        return new CloseFlowStubs(messageUpdatedStub, messageCheckedStub, ratingRequestStub, getQueryMessageStub);
     }
 
-    public ReopenFlowStubs stubReopenFlow(MessageTs threadTs) {
+    public ReopenFlowStubs stubReopenFlow() {
         StubWithResult<TicketMessage> updated = slackWiremock.stubMessageUpdated(
             MessageUpdatedExpectation.<TicketMessage>builder()
                 .channelId(channelId)
                 .ts(formMessageTs)
-                .threadTs(threadTs)
+                .threadTs(queryTs)
                 .receiver(new TicketMessage.Receiver())
                 .build()
         );
@@ -165,8 +173,8 @@ public class Ticket implements SearchableForTicket {
         return new ReopenFlowStubs(updated, uncheck);
     }
 
-    public void stubQueryMessageFetch() {
-        slackWiremock.stubGetMessage(MessageToGet.builder()
+    private Stub stubQueryMessageFetch() {
+        return slackWiremock.stubGetMessage(MessageToGet.builder()
             .channelId(channelId)
             .ts(queryTs)
             .threadTs(queryTs)
@@ -174,17 +182,21 @@ public class Ticket implements SearchableForTicket {
             .blocksJson(queryBlocksJson)
             .userId(user.slackUserId())
             .botId(user.slackBotId())
-            .team(teamId)
             .build());
     }
 
     public void openSummaryAndSubmit(SlackTestKit asSupportSlack, String triggerId, FullSummaryFormSubmission.Values values) {
-        StubWithResult<FullSummaryForm> opened = expectFullSummaryFormOpened(triggerId);
-        asSupportSlack.clickMessageButton(fullSummaryButtonClick(triggerId));
-        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> opened.assertIsCalled("full summary form opened"));
-        asSupportSlack.submitView(fullSummaryFormSubmit(triggerId, values));
+        openSummaryAndSubmit(asSupportSlack, triggerId, values, () -> null);
     }
 
+    public <T> T openSummaryAndSubmit(SlackTestKit asSupportSlack, String triggerId, FullSummaryFormSubmission.Values values, Supplier<T> flowStubs) {
+        FullSummaryFormOpenStubs openedStubs = expectFullSummaryFormOpened(triggerId);
+        asSupportSlack.clickMessageButton(fullSummaryButtonClick(triggerId));
+        openedStubs.awaitAllCalled(Duration.ofSeconds(5), "full summary form opened");
+        T stubs = flowStubs.get();
+        asSupportSlack.submitView(fullSummaryFormSubmit(triggerId, values));
+        return stubs;
+    }
 
     public EscalateFlowStubs stubEscalateFlow(String expectedSlackGroupId, MessageTs newEscalationMessageTs) {
         StubWithResult<EscalationMessage> escalationMessage = expectEscalationMessagePosted(expectedSlackGroupId, newEscalationMessageTs);
@@ -244,11 +256,6 @@ public class Ticket implements SearchableForTicket {
             assertThat(actualLog.event()).isEqualTo(expectedLog.event());
             assertThat(actualLog.date()).isCloseTo(expectedLog.date(), within(1, ChronoUnit.SECONDS));
         }
-    }
-
-    @Override
-    public long ticketId() {
-        return id;
     }
 
     public EscalationButtonClick escalateButtonClick(String triggerId) {
@@ -385,11 +392,32 @@ public class Ticket implements SearchableForTicket {
         }
     }
 
-    public record CloseFlowStubs(StubWithResult<TicketMessage> messageUpdated, Stub whiteCheckMarkAdded) {
+    public record FullSummaryFormOpenStubs(
+        StubWithResult<FullSummaryForm> formOpened,
+        Stub queryPermalink,
+        Stub getQueryMessage
+    ) {
+        public void awaitAllCalled(Duration timeout, String reason) {
+            await().atMost(timeout).untilAsserted(() -> {
+                queryPermalink.clean();
+                getQueryMessage.assertIsCalled(reason + ": get query message");
+                formOpened.assertIsCalled(reason + ": view open message");
+            });
+        }
+    }
+
+    public record CloseFlowStubs(
+        StubWithResult<TicketMessage> messageUpdated,
+        Stub whiteCheckMarkAdded,
+        Stub ratingRequestPosted,
+        Stub getQueryMessage
+    ) {
         public void awaitAllCalled(Duration timeout, String reason) {
             await().atMost(timeout).untilAsserted(() -> {
                 messageUpdated.assertIsCalled(reason + ": ticket form update");
                 whiteCheckMarkAdded.assertIsCalled(reason + ": checkmark added");
+                ratingRequestPosted.assertIsCalled(reason + ": rating request posted");
+                getQueryMessage.assertIsCalled(reason + ": get query message");
             });
         }
     }
