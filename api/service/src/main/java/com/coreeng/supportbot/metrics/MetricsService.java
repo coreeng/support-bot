@@ -32,7 +32,7 @@ public class MetricsService {
     private MultiGauge weeklyActivityGauge;
     private MultiGauge resolutionTimeByTagGauge;
     private final AtomicLong unattendedQueryCount = new AtomicLong(0);
-    private final AtomicReference<Double> longestActiveTicketSeconds = new AtomicReference<>(0.0);
+    private final AtomicReference<Double> maxTicketAgeSecs = new AtomicReference<>(0.0);
 
     public MetricsService(MetricsRepository metricsRepository, MeterRegistry meterRegistry) {
         this.metricsRepository = metricsRepository;
@@ -51,7 +51,7 @@ public class MetricsService {
         resolutionTimeByTagGauge = MultiGauge.builder("supportbot_resolution_time_by_tag_seconds").register(meterRegistry);
         Gauge.builder("supportbot_unattended_queries", unattendedQueryCount, AtomicLong::doubleValue)
                 .register(meterRegistry);
-        Gauge.builder("supportbot_longest_active_ticket_seconds", longestActiveTicketSeconds, AtomicReference::get)
+        Gauge.builder("supportbot_longest_active_ticket_seconds", maxTicketAgeSecs, AtomicReference::get)
                 .register(meterRegistry);
     }
 
@@ -126,7 +126,7 @@ public class MetricsService {
             }
             resolutionTimeByTagGauge.register(resolutionTimeByTagRows, true);
 
-            longestActiveTicketSeconds.set(metricsRepository.getLongestActiveTicketSeconds());
+            maxTicketAgeSecs.set(metricsRepository.getLongestActiveTicketSeconds());
         } catch (Exception e) {
             log.error("Error refreshing metrics", e);
         }
