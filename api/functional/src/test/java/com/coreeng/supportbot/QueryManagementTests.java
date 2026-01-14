@@ -110,11 +110,11 @@ public class QueryManagementTests {
 
         // when: support creates a ticket by reacting with eyes
         MessageTs ticketMessageTs = MessageTs.now();
-        var creationStubs = tenantsMessage.stubTicketCreationFlow(ticketMessageTs);
+        var creationStubs = tenantsMessage.stubTicketCreationFlow("ticket created", ticketMessageTs);
         asSupportSlack.addReactionTo(tenantsMessage, "eyes");
 
         // then: ticket is created
-        creationStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket created");
+        creationStubs.awaitAllCalled(Duration.ofSeconds(5));
         TicketMessage ticketMessage = creationStubs.ticketMessagePosted().result();
         assertThat(ticketMessage).isNotNull();
         TicketByIdQuery ticketByIdQuery = TicketByIdQuery.fromTicketMessage(ticketMessage, queryMessage);

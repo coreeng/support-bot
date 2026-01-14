@@ -70,8 +70,9 @@ public class SupportBotClient {
     }
 
     public TicketResponse assertTicketExists(TicketByIdQuery query) {
-        Stub getPermalinkStub = slackWiremock.stubGetPermalink(query.channelId(), query.queryTs());
+        Stub getPermalinkStub = slackWiremock.stubGetPermalink("assertTicketExists: get permalink", query.channelId(), query.queryTs());
         Stub getMessageStub = slackWiremock.stubGetMessage(MessageToGet.builder()
+            .description("assertTicketExists: get message")
             .ts(query.queryTs())
             .threadTs(query.queryTs())
             .channelId(query.channelId())
@@ -89,7 +90,7 @@ public class SupportBotClient {
                 .extract().as(TicketResponse.class);
         } finally {
             getPermalinkStub.clean(); // it's cached so might be not called
-            getMessageStub.assertIsCalled("get message");
+            getMessageStub.assertIsCalled();
         }
     }
 

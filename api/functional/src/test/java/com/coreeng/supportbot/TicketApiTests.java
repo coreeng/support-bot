@@ -40,7 +40,7 @@ public class TicketApiTests {
                 .message("Initial query")
         );
 
-        var closeStubs = ticket.stubCloseFlow();
+        var closeStubs = ticket.stubCloseFlow("ticket closed");
 
         // when
         var updated = supportBotClient.updateTicket(
@@ -58,6 +58,6 @@ public class TicketApiTests {
         assertThat(updated.team().code()).isEqualTo("wow");
         assertThat(updated.tags()).containsExactlyInAnyOrder("ingresses", "networking");
         assertThat(updated.impact()).isEqualTo("productionBlocking");
-        closeStubs.awaitAllCalled(Duration.ofSeconds(1), "ticket closed");
+        closeStubs.awaitAllCalled(Duration.ofSeconds(1));
     }
 }

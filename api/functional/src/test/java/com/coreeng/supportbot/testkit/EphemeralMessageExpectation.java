@@ -8,6 +8,8 @@ import org.jspecify.annotations.NonNull;
 @Getter
 public class EphemeralMessageExpectation<T> {
     @NonNull
+    private final String description;
+    @NonNull
     private final String channelId;
     @NonNull
     private final MessageTs threadTs;
