@@ -29,8 +29,9 @@ public class TicketTestKit {
             .createdMessageTs(MessageTs.now())
         ).build();
 
-        Stub getPermalinkStub = slackWiremock.stubGetPermalink(ticketToCreate.channelId(), ticketToCreate.queryTs());
+        Stub getPermalinkStub = slackWiremock.stubGetPermalink(ticketToCreate.opDescription() + ": get permalink", ticketToCreate.channelId(), ticketToCreate.queryTs());
         Stub getMessageStub = slackWiremock.stubGetMessage(MessageToGet.builder()
+            .description(ticketToCreate.opDescription() + ": get message")
             .channelId(ticketToCreate.channelId())
             .ts(ticketToCreate.queryTs())
             .threadTs(ticketToCreate.queryTs())
@@ -45,8 +46,8 @@ public class TicketTestKit {
             .createdMessageTs(ticketToCreate.createdMessageTs())
             .build());
 
-        getPermalinkStub.assertIsCalled("get permalink");
-        getMessageStub.assertIsCalled("get message");
+        getPermalinkStub.assertIsCalled();
+        getMessageStub.assertIsCalled();
 
         return Ticket.fromResponse(response)
             .user(testKit.user())

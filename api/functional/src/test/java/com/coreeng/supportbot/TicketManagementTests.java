@@ -5,6 +5,7 @@ import java.time.Duration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import com.coreeng.supportbot.testkit.Stub;
 import com.coreeng.supportbot.testkit.TicketByIdQuery;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
@@ -53,9 +54,9 @@ public class TicketManagementTests {
 
         // when: open Full Summary and assert full structure (including both escalations)
         String openFullSummaryTriggerId = "summary_open_multi";
-        Ticket.FullSummaryFormOpenStubs summaryFormOpened = ticket.expectFullSummaryFormOpened(openFullSummaryTriggerId);
+        Ticket.FullSummaryFormOpenStubs summaryFormOpened = ticket.expectFullSummaryFormOpened("full summary view opened", openFullSummaryTriggerId);
         asSupport.slack().clickMessageButton(ticket.fullSummaryButtonClick(openFullSummaryTriggerId));
-        summaryFormOpened.awaitAllCalled(Duration.ofSeconds(5), "full summary view opened");
+        summaryFormOpened.awaitAllCalled(Duration.ofSeconds(5));
 
         FullSummaryFormSubmission.Values closeValues = FullSummaryFormSubmission.Values.builder()
             .status(Ticket.Status.closed)
@@ -64,7 +65,7 @@ public class TicketManagementTests {
             .impact("productionBlocking")
             .build();
 
-        var closeStubs = ticket.stubCloseFlow();
+        var closeStubs = ticket.stubCloseFlow("ticket close");
         SummaryCloseConfirm confirm = asSupport.slack().submitView(
             ticket.fullSummaryFormSubmit(openFullSummaryTriggerId, closeValues),
             new SummaryCloseConfirm.Receiver(ticket.id(), 2)
@@ -79,7 +80,7 @@ public class TicketManagementTests {
             .resolveEscalations();
 
         // then
-        closeStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket close");
+        closeStubs.awaitAllCalled(Duration.ofSeconds(5));
 
         var ticketResponse = supportBotClient.assertTicketExists(TicketByIdQuery.fromTicket(ticket));
         ticket.assertMatches(ticketResponse);
@@ -97,12 +98,12 @@ public class TicketManagementTests {
         String queryText = "Please, help me with my query";
         SlackMessage tenantsMessage = asTenantSlack.postMessage(MessageTs.now(), queryText);
         MessageTs ticketMessageTs = MessageTs.now();
-        var creationStubs = tenantsMessage.stubTicketCreationFlow(ticketMessageTs);
+        var creationStubs = tenantsMessage.stubTicketCreationFlow("ticket created", ticketMessageTs);
 
         asSupportSlack.addReactionTo(tenantsMessage, "eyes");
 
         // then
-        creationStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket created");
+        creationStubs.awaitAllCalled(Duration.ofSeconds(5));
         TicketMessage ticketMessage = creationStubs.ticketMessagePosted().result();
         assertThat(ticketMessage).isNotNull();
         var ticketResponse = supportBotClient.assertTicketExists(
@@ -133,13 +134,13 @@ public class TicketManagementTests {
 
         // Step 3: Set up stubs for ticket creation on the query message
         MessageTs ticketMessageTs = MessageTs.now();
-        var creationStubs = tenantsQuery.stubTicketCreationFlow(ticketMessageTs);
+        var creationStubs = tenantsQuery.stubTicketCreationFlow("ticket created", ticketMessageTs);
 
         // Step 4: Support reacts with eyes to the query message (not the thread reply)
         asSupportSlack.addReactionTo(tenantsQuery, "eyes");
 
         // then: verify ticket was created successfully
-        creationStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket created");
+        creationStubs.awaitAllCalled(Duration.ofSeconds(5));
         TicketMessage ticketMessage = creationStubs.ticketMessagePosted().result();
         assertThat(ticketMessage).isNotNull();
         var ticketResponse = supportBotClient.assertTicketExists(TicketByIdQuery.fromTicketMessage(ticketMessage, queryText));
@@ -162,9 +163,9 @@ public class TicketManagementTests {
 
         // Step 2: Support reacts with eyes to create a ticket
         MessageTs ticketMessageTs = MessageTs.now();
-        var creationStubs = tenantsQuery.stubTicketCreationFlow(ticketMessageTs);
+        var creationStubs = tenantsQuery.stubTicketCreationFlow("ticket created", ticketMessageTs);
         asSupportSlack.addReactionTo(tenantsQuery, "eyes");
-        creationStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket created");
+        creationStubs.awaitAllCalled(Duration.ofSeconds(5));
 
         // Verify the original ticket form was created
         TicketMessage ticketMessage = creationStubs.ticketMessagePosted().result();
@@ -180,22 +181,22 @@ public class TicketManagementTests {
 
         // Step 4: Support reacts with eyes to the thread reply
         MessageTs secondTicketMessageTs = MessageTs.now();
-        var buggyCreationStubs = threadReply.stubTicketCreationFlow(secondTicketMessageTs);
+        var buggyCreationStubs = threadReply.stubTicketCreationFlow("buggy ticket creation", secondTicketMessageTs);
 
         // Override the conversations.replies stub to indicate this IS a thread reply (thread_ts != ts)
-        threadReply.stubAsThreadReply(queryTs);
-
+        Stub threadReplyCheck = threadReply.stubAsThreadReply("thread reply check", queryTs);
         // Slack doesn't provide thread context when notifies about added reaction
         asSupportSlack.addReactionTo(threadReply, "eyes");
 
         await().pollDelay(Duration.ofSeconds(1)).untilAsserted(() -> {
-            buggyCreationStubs.reactionAdded().assertIsNotCalled(
-                "Reaction added event is received for eyes reaction on thread reply"
-            );
-            buggyCreationStubs.ticketMessagePosted().assertIsNotCalled(
-                "No ticket form should be created for eyes reaction on thread reply"
-            );
+            threadReplyCheck.assertIsCalled();
+
+            buggyCreationStubs.reactionAdded().assertIsNotCalled();
+            buggyCreationStubs.ticketMessagePosted().assertIsNotCalled();
         });
+        // Clean up stubs that were intentionally not called
+        buggyCreationStubs.reactionAdded().clean();
+        buggyCreationStubs.ticketMessagePosted().clean();
     }
 
     @Test
@@ -215,7 +216,7 @@ public class TicketManagementTests {
             .tags(ImmutableList.of("ingresses", "networking"))
             .impact("productionBlocking")
             .build();
-        ticket.openSummaryAndSubmit(asSupport.slack(), openFullSummaryTriggerId, values);
+        ticket.openSummaryAndSubmit(asSupport.slack(), "full summary form", openFullSummaryTriggerId, values);
 
         // then
         ticket.applyChangesLocally().applyFormValues(values);
@@ -240,10 +241,10 @@ public class TicketManagementTests {
             .tags(ImmutableList.of("jenkins-pipelines", "networking"))
             .impact("bauBlocking")
             .build();
-        var closeStubs = ticket.openSummaryAndSubmit(asSupport.slack(), "summary_open", values, ticket::stubCloseFlow);
+        var closeStubs = ticket.openSummaryAndSubmit(asSupport.slack(), "summary_open", "summary_open", values, () -> ticket.stubCloseFlow("ticket close"));
 
         // then
-        closeStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket close");
+        closeStubs.awaitAllCalled(Duration.ofSeconds(5));
 
         ticket.applyChangesLocally()
             .applyFormValues(values)
@@ -266,10 +267,10 @@ public class TicketManagementTests {
 
         Config.EscalationTeam escalationTeam = config.escalationTeams().getFirst();
         String openEscalationTriggerId = "escalate_open";
-        var escalateStubs = ticket.stubEscalateFlow(escalationTeam.slackGroupId(), MessageTs.now());
+        var escalateStubs = ticket.stubEscalateFlow("ticket escalate", escalationTeam.slackGroupId(), MessageTs.now());
 
         // when
-        ticket.openEscalationAndSubmit(asSupport.slack(), openEscalationTriggerId, EscalationFormSubmission.Values.builder()
+        ticket.openEscalationAndSubmit(asSupport.slack(), "escalation form", openEscalationTriggerId, EscalationFormSubmission.Values.builder()
             .team(escalationTeam.code())
             .tags(ImmutableList.of("jenkins-pipelines", "networking"))
             .build());
@@ -283,7 +284,7 @@ public class TicketManagementTests {
             .applyEscalationFromValues(values);
 
         // then
-        escalateStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket escalate");
+        escalateStubs.awaitAllCalled(Duration.ofSeconds(5));
         var ticketResponse = supportBotClient.assertTicketExists(TicketByIdQuery.fromTicket(ticket));
         ticket.assertMatches(ticketResponse);
         escalateStubs.escalationMessage().result().assertMatches(ticketResponse);
@@ -304,7 +305,7 @@ public class TicketManagementTests {
         ticket.escalateViaTestApi(MessageTs.now(), config.escalationTeams().getFirst().code(), escalationTags);
 
         // Stub Slack updates for closing (composite)
-        var closeStubs_whenEscalatedClosed = ticket.stubCloseFlow();
+        var closeStubs_whenEscalatedClosed = ticket.stubCloseFlow("ticket close");
 
         // Open summary view and submit, expect a close confirmation
         String openFullSummaryTriggerId = "summary_open";
@@ -329,7 +330,7 @@ public class TicketManagementTests {
             .resolveEscalations();
 
         // then
-        closeStubs_whenEscalatedClosed.awaitAllCalled(Duration.ofSeconds(5), "ticket close");
+        closeStubs_whenEscalatedClosed.awaitAllCalled(Duration.ofSeconds(5));
 
         var ticketResponse = supportBotClient.assertTicketExists(TicketByIdQuery.fromTicket(ticket));
         ticket.assertMatches(ticketResponse);
@@ -354,13 +355,13 @@ public class TicketManagementTests {
             .tags(ImmutableList.of("jenkins-pipelines", "networking"))
             .impact("bauBlocking")
             .build();
-        var closeStubs = ticket.openSummaryAndSubmit(asSupport.slack(), triggerClose, closeValues, ticket::stubCloseFlow);
+        var closeStubs = ticket.openSummaryAndSubmit(asSupport.slack(), "ticket close", triggerClose, closeValues, () -> ticket.stubCloseFlow("ticket close"));
 
         ticket.applyChangesLocally()
             .applyFormValues(closeValues)
             .addLog("closed");
 
-        closeStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket close");
+        closeStubs.awaitAllCalled(Duration.ofSeconds(5));
 
         // when: reopen via full summary
         String triggerReopen = "summary_open_reopen";
@@ -370,14 +371,14 @@ public class TicketManagementTests {
             .tags(ImmutableList.of("jenkins-pipelines", "networking"))
             .impact("productionBlocking")
             .build();
-        var reopenStubs = ticket.openSummaryAndSubmit(asSupport.slack(), triggerReopen, reopenValues, ticket::stubReopenFlow);
+        var reopenStubs = ticket.openSummaryAndSubmit(asSupport.slack(), "ticket reopen", triggerReopen, reopenValues, () -> ticket.stubReopenFlow("ticket reopen"));
 
         ticket.applyChangesLocally()
             .applyFormValues(reopenValues)
             .addLog("opened");
 
         // then
-        reopenStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket reopen");
+        reopenStubs.awaitAllCalled(Duration.ofSeconds(5));
 
         var ticketResponse = supportBotClient.assertTicketExists(TicketByIdQuery.fromTicket(ticket));
         ticket.assertMatches(ticketResponse);
@@ -398,9 +399,9 @@ public class TicketManagementTests {
 
         // when: Open the full summary form
         String triggerId = "summary_open_bot";
-        Ticket.FullSummaryFormOpenStubs summaryFormOpened = ticket.expectFullSummaryFormOpened(triggerId);
+        Ticket.FullSummaryFormOpenStubs summaryFormOpened = ticket.expectFullSummaryFormOpened("full summary opened", triggerId);
         asSupportSlack.clickMessageButton(ticket.fullSummaryButtonClick(triggerId));
-        summaryFormOpened.awaitAllCalled(Duration.ofSeconds(5), "full summary opened");
+        summaryFormOpened.awaitAllCalled(Duration.ofSeconds(5));
 
         // when: Request team suggestions
         var response = asSupportSlack.requestBlockSuggestion(ticket.teamSuggestionRequest());

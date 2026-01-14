@@ -20,29 +20,31 @@ public class Stub {
     private final StubMapping mapping;
     @NonNull
     private final WireMockServer wireMockServer;
+    @NonNull
+    private final String description;
 
     private boolean asserted;
 
-    public void assertIsCalled(String message) {
+    public void assertIsCalled() {
         if (asserted) {
             return;
         }
         GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
         assertThat(serveEvents.getServeEvents())
-            .as("%s: stub was called exactly once", message)
+            .as("%s: stub was called exactly once", description)
             .hasSize(1);
         asserted = true;
 
         clean(serveEvents);
     }
 
-    public void assertIsNotCalled(String message) {
-        if (!asserted) {
+    public void assertIsNotCalled() {
+        if (asserted) {
             return;
         }
         GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
         assertThat(serveEvents.getServeEvents())
-            .as("%s: stub should not have been called", message)
+            .as("%s: stub should not have been called", description)
             .isEmpty();
         asserted = true;
 

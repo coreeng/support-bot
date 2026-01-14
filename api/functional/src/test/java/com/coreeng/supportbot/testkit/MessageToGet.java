@@ -9,6 +9,8 @@ import org.jspecify.annotations.Nullable;
 @Getter
 public class MessageToGet {
     @NonNull
+    private final String description;
+    @NonNull
     private final String channelId;
     @NonNull
     private final MessageTs ts;
