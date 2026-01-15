@@ -1,6 +1,11 @@
 package com.coreeng.supportbot.testkit;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.apache.commons.text.StringSubstitutor;
 import org.slf4j.Logger;
@@ -16,6 +21,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.stubbing.StubMapping;
@@ -29,6 +35,7 @@ public class SlackWiremock extends WireMockServer {
     private static final Logger logger = LoggerFactory.getLogger(SlackWiremock.class);
 
     private final Config.SlackMock config;
+    private final Set<UUID> permanentStubIds = new HashSet<>();
 
     public SlackWiremock(Config.SlackMock config) {
         super(WireMockConfiguration.options()
@@ -40,6 +47,7 @@ public class SlackWiremock extends WireMockServer {
     public void start() {
         super.start();
         setupAppInitMocks();
+        capturePermanentStubs();
         logger.info("Started Slack Wiremock server on port {}", this.port());
     }
 
@@ -51,11 +59,79 @@ public class SlackWiremock extends WireMockServer {
 
     private void setupAppInitMocks() {
         logger.info("Setting up initial Slack API stubs");
-        stubAuthTest();
+        stubAuthTest("initial mock");
     }
 
-    public void stubAuthTest() {
+    private void capturePermanentStubs() {
+        getStubMappings().forEach(stub -> permanentStubIds.add(stub.getId()));
+        logger.info("Captured {} permanent stubs", permanentStubIds.size());
+    }
+
+    /**
+     * Asserts that no test stubs remain after a test.
+     * Permanent stubs (set up at server start) are excluded from this check.
+     *
+     * @throws AssertionError if any test stubs remain
+     */
+    public void assertNoTestStubsRemaining() {
+        List<StubMapping> remainingTestStubs = getStubMappings().stream()
+            .filter(stub -> !permanentStubIds.contains(stub.getId()))
+            .toList();
+
+        if (!remainingTestStubs.isEmpty()) {
+            String details = remainingTestStubs.stream()
+                .map(s -> "  - " + s.getName() + " (" + s.getRequest().getUrl() + ")")
+                .collect(Collectors.joining("\n"));
+            fail("Test left %d stubs uncleaned:\n%s".formatted(remainingTestStubs.size(), details));
+        }
+    }
+
+    /**
+     * Removes all test stubs, leaving only permanent stubs.
+     * This ensures a clean slate for the next test.
+     */
+    public void cleanupTestStubs() {
+        List<StubMapping> testStubs = getStubMappings().stream()
+            .filter(stub -> !permanentStubIds.contains(stub.getId()))
+            .toList();
+
+        for (StubMapping stub : testStubs) {
+            removeStubMapping(stub);
+        }
+
+        if (!testStubs.isEmpty()) {
+            logger.debug("Cleaned up {} test stubs", testStubs.size());
+        }
+    }
+
+    /**
+     * Asserts that no unhandled requests were made during the test.
+     * All requests should be matched by a stub.
+     *
+     * @throws AssertionError if any requests were not matched
+     */
+    public void assertNoUnhandledRequests() {
+        var unmatchedRequests = findAllUnmatchedRequests();
+
+        if (!unmatchedRequests.isEmpty()) {
+            String details = unmatchedRequests.stream()
+                .map(req -> "  - " + req.getMethod().getName() + " " + req.getUrl())
+                .collect(Collectors.joining("\n"));
+            fail("Test had %d unhandled requests:\n%s".formatted(unmatchedRequests.size(), details));
+        }
+    }
+
+    /**
+     * Clears the request journal to prevent interference between tests.
+     */
+    public void clearRequestJournal() {
+        resetRequests();
+        logger.debug("Cleared request journal");
+    }
+
+    public void stubAuthTest(String description) {
         givenThat(post("/api/auth.test")
+            .withName(description)
             .willReturn(okJson(new StringSubstitutor(Map.of(
                 "url", config.serverUrl(),
                 "team", config.team(),
@@ -76,6 +152,7 @@ public class SlackWiremock extends WireMockServer {
 
     public Stub stubReactionAdd(ReactionAddedExpectation expectation) {
         StubMapping stubMapping = givenThat(post("/api/reactions.add")
+            .withName(expectation.description())
             .withFormParam("name", equalTo(expectation.reaction()))
             .withFormParam("channel", equalTo(expectation.channelId()))
             .withFormParam("timestamp", equalTo(expectation.ts().toString()))
@@ -86,11 +163,13 @@ public class SlackWiremock extends WireMockServer {
         return Stub.builder()
             .mapping(stubMapping)
             .wireMockServer(this)
+            .description(expectation.description())
             .build();
     }
 
     public Stub stubReactionRemove(ReactionAddedExpectation expectation) {
         StubMapping stubMapping = givenThat(post("/api/reactions.remove")
+            .withName(expectation.description())
             .withFormParam("name", equalTo(expectation.reaction()))
             .withFormParam("channel", equalTo(expectation.channelId()))
             .withFormParam("timestamp", equalTo(expectation.ts().toString()))
@@ -101,11 +180,13 @@ public class SlackWiremock extends WireMockServer {
         return Stub.builder()
             .mapping(stubMapping)
             .wireMockServer(this)
+            .description(expectation.description())
             .build();
     }
 
     public <T> StubWithResult<T> stubMessagePosted(ThreadMessagePostedExpectation<T> expectation) {
         StubMapping mapping = givenThat(expectation.receiver().configureStub(post("/api/chat.postMessage"))
+            .withName(expectation.description())
             .withFormParam("channel", equalTo(expectation.channelId()))
             .withFormParam("thread_ts", equalTo(expectation.threadTs().toString()))
             .willReturn(aResponse()
@@ -139,11 +220,13 @@ public class SlackWiremock extends WireMockServer {
             .mapping(mapping)
             .wireMockServer(this)
             .receiver(expectation.receiver())
+            .description(expectation.description())
             .build();
     }
 
     public <T> StubWithResult<T> stubMessageUpdated(MessageUpdatedExpectation<T> expectation) {
         StubMapping stubMapping = givenThat(expectation.receiver().configureStub(post("/api/chat.update"))
+            .withName(expectation.description())
             .withFormParam("channel", equalTo(expectation.channelId()))
             .withFormParam("ts", equalTo(expectation.ts().toString()))
             .willReturn(aResponse()
@@ -179,11 +262,13 @@ public class SlackWiremock extends WireMockServer {
             .mapping(stubMapping)
             .wireMockServer(this)
             .receiver(expectation.receiver())
+            .description(expectation.description())
             .build();
     }
 
-    public Stub stubGetPermalink(String channelId, MessageTs ts, String permalink) {
+    public Stub stubGetPermalink(String description, String channelId, MessageTs ts, String permalink) {
         StubMapping stubMapping = givenThat(post("/api/chat.getPermalink")
+            .withName(description)
             .withFormParam("channel", equalTo(channelId))
             .withFormParam("message_ts", equalTo(ts.toString()))
             .willReturn(okJson(StringSubstitutor.replace("""
@@ -200,11 +285,12 @@ public class SlackWiremock extends WireMockServer {
         return Stub.builder()
             .mapping(stubMapping)
             .wireMockServer(this)
+            .description(description)
             .build();
     }
 
-    public Stub stubGetPermalink(String channelId, MessageTs ts) {
-        return stubGetPermalink(channelId, ts, "https://slack.com/messages/" + channelId + "/" + ts);
+    public Stub stubGetPermalink(String description, String channelId, MessageTs ts) {
+        return stubGetPermalink(description, channelId, ts, "https://slack.com/messages/" + channelId + "/" + ts);
     }
 
     public Stub stubGetMessage(MessageToGet message) {
@@ -233,12 +319,13 @@ public class SlackWiremock extends WireMockServer {
                 ? "\"" + message.botId() + "\""
                 : "null",
             "text", message.text().replace("\"", "\\\""),
-            "team", message.team(),
+            "team", config.team(),
             "blocks", message.blocksJson(),
             "ts", message.ts(),
             "threadTs", message.threadTs()
         ));
         StubMapping stubMapping = givenThat(post("/api/conversations.history")
+            .withName(message.description())
             .withFormParam("channel", equalTo(message.channelId()))
             .withFormParam("limit", equalTo("1"))
             .withFormParam("oldest", equalTo(message.ts().toString()))
@@ -249,6 +336,7 @@ public class SlackWiremock extends WireMockServer {
         return Stub.builder()
             .mapping(stubMapping)
             .wireMockServer(this)
+            .description(message.description())
             .build();
     }
 
@@ -294,6 +382,7 @@ public class SlackWiremock extends WireMockServer {
             ));
         }
         StubMapping stubMapping = givenThat(post("/api/conversations.replies")
+            .withName(conversationReplies.description())
             .withFormParam("channel", equalTo(conversationReplies.channelId()))
             .withFormParam("ts", equalTo(conversationReplies.ts().toString()))
             .withFormParam("limit", equalTo("1"))
@@ -309,11 +398,13 @@ public class SlackWiremock extends WireMockServer {
         return Stub.builder()
             .mapping(stubMapping)
             .wireMockServer(this)
+            .description(conversationReplies.description())
             .build();
     }
 
     public Stub stubGetUserProfileById(UserProfileToGet userProfile) {
         StubMapping stubMapping = givenThat(post("/api/users.info")
+            .withName(userProfile.description())
             .withFormParam("user", equalTo(userProfile.userId()))
             .willReturn(okJson(StringSubstitutor.replace("""
                 {
@@ -334,11 +425,31 @@ public class SlackWiremock extends WireMockServer {
         return Stub.builder()
             .mapping(stubMapping)
             .wireMockServer(this)
+            .description(userProfile.description())
+            .build();
+    }
+
+    public <T> StubWithResult<T> stubEphemeralMessagePosted(EphemeralMessageExpectation<T> expectation) {
+        StubMapping stubMapping = givenThat(expectation.receiver().configureStub(post("/api/chat.postEphemeral"))
+            .withName(expectation.description())
+            .withFormParam("channel", equalTo(expectation.channelId()))
+            .withFormParam("thread_ts", equalTo(expectation.threadTs().toString()))
+            .withFormParam("user", equalTo(expectation.userId()))
+            .willReturn(okJson("""
+                {"ok": true, "message_ts": "1234567890.123456"}
+                """))
+        );
+        return StubWithResult.<T>builder()
+            .mapping(stubMapping)
+            .wireMockServer(this)
+            .receiver(expectation.receiver())
+            .description(expectation.description())
             .build();
     }
 
     public <T> StubWithResult<T> stubViewsOpen(ViewsOpenExpectation<T> expectation) {
         StubMapping mapping = givenThat(expectation.receiver().configureStub(post("/api/views.open"))
+            .withName(expectation.description())
             .withFormParam("trigger_id", equalTo(expectation.triggerId()))
             .withFormParam("view", new UrlDecodedPattern(and(
                 matchingJsonPath("$.type", equalTo(expectation.viewType())),
@@ -377,6 +488,7 @@ public class SlackWiremock extends WireMockServer {
             .mapping(mapping)
             .wireMockServer(this)
             .receiver(expectation.receiver())
+            .description(expectation.description())
             .build();
     }
 }

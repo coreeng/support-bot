@@ -1,5 +1,7 @@
 package com.coreeng.supportbot;
 
+import com.coreeng.supportbot.testkit.SlackWiremock;
+import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolver;
@@ -12,8 +14,9 @@ import java.lang.reflect.Field;
 /**
  * JUnit extension that injects wiremock instances into test classes based on field types.
  * Supports injection of WiremockManager and individual wiremock instances.
+ * Also verifies that all test stubs are cleaned up after each test.
  */
-public class TestKitExtension implements TestInstancePostProcessor, ParameterResolver {
+public class TestKitExtension implements TestInstancePostProcessor, ParameterResolver, AfterEachCallback {
     static final ExtensionContext.Namespace namespace = ExtensionContext.Namespace.create(TestKitExtension.class);
     private static final Logger logger = LoggerFactory.getLogger(TestKitExtension.class);
 
@@ -47,6 +50,24 @@ public class TestKitExtension implements TestInstancePostProcessor, ParameterRes
                 parameterType.getSimpleName(), parameterContext.getDeclaringExecutable().getName());
         }
         return value;
+    }
+
+    @Override
+    public void afterEach(ExtensionContext context) {
+        SlackWiremock slackWiremock = (SlackWiremock) getValueForField(SlackWiremock.class, context);
+        if (slackWiremock != null) {
+            try {
+                // First, assert that no test stubs remain (this will fail the test if stubs are left)
+                slackWiremock.assertNoTestStubsRemaining();
+                // Then, assert that no unhandled requests were made
+                slackWiremock.assertNoUnhandledRequests();
+            } finally {
+                // Always clean up remaining test stubs to prevent test interference
+                slackWiremock.cleanupTestStubs();
+                // Clear request journal to prevent interference between tests
+                slackWiremock.clearRequestJournal();
+            }
+        }
     }
 
     private Object getValueForField(Class<?> fieldType, ExtensionContext extensionContext) {

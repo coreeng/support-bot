@@ -26,7 +26,7 @@ import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 
 @Builder
 @Getter
-public class TicketMessage implements SearchableForTicket {
+public class TicketMessage {
     public static final String fullSummaryButtonActionId = "ticket-summary-view";
     public static final String escalateButtonActionId = "ticket-escalate";
 
