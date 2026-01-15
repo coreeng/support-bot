@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.coreeng.supportbot.slack.RenderingUtils.toOptionObject;
+import static com.slack.api.model.block.composition.BlockCompositions.option;
 import static com.coreeng.supportbot.slack.RenderingUtils.toOptionObjectOrNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
@@ -36,6 +37,9 @@ import static com.slack.api.model.view.Views.*;
 @Component
 @RequiredArgsConstructor
 public class HomepageFilterMapper {
+    public static final String noTagsValue = "__no_tags__";
+    public static final String noTagsLabel = "-- No Tags --";
+
     private final TagsRegistry tagsRegistry;
     private final ImpactsRegistry impactsRegistry;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
@@ -104,18 +108,8 @@ public class HomepageFilterMapper {
                     .optional(true)
                     .element(multiStaticSelect(s -> s
                         .actionId(FilterField.tags.actionId())
-                        .initialOptions(
-                            isEmpty(filter.tags())
-                                ? null
-                                : tagsRegistry.listTagsByCodes(filter.tags()).stream()
-                                .map(RenderingUtils::toOptionObject)
-                                .toList()
-                        )
-                        .options(
-                            tagsRegistry.listAllTags().stream()
-                                .map(RenderingUtils::toOptionObject)
-                                .toList()
-                        )
+                        .initialOptions(buildInitialTagOptions(filter))
+                        .options(buildTagOptions())
                     ))
                 ),
                 input(i -> i
@@ -136,7 +130,7 @@ public class HomepageFilterMapper {
                     ))
                 )
         ));
-        
+
         if (assignmentProps.enabled()) {
             ImmutableList<OptionObject> assigneeOptions = supportTeamService.members().stream()
                 .map(member -> OptionObject.builder()
@@ -144,7 +138,7 @@ public class HomepageFilterMapper {
                     .value(member.slackId().id())
                     .build())
                 .collect(toImmutableList());
-            
+
             filterBlocks.add(
                 input(i -> i
                     .label(plainText("Assigned To"))
@@ -164,7 +158,7 @@ public class HomepageFilterMapper {
                 )
             );
         }
-        
+
         return view
             .title(viewTitle(t -> t
                 .type("plain_text")
@@ -179,6 +173,29 @@ public class HomepageFilterMapper {
                 .text("Cancel")
             ))
             .blocks(filterBlocks);
+    }
+
+    private List<OptionObject> buildTagOptions() {
+        List<OptionObject> options = new ArrayList<>();
+        options.add(option(plainText(noTagsLabel), noTagsValue));
+        tagsRegistry.listAllTags().stream()
+            .map(RenderingUtils::toOptionObject)
+            .forEach(options::add);
+        return options;
+    }
+
+    private List<OptionObject> buildInitialTagOptions(HomepageFilter filter) {
+        if (!filter.includeNoTags() && isEmpty(filter.tags())) {
+            return null;
+        }
+        List<OptionObject> initialOptions = new ArrayList<>();
+        if (filter.includeNoTags()) {
+            initialOptions.add(option(plainText(noTagsLabel), noTagsValue));
+        }
+        tagsRegistry.listTagsByCodes(filter.tags()).stream()
+            .map(RenderingUtils::toOptionObject)
+            .forEach(initialOptions::add);
+        return initialOptions;
     }
 
     public HomepageFilter extractSubmittedValues(View view) {
@@ -213,8 +230,12 @@ public class HomepageFilterMapper {
 
         ViewState.Value tagsValue = values.get(FilterField.tags.actionId());
         if (tagsValue != null && tagsValue.getSelectedOptions() != null) {
-            builder.tags(tagsValue.getSelectedOptions().stream()
+            List<String> selectedValues = tagsValue.getSelectedOptions().stream()
                 .map(ViewState.SelectedOption::getValue)
+                .toList();
+            builder.includeNoTags(selectedValues.contains(noTagsValue));
+            builder.tags(selectedValues.stream()
+                .filter(value -> !noTagsValue.equals(value))
                 .collect(toImmutableList()));
         }
 

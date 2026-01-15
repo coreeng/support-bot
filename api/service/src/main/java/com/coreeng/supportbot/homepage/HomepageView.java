@@ -63,6 +63,7 @@ public class HomepageView {
                 .pageSize(8) // Slack block limit in the Home tab is 100. Passing in 8 here instead of the default 10 to ensure we don't hit a problem
                 .dateTo(dateTo)
                 .tags(filter.tags())
+                .includeNoTags(filter.includeNoTags())
                 .escalationTeam(filter.escalationTeam())
                 .impacts(
                     filter.impact() != null

@@ -33,6 +33,7 @@ class HomepageViewTest {
                         .impact("production blocking")
                         .status(TicketStatus.opened)
                         .tags(ImmutableList.of("tag-a", "tag-b"))
+                        .includeNoTags(true)
                         .build())
                 .build();
 
@@ -45,6 +46,7 @@ class HomepageViewTest {
         assertThat(ticketsQuery.tags().get(0)).isEqualTo("tag-a");
         assertThat(ticketsQuery.tags().get(1)).isEqualTo("tag-b");
         assertThat(ticketsQuery.status()).isEqualTo(TicketStatus.opened);
+        assertThat(ticketsQuery.includeNoTags()).isTrue();
     }
 
     @Test

@@ -24,6 +24,8 @@ public class HomepageFilter {
     private Timeframe timeframe;
     @Builder.Default
     private ImmutableList<String> tags = ImmutableList.of();
+    @Builder.Default
+    private boolean includeNoTags = false;
     @Nullable
     private String impact;
     @Nullable
