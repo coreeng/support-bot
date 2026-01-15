@@ -22,6 +22,7 @@ public class TicketsQuery {
     private ImmutableList<TicketId> ids = ImmutableList.of();
     @Nullable
     private TicketStatus status;
+    private boolean excludeClosed;
     // by date
     @Builder.Default
     @Nullable
