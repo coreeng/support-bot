@@ -2,8 +2,9 @@ package com.coreeng.supportbot.testkit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.admin.model.GetServeEventsResult;
@@ -13,9 +14,10 @@ import com.github.tomakehurst.wiremock.stubbing.StubMapping;
 import lombok.Builder;
 import lombok.Getter;
 
-@Builder
 @Getter
 public class Stub {
+    private static final Logger logger = LoggerFactory.getLogger(Stub.class);
+
     @NonNull
     private final StubMapping mapping;
     @NonNull
@@ -25,8 +27,16 @@ public class Stub {
 
     private boolean asserted;
 
+    @Builder
+    public Stub(@NonNull StubMapping mapping, @NonNull WireMockServer wireMockServer, @NonNull String description) {
+        this.mapping = mapping;
+        this.wireMockServer = wireMockServer;
+        this.description = description;
+    }
+
     public void assertIsCalled() {
         if (asserted) {
+            logger.debug("Stub '{}' already asserted, skipping", description);
             return;
         }
         GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
@@ -35,31 +45,21 @@ public class Stub {
             .hasSize(1);
         asserted = true;
 
-        clean(serveEvents);
+        cleanUp();
     }
 
     public void assertIsNotCalled() {
         if (asserted) {
+            logger.debug("Stub '{}' already asserted, skipping", description);
             return;
         }
         GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
         assertThat(serveEvents.getServeEvents())
             .as("%s: stub should not have been called", description)
             .isEmpty();
-        asserted = true;
-
-        clean(serveEvents);
     }
 
-    public void clean() {
-        GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
-        clean(serveEvents);
-    }
-
-    private void clean(GetServeEventsResult serveEvents) {
+    public void cleanUp() {
         wireMockServer.removeStubMapping(mapping);
-        for (ServeEvent serveEvent : serveEvents.getServeEvents()) {
-            wireMockServer.removeStubMapping(serveEvent.getStubMapping());
-        }
     }
 }

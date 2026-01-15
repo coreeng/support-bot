@@ -94,5 +94,17 @@ public class SlackMessage {
                 ticketMessagePosted.assertIsCalled();
             });
         }
+
+        public void assertNotCalled() {
+            conversationsReplies.assertIsNotCalled();
+            reactionAdded.assertIsNotCalled();
+            ticketMessagePosted.assertIsNotCalled();
+        }
+
+        public void cleanUp() {
+            conversationsReplies.cleanUp();
+            reactionAdded.cleanUp();
+            ticketMessagePosted.cleanUp();
+        }
     }
 }
