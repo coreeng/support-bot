@@ -410,7 +410,7 @@ public class Ticket {
     ) {
         public void awaitAllCalled(Duration timeout) {
             await().atMost(timeout).untilAsserted(() -> {
-                queryPermalink.clean();
+                queryPermalink.cleanUp(); // permalink call is cached, so it's not necessary called
                 getQueryMessage.assertIsCalled();
                 formOpened.assertIsCalled();
             });

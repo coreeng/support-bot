@@ -37,7 +37,7 @@ public class SupportBotClient {
         .registerModule(new GuavaModule());
     private final static RestAssuredConfig restAssuredConfig = RestAssuredConfig.config()
         .objectMapperConfig(ObjectMapperConfig.objectMapperConfig()
-        .jackson2ObjectMapperFactory((type, charset) -> objectMapper));
+            .jackson2ObjectMapperFactory((type, charset) -> objectMapper));
 
 
     private final String baseUrl;
@@ -89,7 +89,7 @@ public class SupportBotClient {
                 .statusCode(200)
                 .extract().as(TicketResponse.class);
         } finally {
-            getPermalinkStub.clean(); // it's cached so might be not called
+            getPermalinkStub.cleanUp(); // it's cached so might be not called
             getMessageStub.assertIsCalled();
         }
     }

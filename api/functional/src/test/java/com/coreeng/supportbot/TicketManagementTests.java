@@ -191,12 +191,9 @@ public class TicketManagementTests {
         await().pollDelay(Duration.ofSeconds(1)).untilAsserted(() -> {
             threadReplyCheck.assertIsCalled();
 
-            buggyCreationStubs.reactionAdded().assertIsNotCalled();
-            buggyCreationStubs.ticketMessagePosted().assertIsNotCalled();
+            buggyCreationStubs.assertNotCalled();
         });
-        // Clean up stubs that were intentionally not called
-        buggyCreationStubs.reactionAdded().clean();
-        buggyCreationStubs.ticketMessagePosted().clean();
+        buggyCreationStubs.cleanUp();
     }
 
     @Test

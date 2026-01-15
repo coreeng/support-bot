@@ -9,13 +9,16 @@ import com.github.tomakehurst.wiremock.stubbing.StubMapping;
 import lombok.Builder;
 import lombok.Getter;
 import org.jspecify.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 
-@Builder
 @Getter
 public class StubWithResult<T> {
+    private static final Logger logger = LoggerFactory.getLogger(StubWithResult.class);
+
     @NonNull
     private final StubMapping mapping;
     @NonNull
@@ -29,8 +32,22 @@ public class StubWithResult<T> {
     private boolean resultCalculated;
     private boolean asserted;
 
+    @Builder
+    public StubWithResult(
+        @NonNull StubMapping mapping,
+        @NonNull WireMockServer wireMockServer,
+        @NonNull Receiver<T> receiver,
+        @NonNull String description
+    ) {
+        this.mapping = mapping;
+        this.wireMockServer = wireMockServer;
+        this.receiver = receiver;
+        this.description = description;
+    }
+
     public void assertIsCalled() {
         if (asserted) {
+            logger.debug("Stub '{}' already asserted, skipping", description);
             return;
         }
         GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
@@ -47,19 +64,18 @@ public class StubWithResult<T> {
             .isNotNull();
         resultCalculated = true;
         asserted = true;
-        clean(serveEvents);
+        cleanUp();
     }
 
     public void assertIsNotCalled() {
         if (asserted) {
+            logger.debug("Stub '{}' already asserted, skipping", description);
             return;
         }
         GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
         assertThat(serveEvents.getServeEvents())
             .as("%s: stub should not have been called", description)
             .isEmpty();
-        asserted = true;
-        clean(serveEvents);
     }
 
     public T result() {
@@ -67,16 +83,8 @@ public class StubWithResult<T> {
         return result;
     }
 
-    public void clean() {
-        GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
-        clean(serveEvents);
-    }
-
-    private void clean(GetServeEventsResult serveEvents) {
+    public void cleanUp() {
         wireMockServer.removeStubMapping(mapping);
-        for (ServeEvent serveEvent : serveEvents.getServeEvents()) {
-            wireMockServer.removeStubMapping(serveEvent.getStubMapping());
-        }
     }
 
     public interface Receiver<T> {

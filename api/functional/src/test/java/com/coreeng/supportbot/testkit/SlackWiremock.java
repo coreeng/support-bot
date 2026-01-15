@@ -131,6 +131,7 @@ public class SlackWiremock extends WireMockServer {
 
     public void stubAuthTest(String description) {
         givenThat(post("/api/auth.test")
+            .withName(description)
             .willReturn(okJson(new StringSubstitutor(Map.of(
                 "url", config.serverUrl(),
                 "team", config.team(),
