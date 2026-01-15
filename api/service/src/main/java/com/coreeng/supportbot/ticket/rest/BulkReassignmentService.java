@@ -11,7 +11,6 @@ import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketRepository;
-import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -79,6 +78,7 @@ public class BulkReassignmentService {
     private ImmutableMap<TicketId, Ticket> fetchTicketsAsMap(List<TicketId> ticketIds) {
         TicketsQuery query = TicketsQuery.builder()
                 .ids(ImmutableList.copyOf(ticketIds))
+                .excludeClosed(true)
                 .unlimited(true)
                 .build();
 
@@ -112,17 +112,8 @@ public class BulkReassignmentService {
             ImmutableMap<TicketId, Ticket> ticketMap,
             ImmutableList.Builder<TicketId> skippedIds
     ) {
-        Ticket ticket = ticketMap.get(ticketId);
-
-        if (ticket == null) {
-            log.warn("Ticket {} not found, skipping", ticketId);
-            skippedIds.add(ticketId);
-            return true;
-        }
-
-        if (ticket.status() != TicketStatus.opened) {
-            log.info("Ticket {} has status {}, skipping bulk reassignment (only OPEN tickets can be bulk-reassigned)",
-                    ticketId, ticket.status());
+        if (!ticketMap.containsKey(ticketId)) {
+            log.warn("Ticket {} not found or is CLOSED, skipping", ticketId);
             skippedIds.add(ticketId);
             return true;
         }

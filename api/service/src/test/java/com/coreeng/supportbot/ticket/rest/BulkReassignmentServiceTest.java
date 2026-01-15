@@ -207,7 +207,7 @@ class BulkReassignmentServiceTest {
     }
 
     @Test
-    void shouldSkipClosedAndStaleTickets() {
+    void shouldSkipClosedTicketsButReassignStaleTickets() {
         // given
         TicketId ticket1 = new TicketId(1);
         TicketId ticket2 = new TicketId(2);
@@ -216,13 +216,14 @@ class BulkReassignmentServiceTest {
         String assignedTo = "U12345";
 
         Ticket openTicket = createTicket(ticket1, TicketStatus.opened);
-        Ticket closedTicket = createTicket(ticket2, TicketStatus.closed);
+        // ticket2 is closed, so it's filtered out at the database level
         Ticket staleTicket = createTicket(ticket3, TicketStatus.stale);
         Ticket anotherOpenTicket = createTicket(ticket4, TicketStatus.opened);
 
         when(assignmentProps.enabled()).thenReturn(true);
+        // Database query with excludeClosed=true only returns non-closed tickets
         when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
-            .thenReturn(new Page<>(ImmutableList.of(openTicket, closedTicket, staleTicket, anotherOpenTicket), 0, 1, 4));
+            .thenReturn(new Page<>(ImmutableList.of(openTicket, staleTicket, anotherOpenTicket), 0, 1, 3));
 
         BulkReassignRequest request = new BulkReassignRequest(
             List.of(ticket1, ticket2, ticket3, ticket4),
@@ -233,18 +234,18 @@ class BulkReassignmentServiceTest {
         BulkReassignResultUI result = service.bulkReassign(request);
 
         // then
-        assertThat(result.successCount()).isEqualTo(2);
-        assertThat(result.successfulTicketIds()).containsExactly(ticket1, ticket4);
-        assertThat(result.skippedCount()).isEqualTo(2);
-        assertThat(result.skippedTicketIds()).containsExactly(ticket2, ticket3);
-        assertThat(result.message()).isEqualTo("2 of 4 tickets successfully reassigned, 2 skipped");
+        assertThat(result.successCount()).isEqualTo(3);
+        assertThat(result.successfulTicketIds()).containsExactly(ticket1, ticket3, ticket4);
+        assertThat(result.skippedCount()).isEqualTo(1);
+        assertThat(result.skippedTicketIds()).containsExactly(ticket2);
+        assertThat(result.message()).isEqualTo("3 of 4 tickets successfully reassigned, 1 skipped");
 
         verify(assignmentProps).enabled();
         verify(ticketRepository).listTickets(ArgumentMatchers.any(TicketsQuery.class));
         verify(ticketRepository).assign(ticket1, assignedTo);
+        verify(ticketRepository).assign(ticket3, assignedTo);
         verify(ticketRepository).assign(ticket4, assignedTo);
         verify(ticketRepository, never()).assign(ticket2, assignedTo);
-        verify(ticketRepository, never()).assign(ticket3, assignedTo);
         verifyNoMoreInteractions(assignmentProps, ticketRepository);
     }
 

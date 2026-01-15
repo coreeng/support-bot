@@ -432,6 +432,11 @@ public class JdbcTicketRepository implements TicketRepository {
                 com.coreeng.supportbot.dbschema.enums.TicketStatus.lookupLiteral(query.status().name()))
             );
         }
+        if (query.excludeClosed()) {
+            condition = condition.and(TICKET.STATUS.ne(
+                com.coreeng.supportbot.dbschema.enums.TicketStatus.closed)
+            );
+        }
         if (query.dateFrom() != null) {
             Instant dateFrom = query.dateFrom().atStartOfDay().toInstant(ZoneOffset.UTC);
             condition = condition.and(QUERY.DATE.ge(dateFrom));
