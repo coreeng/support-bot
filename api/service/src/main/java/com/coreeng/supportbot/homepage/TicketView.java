@@ -27,4 +27,6 @@ public class TicketView {
     private Instant closedAt;
     @Nullable
     private String inquiringTeam;
+    @Nullable
+    private String assignedTo;
 }
