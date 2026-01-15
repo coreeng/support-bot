@@ -126,6 +126,7 @@ public class HomepageViewMapper {
         Optional<SectionBlock> inquiringTeam = buildInquiringTeamSection(ticket);
         Optional<SectionBlock> escalationSection = buildEscalationSection(ticket);
         Optional<SectionBlock> statusSection = buildTicketStatusSection(ticket);
+        Optional<SectionBlock> assignedToSection = buildAssignedToSection(ticket);
         List<LayoutBlock> blocks = new ArrayList<>(List.of(
             section(s -> s
                 .text(markdownText(header))
@@ -143,6 +144,7 @@ public class HomepageViewMapper {
             )
         ));
     statusSection.ifPresent(blocks::add);
+    assignedToSection.ifPresent(blocks::add);
     inquiringTeam.ifPresent(blocks::add);
     escalationSection.ifPresent(blocks::add);
     blocks.add(divider());
@@ -176,6 +178,13 @@ public class HomepageViewMapper {
         return Optional.ofNullable(ticket.inquiringTeam())
             .map(inquiringTeam -> section(s -> s.fields(ImmutableList.of(
                     markdownText(format("*Inquiring Team*: %s", inquiringTeam))
+            ))));
+    }
+
+    private Optional<SectionBlock> buildAssignedToSection(TicketView ticket) {
+        return Optional.ofNullable(ticket.assignedTo())
+            .map(assignedTo -> section(s -> s.fields(ImmutableList.of(
+                    markdownText(format("*Assigned To*: %s", assignedTo))
             ))));
     }
 

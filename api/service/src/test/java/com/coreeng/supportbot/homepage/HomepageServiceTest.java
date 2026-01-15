@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.homepage;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
 import com.coreeng.supportbot.enums.TicketImpact;
 import com.coreeng.supportbot.escalation.Escalation;
@@ -8,6 +9,7 @@ import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationStatus;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.ticket.DetailedTicket;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
@@ -30,6 +32,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
+import com.coreeng.supportbot.slack.SlackId;
+import com.coreeng.supportbot.teams.TeamMemberFetcher;
+
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.Mockito.any;
@@ -51,6 +56,10 @@ class HomepageServiceTest {
     SlackClient slackClient;
     @Mock
     ImpactsRegistry impactsRegistry;
+    @Mock
+    SupportTeamService supportTeamService;
+    @Mock
+    TicketAssignmentProps assignmentProps;
 
     @BeforeEach
     void setup() {
@@ -59,7 +68,9 @@ class HomepageServiceTest {
                 executorService,
                 slackClient,
                 new SlackTicketsProps(channelId, "eyes", "ticket", "tick", "rocket"),
-                impactsRegistry
+                impactsRegistry,
+                supportTeamService,
+                assignmentProps
         );
     }
 
@@ -217,6 +228,7 @@ class HomepageServiceTest {
                 .thenReturn(new Page<>(detailedTickets, 1, 1, detailedTickets.size()));
         when(slackClient.getPermalink(any())).thenReturn("perma.link");
         when(impactsRegistry.findImpactByCode(any())).thenReturn(new TicketImpact("Production Blocking", "productionBlocking"));
+        // assignmentProps.enabled() is not called when tickets have no assignee (assignedTo is null)
 
         // when
         HomepageView ticketsView = homepageService.getTicketsView(state);
@@ -227,6 +239,222 @@ class HomepageServiceTest {
 
         assertThat(requireNonNull(ticketsView.tickets().get(0).escalations()).size()).isEqualTo(0);
         assertThat(requireNonNull(ticketsView.tickets().get(1).escalations()).size()).isEqualTo(0);
+    }
+
+    @Test
+    public void shouldReturnAssignedToEmailWhenTicketHasAssignee() {
+        // given
+        HomepageView.State state = HomepageView.State.builder()
+                .filter(HomepageFilter.builder().build()).build();
+
+        String assignedToUserId = "U12345";
+        String assigneeEmail = "assignee@example.com";
+        Ticket ticket = Ticket.builder()
+                .channelId(channelId)
+                .createdMessageTs(MessageTs.of(messageTs.ts() + 1))
+                .tags(tags)
+                .id(new TicketId(1))
+                .impact("Production Blocking")
+                .lastInteractedAt(Instant.now())
+                .status(TicketStatus.opened)
+                .queryTs(messageTs)
+                .team(TicketTeam.fromCode("lions"))
+                .assignedTo(assignedToUserId)
+                .assignedToOrphaned(false)
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+                .build();
+
+        TeamMemberFetcher.TeamMember teamMember = new TeamMemberFetcher.TeamMember(assigneeEmail, SlackId.user(assignedToUserId));
+
+        Page<DetailedTicket> ticketPage = new Page<>(
+                buildDetailedTickets(ImmutableList.of(ticket), ImmutableList.of()),
+                1, 1, 1
+        );
+
+        when(ticketQueryService.findDetailedTicketByQuery(any()))
+                .thenReturn(ticketPage);
+        when(slackClient.getPermalink(any())).thenReturn("perma.link");
+        when(impactsRegistry.findImpactByCode(any())).thenReturn(new TicketImpact("Production Blocking", "productionBlocking"));
+        when(assignmentProps.enabled()).thenReturn(true);
+        when(supportTeamService.members()).thenReturn(ImmutableList.of(teamMember));
+
+        // when
+        HomepageView ticketsView = homepageService.getTicketsView(state);
+
+        // then
+        assertThat(ticketsView).isNotNull();
+        assertThat(ticketsView.tickets().size()).isEqualTo(1);
+        assertThat(ticketsView.tickets().getFirst().assignedTo()).isEqualTo(assigneeEmail);
+    }
+
+    @Test
+    public void shouldReturnNullAssignedToWhenAssignmentIsDisabled() {
+        // given
+        HomepageView.State state = HomepageView.State.builder()
+                .filter(HomepageFilter.builder().build()).build();
+
+        String assignedToUserId = "U12345";
+        Ticket ticket = Ticket.builder()
+                .channelId(channelId)
+                .createdMessageTs(MessageTs.of(messageTs.ts() + 1))
+                .tags(tags)
+                .id(new TicketId(1))
+                .impact("Production Blocking")
+                .lastInteractedAt(Instant.now())
+                .status(TicketStatus.opened)
+                .queryTs(messageTs)
+                .team(TicketTeam.fromCode("lions"))
+                .assignedTo(assignedToUserId)
+                .assignedToOrphaned(false)
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+                .build();
+
+        Page<DetailedTicket> ticketPage = new Page<>(
+                buildDetailedTickets(ImmutableList.of(ticket), ImmutableList.of()),
+                1, 1, 1
+        );
+
+        when(ticketQueryService.findDetailedTicketByQuery(any()))
+                .thenReturn(ticketPage);
+        when(slackClient.getPermalink(any())).thenReturn("perma.link");
+        when(impactsRegistry.findImpactByCode(any())).thenReturn(new TicketImpact("Production Blocking", "productionBlocking"));
+        when(assignmentProps.enabled()).thenReturn(false);
+
+        // when
+        HomepageView ticketsView = homepageService.getTicketsView(state);
+
+        // then
+        assertThat(ticketsView).isNotNull();
+        assertThat(ticketsView.tickets().size()).isEqualTo(1);
+        assertThat(ticketsView.tickets().getFirst().assignedTo()).isNull();
+    }
+
+    @Test
+    public void shouldReturnNullAssignedToWhenAssigneeIsOrphaned() {
+        // given
+        HomepageView.State state = HomepageView.State.builder()
+                .filter(HomepageFilter.builder().build()).build();
+
+        String assignedToUserId = "U12345";
+        Ticket ticket = Ticket.builder()
+                .channelId(channelId)
+                .createdMessageTs(MessageTs.of(messageTs.ts() + 1))
+                .tags(tags)
+                .id(new TicketId(1))
+                .impact("Production Blocking")
+                .lastInteractedAt(Instant.now())
+                .status(TicketStatus.opened)
+                .queryTs(messageTs)
+                .team(TicketTeam.fromCode("lions"))
+                .assignedTo(assignedToUserId)
+                .assignedToOrphaned(true)
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+                .build();
+
+        Page<DetailedTicket> ticketPage = new Page<>(
+                buildDetailedTickets(ImmutableList.of(ticket), ImmutableList.of()),
+                1, 1, 1
+        );
+
+        when(ticketQueryService.findDetailedTicketByQuery(any()))
+                .thenReturn(ticketPage);
+        when(slackClient.getPermalink(any())).thenReturn("perma.link");
+        when(impactsRegistry.findImpactByCode(any())).thenReturn(new TicketImpact("Production Blocking", "productionBlocking"));
+        // assignmentProps.enabled() is not called when orphaned is true (returns early)
+
+        // when
+        HomepageView ticketsView = homepageService.getTicketsView(state);
+
+        // then
+        assertThat(ticketsView).isNotNull();
+        assertThat(ticketsView.tickets().size()).isEqualTo(1);
+        assertThat(ticketsView.tickets().getFirst().assignedTo()).isNull();
+    }
+
+    @Test
+    public void shouldReturnNullAssignedToWhenAssigneeNotFoundInSupportTeam() {
+        // given
+        HomepageView.State state = HomepageView.State.builder()
+                .filter(HomepageFilter.builder().build()).build();
+
+        String assignedToUserId = "U12345";
+        Ticket ticket = Ticket.builder()
+                .channelId(channelId)
+                .createdMessageTs(MessageTs.of(messageTs.ts() + 1))
+                .tags(tags)
+                .id(new TicketId(1))
+                .impact("Production Blocking")
+                .lastInteractedAt(Instant.now())
+                .status(TicketStatus.opened)
+                .queryTs(messageTs)
+                .team(TicketTeam.fromCode("lions"))
+                .assignedTo(assignedToUserId)
+                .assignedToOrphaned(false)
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+                .build();
+
+        TeamMemberFetcher.TeamMember otherMember = new TeamMemberFetcher.TeamMember("other@example.com", SlackId.user("U99999"));
+
+        Page<DetailedTicket> ticketPage = new Page<>(
+                buildDetailedTickets(ImmutableList.of(ticket), ImmutableList.of()),
+                1, 1, 1
+        );
+
+        when(ticketQueryService.findDetailedTicketByQuery(any()))
+                .thenReturn(ticketPage);
+        when(slackClient.getPermalink(any())).thenReturn("perma.link");
+        when(impactsRegistry.findImpactByCode(any())).thenReturn(new TicketImpact("Production Blocking", "productionBlocking"));
+        when(assignmentProps.enabled()).thenReturn(true);
+        when(supportTeamService.members()).thenReturn(ImmutableList.of(otherMember));
+
+        // when
+        HomepageView ticketsView = homepageService.getTicketsView(state);
+
+        // then
+        assertThat(ticketsView).isNotNull();
+        assertThat(ticketsView.tickets().size()).isEqualTo(1);
+        assertThat(ticketsView.tickets().getFirst().assignedTo()).isNull();
+    }
+
+    @Test
+    public void shouldReturnNullAssignedToWhenTicketHasNoAssignee() {
+        // given
+        HomepageView.State state = HomepageView.State.builder()
+                .filter(HomepageFilter.builder().build()).build();
+
+        Ticket ticket = Ticket.builder()
+                .channelId(channelId)
+                .createdMessageTs(MessageTs.of(messageTs.ts() + 1))
+                .tags(tags)
+                .id(new TicketId(1))
+                .impact("Production Blocking")
+                .lastInteractedAt(Instant.now())
+                .status(TicketStatus.opened)
+                .queryTs(messageTs)
+                .team(TicketTeam.fromCode("lions"))
+                .assignedTo(null)
+                .assignedToOrphaned(false)
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+                .build();
+
+        Page<DetailedTicket> ticketPage = new Page<>(
+                buildDetailedTickets(ImmutableList.of(ticket), ImmutableList.of()),
+                1, 1, 1
+        );
+
+        when(ticketQueryService.findDetailedTicketByQuery(any()))
+                .thenReturn(ticketPage);
+        when(slackClient.getPermalink(any())).thenReturn("perma.link");
+        when(impactsRegistry.findImpactByCode(any())).thenReturn(new TicketImpact("Production Blocking", "productionBlocking"));
+        // assignmentProps.enabled() is not called when assignedTo is null (returns early)
+
+        // when
+        HomepageView ticketsView = homepageService.getTicketsView(state);
+
+        // then
+        assertThat(ticketsView).isNotNull();
+        assertThat(ticketsView.tickets().size()).isEqualTo(1);
+        assertThat(ticketsView.tickets().getFirst().assignedTo()).isNull();
     }
 
     private ImmutableList<Ticket> buildTickets(int numberOfTickets) {
