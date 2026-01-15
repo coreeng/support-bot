@@ -39,7 +39,7 @@ class AssignmentControllerTest {
         when(assignmentProps.enabled()).thenReturn(true);
 
         // when
-        ResponseEntity<AssignmentStatusUI> response = controller.isAssignmentEnabled();
+        ResponseEntity<AssignmentStatusUI> response = controller.getAssignmentStatus();
 
         // then
         assertThat(response.getStatusCode().value()).isEqualTo(200);
@@ -56,7 +56,7 @@ class AssignmentControllerTest {
         when(assignmentProps.enabled()).thenReturn(false);
 
         // when
-        ResponseEntity<AssignmentStatusUI> response = controller.isAssignmentEnabled();
+        ResponseEntity<AssignmentStatusUI> response = controller.getAssignmentStatus();
 
         // then
         assertThat(response.getStatusCode().value()).isEqualTo(200);

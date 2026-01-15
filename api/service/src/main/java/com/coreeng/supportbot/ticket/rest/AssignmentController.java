@@ -17,7 +17,7 @@ public class AssignmentController {
     private final BulkReassignmentService bulkReassignmentService;
 
     @GetMapping("/enabled")
-    public ResponseEntity<AssignmentStatusUI> isAssignmentEnabled() {
+    public ResponseEntity<AssignmentStatusUI> getAssignmentStatus() {
         return ResponseEntity.ok(new AssignmentStatusUI(assignmentProps.enabled()));
     }
 

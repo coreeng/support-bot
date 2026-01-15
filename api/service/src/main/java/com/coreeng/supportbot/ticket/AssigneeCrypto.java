@@ -34,10 +34,10 @@ import java.util.Optional;
 @Component
 public class AssigneeCrypto {
 
-    private static final String ENC_PREFIX = "enc_v1:";
-    private static final String AES_GCM = "AES/GCM/NoPadding";
-    private static final int GCM_TAG_LENGTH = 128; // bits
-    private static final int IV_LENGTH = 12; // bytes
+    private static final String encPrefix = "enc_v1:";
+    private static final String aesGcm = "AES/GCM/NoPadding";
+    private static final int gcmTagLength = 128; // bits
+    private static final int ivLength = 12; // bytes
 
     private final TicketAssignmentProps props;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -56,12 +56,12 @@ public class AssigneeCrypto {
             return Optional.empty();
         }
 
-        byte[] iv = new byte[IV_LENGTH];
+        byte[] iv = new byte[ivLength];
         secureRandom.nextBytes(iv);
 
         try {
-            Cipher cipher = Cipher.getInstance(AES_GCM);
-            GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+            Cipher cipher = Cipher.getInstance(aesGcm);
+            GCMParameterSpec spec = new GCMParameterSpec(gcmTagLength, iv);
             cipher.init(Cipher.ENCRYPT_MODE, key, spec);
             byte[] ciphertext = cipher.doFinal(userId.getBytes(StandardCharsets.UTF_8));
 
@@ -69,10 +69,12 @@ public class AssigneeCrypto {
             System.arraycopy(iv, 0, payload, 0, iv.length);
             System.arraycopy(ciphertext, 0, payload, iv.length, ciphertext.length);
 
-            String encoded = ENC_PREFIX + Base64.getEncoder().encodeToString(payload);
+            String encoded = encPrefix + Base64.getEncoder().encodeToString(payload);
             return Optional.of(new EncryptResult(encoded, "enc_v1"));
         } catch (Exception e) {
-            log.warn("Failed to encrypt assignee: {}", e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("Failed to encrypt assignee: {}", e.getMessage());
+            }
             return Optional.empty();
         }
     }
@@ -99,33 +101,37 @@ public class AssigneeCrypto {
             return Optional.empty();
         }
 
-        String payloadStr = stored.startsWith(ENC_PREFIX) ? stored.substring(ENC_PREFIX.length()) : stored;
+        String payloadStr = stored.startsWith(encPrefix) ? stored.substring(encPrefix.length()) : stored;
         byte[] payload;
         try {
             payload = Base64.getDecoder().decode(payloadStr);
         } catch (IllegalArgumentException e) {
-            log.warn("Failed to base64-decode assignee payload: {}", e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("Failed to base64-decode assignee payload: {}", e.getMessage());
+            }
             return Optional.empty();
         }
 
-        if (payload.length <= IV_LENGTH) {
+        if (payload.length <= ivLength) {
             log.warn("Invalid payload length for encrypted assignee");
             return Optional.empty();
         }
 
-        byte[] iv = new byte[IV_LENGTH];
-        byte[] ciphertext = new byte[payload.length - IV_LENGTH];
-        System.arraycopy(payload, 0, iv, 0, IV_LENGTH);
-        System.arraycopy(payload, IV_LENGTH, ciphertext, 0, ciphertext.length);
+        byte[] iv = new byte[ivLength];
+        byte[] ciphertext = new byte[payload.length - ivLength];
+        System.arraycopy(payload, 0, iv, 0, ivLength);
+        System.arraycopy(payload, ivLength, ciphertext, 0, ciphertext.length);
 
         try {
-            Cipher cipher = Cipher.getInstance(AES_GCM);
-            GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+            Cipher cipher = Cipher.getInstance(aesGcm);
+            GCMParameterSpec spec = new GCMParameterSpec(gcmTagLength, iv);
             cipher.init(Cipher.DECRYPT_MODE, key, spec);
             byte[] plaintext = cipher.doFinal(ciphertext);
             return Optional.of(new String(plaintext, StandardCharsets.UTF_8));
         } catch (GeneralSecurityException e) {
-            log.warn("Failed to decrypt assignee: {}", e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("Failed to decrypt assignee: {}", e.getMessage());
+            }
             return Optional.empty();
         }
     }
@@ -146,7 +152,9 @@ public class AssigneeCrypto {
             byte[] keyBytes = digest.digest(keyStr.getBytes(StandardCharsets.UTF_8)); // 32 bytes
             return new SecretKeySpec(keyBytes, "AES");
         } catch (NoSuchAlgorithmException e) {
-            log.warn("Failed to derive assignment encryption key: {}", e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("Failed to derive assignment encryption key: {}", e.getMessage());
+            }
             return null;
         }
     }
@@ -181,7 +189,9 @@ public class AssigneeCrypto {
             }
             return hex.toString();
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            log.warn("Failed to compute assignee hash: {}", e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("Failed to compute assignee hash: {}", e.getMessage());
+            }
             return null;
         }
     }

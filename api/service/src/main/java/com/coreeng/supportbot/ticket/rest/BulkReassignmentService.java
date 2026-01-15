@@ -126,7 +126,9 @@ public class BulkReassignmentService {
             ticketRepository.assign(ticketId, assignedTo);
             return true;
         } catch (DataAccessException e) {
-            log.warn("Failed to assign ticket {} to {} due to database error: {}", ticketId, assignedTo, e.getMessage());
+            if (log.isWarnEnabled()) {
+                log.warn("Failed to assign ticket {} to {} due to database error: {}", ticketId, assignedTo, e.getMessage());
+            }
             return false;
         }
     }
@@ -155,7 +157,7 @@ public class BulkReassignmentService {
         } else if (successCount == 0) {
             return "No tickets were reassigned (all were skipped or failed)";
         } else {
-            return String.format("%d of %d tickets successfully reassigned, %d skipped",
+            return format("%d of %d tickets successfully reassigned, %d skipped",
                     successCount, totalRequested, skippedCount);
         }
     }
@@ -173,7 +175,9 @@ public class BulkReassignmentService {
             // Open DM conversation with the assignee
             var dmResponse = slackClient.openDmConversation(SlackId.user(assignedToUserId));
             if (!dmResponse.isOk() || dmResponse.getChannel() == null) {
-                log.warn("Failed to open DM conversation with user {}: {}", assignedToUserId, dmResponse.getError());
+                if (log.isWarnEnabled()) {
+                    log.warn("Failed to open DM conversation with user {}: {}", assignedToUserId, dmResponse.getError());
+                }
                 return;
             }
 
@@ -183,9 +187,13 @@ public class BulkReassignmentService {
             
             // Send the message to the DM channel
             slackClient.postMessage(new SlackPostMessageRequest(message, dmChannelId, null));
-            log.info("Sent assignment notification to user {} for {} tickets", assignedToUserId, successfulTicketIds.size());
+            if (log.isInfoEnabled()) {
+                log.info("Sent assignment notification to user {} for {} tickets", assignedToUserId, successfulTicketIds.size());
+            }
         } catch (SlackException e) {
-            log.warn("Failed to send assignment notification to user {}: {}", assignedToUserId, e.getMessage(), e);
+            if (log.isWarnEnabled()) {
+                log.warn("Failed to send assignment notification to user {}: {}", assignedToUserId, e.getMessage(), e);
+            }
         }
     }
 
