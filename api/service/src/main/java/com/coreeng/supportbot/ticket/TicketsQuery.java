@@ -22,6 +22,7 @@ public class TicketsQuery {
     private ImmutableList<TicketId> ids = ImmutableList.of();
     @Nullable
     private TicketStatus status;
+    private boolean excludeClosed;
     // by date
     @Builder.Default
     @Nullable
@@ -42,6 +43,8 @@ public class TicketsQuery {
     private ImmutableList<String> impacts = ImmutableList.of();
     @Builder.Default
     private ImmutableList<String> teams = ImmutableList.of();
+    @Nullable
+    private String assignedTo;
 
     @Getter
     public enum Order implements UIOption {

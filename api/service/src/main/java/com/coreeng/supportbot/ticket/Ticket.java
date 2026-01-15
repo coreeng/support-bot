@@ -31,6 +31,12 @@ public class Ticket {
     private Instant lastInteractedAt;
     @Builder.Default
     private boolean ratingSubmitted = false;
+    @Nullable
+    private String assignedTo;
+    @Builder.Default
+    private String assignedToFormat = "plain"; // "plain" or "enc_v1"
+    @Builder.Default
+    private boolean assignedToOrphaned = false;
 
     public static Ticket createNew(MessageTs queryTs, String channelID) {
         return Ticket.builder()

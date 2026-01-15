@@ -10,6 +10,10 @@ slack:
     expected-initial-reaction: eyes
     response-initial-reaction: ticket
 
+ticket:
+  assignment:
+    enabled: false
+
 enums:
   escalation-teams:
     - label: WoW

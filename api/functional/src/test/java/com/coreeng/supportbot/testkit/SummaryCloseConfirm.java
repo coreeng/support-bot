@@ -49,6 +49,9 @@ public class SummaryCloseConfirm {
         assertThatNoException()
             .isThrownBy(() -> {
                 JsonNode pm = objectMapper.readTree(privateMetadataRaw);
+                String assignedToJson = expected.assignedTo() != null 
+                    ? String.format("\"%s\"", expected.assignedTo())
+                    : "null";
                 String expectedPmJson = String.format("""
                     {
                       "ticketId": %d,
@@ -56,6 +59,7 @@ public class SummaryCloseConfirm {
                       "authorsTeam": "%s",
                       "tags": %s,
                       "impact": "%s",
+                      "assignedTo": %s,
                       "confirmed": false
                     }
                     """,
@@ -63,7 +67,8 @@ public class SummaryCloseConfirm {
                     expected.status(),
                     expected.team(),
                     objectMapper.writeValueAsString(expected.tags()),
-                    expected.impact()
+                    expected.impact(),
+                    assignedToJson
                 );
                 assertThatJson(pm).isEqualTo(expectedPmJson);
             });

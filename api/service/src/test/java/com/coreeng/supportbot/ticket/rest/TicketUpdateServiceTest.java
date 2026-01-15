@@ -36,6 +36,9 @@ class TicketUpdateServiceTest {
     @Mock
     private TicketUIMapper mapper;
 
+    @Mock
+    private TicketRepository ticketRepository;
+
     private TicketUpdateService service;
 
     private TicketId ticketId;
@@ -49,7 +52,8 @@ class TicketUpdateServiceTest {
             queryService,
             impactsRegistry,
             mapper,
-            platformTeamsService
+            platformTeamsService,
+            ticketRepository
         );
 
         ticketId = new TicketId(123L);
@@ -64,7 +68,8 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "core-support",
             ImmutableList.of("bug", "urgent"),
-            "production-blocking"
+            "production-blocking",
+            null
         );
 
         DetailedTicket mockDetailedTicket = mock(DetailedTicket.class);
@@ -112,7 +117,8 @@ class TicketUpdateServiceTest {
             null,
             "core-support",
             ImmutableList.of("bug"),
-            "production-blocking"
+            "production-blocking",
+            null
         );
 
         // when/then
@@ -128,7 +134,8 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             null,
             ImmutableList.of("bug"),
-            "production-blocking"
+            "production-blocking",
+            null
         );
 
         // when/then
@@ -144,7 +151,8 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "  ",
             ImmutableList.of("bug"),
-            "production-blocking"
+            "production-blocking",
+            null
         );
 
         // when/then
@@ -160,7 +168,8 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "invalid-team",
             ImmutableList.of("bug"),
-            "production-blocking"
+            "production-blocking",
+            null
         );
 
         when(platformTeamsService.findTeamByName("invalid-team")).thenReturn(null);
@@ -180,7 +189,8 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "core-support",
             null,
-            "production-blocking"
+            "production-blocking",
+            null
         );
 
         when(platformTeamsService.findTeamByName("core-support")).thenReturn(validTeam);
@@ -198,7 +208,8 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "core-support",
             ImmutableList.of(),
-            "production-blocking"
+            "production-blocking",
+            null
         );
 
         when(platformTeamsService.findTeamByName("core-support")).thenReturn(validTeam);
@@ -216,6 +227,7 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "core-support",
             ImmutableList.of("bug"),
+            null,
             null
         );
 
@@ -234,7 +246,8 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "core-support",
             ImmutableList.of("bug"),
-            "  "
+            "  ",
+            null
         );
 
         when(platformTeamsService.findTeamByName("core-support")).thenReturn(validTeam);
@@ -252,7 +265,8 @@ class TicketUpdateServiceTest {
             TicketStatus.closed,
             "core-support",
             ImmutableList.of("bug"),
-            "invalid-impact"
+            "invalid-impact",
+            null
         );
 
         when(platformTeamsService.findTeamByName("core-support")).thenReturn(validTeam);
@@ -273,7 +287,8 @@ class TicketUpdateServiceTest {
             TicketStatus.opened,
             "core-support",
             ImmutableList.of("bug", "urgent", "customer-impacting", "security"),
-            "production-blocking"
+            "production-blocking",
+            null
         );
 
         DetailedTicket mockDetailedTicket = mock(DetailedTicket.class);
@@ -305,7 +320,8 @@ class TicketUpdateServiceTest {
                 status,
                 "core-support",
                 ImmutableList.of("bug"),
-                "production-blocking"
+                "production-blocking",
+                null
             );
 
             DetailedTicket mockDetailedTicket = mock(DetailedTicket.class);

@@ -77,6 +77,11 @@ ticket:
     time-to-stale: 3d
     remind-about-stale-cron: 0 10 9 * * 1-5 # Schedule for reminding about stale tickets in case no action is performed
     stale-reminder-interval: 1d
+  assignment: # Auto-assign (store to the DB) tickets to the first user who reacts with the configured emoji
+    enabled: true
+    encryption: # Encrypt assignee Slack user IDs before storing
+      enabled: true
+      key: ${TICKET_ASSIGNMENT_ENCRYPTION_KEY:} # Encryption key (AES-256-GCM). Required when encryption.enabled=true; assignment skipped if missing.
 
 enums:
   escalation-teams: # Teams available for query escalation
