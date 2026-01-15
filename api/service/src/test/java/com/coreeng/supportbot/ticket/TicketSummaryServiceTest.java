@@ -18,7 +18,6 @@ import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.TeamMemberFetcher;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.Message;
-import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.SectionBlock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

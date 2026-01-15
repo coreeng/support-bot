@@ -21,7 +21,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -42,7 +41,7 @@ class BulkReassignmentServiceTest {
     private TicketRepository ticketRepository;
 
     @Mock
-    private com.coreeng.supportbot.slack.client.SlackClient slackClient;
+    private SlackClient slackClient;
 
     @InjectMocks
     private BulkReassignmentService service;
@@ -138,7 +137,7 @@ class BulkReassignmentServiceTest {
         Ticket openTicket3 = createTicket(ticket3, TicketStatus.opened);
 
         when(assignmentProps.enabled()).thenReturn(true);
-        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+        when(ticketRepository.listTickets(any(TicketsQuery.class)))
             .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2, openTicket3), 0, 1, 3));
 
         BulkReassignRequest request = new BulkReassignRequest(
@@ -157,7 +156,7 @@ class BulkReassignmentServiceTest {
         assertThat(result.message()).isEqualTo("All tickets successfully reassigned");
 
         verify(assignmentProps).enabled();
-        verify(ticketRepository).listTickets(ArgumentMatchers.any(TicketsQuery.class));
+        verify(ticketRepository).listTickets(any(TicketsQuery.class));
         verify(ticketRepository).assign(ticket1, assignedTo);
         verify(ticketRepository).assign(ticket2, assignedTo);
         verify(ticketRepository).assign(ticket3, assignedTo);
@@ -177,7 +176,7 @@ class BulkReassignmentServiceTest {
         Ticket openTicket3 = createTicket(ticket3, TicketStatus.opened);
 
         when(assignmentProps.enabled()).thenReturn(true);
-        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+        when(ticketRepository.listTickets(any(TicketsQuery.class)))
             .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2, openTicket3), 0, 1, 3));
         when(ticketRepository.assign(ticket1, assignedTo)).thenReturn(true);
         when(ticketRepository.assign(ticket2, assignedTo)).thenThrow(new DataAccessException("Database error"));
@@ -199,7 +198,7 @@ class BulkReassignmentServiceTest {
         assertThat(result.message()).isEqualTo("2 of 3 tickets successfully reassigned, 1 skipped");
 
         verify(assignmentProps).enabled();
-        verify(ticketRepository).listTickets(ArgumentMatchers.any(TicketsQuery.class));
+        verify(ticketRepository).listTickets(any(TicketsQuery.class));
         verify(ticketRepository).assign(ticket1, assignedTo);
         verify(ticketRepository).assign(ticket2, assignedTo);
         verify(ticketRepository).assign(ticket3, assignedTo);
@@ -222,7 +221,7 @@ class BulkReassignmentServiceTest {
 
         when(assignmentProps.enabled()).thenReturn(true);
         // Database query with excludeClosed=true only returns non-closed tickets
-        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+        when(ticketRepository.listTickets(any(TicketsQuery.class)))
             .thenReturn(new Page<>(ImmutableList.of(openTicket, staleTicket, anotherOpenTicket), 0, 1, 3));
 
         BulkReassignRequest request = new BulkReassignRequest(
@@ -241,7 +240,7 @@ class BulkReassignmentServiceTest {
         assertThat(result.message()).isEqualTo("3 of 4 tickets successfully reassigned, 1 skipped");
 
         verify(assignmentProps).enabled();
-        verify(ticketRepository).listTickets(ArgumentMatchers.any(TicketsQuery.class));
+        verify(ticketRepository).listTickets(any(TicketsQuery.class));
         verify(ticketRepository).assign(ticket1, assignedTo);
         verify(ticketRepository).assign(ticket3, assignedTo);
         verify(ticketRepository).assign(ticket4, assignedTo);
@@ -260,7 +259,7 @@ class BulkReassignmentServiceTest {
 
         when(assignmentProps.enabled()).thenReturn(true);
         // ticket2 doesn't exist, so only ticket1 is returned
-        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+        when(ticketRepository.listTickets(any(TicketsQuery.class)))
             .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
 
         BulkReassignRequest request = new BulkReassignRequest(
@@ -279,7 +278,7 @@ class BulkReassignmentServiceTest {
         assertThat(result.message()).isEqualTo("1 of 2 tickets successfully reassigned, 1 skipped");
 
         verify(assignmentProps).enabled();
-        verify(ticketRepository).listTickets(ArgumentMatchers.any(TicketsQuery.class));
+        verify(ticketRepository).listTickets(any(TicketsQuery.class));
         verify(ticketRepository).assign(ticket1, assignedTo);
         verify(ticketRepository, never()).assign(ticket2, assignedTo);
         verifyNoMoreInteractions(assignmentProps, ticketRepository);
@@ -303,10 +302,10 @@ class BulkReassignmentServiceTest {
         when(dmResponse.getChannel()).thenReturn(channel);
 
         when(assignmentProps.enabled()).thenReturn(true);
-        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+        when(ticketRepository.listTickets(any(TicketsQuery.class)))
             .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2), 0, 1, 2));
         when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
-        when(slackClient.getPermalink(ArgumentMatchers.any(SlackGetMessageByTsRequest.class)))
+        when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class)))
             .thenReturn("https://slack.com/permalink1", "https://slack.com/permalink2");
 
         BulkReassignRequest request = new BulkReassignRequest(
@@ -322,7 +321,7 @@ class BulkReassignmentServiceTest {
         
         ArgumentCaptor<SlackPostMessageRequest> messageCaptor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
         verify(slackClient).openDmConversation(SlackId.user(assignedTo));
-        verify(slackClient, times(2)).getPermalink(ArgumentMatchers.any(SlackGetMessageByTsRequest.class));
+        verify(slackClient, times(2)).getPermalink(any(SlackGetMessageByTsRequest.class));
         verify(slackClient).postMessage(messageCaptor.capture());
         
         SlackPostMessageRequest sentMessage = messageCaptor.getValue();
@@ -339,11 +338,10 @@ class BulkReassignmentServiceTest {
         TicketId ticket1 = new TicketId(1);
         String assignedTo = "U12345";
 
-        Ticket closedTicket = createTicket(ticket1, TicketStatus.closed);
-
+        // Closed ticket is filtered out at database level due to excludeClosed=true
         when(assignmentProps.enabled()).thenReturn(true);
-        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
-            .thenReturn(new Page<>(ImmutableList.of(closedTicket), 0, 1, 1));
+        when(ticketRepository.listTickets(any(TicketsQuery.class)))
+            .thenReturn(new Page<>(ImmutableList.of(), 0, 1, 0));
 
         BulkReassignRequest request = new BulkReassignRequest(
             List.of(ticket1),
@@ -373,7 +371,7 @@ class BulkReassignmentServiceTest {
         when(dmResponse.getError()).thenReturn("messages_tab_disabled");
 
         when(assignmentProps.enabled()).thenReturn(true);
-        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+        when(ticketRepository.listTickets(any(TicketsQuery.class)))
             .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
         when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
 
@@ -405,7 +403,7 @@ class BulkReassignmentServiceTest {
         when(dmResponse.getChannel()).thenReturn(null);
 
         when(assignmentProps.enabled()).thenReturn(true);
-        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+        when(ticketRepository.listTickets(any(TicketsQuery.class)))
             .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
         when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
 
@@ -439,12 +437,12 @@ class BulkReassignmentServiceTest {
         when(dmResponse.getChannel()).thenReturn(channel);
 
         when(assignmentProps.enabled()).thenReturn(true);
-        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+        when(ticketRepository.listTickets(any(TicketsQuery.class)))
             .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
         when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
-        when(slackClient.getPermalink(ArgumentMatchers.any(SlackGetMessageByTsRequest.class)))
+        when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class)))
             .thenReturn("https://slack.com/permalink1");
-        when(slackClient.postMessage(ArgumentMatchers.any(SlackPostMessageRequest.class)))
+        when(slackClient.postMessage(any(SlackPostMessageRequest.class)))
             .thenThrow(new SlackException(new RuntimeException("Failed to post message")));
 
         BulkReassignRequest request = new BulkReassignRequest(
@@ -458,7 +456,7 @@ class BulkReassignmentServiceTest {
         // then
         assertThat(result.successCount()).isEqualTo(1);
         verify(slackClient).openDmConversation(SlackId.user(assignedTo));
-        verify(slackClient).postMessage(ArgumentMatchers.any(SlackPostMessageRequest.class));
+        verify(slackClient).postMessage(any(SlackPostMessageRequest.class));
         // Should not throw exception, just log warning
     }
 
@@ -490,10 +488,10 @@ class BulkReassignmentServiceTest {
         when(dmResponse.getChannel()).thenReturn(channel);
 
         when(assignmentProps.enabled()).thenReturn(true);
-        when(ticketRepository.listTickets(ArgumentMatchers.any(TicketsQuery.class)))
+        when(ticketRepository.listTickets(any(TicketsQuery.class)))
             .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2), 0, 1, 2));
         when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
-        when(slackClient.getPermalink(ArgumentMatchers.any(SlackGetMessageByTsRequest.class)))
+        when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class)))
             .thenReturn("https://slack.com/permalink1", "https://slack.com/permalink2");
 
         BulkReassignRequest request = new BulkReassignRequest(

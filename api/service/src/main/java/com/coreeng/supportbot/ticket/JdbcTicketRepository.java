@@ -187,17 +187,18 @@ public class JdbcTicketRepository implements TicketRepository {
     }
 
     private UpdateSetMoreStep<TicketRecord> conditionallyUpdateAssignee(Ticket ticket, UpdateSetMoreStep<TicketRecord> update) {
+        UpdateSetMoreStep<TicketRecord> result = update;
         if (ticket.assignedTo() != null) {
             AssigneeWrite assignee = toDbAssignee(ticket.assignedTo());
             if (assignee.value() != null) {
-                update = update
+                result = result
                     .set(TICKET.ASSIGNED_TO, assignee.value())
                     .set(TICKET.ASSIGNED_TO_FORMAT, assignee.format())
                     .set(TICKET.ASSIGNED_TO_ORPHANED, assignee.orphaned())
                     .set(TICKET.ASSIGNED_TO_HASH, assignee.hash());
             }
         }
-        return update;
+        return result;
     }
 
     @Override
