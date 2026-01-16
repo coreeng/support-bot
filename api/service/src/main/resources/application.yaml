@@ -196,6 +196,5 @@ rbac:
   enabled: true
 
 metrics:
-  enabled: true
+  enabled: false
   refresh-interval: 60s
-
