@@ -84,17 +84,17 @@ public class MetricsService {
             ResponseSLAMetric responseSla = metricsRepository.getResponseSLAMetrics();
             if (responseSla != null) {
                 responseSlaGauge.register(List.of(
-                        MultiGauge.Row.of(Tags.of("percentile", "p50"), responseSla.p50() != null ? responseSla.p50() : 0.0),
-                        MultiGauge.Row.of(Tags.of("percentile", "p90"), responseSla.p90() != null ? responseSla.p90() : 0.0)
+                        MultiGauge.Row.of(Tags.of("percentile", "p50"), responseSla.p50()),
+                        MultiGauge.Row.of(Tags.of("percentile", "p90"), responseSla.p90())
                 ), true);
             }
 
             ResolutionSLAMetric resolutionSla = metricsRepository.getResolutionSLAMetrics();
             if (resolutionSla != null) {
                 resolutionSlaGauge.register(List.of(
-                        MultiGauge.Row.of(Tags.of("percentile", "p50"), resolutionSla.p50() != null ? resolutionSla.p50() : 0.0),
-                        MultiGauge.Row.of(Tags.of("percentile", "p75"), resolutionSla.p75() != null ? resolutionSla.p75() : 0.0),
-                        MultiGauge.Row.of(Tags.of("percentile", "p90"), resolutionSla.p90() != null ? resolutionSla.p90() : 0.0)
+                        MultiGauge.Row.of(Tags.of("percentile", "p50"), resolutionSla.p50()),
+                        MultiGauge.Row.of(Tags.of("percentile", "p75"), resolutionSla.p75()),
+                        MultiGauge.Row.of(Tags.of("percentile", "p90"), resolutionSla.p90())
                 ), true);
             }
 
