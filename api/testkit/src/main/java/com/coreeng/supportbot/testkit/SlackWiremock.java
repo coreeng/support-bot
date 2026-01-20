@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.testkit;
 
+import java.net.Socket;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -11,9 +12,10 @@ import org.apache.commons.text.StringSubstitutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.coreeng.supportbot.Config;
+
 import com.coreeng.supportbot.testkit.matcher.UrlDecodedPattern;
 import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.client.WireMock;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.and;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
@@ -39,7 +41,10 @@ public class SlackWiremock extends WireMockServer {
 
     public SlackWiremock(Config.SlackMock config) {
         super(WireMockConfiguration.options()
-            .port(config.port()));
+            .port(config.port())
+            .globalTemplating(true)
+            .maxRequestJournalEntries(1000)
+            .extensions(new MessageTsHelperExtension()));
         this.config = config;
     }
 
@@ -126,6 +131,7 @@ public class SlackWiremock extends WireMockServer {
      */
     public void clearRequestJournal() {
         resetRequests();
+
         logger.debug("Cleared request journal");
     }
 
@@ -532,5 +538,295 @@ public class SlackWiremock extends WireMockServer {
             .receiver(expectation.receiver())
             .description(expectation.description())
             .build();
+    }
+
+    /**
+     * Returns a DSL for setting up permanent stubs for NFT.
+     * Permanent stubs use response templating and are not cleaned up between iterations.
+     */
+    public PermanentStubs permanent() {
+        return new PermanentStubs();
+    }
+
+    /**
+     * Inner class providing DSL for permanent NFT stubs.
+     * These stubs use response templating to echo back IDs and add realistic latency.
+     * Latency values are based on actual Slack API measurements.
+     */
+    public class PermanentStubs {
+        /**
+         * Stub chat.postMessage for ticket form creation.
+         * Uses response templating to echo back channel, thread_ts, and generate a new ts.
+         * Latency: ~325ms (based on actual Slack API measurements).
+         */
+        public void stubTicketFormPosted() {
+            givenThat(post("/api/chat.postMessage")
+                .withName("permanent-ticket-form-posted")
+                // Match any channel - permanent stubs are broad
+                .willReturn(aResponse()
+                    .withTransformers("response-template")
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withUniformRandomDelay(300, 350)
+                    .withBody("""
+                        {{formData request.body 'formArgs' urlDecode=true}}
+                        {{#assign 'generatedTs'}}{{messageTs}}{{/assign}}
+                        {
+                          "ok": true,
+                          "channel": "{{formArgs.channel}}",
+                          "ts": "{{generatedTs}}",
+                          "message": {
+                            "user": "UNSET_BY_TESTS",
+                            "bot_id": "UNSET_BY_TESTS",
+                            "app_id": "UNSET_BY_TESTS",
+                            "team": "UNSET_BY_TESTS",
+                            "type": "message",
+                            "ts": "{{generatedTs}}",
+                            "thread_ts": "{{formArgs.thread_ts}}",
+                            "text": "{{formArgs.text}}",
+                            "blocks": {{formArgs.blocks}}
+                          }
+                        }
+                        """)));
+            logger.info("Set up permanent stub for chat.postMessage (ticket form)");
+        }
+
+        /**
+         * Stub chat.update for ticket form updates (close/reopen).
+         * Uses response templating.
+         * Latency: ~350ms (based on actual Slack API measurements).
+         */
+        public void stubMessageUpdated() {
+            givenThat(post("/api/chat.update")
+                .withName("permanent-message-updated")
+                .willReturn(aResponse()
+                    .withTransformers("response-template")
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withUniformRandomDelay(300, 400)
+                    .withBody("""
+                        {{formData request.body 'formArgs' urlDecode=true}}
+                        {
+                          "ok": true,
+                          "channel": "{{formArgs.channel}}",
+                          "ts": "{{formArgs.ts}}",
+                          "message": {
+                            "user": "UNSET_BY_TESTS",
+                            "bot_id": "UNSET_BY_TESTS",
+                            "app_id": "UNSET_BY_TESTS",
+                            "team": "UNSET_BY_TESTS",
+                            "type": "message",
+                            "ts": "{{formArgs.ts}}",
+                            "blocks": {{formArgs.blocks}}
+                          }
+                        }
+                        """)));
+            logger.info("Set up permanent stub for chat.update");
+        }
+
+        /**
+         * Stub views.open for summary modal.
+         * Uses response templating to echo back view content.
+         * Latency: ~100ms (based on actual Slack API measurements).
+         */
+        public void stubViewsOpen() {
+            givenThat(post("/api/views.open")
+                .withName("permanent-views-open")
+                .willReturn(aResponse()
+                    .withTransformers("response-template")
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withUniformRandomDelay(80, 120)
+                    .withBody("""
+                        {{formData request.body 'formArgs' urlDecode=true}}
+                        {{parseJson formArgs.view 'formArgView'}}
+                        {
+                          "ok": true,
+                          "view": {
+                            "id": "V{{randomInt lower=1000000000 upper=9999999999}}",
+                            "team_id": "UNSET_BY_TESTS",
+                            "root_view_id": "UNSET_BY_TESTS",
+                            "app_id": "UNSET_BY_TESTS",
+                            "external_id": "",
+                            "app_installed_team_id": "UNSET_BY_TESTS",
+                            "bot_id": "UNSET_BY_TESTS",
+                            "hash": "UNSET_BY_TESTS",
+                            "type": "modal",
+                            "callback_id": {{toJson formArgView.callback_id}},
+                            "blocks": {{toJson formArgView.blocks}},
+                            "private_metadata": {{toJson formArgView.private_metadata}},
+                            "title": {{toJson formArgView.title}},
+                            "close": {{toJson formArgView.close}},
+                            "submit": {{toJson formArgView.submit}}
+                          }
+                        }
+                        """)));
+            logger.info("Set up permanent stub for views.open");
+        }
+
+        /**
+         * Stub reactions.add for checkmark.
+         * Latency: ~125ms (based on actual Slack API measurements).
+         */
+        public void stubReactionAdd() {
+            givenThat(post("/api/reactions.add")
+                .withName("permanent-reaction-add")
+                .willReturn(aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withUniformRandomDelay(100, 150)
+                    .withBody("""
+                        {"ok": true}
+                        """)));
+            logger.info("Set up permanent stub for reactions.add");
+        }
+
+        /**
+         * Stub chat.getPermalink.
+         * Latency: ~65ms (based on actual Slack API measurements).
+         */
+        public void stubGetPermalink() {
+            givenThat(post("/api/chat.getPermalink")
+                .withName("permanent-get-permalink")
+                .willReturn(aResponse()
+                    .withTransformers("response-template")
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withUniformRandomDelay(50, 80)
+                    .withBody("""
+                        {{formData request.body 'formArgs' urlDecode=true}}
+                        {
+                          "ok": true,
+                          "channel": "{{formArgs.channel}}",
+                          "permalink": "https://slack.com/messages/{{formArgs.channel}}/{{formArgs.message_ts}}"
+                        }
+                        """)));
+            logger.info("Set up permanent stub for chat.getPermalink");
+        }
+
+        /**
+         * Stub conversations.history for message fetch.
+         * Latency: ~125ms (based on actual Slack API measurements).
+         */
+        public void stubGetMessage() {
+            givenThat(post("/api/conversations.history")
+                .withName("permanent-get-message")
+                .willReturn(aResponse()
+                    .withTransformers("response-template")
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withUniformRandomDelay(100, 150)
+                    .withBody(StringSubstitutor.replace("""
+                        {{formData request.body 'formArgs' urlDecode=true}}
+                        {
+                          "ok": true,
+                          "oldest": "{{formArgs.oldest}}",
+                          "messages": [
+                            {
+                              "text": "NFT test message",
+                              "user": "UNFT_USER",
+                              "team": "${team}",
+                              "type": "message",
+                              "ts": "{{formArgs.oldest}}",
+                              "thread_ts": "{{formArgs.oldest}}",
+                              "blocks": []
+                            }
+                          ]
+                        }
+                        """, Map.of(
+                            "team", config.team()
+                        )))));
+            logger.info("Set up permanent stub for conversations.history");
+        }
+
+        /**
+         * Stub conversations.replies for thread context.
+         * Latency: ~125ms (similar to conversations.history).
+         */
+        public void stubConversationsReplies() {
+            givenThat(post("/api/conversations.replies")
+                .withName("permanent-conversations-replies")
+                .willReturn(aResponse()
+                    .withTransformers("response-template")
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withUniformRandomDelay(100, 150)
+                    .withBody("""
+                        {{formData request.body 'formArgs' urlDecode=true}}
+                        {
+                          "ok": true,
+                          "messages": [
+                            {
+                              "type": "message",
+                              "ts": "{{formArgs.ts}}",
+                              "thread_ts": null
+                            }
+                          ]
+                        }
+                        """)));
+            logger.info("Set up permanent stub for conversations.replies");
+        }
+
+        /**
+         * Stub chat.postEphemeral for rating request.
+         * Latency: ~160ms (based on actual Slack API measurements).
+         */
+        public void stubEphemeralMessage() {
+            givenThat(post("/api/chat.postEphemeral")
+                .withName("permanent-ephemeral-message")
+                .willReturn(aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withUniformRandomDelay(120, 200)
+                    .withBody("""
+                        {"ok": true, "message_ts": "1234567890.123456"}
+                        """)));
+            logger.info("Set up permanent stub for chat.postEphemeral");
+        }
+
+        /**
+         * Stub users.info for user profile lookup.
+         * Latency: ~100ms (estimate similar to views.open).
+         */
+        public void stubUsersInfo() {
+            givenThat(post("/api/users.info")
+                .withName("permanent-users-info")
+                .willReturn(aResponse()
+                    .withTransformers("response-template")
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withUniformRandomDelay(40, 60)
+                    .withBody("""
+                        {{formData request.body 'formArgs' urlDecode=true}}
+                        {
+                          "ok": true,
+                          "user": {
+                            "id": "{{formArgs.user}}",
+                            "is_bot": false,
+                            "profile": {
+                              "email": "nft-user@example.com"
+                            }
+                          }
+                        }
+                        """)));
+            logger.info("Set up permanent stub for users.info");
+        }
+
+        /**
+         * Sets up all permanent stubs needed for NFT.
+         */
+        public void setupAllNftStubs() {
+            stubAuthTest("nft-auth-test");
+            stubTicketFormPosted();
+            stubMessageUpdated();
+            stubViewsOpen();
+            stubReactionAdd();
+            stubGetPermalink();
+            stubGetMessage();
+            stubConversationsReplies();
+            stubEphemeralMessage();
+            stubUsersInfo();
+            logger.info("Set up all permanent NFT stubs");
+        }
     }
 }

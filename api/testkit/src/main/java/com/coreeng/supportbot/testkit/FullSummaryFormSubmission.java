@@ -11,10 +11,10 @@ import lombok.Getter;
 @Builder
 @Getter
 public class FullSummaryFormSubmission implements ViewSubmission {
+    public static final String callbackId = "ticket-summary";
+
     @NonNull
     private final String triggerId;
-    @NonNull
-    private final String callbackId;
     private final long ticketId;
     @NonNull
     private final Values values;
@@ -36,6 +36,11 @@ public class FullSummaryFormSubmission implements ViewSubmission {
     @Override
     public String viewType() {
         return "modal";
+    }
+
+    @Override
+    public String callbackId() {
+        return callbackId;
     }
 
     @Override

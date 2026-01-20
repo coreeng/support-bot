@@ -259,10 +259,6 @@ public class TicketProcessingService {
 
     @NotNull
     private Ticket onStatusUpdate(Ticket ticket) {
-        publisher.publishEvent(new TicketStatusChanged(
-            ticket.id(),
-            ticket.status()
-        ));
         Ticket updatedTicket = repository.insertStatusLog(ticket, Instant.now());
         log.atInfo()
             .addKeyValue("ticketId", updatedTicket.id().id())
@@ -286,6 +282,11 @@ public class TicketProcessingService {
                 updatedTicket.channelId()
             ));
         }
+
+        publisher.publishEvent(new TicketStatusChanged(
+            ticket.id(),
+            ticket.status()
+        ));
         return updatedTicket;
     }
 

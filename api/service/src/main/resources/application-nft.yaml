@@ -1,0 +1,93 @@
+slack:
+  mode: http
+  enable-request-verification: false
+  client:
+    methods-base-url: "http://localhost:8000/api/"
+  creds:
+    token: dummy-token-dummy-token
+  ticket:
+    channel-id: C1234567891
+    expected-initial-reaction: eyes
+    response-initial-reaction: ticket
+
+enums:
+  escalation-teams:
+    - label: WoW
+      code: wow
+      slack-group-id: S01234ESCWW
+    - label: Infra Integration
+      code: infra-integration
+      slack-group-id: S01234ESCII
+#    - label: connected-app
+#      code: connected-app
+#      slack-group-id: S01234ESCCA
+  tags:
+    - label: Ingresses
+      code: ingresses
+    - label: Jenkins Pipelines
+      code: jenkins-pipelines
+    - label: Networking
+      code: networking
+    - label: Vault
+      code: vault
+    - label: Persistence/Brokers
+      code: persistence-brokers
+    - label: Observability
+      code: observability
+    - label: DNS
+      code: dns
+    - label: Osprey
+      code: osprey
+  impacts:
+    - label: Production Blocking
+      code: productionBlocking
+    - label: BAU Blocking
+      code: bauBlocking
+    - label: Abnormal Behaviour
+      code: abnormalBehaviour
+
+team:
+  support:
+    name: Core Support
+    static:
+      enabled: true
+      members:
+        - email: coby.ivona@company.com
+          slack-id: U0123456781
+        - email: sana.chernobog@company.com
+          slack-id: U0123456782
+        - email: jean.kristijan@company.com
+          slack-id: U0123456783
+  leadership:
+    name: Support Leadership
+    code: support-leadership
+    static:
+      enabled: true
+      members:
+        - email: brian@company.com
+          slack-id: U0124556781
+
+platform-integration:
+  enabled: true
+  static-user:
+    enabled: true
+    users:
+      group-ref-wow:
+        - coby.ivona@company.com
+        - sana.chernobog@company.com
+      group-ref-infra-integration:
+        - jean.kristijan@company.com
+        - chandra.giustino@company.com
+      group-ref-connected-app:
+        - chandra.giustino@company.com
+        - nazira.armel@company.com
+  teams-scraping:
+    static:
+      enabled: true
+      teams:
+        - name: wow
+          groupRef: group-ref-wow
+        - name: infra-integration
+          groupRef: group-ref-infra-integration
+        - name: connected-app
+          groupRef: group-ref-connected-app

@@ -1,6 +1,5 @@
-package com.coreeng.supportbot;
+package com.coreeng.supportbot.testkit;
 
-import com.coreeng.supportbot.testkit.SlackWiremock;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
