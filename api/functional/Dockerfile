@@ -3,14 +3,17 @@ WORKDIR /home/gradle/project
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Copy gradle wrapper and settings
+# Copy Gradle wrapper and core build configuration
 COPY gradlew .
 COPY settings.gradle.kts .
 COPY gradle gradle
+COPY buildSrc buildSrc
 
+# Warm up Gradle to prime the wrapper and caches
 RUN ./gradlew --no-daemon
 
-# Copy only the functional module
+# Copy only the subprojects needed to build the functional tests jar
+COPY testkit testkit
 COPY functional/lombok.config functional/lombok.config
 COPY functional/build.gradle.kts functional/build.gradle.kts
 COPY functional/src functional/src

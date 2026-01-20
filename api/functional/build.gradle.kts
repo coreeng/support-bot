@@ -84,12 +84,16 @@ val sourceSetsContainer = the<SourceSetContainer>()
 val testRuntimeClasspath by configurations.getting
 
 tasks.named<Jar>("jar") {
-    from(sourceSetsContainer.getByName("test").output)
-    from(testRuntimeClasspath.files.map { file -> if (file.isDirectory) file else zipTree(file) })
-    manifest {
-        attributes["Main-Class"] = "org.junit.platform.console.ConsoleLauncher"
-    }
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+	// Make this fat jar depend on whatever tasks are needed to build the test runtime
+	// classpath (including any project dependencies like :testkit).
+	dependsOn(testRuntimeClasspath.buildDependencies)
+
+	from(sourceSetsContainer.getByName("test").output)
+	from(testRuntimeClasspath.files.map { file -> if (file.isDirectory) file else zipTree(file) })
+	manifest {
+		attributes["Main-Class"] = "org.junit.platform.console.ConsoleLauncher"
+	}
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 tasks.register("testIntegrated") {
