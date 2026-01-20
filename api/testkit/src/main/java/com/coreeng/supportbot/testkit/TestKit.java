@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.testkit;
 
-import com.coreeng.supportbot.Config;
 
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -12,8 +11,57 @@ public class TestKit {
     private final SupportBotClient supportBotClient;
     private final Config config;
 
+    /**
+     * Creates a TestKit instance with all dependencies initialized.
+     * The SlackWiremock is created but NOT started - caller must call
+     * {@code testKit.slack().wiremock().start()} to start it.
+     *
+     * @param config the configuration to use
+     * @return a new TestKit instance
+     */
+    public static TestKit create(Config config) {
+        SlackWiremock slackWiremock = new SlackWiremock(config.mocks().slack());
+        SupportBotClient supportBotClient = new SupportBotClient(config.supportBot().baseUrl(), slackWiremock);
+        SupportBotSlackClient supportBotSlackClient = new SupportBotSlackClient(config, slackWiremock);
+        return new TestKit(slackWiremock, supportBotSlackClient, supportBotClient, config);
+    }
+
     public RoledTestKit as(UserRole role) {
         return new RoledTestKit(role);
+    }
+
+    /**
+     * Returns Slack-related resources for this TestKit.
+     */
+    public SlackResources slack() {
+        return new SlackResources();
+    }
+
+    /**
+     * Provides access to Slack-related test resources.
+     */
+    public class SlackResources {
+        /**
+         * Returns the SlackWiremock instance for this TestKit.
+         * Use this to start/stop the server, set up stubs, and verify requests.
+         */
+        public SlackWiremock wiremock() {
+            return slackWiremock;
+        }
+    }
+
+    /**
+     * Returns the SupportBotClient for making API calls to the support bot service.
+     */
+    public SupportBotClient supportBotClient() {
+        return supportBotClient;
+    }
+
+    /**
+     * Returns the configuration used by this TestKit.
+     */
+    public Config config() {
+        return config;
     }
 
     @RequiredArgsConstructor

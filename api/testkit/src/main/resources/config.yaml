@@ -1,0 +1,86 @@
+# todo: come up with a better config structure so that we don't have duplicate users that much
+mocks:
+  slack:
+    port: 8000
+    serverUrl: "https://cecg.slack.com/"
+    team: "CECG"
+    teamId: T0123456789
+    userId: U0123456789
+    supportBotUserId: USUPPORT123
+    supportBotId: B0123456789
+    supportGroupId: S01234567ST
+    supportChannelId: C1234567891
+    supportMembers:
+      - name: Coby Ivona
+        email: coby.ivona@company.com
+      - name: Sana Chernobog
+        email: sana.chernobog@company.com
+      - name: Jean Kristijan
+        email: jean.kristijan@company.com
+
+tenants:
+  - name: wow
+    groupRef: group-ref-wow
+    users:
+      - email: coby.ivona@company.com
+      - email: sana.chernobog@company.com
+  - name: infra-integration
+    groupRef: group-ref-infra-integration
+    users:
+      - email: jean.kristijan@company.com
+      - email: chandra.giustino@company.com
+  - name: connected-app
+    groupRef: group-ref-connected-app
+    users:
+      - email: chandra.giustino@company.com
+      - email: nazira.armel@company.com
+
+escalationTeams:
+  - label: WoW
+    code: wow
+    slackGroupId: S01234ESCWW
+  - label: Infra Integration
+    code: infra-integration
+    slackGroupId: S01234ESCII
+tags:
+  - label: Ingresses
+    code: ingresses
+  - label: Jenkins Pipelines
+    code: jenkins-pipelines
+  - label: Networking
+    code: networking
+  - label: Vault
+    code: vault
+  - label: Persistence/Brokers
+    code: persistence-brokers
+  - label: Observability
+    code: observability
+  - label: DNS
+    code: dns
+  - label: Osprey
+    code: osprey
+impacts:
+  - label: Production Blocking
+    code: productionBlocking
+  - label: BAU Blocking
+    code: bauBlocking
+  - label: Abnormal Behaviour
+    code: abnormalBehaviour
+
+users:
+  # support members
+  - email: coby.ivona@company.com
+    slackUserId: U0123456781
+  - email: sana.chernobog@company.com
+    slackUserId: U0123456782
+  - email: jean.kristijan@company.com
+    slackUserId: U0123456783
+  # others
+  - email: chandra.giustino@company.com
+    slackUserId: U0123456784
+  - email: nazira.armel@company.com
+    slackUserId: U0123456785
+
+supportBot:
+  token: dummy-token-dummy-token
+  baseUrl: ${SERVICE_ENDPOINT:http://localhost:8080}

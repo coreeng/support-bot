@@ -8,7 +8,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.text.StringEscapeUtils;
 import org.apache.commons.text.StringSubstitutor;
 
-import com.coreeng.supportbot.Config;
+
 
 import static io.restassured.RestAssured.given;
 import io.restassured.filter.log.LogDetail;

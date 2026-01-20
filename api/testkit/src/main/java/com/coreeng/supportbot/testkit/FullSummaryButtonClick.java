@@ -11,16 +11,16 @@ public class FullSummaryButtonClick implements MessageButtonClick {
     @NonNull
     private final String triggerId;
     @NonNull
-    private final String actionId;
-    @NonNull
-    private final Ticket ticket;
-
-    @NonNull
-    private final SlackWiremock slackWiremock;
+    private final Long ticketId;
 
     @Override
     public String privateMetadata() {
         return String.format("""
-            {"ticketId": %d}""", ticket.id());
+            {"ticketId": %d}""", ticketId);
+    }
+
+    @Override
+    public String actionId() {
+        return TicketMessage.fullSummaryButtonActionId;
     }
 }
