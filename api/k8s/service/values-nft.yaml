@@ -1,0 +1,16 @@
+configMap:
+  create: false
+  enabled: false
+
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: nft
+  - name: SLACK_CLIENT_METHODS_BASE_URL
+    value: "http://support-bot-nft-tests-wiremock:8000/api/"
+  - name: DB_URL
+    value: "jdbc:postgresql://support-bot-db-postgresql-hl.support-bot-nft.svc.cluster.local:5432/supportbot"
+  - name: DB_USERNAME
+    value: "supportbot"
+  - name: DB_PASSWORD
+    value: "supportbotpassword"
+
