@@ -6,7 +6,7 @@ import static java.util.stream.Collectors.joining;
 
 import org.apache.commons.text.StringSubstitutor;
 
-import com.coreeng.supportbot.Config;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.MappingBuilder;

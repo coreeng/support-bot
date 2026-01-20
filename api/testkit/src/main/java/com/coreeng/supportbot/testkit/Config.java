@@ -1,7 +1,15 @@
-package com.coreeng.supportbot;
+package com.coreeng.supportbot.testkit;
 
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.bind.PropertySourcesPlaceholdersResolver;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.io.ClassPathResource;
 
+import java.io.IOException;
 import java.util.List;
 
 public record Config(
@@ -25,6 +33,28 @@ public record Config(
                 .filter(u -> mocks.slack.supportMembers.stream()
                         .anyMatch(sm -> sm.email.equals(u.email)))
                 .toList();
+    }
+
+    /**
+     * Loads configuration from a YAML file on the classpath.
+     *
+     * @param classpathResource the classpath resource path (e.g., "config.yaml")
+     * @return the loaded Config instance
+     */
+    public static Config load(String classpathResource) {
+        try {
+            var env = new StandardEnvironment();
+            var yamlLoader = new YamlPropertySourceLoader();
+            List<PropertySource<?>> yaml = yamlLoader.load("config", new ClassPathResource(classpathResource));
+            yaml.forEach(ps -> env.getPropertySources().addLast(ps));
+            var binder = new Binder(
+                ConfigurationPropertySources.get(env),
+                new PropertySourcesPlaceholdersResolver(env)
+            );
+            return binder.bind("", Config.class).get();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load config from " + classpathResource, e);
+        }
     }
 
     public record Mocks(

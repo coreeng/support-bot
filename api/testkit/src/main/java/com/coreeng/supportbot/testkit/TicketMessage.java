@@ -68,11 +68,7 @@ public class TicketMessage {
         @Override
         public TicketMessage assertAndExtractResult(ServeEvent servedStub) throws IOException {
             FormParameter textParam = servedStub.getRequest().formParameter("text");
-            String text = textParam.firstValue();
-            Matcher headerMatcher = headerRegex.matcher(text);
-            assertThat(headerMatcher).matches();
-            String ticketIdStr = headerMatcher.group("id");
-            long ticketId = Long.parseLong(ticketIdStr);
+            long ticketId = extractTicketIdFromText(textParam.firstValue());
 
             FormParameter blocksParam = servedStub.getRequest().formParameter("blocks");
             FormParameter attachmentsParam = servedStub.getRequest().formParameter("attachments");
@@ -92,6 +88,13 @@ public class TicketMessage {
                 .status(attachmentView.status())
                 .statusChangedAt(attachmentView.statusChangedAt())
                 .build();
+        }
+
+        public long extractTicketIdFromText(String text) {
+            Matcher headerMatcher = headerRegex.matcher(text);
+            assertThat(headerMatcher).matches();
+            String ticketIdStr = headerMatcher.group("id");
+            return Long.parseLong(ticketIdStr);
         }
 
         private AttachmentView assertAttachmentsAndReturnView(FormParameter attachmentsParam, long ticketId) throws JsonProcessingException {

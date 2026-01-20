@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.within;
 import static org.awaitility.Awaitility.await;
 import org.jspecify.annotations.NonNull;
 
-import com.coreeng.supportbot.Config;
+
 import com.google.common.collect.ImmutableList;
 
 import lombok.Builder;
@@ -77,16 +77,14 @@ public class Ticket {
     public FullSummaryButtonClick fullSummaryButtonClick(String triggerId) {
         return FullSummaryButtonClick.builder()
             .triggerId(triggerId)
-            .actionId("ticket-summary-view")
-            .ticket(this)
-            .slackWiremock(slackWiremock)
+            .ticketId(id)
             .build();
     }
 
     public FullSummaryFormOpenStubs expectFullSummaryFormOpened(String reason, String triggerId) {
         var formOpenStub = slackWiremock.stubViewsOpen(ViewsOpenExpectation.<FullSummaryForm>builder()
             .description(reason + ": view open message")
-            .viewCallbackId("ticket-summary")
+            .viewCallbackId(FullSummaryFormSubmission.callbackId)
             .viewType("modal")
             .triggerId(triggerId)
             .receiver(new FullSummaryForm.Receiver(this, config))
@@ -101,7 +99,6 @@ public class Ticket {
     public FullSummaryFormSubmission fullSummaryFormSubmit(String triggerId, FullSummaryFormSubmission.Values values) {
         return FullSummaryFormSubmission.builder()
             .triggerId(triggerId)
-            .callbackId("ticket-summary")
             .ticketId(id)
             .values(values)
             .build();

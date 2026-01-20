@@ -1,6 +1,6 @@
 package com.coreeng.supportbot.testkit;
 
-import com.coreeng.supportbot.Config;
+
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 

@@ -3,6 +3,7 @@ package com.coreeng.supportbot.testkit;
 import java.time.Instant;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
@@ -118,6 +119,66 @@ public class SupportBotClient {
             .log().ifValidationFails(LogDetail.ALL, true)
             .statusCode(200)
             .extract().as(BulkReassignResponse.class);
+    }
+
+    /**
+     * Get a ticket by its ID.
+     * Returns null if the ticket is not found (404).
+     */
+    @Nullable
+    public TicketResponse getTicketById(long ticketId) {
+        io.restassured.response.Response response = given()
+            .config(restAssuredConfig)
+            .when()
+            .get(baseUrl + "/ticket/{id}", ticketId);
+
+        if (response.statusCode() == 404) {
+            return null;
+        }
+
+        return response.then()
+            .log().ifValidationFails(LogDetail.ALL, true)
+            .statusCode(200)
+            .extract().as(TicketResponse.class);
+    }
+
+    /**
+     * Find the most recently created ticket by queryTs.
+     * Uses the /ticket list endpoint and filters by queryTs.
+     *
+     * @param channelId The channel ID where the ticket was created
+     * @param queryTs   The query message timestamp
+     * @return The ticket response, or null if not found
+     */
+    @Nullable
+    public TicketResponse findTicketByQueryTs(@NonNull String channelId, @NonNull MessageTs queryTs) {
+        TicketListResponse response = given()
+            .config(restAssuredConfig)
+            .when()
+            .queryParam("pageSize", 100)
+            .get(baseUrl + "/ticket")
+            .then()
+            .log().ifValidationFails(LogDetail.ALL, true)
+            .statusCode(200)
+            .extract().as(TicketListResponse.class);
+
+        return response.content().stream()
+            .filter(t -> t.query() != null
+                && t.query().ts() != null
+                && t.query().ts().equals(queryTs)
+                && channelId.equals(t.channelId()))
+            .findFirst()
+            .orElse(null);
+    }
+
+    @Getter
+    @Jacksonized
+    @Builder
+    public static class TicketListResponse {
+        private ImmutableList<@NonNull TicketResponse> content;
+        private long page;
+        private long totalPages;
+        private long totalElements;
     }
 
     public class TestMethods {

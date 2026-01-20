@@ -5,6 +5,7 @@ import java.time.Duration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import com.coreeng.supportbot.testkit.TestKitExtension;
 import com.coreeng.supportbot.testkit.TicketByIdQuery;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,7 +36,9 @@ public class QueryManagementTests {
         );
 
         // then
-        supportBotClient.assertQueryExistsByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts());
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+            supportBotClient.assertQueryExistsByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts())
+        );
     }
 
     @Test
@@ -50,7 +53,9 @@ public class QueryManagementTests {
         );
 
         // then: query should exist
-        supportBotClient.assertQueryExistsByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts());
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+            supportBotClient.assertQueryExistsByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts())
+        );
 
         // when: delete the query message
         asTenant.deleteMessage(tenantsMessage);
@@ -74,7 +79,9 @@ public class QueryManagementTests {
         );
 
         // then: query should exist
-        supportBotClient.assertQueryExistsByMessageRef(tenantsQuery.channelId(), tenantsQuery.ts());
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+            supportBotClient.assertQueryExistsByMessageRef(tenantsQuery.channelId(), tenantsQuery.ts())
+        );
 
         // when: post a thread reply
         MessageTs replyTs = MessageTs.now();
@@ -106,7 +113,9 @@ public class QueryManagementTests {
         SlackMessage tenantsMessage = asTenantSlack.postMessage(queryTs, queryMessage);
 
         // then: query should exist
-        supportBotClient.assertQueryExistsByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts());
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+            supportBotClient.assertQueryExistsByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts())
+        );
 
         // when: support creates a ticket by reacting with eyes
         MessageTs ticketMessageTs = MessageTs.now();
