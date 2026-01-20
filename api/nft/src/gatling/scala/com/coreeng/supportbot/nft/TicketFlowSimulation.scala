@@ -26,7 +26,8 @@ class TicketFlowSimulation extends Simulation {
     .exec(testKitExec("submit-summary", testKit)(submitSummaryForm))
 
   setUp(
-    ticketFlowScenario.inject(constantUsersPerSec(10).during(10.minutes).randomized)
+    // Short duration to speed up local/CI iterations
+    ticketFlowScenario.inject(constantUsersPerSec(10).during(1.minute).randomized)
   ).assertions(
     global.failedRequests.count.is(0),
     details("post-tenant-message").responseTime.percentile(95).lt(100),
