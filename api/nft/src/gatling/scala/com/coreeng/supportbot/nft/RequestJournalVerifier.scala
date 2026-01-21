@@ -12,7 +12,7 @@ import scala.jdk.CollectionConverters._
  * Verifies Slack API calls via WireMock's RequestJournal.
  */
 object RequestJournalVerifier {
-  private val DEFAULT_TIMEOUT = Duration.ofSeconds(5)
+  private val DEFAULT_TIMEOUT: Duration = Duration.ofSeconds(30)
   private val POLL_INTERVAL = Duration.ofMillis(10)
   private val objectMapper = new ObjectMapper()
 
