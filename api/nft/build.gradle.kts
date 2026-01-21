@@ -1,6 +1,4 @@
-import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.bundling.Jar
-import org.gradle.api.file.DuplicatesStrategy
 import java.io.File
 
 plugins {
@@ -23,11 +21,8 @@ java {
 val gatlingVersion = "3.14.3"
 
 dependencies {
-    // TestKit module provides all shared testing infrastructure
-    // The Gatling plugin requires dependencies to be added to gatlingImplementation
     gatlingImplementation(project(":testkit"))
 
-    // Scala library
     gatlingImplementation("org.scala-lang:scala-library:2.13.18")
 
     gatlingImplementation("io.gatling.highcharts:gatling-charts-highcharts:${gatlingVersion}")
@@ -39,19 +34,9 @@ configurations.named("gatlingRuntimeClasspath") {
     extendsFrom(configurations.getByName("gatlingImplementation"))
 }
 
-// Configure Gatling Gradle plugin for container/K8s execution
-// - Point Java preferences to /tmp to avoid java.util.prefs warnings/errors when
-//   running with a read-only root filesystem.
-// - Let Gatling use its default results directory under the project build
-//   directory so the Gradle plugin can reliably locate reports.
-gatling {
-	systemProperties = mapOf(
-	    "java.util.prefs.userRoot" to "/tmp/java-prefs"
-	)
-}
-
 tasks.register("gatlingRunIntegrated") {
 	// Ensure the service and all Gatling runtime dependencies are built
+    dependsOn(":testkit:jar")
     dependsOn(":service:bootJar")
     finalizedBy("gatlingRun")
 
@@ -88,10 +73,7 @@ tasks.register("stopService") {
 
 // Helper task used during Docker image build to fully resolve and download the
 // Gatling runtime classpath so the runtime container can run Gradle in
-// --offline mode using the cached artifacts. We also ensure the shared
-// testkit JAR is built here so that project(":testkit") is available on the
-// Gatling runtime classpath without having to rebuild it in the runtime
-// container.
+// --offline mode using the cached artifacts.
 tasks.register("warmupGatlingRuntimeClasspath") {
     group = "verification"
     description = "Resolves gatlingRuntimeClasspath so Docker runtime can use --offline."

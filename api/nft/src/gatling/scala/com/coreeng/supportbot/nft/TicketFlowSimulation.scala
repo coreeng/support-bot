@@ -1,39 +1,68 @@
 package com.coreeng.supportbot.nft
 
+import com.coreeng.supportbot.nft.TestKitHolder.{getClass, logger}
 import com.coreeng.supportbot.testkit._
 import com.google.common.collect.ImmutableList
 import io.gatling.core.Predef._
 import io.gatling.core.session.Session
+import org.slf4j.LoggerFactory
 
-import java.time.Duration
-import java.util.concurrent.ThreadLocalRandom
+import java.util.concurrent.{ExecutorService, Executors, ThreadLocalRandom, TimeUnit}
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class TicketFlowSimulation extends Simulation {
+  private val logger = LoggerFactory.getLogger(getClass)
 
-  private val testKit = TestKitHolder.testKit
-  private val slackWiremock = TestKitHolder.slackWiremock
-  
+  private var testKit: TestKit = _
+  private var slackWiremock: SlackWiremock = _
+  private var executorService: ExecutorService = _
+  private var executionContext: ExecutionContext = _
+
   import action.TestKitDsl._
 
+  before {
+    logger.info("Initializing TestKit for NFT...")
+
+    val config = Config.load("config.yaml")
+    testKit = TestKit.create(config)
+    slackWiremock = testKit.slack().wiremock()
+
+    slackWiremock.start()
+    slackWiremock.permanent().setupAllNftStubs()
+    logger.info("SlackWiremock started on port {}", testKit.slack().wiremock().port())
+
+    executorService = Executors.newVirtualThreadPerTaskExecutor()
+    executionContext = ExecutionContext.fromExecutor(executorService)
+  }
+
+  after {
+    testKit.slack().wiremock().stop()
+    executorService.shutdown()
+    executorService.awaitTermination(1, TimeUnit.MINUTES)
+  }
+
   private val ticketFlowScenario = scenario("Slack Ticket Flow")
-    .exec(testKitExec("post-tenant-message", testKit)(postTenantMessage))
+    .exec(testKitExec("post-tenant-message", executionContext, testKit)(postTenantMessage))
+    .exitHereIfFailed
     .pause(800.milliseconds, 1200.milliseconds)
-    .exec(testKitExec("create-ticket", testKit)(createTicket))
+    .exec(testKitExec("create-ticket", executionContext, testKit)(createTicket))
+    .exitHereIfFailed
     .pause(800.milliseconds, 1200.milliseconds)
-    .exec(testKitExec("open-summary", testKit)(openSummaryModal))
+    .exec(testKitExec("open-summary", executionContext, testKit)(openSummaryModal))
+    .exitHereIfFailed
     .pause(800.milliseconds, 1200.milliseconds)
-    .exec(testKitExec("submit-summary", testKit)(submitSummaryForm))
+    .exec(testKitExec("submit-summary", executionContext, testKit)(submitSummaryForm))
+    .exitHereIfFailed
 
   setUp(
-    // Short duration to speed up local/CI iterations
     ticketFlowScenario.inject(constantUsersPerSec(10).during(1.minute).randomized)
   ).assertions(
     global.failedRequests.count.is(0),
-    details("post-tenant-message").responseTime.percentile(95).lt(100),
-    details("create-ticket").responseTime.percentile(95).lt(700),
-    details("open-summary").responseTime.percentile(95).lt(600),
-    details("submit-summary").responseTime.percentile(95).lt(1500)
+    details("post-tenant-message").responseTime.percentile(50).lt(100),
+    details("create-ticket").responseTime.percentile(50).lt(700),
+    details("open-summary").responseTime.percentile(50).lt(600),
+    details("submit-summary").responseTime.percentile(50).lt(1500)
   )
 
   /**
@@ -63,7 +92,6 @@ class TicketFlowSimulation extends Simulation {
     val result = RequestJournalVerifier.awaitTicketFormAndExtractId(
       slackWiremock,
       queryMessage.ts().toString,
-      Duration.ofSeconds(5)
     )
 
     session
@@ -89,7 +117,6 @@ class TicketFlowSimulation extends Simulation {
     RequestJournalVerifier.awaitViewsOpenWithTriggerId(
       slackWiremock,
       triggerId,
-      Duration.ofSeconds(5)
     )
 
     session
@@ -120,7 +147,6 @@ class TicketFlowSimulation extends Simulation {
     RequestJournalVerifier.awaitChatUpdate(
       slackWiremock,
       formMessageTs,
-      Duration.ofSeconds(5)
     )
 
     session

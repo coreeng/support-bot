@@ -24,7 +24,7 @@ spec:
             - name: SERVICE_ENDPOINT
               value: "http://support-bot:8080"
             - name: JAVA_OPTS
-              value: "-Xms512m -Xmx512m -Djava.util.prefs.userRoot=/tmp/java-prefs"
+              value: "-Xms2250m -Xmx2250m -Djava.util.prefs.userRoot=/tmp/java-prefs"
           ports:
             - name: slack
               containerPort: 8000

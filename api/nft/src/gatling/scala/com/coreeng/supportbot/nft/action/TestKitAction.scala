@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.nft.action
 
-import com.coreeng.supportbot.nft.TestKitHolder
 import com.coreeng.supportbot.testkit.TestKit
 import io.gatling.commons.stats.{KO, OK}
 import io.gatling.commons.util.Clock
@@ -13,31 +12,27 @@ import io.gatling.core.structure.ScenarioContext
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-object TestKitExecutor {
-  implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(TestKitHolder.virtualThreadExecutor)
-}
-
 class TestKitActionBuilder(
     requestName: String,
     testKit: TestKit,
+    executionContext: ExecutionContext,
     step: (TestKit, Session) => Session
 ) extends ActionBuilder {
 
   override def build(ctx: ScenarioContext, next: Action): Action = {
-    new TestKitAction(requestName, testKit, step, ctx.coreComponents.statsEngine, ctx.coreComponents.clock, next)
+    new TestKitAction(requestName, testKit, executionContext, step, ctx.coreComponents.statsEngine, ctx.coreComponents.clock, next)
   }
 }
 
 class TestKitAction(
     requestName: String,
     testKit: TestKit,
+    executionContext: ExecutionContext,
     step: (TestKit, Session) => Session,
     statsEngine: StatsEngine,
     clock: Clock,
     next: Action
 ) extends Action {
-
-  import TestKitExecutor._
 
   override def name: String = requestName
 
@@ -46,7 +41,7 @@ class TestKitAction(
 
     Future {
       step(testKit, session)
-    }.onComplete {
+    }(executionContext).onComplete {
       case Success(updatedSession) =>
         val endTimestamp = clock.nowMillis
         statsEngine.logResponse(session.scenario, session.groups, requestName, startTimestamp, endTimestamp, OK, None, None)
@@ -54,16 +49,27 @@ class TestKitAction(
 
       case Failure(exception) =>
         val endTimestamp = clock.nowMillis
-        statsEngine.logResponse(session.scenario, session.groups, requestName, startTimestamp, endTimestamp, KO, None, Some(exception.getMessage))
-        next ! session.markAsFailed
-    }
+        val failedSession = session.markAsFailed
+        statsEngine.logResponse(
+          failedSession.scenario,
+          failedSession.groups,
+          requestName,
+          startTimestamp,
+          endTimestamp,
+          KO,
+          None,
+          Option(exception.getMessage)
+        )
+
+        next ! failedSession
+    }(executionContext)
   }
 }
 
 object TestKitDsl {
-  def testKitExec(requestName: String, testKit: TestKit)(
+  def testKitExec(requestName: String, executionContext: ExecutionContext, testKit: TestKit)(
     step: (TestKit, Session) => Session
   ): ActionBuilder = {
-    new TestKitActionBuilder(requestName, testKit, step)
+    new TestKitActionBuilder(requestName, testKit, executionContext, step)
   }
 }
