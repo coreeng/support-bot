@@ -39,3 +39,10 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+reports:
+  pvc:
+    enabled: true
+    storage: 1Gi
+    # Optional storageClassName override; leave empty to use the cluster default
+    storageClassName: ""

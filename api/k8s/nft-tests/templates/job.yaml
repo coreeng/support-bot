@@ -35,9 +35,19 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: nft-reports
+              mountPath: /mnt/nft-reports
       volumes:
         - name: tmp
           emptyDir: {}
+{{- if .Values.reports.pvc.enabled }}
+        - name: nft-reports
+          persistentVolumeClaim:
+            claimName: {{ include "support-bot-nft-tests.fullname" . }}-reports
+{{- else }}
+        - name: nft-reports
+          emptyDir: {}
+{{- end }}
       nodeSelector:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
       tolerations:

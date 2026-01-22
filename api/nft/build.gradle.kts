@@ -34,6 +34,22 @@ configurations.named("gatlingRuntimeClasspath") {
     extendsFrom(configurations.getByName("gatlingImplementation"))
 }
 
+// Configure Gatling Gradle plugin for container/K8s execution
+// - Point Java preferences to /tmp to avoid java.util.prefs warnings/errors when
+//   running with a read-only root filesystem.
+// - When running in CI (including inside the K8s Job), direct Gatling's results
+//   directory to a dedicated volume mounted at /mnt/nft-reports so that
+//   Kubernetes can persist and expose HTML reports via a PVC.
+gatling {
+    if (System.getenv("CI") != null) {
+        // Keep Java preferences under /tmp to avoid java.util.prefs issues
+        // with read-only filesystems.
+        systemProperties = mapOf(
+            "java.util.prefs.userRoot" to "/tmp/java-prefs",
+        )
+    }
+}
+
 tasks.register("gatlingRunIntegrated") {
 	// Ensure the service and all Gatling runtime dependencies are built
     dependsOn(":testkit:jar")

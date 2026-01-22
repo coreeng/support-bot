@@ -11,13 +11,13 @@ permissions:
 
 jobs:
   get-latest-version:
-    uses: coreeng/p2p/.github/workflows/p2p-get-latest-image-extended-test.yaml@v1
+    uses: coreeng/p2p/.github/workflows/p2p-get-latest-image-extended-test.yaml@feature/test-artifacts
     with:
       image-name: support-bot
 
   extendedtests:
     needs: [get-latest-version]
-    uses: coreeng/p2p/.github/workflows/p2p-workflow-extended-test.yaml@v1
+    uses: coreeng/p2p/.github/workflows/p2p-workflow-extended-test.yaml@feature/test-artifacts
     secrets:
       env_vars: ${{ secrets.env_vars }}
     with:
