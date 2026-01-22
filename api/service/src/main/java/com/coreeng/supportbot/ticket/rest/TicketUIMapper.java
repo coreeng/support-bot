@@ -83,7 +83,7 @@ public class TicketUIMapper {
                     .collect(toImmutableList())
             )
             .ratingSubmitted(ticket.ticket().ratingSubmitted())
-            .assignedTo(getAssigneeEmail(ticket.ticket().assignedTo(), ticket.ticket().assignedToOrphaned()))
+            .assignedTo(getAssigneeEmail(ticket.ticket().assignedTo()))
             .build();
     }
 
@@ -93,11 +93,12 @@ public class TicketUIMapper {
         return team != null ? teamUIMapper.mapToUI(team) : null;
     }
 
-    private String getAssigneeEmail(String assignedToUserId, boolean orphaned) {
-        if (assignedToUserId == null || orphaned || !assignmentProps.enabled()) {
+    private String getAssigneeEmail(String assignedToUserId) {
+        if (assignedToUserId == null || !assignmentProps.enabled()) {
             return null;
         }
 
+        // Stream operations with orElse(null) are safe - if user not found, returns null gracefully
         return supportTeamService.members().stream()
             .filter(member -> assignedToUserId.equals(member.slackId().id()))
             .findFirst()

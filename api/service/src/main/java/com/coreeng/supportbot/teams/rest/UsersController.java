@@ -55,11 +55,5 @@ public class UsersController {
             .collect(toImmutableList());
         return ResponseEntity.ok(members);
     }
-
-    public record SupportMemberUI(
-        String userId,      // Slack user ID (used as value in API calls)
-        String displayName  // Email (used for display in UI)
-    ) {
-    }
 }
 

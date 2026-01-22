@@ -1,3 +1,9 @@
+spring:
+  autoconfigure:
+    exclude:
+      - com.azure.spring.cloud.autoconfigure.implementation.context.AzureTokenCredentialAutoConfiguration
+      - com.azure.spring.cloud.autoconfigure.implementation.context.AzureContextAutoConfiguration
+
 slack:
   mode: http
   enable-request-verification: false
@@ -12,7 +18,9 @@ slack:
 
 ticket:
   assignment:
-    enabled: false
+    enabled: true
+    encryption:
+      key: dummy-encryption-key-for-functional-tests-32-chars-long-at-least
 
 enums:
   escalation-teams:
@@ -53,6 +61,8 @@ enums:
 team:
   support:
     name: Core Support
+    code: support
+    slack-group-id: S01234567ST
     static:
       enabled: true
       members:
@@ -65,6 +75,7 @@ team:
   leadership:
     name: Support Leadership
     code: support-leadership
+    slack-group-id: S01234LEADER
     static:
       enabled: true
       members:
@@ -73,6 +84,10 @@ team:
 
 platform-integration:
   enabled: true
+  gcp:
+    enabled: false
+  azure:
+    enabled: false
   static-user:
     enabled: true
     users:
@@ -86,6 +101,8 @@ platform-integration:
         - chandra.giustino@company.com
         - nazira.armel@company.com
   teams-scraping:
+    core-platform:
+      enabled: false
     static:
       enabled: true
       teams:

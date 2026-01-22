@@ -127,7 +127,7 @@ class UsersControllerTest {
         when(supportTeamService.members()).thenReturn(ImmutableList.of());
 
         // when
-        ResponseEntity<List<UsersController.SupportMemberUI>> response = controller.listSupportMembers();
+        ResponseEntity<List<SupportMemberUI>> response = controller.listSupportMembers();
 
         // then
         assertThat(response.getStatusCode().value()).isEqualTo(200);
@@ -157,7 +157,7 @@ class UsersControllerTest {
         when(supportTeamService.members()).thenReturn(ImmutableList.of(member1, member2, member3));
 
         // when
-        ResponseEntity<List<UsersController.SupportMemberUI>> response = controller.listSupportMembers();
+        ResponseEntity<List<SupportMemberUI>> response = controller.listSupportMembers();
 
         // then
         assertThat(response.getStatusCode().value()).isEqualTo(200);
@@ -165,17 +165,17 @@ class UsersControllerTest {
         assertThat(response.getBody()).hasSize(3);
 
         // Verify first member
-        UsersController.SupportMemberUI ui1 = response.getBody().get(0);
+        SupportMemberUI ui1 = response.getBody().get(0);
         assertThat(ui1.userId()).isEqualTo("U12345");
         assertThat(ui1.displayName()).isEqualTo("john.doe@example.com");
 
         // Verify second member
-        UsersController.SupportMemberUI ui2 = response.getBody().get(1);
+        SupportMemberUI ui2 = response.getBody().get(1);
         assertThat(ui2.userId()).isEqualTo("U67890");
         assertThat(ui2.displayName()).isEqualTo("jane.smith@example.com");
 
         // Verify third member
-        UsersController.SupportMemberUI ui3 = response.getBody().get(2);
+        SupportMemberUI ui3 = response.getBody().get(2);
         assertThat(ui3.userId()).isEqualTo("U11111");
         assertThat(ui3.displayName()).isEqualTo("bob.jones@example.com");
 

@@ -22,6 +22,7 @@ public class FullSummaryForm {
     public static class Receiver implements StubWithResult.Receiver<FullSummaryForm> {
         private final static ObjectMapper objectMapper = new ObjectMapper();
         private final Ticket ticket;
+        private final Config config;
 
         @Override
         public MappingBuilder configureStub(MappingBuilder stubBuilder) {
@@ -109,6 +110,9 @@ public class FullSummaryForm {
                 findImpactLabel(ticket.impact()), ticket.impact()
             )
                 : "";
+
+            boolean isAssignmentEnabled = !config.mocks().slack().supportMembers().isEmpty();
+            String assigneeBlock = isAssignmentEnabled ? buildAssigneeBlock() : "";
 
             String headerBlock = """
                 {
@@ -261,7 +265,7 @@ public class FullSummaryForm {
                           ${impactInitialOption}
                           "options": ${impactsOptions}
                         }
-                      }
+                      }${assigneeBlock}
                     ]
                     """,
                 ImmutableMap.<String, Object>builder()
@@ -274,6 +278,7 @@ public class FullSummaryForm {
                     .put("queryPermalink", ticket.queryPermalink())
                     .put("escalationsBlock", buildEscalationBlock())
                     .put("teamInitialOption", teamInitialOption)
+                    .put("assigneeBlock", assigneeBlock)
                     .put("tagsInitialOptions", tagsInitialOptions)
                     .put("impactInitialOption", impactInitialOption)
                     .put("tagsOptions", buildTagsOptionsFromConfig())
@@ -411,6 +416,56 @@ public class FullSummaryForm {
                 .findFirst()
                 .map(Config.Impact::label)
                 .orElse(code);
+        }
+
+        private String buildAssigneeBlock() {
+            String options = config.mocks().slack().supportMembers().stream()
+                .map(member -> String.format("""
+                    {"text": {"type": "plain_text", "text": "%s"}, "value": "%s"}""",
+                    member.email(), member.userId()))
+                .collect(joining(",", "[", "]"));
+
+            String initialOption = "";
+            if (ticket.assignedTo() != null) {
+                Config.SlackSupportMember assignee = config.mocks().slack().supportMembers().stream()
+                    .filter(m -> m.userId().equals(ticket.assignedTo()))
+                    .findFirst()
+                    .orElse(null);
+                if (assignee != null) {
+                    initialOption = String.format("""
+                        "initial_option": {
+                          "text": {"type": "plain_text", "text": "%s"},
+                          "value": "%s"
+                        },
+                    """, assignee.email(), assignee.userId());
+                }
+            }
+
+            return String.format("""
+                ,
+                {
+                  "type": "input",
+                  "label": {
+                    "type": "plain_text",
+                    "text": "Assigned To"
+                  },
+                  "optional": true,
+                  "hint": {
+                    "type": "plain_text",
+                    "text": "Select a support team member to assign this ticket to"
+                  },
+                  "element": {
+                    "type": "static_select",
+                    "action_id": "ticket-change-assignee",
+                    "placeholder": {
+                      "type": "plain_text",
+                      "text": "Unassigned"
+                    },
+                    %s
+                    "options": %s
+                  }
+                }
+                """, initialOption, options);
         }
     }
 }

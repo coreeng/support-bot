@@ -82,8 +82,6 @@ public class TicketInMemoryRepository implements TicketRepository {
         return ticketsByQuery.computeIfPresent(updatedTicket.queryRef(), (key, t) -> {
             Ticket newTicket = updatedTicket.toBuilder()
                 .assignedTo(updatedTicket.assignedTo() != null ? updatedTicket.assignedTo() : t.assignedTo())
-                .assignedToFormat(updatedTicket.assignedTo() != null ? updatedTicket.assignedToFormat() : t.assignedToFormat())
-                .assignedToOrphaned(updatedTicket.assignedTo() != null ? updatedTicket.assignedToOrphaned() : t.assignedToOrphaned())
                 .build();
             tickets.put(newTicket.id(), newTicket);
             return newTicket;
@@ -123,8 +121,6 @@ public class TicketInMemoryRepository implements TicketRepository {
             }
             Ticket updated = t.toBuilder()
                 .assignedTo(slackUserId)
-                .assignedToFormat("plain")
-                .assignedToOrphaned(false)
                 .build();
             ticketsByQuery.put(t.queryRef(), updated);
             return updated;

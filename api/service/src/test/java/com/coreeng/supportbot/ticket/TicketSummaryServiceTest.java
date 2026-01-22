@@ -79,7 +79,6 @@ class TicketSummaryServiceTest {
             .tags(ImmutableList.of("bug", "urgent"))
             .impact("production-blocking")
             .assignedTo(null)
-            .assignedToOrphaned(false)
             .build();
 
         slackMessage = new Message();
@@ -151,7 +150,6 @@ class TicketSummaryServiceTest {
 
         Ticket assignedTicket = ticket.toBuilder()
             .assignedTo("U789012")
-            .assignedToOrphaned(false)
             .build();
 
         ImmutableList<TeamMemberFetcher.TeamMember> members = ImmutableList.of(
@@ -179,44 +177,6 @@ class TicketSummaryServiceTest {
         assertThat(result.availableAssignees().get(1).userId()).isEqualTo("U789013");
         assertThat(result.availableAssignees().get(1).displayName()).isEqualTo("bob@example.com");
         verify(supportTeamService).members();
-    }
-
-    @Test
-    void shouldHandleOrphanedAssignee() {
-        // given
-        TicketAssignmentProps assignmentProps = new TicketAssignmentProps(
-            true, 
-            new TicketAssignmentProps.Encryption(false, null)
-        );
-        service = new TicketSummaryService(
-            repository,
-            slackClient,
-            escalationQueryService,
-            tagsRegistry,
-            impactsRegistry,
-            escalationTeamsRegistry,
-            supportTeamService,
-            assignmentProps
-        );
-
-        Ticket orphanedTicket = ticket.toBuilder()
-            .assignedTo("U999999")
-            .assignedToOrphaned(true)
-            .build();
-
-        when(repository.findTicketById(ticketId)).thenReturn(orphanedTicket);
-        when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
-        when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
-        when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
-        when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of());
-        when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
-        when(supportTeamService.members()).thenReturn(ImmutableList.of());
-
-        // when
-        TicketSummaryView result = service.summaryView(ticketId);
-
-        // then
-        assertThat(result.currentAssignee()).isNull();
     }
 
     @Test

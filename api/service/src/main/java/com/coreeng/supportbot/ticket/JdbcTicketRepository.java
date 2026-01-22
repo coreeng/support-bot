@@ -115,7 +115,6 @@ public class JdbcTicketRepository implements TicketRepository {
                 TICKET.LAST_INTERACTED_AT,
                 TICKET.ASSIGNED_TO,
                 TICKET.ASSIGNED_TO_FORMAT,
-                TICKET.ASSIGNED_TO_ORPHANED,
                 TICKET.ASSIGNED_TO_HASH
             )
             .values(
@@ -129,7 +128,6 @@ public class JdbcTicketRepository implements TicketRepository {
                 ticket.lastInteractedAt(),
                 assignee.value(),
                 assignee.format(),
-                assignee.orphaned(),
                 assignee.hash()
             )
             .onConflictDoNothing()
@@ -194,7 +192,6 @@ public class JdbcTicketRepository implements TicketRepository {
                 result = result
                     .set(TICKET.ASSIGNED_TO, assignee.value())
                     .set(TICKET.ASSIGNED_TO_FORMAT, assignee.format())
-                    .set(TICKET.ASSIGNED_TO_ORPHANED, assignee.orphaned())
                     .set(TICKET.ASSIGNED_TO_HASH, assignee.hash());
             }
         }
@@ -233,7 +230,6 @@ public class JdbcTicketRepository implements TicketRepository {
         UpdateConditionStep<TicketRecord> update = dsl.update(TICKET)
                 .set(TICKET.ASSIGNED_TO, assignee.value())
                 .set(TICKET.ASSIGNED_TO_FORMAT, assignee.format())
-                .set(TICKET.ASSIGNED_TO_ORPHANED, assignee.orphaned())
                 .set(TICKET.ASSIGNED_TO_HASH, assignee.hash())
                 .where(TICKET.ID.eq(ticketId.id()));
 
@@ -575,16 +571,13 @@ public class JdbcTicketRepository implements TicketRepository {
             TICKET.RATING_SUBMITTED,
             TICKET.ASSIGNED_TO,
             TICKET.ASSIGNED_TO_FORMAT,
-            TICKET.ASSIGNED_TO_ORPHANED,
             TICKET.LAST_INTERACTED_AT
         );
     }
 
     private Ticket buildTicketFromRow(Record r) {
         String assignedToFormat = r.get(TICKET.ASSIGNED_TO_FORMAT);
-        Boolean orphaned = r.get(TICKET.ASSIGNED_TO_ORPHANED);
         String assignedPlain = decryptAssignee(r.get(TICKET.ASSIGNED_TO), assignedToFormat);
-        boolean orphanFlag = Boolean.TRUE.equals(orphaned) || (assignedPlain == null && r.get(TICKET.ASSIGNED_TO) != null);
 
         return Ticket.builder()
             .id(new TicketId(r.get(TICKET.ID)))
@@ -596,22 +589,20 @@ public class JdbcTicketRepository implements TicketRepository {
             .impact(r.get(TICKET.IMPACT_CODE))
             .ratingSubmitted(r.get(TICKET.RATING_SUBMITTED))
             .assignedTo(assignedPlain)
-            .assignedToFormat(assignedToFormat == null ? "plain" : assignedToFormat)
-            .assignedToOrphaned(orphanFlag)
             .lastInteractedAt(r.get(TICKET.LAST_INTERACTED_AT))
             .build();
     }
 
     private AssigneeWrite toDbAssignee(String assigneePlain) {
         if (assigneePlain == null) {
-            return new AssigneeWrite(null, "plain", false, null);
+            return new AssigneeWrite(null, "plain", null);
         }
         String hash = assigneeCrypto.computeHash(assigneePlain);
         return assigneeCrypto.encrypt(assigneePlain)
-            .map(res -> new AssigneeWrite(res.value(), res.format(), false, hash))
+            .map(res -> new AssigneeWrite(res.value(), res.format(), hash))
             .orElseGet(() -> {
                 // encryption failed; skip assignment but do not break flow
-                return new AssigneeWrite(null, "plain", false, null);
+                return new AssigneeWrite(null, "plain", null);
             });
     }
 

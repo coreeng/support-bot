@@ -260,7 +260,6 @@ class HomepageServiceTest {
                 .queryTs(messageTs)
                 .team(TicketTeam.fromCode("lions"))
                 .assignedTo(assignedToUserId)
-                .assignedToOrphaned(false)
                 .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
                 .build();
 
@@ -305,7 +304,6 @@ class HomepageServiceTest {
                 .queryTs(messageTs)
                 .team(TicketTeam.fromCode("lions"))
                 .assignedTo(assignedToUserId)
-                .assignedToOrphaned(false)
                 .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
                 .build();
 
@@ -347,7 +345,6 @@ class HomepageServiceTest {
                 .queryTs(messageTs)
                 .team(TicketTeam.fromCode("lions"))
                 .assignedTo(assignedToUserId)
-                .assignedToOrphaned(true)
                 .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
                 .build();
 
@@ -389,7 +386,6 @@ class HomepageServiceTest {
                 .queryTs(messageTs)
                 .team(TicketTeam.fromCode("lions"))
                 .assignedTo(assignedToUserId)
-                .assignedToOrphaned(false)
                 .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
                 .build();
 
@@ -433,7 +429,6 @@ class HomepageServiceTest {
                 .queryTs(messageTs)
                 .team(TicketTeam.fromCode("lions"))
                 .assignedTo(null)
-                .assignedToOrphaned(false)
                 .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
                 .build();
 
