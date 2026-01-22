@@ -36,9 +36,6 @@ class TicketUpdateServiceTest {
     @Mock
     private TicketUIMapper mapper;
 
-    @Mock
-    private TicketRepository ticketRepository;
-
     private TicketUpdateService service;
 
     private TicketId ticketId;
@@ -52,8 +49,7 @@ class TicketUpdateServiceTest {
             queryService,
             impactsRegistry,
             mapper,
-            platformTeamsService,
-            ticketRepository
+            platformTeamsService
         );
 
         ticketId = new TicketId(123L);

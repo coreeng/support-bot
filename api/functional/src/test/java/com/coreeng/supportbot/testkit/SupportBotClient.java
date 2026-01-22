@@ -91,6 +91,19 @@ public class SupportBotClient {
             .extract().as(TicketResponse.class);
     }
 
+    public BulkReassignResponse bulkReassign(BulkReassignRequest request) {
+        return given()
+            .config(restAssuredConfig)
+            .when()
+            .contentType(ContentType.JSON)
+            .body(request)
+            .post(baseUrl + "/assignment/bulk-reassign")
+            .then()
+            .log().ifValidationFails(LogDetail.ALL, true)
+            .statusCode(200)
+            .extract().as(BulkReassignResponse.class);
+    }
+
     public class TestMethods {
         public TicketResponse createTicket(TicketToCreateRequest request) {
             return given()
@@ -145,6 +158,7 @@ public class SupportBotClient {
         private ImmutableList<Ticket.@NonNull StatusLog> logs;
         private boolean escalated;
         private ImmutableList<@NonNull Escalation> escalations;
+        private String assignedTo;
     }
 
     public record QueryResponse(String link, Instant date, MessageTs ts, String text) {}
@@ -179,5 +193,26 @@ public class SupportBotClient {
         private final String authorsTeam;
         private final ImmutableList<@NonNull String> tags;
         private final String impact;
+    }
+
+    @Builder
+    @Getter
+    @Jacksonized
+    public static class BulkReassignRequest {
+        private final ImmutableList<Long> ticketIds;
+        private final String assignedTo;
+    }
+
+    @Builder
+    @Getter
+    @Jacksonized
+    public static class BulkReassignResponse {
+        private final int successCount;
+        private final int failureCount;
+        private final int skippedCount;
+        private final ImmutableList<Long> successfulTicketIds;
+        private final ImmutableList<Long> failedTicketIds;
+        private final ImmutableList<Long> skippedTicketIds;
+        private final String message;
     }
 }

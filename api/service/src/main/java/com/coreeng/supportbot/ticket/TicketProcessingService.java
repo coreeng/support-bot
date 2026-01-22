@@ -50,7 +50,6 @@ public class TicketProcessingService {
             Ticket updatedTicket = repository.updateTicket(
                 ticket.toBuilder()
                     .status(TicketStatus.opened)
-                    .assignedTo(null) // avoid rewriting assignment when not changing it
                     .lastInteractedAt(Instant.now())
                     .build()
             );
@@ -139,7 +138,6 @@ public class TicketProcessingService {
             repository.updateTicket(
                 newTicket.toBuilder()
                     .createdMessageTs(postedMessageRef.ts())
-                    .assignedTo(null) // do not rewrite assignment
                     .lastInteractedAt(Instant.now())
                     .build()
             );
@@ -174,14 +172,10 @@ public class TicketProcessingService {
                 .team(submission.authorsTeam())
                 .tags(submission.tags())
                 .impact(submission.impact())
-                .assignedTo(null) // leave assignment untouched unless explicitly set
+                .assignedTo(submission.assignedTo())
                 .lastInteractedAt(Instant.now())
                 .build()
         );
-
-        if (submission.assignedTo() != null) {
-            repository.assign(updatedTicket.id(), submission.assignedTo());
-        }
 
         log.atInfo()
             .addKeyValue("ticketId", updatedTicket.id().id())
@@ -240,7 +234,6 @@ public class TicketProcessingService {
         Ticket updatedTicket = repository.updateTicket(
             ticket.toBuilder()
                 .status(TicketStatus.stale)
-                .assignedTo(null) // leave assignment untouched
                 .lastInteractedAt(Instant.now())
                 .build()
         );

@@ -1,37 +1,23 @@
 package com.coreeng.supportbot;
 
-import java.time.Duration;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
+import com.coreeng.supportbot.testkit.*;
+import com.google.common.collect.ImmutableList;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import com.coreeng.supportbot.testkit.EscalationFormSubmission;
-import com.coreeng.supportbot.testkit.FullSummaryForm;
-import com.coreeng.supportbot.testkit.FullSummaryFormSubmission;
-import com.coreeng.supportbot.testkit.MessageTs;
-import com.coreeng.supportbot.testkit.ReactionAddedExpectation;
-import com.coreeng.supportbot.testkit.SlackMessage;
-import com.coreeng.supportbot.testkit.SlackTestKit;
-import com.coreeng.supportbot.testkit.StubWithResult;
-import com.coreeng.supportbot.testkit.SummaryCloseConfirm;
-import com.coreeng.supportbot.testkit.SupportBotClient;
-import com.coreeng.supportbot.testkit.TestKit;
-import com.coreeng.supportbot.testkit.Ticket;
-import com.coreeng.supportbot.testkit.TicketMessage;
-import com.coreeng.supportbot.testkit.MessageUpdatedExpectation;
-import static com.coreeng.supportbot.testkit.UserRole.workflow;
-import static com.coreeng.supportbot.testkit.UserRole.support;
-import static com.coreeng.supportbot.testkit.UserRole.tenant;
-import com.google.common.collect.ImmutableList;
+import java.time.Duration;
+
+import static com.coreeng.supportbot.testkit.UserRole.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 @ExtendWith(TestKitExtension.class)
 public class TicketManagementTests {
     private TestKit testKit;
     private SupportBotClient supportBotClient;
     private Config config;
+    private SlackWiremock slackWiremock;
 
     @Test
     public void whenTicketHasMultipleEscalations_summaryShowsAllAndCloseResolvesAll() {
@@ -96,9 +82,10 @@ public class TicketManagementTests {
         // given
         TestKit.RoledTestKit asTenant = testKit.as(tenant);
         SlackTestKit asTenantSlack = asTenant.slack();
-        SlackTestKit asSupportSlack = testKit.as(support).slack();
+        TestKit.RoledTestKit asSupport = testKit.as(support);
+        SlackTestKit asSupportSlack = asSupport.slack();
+        var supportUser = config.supportUsers().getFirst();
 
-        // when
         SlackMessage tenantsMessage = asTenantSlack.postMessage(
             MessageTs.now(),
             "Please, help me with my query"
@@ -108,12 +95,15 @@ public class TicketManagementTests {
 
         asSupportSlack.addReactionTo(tenantsMessage, "eyes");
 
-        // then
         creationStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket created");
         TicketMessage ticketMessage = creationStubs.ticketMessagePosted().result();
         assertThat(ticketMessage).isNotNull();
         var ticketResponse = supportBotClient.assertTicketExists(ticketMessage);
         ticketMessage.assertMatches(ticketResponse);
+
+        assertThat(ticketResponse.assignedTo())
+            .as("Ticket should be auto-assigned to support member who reacted with eyes emoji")
+            .isEqualTo(supportUser.email());
     }
 
     @Test
@@ -423,5 +413,69 @@ public class TicketManagementTests {
 
         // then: Should return 200 with team options
         response.statusCode(200);
+    }
+
+    @Test
+    public void whenTicketIsManuallyReassignedViaFullSummary_newAssigneeIsSaved() {
+        TestKit.RoledTestKit asTenant = testKit.as(tenant);
+        TestKit.RoledTestKit asSupport = testKit.as(support);
+        var supportUser1 = config.supportUsers().getFirst();
+        var supportUser2 = config.supportUsers().stream()
+            .filter(u -> !u.slackUserId().equals(supportUser1.slackUserId()))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("Need at least 2 support members for this test"));
+        
+        SlackMessage tenantsMessage = asTenant.slack().postMessage(
+            MessageTs.now(),
+            "Please, help me with my query"
+        );
+        MessageTs ticketMessageTs = MessageTs.now();
+        var creationStubs = tenantsMessage.stubTicketCreationFlow(ticketMessageTs);
+        
+        asSupport.slack().addReactionTo(tenantsMessage, "eyes");
+        
+        creationStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket created");
+        TicketMessage ticketMessage = creationStubs.ticketMessagePosted().result();
+        var initialResponse = supportBotClient.assertTicketExists(ticketMessage);
+        
+        assertThat(initialResponse.assignedTo())
+            .as("Ticket should be auto-assigned to support member 1 who reacted")
+            .isEqualTo(supportUser1.email());
+        
+        String queryMessage = "Please, help me with my query";
+        String queryBlocksJson = String.format("""
+            [{"type":"rich_text","elements":[{"type":"rich_text_section","elements":[{"type":"text","text":"%s"}]}]}]
+            """, queryMessage);
+
+        String assignedToUserId = supportUser1.slackUserId();
+        
+        Ticket ticket = Ticket.fromResponse(initialResponse)
+            .user(asTenant.user())
+            .config(config)
+            .teamId(asTenant.teamId())
+            .slackWiremock(slackWiremock)
+            .supportBotClient(supportBotClient)
+            .queryBlocksJson(queryBlocksJson)
+            .queryText(queryMessage)
+            .queryPermalink("https://slack.com/messages/" + tenantsMessage.channelId() + "/" + tenantsMessage.ts())
+            .assignedTo(assignedToUserId)
+            .build();
+        
+        String triggerId = "reassign_ticket_trigger";
+        FullSummaryFormSubmission.Values reassignValues = FullSummaryFormSubmission.Values.builder()
+            .status(ticket.status())
+            .team("wow")
+            .tags(ImmutableList.of("ingresses"))
+            .impact("productionBlocking")
+            .assignedTo(supportUser2.slackUserId())
+            .build();
+        
+        ticket.openSummaryAndSubmit(asSupport.slack(), triggerId, reassignValues);
+        ticket.applyChangesLocally().applyFormValues(reassignValues);
+        
+        SupportBotClient.TicketResponse finalResponse = supportBotClient.assertTicketExists(ticket);
+        assertThat(finalResponse.assignedTo())
+            .as("Ticket should be reassigned to support member 2")
+            .isEqualTo(supportUser2.email());
     }
 }

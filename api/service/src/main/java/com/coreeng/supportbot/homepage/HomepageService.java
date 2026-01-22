@@ -122,13 +122,13 @@ public class HomepageService {
                 .get().date()
         );
 
-        view.assignedTo(getAssigneeEmail(ticket.assignedTo(), ticket.assignedToOrphaned()));
+        view.assignedTo(getAssigneeEmail(ticket.assignedTo()));
 
         return view.build();
     }
 
-    private String getAssigneeEmail(String assignedToUserId, boolean orphaned) {
-        if (assignedToUserId == null || orphaned || !assignmentProps.enabled()) {
+    private String getAssigneeEmail(String assignedToUserId) {
+        if (assignedToUserId == null || !assignmentProps.enabled()) {
             return null;
         }
 
