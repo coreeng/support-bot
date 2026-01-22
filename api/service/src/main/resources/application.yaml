@@ -195,3 +195,6 @@ mock-data:
 rbac:
   enabled: true
 
+metrics:
+  enabled: false
+  refresh-interval: 60s

@@ -16,7 +16,7 @@ public class TicketTestKit {
     @NonNull
     private final Config config;
 
-    private static String messageToBlocksJson(String message) {
+    public static String messageToBlocksJson(String message) {
         return String.format("""
             [{"type":"rich_text","elements":[{"type":"rich_text_section","elements":[{"type":"text","text":"%s"}]}]}]
             """, message);
@@ -29,8 +29,9 @@ public class TicketTestKit {
             .createdMessageTs(MessageTs.now())
         ).build();
 
-        slackWiremock.stubGetPermalink(ticketToCreate.channelId(), ticketToCreate.queryTs());
-        slackWiremock.stubGetMessage(MessageToGet.builder()
+        Stub getPermalinkStub = slackWiremock.stubGetPermalink(ticketToCreate.opDescription() + ": get permalink", ticketToCreate.channelId(), ticketToCreate.queryTs());
+        Stub getMessageStub = slackWiremock.stubGetMessage(MessageToGet.builder()
+            .description(ticketToCreate.opDescription() + ": get message")
             .channelId(ticketToCreate.channelId())
             .ts(ticketToCreate.queryTs())
             .threadTs(ticketToCreate.queryTs())
@@ -38,13 +39,15 @@ public class TicketTestKit {
             .blocksJson(messageToBlocksJson(ticketToCreate.message()))
             .userId(testKit.user().slackUserId())
             .botId(testKit.user().slackBotId())
-            .team(testKit.teamId())
             .build());
         SupportBotClient.TicketResponse response = supportBotClient.test().createTicket(SupportBotClient.TicketToCreateRequest.builder()
             .channelId(ticketToCreate.channelId())
             .queryTs(ticketToCreate.queryTs())
             .createdMessageTs(ticketToCreate.createdMessageTs())
             .build());
+
+        getPermalinkStub.assertIsCalled();
+        getMessageStub.assertIsCalled();
 
         return Ticket.fromResponse(response)
             .user(testKit.user())

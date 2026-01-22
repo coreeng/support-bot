@@ -5,6 +5,8 @@ import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.time.Duration;
+
 import static com.coreeng.supportbot.testkit.UserRole.support;
 import static com.coreeng.supportbot.testkit.UserRole.tenant;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,10 +27,8 @@ public class TicketApiTests {
                 .message(messageText)
         );
 
-        ticket.stubQueryMessageFetch();
-
         // then
-        var ticketResponse = supportBotClient.assertTicketExists(ticket);
+        var ticketResponse = supportBotClient.assertTicketExists(TicketByIdQuery.fromTicket(ticket));
         assertThat(ticketResponse.query().text()).isEqualTo(messageText);
     }
 
@@ -40,21 +40,7 @@ public class TicketApiTests {
                 .message("Initial query")
         );
 
-        var updateStub = ticket.slackWiremock().stubMessageUpdated(
-                MessageUpdatedExpectation.<TicketMessage>builder()
-                        .channelId(ticket.channelId())
-                        .ts(ticket.formMessageTs())
-                        .threadTs(ticket.queryTs())
-                        .receiver(new TicketMessage.Receiver())
-                        .build()
-        );
-        var closeReaction = ticket.slackWiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
-                        .reaction("white_check_mark")
-                        .channelId(ticket.channelId())
-                        .ts(ticket.queryTs())
-                        .build()
-        );
+        var closeStubs = ticket.stubCloseFlow("ticket closed");
 
         // when
         var updated = supportBotClient.updateTicket(
@@ -72,8 +58,7 @@ public class TicketApiTests {
         assertThat(updated.team().code()).isEqualTo("wow");
         assertThat(updated.tags()).containsExactlyInAnyOrder("ingresses", "networking");
         assertThat(updated.impact()).isEqualTo("productionBlocking");
-        updateStub.assertIsCalled("ticket form message updated");
-        closeReaction.assertIsCalled("ticket close reaction added");
+        closeStubs.awaitAllCalled(Duration.ofSeconds(1));
     }
 
     @Test

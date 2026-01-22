@@ -9,6 +9,8 @@ import lombok.Getter;
 @Getter
 public class UserProfileToGet {
     @NonNull
+    private final String description;
+    @NonNull
     private final String userId;
     @NonNull
     private final String email;

@@ -62,6 +62,14 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 
+    // Support test filtering via -Dtests="pattern" (e.g., -Dtests="*SomeTest*")
+    // Useful when we run tests via testIntegrated task, because `--test` doesn't work with it
+    System.getProperty("tests")?.let { pattern ->
+        filter {
+            includeTestsMatching(pattern)
+        }
+    }
+
     testLogging {
         events = setOf(
             TestLogEvent.PASSED,

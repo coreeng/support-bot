@@ -9,6 +9,9 @@ import lombok.Getter;
 @Getter
 public class TicketToCreate {
     @NonNull
+    @Builder.Default
+    private final String opDescription = "create ticket";
+    @NonNull
     private final String channelId;
     @NonNull
     private final MessageTs queryTs;

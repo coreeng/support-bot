@@ -14,11 +14,14 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.collect.ImmutableList;
 
 import static io.restassured.RestAssured.given;
+
 import io.restassured.config.ObjectMapperConfig;
 import io.restassured.config.RestAssuredConfig;
 import io.restassured.filter.log.LogDetail;
 import io.restassured.http.ContentType;
+
 import static io.restassured.http.ContentType.JSON;
+
 import lombok.Builder;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -66,16 +69,29 @@ public class SupportBotClient {
             .statusCode(404);
     }
 
-    public TicketResponse assertTicketExists(SearchableForTicket ticket) {
-        slackWiremock.stubGetPermalink(ticket.channelId(), ticket.queryTs());
-        return given()
-            .config(restAssuredConfig)
-            .when()
-            .get(baseUrl + "/ticket/{id}", ticket.ticketId())
-            .then()
-            .log().ifValidationFails(LogDetail.ALL, true)
-            .statusCode(200)
-            .extract().as(TicketResponse.class);
+    public TicketResponse assertTicketExists(TicketByIdQuery query) {
+        Stub getPermalinkStub = slackWiremock.stubGetPermalink("assertTicketExists: get permalink", query.channelId(), query.queryTs());
+        Stub getMessageStub = slackWiremock.stubGetMessage(MessageToGet.builder()
+            .description("assertTicketExists: get message")
+            .ts(query.queryTs())
+            .threadTs(query.queryTs())
+            .channelId(query.channelId())
+            .text(query.queryText())
+            .blocksJson(query.queryBlocksJson())
+            .build());
+        try {
+            return given()
+                .config(restAssuredConfig)
+                .when()
+                .get(baseUrl + "/ticket/{id}", query.ticketId())
+                .then()
+                .log().ifValidationFails(LogDetail.ALL, true)
+                .statusCode(200)
+                .extract().as(TicketResponse.class);
+        } finally {
+            getPermalinkStub.cleanUp(); // it's cached so might be not called
+            getMessageStub.assertIsCalled();
+        }
     }
 
     public TicketResponse updateTicket(long ticketId, UpdateTicketRequest request) {
@@ -161,9 +177,15 @@ public class SupportBotClient {
         private String assignedTo;
     }
 
-    public record QueryResponse(String link, Instant date, MessageTs ts, String text) {}
-    public record TicketFormMessage(MessageTs ts) {}
-    public record Team(String label, String code, ImmutableList<@NonNull String> types) {}
+    public record QueryResponse(String link, Instant date, MessageTs ts, String text) {
+    }
+
+    public record TicketFormMessage(MessageTs ts) {
+    }
+
+    public record Team(String label, String code, ImmutableList<@NonNull String> types) {
+    }
+
     @Builder
     @Getter
     @Jacksonized
