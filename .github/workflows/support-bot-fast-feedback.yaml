@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   version:
-    uses: coreeng/p2p/.github/workflows/p2p-version.yaml@v1
+    uses: coreeng/p2p/.github/workflows/p2p-version.yaml@feature/test-artifacts
     with:
       version-prefix: v
     secrets:
@@ -27,10 +27,13 @@ jobs:
 
   fastfeedback:
     needs: [version]
-    uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@v1
+    uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@feature/test-artifacts
     secrets:
       env_vars: ${{ secrets.env_vars }}
     with:
       app-name: support-bot
       version: ${{ needs.version.outputs.version }}
       working-directory: ./
+      artifacts: |
+        p2p-nft:
+          - reports/nft/**

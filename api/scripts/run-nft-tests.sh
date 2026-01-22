@@ -36,6 +36,96 @@ cleanup() {
 
 trap cleanup EXIT
 
+collect_nft_artifacts() {
+  # Copy Gatling HTML reports from the PVC used by the nft-tests Job, via a
+  # short-lived helper pod that mounts the same claim. This avoids relying on
+  # exec access to the main Job pod, which may already be in Failed phase.
+
+  local root_dir
+  root_dir="${ARTIFACTS_BASE_DIR:-${SCRIPT_DIR}/../..}"
+  local dest_dir
+  dest_dir="${root_dir}/reports/nft"
+
+  mkdir -p "${dest_dir}"
+
+  # Discover the PVC backing the dedicated reports volume on the Job template.
+  local pvc_name
+  pvc_name=$(kubectl get job "${JOB_RELEASE}" -n "${NAMESPACE}" \
+    -o jsonpath='{.spec.template.spec.volumes[?(@.name=="nft-reports")].persistentVolumeClaim.claimName}' 2>/dev/null || echo "")
+
+  if [[ -z "${pvc_name}" ]]; then
+    log_warning "No PVC-backed tmp volume found on job ${JOB_RELEASE}; skipping PVC-based artifact collection"
+    return 0
+  fi
+
+  local helper_pod
+  helper_pod="${JOB_RELEASE}-reports-helper-$(date +%s)"
+  log "Creating helper pod ${helper_pod} to copy Gatling reports from PVC ${pvc_name}"
+
+  cat <<EOF | kubectl apply -n "${NAMESPACE}" -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${helper_pod}
+spec:
+  restartPolicy: Never
+  volumes:
+    - name: nft-reports
+      persistentVolumeClaim:
+        claimName: ${pvc_name}
+  containers:
+    - name: helper
+      image: alpine:3.19
+      command: ["sh", "-c", "sleep 3600"]
+      volumeMounts:
+        - name: nft-reports
+          mountPath: /mnt/nft-reports
+EOF
+
+  # Wait for helper pod to be Running so we can kubectl cp from it
+  local attempt=0
+  local max_attempts=60
+  while (( attempt < max_attempts )); do
+    attempt=$((attempt + 1))
+    local phase
+    phase=$(kubectl get pod "${helper_pod}" -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+
+    if [[ "${phase}" == "Running" ]]; then
+      break
+    fi
+
+    if [[ "${phase}" == "Failed" || "${phase}" == "Succeeded" ]]; then
+      log_warning "Helper pod ${helper_pod} reached phase '${phase}' before becoming Running; giving up on artifact collection"
+      kubectl delete pod "${helper_pod}" -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+      return 0
+    fi
+
+    log "[artifacts] Waiting for helper pod ${helper_pod} to be Running (current phase: ${phase:-Unknown})"
+    sleep 5
+  done
+
+  if (( attempt >= max_attempts )); then
+    log_warning "Timed out waiting for helper pod ${helper_pod} to be Running; skipping artifact collection"
+    kubectl delete pod "${helper_pod}" -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+    return 0
+  fi
+
+  # Gatling is configured in Gradle to write results directly under
+  # /mnt/nft-reports inside the test container, which is backed by this PVC.
+  # The helper pod mounts the same PVC at /mnt/nft-reports, so we can copy
+  # that directory as-is.
+  local src_path
+  src_path="/mnt/nft-reports"
+  log "Collecting Gatling reports from helper pod ${helper_pod}:${src_path} into ${dest_dir}"
+  if kubectl cp "${NAMESPACE}/${helper_pod}:${src_path}" "${dest_dir}" -c helper; then
+    log_success "Copied Gatling reports to ${dest_dir}"
+  else
+    log_warning "Failed to copy Gatling reports from helper pod ${helper_pod}; artifacts may be missing"
+  fi
+
+  kubectl delete pod "${helper_pod}" -n "${NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+}
+
 main() {
   log "Running NFT tests in namespace ${NAMESPACE}"
   log "Job image: ${JOB_IMAGE_REPOSITORY}:${IMAGE_TAG}"
@@ -73,13 +163,23 @@ main() {
     --set image.tag="${IMAGE_TAG}" \
     --set job.activeDeadlineSeconds="${TIMEOUT}"
 
-  # Wait for job completion and stream logs from the nft-tests container
-  if ! wait_for_job_with_logs "${JOB_RELEASE}" "${NAMESPACE}" "${TIMEOUT}" "nft-tests"; then
-    show_job_status "${JOB_RELEASE}" "${NAMESPACE}"
-    exit 1
-  fi
+	  # Wait for job completion and stream logs from the nft-tests container
+	  local job_exit_code=0
+	  if ! wait_for_job_with_logs "${JOB_RELEASE}" "${NAMESPACE}" "${TIMEOUT}" "nft-tests"; then
+	    job_exit_code=1
+	    show_job_status "${JOB_RELEASE}" "${NAMESPACE}"
+	  fi
 
-  log_success "NFT tests completed successfully"
+	  # Attempt to collect Gatling reports from the PVC via helper pod, even if
+	  # the job failed.
+	  collect_nft_artifacts || true
+	
+	  if [[ "${job_exit_code}" -ne 0 ]]; then
+	    log_error "NFT tests failed"
+	    exit "${job_exit_code}"
+	  fi
+	
+	  log_success "NFT tests completed successfully"
 }
 
 main "$@"

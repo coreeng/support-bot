@@ -43,15 +43,22 @@ ENV NFT_SIMULATION_FQCN="com.coreeng.supportbot.nft.TicketFlowSimulation"
 #      so runtime Gradle can reuse dependency caches while still writing only
 #      under /tmp.
 #   3. Run the Gatling Gradle task in non-interactive, offline mode for the NFT
-#      simulation.
+#      simulation and then copy the generated reports into the PVC-backed
+#      /mnt/nft-reports directory so they can be exported by the helper pod.
 ENTRYPOINT ["sh", "-c", "\
   set -e; \
-  mkdir -p /tmp/project \"$GRADLE_USER_HOME\"; \
+  mkdir -p /tmp/project \"$GRADLE_USER_HOME\" /mnt/nft-reports; \
   cp -R /opt/project/. /tmp/project/; \
   if [ -d /opt/gradle-home ]; then \
     cp -R /opt/gradle-home/. \"$GRADLE_USER_HOME/\"; \
   fi; \
-  cd /tmp/project && \
-  CI=true ./gradlew :nft:gatlingRun --no-daemon --offline --simulation=$NFT_SIMULATION_FQCN"]
+  cd /tmp/project; \
+  CI=true ./gradlew :nft:gatlingRun --no-daemon --offline --simulation=$NFT_SIMULATION_FQCN || GRADLE_EXIT_CODE=$?; \
+  : \"${GRADLE_EXIT_CODE:=0}\"; \
+  rm -rf /mnt/nft-reports/*; \
+  if [ -d /tmp/project/nft/build/reports/gatling ]; then \
+    cp -R /tmp/project/nft/build/reports/gatling/. /mnt/nft-reports/ || true; \
+  fi; \
+  exit $GRADLE_EXIT_CODE"]
 
 USER 185
