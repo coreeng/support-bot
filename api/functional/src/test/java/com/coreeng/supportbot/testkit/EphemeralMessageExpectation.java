@@ -4,17 +4,17 @@ import lombok.Builder;
 import lombok.Getter;
 import org.jspecify.annotations.NonNull;
 
-@Builder(toBuilder = true)
+@Builder
 @Getter
-public class ThreadMessagePostedExpectation<T> {
+public class EphemeralMessageExpectation<T> {
     @NonNull
     private final String description;
-    private final StubWithResult.@NonNull Receiver<T> receiver;
     @NonNull
-    private final UserRole from;
-    @NonNull
-    private final MessageTs newMessageTs;
-
     private final String channelId;
+    @NonNull
     private final MessageTs threadTs;
+    @NonNull
+    private final String userId;
+    private final StubWithResult.@NonNull Receiver<T> receiver;
 }
+

@@ -21,9 +21,10 @@ public class SlackMessage {
     @NonNull
     private final String channelId;
 
-    public Stub expectReactionAdded(String reaction) {
+    public Stub expectReactionAdded(String description, String reaction) {
         return slackWiremock.stubReactionAdd(
             ReactionAddedExpectation.builder()
+                .description(description)
                 .reaction(reaction)
                 .channelId(channelId)
                 .ts(ts)
@@ -34,10 +35,12 @@ public class SlackMessage {
     /**
      * Stub conversations.replies to indicate this message is a thread reply.
      *
+     * @param description Description for the stub
      * @param threadTs The parent thread timestamp (indicates this message is a reply in that thread)
      */
-    public Stub stubAsThreadReply(MessageTs threadTs) {
+    public Stub stubAsThreadReply(String description, MessageTs threadTs) {
         return slackWiremock.stubConversationsReplies(ConversationRepliesToGet.builder()
+            .description(description)
             .channelId(channelId)
             .ts(ts)
             .threadTs(threadTs)
@@ -52,37 +55,56 @@ public class SlackMessage {
             .build());
     }
 
-    public TicketCreationFlowStubs stubTicketCreationFlow(MessageTs newTicketMessageTs) {
-        return stubTicketCreationFlow(newTicketMessageTs, null);
+    public TicketCreationFlowStubs stubTicketCreationFlow(String reason, MessageTs newTicketMessageTs) {
+        return stubTicketCreationFlow(reason, newTicketMessageTs, null);
     }
 
-    public TicketCreationFlowStubs stubTicketCreationFlow(MessageTs newTicketMessageTs, @Nullable MessageTs replyTs) {
+    public TicketCreationFlowStubs stubTicketCreationFlow(String reason, MessageTs newTicketMessageTs, @Nullable MessageTs replyTs) {
         // Stub conversations.replies to indicate this is NOT a thread reply
         // This is needed because the service checks if the message is a thread reply before creating a ticket
-        slackWiremock.stubConversationsReplies(ConversationRepliesToGet.builder()
+        Stub conversationsReplies = slackWiremock.stubConversationsReplies(ConversationRepliesToGet.builder()
+            .description(reason + ": conversations.replies")
             .channelId(channelId)
             .ts(ts)
             .threadTs(ts)
             .reply(replyTs)
             .build());
 
-        Stub reaction = expectReactionAdded("ticket");
+        Stub reaction = expectReactionAdded(reason + ": reaction added", "ticket");
         StubWithResult<TicketMessage> posted = expectThreadMessagePosted(
             ThreadMessagePostedExpectation.<TicketMessage>builder()
+                .description(reason + ": ticket message posted")
                 .receiver(new TicketMessage.Receiver())
                 .from(UserRole.supportBot)
                 .newMessageTs(newTicketMessageTs)
                 .build()
         );
-        return new TicketCreationFlowStubs(reaction, posted);
+        return new TicketCreationFlowStubs(conversationsReplies, reaction, posted);
     }
 
-    public record TicketCreationFlowStubs(Stub reactionAdded, StubWithResult<TicketMessage> ticketMessagePosted) {
-        public void awaitAllCalled(Duration timeout, String reason) {
+    public record TicketCreationFlowStubs(
+        Stub conversationsReplies,
+        Stub reactionAdded,
+        StubWithResult<TicketMessage> ticketMessagePosted
+    ) {
+        public void awaitAllCalled(Duration timeout) {
             await().atMost(timeout).untilAsserted(() -> {
-                reactionAdded.assertIsCalled(reason + ": reaction added");
-                ticketMessagePosted.assertIsCalled(reason + ": ticket message posted");
+                conversationsReplies.assertIsCalled();
+                reactionAdded.assertIsCalled();
+                ticketMessagePosted.assertIsCalled();
             });
+        }
+
+        public void assertNotCalled() {
+            conversationsReplies.assertIsNotCalled();
+            reactionAdded.assertIsNotCalled();
+            ticketMessagePosted.assertIsNotCalled();
+        }
+
+        public void cleanUp() {
+            conversationsReplies.cleanUp();
+            reactionAdded.cleanUp();
+            ticketMessagePosted.cleanUp();
         }
     }
 }

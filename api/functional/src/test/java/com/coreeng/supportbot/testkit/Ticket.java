@@ -3,6 +3,7 @@ package com.coreeng.supportbot.testkit;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -11,14 +12,13 @@ import org.jspecify.annotations.NonNull;
 
 import com.coreeng.supportbot.Config;
 import com.google.common.collect.ImmutableList;
-import com.coreeng.supportbot.testkit.MessageToGet;
 
 import lombok.Builder;
 import lombok.Getter;
 
 @Builder
 @Getter
-public class Ticket implements SearchableForTicket {
+public class Ticket {
     private final long id;
     @NonNull
     private final MessageTs queryTs;
@@ -83,20 +83,19 @@ public class Ticket implements SearchableForTicket {
             .build();
     }
 
-    public StubWithResult<FullSummaryForm> expectFullSummaryFormOpened(String triggerId) {
-        var expectation = ViewsOpenExpectation.<FullSummaryForm>builder()
+    public FullSummaryFormOpenStubs expectFullSummaryFormOpened(String reason, String triggerId) {
+        var formOpenStub = slackWiremock.stubViewsOpen(ViewsOpenExpectation.<FullSummaryForm>builder()
+            .description(reason + ": view open message")
             .viewCallbackId("ticket-summary")
             .viewType("modal")
             .triggerId(triggerId)
             .receiver(new FullSummaryForm.Receiver(this, config))
-            .build();
+            .build());
 
-        // Stub permalink for the ticket form message (used for escalation thread links in summary)
-        if (!escalations.isEmpty()) {
-            slackWiremock.stubGetPermalink(channelId, formMessageTs);
-        }
+        var queryPermalinkStub = slackWiremock.stubGetPermalink(reason + ": get query permalink", channelId, queryTs);
+        var queryMessageStub = stubQueryMessageFetch(reason + ": get query message");
 
-        return slackWiremock.stubViewsOpen(expectation);
+        return new FullSummaryFormOpenStubs(formOpenStub, queryPermalinkStub, queryMessageStub);
     }
 
     public FullSummaryFormSubmission fullSummaryFormSubmit(String triggerId, FullSummaryFormSubmission.Values values) {
@@ -129,36 +128,52 @@ public class Ticket implements SearchableForTicket {
         return new TicketUpdater();
     }
 
-    public CloseFlowStubs stubCloseFlow(MessageTs threadTs) {
-        StubWithResult<TicketMessage> updated = slackWiremock.stubMessageUpdated(
+    public CloseFlowStubs stubCloseFlow(String reason) {
+        StubWithResult<TicketMessage> messageUpdatedStub = slackWiremock.stubMessageUpdated(
             MessageUpdatedExpectation.<TicketMessage>builder()
+                .description(reason + ": ticket form update")
                 .channelId(channelId)
                 .ts(formMessageTs)
-                .threadTs(threadTs)
+                .threadTs(queryTs)
                 .receiver(new TicketMessage.Receiver())
                 .build()
         );
-        Stub check = slackWiremock.stubReactionAdd(
+        Stub messageCheckedStub = slackWiremock.stubReactionAdd(
             ReactionAddedExpectation.builder()
+                .description(reason + ": checkmark added")
                 .reaction("white_check_mark")
                 .channelId(channelId)
                 .ts(queryTs)
                 .build()
         );
-        return new CloseFlowStubs(updated, check);
+        // Stub the ephemeral rating request message
+        StubWithResult<RatingRequestMessage> ratingRequestStub = slackWiremock.stubEphemeralMessagePosted(
+            EphemeralMessageExpectation.<RatingRequestMessage>builder()
+                .description(reason + ": rating request posted")
+                .channelId(channelId)
+                .threadTs(queryTs)
+                .userId(user.slackUserId())
+                .receiver(new RatingRequestMessage.Receiver(id))
+                .build()
+        );
+        // Stub getting the original query message (needed for rating request to find user ID)
+        Stub getQueryMessageStub = stubQueryMessageFetch(reason + ": get query message");
+        return new CloseFlowStubs(messageUpdatedStub, messageCheckedStub, ratingRequestStub, getQueryMessageStub);
     }
 
-    public ReopenFlowStubs stubReopenFlow(MessageTs threadTs) {
+    public ReopenFlowStubs stubReopenFlow(String reason) {
         StubWithResult<TicketMessage> updated = slackWiremock.stubMessageUpdated(
             MessageUpdatedExpectation.<TicketMessage>builder()
+                .description(reason + ": ticket form update")
                 .channelId(channelId)
                 .ts(formMessageTs)
-                .threadTs(threadTs)
+                .threadTs(queryTs)
                 .receiver(new TicketMessage.Receiver())
                 .build()
         );
         Stub uncheck = slackWiremock.stubReactionRemove(
             ReactionAddedExpectation.builder()
+                .description(reason + ": checkmark removed")
                 .reaction("white_check_mark")
                 .channelId(channelId)
                 .ts(queryTs)
@@ -167,8 +182,9 @@ public class Ticket implements SearchableForTicket {
         return new ReopenFlowStubs(updated, uncheck);
     }
 
-    public void stubQueryMessageFetch() {
-        slackWiremock.stubGetMessage(MessageToGet.builder()
+    private Stub stubQueryMessageFetch(String description) {
+        return slackWiremock.stubGetMessage(MessageToGet.builder()
+            .description(description)
             .channelId(channelId)
             .ts(queryTs)
             .threadTs(queryTs)
@@ -176,22 +192,27 @@ public class Ticket implements SearchableForTicket {
             .blocksJson(queryBlocksJson)
             .userId(user.slackUserId())
             .botId(user.slackBotId())
-            .team(teamId)
             .build());
     }
 
-    public void openSummaryAndSubmit(SlackTestKit asSupportSlack, String triggerId, FullSummaryFormSubmission.Values values) {
-        StubWithResult<FullSummaryForm> opened = expectFullSummaryFormOpened(triggerId);
-        asSupportSlack.clickMessageButton(fullSummaryButtonClick(triggerId));
-        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> opened.assertIsCalled("full summary form opened"));
-        asSupportSlack.submitView(fullSummaryFormSubmit(triggerId, values));
+    public void openSummaryAndSubmit(SlackTestKit asSupportSlack, String reason, String triggerId, FullSummaryFormSubmission.Values values) {
+        openSummaryAndSubmit(asSupportSlack, reason, triggerId, values, () -> null);
     }
 
+    public <T> T openSummaryAndSubmit(SlackTestKit asSupportSlack, String reason, String triggerId, FullSummaryFormSubmission.Values values, Supplier<T> flowStubs) {
+        FullSummaryFormOpenStubs openedStubs = expectFullSummaryFormOpened(reason, triggerId);
+        asSupportSlack.clickMessageButton(fullSummaryButtonClick(triggerId));
+        openedStubs.awaitAllCalled(Duration.ofSeconds(5));
+        T stubs = flowStubs.get();
+        asSupportSlack.submitView(fullSummaryFormSubmit(triggerId, values));
+        return stubs;
+    }
 
-    public EscalateFlowStubs stubEscalateFlow(String expectedSlackGroupId, MessageTs newEscalationMessageTs) {
-        StubWithResult<EscalationMessage> escalationMessage = expectEscalationMessagePosted(expectedSlackGroupId, newEscalationMessageTs);
+    public EscalateFlowStubs stubEscalateFlow(String reason, String expectedSlackGroupId, MessageTs newEscalationMessageTs) {
+        StubWithResult<EscalationMessage> escalationMessage = expectEscalationMessagePosted(reason, expectedSlackGroupId, newEscalationMessageTs);
         Stub rocketReactionAdded = slackWiremock.stubReactionAdd(
             ReactionAddedExpectation.builder()
+                .description(reason + ": rocket reaction added")
                 .reaction("rocket")
                 .channelId(channelId)
                 .ts(queryTs)
@@ -200,10 +221,10 @@ public class Ticket implements SearchableForTicket {
         return new EscalateFlowStubs(escalationMessage, rocketReactionAdded);
     }
 
-    public void openEscalationAndSubmit(SlackTestKit asSupportSlack, String triggerId, EscalationFormSubmission.Values values) {
-        StubWithResult<EscalationForm> opened = expectEscalationFormOpened(triggerId);
+    public void openEscalationAndSubmit(SlackTestKit asSupportSlack, String reason, String triggerId, EscalationFormSubmission.Values values) {
+        StubWithResult<EscalationForm> opened = expectEscalationFormOpened(reason, triggerId);
         asSupportSlack.clickMessageButton(escalateButtonClick(triggerId));
-        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> opened.assertIsCalled("escalation form opened"));
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(opened::assertIsCalled);
         asSupportSlack.submitView(escalationFormSubmit(triggerId, values));
     }
 
@@ -249,11 +270,6 @@ public class Ticket implements SearchableForTicket {
         }
     }
 
-    @Override
-    public long ticketId() {
-        return id;
-    }
-
     public EscalationButtonClick escalateButtonClick(String triggerId) {
         return EscalationButtonClick.builder()
             .triggerId(triggerId)
@@ -261,8 +277,9 @@ public class Ticket implements SearchableForTicket {
             .build();
     }
 
-    public StubWithResult<EscalationForm> expectEscalationFormOpened(String triggerId) {
+    public StubWithResult<EscalationForm> expectEscalationFormOpened(String reason, String triggerId) {
         var expectation = ViewsOpenExpectation.<EscalationForm>builder()
+            .description(reason + ": escalation form opened")
             .viewCallbackId("ticket-escalate")
             .viewType("modal")
             .triggerId(triggerId)
@@ -279,8 +296,9 @@ public class Ticket implements SearchableForTicket {
             .build();
     }
 
-    public StubWithResult<EscalationMessage> expectEscalationMessagePosted(String expectedSlackGroupId, MessageTs ts) {
+    public StubWithResult<EscalationMessage> expectEscalationMessagePosted(String reason, String expectedSlackGroupId, MessageTs ts) {
         return slackWiremock.stubMessagePosted(ThreadMessagePostedExpectation.<EscalationMessage>builder()
+            .description(reason + ": escalation message posted")
             .receiver(new EscalationMessage.Receiver(expectedSlackGroupId))
             .from(UserRole.supportBot)
             .newMessageTs(ts)
@@ -389,28 +407,49 @@ public class Ticket implements SearchableForTicket {
         }
     }
 
-    public record CloseFlowStubs(StubWithResult<TicketMessage> messageUpdated, Stub whiteCheckMarkAdded) {
-        public void awaitAllCalled(Duration timeout, String reason) {
+    public record FullSummaryFormOpenStubs(
+        StubWithResult<FullSummaryForm> formOpened,
+        Stub queryPermalink,
+        Stub getQueryMessage
+    ) {
+        public void awaitAllCalled(Duration timeout) {
             await().atMost(timeout).untilAsserted(() -> {
-                messageUpdated.assertIsCalled(reason + ": ticket form update");
-                whiteCheckMarkAdded.assertIsCalled(reason + ": checkmark added");
+                queryPermalink.cleanUp(); // permalink call is cached, so it's not necessary called
+                getQueryMessage.assertIsCalled();
+                formOpened.assertIsCalled();
+            });
+        }
+    }
+
+    public record CloseFlowStubs(
+        StubWithResult<TicketMessage> messageUpdated,
+        Stub whiteCheckMarkAdded,
+        StubWithResult<RatingRequestMessage> ratingRequestPosted,
+        Stub getQueryMessage
+    ) {
+        public void awaitAllCalled(Duration timeout) {
+            await().atMost(timeout).untilAsserted(() -> {
+                messageUpdated.assertIsCalled();
+                whiteCheckMarkAdded.assertIsCalled();
+                ratingRequestPosted.assertIsCalled();
+                getQueryMessage.assertIsCalled();
             });
         }
     }
 
     public record ReopenFlowStubs(StubWithResult<TicketMessage> messageUpdated, Stub whiteCheckMarkRemoved) {
-        public void awaitAllCalled(Duration timeout, String reason) {
+        public void awaitAllCalled(Duration timeout) {
             await().atMost(timeout).untilAsserted(() -> {
-                messageUpdated.assertIsCalled(reason + ": ticket form update");
-                whiteCheckMarkRemoved.assertIsCalled(reason + ": checkmark removed");
+                messageUpdated.assertIsCalled();
+                whiteCheckMarkRemoved.assertIsCalled();
             });
         }
     }
     public record EscalateFlowStubs(StubWithResult<EscalationMessage> escalationMessage, Stub rocketReactionAdded) {
-        public void awaitAllCalled(Duration timeout, String reason) {
+        public void awaitAllCalled(Duration timeout) {
             await().atMost(timeout).untilAsserted(() -> {
-                escalationMessage.assertIsCalled(reason + ": escalation message posted");
-                rocketReactionAdded.assertIsCalled(reason + ": rocket reaction added");
+                escalationMessage.assertIsCalled();
+                rocketReactionAdded.assertIsCalled();
             });
         }
     }
