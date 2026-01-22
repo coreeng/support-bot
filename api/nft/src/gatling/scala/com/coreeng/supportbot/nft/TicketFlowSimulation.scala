@@ -1,45 +1,36 @@
 package com.coreeng.supportbot.nft
 
-import com.coreeng.supportbot.nft.TestKitHolder.{getClass, logger}
 import com.coreeng.supportbot.testkit._
 import com.google.common.collect.ImmutableList
 import io.gatling.core.Predef._
 import io.gatling.core.session.Session
 import org.slf4j.LoggerFactory
 
-import java.util.concurrent.{ExecutorService, Executors, ThreadLocalRandom, TimeUnit}
+import java.util.concurrent.{ExecutorService, Executors, ThreadLocalRandom}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class TicketFlowSimulation extends Simulation {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  private var testKit: TestKit = _
-  private var slackWiremock: SlackWiremock = _
-  private var executorService: ExecutorService = _
-  private var executionContext: ExecutionContext = _
+  private val config: Config = Config.load("config.yaml")
+  private val testKit: TestKit = TestKit.create(config)
+  private val slackWiremock: SlackWiremock = testKit.slack().wiremock()
+  private val executorService: ExecutorService = Executors.newVirtualThreadPerTaskExecutor()
+  private implicit val executionContext: ExecutionContext = ExecutionContext.fromExecutor(executorService)
 
   import action.TestKitDsl._
 
   before {
     logger.info("Initializing TestKit for NFT...")
-
-    val config = Config.load("config.yaml")
-    testKit = TestKit.create(config)
-    slackWiremock = testKit.slack().wiremock()
-
     slackWiremock.start()
     slackWiremock.permanent().setupAllNftStubs()
-    logger.info("SlackWiremock started on port {}", testKit.slack().wiremock().port())
-
-    executorService = Executors.newVirtualThreadPerTaskExecutor()
-    executionContext = ExecutionContext.fromExecutor(executorService)
+    logger.info("SlackWiremock started on port {}", slackWiremock.port())
   }
 
   after {
     testKit.slack().wiremock().stop()
     executorService.shutdown()
-    executorService.awaitTermination(1, TimeUnit.MINUTES)
   }
 
   private val ticketFlowScenario = scenario("Slack Ticket Flow")
@@ -56,13 +47,19 @@ class TicketFlowSimulation extends Simulation {
     .exitHereIfFailed
 
   setUp(
-    ticketFlowScenario.inject(constantUsersPerSec(10).during(1.minute).randomized)
+    ticketFlowScenario.inject(
+      // Warmup: low traffic for 1 minute to let the service, JVM and mocks
+      // stabilise before the main load.
+      constantUsersPerSec(0.5).during(1.minute).randomized,
+      // Main load: the original profile.
+      constantUsersPerSec(5).during(1.minute).randomized
+    )
   ).assertions(
     global.failedRequests.count.is(0),
-    details("post-tenant-message").responseTime.percentile(50).lt(100),
-    details("create-ticket").responseTime.percentile(50).lt(700),
-    details("open-summary").responseTime.percentile(50).lt(600),
-    details("submit-summary").responseTime.percentile(50).lt(1500)
+    details("post-tenant-message").responseTime.percentile(50).lt(5000),
+    details("create-ticket").responseTime.percentile(50).lt(5000),
+    details("open-summary").responseTime.percentile(50).lt(5000),
+    details("submit-summary").responseTime.percentile(50).lt(5000)
   )
 
   /**

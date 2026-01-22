@@ -34,16 +34,12 @@ application {
 }
 
 tasks.jar {
-	// Ensure all artifacts on the test runtime classpath are built before we
-	// assemble the fat jar (e.g. any future project dependencies).
-	dependsOn(configurations.testRuntimeClasspath.get().buildDependencies)
-
-	from(sourceSets.test.get().output)
-	from(configurations.testRuntimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
-	manifest {
-		attributes["Main-Class"] = "org.junit.platform.console.ConsoleLauncher"
-	}
-	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from(sourceSets.test.get().output)
+    from(configurations.testRuntimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
+    manifest {
+        attributes["Main-Class"] = "org.junit.platform.console.ConsoleLauncher"
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 tasks.test {
