@@ -90,15 +90,11 @@ public class TicketApiTests {
         );
         
         // Verify tickets are reassigned
-        ticket1.stubQueryMessageFetch();
-        ticket2.stubQueryMessageFetch();
-        ticket3.stubQueryMessageFetch();
-        
-        assertThat(supportBotClient.assertTicketExists(ticket1).assignedTo())
+        assertThat(supportBotClient.assertTicketExists(TicketByIdQuery.fromTicket(ticket1)).assignedTo())
             .isEqualTo("sana.chernobog@company.com");
-        assertThat(supportBotClient.assertTicketExists(ticket2).assignedTo())
+        assertThat(supportBotClient.assertTicketExists(TicketByIdQuery.fromTicket(ticket2)).assignedTo())
             .isEqualTo("sana.chernobog@company.com");
-        assertThat(supportBotClient.assertTicketExists(ticket3).assignedTo())
+        assertThat(supportBotClient.assertTicketExists(TicketByIdQuery.fromTicket(ticket3)).assignedTo())
             .isEqualTo("sana.chernobog@company.com");
     }
 }

@@ -1,7 +1,6 @@
 package com.coreeng.supportbot;
 
 import com.coreeng.supportbot.testkit.*;
-import com.google.common.collect.ImmutableList;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -432,19 +431,21 @@ public class TicketManagementTests {
             "Please, help me with my query"
         );
         MessageTs ticketMessageTs = MessageTs.now();
-        var creationStubs = tenantsMessage.stubTicketCreationFlow(ticketMessageTs);
+        var creationStubs = tenantsMessage.stubTicketCreationFlow("ticket creation", ticketMessageTs);
 
         asSupport.slack().addReactionTo(tenantsMessage, "eyes");
 
-        creationStubs.awaitAllCalled(Duration.ofSeconds(5), "ticket created");
+        creationStubs.awaitAllCalled(Duration.ofSeconds(5));
         TicketMessage ticketMessage = creationStubs.ticketMessagePosted().result();
-        var initialResponse = supportBotClient.assertTicketExists(ticketMessage);
+        String queryMessage = "Please, help me with my query";
+        var initialResponse = supportBotClient.assertTicketExists(
+            TicketByIdQuery.fromTicketMessage(ticketMessage, queryMessage)
+        );
 
         assertThat(initialResponse.assignedTo())
             .as("Ticket should be auto-assigned to support member 1 who reacted")
             .isEqualTo(supportUser1.email());
 
-        String queryMessage = "Please, help me with my query";
         String queryBlocksJson = String.format("""
             [{"type":"rich_text","elements":[{"type":"rich_text_section","elements":[{"type":"text","text":"%s"}]}]}]
             """, queryMessage);
@@ -472,10 +473,12 @@ public class TicketManagementTests {
             .assignedTo(supportUser2.slackUserId())
             .build();
 
-        ticket.openSummaryAndSubmit(asSupport.slack(), triggerId, reassignValues);
+        ticket.openSummaryAndSubmit(asSupport.slack(), "ticket reassigned", triggerId, reassignValues);
         ticket.applyChangesLocally().applyFormValues(reassignValues);
 
-        SupportBotClient.TicketResponse finalResponse = supportBotClient.assertTicketExists(ticket);
+        SupportBotClient.TicketResponse finalResponse = supportBotClient.assertTicketExists(
+            TicketByIdQuery.fromTicket(ticket)
+        );
         assertThat(finalResponse.assignedTo())
             .as("Ticket should be reassigned to support member 2")
             .isEqualTo(supportUser2.email());
