@@ -1,0 +1,7 @@
+labels: 
+  monitoring/instance: support-bot
+annotations: {}
+
+instanceSelector:
+  matchLabels:
+    grafana: grafana-support-bot

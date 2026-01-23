@@ -13,3 +13,8 @@ env:
     value: "supportbot"
   - name: DB_PASSWORD
     value: "supportbotpassword"
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true

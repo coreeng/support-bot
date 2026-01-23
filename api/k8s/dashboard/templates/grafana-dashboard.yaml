@@ -1,0 +1,20 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: support-bot-service-dashboard
+  labels:
+    {{- with .Values.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  instanceSelector:
+    matchLabels:
+      {{- range $k, $v := .Values.instanceSelector.matchLabels }}
+      {{ $k }}: {{ $v | quote }}
+      {{- end }}
+  json: |
+{{ .Files.Get "grafana/service-dashboard.json" | indent 4 }}

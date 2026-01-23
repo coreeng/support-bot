@@ -1,17 +1,21 @@
-name: support-bot Fast Feedback
+name: support-bot Monitoring
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
-    paths-ignore:
+    paths:
+      - 'Makefile'
       - 'api/k8s/dashboard/**'
+      - '.github/workflows/support-bot-monitoring.yaml'
   pull_request:
     branches:
       - main
-    paths-ignore:
+    paths:
+      - 'Makefile'
       - 'api/k8s/dashboard/**'
+      - '.github/workflows/support-bot-monitoring.yaml'
 
 permissions:
   contents: write
@@ -25,12 +29,15 @@ jobs:
     secrets:
       git-token: ${{ secrets.GITHUB_TOKEN }}
 
-  fastfeedback:
+  deploy-monitoring:
     needs: [version]
-    uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@v1
+    uses: coreeng/p2p/.github/workflows/p2p-execute-command.yaml@v1
     secrets:
       env_vars: ${{ secrets.env_vars }}
     with:
+      github_env: gcp-dev
       app-name: support-bot
+      subnamespace: grafana
       version: ${{ needs.version.outputs.version }}
+      command: monitoring-deploy
       working-directory: ./
