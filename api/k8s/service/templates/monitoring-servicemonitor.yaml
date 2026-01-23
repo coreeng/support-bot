@@ -1,0 +1,29 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: support-bot
+  namespace: {{ default .Release.Namespace .Values.monitoring.serviceMonitor.namespace }}
+  labels:
+    app.kubernetes.io/name: support-bot
+    monitoring/instance: support-bot
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.monitoring.serviceMonitor.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- if .Values.monitoring.serviceMonitor.selector.matchLabels }}
+      {{- toYaml .Values.monitoring.serviceMonitor.selector.matchLabels | nindent 6 }}
+      {{- else }}
+      {{- include "support-bot.selectorLabels" . | nindent 6 }}
+      {{- end }}
+  endpoints:
+    - interval: 30s
+      port: metrics
+      path: /prometheus
+{{- end }}
