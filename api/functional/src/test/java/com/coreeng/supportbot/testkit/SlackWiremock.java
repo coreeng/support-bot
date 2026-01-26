@@ -60,8 +60,6 @@ public class SlackWiremock extends WireMockServer {
     private void setupAppInitMocks() {
         logger.info("Setting up initial Slack API stubs");
         stubAuthTest("initial mock");
-        stubUsergroupUsersList();
-        stubSupportMemberProfiles();
     }
 
     private void capturePermanentStubs() {
@@ -150,40 +148,6 @@ public class SlackWiremock extends WireMockServer {
                   "user_id":"${userId}",
                   "bot_id":"${botId}",
                   "is_enterprise_install":false}"""))));
-    }
-
-    private void stubUsergroupUsersList() {
-        String userIds = config.supportMembers().stream()
-            .map(member -> "\"" + member.userId() + "\"")
-            .reduce((a, b) -> a + "," + b)
-            .orElse("");
-
-        givenThat(post("/api/usergroups.users.list")
-            .withFormParam("usergroup", equalTo(config.supportGroupId()))
-            .willReturn(okJson("""
-                {
-                  "ok": true,
-                  "users": [%s]
-                }""".formatted(userIds))));
-    }
-
-    private void stubSupportMemberProfiles() {
-        for (var member : config.supportMembers()) {
-            givenThat(post("/api/users.info")
-                .withFormParam("user", equalTo(member.userId()))
-                .willReturn(okJson("""
-                    {
-                      "ok": true,
-                      "user": {
-                        "id": "%s",
-                        "name": "%s",
-                        "profile": {
-                          "email": "%s",
-                          "real_name": "%s"
-                        }
-                      }
-                    }""".formatted(member.userId(), member.name(), member.email(), member.name()))));
-        }
     }
 
     public Stub stubConversationsOpen(String description, String expectedUserId) {
