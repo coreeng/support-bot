@@ -5,6 +5,7 @@ import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.EscalationInMemoryRepository;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
@@ -175,7 +176,7 @@ public class TicketProcessingServiceTests {
 
         Ticket ticket = ticketRepository.findTicketByQuery(threadRef);
         assertNotNull(ticket);
-        assertEquals(userId, ticket.assignedTo());
+        assertEquals(SlackId.user(userId), ticket.assignedTo());
 
         TicketSubmission submission = TicketSubmission.builder()
             .ticketId(ticket.id())
@@ -190,7 +191,7 @@ public class TicketProcessingServiceTests {
 
         Ticket afterSubmit = ticketRepository.findTicketById(ticket.id());
         assertNotNull(afterSubmit);
-        assertEquals(userId, afterSubmit.assignedTo(), "Assignment is preserved when update uses assignedTo(null)");
+        assertEquals(SlackId.user(userId), afterSubmit.assignedTo(), "Assignment is preserved when update uses assignedTo(null)");
     }
 
     @Test

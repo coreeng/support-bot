@@ -8,6 +8,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 import com.coreeng.supportbot.dbschema.tables.records.TicketRecord;
+import com.coreeng.supportbot.slack.SlackId;
 import org.jooq.*;
 
 import static org.jooq.impl.DSL.any;
@@ -104,7 +105,7 @@ public class JdbcTicketRepository implements TicketRepository {
         checkArgument(ticket.id() == null);
 
         long queryId = getQueryIdOrCreate(ticket.queryRef());
-        AssigneeWrite assignee = toDbAssignee(ticket.assignedTo());
+        AssigneeWrite assignee = toDbAssignee(ticket.assignedTo() != null ? ticket.assignedTo().id() : null);
         Long ticketId = dsl.insertInto(
                 TICKET,
                 TICKET.QUERY_ID,
@@ -187,7 +188,7 @@ public class JdbcTicketRepository implements TicketRepository {
     private UpdateSetMoreStep<TicketRecord> conditionallyUpdateAssignee(Ticket ticket, UpdateSetMoreStep<TicketRecord> update) {
         UpdateSetMoreStep<TicketRecord> result = update;
         if (ticket.assignedTo() != null) {
-            AssigneeWrite assignee = toDbAssignee(ticket.assignedTo());
+            AssigneeWrite assignee = toDbAssignee(ticket.assignedTo().id());
             if (assignee.value() != null) {
                 result = result
                     .set(TICKET.ASSIGNED_TO, assignee.value())
@@ -579,7 +580,7 @@ public class JdbcTicketRepository implements TicketRepository {
             .team(fromDbTeam(r.get(TICKET.TEAM)))
             .impact(r.get(TICKET.IMPACT_CODE))
             .ratingSubmitted(r.get(TICKET.RATING_SUBMITTED))
-            .assignedTo(assignedPlain)
+            .assignedTo(assignedPlain != null ? SlackId.user(assignedPlain) : null)
             .lastInteractedAt(r.get(TICKET.LAST_INTERACTED_AT))
             .build();
     }

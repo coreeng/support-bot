@@ -219,7 +219,7 @@ public class TicketUIMapperTest {
             .tags(ImmutableList.of())
             .lastInteractedAt(Instant.now())
             .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
-            .assignedTo("U12345")
+            .assignedTo(SlackId.user("U12345"))
             .build();
 
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
@@ -246,7 +246,7 @@ public class TicketUIMapperTest {
             .tags(ImmutableList.of())
             .lastInteractedAt(Instant.now())
             .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
-            .assignedTo("U12345")
+            .assignedTo(SlackId.user("U12345"))
             .build();
 
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
@@ -274,7 +274,7 @@ public class TicketUIMapperTest {
             .tags(ImmutableList.of())
             .lastInteractedAt(Instant.now())
             .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
-            .assignedTo("U12345")
+            .assignedTo(SlackId.user("U12345"))
             .build();
 
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
@@ -306,7 +306,7 @@ public class TicketUIMapperTest {
             .tags(ImmutableList.of())
             .lastInteractedAt(Instant.now())
             .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
-            .assignedTo(slackUserId)
+            .assignedTo(SlackId.user(slackUserId))
             .build();
 
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());

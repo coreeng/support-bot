@@ -2,6 +2,7 @@ package com.coreeng.supportbot.ticket.rest;
 
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.rest.EscalationUIMapper;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.teams.SupportTeamService;
@@ -93,14 +94,14 @@ public class TicketUIMapper {
         return team != null ? teamUIMapper.mapToUI(team) : null;
     }
 
-    private String getAssigneeEmail(String assignedToUserId) {
+    private String getAssigneeEmail(SlackId.User assignedToUserId) {
         if (assignedToUserId == null || !assignmentProps.enabled()) {
             return null;
         }
 
         // Stream operations with orElse(null) are safe - if user not found, returns null gracefully
         return supportTeamService.members().stream()
-            .filter(member -> assignedToUserId.equals(member.slackId().id()))
+            .filter(member -> assignedToUserId.equals(member.slackId()))
             .findFirst()
             .map(TeamMemberFetcher.TeamMember::email)
             .orElse(null);

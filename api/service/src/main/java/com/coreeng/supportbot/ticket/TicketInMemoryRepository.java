@@ -2,6 +2,7 @@ package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
@@ -112,7 +113,7 @@ public class TicketInMemoryRepository implements TicketRepository {
 
         return tickets.computeIfPresent(ticketId, (id, t) -> {
             Ticket updated = t.toBuilder()
-                .assignedTo(slackUserId)
+                .assignedTo(SlackId.user(slackUserId))
                 .build();
             ticketsByQuery.put(t.queryRef(), updated);
             return updated;
@@ -240,7 +241,7 @@ public class TicketInMemoryRepository implements TicketRepository {
             if (ticket.assignedTo() == null) {
                 return false;
             }
-            return query.assignedTo().equals(ticket.assignedTo());
+            return query.assignedTo().equals(ticket.assignedTo().id());
         }
         return true;
     }
