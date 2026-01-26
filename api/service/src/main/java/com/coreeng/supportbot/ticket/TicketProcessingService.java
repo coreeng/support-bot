@@ -110,6 +110,8 @@ public class TicketProcessingService {
             newTicket = newTicket.toBuilder()
                 .assignedTo(e.userId())
                 .build();
+        } else {
+            log.atDebug().log("Assignment disabled by config; skipping assignment");
         }
         newTicket = repository.createTicketIfNotExists(newTicket);
         log.atInfo()
