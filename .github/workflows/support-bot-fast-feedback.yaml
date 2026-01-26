@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   version:
-    uses: coreeng/p2p/.github/workflows/p2p-version.yaml@feature/test-artifacts
+    uses: coreeng/p2p/.github/workflows/p2p-version.yaml@v1
     with:
       version-prefix: v
     secrets:
@@ -27,7 +27,7 @@ jobs:
 
   fastfeedback:
     needs: [version]
-    uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@feature/test-artifacts
+    uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@v1
     secrets:
       env_vars: ${{ secrets.env_vars }}
     with:
