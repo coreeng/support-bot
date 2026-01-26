@@ -15,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class TicketApiTests {
     private TestKit testKit;
     private SupportBotClient supportBotClient;
+    private SlackWiremock slackWiremock;
 
     @Test
     public void whenTicketIsFetched_queryTextIsReturned() {
@@ -72,6 +73,9 @@ public class TicketApiTests {
         Ticket ticket3 = asTenant.ticket().create(builder -> builder.message("Query 3"));
         
         String newAssignee = "U0123456782"; // Sana Chernobog
+        String dmChannelId = "D" + newAssignee;
+        Stub openDmStub = slackWiremock.stubConversationsOpen("bulk reassign: open dm", newAssignee);
+        Stub notifyStub = slackWiremock.stubChatPostMessage("bulk reassign: notify assignee", dmChannelId);
         
         // when
         var result = supportBotClient.bulkReassign(
@@ -96,5 +100,8 @@ public class TicketApiTests {
             .isEqualTo("sana.chernobog@company.com");
         assertThat(supportBotClient.assertTicketExists(TicketByIdQuery.fromTicket(ticket3)).assignedTo())
             .isEqualTo("sana.chernobog@company.com");
+
+        openDmStub.assertIsCalled();
+        notifyStub.assertIsCalled();
     }
 }

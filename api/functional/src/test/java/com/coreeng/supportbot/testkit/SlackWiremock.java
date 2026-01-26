@@ -62,8 +62,6 @@ public class SlackWiremock extends WireMockServer {
         stubAuthTest("initial mock");
         stubUsergroupUsersList();
         stubSupportMemberProfiles();
-        stubConversationsOpen();
-        stubChatPostMessage();
     }
 
     private void capturePermanentStubs() {
@@ -188,43 +186,46 @@ public class SlackWiremock extends WireMockServer {
         }
     }
 
-    private void stubConversationsOpen() {
-        // Generic stub for opening DM conversations
-        givenThat(post("/api/conversations.open")
-            .willReturn(aResponse()
-                .withTransformers("response-template")
-                .withStatus(200)
-                .withHeader("Content-Type", "application/json")
-                .withBody("""
-                    {{formData request.body 'formArgs' urlDecode=true}}
-                    {
-                      "ok": true,
-                      "channel": {
-                        "id": "D{{formArgs.users}}"
-                      }
-                    }
-                    """)));
+    public Stub stubConversationsOpen(String description, String expectedUserId) {
+        String channelId = "D" + expectedUserId;
+        StubMapping stubMapping = givenThat(post("/api/conversations.open")
+            .withName(description)
+            .withFormParam("users", equalTo(expectedUserId))
+            .willReturn(okJson("""
+                {
+                  "ok": true,
+                  "channel": {
+                    "id": "%s"
+                  }
+                }""".formatted(channelId)))
+        );
+        return Stub.builder()
+            .mapping(stubMapping)
+            .wireMockServer(this)
+            .description(description)
+            .build();
     }
 
-    private void stubChatPostMessage() {
-        // Generic stub for posting messages (including DMs)
-        givenThat(post("/api/chat.postMessage")
-            .willReturn(aResponse()
-                .withTransformers("response-template")
-                .withStatus(200)
-                .withHeader("Content-Type", "application/json")
-                .withBody("""
-                    {{formData request.body 'formArgs' urlDecode=true}}
-                    {
-                      "ok": true,
-                      "channel": "{{formArgs.channel}}",
-                      "ts": "{{randomValue type='UUID'}}",
-                      "message": {
-                        "type": "message",
-                        "text": "{{formArgs.text}}"
-                      }
-                    }
-                    """)));
+    public Stub stubChatPostMessage(String description, String expectedChannelId) {
+        StubMapping stubMapping = givenThat(post("/api/chat.postMessage")
+            .withName(description)
+            .withFormParam("channel", equalTo(expectedChannelId))
+            .willReturn(okJson("""
+                {
+                  "ok": true,
+                  "channel": "%s",
+                  "ts": "1234567890.123456",
+                  "message": {
+                    "type": "message",
+                    "text": "UNSET_BY_TESTS"
+                  }
+                }""".formatted(expectedChannelId)))
+        );
+        return Stub.builder()
+            .mapping(stubMapping)
+            .wireMockServer(this)
+            .description(description)
+            .build();
     }
 
     public Stub stubReactionAdd(ReactionAddedExpectation expectation) {
