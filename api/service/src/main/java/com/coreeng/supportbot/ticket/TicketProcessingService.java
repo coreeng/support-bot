@@ -105,20 +105,18 @@ public class TicketProcessingService {
             return;
         }
 
-        Ticket newTicket = repository.createTicketIfNotExists(Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
+        Ticket newTicket = Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId());
+        if (assignmentProps.enabled()) {
+            newTicket = newTicket.toBuilder()
+                .assignedTo(e.userId())
+                .build();
+        }
+        newTicket = repository.createTicketIfNotExists(newTicket);
         log.atInfo()
             .addKeyValue("ticketId", newTicket.id().id())
             .log("Ticket created on reaction to message({})", e.messageRef().actualThreadTs());
 
-        if (assignmentProps.enabled()) {
-            boolean assigned = repository.assignOnTicketCreation(Objects.requireNonNull(newTicket.id()), e.userId());
-            if (assigned) {
-                log.atInfo()
-                    .addKeyValue("ticketId", newTicket.id().id())
-                    .addKeyValue("assignee", e.userId())
-                    .log("Ticket assigned to first reactor");
-            }
-        } else {
+        if (!assignmentProps.enabled()) {
             log.atDebug().log("Assignment disabled by config; skipping assignment");
         }
 

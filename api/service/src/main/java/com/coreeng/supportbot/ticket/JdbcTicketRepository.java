@@ -209,16 +209,11 @@ public class JdbcTicketRepository implements TicketRepository {
     }
 
     @Override
-    public boolean assignOnTicketCreation(TicketId ticketId, String slackUserId) {
-        return assignInternal(ticketId, slackUserId, true);
-    }
-
-    @Override
     public boolean assign(TicketId ticketId, String slackUserId) {
-        return assignInternal(ticketId, slackUserId, false);
+        return assignInternal(ticketId, slackUserId);
     }
 
-    private boolean assignInternal(TicketId ticketId, String slackUserId, boolean newTicket) {
+    private boolean assignInternal(TicketId ticketId, String slackUserId) {
         checkNotNull(ticketId);
         checkNotNull(slackUserId);
 
@@ -232,10 +227,6 @@ public class JdbcTicketRepository implements TicketRepository {
                 .set(TICKET.ASSIGNED_TO_FORMAT, assignee.format())
                 .set(TICKET.ASSIGNED_TO_HASH, assignee.hash())
                 .where(TICKET.ID.eq(ticketId.id()));
-
-        if (newTicket) {
-            update = update.and(TICKET.ASSIGNED_TO.isNull());
-        }
 
         int updated = update.execute();
 
