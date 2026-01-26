@@ -41,19 +41,28 @@ public class TicketTeamSuggestionHandler implements SlackBlockSuggestionHandler 
         String value = req.getPayload().getValue();
         TicketSummaryView.Metadata metadata = viewMapper.parseMetadata(req.getPayload().getView().getPrivateMetadata());
         SlackId authorId = metadata.authorId();
+        TicketTeamsSuggestion teamsSuggestion;
 
-        try {
-            var teamSuggestion = service.getTeamSuggestions(value, authorId);
-            return renderTeamSuggestions(teamSuggestion);
-        } catch (Exception e) {
-            log.atError()
-                .setCause(e)
+        if (authorId != null && !SlackId.slackbot.equals(authorId)) {
+            try {
+                teamsSuggestion = service.getTeamSuggestions(value, authorId);
+            } catch (Exception e) {
+                log.atError()
+                    .setCause(e)
+                    .addKeyValue("authorId", authorId.id())
+                    .addKeyValue("ticketId", metadata.ticketId())
+                    .log("Error getting team suggestions, returning fallback with all teams");
+                teamsSuggestion = service.getFallbackSuggestions(value);
+            }
+        } else {
+            log.atDebug()
                 .addKeyValue("authorId", authorId != null ? authorId.id() : "null")
                 .addKeyValue("ticketId", metadata.ticketId())
-                .log("Error getting team suggestions, returning fallback with all teams");
-            var fallbackSuggestion = service.getFallbackSuggestions(value);
-            return renderTeamSuggestions(fallbackSuggestion);
+                .log("Author id is null or slackbot, returning fallback with all teams");
+            teamsSuggestion = service.getFallbackSuggestions(value);
         }
+
+        return renderTeamSuggestions(teamsSuggestion);
     }
 
     private BlockSuggestionResponse renderTeamSuggestions(TicketTeamsSuggestion teams) {
