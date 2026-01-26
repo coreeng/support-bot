@@ -13,6 +13,7 @@ import com.slack.api.model.block.element.StaticSelectElement;
 import com.slack.api.model.view.View;
 import com.slack.api.model.view.ViewState;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -76,13 +77,8 @@ public class TicketSummaryViewMapper {
                     context(List.of(
                         markdownText(t -> t
                             .verbatim(false)
-                            .text(format("""
-                                    Sent by <@%s> | %s | <%s|View Message>
-                                    """,
-                                summaryView.query().senderId().id(),
-                                formatSlackDate(summaryView.query().messageTs().getDate()),
-                                summaryView.query().permalink()
-                            )))
+	                            .text(buildQueryContextLine(summaryView))
+	                        )
                     )),
                     divider(),
                     header(h -> h.text(plainText("Status History"))),
@@ -146,6 +142,20 @@ public class TicketSummaryViewMapper {
                 .build()
             );
     }
+
+	    private String buildQueryContextLine(TicketSummaryView summaryView) {
+	        TicketSummaryView.QuerySummaryView query = summaryView.query();
+	        String authorText = query.senderId() != null
+	            ? "<@" + query.senderId().id() + ">"
+	            : "Unknown author";
+	        String dateText = formatSlackDate(query.messageTs().getDate());
+	        String permalink = query.permalink();
+	        if (StringUtils.isNotBlank(permalink)) {
+	            return format("Sent by %s | %s | <%s|View Message>\n", authorText, dateText, permalink);
+	        } else {
+	            return format("Sent by %s | %s\n", authorText, dateText);
+	        }
+	    }
 
     private StaticSelectElement statusPicker(TicketSummaryView summaryView) {
         List<OptionObject> statusOptions = summaryView.currentStatus() == TicketStatus.stale

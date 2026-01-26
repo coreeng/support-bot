@@ -6,6 +6,7 @@ import com.coreeng.supportbot.rating.RatingRequestMessageMapper;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackException;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackEditMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
@@ -138,6 +139,11 @@ public class TicketSlackServiceImpl implements TicketSlackService {
             if (log.isWarnEnabled()) {
                 log.warn("Could not determine user for ticket {} rating request", ticketId);
             }
+            return;
+        }
+
+        if (SlackId.slackbot.id().equals(userId)) {
+            log.info("Skipping rating request for ticket {} because author is Slackbot (userId={})", ticketId, userId);
             return;
         }
 
