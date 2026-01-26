@@ -149,7 +149,7 @@ class TicketSummaryServiceTest {
         );
 
         Ticket assignedTicket = ticket.toBuilder()
-            .assignedTo("U789012")
+            .assignedTo(SlackId.user("U789012"))
             .build();
 
         ImmutableList<TeamMemberFetcher.TeamMember> members = ImmutableList.of(

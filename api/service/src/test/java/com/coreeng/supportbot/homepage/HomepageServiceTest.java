@@ -259,7 +259,7 @@ class HomepageServiceTest {
                 .status(TicketStatus.opened)
                 .queryTs(messageTs)
                 .team(TicketTeam.fromCode("lions"))
-                .assignedTo(assignedToUserId)
+                .assignedTo(SlackId.user(assignedToUserId))
                 .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
                 .build();
 
@@ -303,7 +303,7 @@ class HomepageServiceTest {
                 .status(TicketStatus.opened)
                 .queryTs(messageTs)
                 .team(TicketTeam.fromCode("lions"))
-                .assignedTo(assignedToUserId)
+                .assignedTo(SlackId.user(assignedToUserId))
                 .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
                 .build();
 
@@ -344,7 +344,7 @@ class HomepageServiceTest {
                 .status(TicketStatus.opened)
                 .queryTs(messageTs)
                 .team(TicketTeam.fromCode("lions"))
-                .assignedTo(assignedToUserId)
+                .assignedTo(SlackId.user(assignedToUserId))
                 .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
                 .build();
 
@@ -385,7 +385,7 @@ class HomepageServiceTest {
                 .status(TicketStatus.opened)
                 .queryTs(messageTs)
                 .team(TicketTeam.fromCode("lions"))
-                .assignedTo(assignedToUserId)
+                .assignedTo(SlackId.user(assignedToUserId))
                 .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
                 .build();
 

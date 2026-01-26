@@ -47,8 +47,8 @@ public class TicketSummaryService {
         ImmutableList<TicketImpact> allImpacts = impactsRegistry.listAllImpacts();
         
         // Assignee fields (only if assignment is enabled)
-        String currentAssignee = assignmentProps.enabled() 
-            ? ticket.assignedTo() 
+        String currentAssignee = assignmentProps.enabled() && ticket.assignedTo() != null
+            ? ticket.assignedTo().id()
             : null;
         ImmutableList<TicketSummaryView.AssigneeOption> availableAssignees = assignmentProps.enabled()
             ? supportTeamService.members().stream()

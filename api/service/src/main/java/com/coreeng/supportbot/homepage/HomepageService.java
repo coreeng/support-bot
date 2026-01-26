@@ -3,6 +3,7 @@ package com.coreeng.supportbot.homepage;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.teams.SupportTeamService;
@@ -127,13 +128,13 @@ public class HomepageService {
         return view.build();
     }
 
-    private String getAssigneeEmail(String assignedToUserId) {
+    private String getAssigneeEmail(SlackId.User assignedToUserId) {
         if (assignedToUserId == null || !assignmentProps.enabled()) {
             return null;
         }
 
         return supportTeamService.members().stream()
-            .filter(member -> assignedToUserId.equals(member.slackId().id()))
+            .filter(member -> assignedToUserId.equals(member.slackId()))
             .findFirst()
             .map(TeamMemberFetcher.TeamMember::email)
             .orElse(null);
