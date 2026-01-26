@@ -118,10 +118,6 @@ public class TicketProcessingService {
             .addKeyValue("ticketId", newTicket.id().id())
             .log("Ticket created on reaction to message({})", e.messageRef().actualThreadTs());
 
-        if (!assignmentProps.enabled()) {
-            log.atDebug().log("Assignment disabled by config; skipping assignment");
-        }
-
         slackService.markPostTracked(new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
 
         if (newTicket.createdMessageTs() == null) {
