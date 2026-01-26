@@ -102,23 +102,15 @@ public class TicketInMemoryRepository implements TicketRepository {
     }
 
     @Override
-    public boolean assignOnTicketCreation(TicketId ticketId, String slackUserId) {
-        return assignInternal(ticketId, slackUserId, true);
-    }
-
-    @Override
     public boolean assign(TicketId ticketId, String slackUserId) {
-        return assignInternal(ticketId, slackUserId, false);
+        return assignInternal(ticketId, slackUserId);
     }
 
-    private boolean assignInternal(TicketId ticketId, String slackUserId, boolean ticketCreated) {
+    private boolean assignInternal(TicketId ticketId, String slackUserId) {
         checkNotNull(ticketId);
         checkNotNull(slackUserId);
 
         return tickets.computeIfPresent(ticketId, (id, t) -> {
-            if (ticketCreated && t.assignedTo() != null) {
-                return t; // already assigned
-            }
             Ticket updated = t.toBuilder()
                 .assignedTo(slackUserId)
                 .build();
