@@ -15,7 +15,9 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 public sealed interface SlackId
         permits SlackId.User, SlackId.Bot, SlackId.Channel, SlackId.Group, SlackId.Workflow, SlackId.Subteam {
 
-    String id();
+	    User slackbot = new User("USLACKBOT");
+
+	    String id();
 
     static User user(String id) {
         return new User(id);

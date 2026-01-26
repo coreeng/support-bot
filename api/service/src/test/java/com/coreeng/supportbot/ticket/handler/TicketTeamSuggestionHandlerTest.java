@@ -223,6 +223,49 @@ class TicketTeamSuggestionHandlerTest {
         assertEquals("O99", others.getLast().getText().getText());
     }
 
+    @Test
+    void slackbotAuthor_usesFallbackSuggestions() {
+        // given
+        BlockSuggestionRequest req = mockSuggestionRequest("", SlackId.slackbot.id());
+        BlockSuggestionContext ctx = mock(BlockSuggestionContext.class);
+
+        PlatformTeam t1 = team("Team A");
+        PlatformTeam t2 = team("Team B");
+        when(platformTeamsService.listTeams()).thenReturn(ImmutableList.of(t1, t2));
+
+        // when
+        BlockSuggestionResponse resp = handler.apply(req, ctx);
+
+        // then
+        List<OptionGroup> groups = resp.getOptionGroups();
+        assertEquals(1, groups.size());
+        assertEquals("Others", groups.getFirst().getLabel().getText());
+        assertOptionsEqual(groups.getFirst().getOptions(), ImmutableList.of("Team A", "Team B"));
+        verifyNoInteractions(slackClient);
+    }
+
+    @Test
+    void errorGettingTeamSuggestions_usesFallbackSuggestions() {
+        // given
+        BlockSuggestionRequest req = mockSuggestionRequest("", "U123");
+        BlockSuggestionContext ctx = mock(BlockSuggestionContext.class);
+
+        PlatformTeam t1 = team("Team A");
+        PlatformTeam t2 = team("Team B");
+        when(platformTeamsService.listTeams()).thenReturn(ImmutableList.of(t1, t2));
+        when(slackClient.getUserById(new SlackId.User("U123")))
+            .thenThrow(new RuntimeException("boom"));
+
+        // when
+        BlockSuggestionResponse resp = handler.apply(req, ctx);
+
+        // then
+        List<OptionGroup> groups = resp.getOptionGroups();
+        assertEquals(1, groups.size());
+        assertEquals("Others", groups.get(0).getLabel().getText());
+        assertOptionsEqual(groups.get(0).getOptions(), ImmutableList.of("Team A", "Team B"));
+    }
+
     private void mockSlackUserEmail(String userId, String email) {
         User.Profile profile = new User.Profile();
         profile.setEmail(email);

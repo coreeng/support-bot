@@ -62,34 +62,31 @@ public record TicketSummaryView(
     public record QuerySummaryView(
         ImmutableList<LayoutBlock> blocks,
         MessageTs messageTs,
-        SlackId senderId,
-        String permalink
+        @Nullable SlackId senderId,
+        @Nullable String permalink
     ) {
     }
 
-    public record EscalationView(
-        EscalationId id,
-        String threadPermalink,
-        String teamSlackGroupId,
-        EscalationStatus status
-    ) {
-        public static EscalationView of(
-            Escalation escalation,
-            String threadPermalink,
-            String teamSlackGroupId
-        ) {
-            return new EscalationView(
-                escalation.id(),
-                threadPermalink,
-                teamSlackGroupId,
-                escalation.status()
-            );
-        }
-    }
+	    public record EscalationView(
+	        EscalationId id,
+	        String teamSlackGroupId,
+	        EscalationStatus status
+	    ) {
+	        public static EscalationView of(
+	            Escalation escalation,
+	            String teamSlackGroupId
+	        ) {
+	            return new EscalationView(
+	                escalation.id(),
+	                teamSlackGroupId,
+	                escalation.status()
+	            );
+	        }
+	    }
 
     public record Metadata(
         long ticketId,
-        SlackId authorId
+        @Nullable SlackId authorId
     ) {
     }
 
