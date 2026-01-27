@@ -150,6 +150,48 @@ public class SlackWiremock extends WireMockServer {
                   "is_enterprise_install":false}"""))));
     }
 
+    public Stub stubConversationsOpen(String description, String expectedUserId) {
+        String channelId = "D" + expectedUserId;
+        StubMapping stubMapping = givenThat(post("/api/conversations.open")
+            .withName(description)
+            .withFormParam("users", equalTo(expectedUserId))
+            .willReturn(okJson("""
+                {
+                  "ok": true,
+                  "channel": {
+                    "id": "%s"
+                  }
+                }""".formatted(channelId)))
+        );
+        return Stub.builder()
+            .mapping(stubMapping)
+            .wireMockServer(this)
+            .description(description)
+            .build();
+    }
+
+    public Stub stubChatPostMessage(String description, String expectedChannelId) {
+        StubMapping stubMapping = givenThat(post("/api/chat.postMessage")
+            .withName(description)
+            .withFormParam("channel", equalTo(expectedChannelId))
+            .willReturn(okJson("""
+                {
+                  "ok": true,
+                  "channel": "%s",
+                  "ts": "1234567890.123456",
+                  "message": {
+                    "type": "message",
+                    "text": "UNSET_BY_TESTS"
+                  }
+                }""".formatted(expectedChannelId)))
+        );
+        return Stub.builder()
+            .mapping(stubMapping)
+            .wireMockServer(this)
+            .description(description)
+            .build();
+    }
+
     public Stub stubReactionAdd(ReactionAddedExpectation expectation) {
         StubMapping stubMapping = givenThat(post("/api/reactions.add")
             .withName(expectation.description())

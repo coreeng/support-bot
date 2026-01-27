@@ -60,6 +60,7 @@ public class HomepageView {
                 .status(filter.status())
                 .order(filter.order())
                 .dateFrom(dateFrom)
+                .pageSize(8) // Slack block limit in the Home tab is 100. Passing in 8 here instead of the default 10 to ensure we don't hit a problem
                 .dateTo(dateTo)
                 .tags(filter.tags())
                 .includeNoTags(filter.includeNoTags())
@@ -69,6 +70,7 @@ public class HomepageView {
                         ? ImmutableList.of(filter.impact())
                         : ImmutableList.of()
                 )
+                .assignedTo(filter.assignedTo())
                 .build();
         }
     }

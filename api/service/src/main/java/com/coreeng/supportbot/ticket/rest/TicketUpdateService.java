@@ -44,6 +44,7 @@ public class TicketUpdateService {
             .authorsTeam(TicketTeam.fromCode(request.authorsTeam()))
             .tags(ImmutableList.copyOf(request.tags()))
             .impact(request.impact())
+            .assignedTo(request.assignedTo())
             .confirmed(true)
             .build();
     }

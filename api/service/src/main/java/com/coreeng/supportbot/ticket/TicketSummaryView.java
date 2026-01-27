@@ -21,7 +21,9 @@ public record TicketSummaryView(
     ImmutableList<Tag> tags,
     ImmutableList<Tag> currentTags,
     ImmutableList<TicketImpact> impacts,
-    @Nullable TicketImpact currentImpact
+    @Nullable TicketImpact currentImpact,
+    @Nullable String currentAssignee,
+    ImmutableList<AssigneeOption> availableAssignees
 ) {
     public static TicketSummaryView of(
         Ticket ticket,
@@ -30,7 +32,9 @@ public record TicketSummaryView(
         ImmutableList<Tag> tags,
         ImmutableList<Tag> currentTags,
         ImmutableList<TicketImpact> impacts,
-        @Nullable TicketImpact currentImpact
+        @Nullable TicketImpact currentImpact,
+        @Nullable String currentAssignee,
+        ImmutableList<AssigneeOption> availableAssignees
     ) {
         return new TicketSummaryView(
             ticket.id(),
@@ -42,7 +46,9 @@ public record TicketSummaryView(
             tags,
             currentTags,
             impacts,
-            currentImpact
+            currentImpact,
+            currentAssignee,
+            availableAssignees
         );
     }
 
@@ -84,6 +90,12 @@ public record TicketSummaryView(
     public record Metadata(
         long ticketId,
         SlackId authorId
+    ) {
+    }
+
+    public record AssigneeOption(
+        String userId,
+        String displayName
     ) {
     }
 }

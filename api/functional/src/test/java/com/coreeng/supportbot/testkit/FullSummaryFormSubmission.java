@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.testkit;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.google.common.collect.ImmutableList;
 
@@ -28,6 +29,8 @@ public class FullSummaryFormSubmission implements ViewSubmission {
         private final ImmutableList<@NonNull String> tags;
         @NonNull
         private final String impact;
+        @Nullable
+        private final String assignedTo;  // Slack user ID, optional
     }
 
     @Override
@@ -37,12 +40,17 @@ public class FullSummaryFormSubmission implements ViewSubmission {
 
     @Override
     public ImmutableList<@NonNull Value> values() {
-        return ImmutableList.of(
-            new StaticSelectValue("ticket-change-status", values.status().code()),
-            new StaticSelectValue("ticket-change-team", values.team()),
-            new MultiStaticSelectValue("ticket-change-tags", values.tags()),
-            new StaticSelectValue("ticket-change-impact", values.impact())
-        );
+        ImmutableList.Builder<Value> builder = ImmutableList.<Value>builder()
+            .add(new StaticSelectValue("ticket-change-status", values.status().code()))
+            .add(new StaticSelectValue("ticket-change-team", values.team()))
+            .add(new MultiStaticSelectValue("ticket-change-tags", values.tags()))
+            .add(new StaticSelectValue("ticket-change-impact", values.impact()));
+        
+        if (values.assignedTo() != null) {
+            builder.add(new StaticSelectValue("ticket-change-assignee", values.assignedTo()));
+        }
+        
+        return builder.build();
     }
 
     @Override

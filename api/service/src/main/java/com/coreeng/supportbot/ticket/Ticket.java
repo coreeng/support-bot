@@ -2,6 +2,7 @@ package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackId;
 import com.google.common.collect.ImmutableList;
 import lombok.Builder;
 import lombok.Getter;
@@ -31,6 +32,7 @@ public class Ticket {
     private Instant lastInteractedAt;
     @Builder.Default
     private boolean ratingSubmitted = false;
+    private SlackId.User assignedTo;
 
     public static Ticket createNew(MessageTs queryTs, String channelID) {
         return Ticket.builder()

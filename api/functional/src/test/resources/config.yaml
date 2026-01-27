@@ -11,11 +11,14 @@ mocks:
     supportGroupId: S01234567ST
     supportChannelId: C1234567891
     supportMembers:
-      - name: Coby Ivona
+      - userId: U0123456781
+        name: Coby Ivona
         email: coby.ivona@company.com
-      - name: Sana Chernobog
+      - userId: U0123456782
+        name: Sana Chernobog
         email: sana.chernobog@company.com
-      - name: Jean Kristijan
+      - userId: U0123456783
+        name: Jean Kristijan
         email: jean.kristijan@company.com
 
 tenants:

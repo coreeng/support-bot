@@ -2,25 +2,32 @@ package com.coreeng.supportbot.teams.rest;
 
 import com.coreeng.supportbot.teams.PlatformTeamsService;
 import com.coreeng.supportbot.teams.PlatformUser;
+import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashSet;
+import java.util.List;
+
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/user")
 public class UsersController {
     private final PlatformTeamsService platformTeamsService;
     private final TeamService teamService;
     private final TeamUIMapper mapper;
+    private final SupportTeamService supportTeamService;
 
-    @GetMapping("/user")
+    @GetMapping
     public ResponseEntity<UserUI> findByEmail(
         @RequestParam String email
     ) {
@@ -36,6 +43,17 @@ public class UsersController {
             user = new PlatformUser(email.toLowerCase(), new HashSet<>());
         }
         return ResponseEntity.ok(mapper.mapToUI(user, teams));
+    }
+
+    @GetMapping("/support")
+    public ResponseEntity<List<SupportMemberUI>> listSupportMembers() {
+        ImmutableList<SupportMemberUI> members = supportTeamService.members().stream()
+            .map(member -> new SupportMemberUI(
+                member.slackId().id(),
+                member.email()
+            ))
+            .collect(toImmutableList());
+        return ResponseEntity.ok(members);
     }
 }
 

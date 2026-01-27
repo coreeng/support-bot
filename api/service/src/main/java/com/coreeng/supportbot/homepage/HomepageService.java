@@ -1,9 +1,13 @@
 package com.coreeng.supportbot.homepage;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.teams.SupportTeamService;
+import com.coreeng.supportbot.teams.TeamMemberFetcher;
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
@@ -30,6 +34,8 @@ public class HomepageService {
     private final SlackClient slackClient;
     private final SlackTicketsProps slackTicketsProps;
     private final ImpactsRegistry impactsRegistry;
+    private final SupportTeamService supportTeamService;
+    private final TicketAssignmentProps assignmentProps;
 
     public HomepageView getTicketsView(HomepageView.State state) {
         Page<DetailedTicket> page = ticketQueryService.findDetailedTicketByQuery(state.toTicketsQuery());
@@ -117,6 +123,20 @@ public class HomepageService {
                 .get().date()
         );
 
+        view.assignedTo(getAssigneeEmail(ticket.assignedTo()));
+
         return view.build();
+    }
+
+    private String getAssigneeEmail(SlackId.User assignedToUserId) {
+        if (assignedToUserId == null || !assignmentProps.enabled()) {
+            return null;
+        }
+
+        return supportTeamService.members().stream()
+            .filter(member -> assignedToUserId.equals(member.slackId()))
+            .findFirst()
+            .map(TeamMemberFetcher.TeamMember::email)
+            .orElse(null);
     }
 }
