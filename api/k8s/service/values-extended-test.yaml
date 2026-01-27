@@ -88,6 +88,10 @@ configMap:
         time-to-stale: 7d
         remind-about-stale-cron: 0 10 9 * * 1-5
         stale-reminder-interval: 1d
+      assignment:
+        enabled: true
+        encryption:
+          enabled: false
     enums:
       escalationTeams:
         - code: core-platform
