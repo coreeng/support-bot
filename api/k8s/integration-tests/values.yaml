@@ -28,6 +28,11 @@ serviceAccount:
         resources: ["services"]
         verbs: ["get", "list", "create", "delete"]
 
+      # ServiceMonitor operations - for metrics/monitoring resources created by the service Helm chart
+      - apiGroups: ["monitoring.coreos.com"]
+        resources: ["servicemonitors"]
+        verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+
       # Deployment operations - for waiting until ready
       - apiGroups: ["apps"]
         resources: ["statefulsets", "deployments", "replicasets"]
