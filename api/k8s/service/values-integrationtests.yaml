@@ -43,3 +43,8 @@ env:
       secretKeyRef:
         name: azure
         key: AZURE_CLIENT_SECRET
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
