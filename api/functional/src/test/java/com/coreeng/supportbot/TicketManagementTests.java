@@ -1,5 +1,9 @@
 package com.coreeng.supportbot;
 
+import org.jspecify.annotations.NonNull;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -7,9 +11,6 @@ import static org.awaitility.Awaitility.await;
 
 import com.coreeng.supportbot.testkit.Stub;
 import com.coreeng.supportbot.testkit.TicketByIdQuery;
-import org.jspecify.annotations.NonNull;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.coreeng.supportbot.testkit.EscalationFormSubmission;
 import com.coreeng.supportbot.testkit.FullSummaryFormSubmission;
@@ -92,7 +93,9 @@ public class TicketManagementTests {
         // given
         TestKit.RoledTestKit asTenant = testKit.as(tenant);
         SlackTestKit asTenantSlack = asTenant.slack();
-        SlackTestKit asSupportSlack = testKit.as(support).slack();
+        TestKit.RoledTestKit asSupport = testKit.as(support);
+        SlackTestKit asSupportSlack = asSupport.slack();
+        var supportUser = config.supportUsers().getFirst();
 
         // when
         String queryText = "Please, help me with my query";
@@ -110,6 +113,10 @@ public class TicketManagementTests {
             TicketByIdQuery.fromTicketMessage(ticketMessage, queryText)
         );
         ticketMessage.assertMatches(ticketResponse);
+
+        assertThat(ticketResponse.assignedTo())
+            .as("Ticket should be auto-assigned to support member who reacted with eyes emoji")
+            .isEqualTo(supportUser.email());
     }
 
     @Test
@@ -405,5 +412,33 @@ public class TicketManagementTests {
 
         // then: Should return 200 with team options
         response.statusCode(200);
+    }
+
+    @Test
+    public void whenTicketIsManuallyReassignedViaFullSummary_newAssigneeIsSaved() {
+        TestKit.RoledTestKit asTenant = testKit.as(tenant);
+        TestKit.RoledTestKit asSupport = testKit.as(support);
+        String queryMessage = "Please, help me with my query";
+        Ticket ticket = asTenant.ticket().create(builder -> builder.message(queryMessage));
+        var supportUser = config.supportUsers().getFirst();
+
+        String triggerId = "reassign_ticket_trigger";
+        FullSummaryFormSubmission.Values reassignValues = FullSummaryFormSubmission.Values.builder()
+            .status(ticket.status())
+            .team("wow")
+            .tags(ImmutableList.of("ingresses"))
+            .impact("productionBlocking")
+            .assignedTo(supportUser.slackUserId())
+            .build();
+
+        ticket.openSummaryAndSubmit(asSupport.slack(), "ticket reassigned", triggerId, reassignValues);
+        ticket.applyChangesLocally().applyFormValues(reassignValues);
+
+        SupportBotClient.TicketResponse finalResponse = supportBotClient.assertTicketExists(
+            TicketByIdQuery.fromTicket(ticket)
+        );
+        assertThat(finalResponse.assignedTo())
+            .as("Ticket should be assigned to support member")
+            .isEqualTo(supportUser.email());
     }
 }

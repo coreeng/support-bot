@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
+import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
 import com.coreeng.supportbot.enums.Tag;
@@ -11,6 +12,7 @@ import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.teams.SupportTeamService;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.Message;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,8 @@ public class TicketSummaryService {
     private final TagsRegistry tagsRegistry;
     private final ImpactsRegistry impactsRegistry;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
+    private final SupportTeamService supportTeamService;
+    private final TicketAssignmentProps assignmentProps;
 
     public TicketSummaryView summaryView(TicketId id) {
         Ticket ticket = repository.findTicketById(id);
@@ -41,6 +45,20 @@ public class TicketSummaryService {
         ImmutableList<TicketSummaryView.EscalationView> escalations = getEscalationViews(ticket);
         ImmutableList<Tag> allTags = tagsRegistry.listAllTags();
         ImmutableList<TicketImpact> allImpacts = impactsRegistry.listAllImpacts();
+        
+        // Assignee fields (only if assignment is enabled)
+        String currentAssignee = assignmentProps.enabled() && ticket.assignedTo() != null
+            ? ticket.assignedTo().id()
+            : null;
+        ImmutableList<TicketSummaryView.AssigneeOption> availableAssignees = assignmentProps.enabled()
+            ? supportTeamService.members().stream()
+                .map(member -> new TicketSummaryView.AssigneeOption(
+                    member.slackId().id(),
+                    member.email()
+                ))
+                .collect(toImmutableList())
+            : ImmutableList.of();
+        
         return TicketSummaryView.of(
             ticket,
             querySummary,
@@ -54,7 +72,9 @@ public class TicketSummaryService {
                 ? allImpacts.stream()
                     .filter(i -> ticket.impact().contains(i.code()))
                     .findAny().orElse(null)
-                : null
+                : null,
+            currentAssignee,
+            availableAssignees
         );
     }
 

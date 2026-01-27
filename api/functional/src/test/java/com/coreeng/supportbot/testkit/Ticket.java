@@ -54,6 +54,7 @@ public class Ticket {
     private boolean escalated = false;
     @Builder.Default
     private ImmutableList<@NonNull EscalationInfo> escalations = ImmutableList.of();
+    private String assignedTo;
 
     public static TicketBuilder fromResponse(SupportBotClient.TicketResponse ticketResponse) {
         return Ticket.builder()
@@ -69,7 +70,8 @@ public class Ticket {
                     : null
             )
             .tags(ticketResponse.tags())
-            .logs(ticketResponse.logs());
+            .logs(ticketResponse.logs())
+            .assignedTo(ticketResponse.assignedTo());
     }
 
     public FullSummaryButtonClick fullSummaryButtonClick(String triggerId) {
@@ -87,7 +89,7 @@ public class Ticket {
             .viewCallbackId("ticket-summary")
             .viewType("modal")
             .triggerId(triggerId)
-            .receiver(new FullSummaryForm.Receiver(this))
+            .receiver(new FullSummaryForm.Receiver(this, config))
             .build());
 
         var queryPermalinkStub = slackWiremock.stubGetPermalink(reason + ": get query permalink", channelId, queryTs);
@@ -242,6 +244,7 @@ public class Ticket {
             assertThat(response.team().code()).isEqualTo(team);
         }
         assertThat(response.tags()).isEqualTo(tags());
+        assertThat(response.assignedTo()).isEqualTo(assignedTo);
 
         assertThat(response.escalated()).isEqualTo(escalated);
         assertThat(response.escalations()).hasSize(escalations.size());
@@ -374,6 +377,7 @@ public class Ticket {
             team = values.team();
             tags = values.tags();
             impact = values.impact();
+            assignedTo = values.assignedTo();
             return this;
         }
 

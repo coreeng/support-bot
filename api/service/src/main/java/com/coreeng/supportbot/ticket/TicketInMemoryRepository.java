@@ -2,6 +2,7 @@ package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
@@ -80,8 +81,11 @@ public class TicketInMemoryRepository implements TicketRepository {
         checkNotNull(updatedTicket.id());
 
         return ticketsByQuery.computeIfPresent(updatedTicket.queryRef(), (key, t) -> {
-            tickets.put(updatedTicket.id(), updatedTicket);
-            return updatedTicket;
+            Ticket newTicket = updatedTicket.toBuilder()
+                .assignedTo(updatedTicket.assignedTo() != null ? updatedTicket.assignedTo() : t.assignedTo())
+                .build();
+            tickets.put(newTicket.id(), newTicket);
+            return newTicket;
         });
     }
 
@@ -95,6 +99,24 @@ public class TicketInMemoryRepository implements TicketRepository {
                 .build();
             ticketsByQuery.put(t.queryRef(), touchedTicket);
             return touchedTicket;
+        }) != null;
+    }
+
+    @Override
+    public boolean assign(TicketId ticketId, String slackUserId) {
+        return assignInternal(ticketId, slackUserId);
+    }
+
+    private boolean assignInternal(TicketId ticketId, String slackUserId) {
+        checkNotNull(ticketId);
+        checkNotNull(slackUserId);
+
+        return tickets.computeIfPresent(ticketId, (id, t) -> {
+            Ticket updated = t.toBuilder()
+                .assignedTo(SlackId.user(slackUserId))
+                .build();
+            ticketsByQuery.put(t.queryRef(), updated);
+            return updated;
         }) != null;
     }
 
@@ -214,6 +236,12 @@ public class TicketInMemoryRepository implements TicketRepository {
                 return false;
             }
             return query.teams().contains(ticket.team().toCode());
+        }
+        if (query.assignedTo() != null) {
+            if (ticket.assignedTo() == null) {
+                return false;
+            }
+            return query.assignedTo().equals(ticket.assignedTo().id());
         }
         return true;
     }

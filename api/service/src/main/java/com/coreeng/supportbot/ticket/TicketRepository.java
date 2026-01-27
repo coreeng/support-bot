@@ -29,4 +29,6 @@ public interface TicketRepository {
 
     boolean isTicketRated(TicketId ticketId);
     void markTicketAsRated(TicketId ticketId);
+
+    boolean assign(TicketId ticketId, String slackUserId);
 }

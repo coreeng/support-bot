@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.jackson.Jacksonized;
+import org.jspecify.annotations.Nullable;
 
 @Getter
 @Builder(toBuilder = true)
@@ -14,5 +15,7 @@ public class TicketSubmission {
     private TicketTeam authorsTeam;
     private ImmutableList<String> tags;
     private String impact;
+    @Nullable
+    private String assignedTo;
     private boolean confirmed;
 }

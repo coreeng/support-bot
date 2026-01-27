@@ -30,7 +30,8 @@ public class TicketController {
             @RequestParam(required = false) TicketStatus status,
             @RequestParam(required = false) Boolean escalated,
             @RequestParam(required = false, defaultValue = "") List<String> impacts,
-            @RequestParam(required = false, defaultValue = "") List<String> teams
+            @RequestParam(required = false, defaultValue = "") List<String> teams,
+            @RequestParam(required = false) String assignedTo
     ) {
         TicketsQuery ticketQuery = TicketsQuery.builder()
                 .page(page)
@@ -42,6 +43,7 @@ public class TicketController {
                 .impacts(ImmutableList.copyOf(impacts))
                 .teams(ImmutableList.copyOf(teams))
                 .escalated(escalated)
+                .assignedTo(assignedTo)
                 .build();
 
         Page<DetailedTicket> detailedTicketsPage = queryService.findDetailedTicketByQuery(ticketQuery);

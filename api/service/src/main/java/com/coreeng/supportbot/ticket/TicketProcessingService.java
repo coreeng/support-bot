@@ -1,8 +1,10 @@
 package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.events.MessageDeleted;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
@@ -24,6 +26,7 @@ public class TicketProcessingService {
     private final TicketSlackService slackService;
     private final EscalationQueryService escalationQueryService;
     private final SlackTicketsProps slackTicketsProps;
+    private final TicketAssignmentProps assignmentProps;
     private final ApplicationEventPublisher publisher;
 
     public void handleMessagePosted(MessagePosted e) {
@@ -103,7 +106,15 @@ public class TicketProcessingService {
             return;
         }
 
-        Ticket newTicket = repository.createTicketIfNotExists(Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
+        Ticket newTicket = Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId());
+        if (assignmentProps.enabled()) {
+            newTicket = newTicket.toBuilder()
+                .assignedTo(SlackId.user(e.userId()))
+                .build();
+        } else {
+            log.atDebug().log("Assignment disabled by config; skipping assignment");
+        }
+        newTicket = repository.createTicketIfNotExists(newTicket);
         log.atInfo()
             .addKeyValue("ticketId", newTicket.id().id())
             .log("Ticket created on reaction to message({})", e.messageRef().actualThreadTs());
@@ -158,6 +169,9 @@ public class TicketProcessingService {
                 .team(submission.authorsTeam())
                 .tags(submission.tags())
                 .impact(submission.impact())
+                .assignedTo(submission.assignedTo() != null
+                    ? SlackId.user(submission.assignedTo())
+                    : null)
                 .lastInteractedAt(Instant.now())
                 .build()
         );
