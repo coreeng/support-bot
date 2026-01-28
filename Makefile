@@ -180,3 +180,20 @@ publish-chart: ## Package and publish Helm chart (version aligned to image)
 	  --username "$(or $(GITHUB_ACTOR),anonymous)" --password-stdin
 	# Push to GHCR as an OCI Helm chart. Result path: ghcr.io/coreeng/charts/support-bot:$(p2p_version)
 	helm push "dist/charts/support-bot-$(p2p_version).tgz" oci://ghcr.io/coreeng/charts
+
+##@ Monitoring
+
+.PHONY: monitoring-deploy
+monitoring-deploy: ## Deploy monitoring stack (Prometheus + Grafana) for support-bot
+	helm repo add coreeng https://coreeng.github.io/core-platform-assets
+	helm repo update
+	helm upgrade --install support-bot-monitoring coreeng/monitoring-stack \
+	  --version 0.1.5 \
+	  --set tenantName=$${TENANT_NAME} \
+	  --set internalServicesDomain=$${INTERNAL_SERVICES_DOMAIN} \
+	  --set prometheus.ingress.enabled=true \
+	  --set grafana.ingress.enabled=true \
+	  $(if $(DRY_RUN),--dry-run --debug,)
+	helm upgrade --install support-bot-dashboard ./api/k8s/dashboard \
+	  $(if $(DRY_RUN),--dry-run --debug,)
+
