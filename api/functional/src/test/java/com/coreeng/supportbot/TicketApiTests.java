@@ -11,7 +11,7 @@ import static com.coreeng.supportbot.testkit.UserRole.support;
 import static com.coreeng.supportbot.testkit.UserRole.tenant;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@ExtendWith(TestKitExtension.class)
+@ExtendWith(com.coreeng.supportbot.testkit.TestKitExtension.class)
 public class TicketApiTests {
     private TestKit testKit;
     private SupportBotClient supportBotClient;

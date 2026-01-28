@@ -27,7 +27,7 @@ import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@Profile("functionaltests")
+@Profile({"functionaltests", "nft"})
 @RequestMapping("/test/ticket")
 @RequiredArgsConstructor
 public class TicketTestController {
