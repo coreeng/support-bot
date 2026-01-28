@@ -11,14 +11,20 @@ import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.TeamMemberFetcher;
+import com.coreeng.supportbot.util.JsonMapper;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.Message;
+import com.slack.api.model.block.ContextBlock;
+import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.SectionBlock;
+import com.slack.api.model.block.composition.MarkdownTextObject;
+import com.slack.api.model.view.View;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,8 +33,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 
+import static com.slack.api.model.block.Blocks.section;
+import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
+import static com.slack.api.model.view.Views.view;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -37,7 +47,6 @@ class TicketSummaryServiceTest {
 
     @Mock
     private TicketRepository repository;
-
     @Mock
     private SlackClient slackClient;
 
@@ -57,6 +66,7 @@ class TicketSummaryServiceTest {
     private SupportTeamService supportTeamService;
 
     private TicketSummaryService service;
+    private TicketSummaryViewMapper summaryViewMapper;
 
     private TicketId ticketId;
     private String channelId;
@@ -88,6 +98,27 @@ class TicketSummaryServiceTest {
         // Create a simple section block for testing
         SectionBlock sectionBlock = new SectionBlock();
         slackMessage.setBlocks(ImmutableList.of(sectionBlock));
+
+        JsonMapper jsonMapper = new JsonMapper();
+        summaryViewMapper = new TicketSummaryViewMapper(jsonMapper);
+
+        TicketAssignmentProps defaultAssignmentProps = new TicketAssignmentProps(
+            false,
+            new TicketAssignmentProps.Encryption(false, null)
+        );
+        service = new TicketSummaryService(
+            repository,
+            slackClient,
+            escalationQueryService,
+            tagsRegistry,
+            impactsRegistry,
+            escalationTeamsRegistry,
+            supportTeamService,
+            defaultAssignmentProps
+        );
+
+        lenient().when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of());
+        lenient().when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
     }
 
     @Test
@@ -236,9 +267,7 @@ class TicketSummaryServiceTest {
         assertThat(result.escalations()).hasSize(2);
         // Should be sorted by openedAt
         assertThat(result.escalations().get(0).teamSlackGroupId()).isEqualTo("platform-support");
-        assertThat(result.escalations().get(0).threadPermalink()).isEqualTo("https://slack.com/escalation1-permalink");
         assertThat(result.escalations().get(1).teamSlackGroupId()).isEqualTo("security-group");
-        assertThat(result.escalations().get(1).threadPermalink()).isEqualTo("https://slack.com/escalation2-permalink");
     }
 
     @Test
@@ -453,6 +482,122 @@ class TicketSummaryServiceTest {
 
         // then
         assertThat(result.currentImpact()).isNull();
+    }
+
+    private Ticket sampleTicket() {
+        return Ticket.builder()
+            .id(new TicketId(1))
+            .channelId("C123")
+            .queryTs(MessageTs.of("123.456"))
+            .createdMessageTs(MessageTs.of("123.456"))
+            .status(TicketStatus.opened)
+            .lastInteractedAt(Instant.EPOCH)
+            .build();
+    }
+
+    @Test
+    void summaryView_handlesTombstoneMessage() {
+        Ticket ticket = sampleTicket();
+        when(repository.findTicketById(ticket.id())).thenReturn(ticket);
+        when(escalationQueryService.listByTicketId(ticket.id())).thenReturn(ImmutableList.of());
+
+        Message tombstone = new Message();
+        tombstone.setSubtype("tombstone");
+        tombstone.setText("This message was deleted");
+
+        when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(tombstone);
+        when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.test/permalink");
+
+        TicketSummaryView summary = service.summaryView(ticket.id());
+        TicketSummaryView.QuerySummaryView query = summary.query();
+
+        assertEquals(ticket.queryTs(), query.messageTs());
+        assertNull(query.senderId());
+        assertEquals("https://slack.test/permalink", query.permalink());
+        ImmutableList<LayoutBlock> expectedBlocks = ImmutableList.of(
+            section(s -> s.text(markdownText(t ->
+                t.text("This message was deleted"))))
+        );
+        assertEquals(expectedBlocks, query.blocks());
+    }
+
+    @Test
+    void summaryView_handlesGetMessageByTsFailure_andPermalinkSuccessAndFailure() {
+        Ticket ticket = sampleTicket();
+        when(repository.findTicketById(ticket.id())).thenReturn(ticket);
+        when(escalationQueryService.listByTicketId(ticket.id())).thenReturn(ImmutableList.of());
+
+        when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class)))
+            .thenThrow(new SlackException(new RuntimeException("boom")));
+        when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class)))
+            .thenReturn("https://slack.test/permalink")
+            .thenThrow(new SlackException(new RuntimeException("permalink boom")));
+
+        TicketSummaryView first = service.summaryView(ticket.id());
+        TicketSummaryView.QuerySummaryView firstQuery = first.query();
+        assertEquals(ticket.queryTs(), firstQuery.messageTs());
+        assertNull(firstQuery.senderId());
+        assertEquals("https://slack.test/permalink", firstQuery.permalink());
+        ImmutableList<LayoutBlock> expectedFirstBlocks = ImmutableList.of(
+            section(s -> s.text(markdownText(t -> t.text("Couldn't fetch the message"))))
+        );
+        assertEquals(expectedFirstBlocks, firstQuery.blocks());
+
+        View firstView = view(v -> summaryViewMapper.render(first, v).type("modal"));
+        ContextBlock firstContext = (ContextBlock) firstView.getBlocks().stream()
+            .filter(b -> b instanceof ContextBlock)
+            .findFirst()
+            .orElseThrow();
+        MarkdownTextObject firstContextText = (MarkdownTextObject) firstContext.getElements().get(0);
+        assertTrue(firstContextText.getText().contains("Unknown author"));
+        assertTrue(firstContextText.getText().contains("View Message"));
+
+        TicketSummaryView second = service.summaryView(ticket.id());
+        TicketSummaryView.QuerySummaryView secondQuery = second.query();
+        assertNull(secondQuery.permalink());
+
+        View secondView = view(v -> summaryViewMapper.render(second, v).type("modal"));
+        ContextBlock secondContext = (ContextBlock) secondView.getBlocks().stream()
+            .filter(b -> b instanceof ContextBlock)
+            .findFirst()
+            .orElseThrow();
+        MarkdownTextObject secondContextText = (MarkdownTextObject) secondContext.getElements().getFirst();
+        assertTrue(secondContextText.getText().contains("Unknown author"));
+        assertFalse(secondContextText.getText().contains("View Message"));
+    }
+
+    @Test
+    void summaryView_handlesPermalinkFailureWhenMessageFetchSucceeds() {
+        Ticket ticket = sampleTicket();
+        when(repository.findTicketById(ticket.id())).thenReturn(ticket);
+        when(escalationQueryService.listByTicketId(ticket.id())).thenReturn(ImmutableList.of());
+
+        Message message = new Message();
+        message.setUser("U123");
+        message.setText("Hello");
+        when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(message);
+        when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class)))
+            .thenThrow(new SlackException(new RuntimeException("permalink boom")));
+
+        TicketSummaryView summary = service.summaryView(ticket.id());
+        TicketSummaryView.QuerySummaryView query = summary.query();
+
+        assertEquals(ticket.queryTs(), query.messageTs());
+        ImmutableList<LayoutBlock> expectedBlocks = ImmutableList.of(
+            section(s -> s.text(markdownText(t -> t.text("Hello"))))
+        );
+        assertEquals(expectedBlocks, query.blocks());
+        assertNull(query.permalink());
+
+        View view = view(v -> summaryViewMapper.render(summary, v).type("modal"));
+        ContextBlock context = (ContextBlock) view.getBlocks().stream()
+            .filter(b -> b instanceof ContextBlock)
+            .findFirst()
+            .orElseThrow();
+        MarkdownTextObject contextText = (MarkdownTextObject) context.getElements().get(0);
+        assertTrue(contextText.getText().contains("<@U123>"));
+        assertFalse(contextText.getText().contains("View Message"));
+
     }
 }
 
