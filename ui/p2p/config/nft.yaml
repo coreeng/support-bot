@@ -28,7 +28,7 @@ envVarsMap:
   BACKEND_URL: http://mock-backend:8080
   DATABASE_URL: postgresql://mock-db:5432/testdb
   NEXTAUTH_SECRET: test-secret-for-nft-tests-only
-  NEXTAUTH_URL: http://support-ui:3000
+  NEXTAUTH_URL: http://support-bot-ui:3000
   # OAuth credentials not needed for NFT tests (mocked authentication)
   AZURE_AD_CLIENT_ID: ""
   AZURE_AD_CLIENT_SECRET: ""
