@@ -1,0 +1,21 @@
+{
+  "name": "functional",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:cucumber": "NODE_ENV=test cucumber-js tests/features/ --parallel 3",
+    "test:cucumber:ci": "NODE_ENV=test cucumber-js tests/features/ --parallel 1",
+    "test:cucumber:fast": "NODE_ENV=test cucumber-js tests/features/ --parallel 4",
+    "test:cucumber:single": "NODE_ENV=test cucumber-js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.1",
+    "@types/node": "^24.6.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@cucumber/cucumber": "^12.2.0",
+    "glob": "^11.1.0"
+  }
+}
