@@ -15,6 +15,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@cucumber/cucumber": "^12.2.0"
+    "@cucumber/cucumber": "^12.2.0",
+    "glob": "^11.1.0"
   }
 }
