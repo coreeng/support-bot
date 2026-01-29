@@ -1,0 +1,32 @@
+---
+envVarsMap:
+  NODE_ENV: test  # Enable test mode bypass for authentication middleware
+  BACKEND_URL: http://mock-backend:8080
+  DATABASE_URL: postgresql://mock-db:5432/testdb
+  NEXTAUTH_SECRET: test-secret-for-functional-tests-only
+  NEXTAUTH_URL: http://support-ui:3000
+  # OAuth credentials not needed for functional tests (mocked authentication)
+  AZURE_AD_CLIENT_ID: ""
+  AZURE_AD_CLIENT_SECRET: ""
+  AZURE_AD_TENANT_ID: ""
+  GOOGLE_CLIENT_ID: ""
+  GOOGLE_CLIENT_SECRET: ""
+  ENABLE_TEST_AUTH_BYPASS: "true"
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    memory: 1Gi
+
+livenessProbe:
+  failureThreshold: 3
+  periodSeconds: 10
+  timeoutSeconds: 3
+  initialDelaySeconds: 10
+readinessProbe:
+  failureThreshold: 3
+  periodSeconds: 10
+  timeoutSeconds: 3
+  initialDelaySeconds: 10

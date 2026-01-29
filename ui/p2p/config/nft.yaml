@@ -1,0 +1,38 @@
+---
+# Increase resources for NFT load testing
+replicaCount: 2
+
+resources:
+  requests:
+    cpu: 1500m
+    memory: 2000Mi
+  limits:
+    cpu: 1500m
+    memory: 2000Mi
+
+# Configure k6 test pod resources (injector)
+tests:
+  nft:
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 3Gi
+      limits:
+        cpu: 1000m
+        memory: 3Gi
+
+# Override NFT defaults and provide backend URLs
+envVarsMap:
+  VUS: "100"
+  REQ_PER_SECOND: "300"
+  BACKEND_URL: http://mock-backend:8080
+  DATABASE_URL: postgresql://mock-db:5432/testdb
+  NEXTAUTH_SECRET: test-secret-for-nft-tests-only
+  NEXTAUTH_URL: http://support-ui:3000
+  # OAuth credentials not needed for NFT tests (mocked authentication)
+  AZURE_AD_CLIENT_ID: ""
+  AZURE_AD_CLIENT_SECRET: ""
+  AZURE_AD_TENANT_ID: ""
+  GOOGLE_CLIENT_ID: ""
+  GOOGLE_CLIENT_SECRET: ""
+  ENABLE_TEST_AUTH_BYPASS: "true"
