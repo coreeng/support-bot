@@ -27,7 +27,7 @@ export function isIframeRequest(request: NextRequest): boolean {
  * This allows functional tests (Playwright/Cucumber) to mock authentication without
  * generating real JWTs. Production and development modes always validate real tokens.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Allow auth endpoints (sign in, callbacks, etc.)
