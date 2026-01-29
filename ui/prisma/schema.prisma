@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model escalation {
+  id                 BigInt              @id @default(autoincrement())
+  ticket_id          BigInt
+  channel_id         String?
+  thread_ts          String?
+  created_message_ts String?
+  status             escalation_status
+  team               String?
+  ticket             ticket              @relation(fields: [ticket_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "escalation_ticket_id_fk")
+  escalation_log     escalation_log[]
+  escalation_to_tag  escalation_to_tag[]
+}
+
+model escalation_log {
+  id            BigInt                @id @default(autoincrement())
+  escalation_id BigInt
+  event         escalation_event_type
+  date          DateTime              @db.Timestamptz(6)
+  escalation    escalation            @relation(fields: [escalation_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "escalation_log_escalation_id_fk")
+
+  @@index([escalation_id])
+}
+
+model escalation_to_tag {
+  escalation_id BigInt
+  tag_code      String
+  escalation    escalation @relation(fields: [escalation_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "escalation_to_tag_escalation_id_fk")
+  tag           tag        @relation(fields: [tag_code], references: [code], onDelete: NoAction, onUpdate: NoAction, map: "escalation_to_tag_tag_code_fk")
+
+  @@id([escalation_id, tag_code])
+}
+
+model flyway_schema_history {
+  installed_rank Int      @id(map: "flyway_schema_history_pk")
+  version        String?  @db.VarChar(50)
+  description    String   @db.VarChar(200)
+  type           String   @db.VarChar(20)
+  script         String   @db.VarChar(1000)
+  checksum       Int?
+  installed_by   String   @db.VarChar(100)
+  installed_on   DateTime @default(now()) @db.Timestamp(6)
+  execution_time Int
+  success        Boolean
+
+  @@index([success], map: "flyway_schema_history_s_idx")
+}
+
+model impact {
+  code                           String    @id
+  label                          String
+  deleted_at                     DateTime? @db.Timestamptz(6)
+  ratings_ratings_impactToimpact ratings[] @relation("ratings_impactToimpact")
+  ticket                         ticket[]
+}
+
+model query {
+  id         BigInt   @id @default(autoincrement())
+  ts         String
+  channel_id String
+  date       DateTime @db.Timestamptz(6)
+  ticket     ticket?
+
+  @@unique([ts, channel_id], map: "query_ts_unique_idx")
+  @@index([date])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ratings {
+  id                            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rating                        Int
+  submitted_ts                  String
+  status                        ticket_status
+  impact                        String?
+  tags                          String[]      @db.VarChar(255)
+  is_escalated                  Boolean       @default(false)
+  impact_ratings_impactToimpact impact?       @relation("ratings_impactToimpact", fields: [impact], references: [code], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model tag {
+  code              String              @id
+  label             String
+  deleted_at        DateTime?           @db.Timestamptz(6)
+  escalation_to_tag escalation_to_tag[]
+  ticket_to_tag     ticket_to_tag[]
+}
+
+model ticket {
+  id                 BigInt          @id @default(autoincrement())
+  query_id           BigInt          @unique(map: "ticket_query_id_idx")
+  created_message_ts String?
+  status             ticket_status
+  team               String?
+  impact_code        String?
+  last_interacted_at DateTime        @default(now()) @db.Timestamptz(6)
+  rating_submitted   Boolean         @default(false)
+  escalation         escalation[]
+  impact             impact?         @relation(fields: [impact_code], references: [code], onDelete: NoAction, onUpdate: NoAction, map: "ticket_impact_fk")
+  query              query           @relation(fields: [query_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "ticket_query_id_fk")
+  ticket_log         ticket_log[]
+  ticket_to_tag      ticket_to_tag[]
+}
+
+model ticket_log {
+  id        BigInt            @id @default(autoincrement())
+  ticket_id BigInt
+  event     ticket_event_type
+  date      DateTime          @db.Timestamptz(6)
+  ticket    ticket            @relation(fields: [ticket_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "ticket_log_ticket_id_fk")
+
+  @@index([ticket_id])
+}
+
+model ticket_to_tag {
+  ticket_id BigInt
+  tag_code  String
+  tag       tag    @relation(fields: [tag_code], references: [code], onDelete: NoAction, onUpdate: NoAction, map: "ticket_to_tag_tag_code_fk")
+  ticket    ticket @relation(fields: [ticket_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "ticket_to_tag_ticket_id_fk")
+
+  @@id([ticket_id, tag_code])
+}
+
+enum escalation_event_type {
+  opened
+  resolved
+}
+
+enum escalation_status {
+  opened
+  resolved
+}
+
+enum ticket_event_type {
+  opened
+  stale
+  closed
+}
+
+enum ticket_status {
+  opened
+  stale
+  closed
+}
+
+model AggregatedTicketData {
+  ticket_id                 BigInt   @id
+  status                    String?
+  impact                    String?
+  last_reply_date           DateTime?
+  last_reply_date_iso       String?
+  query_id                  BigInt?
+  query_msg_ts              String?
+  query_msg_ts_iso          String?
+  permalink                 String?
+  first_open_ts             DateTime?
+  first_open_ts_iso         String?
+  last_closed_ts            DateTime?
+  last_closed_ts_iso        String?
+  last_open_ts              DateTime?
+  last_open_ts_iso          DateTime?
+  tags                      String[]
+  tags_ids                  String[]
+  assignee_name             String?
+  escalation_id             BigInt?
+  assignee_id               String?
+  escalation_creation_ts    DateTime?
+  escalation_creation_ts_iso String?
+  escalation_thread_permalink String?
+
+  @@map("aggregated_ticket_data")
+}

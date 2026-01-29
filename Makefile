@@ -2,6 +2,8 @@
 P2P_TENANT_NAME ?= support-bot
 P2P_APP_NAME ?= support-bot
 
+P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui
+
 # Download and include p2p makefile
 $(shell curl -fsSL "https://raw.githubusercontent.com/coreeng/p2p/v1/p2p.mk" -o ".p2p.mk")
 include .p2p.mk
@@ -34,17 +36,31 @@ p2p-prod:          publish-prod        publish-chart                            
 
 ##@ Lint targets
 
-.PHONY: lint-app
-lint-app: ## Lint app
+.PHONY: lint-api
+lint-api: ## Lint API Dockerfiles
 	docker run --rm -i docker.io/hadolint/hadolint < api/Dockerfile
 	docker run --rm -i docker.io/hadolint/hadolint < api/functional/Dockerfile
 	docker run --rm -i docker.io/hadolint/hadolint < api/integration-tests/Dockerfile
 
+.PHONY: lint-ui
+lint-ui: ## Lint UI Dockerfiles
+	docker run --rm -i docker.io/hadolint/hadolint < ui/Dockerfile
+
+.PHONY: lint-app
+lint-app: lint-api lint-ui ## Lint all Dockerfiles
+
 ##@ Build targets
 
-.PHONY: build-app
-build-app: lint-app ## Build app
+.PHONY: build-api-app
+build-api-app: lint-api ## Build API
 	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --build-arg P2P_VERSION="$(p2p_version)" api
+
+.PHONY: build-ui-app
+build-ui-app: lint-ui ## Build UI
+	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" --build-arg P2P_VERSION="$(p2p_version)" ui
+
+.PHONY: build-app
+build-app: build-api-app build-ui-app ## Build all apps
 
 .PHONY: build-functional
 build-functional: ## Build functional test docker image
@@ -64,9 +80,16 @@ build-extended-test:
 
 ##@ Push targets
 
-.PHONY: push-app
-push-app: ## Push app
+.PHONY: push-api-app
+push-api-app: ## Push API app
 	docker image push "$(p2p_image_tag)"
+
+.PHONY: push-ui-app
+push-ui-app: ## Push UI app
+	docker image push "$(call p2p_image_tag,$(p2p_app_name)-ui)"
+
+.PHONY: push-app
+push-app: push-api-app push-ui-app ## Push all apps
 
 .PHONY: push-functional
 push-functional: ## Push functional test docker image
@@ -94,8 +117,8 @@ deploy-integration:
 deploy-nft:
 	@echo "WARNING: $@ not implemented"
 
-.PHONY: deploy-extended-test
-deploy-extended-test: ## Deploy service and DB for extended test environment
+.PHONY: deploy-api-extended-test
+deploy-api-extended-test: ## Deploy service and DB for extended test environment
 	NAMESPACE="$(p2p_namespace)" \
 	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
 	SERVICE_IMAGE_TAG="$(p2p_version)" \
@@ -105,8 +128,8 @@ deploy-extended-test: ## Deploy service and DB for extended test environment
 	VALUES_FILE=api/k8s/service/values-extended-test.yaml \
 	./api/scripts/deploy-service.sh
 
-.PHONY: deploy-functional
-deploy-functional: ## Deploy service and DB for functional tests, then run tests
+.PHONY: deploy-api-functional
+deploy-api-functional: ## Deploy service and DB for functional tests, then run tests
 	NAMESPACE="$(p2p_namespace)" \
 	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
 	SERVICE_IMAGE_TAG="$(p2p_version)" \
@@ -115,14 +138,46 @@ deploy-functional: ## Deploy service and DB for functional tests, then run tests
 	ACTION=deploy \
 	VALUES_FILE=api/k8s/service/values-functional.yaml \
 	./api/scripts/deploy-service.sh
+
+.PHONY: deploy-ui-%
+deploy-ui-%:
+	helm repo add core-platform-assets https://coreeng.github.io/core-platform-assets
+	helm upgrade --install "$(p2p_app_name)-ui" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
+		-f <(envsubst < ui/p2p/config/common.yaml) \
+		-f <(envsubst < ui/p2p/config/$*.yaml) \
+		--set nameOverride="$(p2p_app_name)-ui" \
+		--set tenantName="$(p2p_tenant_name)" \
+		--set image.repository="$(p2p_registry)/$(p2p_app_name)-ui" \
+		--set image.tag="$(p2p_version)" \
+		--set ingress.appUrlSuffix="$(p2p_app_url_suffix)" \
+		--set ingress.domain="$(BASE_DOMAIN)" \
+		--atomic \
+		--timeout 10m
+
+.PHONY: deploy-functional
+deploy-functional: deploy-api-functional deploy-ui-functional
+
+.PHONY: deploy-extended-test
+deploy-extended-test: deploy-api-extended-test deploy-ui-extended-test
 ##@ Run targets
 
-.PHONY: run-app
-run-app: ## Run app
+.PHONY: run-api-app
+run-api-app: ## Run API app
 	@docker network inspect "$(p2p_app_name)" >/dev/null 2>&1 || docker network create "$(p2p_app_name)" >/dev/null
 	docker run --rm --network "$(p2p_app_name)" --name "$(p2p_app_name)" \
 		-p 8080:8080 \
 		"$(p2p_image_tag)"
+
+.PHONY: run-ui-app
+run-ui-app: ## Run UI app
+	@docker network inspect "$(p2p_app_name)" >/dev/null 2>&1 || docker network create "$(p2p_app_name)" >/dev/null
+	docker run --rm --network "$(p2p_app_name)" --name "$(p2p_app_name)-ui" \
+		-p 3000:3000 \
+		"$(call p2p_image_tag,$(p2p_app_name)-ui)"
+
+.PHONY: run-app
+run-app: ## Run app
+	@echo "WARNING: use run-api-app or run-ui-app"
 
 .PHONY: run-functional
 run-functional:
@@ -161,11 +216,21 @@ run-extended-test:
 
 ##@ Publish target
 
-.PHONY: publish-prod
-publish-prod: ## Publish container image
+.PHONY: login-ghcr
+login-ghcr:
 	@printf "Login to ghcr.io... "
 	@echo "$(GITHUB_TOKEN)" | skopeo login --username "$(or $(GITHUB_ACTOR),anonymous)" --password-stdin ghcr.io
+
+.PHONY: publish-api-prod
+publish-api-prod: login-ghcr ## Publish API container image
 	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/$(p2p_app_name):$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name):$(p2p_version)"
+
+.PHONY: publish-ui-prod
+publish-ui-prod: login-ghcr ## Publish UI container image
+	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/$(p2p_app_name)-ui:$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name)-ui:$(p2p_version)"
+
+.PHONY: publish-prod
+publish-prod: publish-api-prod publish-ui-prod ## Publish all container images
 
 .PHONY: publish-chart
 publish-chart: ## Package and publish Helm chart (version aligned to image)

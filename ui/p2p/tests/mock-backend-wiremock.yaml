@@ -1,0 +1,566 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wiremock-mappings
+  labels:
+    app: mock-backend
+data:
+  # /team?type=escalation - escalation teams
+  # These teams appear in authorization tests
+  # Priority: Must come before catch-all to match correctly
+  "01-team-escalation.json": |
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/team$",
+        "queryParameters": {
+          "type": {
+            "equalTo": "escalation"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "label": "Core-platform",
+            "code": "core-platform",
+            "types": ["escalation"]
+          },
+          {
+            "label": "Other-team",
+            "code": "other-team",
+            "types": ["escalation"]
+          }
+        ]
+      }
+    }
+  
+  # /team?type=tenant - Tenant teams
+  "02-team-tenant.json": |
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/team$",
+        "queryParameters": {
+          "type": {
+            "equalTo": "tenant"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "label": "Engineering",
+            "code": "engineering",
+            "types": ["tenant"]
+          },
+          {
+            "label": "Support",
+            "code": "support",
+            "types": ["tenant"]
+          }
+        ]
+      }
+    }
+  
+  # /team/leadership/members
+  "team-leadership-members.json": |
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/team/leadership/members$"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": []
+      }
+    }
+  
+  # /team/support/members
+  "team-support-members.json": |
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/team/support/members$"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": []
+      }
+    }
+  
+  # /user/support - Get support members list (for assignee dropdown)
+  "user-support.json": |
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/user/support$"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "userId": "U123456",
+            "displayName": "support-engineer-1@example.com"
+          },
+          {
+            "userId": "U789012",
+            "displayName": "support-engineer-2@example.com"
+          },
+          {
+            "userId": "U345678",
+            "displayName": "support-engineer-3@example.com"
+          }
+        ]
+      }
+    }
+  
+  # /assignment/enabled - Check if assignment feature is enabled
+  "assignment-enabled.json": |
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/assignment/enabled$"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "enabled": true
+        }
+      }
+    }
+  
+  # POST /assignment/bulk-reassign - Bulk reassign tickets
+  "assignment-bulk-reassign.json": |
+    {
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "urlPathPattern": "/assignment/bulk-reassign$"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "successCount": 3,
+          "successfulTicketIds": [1, 2, 3],
+          "message": "All tickets successfully reassigned"
+        }
+      }
+    }
+  
+  # /user?email=... - Get user teams (called server-side by NextAuth)
+  # Returns teams for escalation users, empty for others
+  # Using urlPattern to match query params (matches any email - intentional for tests)
+  # Lower priority so specific /user/* endpoints match first
+  "user-info.json": |
+    {
+      "priority": 5,
+      "request": {
+        "method": "GET",
+        "urlPattern": "/user.*"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "email": "escalation@example.com",
+          "teams": [
+            {
+              "name": "Core-platform",
+              "groupRefs": []
+            }
+          ]
+        }
+      }
+    }
+  
+  # /ticket/{id} - Get single ticket by ID (MUST come before /ticket list)
+  "ticket-single.json": |
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/ticket/[0-9]+$"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "id": 1,
+          "ticketId": "TICKET-001",
+          "status": "opened",
+          "impact": "high",
+          "team": {
+            "label": "Core-platform",
+            "code": "core-platform"
+          },
+          "query": {
+            "text": "Hello @support-team! My application called `app` had some issues yesterday:\n```\nError: Cannot connect to database\n  at Connection.connect (db.js:45)\n```\nCan you please help me?",
+            "link": "https://example.com/ticket/1",
+            "date": "2025-11-21T10:00:00Z"
+          },
+          "createdAt": "2025-11-21T10:00:00Z",
+          "tags": ["bug"],
+          "escalations": [],
+          "assignedTo": "support-engineer-1@example.com",
+          "logs": [
+            {
+              "event": "Ticket created",
+              "date": "2025-11-21T10:00:00Z"
+            },
+            {
+              "event": "Status updated to opened",
+              "date": "2025-11-21T10:05:00Z"
+            }
+          ]
+        }
+      }
+    }
+  
+  # PATCH /ticket/{id} - Update ticket
+  "ticket-update.json": |
+    {
+      "priority": 1,
+      "request": {
+        "method": "PATCH",
+        "urlPathPattern": "/ticket/[0-9]+$"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "id": 1,
+          "ticketId": "TICKET-001",
+          "status": "closed",
+          "impact": "high",
+          "team": {
+            "label": "Core-platform",
+            "code": "core-platform"
+          },
+          "query": {
+            "text": "Sample ticket 1",
+            "link": "https://example.com/ticket/1"
+          },
+          "createdAt": "2025-11-21T10:00:00Z",
+          "tags": ["bug", "urgent"],
+          "escalations": [],
+          "assignedTo": "support-engineer-2@example.com",
+          "logs": [
+            {
+              "event": "Ticket created",
+              "date": "2025-11-21T10:00:00Z"
+            },
+            {
+              "event": "Status updated to opened",
+              "date": "2025-11-21T10:05:00Z"
+            },
+            {
+              "event": "Status updated to closed",
+              "date": "2025-11-21T11:00:00Z"
+            }
+          ]
+        }
+      }
+    }
+  
+  # /ticket - List tickets with sample data
+  "ticket-list.json": |
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPattern": "/ticket.*"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "content": [
+            {
+              "id": 1,
+              "ticketId": "TICKET-001",
+              "status": "opened",
+              "impact": "high",
+              "team": {
+                "label": "Core-platform",
+                "code": "core-platform"
+              },
+              "query": "Sample ticket 1",
+              "createdAt": "2025-11-21T10:00:00Z",
+              "tags": ["bug"],
+              "escalations": [],
+              "assignedTo": "support-engineer-1@example.com"
+            },
+            {
+              "id": 2,
+              "ticketId": "TICKET-002",
+              "status": "closed",
+              "impact": "medium",
+              "team": {
+                "label": "Other-team",
+                "code": "other-team"
+              },
+              "query": "Sample ticket 2",
+              "createdAt": "2025-11-20T10:00:00Z",
+              "tags": ["feature"],
+              "escalations": [],
+              "assignedTo": null
+            }
+          ],
+          "totalElements": 2,
+          "totalPages": 1,
+          "size": 1000,
+          "page": 0
+        }
+      }
+    }
+  
+  # /escalation - List escalations with sample data for escalation tests
+  "escalation-list.json": |
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/escalation$"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "content": [
+            {
+              "id": 1,
+              "ticketId": 1,
+              "status": "ongoing",
+              "team": {
+                "label": "Core-platform",
+                "code": "core-platform"
+              },
+              "escalatingTeam": "Team A",
+              "impact": "high",
+              "openedAt": "2025-11-21T09:00:00Z",
+              "resolvedAt": null,
+              "threadLink": "https://example.com/thread1",
+              "tags": ["urgent"]
+            },
+            {
+              "id": 2,
+              "ticketId": 2,
+              "status": "resolved",
+              "team": {
+                "label": "Core-platform",
+                "code": "core-platform"
+              },
+              "escalatingTeam": "Team B",
+              "impact": "medium",
+              "openedAt": "2025-11-20T09:00:00Z",
+              "resolvedAt": "2025-11-20T15:00:00Z",
+              "threadLink": "https://example.com/thread2",
+              "tags": ["bug"]
+            }
+          ],
+          "totalElements": 2,
+          "totalPages": 1,
+          "size": 50,
+          "page": 0
+        }
+      }
+    }
+  
+  # /registry/impact - Impact codes used in filters
+  "registry-impact.json": |
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/registry/impact$"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "code": "high",
+            "label": "High"
+          },
+          {
+            "code": "medium",
+            "label": "Medium"
+          },
+          {
+            "code": "low",
+            "label": "Low"
+          }
+        ]
+      }
+    }
+  
+  # /registry/tag - Tag codes used in filters  
+  "registry-tag.json": |
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/registry/tag$"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "code": "bug",
+            "label": "Bug"
+          },
+          {
+            "code": "feature",
+            "label": "Feature"
+          },
+          {
+            "code": "question",
+            "label": "Question"
+          },
+          {
+            "code": "urgent",
+            "label": "Urgent"
+          }
+        ]
+      }
+    }
+  
+  # /stats - Stats aggregation endpoint
+  "stats.json": |
+    {
+      "request": {
+        "method": "POST",
+        "urlPathPattern": "/stats$"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "totalTickets": 10,
+          "openedTickets": 5,
+          "closedTickets": 5,
+          "escalatedTickets": 2,
+          "avgResolutionTime": 3600
+        }
+      }
+    }
+  
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-backend
+  labels:
+    app: mock-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-backend
+  template:
+    metadata:
+      labels:
+        app: mock-backend
+    spec:
+      containers:
+      - name: wiremock
+        image: wiremock/wiremock:3.3.1
+        args:
+          - --port=8080
+          - --global-response-templating
+          - --verbose
+          - --enable-browser-proxying=false
+        ports:
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+        - name: mappings
+          mountPath: /home/wiremock/mappings
+        resources:
+          requests:
+            cpu: 200m
+            memory: 300Mi
+          limits:
+            memory: 300Mi
+        livenessProbe:
+          httpGet:
+            path: /__admin/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /__admin/health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: mappings
+        configMap:
+          name: wiremock-mappings
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-backend
+  labels:
+    app: mock-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: mock-backend
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+
