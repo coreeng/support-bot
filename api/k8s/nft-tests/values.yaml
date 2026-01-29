@@ -23,7 +23,7 @@ securityContext:
 job:
   restartPolicy: Never
   backoffLimit: 0
-  activeDeadlineSeconds: 60
+  activeDeadlineSeconds: 120
   parallelism: 1
   completions: 1
 

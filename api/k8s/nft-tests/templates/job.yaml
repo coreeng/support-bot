@@ -6,6 +6,7 @@ metadata:
     {{- include "support-bot-nft-tests.labels" . | nindent 4 }}
 spec:
   backoffLimit: {{ .Values.job.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.job.activeDeadlineSeconds }}
   parallelism: {{ .Values.job.parallelism }}
   completions: {{ .Values.job.completions }}
   template:

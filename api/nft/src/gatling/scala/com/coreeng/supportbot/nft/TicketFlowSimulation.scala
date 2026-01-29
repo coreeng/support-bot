@@ -6,9 +6,10 @@ import io.gatling.core.Predef._
 import io.gatling.core.session.Session
 import org.slf4j.LoggerFactory
 
-import java.util.concurrent.{ExecutorService, Executors, ThreadLocalRandom}
+import java.util.concurrent.{ExecutorService, Executors, ThreadLocalRandom, TimeUnit}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.util.control.NonFatal
 
 class TicketFlowSimulation extends Simulation {
   private val logger = LoggerFactory.getLogger(getClass)
@@ -20,18 +21,6 @@ class TicketFlowSimulation extends Simulation {
   private implicit val executionContext: ExecutionContext = ExecutionContext.fromExecutor(executorService)
 
   import action.TestKitDsl._
-
-  before {
-    logger.info("Initializing TestKit for NFT...")
-    slackWiremock.start()
-    slackWiremock.permanent().setupAllNftStubs()
-    logger.info("SlackWiremock started on port {}", slackWiremock.port())
-  }
-
-  after {
-    testKit.slack().wiremock().stop()
-    executorService.shutdown()
-  }
 
   private val ticketFlowScenario = scenario("Slack Ticket Flow")
     .exec(testKitExec("post-tenant-message", executionContext, testKit)(postTenantMessage))
@@ -147,5 +136,32 @@ class TicketFlowSimulation extends Simulation {
     )
 
     session
+  }
+
+  before {
+    logger.info("Initializing TestKit for NFT...")
+    slackWiremock.start()
+    slackWiremock.permanent().setupAllNftStubs()
+    logger.info("SlackWiremock started on port {}", slackWiremock.port())
+  }
+
+  after {
+    try {
+      testKit.slack().wiremock().stop()
+    } catch {
+      case NonFatal(e) =>
+        logger.warn("Error while stopping SlackWiremock in NFT after hook", e)
+    }
+
+    executorService.shutdown()
+
+    try {
+      if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
+        logger.warn("ExecutorService did not terminate within 10 seconds")
+      }
+    } catch {
+      case NonFatal(e) =>
+        logger.warn("Interrupted or failed while awaiting executor termination", e)
+    }
   }
 }

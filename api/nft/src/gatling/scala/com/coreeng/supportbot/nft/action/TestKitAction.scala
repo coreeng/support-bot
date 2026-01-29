@@ -50,6 +50,15 @@ class TestKitAction(
       case Failure(exception) =>
         val endTimestamp = clock.nowMillis
         val failedSession = session.markAsFailed
+
+        logger.error(
+          "TestKit step '{}' failed for scenario '{}' and groups {}",
+          requestName,
+          failedSession.scenario,
+          failedSession.groups,
+          exception
+        )
+
         statsEngine.logResponse(
           failedSession.scenario,
           failedSession.groups,
@@ -58,7 +67,7 @@ class TestKitAction(
           endTimestamp,
           KO,
           None,
-          Option(exception.getMessage)
+          Option(exception.toString)
         )
 
         next ! failedSession

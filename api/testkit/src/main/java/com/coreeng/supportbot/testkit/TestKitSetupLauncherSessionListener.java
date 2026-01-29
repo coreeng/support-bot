@@ -37,7 +37,16 @@ public class TestKitSetupLauncherSessionListener implements LauncherSessionListe
 
     @Override
     public void launcherSessionClosed(LauncherSession session) {
+        if (testKit == null) {
+            logger.warn("TestKit was not initialized; nothing to shut down");
+            return;
+        }
+
         logger.info("Closing SlackWiremock server");
-        testKit.slack().wiremock().stop();
+        try {
+            testKit.slack().wiremock().stop();
+        } catch (RuntimeException e) {
+            logger.warn("Failed to stop SlackWiremock server cleanly", e);
+        }
     }
 }

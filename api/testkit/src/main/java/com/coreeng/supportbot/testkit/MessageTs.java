@@ -5,44 +5,64 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import org.jspecify.annotations.NonNull;
 
 import java.time.Instant;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public record MessageTs(
     @NonNull
     Instant instant
-) {
-    private static final AtomicInteger counter = new AtomicInteger(0);
+ ) {
+    private static final AtomicLong counter = new AtomicLong(0L);
 
     /**
-     * Creates a new MessageTs with the current time plus an atomic counter
-     * to ensure uniqueness even when called multiple times within the same millisecond.
-     * The counter fills the last 3 digits of the nanosecond field (modulo 1000).
+     * Creates a new MessageTs with the current epoch second and a monotonically
+     * increasing microsecond suffix derived from an atomic counter.
+     * <p>The right part (after the dot) is a 6-digit zero-padded counter-value
+     * modulo 1_000_000, so generated timestamps look like Slack ts strings and
+     * are effectively unique in tests.</p>
      */
     public static MessageTs now() {
-        return now(counter.getAndIncrement() % 1000);
+        long epochSecond = Instant.now().getEpochSecond();
+        long suffixMicros = counter.getAndIncrement() % 1_000_000L;
+        Instant instant = Instant.ofEpochSecond(epochSecond, suffixMicros * 1_000L);
+        return new MessageTs(instant);
     }
 
     /**
-     * Creates a new MessageTs with the current time plus an explicit counter value.
+     * Creates a new MessageTs with the current epoch second and an explicit
+     * counter-derived microsecond suffix.
      */
     public static MessageTs now(int counterValue) {
-        Instant now = Instant.now();
-        // Clear the last 3 digits and add the counter value
-        long nanos = (now.getNano() / 1000) * 1000 + (counterValue % 1000);
-        return new MessageTs(Instant.ofEpochSecond(now.getEpochSecond(), nanos));
+        long epochSecond = Instant.now().getEpochSecond();
+        long suffixMicros = Math.floorMod(counterValue, 1_000_000);
+        Instant instant = Instant.ofEpochSecond(epochSecond, suffixMicros * 1_000L);
+        return new MessageTs(instant);
     }
 
     @JsonCreator
     public static MessageTs fromTsString(String ts) {
-        String[] parts = ts.split("\\.");
+        String[] parts = ts.split("\\.", 2);
         long epochSecs = Long.parseLong(parts[0]);
-        long epochNano = Long.parseLong(parts[1]);
-        return new MessageTs(Instant.ofEpochSecond(epochSecs, epochNano));
+
+        long micros = 0L;
+        if (parts.length > 1 && !parts[1].isEmpty()) {
+            String frac = parts[1];
+            if (frac.length() > 6) {
+                frac = frac.substring(0, 6);
+            } else if (frac.length() < 6) {
+                frac = String.format("%-6s", frac).replace(' ', '0');
+            }
+            micros = Long.parseLong(frac);
+        }
+
+        Instant instant = Instant.ofEpochSecond(epochSecs, micros * 1_000L);
+        return new MessageTs(instant);
     }
 
     @JsonValue
     @Override
     public @NonNull String toString() {
-        return instant.getEpochSecond() + "." + instant.getNano();
+        long epochSecs = instant.getEpochSecond();
+        long micros = instant.getNano() / 1_000L;
+        return epochSecs + "." + String.format("%06d", micros);
     }
 }

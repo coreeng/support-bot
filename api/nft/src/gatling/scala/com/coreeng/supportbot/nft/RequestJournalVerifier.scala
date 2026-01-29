@@ -12,8 +12,8 @@ import scala.jdk.CollectionConverters._
  * Verifies Slack API calls via WireMock's RequestJournal.
  */
 object RequestJournalVerifier {
-  private val DEFAULT_TIMEOUT: Duration = Duration.ofSeconds(30)
-  private val POLL_INTERVAL = Duration.ofMillis(10)
+  private val defaultTimeout: Duration = Duration.ofSeconds(30)
+  private val pollInterval = Duration.ofMillis(10)
   private val objectMapper = new ObjectMapper()
 
   /**
@@ -21,10 +21,10 @@ object RequestJournalVerifier {
    * Uses the unique message timestamp from the ticket form response to avoid
    * false positives from substring matching on numeric ticket IDs.
    */
-  def awaitChatUpdate(wiremock: SlackWiremock, formMessageTs: String, timeout: Duration = DEFAULT_TIMEOUT): Unit = {
+  def awaitChatUpdate(wiremock: SlackWiremock, formMessageTs: String, timeout: Duration = defaultTimeout): Unit = {
     Awaitility.await()
       .atMost(timeout)
-      .pollInterval(POLL_INTERVAL)
+      .pollInterval(pollInterval)
       .untilAsserted { () =>
         val requests = wiremock.findAll(
           postRequestedFor(urlPathEqualTo("/api/chat.update"))
@@ -42,14 +42,14 @@ object RequestJournalVerifier {
    * Waits for a chat.postMessage call and extracts both the ticket ID from the request
    * and the generated message timestamp from the response.
    */
-  def awaitTicketFormAndExtractId(wiremock: SlackWiremock, uniqueId: String, timeout: Duration = DEFAULT_TIMEOUT): TicketFormResult = {
+  def awaitTicketFormAndExtractId(wiremock: SlackWiremock, uniqueId: String, timeout: Duration = defaultTimeout): TicketFormResult = {
     val receiver = new TicketMessage.Receiver()
     var ticketId: Long = -1
     var formMessageTs: String = ""
 
     Awaitility.await()
       .atMost(timeout)
-      .pollInterval(POLL_INTERVAL)
+      .pollInterval(pollInterval)
       .untilAsserted { () =>
         // Use getAllServeEvents to get both request and response
         val allEvents = wiremock.getAllServeEvents.asScala
@@ -65,26 +65,35 @@ object RequestJournalVerifier {
         val request = matchingEvent.getRequest
         val textParam = request.formParameter("text")
         if (!textParam.isPresent) {
-          throw new AssertionError(s"No 'text' form parameter found in request")
+          throw new IllegalStateException("No 'text' form parameter found in request")
         }
-        ticketId = receiver.extractTicketIdFromText(textParam.firstValue())
+        try {
+          ticketId = receiver.extractTicketIdFromText(textParam.firstValue())
+        } catch {
+          case e: AssertionError =>
+            throw new IllegalStateException("Failed to parse ticketId from 'text' form parameter", e)
+        }
 
         // Extract formMessageTs from response
         val responseBody = matchingEvent.getResponse.getBodyAsString
         val jsonNode: JsonNode = objectMapper.readTree(responseBody)
-        formMessageTs = jsonNode.get("ts").asText()
+        val tsNode = jsonNode.get("ts")
+        if (tsNode == null) {
+          throw new IllegalStateException("No 'ts' field found in response body JSON")
+        }
+        formMessageTs = tsNode.asText()
         if (formMessageTs.isEmpty) {
-          throw new AssertionError(s"No 'ts' field found in response body")
+          throw new IllegalStateException("Empty 'ts' field in response body JSON")
         }
       }
 
     TicketFormResult(ticketId, formMessageTs)
   }
 
-  def awaitViewsOpenWithTriggerId(wiremock: SlackWiremock, triggerId: String, timeout: Duration = DEFAULT_TIMEOUT): Unit = {
+  def awaitViewsOpenWithTriggerId(wiremock: SlackWiremock, triggerId: String, timeout: Duration = defaultTimeout): Unit = {
     Awaitility.await()
       .atMost(timeout)
-      .pollInterval(POLL_INTERVAL)
+      .pollInterval(pollInterval)
       .untilAsserted { () =>
         val requests = wiremock.findAll(
           postRequestedFor(urlPathEqualTo("/api/views.open"))

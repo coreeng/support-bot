@@ -2,8 +2,11 @@ import org.gradle.api.Project
 import org.gradle.api.logging.Logger
 import org.gradle.kotlin.dsl.extra
 import java.io.File
-import java.net.HttpURLConnection
 import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 /**
@@ -15,6 +18,9 @@ class ServiceLifecycle(
     private val keyPrefix: String,
     private val logger: Logger
 ) {
+    private val httpClient: HttpClient = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(1))
+        .build()
     private val pidFile: File = project.layout.buildDirectory.get().asFile.resolve("service.pid")
     private val serviceStateKey = "$keyPrefix.serviceProcess"
     private val serviceAlreadyRunningKey = "$keyPrefix.serviceAlreadyRunning"
@@ -41,30 +47,66 @@ class ServiceLifecycle(
      * Kills any stale service process from a previous interrupted run.
      */
     fun killStaleProcess() {
-        if (!pidFile.exists()) return
+	        if (!pidFile.exists()) return
 
-        try {
-            val pid = pidFile.readText().trim().toLong()
-            val processHandle = ProcessHandle.of(pid).orElse(null)
-            if (processHandle != null && processHandle.isAlive) {
-                logger.lifecycle("Found stale service process (PID: $pid) from previous run, killing it...")
-                processHandle.destroyForcibly()
-                var attempts = 0
-                while (processHandle.isAlive && attempts < 10) {
-                    Thread.sleep(500)
-                    attempts++
-                }
-                if (processHandle.isAlive) {
-                    logger.warn("Failed to kill stale process (PID: $pid)")
-                } else {
-                    logger.lifecycle("Stale process killed successfully")
-                }
-            }
-        } catch (e: Exception) {
-            logger.warn("Error cleaning up stale process: ${e.message}")
-        } finally {
-            pidFile.delete()
-        }
+	        val rawText = try {
+	            pidFile.readText().trim()
+	        } catch (e: Exception) {
+	            logger.warn("Failed to read PID file ${pidFile.absolutePath}; leaving it in place", e)
+	            return
+	        }
+
+	        if (rawText.isEmpty()) {
+	            logger.warn("PID file ${pidFile.absolutePath} was empty; deleting it")
+	            if (!pidFile.delete()) {
+	                logger.warn("Failed to delete empty PID file ${pidFile.absolutePath}")
+	            }
+	            return
+	        }
+
+	        val pid = rawText.toLongOrNull()
+	        if (pid == null) {
+	            logger.warn("PID file ${pidFile.absolutePath} is corrupt ('$rawText'); deleting it")
+	            if (!pidFile.delete()) {
+	                logger.warn("Failed to delete corrupt PID file ${pidFile.absolutePath}")
+	            }
+	            return
+	        }
+
+	        val processHandle = try {
+	            ProcessHandle.of(pid).orElse(null)
+	        } catch (e: Exception) {
+	            logger.warn("Error looking up process handle for PID $pid from PID file ${pidFile.absolutePath}", e)
+	            return
+	        }
+
+	        if (processHandle == null || !processHandle.isAlive) {
+	            logger.lifecycle("No live process with PID $pid; deleting stale PID file ${pidFile.absolutePath}")
+	            if (!pidFile.delete()) {
+	                logger.warn("Failed to delete stale PID file ${pidFile.absolutePath}")
+	            }
+	            return
+	        }
+
+	        try {
+	            logger.lifecycle("Found stale service process (PID: $pid) from previous run, killing it...")
+	            processHandle.destroyForcibly()
+	            var attempts = 0
+	            while (processHandle.isAlive && attempts < 10) {
+	                Thread.sleep(500)
+	                attempts++
+	            }
+	            if (processHandle.isAlive) {
+	                logger.warn("Failed to kill stale process (PID: $pid); keeping PID file at ${pidFile.absolutePath}")
+	            } else {
+	                logger.lifecycle("Stale process killed successfully; deleting PID file ${pidFile.absolutePath}")
+	                if (!pidFile.delete()) {
+	                    logger.warn("Failed to delete PID file ${pidFile.absolutePath} after killing process")
+	                }
+	            }
+	        } catch (e: Exception) {
+	            logger.warn("Error killing stale process (PID: $pid); keeping PID file at ${pidFile.absolutePath}", e)
+	        }
     }
 
     private fun savePid(process: Process) {
@@ -83,12 +125,14 @@ class ServiceLifecycle(
      */
     fun checkServiceHealth(healthUrl: String): Boolean {
         return try {
-            val conn = URI(healthUrl).toURL().openConnection() as HttpURLConnection
-            conn.connectTimeout = 1000
-            conn.readTimeout = 1000
-            conn.requestMethod = "GET"
-            conn.responseCode == 200
-        } catch (_: Throwable) {
+            val request = HttpRequest.newBuilder()
+                .uri(URI.create(healthUrl))
+                .GET()
+                .timeout(Duration.ofSeconds(1))
+                .build()
+            val response = httpClient.send(request, HttpResponse.BodyHandlers.discarding())
+            response.statusCode() == 200
+        } catch (_: Exception) {
             false
         }
     }
