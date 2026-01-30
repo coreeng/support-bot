@@ -10,4 +10,6 @@ RUN yarn --frozen-lockfile;
 COPY tsconfig.json cucumber.json ./
 COPY tests ./tests
 
+USER pwuser
+
 CMD ["yarn", "test:cucumber:ci"]
