@@ -1,0 +1,48 @@
+image:
+  repository: support-bot-nft-tests
+  tag: latest
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 185
+  runAsGroup: 185
+  fsGroup: 185
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+job:
+  restartPolicy: Never
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  parallelism: 1
+  completions: 1
+
+resources:
+  requests:
+    cpu: 0.5
+    memory: 2250Mi
+  limits:
+    memory: 2500Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+reports:
+  pvc:
+    enabled: true
+    storage: 1Gi
+    # Optional storageClassName override; leave empty to use the cluster default
+    storageClassName: ""

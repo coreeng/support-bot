@@ -41,6 +41,7 @@ lint-api: ## Lint API Dockerfiles
 	docker run --rm -i docker.io/hadolint/hadolint < api/Dockerfile
 	docker run --rm -i docker.io/hadolint/hadolint < api/functional/Dockerfile
 	docker run --rm -i docker.io/hadolint/hadolint < api/integration-tests/Dockerfile
+	docker run --rm -i docker.io/hadolint/hadolint < api/nft/Dockerfile
 
 .PHONY: lint-ui
 lint-ui: ## Lint UI Dockerfiles
@@ -67,8 +68,8 @@ build-functional: ## Build functional test docker image
 	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --file api/functional/Dockerfile api
 
 .PHONY: build-nft
-build-nft:
-	@echo "warning: $@ not implemented"
+build-nft: ## Build nft test docker image
+	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --file api/nft/Dockerfile api
 
 .PHONY: build-integration
 build-integration:
@@ -97,7 +98,7 @@ push-functional: ## Push functional test docker image
 
 .PHONY: push-nft
 push-nft: ## Push nft test docker image
-	@echo "WARNING: $@ not implemented"
+	docker image push "$(p2p_image_tag)"
 
 .PHONY: push-integration
 push-integration: ## Push integration test docker image
@@ -114,8 +115,15 @@ deploy-integration:
 	echo "Service deployment is managed by tests"
 
 .PHONY: deploy-nft
-deploy-nft:
-	@echo "WARNING: $@ not implemented"
+deploy-nft: ## Deploy service and DB for nft tests
+	NAMESPACE="$(p2p_namespace)" \
+	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
+	SERVICE_IMAGE_TAG="$(p2p_version)" \
+	DB_RELEASE="$(p2p_app_name)-db" \
+	SERVICE_RELEASE="$(p2p_app_name)" \
+	ACTION=deploy \
+	VALUES_FILE=api/k8s/service/values-nft.yaml \
+	./api/scripts/deploy-service.sh
 
 .PHONY: deploy-api-extended-test
 deploy-api-extended-test: ## Deploy service and DB for extended test environment
@@ -199,7 +207,23 @@ run-functional:
 
 .PHONY: run-nft
 run-nft:
-	@echo "WARNING: $@ not implemented"
+	NAMESPACE="$(p2p_namespace)" \
+	JOB_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)-nft" \
+	IMAGE_TAG="$(p2p_version)" \
+	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
+	SERVICE_IMAGE_TAG="$(p2p_version)" \
+	DEPLOY_SERVICE=false \
+	./api/scripts/run-nft-tests.sh
+
+	NAMESPACE="$(p2p_namespace)" \
+	SERVICE_RELEASE="$(p2p_app_name)" \
+	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
+	SERVICE_IMAGE_TAG="$(p2p_version)" \
+	DB_RELEASE="$(p2p_app_name)-db" \
+	ACTION=delete \
+	DELETE_DB=true \
+	DEPLOY_DB=true \
+	./api/scripts/deploy-service.sh
 
 .PHONY: run-integration
 run-integration:

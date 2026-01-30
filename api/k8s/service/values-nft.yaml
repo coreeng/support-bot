@@ -1,0 +1,30 @@
+configMap:
+  create: false
+  enabled: false
+
+resources:
+  requests:
+    cpu: 0.5
+    memory: 512Mi
+  limits:
+    memory: 750Mi
+
+
+env:
+  - name: JAVA_OPTS
+    value: "-Xms512m -Xmx512m"
+  - name: SPRING_PROFILES_ACTIVE
+    value: nft
+  - name: SLACK_CLIENT_METHODS_BASE_URL
+    value: "http://support-bot-nft-tests-wiremock:8000/api/"
+  - name: DB_URL
+    value: "jdbc:postgresql://support-bot-db-postgresql-hl.support-bot-nft.svc.cluster.local:5432/supportbot"
+  - name: DB_USERNAME
+    value: "supportbot"
+  - name: DB_PASSWORD
+    value: "supportbotpassword"
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
