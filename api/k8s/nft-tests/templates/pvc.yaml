@@ -1,0 +1,17 @@
+{{- if .Values.reports.pvc.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "support-bot-nft-tests.fullname" . }}-reports
+  labels:
+    {{- include "support-bot-nft-tests.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.reports.pvc.storage | default "1Gi" }}
+{{- with .Values.reports.pvc.storageClassName }}
+  storageClassName: {{ . }}
+{{- end }}
+{{- end }}

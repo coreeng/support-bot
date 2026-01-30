@@ -34,3 +34,6 @@ jobs:
       app-name: support-bot
       version: ${{ needs.version.outputs.version }}
       working-directory: ./
+      artifacts: |
+        p2p-nft:
+          - reports/nft/**

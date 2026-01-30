@@ -213,3 +213,8 @@ configMap:
         slack-group-id: S0A2CQB5YE9
         static:
           enabled: false
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true

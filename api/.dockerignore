@@ -1,0 +1,13 @@
+# Ignore Gradle and build outputs from the Docker build context
+**/build
+**/.gradle
+
+# IDE/project metadata
+.idea
+.vscode
+*.iml
+
+# Logs and temp files
+*.log
+*.tmp
+

@@ -1,6 +1,7 @@
 package com.coreeng.supportbot;
 
 import com.coreeng.supportbot.testkit.SlackWiremock;
+import com.coreeng.supportbot.testkit.TestKitExtension;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
