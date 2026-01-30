@@ -506,6 +506,12 @@ spec:
       labels:
         app: mock-backend
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: wiremock
         image: wiremock/wiremock:3.3.1
@@ -517,9 +523,17 @@ spec:
         ports:
         - containerPort: 8080
           name: http
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
         volumeMounts:
         - name: mappings
           mountPath: /home/wiremock/mappings
+        - name: tmp
+          mountPath: /tmp
         resources:
           requests:
             cpu: 200m
@@ -546,6 +560,8 @@ spec:
       - name: mappings
         configMap:
           name: wiremock-mappings
+      - name: tmp
+        emptyDir: {}
 
 ---
 apiVersion: v1
