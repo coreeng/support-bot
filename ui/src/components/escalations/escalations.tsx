@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useEscalations, useEscalationTeams, useRegistry } from '@/lib/hooks'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
-import { useUser } from '@/contexts/UserContext'
+import { useUser } from '@/contexts/AuthContext'
 import EscalatedToMyTeamTable from './EscalatedToMyTeamTable'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
 

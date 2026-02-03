@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useUser } from '@/contexts/UserContext'
+import { useUser } from '@/contexts/AuthContext'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { Users } from 'lucide-react'
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTicket, useTenantTeams, useRegistry, useSupportMembers, useAssignmentEnabled } from '@/lib/hooks'
 import { TicketWithLogs, TicketImpact, TicketTag, Escalation, SupportMember } from '@/lib/types'
-import { useUser } from '@/contexts/UserContext'
+import { useUser } from '@/contexts/AuthContext'
 import {
     Dialog,
     DialogContent,

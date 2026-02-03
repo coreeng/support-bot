@@ -2,7 +2,7 @@
 
 import { useMemo, useCallback } from 'react'
 import { useEscalations, useRegistry } from '@/lib/hooks'
-import { useUser } from '@/contexts/UserContext'
+import { useUser } from '@/contexts/AuthContext'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
