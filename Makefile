@@ -8,6 +8,23 @@ P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui
 $(shell curl -fsSL "https://raw.githubusercontent.com/coreeng/p2p/v1/p2p.mk" -o ".p2p.mk")
 include .p2p.mk
 
+##@ Local Development
+
+.PHONY: run-local
+run-local: ## Run both API and UI locally (Ctrl+C to stop)
+	@trap 'kill 0' EXIT; \
+	(cd api && make run-local 2>&1 | sed 's/^/[API] /') & \
+	(cd ui && make run-local 2>&1 | sed 's/^/[UI]  /') & \
+	wait
+
+.PHONY: run-local-api
+run-local-api: ## Run only API locally
+	cd api && make run-local
+
+.PHONY: run-local-ui
+run-local-ui: ## Run only UI locally
+	cd ui && make run-local
+
 ##@ General
 
 # The help target prints out all targets with their descriptions organized

@@ -1,8 +1,28 @@
-const BASE_URL = '/api';  // now points to our Next.js proxy
+import { getToken, clearToken } from './auth/token'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+
+// Custom error class for API errors
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public statusText: string
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
 
 // Helper to get headers for API requests
 function getApiHeaders(): Record<string, string> {
   const headers: Record<string, string> = {}
+
+  // Add auth token if available
+  const token = getToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
 
   // Add iframe detection header if running in iframe
   if (typeof window !== 'undefined') {
@@ -19,11 +39,30 @@ function getApiHeaders(): Record<string, string> {
   return headers
 }
 
+// Handle API response
+async function handleResponse(res: Response, path: string) {
+  if (res.status === 401) {
+    // Token expired or invalid - clear it and redirect to login
+    clearToken()
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('auth_return_to', window.location.pathname)
+      window.location.href = '/login'
+    }
+    throw new ApiError('Unauthorized', res.status, res.statusText)
+  }
+
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => 'Unknown error')
+    throw new ApiError(`Error with ${path}: ${errorText}`, res.status, res.statusText)
+  }
+
+  return res.json()
+}
+
 export async function apiGet(path: string) {
   const headers = getApiHeaders()
-  const res = await fetch(`${BASE_URL}${path}`, { headers })
-  if (!res.ok) throw new Error(`Error fetching ${path}`)
-  return res.json()
+  const res = await fetch(`${API_URL}${path}`, { headers })
+  return handleResponse(res, path)
 }
 
 export async function apiPost(path: string, body: unknown) {
@@ -31,13 +70,12 @@ export async function apiPost(path: string, body: unknown) {
     'Content-Type': 'application/json',
     ...getApiHeaders(),
   }
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`Error posting to ${path}`)
-  return res.json()
+  return handleResponse(res, path)
 }
 
 export async function apiPut(path: string, body: unknown) {
@@ -45,13 +83,12 @@ export async function apiPut(path: string, body: unknown) {
     'Content-Type': 'application/json',
     ...getApiHeaders(),
   }
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${API_URL}${path}`, {
     method: 'PUT',
     headers,
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`Error updating ${path}`)
-  return res.json()
+  return handleResponse(res, path)
 }
 
 export async function apiPatch(path: string, body: unknown) {
@@ -59,14 +96,19 @@ export async function apiPatch(path: string, body: unknown) {
     'Content-Type': 'application/json',
     ...getApiHeaders(),
   }
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${API_URL}${path}`, {
     method: 'PATCH',
     headers,
     body: JSON.stringify(body),
   })
-  if (!res.ok) {
-    const errorText = await res.text().catch(() => 'Unknown error')
-    throw new Error(`Error updating ${path}: ${errorText}`)
-  }
-  return res.json()
+  return handleResponse(res, path)
+}
+
+export async function apiDelete(path: string) {
+  const headers = getApiHeaders()
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'DELETE',
+    headers,
+  })
+  return handleResponse(res, path)
 }

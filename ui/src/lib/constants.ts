@@ -35,10 +35,10 @@ export const QUERY_KEYS = {
 } as const
 
 /**
- * API endpoint paths
+ * API endpoint paths (relative to API_URL)
  */
 export const API_ENDPOINTS = {
-    DASHBOARD: '/api/db/dashboard',
+    DASHBOARD: '/dashboard',
     TICKETS: '/ticket',
     ESCALATIONS: '/escalation',
     TEAMS: '/team',

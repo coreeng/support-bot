@@ -4,7 +4,6 @@
  */
 
 import { NextRequest } from 'next/server'
-import { getToken } from 'next-auth/jwt'
 
 interface RateLimitEntry {
   count: number
@@ -128,16 +127,9 @@ export const RATE_LIMITS = {
 
 /**
  * Extract a unique identifier from the request for rate limiting
- * Uses user email if authenticated, otherwise falls back to IP address
+ * Uses IP address as identifier (server-side routes don't have auth tokens)
  */
-async function getIdentifier(request: NextRequest): Promise<string> {
-  // Try to get user from JWT token
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
-  if (token?.email) {
-    return token.email as string
-  }
-
-  // Fallback to IP address
+function getIdentifier(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for')
   const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
   return ip
@@ -149,11 +141,11 @@ async function getIdentifier(request: NextRequest): Promise<string> {
  * @param config - Rate limit configuration
  * @returns Rate limit result
  */
-export async function rateLimit(
+export function rateLimit(
   request: NextRequest,
   config: RateLimitConfig = {}
-): Promise<RateLimitResult> {
-  const identifier = await getIdentifier(request)
+): RateLimitResult {
+  const identifier = getIdentifier(request)
   return checkRateLimit(identifier, config)
 }
 

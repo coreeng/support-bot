@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useEscalations, useRegistry } from '@/lib/hooks'
-import { useUser } from '@/contexts/UserContext'
+import { useUser } from '@/contexts/AuthContext'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 
 export default function EscalatedToMyTeamTable() {

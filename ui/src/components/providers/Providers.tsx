@@ -4,12 +4,12 @@
 import * as React from 'react'
 import { ReactNode, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { SessionProvider } from 'next-auth/react'
 
 import { ThemeProvider } from './theme-provider'
-import { UserProvider } from '@/contexts/UserContext'
+import { AuthProvider } from '@/contexts/AuthContext'
 import { TeamFilterProvider } from '@/contexts/TeamFilterContext'
 import { IframeProvider } from '@/contexts/IframeContext'
+import { AuthGuard } from '@/components/AuthGuard'
 
 type ProvidersProps = {
     children: ReactNode
@@ -26,17 +26,17 @@ export function GlobalProviders({ children }: ProvidersProps) {
 
     return (
         <IframeProvider>
-        <SessionProvider>
             <QueryClientProvider client={queryClient}>
-                <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light" disableTransitionOnChange>
-                    <UserProvider>
-                        <TeamFilterProvider>
-                            {children}
-                        </TeamFilterProvider>
-                    </UserProvider>
-                </ThemeProvider>
+                <AuthProvider>
+                    <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light" disableTransitionOnChange>
+                        <AuthGuard>
+                            <TeamFilterProvider>
+                                {children}
+                            </TeamFilterProvider>
+                        </AuthGuard>
+                    </ThemeProvider>
+                </AuthProvider>
             </QueryClientProvider>
-        </SessionProvider>
         </IframeProvider>
     )
 }
