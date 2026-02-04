@@ -74,7 +74,7 @@ public class EscalationProcessingService {
 
     public void resolveByTicketId(TicketId ticketId) {
         for (var escalation : repository.listByTicketId(ticketId)) {
-            if (EscalationStatus.resolved.equals(escalation.status())) {
+            if (escalation.status() == EscalationStatus.resolved) {
                 continue;
             }
             resolve(escalation);

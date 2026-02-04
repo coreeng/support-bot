@@ -195,7 +195,7 @@ public class TicketInMemoryRepository implements TicketRepository {
         if (!query.ids().isEmpty() && !query.ids().contains(ticket.id())) {
             return false;
         }
-        if (query.status() != null && !query.status().equals(ticket.status())) {
+        if (query.status() != null && query.status() != ticket.status()) {
             return false;
         }
         ZonedDateTime queryDate = ticket.queryTs().getDate().atZone(timezone);

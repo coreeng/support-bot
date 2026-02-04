@@ -53,7 +53,7 @@ public class TicketUIMapper {
             .team(
                 switch (ticket.ticket().team()) {
                     case null -> null;
-                    case TicketTeam.UnknownTeam u -> new TeamUI(
+                    case TicketTeam.UnknownTeam _ -> new TeamUI(
                         TicketTeam.notATenantCode,
                         TicketTeam.notATenantCode,
                         ImmutableList.of()

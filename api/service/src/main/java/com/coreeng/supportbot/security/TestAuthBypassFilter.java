@@ -17,8 +17,8 @@ import java.io.IOException;
 @Slf4j
 @RequiredArgsConstructor
 public class TestAuthBypassFilter extends OncePerRequestFilter {
-    private static final String TEST_USER_HEADER = "X-Test-User";
-    private static final String TEST_ROLE_HEADER = "X-Test-Role";
+    private static final String testUserHeader = "X-Test-User";
+    private static final String testRoleHeader = "X-Test-Role";
 
     private final SecurityProperties properties;
 
@@ -33,9 +33,9 @@ public class TestAuthBypassFilter extends OncePerRequestFilter {
             return;
         }
 
-        var testUser = request.getHeader(TEST_USER_HEADER);
+        var testUser = request.getHeader(testUserHeader);
         if (testUser != null && !testUser.isBlank()) {
-            var testRole = request.getHeader(TEST_ROLE_HEADER);
+            var testRole = request.getHeader(testRoleHeader);
             var principal = createTestPrincipal(testUser, testRole);
             var authentication = new JwtAuthenticationToken(principal, "test-token");
             SecurityContextHolder.getContext().setAuthentication(authentication);

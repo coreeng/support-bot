@@ -55,22 +55,22 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Order(200)
 public class MockDataGenerator implements ApplicationRunner {
-    private final static long secondsPerDay = 24 * 60 * 60;
-    private final static double avgTicketsPerDay = 35;
-    private final static double stdTicketsPerDay = 10;
-    private final static int maxTicketsPerDay = 50;
-    private final static double avgQueryResponseTimeSecs = 10 * 60;
-    private final static double stdQueryResponseTimeSecs = 5 * 60;
-    private final static double avgTicketReopenedTimes = 0.5;
-    private final static double stdTicketReopenedTimes = 2.0;
-    private final static long ticketChangeStatusDelayLowerBoundSecs = 60 * 60; //NOPMD - suppressed LongVariable
-    private final static long ticketChangeStatusDelayHigherBoundSecs = 3 * 60 * 60; //NOPMD - suppressed LongVariable
-    private final static long maxNumberOfEscalations = 3;
-    private final static double avgTicketEscalatedAfterSeconds = 30 * 60; //NOPMD - suppressed LongVariable
-    private final static double stdTicketEscalatedAfterSeconds = 5 * 60; //NOPMD - suppressed LongVariable
-    private final static double avgEscalationResolutionTime = 10 * 60; //NOPMD - suppressed LongVariable
-    private final static double stdEscalationResolutionTime = 2 * 60; //NOPMD - suppressed LongVariable
-    private final static double closedTicketIsEscalatedChance = 33.0; //NOPMD - suppressed LongVariable
+    private static final long secondsPerDay = 24 * 60 * 60;
+    private static final double avgTicketsPerDay = 35;
+    private static final double stdTicketsPerDay = 10;
+    private static final int maxTicketsPerDay = 50;
+    private static final double avgQueryResponseTimeSecs = 10 * 60;
+    private static final double stdQueryResponseTimeSecs = 5 * 60;
+    private static final double avgTicketReopenedTimes = 0.5;
+    private static final double stdTicketReopenedTimes = 2.0;
+    private static final long ticketChangeStatusDelayLowerBoundSecs = 60 * 60; //NOPMD - suppressed LongVariable
+    private static final long ticketChangeStatusDelayHigherBoundSecs = 3 * 60 * 60; //NOPMD - suppressed LongVariable
+    private static final long maxNumberOfEscalations = 3;
+    private static final double avgTicketEscalatedAfterSeconds = 30 * 60; //NOPMD - suppressed LongVariable
+    private static final double stdTicketEscalatedAfterSeconds = 5 * 60; //NOPMD - suppressed LongVariable
+    private static final double avgEscalationResolutionTime = 10 * 60; //NOPMD - suppressed LongVariable
+    private static final double stdEscalationResolutionTime = 2 * 60; //NOPMD - suppressed LongVariable
+    private static final double closedTicketIsEscalatedChance = 33.0; //NOPMD - suppressed LongVariable
 
     private final SlackTicketsProps ticketsProps;
     private final TicketRepository ticketRepository;

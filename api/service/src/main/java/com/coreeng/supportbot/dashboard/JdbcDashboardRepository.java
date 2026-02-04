@@ -22,7 +22,7 @@ import lombok.RequiredArgsConstructor;
 public class JdbcDashboardRepository implements DashboardRepository {
 
     private final DSLContext dsl;
-    private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final DateTimeFormatter isoDate = DateTimeFormatter.ISO_LOCAL_DATE;
 
     // ===== Response SLAs =====
 
@@ -197,12 +197,12 @@ public class JdbcDashboardRepository implements DashboardRepository {
             new BucketDef("15-30 min", 900, 1800),
             new BucketDef("30-60 min", 1800, 3600),
             new BucketDef("1-2 hours", 3600, 7200),
-            new BucketDef("2-4 hours", 7200, 14400),
-            new BucketDef("4-8 hours", 14400, 28800),
-            new BucketDef("8-24 hours", 28800, 86400),
-            new BucketDef("1-3 days", 86400, 259200),
-            new BucketDef("3-7 days", 259200, 604800),
-            new BucketDef("> 7 days", 604800, Double.POSITIVE_INFINITY)
+            new BucketDef("2-4 hours", 7_200, 14_400),
+            new BucketDef("4-8 hours", 14_400, 28_800),
+            new BucketDef("8-24 hours", 28_800, 86_400),
+            new BucketDef("1-3 days", 86_400, 259_200),
+            new BucketDef("3-7 days", 259_200, 604_800),
+            new BucketDef("> 7 days", 604_800, Double.POSITIVE_INFINITY)
         );
 
         List<ResolutionDurationBucket> result = new ArrayList<>();
@@ -255,7 +255,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
         return dsl.resultQuery(sql)
             .fetch(r -> new WeeklyResolutionTimes(
-                r.get("week", java.sql.Timestamp.class).toLocalDateTime().toLocalDate().format(ISO_DATE),
+                r.get("week", java.sql.Timestamp.class).toLocalDateTime().toLocalDate().format(isoDate),
                 nullToZero(r.get("p50", Double.class)),
                 nullToZero(r.get("p75", Double.class)),
                 nullToZero(r.get("p90", Double.class))
@@ -310,8 +310,8 @@ public class JdbcDashboardRepository implements DashboardRepository {
             : "date_trunc('hour', last_closed_ts::timestamptz)";
         String interval = useDailyInterval ? "'1 day'::interval" : "'1 hour'::interval";
 
-        String startStr = start.format(ISO_DATE);
-        String endStr = end.format(ISO_DATE);
+        String startStr = start.format(isoDate);
+        String endStr = end.format(isoDate);
 
         String sql = """
             WITH time_series AS (
@@ -446,7 +446,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
         return dsl.resultQuery(sql)
             .fetch(r -> new DateEscalations(
-                r.get("escalation_date", java.sql.Timestamp.class).toLocalDateTime().toLocalDate().format(ISO_DATE),
+                r.get("escalation_date", java.sql.Timestamp.class).toLocalDateTime().toLocalDate().format(isoDate),
                 nullToZero(r.get("escalations", Long.class))
             ));
     }
@@ -529,7 +529,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
             ORDER BY w.week
             """)
             .fetch(r -> new WeeklyTicketCounts(
-                r.get("week", java.sql.Timestamp.class).toLocalDateTime().toLocalDate().format(ISO_DATE),
+                r.get("week", java.sql.Timestamp.class).toLocalDateTime().toLocalDate().format(isoDate),
                 nullToZero(r.get("opened", Long.class)),
                 nullToZero(r.get("closed", Long.class)),
                 nullToZero(r.get("escalated", Long.class)),
@@ -648,8 +648,8 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
     private String buildDateFilter(LocalDate dateFrom, LocalDate dateTo, String column) {
         if (dateFrom != null && dateTo != null) {
-            return "AND " + column + "::date >= '" + dateFrom.format(ISO_DATE) + "'::date " +
-                   "AND " + column + "::date <= '" + dateTo.format(ISO_DATE) + "'::date";
+            return "AND " + column + "::date >= '" + dateFrom.format(isoDate) + "'::date " +
+                   "AND " + column + "::date <= '" + dateTo.format(isoDate) + "'::date";
         }
         return "";
     }

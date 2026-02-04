@@ -42,7 +42,7 @@ pmd {
     isIgnoreFailures = false
     isConsoleOutput = true
     ruleSetFiles("${project.projectDir.absolutePath}/pmd-ruleset.xml")
-    toolVersion = "7.9.0"
+    toolVersion = "7.21.0"
 }
 
 tasks.withType<Pmd>().configureEach {
@@ -60,7 +60,12 @@ repositories {
     mavenCentral()
 }
 
-val lombokVersion = "1.18.+"
+// Java 25 compatibility: override transitive dependency versions
+extra["byte-buddy.version"] = "1.18.4"
+extra["mockito.version"] = "5.21.0"
+extra["asm.version"] = "9.9.1"
+
+val lombokVersion = "1.18.42"
 
 dependencies {
     implementation("org.jspecify:jspecify:1.0.0")
