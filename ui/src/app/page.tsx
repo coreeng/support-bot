@@ -197,7 +197,7 @@ export default function Dashboard() {
                                                 <div className="bg-gray-900 text-white text-xs rounded py-2 px-3 shadow-lg border border-gray-700">
                                                     <p className="font-semibold mb-1">{user.email}</p>
                                                     <p className="text-gray-400">{user.teams.length} {user.teams.length === 1 ? 'team' : 'teams'}:</p>
-                                                    <p>{user.teams.map(t => t.name).join(', ')}</p>
+                                                    <p>{user.teams.map(t => t.label).join(', ')}</p>
                                                 </div>
                                             </div>
                                         </div>

@@ -95,29 +95,23 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     }
 
     private boolean computeIsLeadership(String email, ImmutableList<Team> teams) {
-        if (supportTeamService.isLeadershipMemberByUserEmail(email)) {
-            return true;
-        }
-        return teams.stream()
-            .flatMap(t -> t.types().stream())
-            .map(TeamType::name)
-            .anyMatch(type -> LEADERSHIP_PATTERN.matcher(type).find());
+        return supportTeamService.isLeadershipMemberByUserEmail(email)
+            || hasTeamType(teams, LEADERSHIP_PATTERN);
     }
 
     private boolean computeIsSupportEngineer(String email, ImmutableList<Team> teams) {
-        if (supportTeamService.isMemberByUserEmail(email)) {
-            return true;
-        }
-        return teams.stream()
-            .flatMap(t -> t.types().stream())
-            .map(TeamType::name)
-            .anyMatch(type -> SUPPORT_PATTERN.matcher(type).find());
+        return supportTeamService.isMemberByUserEmail(email)
+            || hasTeamType(teams, SUPPORT_PATTERN);
     }
 
     private boolean computeIsEscalation(ImmutableList<Team> teams) {
+        return hasTeamType(teams, ESCALATION_PATTERN);
+    }
+
+    private boolean hasTeamType(ImmutableList<Team> teams, Pattern pattern) {
         return teams.stream()
             .flatMap(t -> t.types().stream())
             .map(TeamType::name)
-            .anyMatch(type -> ESCALATION_PATTERN.matcher(type).find());
+            .anyMatch(type -> pattern.matcher(type).find());
     }
 }

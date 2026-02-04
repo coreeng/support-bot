@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
@@ -29,7 +30,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
     public List<Double> getFirstResponseDurationDistribution(LocalDate dateFrom, LocalDate dateTo) {
         String dateFilter = buildDateFilter(dateFrom, dateTo, "query_posted_ts");
 
-        return dsl.resultQuery("""
+        String sql = """
             SELECT
                 EXTRACT(EPOCH FROM business_time_between(
                     query_posted_ts,
@@ -40,9 +41,11 @@ public class JdbcDashboardRepository implements DashboardRepository {
             WHERE first_open_ts IS NOT NULL
               AND query_posted_ts IS NOT NULL
               AND first_open_ts > query_posted_ts
-              """ + dateFilter + """
+              %s
             ORDER BY ticket_id
-            """)
+            """.formatted(dateFilter);
+
+        return dsl.resultQuery(sql)
             .fetch(r -> {
                 Double d = r.get("duration", Double.class);
                 return d != null && d > 0 ? d : null;
@@ -56,7 +59,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
     public ResponsePercentiles getFirstResponsePercentiles(LocalDate dateFrom, LocalDate dateTo) {
         String dateFilter = buildDateFilter(dateFrom, dateTo, "first_open_ts");
 
-        var result = dsl.resultQuery("""
+        String sql = """
             WITH response_durations AS (
                 SELECT
                     EXTRACT(EPOCH FROM business_time_between(
@@ -68,14 +71,16 @@ public class JdbcDashboardRepository implements DashboardRepository {
                 WHERE first_open_ts IS NOT NULL
                   AND query_posted_ts IS NOT NULL
                   AND first_open_ts::timestamptz > query_posted_ts::timestamptz
-                  """ + dateFilter + """
+                  %s
             )
             SELECT
                 percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) AS p50,
                 percentile_cont(0.9) WITHIN GROUP (ORDER BY duration) AS p90
             FROM response_durations
             WHERE duration IS NOT NULL AND duration > 0
-            """).fetchOne();
+            """.formatted(dateFilter);
+
+        var result = dsl.resultQuery(sql).fetchOne();
 
         if (result == null) {
             return new ResponsePercentiles(0.0, 0.0);
@@ -90,12 +95,14 @@ public class JdbcDashboardRepository implements DashboardRepository {
     public long getUnattendedQueriesCount(LocalDate dateFrom, LocalDate dateTo) {
         String dateFilter = buildDateFilter(dateFrom, dateTo, "query_posted_ts");
 
-        var result = dsl.resultQuery("""
+        String sql = """
             SELECT COUNT(*) AS count
             FROM aggregated_ticket_data
             WHERE ticket_id IS NULL
-              """ + dateFilter + """
-            """).fetchOne();
+              %s
+            """.formatted(dateFilter);
+
+        var result = dsl.resultQuery(sql).fetchOne();
 
         return result != null ? nullToZero(result.get("count", Long.class)) : 0;
     }
@@ -106,7 +113,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
     public ResolutionPercentiles getResolutionPercentiles(LocalDate dateFrom, LocalDate dateTo) {
         String dateFilter = buildDateFilter(dateFrom, dateTo, "first_open_ts");
 
-        var result = dsl.resultQuery("""
+        String sql = """
             SELECT
                 percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) AS p50,
                 percentile_cont(0.75) WITHIN GROUP (ORDER BY duration) AS p75,
@@ -123,10 +130,12 @@ public class JdbcDashboardRepository implements DashboardRepository {
                 WHERE last_closed_ts IS NOT NULL
                   AND first_open_ts IS NOT NULL
                   AND last_closed_ts::timestamptz > first_open_ts::timestamptz
-                  """ + dateFilter + """
+                  %s
             ) sub
             WHERE duration IS NOT NULL AND duration > 0
-            """).fetchOne();
+            """.formatted(dateFilter);
+
+        var result = dsl.resultQuery(sql).fetchOne();
 
         if (result == null) {
             return new ResolutionPercentiles(0.0, 0.0, 0.0);
@@ -142,7 +151,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
     public List<ResolutionDurationBucket> getResolutionDurationDistribution(LocalDate dateFrom, LocalDate dateTo) {
         String dateFilter = buildDateFilter(dateFrom, dateTo, "first_open_ts");
 
-        var rows = dsl.resultQuery("""
+        String sql = """
             WITH durations AS (
                 SELECT
                     EXTRACT(EPOCH FROM business_time_between(
@@ -154,7 +163,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
                 WHERE last_closed_ts IS NOT NULL
                   AND first_open_ts IS NOT NULL
                   AND last_closed_ts > first_open_ts
-                  """ + dateFilter + """
+                  %s
             )
             SELECT
                 bucket,
@@ -177,7 +186,9 @@ public class JdbcDashboardRepository implements DashboardRepository {
             WHERE bucket IS NOT NULL AND bucket >= 0 AND bucket <= 10
             GROUP BY bucket
             ORDER BY bucket
-            """).fetch();
+            """.formatted(dateFilter);
+
+        var rows = dsl.resultQuery(sql).fetch();
 
         // Bucket definitions matching the UI
         record BucketDef(String label, double minSeconds, double maxSeconds) {}
@@ -216,7 +227,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
     public List<WeeklyResolutionTimes> getResolutionTimesByWeek(LocalDate dateFrom, LocalDate dateTo) {
         String dateFilter = buildDateFilter(dateFrom, dateTo, "first_open_ts");
 
-        return dsl.resultQuery("""
+        String sql = """
             WITH ticket_durations AS (
                 SELECT
                     date_trunc('week', first_open_ts::timestamptz) AS week,
@@ -229,7 +240,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
                 WHERE last_closed_ts IS NOT NULL
                   AND first_open_ts IS NOT NULL
                   AND last_closed_ts::timestamptz > first_open_ts::timestamptz
-                  """ + dateFilter + """
+                  %s
             )
             SELECT
                 week,
@@ -240,7 +251,9 @@ public class JdbcDashboardRepository implements DashboardRepository {
             WHERE duration IS NOT NULL AND duration > 0
             GROUP BY week
             ORDER BY week
-            """)
+            """.formatted(dateFilter);
+
+        return dsl.resultQuery(sql)
             .fetch(r -> new WeeklyResolutionTimes(
                 r.get("week", java.sql.Timestamp.class).toLocalDateTime().toLocalDate().format(ISO_DATE),
                 nullToZero(r.get("p50", Double.class)),
@@ -253,19 +266,21 @@ public class JdbcDashboardRepository implements DashboardRepository {
     public UnresolvedTicketAges getUnresolvedTicketAges(LocalDate dateFrom, LocalDate dateTo) {
         String dateFilter = buildDateFilter(dateFrom, dateTo, "first_open_ts");
 
-        var result = dsl.resultQuery("""
+        String sql = """
             WITH ages AS (
                 SELECT NOW() - first_open_ts::timestamptz AS age
                 FROM aggregated_ticket_data
                 WHERE last_closed_ts IS NULL
                   AND first_open_ts IS NOT NULL
-                  """ + dateFilter + """
+                  %s
             )
             SELECT
                 percentile_cont(0.5) WITHIN GROUP (ORDER BY age)::text AS p50,
                 percentile_cont(0.9) WITHIN GROUP (ORDER BY age)::text AS p90
             FROM ages
-            """).fetchOne();
+            """.formatted(dateFilter);
+
+        var result = dsl.resultQuery(sql).fetchOne();
 
         if (result == null) {
             return new UnresolvedTicketAges("0 seconds", "0 seconds");
@@ -298,33 +313,33 @@ public class JdbcDashboardRepository implements DashboardRepository {
         String startStr = start.format(ISO_DATE);
         String endStr = end.format(ISO_DATE);
 
-        return dsl.resultQuery("""
+        String sql = """
             WITH time_series AS (
                 SELECT generate_series(
-                    '""" + startStr + """'::timestamptz,
-                    '""" + endStr + """'::timestamptz + INTERVAL '1 day',
-                    """ + interval + """
+                    '%s'::timestamptz,
+                    '%s'::timestamptz + INTERVAL '1 day',
+                    %s
                 ) AS time_bucket
             ),
             incoming_counts AS (
                 SELECT
-                    """ + truncFunc + """ AS time_bucket,
+                    %s AS time_bucket,
                     COUNT(DISTINCT query_id) AS count
                 FROM aggregated_ticket_data
                 WHERE query_posted_ts IS NOT NULL
-                  AND query_posted_ts::date >= '""" + startStr + """'::date
-                  AND query_posted_ts::date <= '""" + endStr + """'::date
-                GROUP BY """ + truncFunc + """
+                  AND query_posted_ts::date >= '%s'::date
+                  AND query_posted_ts::date <= '%s'::date
+                GROUP BY %s
             ),
             resolved_counts AS (
                 SELECT
-                    """ + truncFuncResolved + """ AS time_bucket,
+                    %s AS time_bucket,
                     COUNT(*) AS count
                 FROM aggregated_ticket_data
                 WHERE last_closed_ts IS NOT NULL
-                  AND last_closed_ts::date >= '""" + startStr + """'::date
-                  AND last_closed_ts::date <= '""" + endStr + """'::date
-                GROUP BY """ + truncFuncResolved + """
+                  AND last_closed_ts::date >= '%s'::date
+                  AND last_closed_ts::date <= '%s'::date
+                GROUP BY %s
             )
             SELECT
                 ts.time_bucket,
@@ -333,10 +348,17 @@ public class JdbcDashboardRepository implements DashboardRepository {
             FROM time_series ts
             LEFT JOIN incoming_counts ic ON ts.time_bucket = ic.time_bucket
             LEFT JOIN resolved_counts rc ON ts.time_bucket = rc.time_bucket
-            WHERE ts.time_bucket >= '""" + startStr + """'::timestamptz
-              AND ts.time_bucket <= '""" + endStr + """'::timestamptz + INTERVAL '1 day'
+            WHERE ts.time_bucket >= '%s'::timestamptz
+              AND ts.time_bucket <= '%s'::timestamptz + INTERVAL '1 day'
             ORDER BY ts.time_bucket
-            """)
+            """.formatted(
+                startStr, endStr, interval,
+                truncFunc, startStr, endStr, truncFunc,
+                truncFuncResolved, startStr, endStr, truncFuncResolved,
+                startStr, endStr
+            );
+
+        return dsl.resultQuery(sql)
             .fetch(r -> new IncomingVsResolved(
                 r.get("time_bucket", java.sql.Timestamp.class).toInstant().toString(),
                 nullToZero(r.get("incoming", Long.class)),
@@ -348,9 +370,9 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
     @Override
     public List<TagDuration> getAvgEscalationDurationByTag(LocalDate dateFrom, LocalDate dateTo) {
-        String dateFilter = buildEscalationDateFilter(dateFrom, dateTo, "ed.open_ts");
+        String dateFilter = buildDateFilter(dateFrom, dateTo, "ed.open_ts");
 
-        return dsl.resultQuery("""
+        String sql = """
             SELECT
                 unnest(ed.tags) AS tag,
                 AVG(EXTRACT(EPOCH FROM business_time_between(
@@ -362,12 +384,14 @@ public class JdbcDashboardRepository implements DashboardRepository {
             WHERE ed.open_ts IS NOT NULL
               AND ed.resolved_ts IS NOT NULL
               AND ed.tags IS NOT NULL
-              """ + dateFilter + """
+              %s
             GROUP BY tag
             HAVING AVG(EXTRACT(EPOCH FROM business_time_between(ed.open_ts, ed.resolved_ts, 'Europe/London'))) > 0
             ORDER BY avg_duration DESC NULLS LAST
             LIMIT 15
-            """)
+            """.formatted(dateFilter);
+
+        return dsl.resultQuery(sql)
             .fetch(r -> new TagDuration(
                 r.get("tag", String.class),
                 nullToZero(r.get("avg_duration", Double.class))
@@ -379,21 +403,23 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
     @Override
     public List<TagCount> getEscalationPercentageByTag(LocalDate dateFrom, LocalDate dateTo) {
-        String dateFilter = buildEscalationDateFilter(dateFrom, dateTo, "ed.open_ts");
+        String dateFilter = buildDateFilter(dateFrom, dateTo, "ed.open_ts");
 
-        return dsl.resultQuery("""
+        String sql = """
             SELECT
                 unnest(ed.tags) AS tag,
                 COUNT(*) AS count
             FROM aggregated_escalation_data ed
             WHERE ed.open_ts IS NOT NULL
               AND ed.tags IS NOT NULL
-              """ + dateFilter + """
+              %s
             GROUP BY tag
             HAVING COUNT(*) > 0
             ORDER BY count DESC
             LIMIT 15
-            """)
+            """.formatted(dateFilter);
+
+        return dsl.resultQuery(sql)
             .fetch(r -> new TagCount(
                 r.get("tag", String.class),
                 nullToZero(r.get("count", Long.class))
@@ -405,18 +431,20 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
     @Override
     public List<DateEscalations> getEscalationTrendsByDate(LocalDate dateFrom, LocalDate dateTo) {
-        String dateFilter = buildEscalationDateFilter(dateFrom, dateTo, "ed.open_ts");
+        String dateFilter = buildDateFilter(dateFrom, dateTo, "ed.open_ts");
 
-        return dsl.resultQuery("""
+        String sql = """
             SELECT
                 DATE_TRUNC('day', ed.open_ts::timestamptz) AS escalation_date,
                 COUNT(ed.escalation_id) AS escalations
             FROM aggregated_escalation_data ed
             WHERE ed.open_ts IS NOT NULL
-              """ + dateFilter + """
+              %s
             GROUP BY escalation_date
             ORDER BY escalation_date
-            """)
+            """.formatted(dateFilter);
+
+        return dsl.resultQuery(sql)
             .fetch(r -> new DateEscalations(
                 r.get("escalation_date", java.sql.Timestamp.class).toLocalDateTime().toLocalDate().format(ISO_DATE),
                 nullToZero(r.get("escalations", Long.class))
@@ -427,19 +455,21 @@ public class JdbcDashboardRepository implements DashboardRepository {
     public List<TeamEscalations> getEscalationsByTeam(LocalDate dateFrom, LocalDate dateTo) {
         String dateFilter = buildDateFilter(dateFrom, dateTo, "td.first_open_ts");
 
-        return dsl.resultQuery("""
+        String sql = """
             SELECT
                 COALESCE(ed.team_id, 'Unassigned') AS team_name,
                 COUNT(ed.escalation_id) AS total_escalations
             FROM aggregated_escalation_data ed
             INNER JOIN aggregated_ticket_data td ON ed.ticket_id = td.ticket_id
             WHERE ed.open_ts IS NOT NULL
-              """ + dateFilter + """
+              %s
             GROUP BY ed.team_id
             HAVING COUNT(ed.escalation_id) > 0
             ORDER BY total_escalations DESC
             LIMIT 10
-            """)
+            """.formatted(dateFilter);
+
+        return dsl.resultQuery(sql)
             .fetch(r -> new TeamEscalations(
                 r.get("team_name", String.class),
                 nullToZero(r.get("total_escalations", Long.class))
@@ -451,20 +481,22 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
     @Override
     public List<ImpactEscalations> getEscalationsByImpact(LocalDate dateFrom, LocalDate dateTo) {
-        String dateFilter = buildEscalationDateFilter(dateFrom, dateTo, "ed.open_ts");
+        String dateFilter = buildDateFilter(dateFrom, dateTo, "ed.open_ts");
 
-        return dsl.resultQuery("""
+        String sql = """
             SELECT
                 COALESCE(td.impact, 'Not yet tagged') AS impact_level,
                 COUNT(ed.escalation_id) AS total_escalations
             FROM aggregated_escalation_data ed
             INNER JOIN aggregated_ticket_data td ON ed.ticket_id = td.ticket_id
             WHERE ed.open_ts IS NOT NULL
-              """ + dateFilter + """
+              %s
             GROUP BY td.impact
             HAVING COUNT(ed.escalation_id) > 0
             ORDER BY total_escalations DESC
-            """)
+            """.formatted(dateFilter);
+
+        return dsl.resultQuery(sql)
             .fetch(r -> new ImpactEscalations(
                 r.get("impact_level", String.class),
                 nullToZero(r.get("total_escalations", Long.class))
@@ -573,7 +605,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
     public List<TagResolutionTime> getResolutionTimeByTag(LocalDate dateFrom, LocalDate dateTo) {
         String dateFilter = buildDateFilter(dateFrom, dateTo, "td.first_open_ts");
 
-        return dsl.resultQuery("""
+        String sql = """
             WITH tag_durations AS (
                 SELECT
                     unnest(td.tags) AS tag,
@@ -586,7 +618,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
                 WHERE td.status = 'closed'
                   AND td.last_closed_ts IS NOT NULL
                   AND td.first_open_ts IS NOT NULL
-                  """ + dateFilter + """
+                  %s
             )
             SELECT
                 tag,
@@ -599,7 +631,9 @@ public class JdbcDashboardRepository implements DashboardRepository {
             HAVING COUNT(*) > 0
             ORDER BY p50 DESC
             LIMIT 15
-            """)
+            """.formatted(dateFilter);
+
+        return dsl.resultQuery(sql)
             .fetch(r -> new TagResolutionTime(
                 r.get("tag", String.class),
                 nullToZero(r.get("p50", Double.class)),
@@ -620,19 +654,11 @@ public class JdbcDashboardRepository implements DashboardRepository {
         return "";
     }
 
-    private String buildEscalationDateFilter(LocalDate dateFrom, LocalDate dateTo, String column) {
-        if (dateFrom != null && dateTo != null) {
-            return "AND " + column + "::date >= '" + dateFrom.format(ISO_DATE) + "'::date " +
-                   "AND " + column + "::date <= '" + dateTo.format(ISO_DATE) + "'::date";
-        }
-        return "";
-    }
-
     private static double nullToZero(Double value) {
-        return value != null ? value : 0.0;
+        return Objects.requireNonNullElse(value, 0.0);
     }
 
     private static long nullToZero(Long value) {
-        return value != null ? value : 0L;
+        return Objects.requireNonNullElse(value, 0L);
     }
 }

@@ -1,13 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { exchangeCodeForToken } from '@/lib/auth/token'
+import { useAuth } from '@/contexts/AuthContext'
+
+// Track exchanged codes outside component to survive React Strict Mode remounts
+const exchangedCodes = new Set<string>()
 
 export default function AuthCallbackPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { refreshUser } = useAuth()
   const [error, setError] = useState<string | null>(null)
+  const refreshUserRef = useRef(refreshUser)
+  refreshUserRef.current = refreshUser
 
   useEffect(() => {
     const code = searchParams.get('code')
@@ -17,8 +24,14 @@ export default function AuthCallbackPage() {
       return
     }
 
+    // Prevent double execution - check if this specific code was already exchanged
+    if (exchangedCodes.has(code)) return
+    exchangedCodes.add(code)
+
     exchangeCodeForToken(code)
-      .then(() => {
+      .then(async () => {
+        // Refresh auth context to load the new user
+        await refreshUserRef.current()
         // Redirect to home or the page they were trying to access
         const returnTo = sessionStorage.getItem('auth_return_to') || '/'
         sessionStorage.removeItem('auth_return_to')
@@ -26,6 +39,8 @@ export default function AuthCallbackPage() {
       })
       .catch((err) => {
         console.error('Token exchange failed:', err)
+        // Remove from set so user can retry with a new code
+        exchangedCodes.delete(code)
         setError('Authentication failed. Please try again.')
       })
   }, [searchParams, router])

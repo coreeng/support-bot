@@ -1,3 +1,8 @@
+server:
+  port: 8080
+  shutdown: graceful
+  max-http-request-header-size: 65536  # 64KB
+
 management:
   server:
     port: 8081
@@ -25,6 +30,8 @@ security:
     enabled: false
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   main:
     banner-mode: off
   application:

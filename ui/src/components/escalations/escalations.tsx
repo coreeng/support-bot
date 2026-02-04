@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useEscalations, useEscalationTeams, useRegistry } from '@/lib/hooks'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
-import { useUser } from '@/contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import EscalatedToMyTeamTable from './EscalatedToMyTeamTable'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
 
@@ -18,7 +18,7 @@ export default function EscalationsPage() {
     const pageSize = 15
 
     const { hasFullAccess, effectiveTeams, selectedTeam: teamFilterSelectedTeam } = useTeamFilter()
-    const { actualEscalationTeams } = useUser()
+    const { actualEscalationTeams } = useAuth()
     
     // Check if viewing as an escalation team (when "Escalated to My Team" section is visible)
     const isViewingAsEscalationTeam = useMemo(() => {

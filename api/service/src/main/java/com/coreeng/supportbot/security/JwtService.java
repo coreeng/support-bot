@@ -2,7 +2,6 @@ package com.coreeng.supportbot.security;
 
 import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamType;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -24,11 +23,9 @@ import java.util.Optional;
 public class JwtService {
     private final SecretKey secretKey;
     private final SecurityProperties properties;
-    private final ObjectMapper objectMapper;
 
-    public JwtService(SecurityProperties properties, ObjectMapper objectMapper) {
+    public JwtService(SecurityProperties properties) {
         this.properties = properties;
-        this.objectMapper = objectMapper;
         this.secretKey = Keys.hmacShaKeyFor(
             properties.jwt().secret().getBytes(StandardCharsets.UTF_8)
         );
@@ -84,9 +81,9 @@ public class JwtService {
                 email,
                 name,
                 teams,
-                isLeadership != null && isLeadership,
-                isSupportEngineer != null && isSupportEngineer,
-                isEscalation != null && isEscalation
+                Boolean.TRUE.equals(isLeadership),
+                Boolean.TRUE.equals(isSupportEngineer),
+                Boolean.TRUE.equals(isEscalation)
             ));
         } catch (JwtException | IllegalArgumentException e) {
             log.debug("JWT validation failed: {}", e.getMessage());
