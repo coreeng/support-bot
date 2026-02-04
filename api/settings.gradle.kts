@@ -1,7 +1,10 @@
 rootProject.name = "support-bot-api"
 
 include("service")
-include("testkit")
-include("functional")
-include("nft")
-include("integration-tests")
+
+// Only include test modules if their directories exist (supports Docker partial builds)
+listOf("testkit", "functional", "nft", "integration-tests").forEach { module ->
+    if (file(module).isDirectory) {
+        include(module)
+    }
+}
