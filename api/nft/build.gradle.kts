@@ -3,7 +3,7 @@ import java.io.File
 
 plugins {
     scala
-    id("io.gatling.gradle") version "3.14.3"
+    id("io.gatling.gradle") version "3.14.9.5"
 }
 
 val serviceLifecycle = ServiceLifecycle(project, "nft", logger)
@@ -18,7 +18,7 @@ java {
     }
 }
 
-val gatlingVersion = "3.14.3"
+val gatlingVersion = "3.14.9"
 
 dependencies {
     gatlingImplementation(project(":testkit"))
