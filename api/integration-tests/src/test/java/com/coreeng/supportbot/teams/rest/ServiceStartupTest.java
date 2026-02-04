@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import io.fabric8.kubernetes.api.model.Pod;
 import io.restassured.RestAssured;
+import io.restassured.builder.RequestSpecBuilder;
 import static io.restassured.RestAssured.when;
 
 @Tag("integration")
@@ -60,6 +61,13 @@ public class ServiceStartupTest {
             } else {
                 RestAssured.baseURI = "http://" + config.service().deployment().name() + "." + config.namespace() + ".svc.cluster.local:" + config.portForwarding().remotePort();
             }
+
+            // Configure RestAssured with default auth bypass headers
+            RestAssured.requestSpecification = new RequestSpecBuilder()
+                .addHeader("X-Test-User", "test@integration.test")
+                .addHeader("X-Test-Role", "support")
+                .build();
+            logger.info("RestAssured configured with test auth bypass headers");
         } catch (Exception e) {
             logger.error("Error during setup", e);
             throw e;
