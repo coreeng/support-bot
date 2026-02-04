@@ -61,7 +61,7 @@ public class SlackSocketController implements CommandLineRunner {
     }
 
     @PreDestroy
-    public void destroy() throws Exception { //NOPMD - suppressed SignatureDeclareThrowsException - it's thrown by the underlying library
+    public void destroy() throws Exception {
         shuttingDown.set(true);
         socketModeApp.close();
     }

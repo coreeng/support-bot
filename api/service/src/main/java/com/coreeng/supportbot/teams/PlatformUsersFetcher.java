@@ -2,6 +2,7 @@ package com.coreeng.supportbot.teams;
 
 import java.util.List;
 
+@FunctionalInterface
 public interface PlatformUsersFetcher {
     /**
      * If the group doesn't exist, return an empty membership list

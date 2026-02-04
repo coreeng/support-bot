@@ -11,11 +11,11 @@ import java.util.Optional;
 
 @Component
 public class AuthCodeStore {
-    private static final int CODE_LENGTH = 32;
-    private static final Duration CODE_EXPIRY = Duration.ofSeconds(60);
+    private static final int codeLength = 32;
+    private static final Duration codeExpiry = Duration.ofSeconds(60);
 
     private final Cache<String, String> codeToJwt = Caffeine.newBuilder()
-        .expireAfterWrite(CODE_EXPIRY)
+        .expireAfterWrite(codeExpiry)
         .maximumSize(10_000)
         .build();
     private final SecureRandom secureRandom = new SecureRandom();
@@ -36,7 +36,7 @@ public class AuthCodeStore {
     }
 
     private String generateCode() {
-        var bytes = new byte[CODE_LENGTH];
+        var bytes = new byte[codeLength];
         secureRandom.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }

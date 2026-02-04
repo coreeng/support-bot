@@ -20,9 +20,9 @@ import java.util.regex.Pattern;
 @Slf4j
 @RequiredArgsConstructor
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
-    private static final Pattern LEADERSHIP_PATTERN = Pattern.compile("leadership", Pattern.CASE_INSENSITIVE);
-    private static final Pattern SUPPORT_PATTERN = Pattern.compile("support", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ESCALATION_PATTERN = Pattern.compile("escalation", Pattern.CASE_INSENSITIVE);
+    private static final Pattern leadershipPattern = Pattern.compile("leadership", Pattern.CASE_INSENSITIVE);
+    private static final Pattern supportPattern = Pattern.compile("support", Pattern.CASE_INSENSITIVE);
+    private static final Pattern escalationPattern = Pattern.compile("escalation", Pattern.CASE_INSENSITIVE);
 
     private final SecurityProperties properties;
     private final JwtService jwtService;
@@ -96,16 +96,16 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     private boolean computeIsLeadership(String email, ImmutableList<Team> teams) {
         return supportTeamService.isLeadershipMemberByUserEmail(email)
-            || hasTeamType(teams, LEADERSHIP_PATTERN);
+            || hasTeamType(teams, leadershipPattern);
     }
 
     private boolean computeIsSupportEngineer(String email, ImmutableList<Team> teams) {
         return supportTeamService.isMemberByUserEmail(email)
-            || hasTeamType(teams, SUPPORT_PATTERN);
+            || hasTeamType(teams, supportPattern);
     }
 
     private boolean computeIsEscalation(ImmutableList<Team> teams) {
-        return hasTeamType(teams, ESCALATION_PATTERN);
+        return hasTeamType(teams, escalationPattern);
     }
 
     private boolean hasTeamType(ImmutableList<Team> teams, Pattern pattern) {

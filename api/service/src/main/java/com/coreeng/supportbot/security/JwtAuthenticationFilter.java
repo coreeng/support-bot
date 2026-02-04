@@ -14,8 +14,8 @@ import java.io.IOException;
 @Slf4j
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-    private static final String AUTHORIZATION_HEADER = "Authorization";
-    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String authorizationHeader = "Authorization";
+    private static final String bearerPrefix = "Bearer ";
 
     private final JwtService jwtService;
 
@@ -25,10 +25,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         HttpServletResponse response,
         FilterChain filterChain
     ) throws ServletException, IOException {
-        var authHeader = request.getHeader(AUTHORIZATION_HEADER);
+        var authHeader = request.getHeader(authorizationHeader);
 
-        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
-            var token = authHeader.substring(BEARER_PREFIX.length());
+        if (authHeader != null && authHeader.startsWith(bearerPrefix)) {
+            var token = authHeader.substring(bearerPrefix.length());
             var principalOpt = jwtService.validateToken(token);
 
             principalOpt.ifPresent(principal -> {
