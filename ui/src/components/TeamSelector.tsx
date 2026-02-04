@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useUser } from '@/contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { Users } from 'lucide-react'
 
 export default function TeamSelector() {
-    const { user, isLeadership, isSupportEngineer } = useUser()
+    const { user, isLeadership, isSupportEngineer } = useAuth()
     const { selectedTeam, setSelectedTeam } = useTeamFilter()
 
     // Business rule for showing dropdown:

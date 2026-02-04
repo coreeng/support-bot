@@ -14,16 +14,11 @@ public class AuthCodeStore {
     private static final int CODE_LENGTH = 32;
     private static final Duration CODE_EXPIRY = Duration.ofSeconds(60);
 
-    private final Cache<String, String> codeToJwt;
-    private final SecureRandom secureRandom;
-
-    public AuthCodeStore() {
-        this.codeToJwt = Caffeine.newBuilder()
-            .expireAfterWrite(CODE_EXPIRY)
-            .maximumSize(10_000)
-            .build();
-        this.secureRandom = new SecureRandom();
-    }
+    private final Cache<String, String> codeToJwt = Caffeine.newBuilder()
+        .expireAfterWrite(CODE_EXPIRY)
+        .maximumSize(10_000)
+        .build();
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public String storeToken(String jwt) {
         var code = generateCode();

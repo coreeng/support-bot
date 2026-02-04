@@ -6,13 +6,17 @@ help: ## Display this help
 
 ##@ Development
 
-.PHONY: run-local
-run-local: install ## Run UI dev server locally (installs deps first)
-	yarn dev
+# Marker file to track when yarn install was last run
+.yarn-install: package.json yarn.lock
+	yarn install
+	@touch .yarn-install
 
 .PHONY: install
-install: ## Install dependencies
-	yarn install
+install: .yarn-install ## Install dependencies (only if needed)
+
+.PHONY: run-local
+run-local: install ## Run UI dev server locally
+	yarn dev
 
 .PHONY: build
 build: install ## Build for production

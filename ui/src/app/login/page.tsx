@@ -2,17 +2,22 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getLoginUrl, isAuthenticated } from '@/lib/auth/token'
+import { getLoginUrl } from '@/lib/auth/token'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function LoginPage() {
   const router = useRouter()
+  const { isAuthenticated, isLoading } = useAuth()
 
   useEffect(() => {
+    // Wait for auth state to be determined before redirecting
+    if (isLoading) return
+
     // If already authenticated, redirect to home
-    if (isAuthenticated()) {
+    if (isAuthenticated) {
       router.replace('/')
     }
-  }, [router])
+  }, [isAuthenticated, isLoading, router])
 
   const handleLogin = (provider: 'google' | 'azure') => {
     // Store the current path to return to after login
@@ -23,6 +28,15 @@ export default function LoginPage() {
 
     // Redirect to API's OAuth endpoint
     window.location.href = getLoginUrl(provider)
+  }
+
+  // Show loading state while checking auth
+  if (isLoading || isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    )
   }
 
   return (

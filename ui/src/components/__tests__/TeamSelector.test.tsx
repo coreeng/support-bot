@@ -2,15 +2,15 @@ import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import TeamSelector from '../TeamSelector'
 
-jest.mock('../../contexts/UserContext', () => ({
-  useUser: jest.fn(),
+jest.mock('../../contexts/AuthContext', () => ({
+  useAuth: jest.fn(),
 }))
 
 jest.mock('../../contexts/TeamFilterContext', () => ({
   useTeamFilter: jest.fn(),
 }))
 
-const mockUseUser = jest.requireMock('../../contexts/UserContext').useUser as jest.Mock
+const mockUseAuth = jest.requireMock('../../contexts/AuthContext').useAuth as jest.Mock
 const mockUseTeamFilter = jest.requireMock('../../contexts/TeamFilterContext').useTeamFilter as jest.Mock
 
 const baseTeamFilter = () => ({
@@ -27,14 +27,14 @@ describe('TeamSelector', () => {
   })
 
   it('does not render when there is no user', () => {
-    mockUseUser.mockReturnValue({ user: null })
+    mockUseAuth.mockReturnValue({ user: null })
 
     const { container } = renderSelector()
     expect(container).toBeEmptyDOMElement()
   })
 
   it('shows warning message when user has no teams', () => {
-    mockUseUser.mockReturnValue({
+    mockUseAuth.mockReturnValue({
       user: { teams: [] },
       isLeadership: false,
       isSupportEngineer: false,
@@ -49,7 +49,7 @@ describe('TeamSelector', () => {
   })
 
   it('shows dropdown when user has only role teams (leadership/support) and is leadership or support engineer', () => {
-    mockUseUser.mockReturnValue({
+    mockUseAuth.mockReturnValue({
       user: {
         teams: [
           { name: 'Leadership Team', types: ['leadership'], groupRefs: [] },
@@ -69,7 +69,7 @@ describe('TeamSelector', () => {
   })
 
   it('shows dropdown when a non-role team exists and includes role teams as options', () => {
-    mockUseUser.mockReturnValue({
+    mockUseAuth.mockReturnValue({
       user: {
         teams: [
           { name: 'Leadership Team', types: ['leadership'], groupRefs: [] },
@@ -99,7 +99,7 @@ describe('TeamSelector', () => {
   })
 
   it('deduplicates team names when building options', () => {
-    mockUseUser.mockReturnValue({
+    mockUseAuth.mockReturnValue({
       user: {
         teams: [
           { name: 'Tenant A', types: ['tenant'], groupRefs: [] },
@@ -122,7 +122,7 @@ describe('TeamSelector', () => {
       selectedTeam: 'Old Team',
       setSelectedTeam,
     })
-    mockUseUser.mockReturnValue({
+    mockUseAuth.mockReturnValue({
       user: {
         teams: [
           { name: 'Tenant A', types: ['tenant'], groupRefs: [] },
@@ -144,7 +144,7 @@ describe('TeamSelector', () => {
       selectedTeam: 'Tenant A',
       setSelectedTeam,
     })
-    mockUseUser.mockReturnValue({
+    mockUseAuth.mockReturnValue({
       user: {
         teams: [
           { name: 'Tenant A', types: ['tenant'], groupRefs: [] },

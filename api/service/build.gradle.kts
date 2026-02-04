@@ -17,7 +17,7 @@ plugins {
     id("org.springframework.boot") version "3.4.5"
     id("io.spring.dependency-management") version "1.1.7"
 
-    id("org.flywaydb.flyway") version "11.3.0"
+    id("org.flywaydb.flyway") version "12.0.0"
     id("org.jooq.jooq-codegen-gradle") version "3.19.18"
 }
 
@@ -26,7 +26,7 @@ version = project.findProperty("version")?.toString() ?: "0.0.1-SNAPSHOT"
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 // we only use result of the bootJar
@@ -147,7 +147,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("org.flywaydb:flyway-database-postgresql:11.3.0")
+        classpath("org.flywaydb:flyway-database-postgresql:12.0.0")
         classpath("org.postgresql:postgresql:42.7.5")
         classpath("org.testcontainers:postgresql:1.20.4")
         classpath("org.jooq:jooq-codegen:3.19.18")

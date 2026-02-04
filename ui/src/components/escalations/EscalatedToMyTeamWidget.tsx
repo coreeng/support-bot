@@ -2,12 +2,12 @@
 
 import { useMemo, useCallback } from 'react'
 import { useEscalations, useRegistry } from '@/lib/hooks'
-import { useUser } from '@/contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 export default function EscalatedToMyTeamWidget() {
-    const { isEscalationTeam, actualEscalationTeams } = useUser()
+    const { isEscalationTeam, actualEscalationTeams } = useAuth()
     const { selectedTeam } = useTeamFilter()
     const { data: escalationsData, isLoading, error: escalationsError } = useEscalations()
     const { data: registryData } = useRegistry()

@@ -1,14 +1,17 @@
 const TOKEN_KEY = 'auth_token'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
+export interface AuthTeam {
+  label: string
+  code: string
+  types: string[]
+  name: string  // Alias for label, used throughout the UI
+}
+
 export interface AuthUser {
   email: string
   name: string
-  teams: Array<{
-    label: string
-    code: string
-    types: string[]
-  }>
+  teams: AuthTeam[]
   isLeadership: boolean
   isSupportEngineer: boolean
   isEscalation: boolean
@@ -72,6 +75,21 @@ export async function exchangeCodeForToken(code: string): Promise<string> {
   return data.token
 }
 
+interface ApiTeamResponse {
+  label: string
+  code: string
+  types: string[]
+}
+
+interface ApiUserResponse {
+  email: string
+  name: string
+  teams: ApiTeamResponse[]
+  isLeadership: boolean
+  isSupportEngineer: boolean
+  isEscalation: boolean
+}
+
 export async function fetchCurrentUser(): Promise<AuthUser | null> {
   const token = getToken()
   if (!token) return null
@@ -90,7 +108,16 @@ export async function fetchCurrentUser(): Promise<AuthUser | null> {
       return null
     }
 
-    return response.json()
+    const data: ApiUserResponse = await response.json()
+
+    // Map teams to include `name` alias for `label`
+    return {
+      ...data,
+      teams: data.teams.map(team => ({
+        ...team,
+        name: team.label,
+      })),
+    }
   } catch {
     return null
   }

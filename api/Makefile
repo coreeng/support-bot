@@ -6,19 +6,26 @@ help: ## Display this help
 
 ##@ Development
 
+.PHONY: db-up
+db-up: ## Start PostgreSQL database container
+	@docker compose -f service/docker-compose.yaml up -d db
+	@echo "Waiting for PostgreSQL..."
+	@until docker compose -f service/docker-compose.yaml exec -T db pg_isready -U postgres > /dev/null 2>&1; do sleep 1; done
+	@echo "PostgreSQL ready."
+
+.PHONY: db-down
+db-down: ## Stop PostgreSQL database container
+	@docker compose -f service/docker-compose.yaml stop db
+
 .PHONY: run-local
-run-local: install ## Run API locally with .env.local loaded (installs deps first)
+run-local: db-up ## Run API locally (starts DB, loads .env.local)
 	@if [ -f .env.local ]; then \
 		set -a && source .env.local && set +a && \
 		cd service && ../gradlew bootRun; \
 	else \
-		echo "Error: .env.local not found. Copy from .envrc.example and update values."; \
+		echo "Error: .env.local not found. Copy from .env.example and update values."; \
 		exit 1; \
 	fi
-
-.PHONY: install
-install: ## Download dependencies
-	cd service && ../gradlew dependencies --quiet
 
 .PHONY: build
 build: ## Build the API

@@ -1,12 +1,11 @@
 package com.coreeng.supportbot.security;
 
+import com.google.common.collect.ImmutableList;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 public class JwtAuthenticationToken extends AbstractAuthenticationToken {
     private final UserPrincipal principal;
@@ -20,19 +19,19 @@ public class JwtAuthenticationToken extends AbstractAuthenticationToken {
     }
 
     private static Collection<? extends GrantedAuthority> buildAuthorities(UserPrincipal principal) {
-        List<GrantedAuthority> authorities = new ArrayList<>();
-        authorities.add(new SimpleGrantedAuthority("ROLE_USER"));
+        var builder = ImmutableList.<GrantedAuthority>builder();
+        builder.add(new SimpleGrantedAuthority("ROLE_USER"));
 
         if (principal.isLeadership()) {
-            authorities.add(new SimpleGrantedAuthority("ROLE_LEADERSHIP"));
+            builder.add(new SimpleGrantedAuthority("ROLE_LEADERSHIP"));
         }
         if (principal.isSupportEngineer()) {
-            authorities.add(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"));
+            builder.add(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"));
         }
         if (principal.isEscalation()) {
-            authorities.add(new SimpleGrantedAuthority("ROLE_ESCALATION"));
+            builder.add(new SimpleGrantedAuthority("ROLE_ESCALATION"));
         }
-        return authorities;
+        return builder.build();
     }
 
     @Override
