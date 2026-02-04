@@ -43,7 +43,7 @@ public class SecurityConfig {
                 // Public endpoints
                 .requestMatchers("/oauth2/**", "/login/**").permitAll()
                 .requestMatchers("/auth/token").permitAll()
-                .requestMatchers("/actuator/health", "/actuator/prometheus").permitAll()
+                .requestMatchers("/health", "/prometheus").permitAll()
                 // Slack webhook endpoint - uses Slack's own signing secret verification
                 .requestMatchers("/slack/events").permitAll()
                 // Dashboard restricted to leadership or support engineers
