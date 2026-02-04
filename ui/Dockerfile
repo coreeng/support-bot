@@ -15,13 +15,9 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json yarn.lock* eslint.config.mjs next.config.ts postcss.config.mjs tsconfig.json jest.config.ts jest.setup.ts components.json ./
-COPY prisma ./prisma
 COPY p2p ./p2p
 COPY public ./public
 COPY src ./src
-
-# Generate Prisma Client
-RUN npx prisma generate
 
 # Build and test the app
 RUN yarn run test && yarn run build
