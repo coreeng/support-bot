@@ -31,6 +31,7 @@ public class SecurityConfig {
     private final AuthCodeStore authCodeStore;
     private final TeamService teamService;
     private final SupportTeamService supportTeamService;
+    private final OAuth2AvailabilityChecker oauth2AvailabilityChecker;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -50,9 +51,13 @@ public class SecurityConfig {
                 // All other endpoints require authentication
                 .anyRequest().authenticated()
             )
-            .oauth2Login(oauth2 -> oauth2
-                .successHandler(oauth2SuccessHandler())
-            )
+            .oauth2Login(oauth2 -> {
+                if (oauth2AvailabilityChecker.isOAuth2Available()) {
+                    oauth2.successHandler(oauth2SuccessHandler());
+                } else {
+                    oauth2.disable();
+                }
+            })
             .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(testAuthBypassFilter(), JwtAuthenticationFilter.class);
 
