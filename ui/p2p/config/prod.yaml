@@ -1,11 +1,17 @@
-wawait---
-envVarsMap:
-  # OAuth Credentials - Set these from Kubernetes secrets in production
-  # These will be injected via --set flags in Makefile
-  NEXTAUTH_SECRET: ""  # Set from Kubernetes secret
-  NEXTAUTH_URL: ""  # Set from ingress configuration via --set flag in Makefile
-  AZURE_AD_CLIENT_ID: ""  # Set from Kubernetes secret
-  AZURE_AD_CLIENT_SECRET: ""  # Set from Kubernetes secret
-  AZURE_AD_TENANT_ID: ""  # Set from Kubernetes secret
-  GOOGLE_CLIENT_ID: ""  # Set from Kubernetes secret
-  GOOGLE_CLIENT_SECRET: ""  # Set from Kubernetes secret
+---
+ui:
+  env:
+    - name: NEXTAUTH_SECRET
+      value: ""
+    - name: NEXTAUTH_URL
+      value: ""
+    - name: AZURE_AD_CLIENT_ID
+      value: ""
+    - name: AZURE_AD_CLIENT_SECRET
+      value: ""
+    - name: AZURE_AD_TENANT_ID
+      value: ""
+    - name: GOOGLE_CLIENT_ID
+      value: ""
+    - name: GOOGLE_CLIENT_SECRET
+      value: ""

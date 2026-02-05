@@ -1,14 +1,23 @@
 ---
-envVarsMap:
-  BACKEND_URL: http://support-bot.support-bot-extended:8080
-  DATABASE_URL: ${SUPPORTBOT_DB_URL}
-  NODE_ENV: development
-  NEXTAUTH_SECRET: ""  # Set from Kubernetes secret
-  NEXTAUTH_URL: ""
-  # These will be injected via --set flags in Makefile
-  AZURE_AD_CLIENT_ID: ""  # Set from Kubernetes secret
-  AZURE_AD_CLIENT_SECRET: ""  # Set from Kubernetes secret
-  AZURE_AD_TENANT_ID: ""  # Set from Kubernetes secret
-  GOOGLE_CLIENT_ID: ""  # Set from Kubernetes secret
-  GOOGLE_CLIENT_SECRET: ""  # Set from Kubernetes secret
-  AUTH_TRUST_HOST: "true"
+ui:
+  env:
+    - name: NODE_ENV
+      value: "development"
+    - name: BACKEND_URL
+      value: "http://support-bot.support-bot-extended:8080"
+    - name: NEXTAUTH_SECRET
+      value: ""
+    - name: NEXTAUTH_URL
+      value: ""
+    - name: AZURE_AD_CLIENT_ID
+      value: ""
+    - name: AZURE_AD_CLIENT_SECRET
+      value: ""
+    - name: AZURE_AD_TENANT_ID
+      value: ""
+    - name: GOOGLE_CLIENT_ID
+      value: ""
+    - name: GOOGLE_CLIENT_SECRET
+      value: ""
+    - name: AUTH_TRUST_HOST
+      value: "true"
