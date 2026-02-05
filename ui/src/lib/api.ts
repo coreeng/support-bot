@@ -1,6 +1,4 @@
-import { getToken, clearToken } from './auth/token'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+import { getToken, clearToken, API_URL } from './auth/token'
 
 // Custom error class for API errors
 export class ApiError extends Error {
