@@ -73,7 +73,7 @@ export function getTokenExpiry(): Date | null {
 }
 
 export async function exchangeCodeForToken(code: string): Promise<string> {
-  const response = await fetch(`${API_URL}/auth/token`, {
+  const response = await fetch(`/backend/auth/token`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -110,7 +110,7 @@ export async function fetchCurrentUser(): Promise<AuthUser | null> {
   if (!token) return null
 
   try {
-    const response = await fetch(`${API_URL}/auth/me`, {
+    const response = await fetch(`/backend/auth/me`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -142,7 +142,7 @@ export async function logout(): Promise<void> {
   const token = getToken()
   if (token) {
     try {
-      await fetch(`${API_URL}/auth/logout`, {
+      await fetch(`/backend/auth/logout`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
