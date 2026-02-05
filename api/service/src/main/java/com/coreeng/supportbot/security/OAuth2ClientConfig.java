@@ -64,7 +64,7 @@ public class OAuth2ClientConfig {
     }
 
     private ClientRegistration azureClientRegistration(String clientId, String clientSecret, String tenantId) {
-        String issuerUri = "https://login.microsoftonline.com/" + tenantId + "/v2.0";
+        String baseUri = "https://login.microsoftonline.com/" + tenantId;
         return ClientRegistration.withRegistrationId("azure")
             .clientId(clientId)
             .clientSecret(clientSecret)
@@ -72,9 +72,9 @@ public class OAuth2ClientConfig {
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
             .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
             .scope("openid", "email", "profile")
-            .authorizationUri(issuerUri + "/authorize")
-            .tokenUri(issuerUri + "/token")
-            .jwkSetUri(issuerUri + "/discovery/keys")
+            .authorizationUri(baseUri + "/oauth2/v2.0/authorize")
+            .tokenUri(baseUri + "/oauth2/v2.0/token")
+            .jwkSetUri(baseUri + "/discovery/v2.0/keys")
             .userInfoUri("https://graph.microsoft.com/oidc/userinfo")
             .userNameAttributeName(IdTokenClaimNames.SUB)
             .clientName("Azure AD")

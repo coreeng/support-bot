@@ -1,5 +1,20 @@
 const TOKEN_KEY = 'auth_token'
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+// NEXT_PUBLIC_ env vars are inlined at build time, so a single Docker image
+// can't serve multiple environments. Instead, derive the API URL at runtime
+// by stripping '-ui' from the hostname (e.g. support-bot-ui.foo.com -> support-bot.foo.com).
+export function getApiUrl(hostname?: string, protocol?: string): string {
+  const currentHostname = hostname ?? (typeof window !== 'undefined' ? window.location.hostname : undefined)
+  const currentProtocol = protocol ?? (typeof window !== 'undefined' ? window.location.protocol : undefined)
+
+  if (!currentHostname || currentHostname === 'localhost') {
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+  }
+
+  const apiHostname = currentHostname.replace('-ui', '')
+  return `${currentProtocol}//${apiHostname}`
+}
+
+export const API_URL = getApiUrl()
 
 export interface AuthTeam {
   label: string
