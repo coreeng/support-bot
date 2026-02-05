@@ -1,4 +1,4 @@
-import { getToken, clearToken, API_URL } from './auth/token'
+import { getToken, clearToken } from './auth/token'
 
 // Custom error class for API errors
 export class ApiError extends Error {
@@ -59,7 +59,7 @@ async function handleResponse(res: Response, path: string) {
 
 export async function apiGet(path: string) {
   const headers = getApiHeaders()
-  const res = await fetch(`${API_URL}${path}`, { headers })
+  const res = await fetch(`/backend${path}`, { headers })
   return handleResponse(res, path)
 }
 
@@ -68,7 +68,7 @@ export async function apiPost(path: string, body: unknown) {
     'Content-Type': 'application/json',
     ...getApiHeaders(),
   }
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`/backend${path}`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -81,7 +81,7 @@ export async function apiPut(path: string, body: unknown) {
     'Content-Type': 'application/json',
     ...getApiHeaders(),
   }
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`/backend${path}`, {
     method: 'PUT',
     headers,
     body: JSON.stringify(body),
@@ -94,7 +94,7 @@ export async function apiPatch(path: string, body: unknown) {
     'Content-Type': 'application/json',
     ...getApiHeaders(),
   }
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`/backend${path}`, {
     method: 'PATCH',
     headers,
     body: JSON.stringify(body),
@@ -104,7 +104,7 @@ export async function apiPatch(path: string, body: unknown) {
 
 export async function apiDelete(path: string) {
   const headers = getApiHeaders()
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`/backend${path}`, {
     method: 'DELETE',
     headers,
   })
