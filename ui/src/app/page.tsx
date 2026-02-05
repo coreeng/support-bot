@@ -12,7 +12,8 @@ import Image from 'next/image'
 import DashboardsPage from '@/components/dashboards/dashboards'
 import TeamSelector from '@/components/TeamSelector'
 import { signIn, signOut } from 'next-auth/react'
-import { LogOut } from 'lucide-react'
+import { LogOut, BookOpen } from 'lucide-react'
+import KnowledgeGapsPage from '@/components/knowledge/knowledge-gaps'
 
 
 // 1. Define support sub-tabs
@@ -20,6 +21,7 @@ const supportSubTabs = [
     { key: 'home', label: 'Home', icon: <Home className="w-5 h-5 mr-2" /> },
     { key: 'tickets', label: 'Tickets', icon: <Ticket className="w-5 h-5 mr-2" /> },
     { key: 'escalations', label: 'Escalations', icon: <AlertCircle className="w-5 h-5 mr-2" /> },
+    { key: 'knowledge-gaps', label: 'Knowledge Gaps', icon: <BookOpen className="w-5 h-5 mr-2" /> },
     { key: 'health', label: 'Analytics & Operations', icon: <BarChart2 className="w-5 h-5 mr-2" /> },
     { key: 'sla', label: 'SLA Dashboard', icon: <BarChart2 className="w-5 h-5 mr-2" /> }
 ] as const
@@ -403,6 +405,7 @@ export default function Dashboard() {
                         {activeSupportSubTab === 'home' && <StatsPage />}
                         {activeSupportSubTab === 'tickets' && <TicketsPage />}
                         {activeSupportSubTab === 'escalations' && <EscalationsPage />}
+                        {activeSupportSubTab === 'knowledge-gaps' && <KnowledgeGapsPage />}
                         {activeSupportSubTab === 'health' && hasFullAccess && <HealthPage />}
                         {activeSupportSubTab === 'sla' && <DashboardsPage />}
                     </div>
