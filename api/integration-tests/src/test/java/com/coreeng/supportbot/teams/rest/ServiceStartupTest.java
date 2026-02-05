@@ -1,7 +1,11 @@
 package com.coreeng.supportbot.teams.rest;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.AfterAll;
@@ -141,11 +145,17 @@ public class ServiceStartupTest {
         env.put("DEPLOY_DB", "false");
         env.put("HELM_DRIVER", "configmap");
 
-        pb.inheritIO();
+        pb.redirectErrorStream(true);
         Process p = pb.start();
+        String output;
+        try (var reader = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+            output = reader.lines().collect(Collectors.joining("\n"));
+        }
         int code = p.waitFor();
+        logger.info("deploy-service.sh (action={}) output:\n{}", action, output);
         if (code != 0) {
-            throw new IllegalStateException("deploy-service.sh failed with exit code " + code + " (action=" + action + ")");
+            throw new IllegalStateException(
+                "deploy-service.sh failed with exit code " + code + " (action=" + action + ")\n--- script output ---\n" + output);
         }
     }
 }
