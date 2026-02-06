@@ -1,7 +1,6 @@
 package com.coreeng.supportbot.stats;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
 import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
@@ -113,7 +112,7 @@ public class StatsRequest {
             return idFromValue(value);
         }
         @Override
-        public @Nullable Id getMechanism() {
+        public JsonTypeInfo.@Nullable Id getMechanism() {
             return null;
         }
 

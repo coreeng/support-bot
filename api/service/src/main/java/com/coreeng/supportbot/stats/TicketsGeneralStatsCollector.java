@@ -30,7 +30,7 @@ public class TicketsGeneralStatsCollector implements StatsCollector<StatsRequest
             .mapToDouble(t -> Duration.between(
                 t.ticket().queryTs().getDate(),
                 t.ticket().statusLog().getLast().date()
-            ).getSeconds())
+            ).toSeconds())
             .average()
             .orElse(0.0);
 
@@ -38,7 +38,7 @@ public class TicketsGeneralStatsCollector implements StatsCollector<StatsRequest
             .mapToDouble(t -> Duration.between(
                 t.ticket().queryTs().getDate(),
                 t.ticket().statusLog().getFirst().date()
-            ).getSeconds())
+            ).toSeconds())
             .average()
             .orElse(0.0);
 
@@ -47,11 +47,11 @@ public class TicketsGeneralStatsCollector implements StatsCollector<StatsRequest
                 case closed -> Duration.between(
                     t.ticket().statusLog().getFirst().date(),
                     t.ticket().statusLog().getLast().date()
-                ).getSeconds();
+                ).toSeconds();
                 case opened, stale -> Duration.between(
                     t.ticket().statusLog().getFirst().date(),
                     Instant.now()
-                ).getSeconds();
+                ).toSeconds();
             })
             .max()
             .orElse(0.0);

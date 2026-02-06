@@ -17,21 +17,21 @@ import org.jspecify.annotations.Nullable;
 @Jacksonized
 public class HomepageFilter {
     @Nullable
-    private TicketStatus status;
+    private final TicketStatus status;
     @Builder.Default
-    private TicketsQuery.Order order = TicketsQuery.Order.desc;
+    private final TicketsQuery.Order order = TicketsQuery.Order.desc;
     @Nullable
-    private Timeframe timeframe;
+    private final Timeframe timeframe;
     @Builder.Default
-    private ImmutableList<String> tags = ImmutableList.of();
+    private final ImmutableList<String> tags = ImmutableList.of();
     @Builder.Default
-    private boolean includeNoTags = false;
+    private final boolean includeNoTags = false;
     @Nullable
-    private String impact;
+    private final String impact;
     @Nullable
-    private String escalationTeam;
+    private final String escalationTeam;
     @Nullable
-    private String assignedTo;
+    private final String assignedTo;
 
     @Getter
     public enum Timeframe implements UIOption {

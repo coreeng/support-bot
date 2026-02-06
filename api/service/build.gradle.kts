@@ -158,11 +158,12 @@ tasks.withType<Test> {
 }
 
 tasks.withType<JavaCompile>().configureEach {
+    // Required for Error Prone on JDK 21; revisit and remove after JDK upgrade.
+    options.compilerArgs.add("-XDaddTypeAnnotationsToSymbol=true")
+    options.compilerArgs.add("-Werror")
     options.errorprone(
         object : Action<ErrorProneOptions> {
             override fun execute(errorproneOptions: ErrorProneOptions) {
-                // Run only NullAway and treat service packages as null-checked by default.
-                errorproneOptions.disableAllChecks.set(true)
                 errorproneOptions.check("NullAway", CheckSeverity.ERROR)
                 errorproneOptions.option("NullAway:AnnotatedPackages", "com.coreeng.supportbot")
                 errorproneOptions.option(

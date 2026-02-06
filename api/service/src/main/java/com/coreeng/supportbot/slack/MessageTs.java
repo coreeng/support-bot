@@ -35,6 +35,7 @@ public record MessageTs(
         return ts != null ? of(ts) : null;
     }
 
+    @Override
     public String ts() {
         if (mocked) {
             return mockedPrefix + ts;
