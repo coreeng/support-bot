@@ -24,6 +24,7 @@ public class SentimentAnalysisController {
     private final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
     @PostMapping("/ticket/job")
+    @SuppressWarnings("FutureReturnValueIgnored")
     public void calculateSentiment() {
         executorService.submit(job::analyzeClosedTickets);
     }

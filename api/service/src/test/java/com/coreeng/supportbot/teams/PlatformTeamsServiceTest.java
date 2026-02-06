@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -170,7 +171,7 @@ class PlatformTeamsServiceTest {
         PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, usersFetcher, registry, props);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, service::init);
-        assertTrue(String.valueOf(ex.getMessage()).toLowerCase().contains("timed out"));
+        assertTrue(String.valueOf(ex.getMessage()).toLowerCase(Locale.ROOT).contains("timed out"));
     }
 
     @Test

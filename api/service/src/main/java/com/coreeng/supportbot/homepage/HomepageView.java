@@ -9,6 +9,7 @@ import lombok.extern.jackson.Jacksonized;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 @Getter
 @Builder
@@ -43,12 +44,12 @@ public class HomepageView {
             LocalDate dateTo;
             switch (filter.timeframe()) {
                 case thisWeek -> {
-                    dateFrom = LocalDate.now().with(java.time.DayOfWeek.MONDAY);
-                    dateTo = LocalDate.now().with(java.time.DayOfWeek.SUNDAY);
+                    dateFrom = LocalDate.now(ZoneId.systemDefault()).with(java.time.DayOfWeek.MONDAY);
+                    dateTo = LocalDate.now(ZoneId.systemDefault()).with(java.time.DayOfWeek.SUNDAY);
                 }
                 case previousWeek -> {
-                    dateFrom = LocalDate.now().with(java.time.DayOfWeek.MONDAY).minusWeeks(1);
-                    dateTo = LocalDate.now().with(java.time.DayOfWeek.SUNDAY).minusWeeks(1);
+                    dateFrom = LocalDate.now(ZoneId.systemDefault()).with(java.time.DayOfWeek.MONDAY).minusWeeks(1);
+                    dateTo = LocalDate.now(ZoneId.systemDefault()).with(java.time.DayOfWeek.SUNDAY).minusWeeks(1);
                 }
                 case null -> {
                     dateFrom = null;
