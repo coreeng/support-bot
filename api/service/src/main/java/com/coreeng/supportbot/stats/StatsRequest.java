@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.stats;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
 import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
@@ -8,6 +9,7 @@ import com.fasterxml.jackson.databind.jsontype.impl.TypeIdResolverBase;
 import lombok.Getter;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.jackson.Jacksonized;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDate;
 
@@ -111,7 +113,7 @@ public class StatsRequest {
             return idFromValue(value);
         }
         @Override
-        public JsonTypeInfo.Id getMechanism() {
+        public @Nullable Id getMechanism() {
             return null;
         }
 

@@ -13,6 +13,7 @@ import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -22,6 +23,7 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Comparator.comparing;
 
@@ -72,7 +74,7 @@ public class HomepageService {
                             ticket.channelId(),
                             ticket.queryTs()
                         ));
-                        return new TicketPermalink(ticket.id(), permalink);
+                        return new TicketPermalink(checkNotNull(ticket.id()), permalink);
                     } catch (Exception e) {
                         log.atError()
                             .setCause(e)
@@ -98,14 +100,14 @@ public class HomepageService {
         return result;
     }
 
-    private TicketView ticketToTicketView(DetailedTicket t, String permalink) {
+    private TicketView ticketToTicketView(DetailedTicket t, @Nullable String permalink) {
         Ticket ticket = t.ticket();
         TicketView.TicketViewBuilder view = TicketView.builder()
-            .id(ticket.id())
+            .id(checkNotNull(ticket.id()))
             .status(ticket.status())
             .escalations(t.escalations())
             .inquiringTeam(t.ticket().team() != null ? t.ticket().team().toCode() : null)
-            .impact(impactsRegistry.findImpactByCode(ticket.impact()))
+            .impact(ticket.impact() != null ? impactsRegistry.findImpactByCode(ticket.impact()) : null)
             .queryPermalink(permalink);
 
         if (ticket.status() == TicketStatus.closed) {
@@ -128,7 +130,8 @@ public class HomepageService {
         return view.build();
     }
 
-    private String getAssigneeEmail(SlackId.User assignedToUserId) {
+    @Nullable
+    private String getAssigneeEmail(SlackId.@Nullable User assignedToUserId) {
         if (assignedToUserId == null || !assignmentProps.enabled()) {
             return null;
         }

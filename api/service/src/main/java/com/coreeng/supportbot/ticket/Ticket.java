@@ -19,6 +19,7 @@ public class Ticket {
     private TicketId id;
     private String channelId;
     private MessageTs queryTs;
+    @Nullable
     private MessageTs createdMessageTs;
     private TicketStatus status;
     @Nullable
@@ -32,7 +33,7 @@ public class Ticket {
     private Instant lastInteractedAt;
     @Builder.Default
     private boolean ratingSubmitted = false;
-    private SlackId.User assignedTo;
+    private SlackId.@Nullable User assignedTo;
 
     public static Ticket createNew(MessageTs queryTs, String channelID) {
         return Ticket.builder()

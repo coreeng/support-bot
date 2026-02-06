@@ -4,10 +4,10 @@ import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -85,7 +85,7 @@ public class TeamService {
             .collect(toImmutableList());
     }
 
-    @NotNull
+    @NonNull
     private Team mapPlatformTeam(PlatformTeam t) {
         EscalationTeam escalationTeam = escalationTeamsRegistry.findEscalationTeamByCode(t.name());
         if (escalationTeam != null) {

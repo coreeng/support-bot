@@ -11,7 +11,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -37,10 +36,6 @@ public class MetricsService {
     public MetricsService(MetricsRepository metricsRepository, MeterRegistry meterRegistry) {
         this.metricsRepository = metricsRepository;
         this.meterRegistry = meterRegistry;
-    }
-
-    @PostConstruct
-    void init() {
         ticketGauge = MultiGauge.builder("supportbot_tickets").register(meterRegistry);
         escalationGauge = MultiGauge.builder("supportbot_escalations").register(meterRegistry);
         ratingGauge = MultiGauge.builder("supportbot_ratings").register(meterRegistry);

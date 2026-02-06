@@ -2,6 +2,7 @@ package com.coreeng.supportbot.ticket.rest;
 
 import java.time.Instant;
 
+import static java.util.Objects.requireNonNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -114,9 +115,10 @@ public class TicketUIMapperTest {
 
         // then
         TicketUI result = assertDoesNotThrow(() -> ticketUIMapper.mapToUI(detailedTicket));
-        assertEquals(TicketTeam.notATenantCode, result.team().label());
-        assertEquals(TicketTeam.notATenantCode, result.team().code());
-        assertTrue(result.team().types().isEmpty());
+        TeamUI team = requireNonNull(result.team());
+        assertEquals(TicketTeam.notATenantCode, team.label());
+        assertEquals(TicketTeam.notATenantCode, team.code());
+        assertTrue(team.types().isEmpty());
     }
 
     @Test

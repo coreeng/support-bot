@@ -36,7 +36,13 @@ public class AzureUsersFetcher implements PlatformUsersFetcher {
                         && (!isBlank(v.getMail()) || !isBlank(v.getUserPrincipalName())));
 
         return validUserStream
-                .map(v -> new Membership(v.getMail() != null ? v.getMail() : v.getUserPrincipalName()))
+                .map(v -> {
+                    String email = v.getMail();
+                    if (isBlank(email)) {
+                        email = v.getUserPrincipalName();
+                    }
+                    return new Membership(requireNonNull(email));
+                })
                 .toList();
     }
 }

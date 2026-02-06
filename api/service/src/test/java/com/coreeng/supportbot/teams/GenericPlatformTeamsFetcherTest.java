@@ -16,6 +16,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 @EnableKubernetesMockClient(crud = true)
+@SuppressWarnings("NullAway")
 class GenericPlatformTeamsFetcherTest {
     private KubernetesMockServer k8sServer;
     private KubernetesClient k8sClient;

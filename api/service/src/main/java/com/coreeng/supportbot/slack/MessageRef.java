@@ -5,12 +5,13 @@ import com.slack.api.app_backend.interactive_components.payload.BlockActionPaylo
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
+import org.jspecify.annotations.Nullable;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public record MessageRef(
     MessageTs ts,
-    MessageTs threadTs,
+    @Nullable MessageTs threadTs,
     String channelId
 ) {
     public MessageRef {
@@ -67,6 +68,7 @@ public record MessageRef(
         return new MessageRef(ts, MessageTs.ofOrNull(threadTs), channelId);
     }
 
+    @Nullable
     private static String extractThreadTs(URL url) {
         if (url.getQuery() == null) {
             return null;
@@ -82,9 +84,10 @@ public record MessageRef(
     }
 
     public MessageRef toThreadRef() {
-        return isReply()
-            ? new MessageRef(threadTs, channelId)
-            : this;
+        if (threadTs == null) {
+            return this;
+        }
+        return new MessageRef(threadTs, channelId);
     }
 
     public MessageTs actualThreadTs() {

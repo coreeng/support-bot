@@ -76,7 +76,6 @@ public class MockDataGenerator implements ApplicationRunner {
     private final TicketRepository ticketRepository;
     private final EscalationRepository escalationRepository;
     @Nullable
-    @org.springframework.lang.Nullable
     private final SentimentRepository sentimentRepository;
     private final PlatformTeamsService platformTeamsService;
     private final ImpactsRegistry impactsRegistry;
@@ -242,7 +241,7 @@ public class MockDataGenerator implements ApplicationRunner {
         Set<Tag> pickedTags = generatePickedTags(random);
 
         Escalation escalation = Escalation.createNew(
-            ticket.id(),
+            checkNotNull(ticket.id()),
             escalationTeam.code(),
             pickedTags.stream()
                 .map(Tag::code)
@@ -269,7 +268,7 @@ public class MockDataGenerator implements ApplicationRunner {
             ticket = generateFilledTicket(random, date);
         }
 
-        ImmutableList<Escalation> escalations = escalationRepository.listByTicketId(ticket.id());
+        ImmutableList<Escalation> escalations = escalationRepository.listByTicketId(checkNotNull(ticket.id()));
         for (Escalation escalation : escalations) {
             if (escalation.status() != EscalationStatus.resolved) {
                 Instant resolvedAt = getEscalationResolutionTime(random, escalation);
@@ -320,9 +319,9 @@ public class MockDataGenerator implements ApplicationRunner {
         if (sentimentRepository == null) {
             return;
         }
-        sentimentRepository.save(ticket.id(),
+        sentimentRepository.save(checkNotNull(ticket.id()),
             TicketSentimentResults.builder()
-                .ticketId(ticket.id())
+                .ticketId(checkNotNull(ticket.id()))
                 .authorSentiment(generateSentiment(random))
                 .supportSentiment(random.nextDouble() > 0.2
                     ? generateSentiment(random)
@@ -410,6 +409,4 @@ public class MockDataGenerator implements ApplicationRunner {
         }
     }
 }
-
-
 

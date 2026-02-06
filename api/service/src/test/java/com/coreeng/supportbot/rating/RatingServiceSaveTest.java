@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.ZoneId;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
@@ -43,9 +44,10 @@ class RatingServiceSaveTest {
             .status(TicketStatus.closed)
             .build();
         Ticket created = ticketRepository.createTicketIfNotExists(ticket);
-        ticketRepository.markTicketAsRated(created.id());
+        TicketId createdId = requireNonNull(created.id());
+        ticketRepository.markTicketAsRated(createdId);
 
-        Rating result = service.save(created.id(), 4);
+        Rating result = service.save(createdId, 4);
 
         assertThat(result).isNull();
         assertThat(ratingRepository.size()).isEqualTo(0);
@@ -71,10 +73,11 @@ class RatingServiceSaveTest {
             .tags(ImmutableList.of("ingress", "api"))
             .build();
         Ticket created = ticketRepository.createTicketIfNotExists(ticket);
+        TicketId createdId = requireNonNull(created.id());
 
-        when(escalationQueryService.existsByTicketId(created.id())).thenReturn(false);
+        when(escalationQueryService.existsByTicketId(createdId)).thenReturn(false);
 
-        Rating saved = service.save(created.id(), 4);
+        Rating saved = service.save(createdId, 4);
 
         assertThat(saved).isNotNull();
         assertThat(saved.id()).isNotNull();
@@ -93,7 +96,7 @@ class RatingServiceSaveTest {
         assertThat(persisted.tags()).containsExactly("ingress", "api");
         assertThat(persisted.isEscalated()).isFalse();
 
-        assertThat(ticketRepository.isTicketRated(created.id())).isTrue();
+        assertThat(ticketRepository.isTicketRated(createdId)).isTrue();
     }
 
     @Test
@@ -106,10 +109,11 @@ class RatingServiceSaveTest {
             .tags(ImmutableList.of("ui"))
             .build();
         Ticket created = ticketRepository.createTicketIfNotExists(ticket);
+        TicketId createdId = requireNonNull(created.id());
 
-        when(escalationQueryService.existsByTicketId(created.id())).thenReturn(true);
+        when(escalationQueryService.existsByTicketId(createdId)).thenReturn(true);
 
-        Rating saved = service.save(created.id(), 2);
+        Rating saved = service.save(createdId, 2);
 
         assertThat(saved).isNotNull();
         assertThat(saved.id()).isNotNull();
@@ -123,6 +127,6 @@ class RatingServiceSaveTest {
         assertThat(persisted).isNotNull();
         assertThat(persisted.isEscalated()).isTrue();
 
-        assertThat(ticketRepository.isTicketRated(created.id())).isTrue();
+        assertThat(ticketRepository.isTicketRated(createdId)).isTrue();
     }
 }

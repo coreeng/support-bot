@@ -110,8 +110,7 @@ class HomepageServiceTest {
         assertThat(ticketsView).isNotNull();
         assertThat(ticketsView.tickets().size()).isEqualTo(1);
 
-        ImmutableList<Escalation> actualEscalation = ticketsView.tickets().getFirst().escalations();
-        assertThat(actualEscalation).isNotNull();
+        ImmutableList<Escalation> actualEscalation = requireNonNull(ticketsView.tickets().getFirst().escalations());
         assertThat(actualEscalation.size()).isEqualTo(1);
         assertThat(actualEscalation.getFirst())
                 .usingRecursiveAssertion()
