@@ -7,6 +7,7 @@ import {
   fetchCurrentUser,
   logout as authLogout,
   clearToken,
+  setToken,
 } from '@/lib/auth/token'
 
 type AuthContextType = {
@@ -45,10 +46,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [])
 
-  useEffect(() => {
-    loadUser()
-  }, [loadUser])
-
   const logout = useCallback(async () => {
     await authLogout()
     setUser(null)
@@ -58,6 +55,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true)
     await loadUser()
   }, [loadUser])
+
+  useEffect(() => {
+    loadUser()
+  }, [loadUser])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handler = (event: MessageEvent) => {
+      // Only accept messages from our own origin (popup is same-origin)
+      if (event.origin !== window.location.origin) return
+      if (event.data?.type !== 'auth:success') return
+      if (event.data?.token) {
+        setToken(event.data.token)
+      }
+      refreshUser()
+      const returnTo = sessionStorage.getItem('auth_return_to') || '/'
+      sessionStorage.removeItem('auth_return_to')
+      if (window.location.pathname !== returnTo) {
+        window.location.replace(returnTo)
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [refreshUser])
 
   const isAuthenticated = !!user && checkAuth()
   const isLeadership = user?.isLeadership ?? false

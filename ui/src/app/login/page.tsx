@@ -26,8 +26,36 @@ export default function LoginPage() {
       sessionStorage.setItem('auth_return_to', '/')
     }
 
-    // Redirect to API's OAuth endpoint
-    window.location.href = getLoginUrl(provider)
+    const loginUrl = getLoginUrl(provider)
+    const isInIframe = (() => {
+      try {
+        return window.self !== window.top
+      } catch {
+        return true
+      }
+    })()
+
+    if (!isInIframe) {
+      // Redirect to API's OAuth endpoint
+      window.location.href = loginUrl
+      return
+    }
+
+    const width = 600
+    const height = 720
+    const left = window.screenX + (window.outerWidth - width) / 2
+    const top = window.screenY + (window.outerHeight - height) / 2
+    const popup = window.open(
+      loginUrl,
+      'supportbot-auth',
+      `popup=yes,width=${width},height=${height},left=${left},top=${top}`
+    )
+
+    if (!popup) {
+      window.location.href = loginUrl
+    } else {
+      popup.focus()
+    }
   }
 
   // Show loading state while checking auth
