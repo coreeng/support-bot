@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.dashboard;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -296,8 +297,8 @@ public class JdbcDashboardRepository implements DashboardRepository {
     @Override
     public List<IncomingVsResolved> getIncomingVsResolvedRate(LocalDate dateFrom, LocalDate dateTo) {
         // Default to last 7 days if no date range
-        LocalDate start = dateFrom != null ? dateFrom : LocalDate.now().minusDays(7);
-        LocalDate end = dateTo != null ? dateTo : LocalDate.now();
+        LocalDate start = dateFrom != null ? dateFrom : LocalDate.now(ZoneId.systemDefault()).minusDays(7);
+        LocalDate end = dateTo != null ? dateTo : LocalDate.now(ZoneId.systemDefault());
 
         long diffDays = java.time.temporal.ChronoUnit.DAYS.between(start, end);
         boolean useDailyInterval = diffDays > 60;

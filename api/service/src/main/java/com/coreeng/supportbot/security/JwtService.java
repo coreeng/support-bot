@@ -8,6 +8,7 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -71,11 +72,7 @@ public class JwtService {
             var isSupportEngineer = claims.get("isSupportEngineer", Boolean.class);
             var isEscalation = claims.get("isEscalation", Boolean.class);
 
-            @SuppressWarnings("unchecked")
-            var teamsRaw = (List<Map<String, Object>>) claims.get("teams");
-            var teams = teamsRaw.stream()
-                .map(this::parseTeam)
-                .collect(ImmutableList.toImmutableList());
+            var teams = parseTeamsClaim(claims.get("teams"));
 
             return Optional.of(new UserPrincipal(
                 email,
@@ -91,20 +88,57 @@ public class JwtService {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private Team parseTeam(Map<String, Object> teamMap) {
-        var label = (String) teamMap.get("label");
-        var code = (String) teamMap.get("code");
-        var typesRaw = (List<String>) teamMap.get("types");
-        var types = typesRaw.stream()
-            .map(t -> {
-                try {
-                    return TeamType.valueOf(t);
-                } catch (IllegalArgumentException e) {
-                    return TeamType.tenant;
-                }
-            })
-            .collect(ImmutableList.toImmutableList());
+    private ImmutableList<Team> parseTeamsClaim(@Nullable Object teamsClaim) {
+        if (!(teamsClaim instanceof List<?> teamsRaw)) {
+            return ImmutableList.of();
+        }
+
+        var teams = ImmutableList.<Team>builder();
+        for (Object teamRaw : teamsRaw) {
+            if (teamRaw instanceof Map<?, ?> teamMap) {
+                teams.add(parseTeam(teamMap));
+            }
+        }
+        return teams.build();
+    }
+
+    private Team parseTeam(Map<?, ?> teamMap) {
+        var label = parseStringValue(teamMap.get("label"), "unknown");
+        var code = parseStringValue(teamMap.get("code"), label);
+        var types = parseTeamTypes(teamMap.get("types"));
         return new Team(label, code, types);
+    }
+
+    private ImmutableList<TeamType> parseTeamTypes(@Nullable Object typesClaim) {
+        if (!(typesClaim instanceof List<?> typesRaw)) {
+            return ImmutableList.of(TeamType.tenant);
+        }
+
+        var types = ImmutableList.<TeamType>builder();
+        for (Object typeRaw : typesRaw) {
+            types.add(parseTeamType(typeRaw));
+        }
+
+        var parsedTypes = types.build();
+        return parsedTypes.isEmpty() ? ImmutableList.of(TeamType.tenant) : parsedTypes;
+    }
+
+    private TeamType parseTeamType(@Nullable Object typeRaw) {
+        if (typeRaw == null) {
+            return TeamType.tenant;
+        }
+        try {
+            return TeamType.valueOf(typeRaw.toString());
+        } catch (IllegalArgumentException e) {
+            return TeamType.tenant;
+        }
+    }
+
+    private String parseStringValue(@Nullable Object value, String fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        String parsedValue = value.toString();
+        return parsedValue.isBlank() ? fallback : parsedValue;
     }
 }
