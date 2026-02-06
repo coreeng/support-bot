@@ -35,9 +35,9 @@ public class Ticket {
     private boolean ratingSubmitted = false;
     private SlackId.@Nullable User assignedTo;
 
-    public static Ticket createNew(MessageTs queryTs, String channelID) {
+    public static Ticket createNew(MessageTs queryTs, String channelId) {
         return Ticket.builder()
-            .channelId(channelID)
+            .channelId(channelId)
             .queryTs(queryTs)
             .status(TicketStatus.opened)
             .statusLog(ImmutableList.of(new StatusLog(

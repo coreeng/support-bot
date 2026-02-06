@@ -4,8 +4,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.regex.Pattern;
 
-import org.jspecify.annotations.Nullable;
-
 import org.springframework.stereotype.Component;
 
 import com.coreeng.supportbot.rbac.RbacService;
@@ -43,6 +41,7 @@ public class TicketViewsSubmissionHandler implements SlackViewSubmitHandler {
     }
 
     @Override
+    @SuppressWarnings("FutureReturnValueIgnored")
     public ViewSubmissionResponse apply(ViewSubmissionRequest request, ViewSubmissionContext context) {
         if (!rbacService.isSupportBySlackId(SlackId.user(context.getRequestUserId()))) {
             log.atInfo()
@@ -55,7 +54,7 @@ public class TicketViewsSubmissionHandler implements SlackViewSubmitHandler {
         }
         
         String callbackId = request.getPayload().getView().getCallbackId();
-        @Nullable TicketViewType viewType = TicketViewType.fromCallbackIdOrNull(callbackId);
+        TicketViewType viewType = TicketViewType.fromCallbackIdOrNull(callbackId);
         switch (viewType) {
             case summary -> {
                 TicketSubmission ticketSubmission = ticketSummaryViewMapper.extractSubmittedValues(

@@ -20,7 +20,6 @@ import java.util.List;
 public class MetricsService {
     // TODO: Structure metric definitions better e.g. in a map
     private final MetricsRepository metricsRepository;
-    private final MeterRegistry meterRegistry;
     private MultiGauge ticketGauge;
     private MultiGauge escalationGauge;
     private MultiGauge ratingGauge;
@@ -35,7 +34,6 @@ public class MetricsService {
 
     public MetricsService(MetricsRepository metricsRepository, MeterRegistry meterRegistry) {
         this.metricsRepository = metricsRepository;
-        this.meterRegistry = meterRegistry;
         ticketGauge = MultiGauge.builder("supportbot_tickets").register(meterRegistry);
         escalationGauge = MultiGauge.builder("supportbot_escalations").register(meterRegistry);
         ratingGauge = MultiGauge.builder("supportbot_ratings").register(meterRegistry);
