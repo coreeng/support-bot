@@ -1,6 +1,6 @@
 'use client'
 import { createContext, useContext, ReactNode, useState, useEffect, useMemo } from 'react'
-import { useUser } from './UserContext'
+import { useAuth } from './AuthContext'
 
 type TeamFilterContextType = {
     selectedTeam: string | null  // null = "All Teams", string = specific team
@@ -14,7 +14,7 @@ type TeamFilterContextType = {
 const TeamFilterContext = createContext<TeamFilterContextType | undefined>(undefined)
 
 export const TeamFilterProvider = ({ children }: { children: ReactNode }) => {
-    const { user, isLeadership, isSupportEngineer } = useUser()
+    const { user, isLeadership, isSupportEngineer } = useAuth()
     const [selectedTeam, setSelectedTeam] = useState<string | null>(null)
     const [initialized, setInitialized] = useState(false)
 

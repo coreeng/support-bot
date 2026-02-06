@@ -583,7 +583,15 @@ $RECYCLE.BIN/
 # End of https://www.toptal.com/developers/gitignore/api/vim,intellij,intellij+all,intellij+iml,windows,macos,linux,emacs,visualstudiocode,webstorm,webstorm+all,webstorm+iml
 api/service/logs/support-bot.log
 
+# Environment files with secrets (anywhere in repo)
+.env.local
+
 # UI (Next.js)
 ui/node_modules/
 ui/.next/
-ui/.env.local
+
+# Gas Town (added by gt)
+.runtime/
+.claude/
+.beads/
+.logs/

@@ -628,7 +628,7 @@ public class JdbcTicketRepository implements TicketRepository {
         }
         return switch (team) {
             case TicketTeam.KnownTeam known -> known.code();
-            case TicketTeam.UnknownTeam unknown -> TicketTeam.notATenantCode;
+            case TicketTeam.UnknownTeam _ -> TicketTeam.notATenantCode;
         };
     }
 

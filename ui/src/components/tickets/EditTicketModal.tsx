@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTicket, useTenantTeams, useRegistry, useSupportMembers, useAssignmentEnabled } from '@/lib/hooks'
 import { TicketWithLogs, TicketImpact, TicketTag, Escalation, SupportMember } from '@/lib/types'
-import { useUser } from '@/contexts/UserContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
     Dialog,
     DialogContent,
@@ -30,7 +30,7 @@ export default function EditTicketModal({
     onOpenChange,
     onSuccess,
 }: EditTicketModalProps) {
-    const { isSupportEngineer } = useUser()
+    const { isSupportEngineer } = useAuth()
     const { data: ticketDetails, isLoading: isTicketLoading, error: ticketError } = useTicket(ticketId || undefined)
     const { data: teamsData } = useTenantTeams()
     const { data: registryData } = useRegistry()

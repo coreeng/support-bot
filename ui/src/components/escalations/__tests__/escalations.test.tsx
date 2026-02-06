@@ -4,11 +4,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import EscalationsPage from '../escalations'
 import * as hooks from '../../../lib/hooks'
 import * as TeamFilterContext from '../../../contexts/TeamFilterContext'
-import * as UserContext from '../../../contexts/UserContext'
+import * as AuthContext from '../../../contexts/AuthContext'
 
 jest.mock('../../../lib/hooks')
 jest.mock('../../../contexts/TeamFilterContext')
-jest.mock('../../../contexts/UserContext')
+jest.mock('../../../contexts/AuthContext')
 jest.mock('../EscalatedToMyTeamTable', () => {
     const Mock = () => <div data-testid="escalated-to-my-team-table" />
     Mock.displayName = 'MockEscalatedToMyTeamTable'
@@ -19,7 +19,7 @@ const mockUseEscalations = hooks.useEscalations as jest.MockedFunction<typeof ho
 const mockUseEscalationTeams = hooks.useEscalationTeams as jest.MockedFunction<typeof hooks.useEscalationTeams>
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>
 const mockUseTeamFilter = TeamFilterContext.useTeamFilter as jest.MockedFunction<typeof TeamFilterContext.useTeamFilter>
-const mockUseUser = UserContext.useUser as jest.MockedFunction<typeof UserContext.useUser>
+const mockUseAuth = AuthContext.useAuth as jest.MockedFunction<typeof AuthContext.useAuth>
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -51,7 +51,7 @@ describe('EscalationsPage', () => {
             initialized: true
         })
 
-        mockUseUser.mockReturnValue({
+        mockUseAuth.mockReturnValue({
             user: null,
             isLoading: false,
             isAuthenticated: true,
@@ -104,7 +104,7 @@ describe('EscalationsPage', () => {
             initialized: true
         })
 
-        mockUseUser.mockReturnValue({
+        mockUseAuth.mockReturnValue({
             user: null,
             isLoading: false,
             isAuthenticated: true,
@@ -157,7 +157,7 @@ describe('EscalationsPage', () => {
             initialized: true
         })
 
-        mockUseUser.mockReturnValue({
+        mockUseAuth.mockReturnValue({
             user: null,
             isLoading: false,
             isAuthenticated: true,

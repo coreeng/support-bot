@@ -1,4 +1,4 @@
-FROM gradle:8.12.1-jdk21 AS builder
+FROM gradle:9.3.1-jdk25 AS builder
 WORKDIR /home/gradle/project
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -31,7 +31,7 @@ COPY integration-tests/src integration-tests/src
 
 RUN ./gradlew :integration-tests:jar --no-daemon
 
-FROM registry.access.redhat.com/ubi8/openjdk-21-runtime:1.23
+FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24
 WORKDIR /app
 
 COPY --from=builder /usr/local/bin/helm /usr/local/bin/helm
