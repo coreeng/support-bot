@@ -7,6 +7,7 @@ import com.google.common.collect.ImmutableList;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.jackson.Jacksonized;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 
@@ -16,11 +17,16 @@ import java.time.Instant;
 public class EscalationUI {
     private EscalationId id;
     private TicketId ticketId;
+    @Nullable
     private String escalatingTeam;
+    @Nullable
     private String threadLink;
     private Instant openedAt;
+    @Nullable
     private Instant resolvedAt;
+    @Nullable
     private TeamUI team;
     private ImmutableList<String> tags;
+    @Nullable
     private String impact;
 }

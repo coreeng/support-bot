@@ -5,6 +5,7 @@ import static java.lang.Math.round;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoField;
 import java.util.Arrays;
@@ -76,7 +77,6 @@ public class MockDataGenerator implements ApplicationRunner {
     private final TicketRepository ticketRepository;
     private final EscalationRepository escalationRepository;
     @Nullable
-    @org.springframework.lang.Nullable
     private final SentimentRepository sentimentRepository;
     private final PlatformTeamsService platformTeamsService;
     private final ImpactsRegistry impactsRegistry;
@@ -96,7 +96,7 @@ public class MockDataGenerator implements ApplicationRunner {
         }
 
         Random random = new Random();
-        LocalDate nowDate = LocalDate.now();
+        LocalDate nowDate = LocalDate.now(ZoneId.systemDefault());
         LocalDate date = nowDate.minusWeeks(2);
 
         int ticketsGeneratedForDate = 0;
@@ -242,7 +242,7 @@ public class MockDataGenerator implements ApplicationRunner {
         Set<Tag> pickedTags = generatePickedTags(random);
 
         Escalation escalation = Escalation.createNew(
-            ticket.id(),
+            checkNotNull(ticket.id()),
             escalationTeam.code(),
             pickedTags.stream()
                 .map(Tag::code)
@@ -269,7 +269,7 @@ public class MockDataGenerator implements ApplicationRunner {
             ticket = generateFilledTicket(random, date);
         }
 
-        ImmutableList<Escalation> escalations = escalationRepository.listByTicketId(ticket.id());
+        ImmutableList<Escalation> escalations = escalationRepository.listByTicketId(checkNotNull(ticket.id()));
         for (Escalation escalation : escalations) {
             if (escalation.status() != EscalationStatus.resolved) {
                 Instant resolvedAt = getEscalationResolutionTime(random, escalation);
@@ -320,9 +320,9 @@ public class MockDataGenerator implements ApplicationRunner {
         if (sentimentRepository == null) {
             return;
         }
-        sentimentRepository.save(ticket.id(),
+        sentimentRepository.save(checkNotNull(ticket.id()),
             TicketSentimentResults.builder()
-                .ticketId(ticket.id())
+                .ticketId(checkNotNull(ticket.id()))
                 .authorSentiment(generateSentiment(random))
                 .supportSentiment(random.nextDouble() > 0.2
                     ? generateSentiment(random)
@@ -385,24 +385,17 @@ public class MockDataGenerator implements ApplicationRunner {
         escalated(20.0),
         closed(35.0);
 
-        static {
-            double runningChances = 0.0;
-            for (TicketProgression p : values()) {
-                runningChances += p.pickChances;
-                p.pickBorder = runningChances;
-            }
-        }
-
         private final double pickChances;
-        private double pickBorder;
 
         private static TicketProgression pick(Random random) {
             double totalChances = Arrays.stream(values())
                 .mapToDouble(TicketProgression::pickChances)
                 .sum();
             double r = random.nextDouble(totalChances);
+            double runningChances = 0.0;
             for (TicketProgression p : values()) {
-                if (r <= p.pickBorder()) {
+                runningChances += p.pickChances();
+                if (r <= runningChances) {
                     return p;
                 }
             }
@@ -410,6 +403,3 @@ public class MockDataGenerator implements ApplicationRunner {
         }
     }
 }
-
-
-

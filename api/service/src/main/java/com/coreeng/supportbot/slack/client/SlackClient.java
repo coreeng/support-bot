@@ -17,6 +17,7 @@ import com.slack.api.methods.response.views.ViewsOpenResponse;
 import com.slack.api.methods.response.views.ViewsPublishResponse;
 import com.slack.api.model.Message;
 import com.slack.api.model.User;
+import org.jspecify.annotations.Nullable;
 
 public interface SlackClient {
     ReactionsAddResponse addReaction(ReactionsAddRequest request);
@@ -43,8 +44,10 @@ public interface SlackClient {
 
     ImmutableList<String> getGroupMembers(SlackId.Group groupId);
 
+    @Nullable
     String getGroupName(SlackId.Group groupId);
 
+    @Nullable
     String getChannelName(String channelId);
 
     ConversationsOpenResponse openDmConversation(SlackId.User userId);

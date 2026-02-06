@@ -5,6 +5,7 @@ import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -30,11 +31,11 @@ public class EscalationController {
             @RequestParam(defaultValue = "0") Long page,
             @RequestParam(defaultValue = "10") Long pageSize,
             @RequestParam(defaultValue = "") List<EscalationId> ids,
-            @RequestParam(required = false) TicketId ticketId,
-            @RequestParam(required = false) LocalDate dateFrom,
-            @RequestParam(required = false) LocalDate dateTo,
-            @RequestParam(required = false) EscalationStatus status,
-            @RequestParam(required = false) String team
+            @Nullable @RequestParam(required = false) TicketId ticketId,
+            @Nullable @RequestParam(required = false) LocalDate dateFrom,
+            @Nullable @RequestParam(required = false) LocalDate dateTo,
+            @Nullable @RequestParam(required = false) EscalationStatus status,
+            @Nullable @RequestParam(required = false) String team
     ) {
         Page<Escalation> escalationsPage = escalationQueryService.findByQuery(
                 EscalationQuery.builder()

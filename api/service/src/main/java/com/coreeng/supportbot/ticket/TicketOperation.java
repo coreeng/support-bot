@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.ticket;
 
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 
 import java.util.regex.Pattern;
 
@@ -16,6 +17,7 @@ public enum TicketOperation {
         this.actionId = actionId;
     }
 
+    @Nullable
     public static TicketOperation fromActionIdOrNull(String name) {
         for (TicketOperation op : values()) {
             if (op.actionId().equals(name)) {

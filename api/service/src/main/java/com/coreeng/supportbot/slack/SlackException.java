@@ -3,11 +3,13 @@ package com.coreeng.supportbot.slack;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.SlackApiTextResponse;
+import org.jspecify.annotations.Nullable;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.String.format;
 
 public class SlackException extends RuntimeException {
+    @Nullable
     private final SlackApiTextResponse response;
     private final ImmutableList<String> errorDetails;
 
@@ -48,23 +50,27 @@ public class SlackException extends RuntimeException {
         }
     }
 
+    @Nullable
     public String getError() {
         if (response != null) {
             return response.getError();
-        } else {
-            return getCause().getMessage();
         }
+        Throwable cause = getCause();
+        return cause != null ? cause.getMessage() : null;
     }
 
+    @Nullable
     public String getWarning() {
-        return response.getWarning();
+        return response != null ? response.getWarning() : null;
     }
 
+    @Nullable
     public String getNeeded() {
-        return response.getNeeded();
+        return response != null ? response.getNeeded() : null;
     }
 
+    @Nullable
     public String getProvided() {
-        return response.getProvided();
+        return response != null ? response.getProvided() : null;
     }
 }

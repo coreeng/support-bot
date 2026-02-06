@@ -4,6 +4,7 @@ import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import lombok.Builder;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDate;
 
@@ -18,10 +19,10 @@ public class EscalationQuery {
     private ImmutableList<EscalationId> ids = ImmutableList.of();
     @Builder.Default
     private ImmutableList<TicketId> ticketIds = ImmutableList.of();
-    private TicketId ticketId;
-    private LocalDate dateFrom;
-    private LocalDate dateTo;
-    private EscalationStatus status;
-    private String team;
+    private @Nullable TicketId ticketId;
+    private @Nullable LocalDate dateFrom;
+    private @Nullable LocalDate dateTo;
+    private @Nullable EscalationStatus status;
+    private @Nullable String team;
     private boolean unlimited;
 }

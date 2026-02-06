@@ -74,6 +74,7 @@ public class SlackAppInit implements InitializingBean {
     }
 
     @Override
+    @SuppressWarnings("FutureReturnValueIgnored")
     public void afterPropertiesSet() {
         eventHandlers.stream().collect(groupingBy(SlackEventHandler::getEventClass))
             .forEach((eventClass, handlers) -> {

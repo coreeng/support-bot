@@ -5,12 +5,13 @@ import com.coreeng.supportbot.ticket.TicketId;
 import lombok.Builder;
 import lombok.Getter;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @Getter
 @Builder(toBuilder = true)
 public class TicketSentimentResults {
     private TicketId ticketId;
+    @Nullable
     private Sentiment authorSentiment;
     @Nullable
     private Sentiment supportSentiment;

@@ -7,6 +7,7 @@ import com.slack.api.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -79,7 +80,7 @@ class GenericSlackMemberFetcherTest {
 
         for (SlackId.User userId : userIds) {
             when(slackClient.getUserById(userId))
-                    .thenReturn(createUser(userId.id().toLowerCase() + "@example.com"));
+                    .thenReturn(createUser(userId.id().toLowerCase(Locale.ROOT) + "@example.com"));
         }
 
         // When
@@ -140,4 +141,3 @@ class GenericSlackMemberFetcherTest {
         verify(slackClient).getUserById(SlackId.user("U99"));
     }
 }
-

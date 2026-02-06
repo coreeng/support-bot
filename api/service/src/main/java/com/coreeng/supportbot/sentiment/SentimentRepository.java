@@ -3,7 +3,7 @@ package com.coreeng.supportbot.sentiment;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.LocalDate;
 
 public interface SentimentRepository {

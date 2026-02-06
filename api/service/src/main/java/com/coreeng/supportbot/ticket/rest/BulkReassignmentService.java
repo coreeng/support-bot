@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.exception.DataAccessException;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -59,6 +60,7 @@ public class BulkReassignmentService {
         );
     }
 
+    @Nullable
     private BulkReassignResultUI validateRequest(BulkReassignRequest request) {
         if (!assignmentProps.enabled()) {
             return createEmptyResult("Assignment feature is disabled");
@@ -225,4 +227,3 @@ public class BulkReassignmentService {
             .build();
     }
 }
-

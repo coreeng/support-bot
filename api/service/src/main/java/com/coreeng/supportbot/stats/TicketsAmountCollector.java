@@ -8,6 +8,7 @@ import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Objects;
 import java.util.function.Function;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -32,11 +33,10 @@ public class TicketsAmountCollector implements StatsCollector<StatsRequest.Ticke
             .dateTo(request.to())
             .build());
         Function<Ticket, String> groupByKeyMapper = switch (request.groupBy()) {
-            case impact -> Ticket::impact;
+            case impact -> t -> Objects.requireNonNullElse(t.impact(), "unknown");
             case status -> t -> t.status().name();
         };
         ImmutableList<StatsResult.CategorisedValue> values = tickets.content().stream()
-            .filter(t -> groupByKeyMapper.apply(t) != null)
             .collect(groupingBy(
                 groupByKeyMapper,
                 counting()

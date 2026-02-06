@@ -11,6 +11,8 @@ import com.google.common.collect.ImmutableList;
 import com.slack.api.model.block.LayoutBlock;
 import org.jspecify.annotations.Nullable;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 public record TicketSummaryView(
     TicketId ticketId,
     QuerySummaryView query,
@@ -37,7 +39,7 @@ public record TicketSummaryView(
         ImmutableList<AssigneeOption> availableAssignees
     ) {
         return new TicketSummaryView(
-            ticket.id(),
+            checkNotNull(ticket.id()),
             query,
             ticket.status(),
             ticket.team() != null ? ticket.team().toCode() : null,
@@ -76,13 +78,13 @@ public record TicketSummaryView(
 	            Escalation escalation,
 	            String teamSlackGroupId
 	        ) {
-	            return new EscalationView(
-	                escalation.id(),
-	                teamSlackGroupId,
-	                escalation.status()
-	            );
-	        }
-	    }
+            return new EscalationView(
+                checkNotNull(escalation.id()),
+                teamSlackGroupId,
+                escalation.status()
+            );
+        }
+    }
 
     public record Metadata(
         long ticketId,

@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -75,7 +76,7 @@ public class PlatformTeamsService {
             List<PlatformUsersFetcher.Membership> memberships = e.getValue();
             List<PlatformUser> users = new ArrayList<>(memberships.size());
             for (PlatformUsersFetcher.Membership m : memberships) {
-                String normalisedEmail = m.email().toLowerCase();
+                String normalisedEmail = m.email().toLowerCase(Locale.ROOT);
                 PlatformUser user = usersByEmail.computeIfAbsent(
                     normalisedEmail, k -> new PlatformUser(
                         normalisedEmail,
@@ -199,7 +200,7 @@ public class PlatformTeamsService {
     }
 
     public ImmutableList<PlatformTeam> listTeamsByUserEmail(String email) {
-        PlatformUser user = usersByEmail.get(email.toLowerCase());
+        PlatformUser user = usersByEmail.get(email.toLowerCase(Locale.ROOT));
         if (user == null) {
             return ImmutableList.of();
         }
@@ -213,6 +214,6 @@ public class PlatformTeamsService {
 
     @Nullable
     public PlatformUser findUserByEmail(String email) {
-        return usersByEmail.get(email.toLowerCase());
+        return usersByEmail.get(email.toLowerCase(Locale.ROOT));
     }
 }

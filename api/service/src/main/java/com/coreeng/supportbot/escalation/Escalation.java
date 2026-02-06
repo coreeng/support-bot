@@ -5,7 +5,7 @@ import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import java.time.Instant;
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -15,7 +15,9 @@ public class Escalation {
     @Nullable
     private EscalationId id;
     private String channelId;
+    @Nullable
     private MessageTs threadTs;
+    @Nullable
     private MessageTs createdMessageTs;
     private EscalationStatus status;
     private TicketId ticketId;

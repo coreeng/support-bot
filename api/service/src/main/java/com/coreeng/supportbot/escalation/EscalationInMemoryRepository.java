@@ -6,7 +6,7 @@ import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.chrono.ChronoLocalDate;
@@ -46,7 +46,7 @@ public class EscalationInMemoryRepository implements EscalationRepository {
         } else {
             escalations.put(escalationWithId.id(), escalationWithId);
         }
-        return escalations.get(escalationWithId.id());
+        return checkNotNull(escalations.get(escalationWithId.id()));
     }
 
     @Override
@@ -64,7 +64,7 @@ public class EscalationInMemoryRepository implements EscalationRepository {
                 escalationsByThreadTs.remove(previousVersion.threadTs(), previousVersion);
             }
         }
-        return escalations.get(escalation.id());
+        return checkNotNull(escalations.get(escalation.id()));
     }
 
     @Override

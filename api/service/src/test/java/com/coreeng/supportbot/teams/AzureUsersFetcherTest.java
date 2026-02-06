@@ -10,6 +10,7 @@ import com.microsoft.graph.serviceclient.GraphServiceClient;
 import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -55,7 +56,7 @@ class AzureUsersFetcherTest {
         User user5 = new User();
         user5.setMail("user5@example.com");
         user5.setAccountEnabled(true);
-        user5.setDeletedDateTime(OffsetDateTime.now());
+        user5.setDeletedDateTime(OffsetDateTime.now(ZoneId.systemDefault()));
 
         mockResponse.setValue(List.of(user1, user2, user3));
 

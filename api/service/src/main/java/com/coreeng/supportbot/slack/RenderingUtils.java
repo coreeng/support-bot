@@ -2,7 +2,7 @@ package com.coreeng.supportbot.slack;
 
 import com.slack.api.model.block.composition.OptionObject;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
@@ -19,6 +19,7 @@ public class RenderingUtils {
             .build();
     }
 
+    @Nullable
     public static OptionObject toOptionObjectOrNull(@Nullable UIOption option) {
         return option != null
             ? toOptionObject(option)

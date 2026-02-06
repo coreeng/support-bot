@@ -10,13 +10,15 @@ import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
-import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 @Service
 @Slf4j
@@ -56,7 +58,8 @@ public class TicketProcessingService {
             );
             onStatusUpdate(updatedTicket);
         } else {
-            repository.touchTicketById(ticket.id(), Instant.now());
+            TicketId ticketId = checkNotNull(ticket.id());
+            repository.touchTicketById(ticketId, Instant.now());
         }
     }
 
@@ -115,8 +118,9 @@ public class TicketProcessingService {
             log.atDebug().log("Assignment disabled by config; skipping assignment");
         }
         newTicket = repository.createTicketIfNotExists(newTicket);
+        TicketId newTicketId = checkNotNull(newTicket.id());
         log.atInfo()
-            .addKeyValue("ticketId", newTicket.id().id())
+            .addKeyValue("ticketId", newTicketId.id())
             .log("Ticket created on reaction to message({})", e.messageRef().actualThreadTs());
 
         slackService.markPostTracked(new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
@@ -127,7 +131,7 @@ public class TicketProcessingService {
             MessageRef postedMessageRef = slackService.postTicketForm(
                 new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()),
                 new TicketCreatedMessage(
-                    newTicket.id(),
+                    newTicketId,
                     newTicket.status(),
                     newTicket.statusLog().getLast().date()
                 )
@@ -154,7 +158,8 @@ public class TicketProcessingService {
         if (!submission.confirmed()
             && ticket.status() != TicketStatus.closed
             && submission.status() == TicketStatus.closed) {
-            long unresolvedEscalations = escalationQueryService.countNotResolvedByTicketId(ticket.id());
+            TicketId ticketId = checkNotNull(ticket.id());
+            long unresolvedEscalations = escalationQueryService.countNotResolvedByTicketId(ticketId);
             if (unresolvedEscalations > 0) {
                 return new TicketSubmitResult.RequiresConfirmation(
                     submission,
@@ -177,7 +182,7 @@ public class TicketProcessingService {
         );
 
         log.atInfo()
-            .addKeyValue("ticketId", updatedTicket.id().id())
+            .addKeyValue("ticketId", checkNotNull(updatedTicket.id()).id())
             .log("Ticket submitted");
 
         if (ticket.status() != updatedTicket.status()) {
@@ -208,7 +213,7 @@ public class TicketProcessingService {
             request.tags()
         ));
         log.atInfo()
-            .addKeyValue("ticketId", ticket.id().id())
+            .addKeyValue("ticketId", checkNotNull(ticket.id()).id())
             .log("Ticket escalated");
         slackService.markTicketEscalated(ticket.queryRef());
     }
@@ -227,7 +232,7 @@ public class TicketProcessingService {
         }
 
         log.atInfo()
-            .addKeyValue("ticketId", ticket.id().id())
+            .addKeyValue("ticketId", checkNotNull(ticket.id()).id())
             .log("Marking ticket as stale");
         slackService.warnStaleness(ticket.queryRef());
         Ticket updatedTicket = repository.updateTicket(
@@ -257,16 +262,16 @@ public class TicketProcessingService {
         repository.touchTicketById(ticketId, Instant.now());
     }
 
-    @NotNull
+    @NonNull
     private Ticket onStatusUpdate(Ticket ticket) {
         Ticket updatedTicket = repository.insertStatusLog(ticket, Instant.now());
         log.atInfo()
-            .addKeyValue("ticketId", updatedTicket.id().id())
+            .addKeyValue("ticketId", checkNotNull(updatedTicket.id()).id())
             .log("Ticket status changed");
         slackService.editTicketForm(
-            new MessageRef(updatedTicket.createdMessageTs(), updatedTicket.channelId()),
+            new MessageRef(Objects.requireNonNull(updatedTicket.createdMessageTs()), updatedTicket.channelId()),
             new TicketCreatedMessage(
-                updatedTicket.id(),
+                checkNotNull(updatedTicket.id()),
                 updatedTicket.status(),
                 updatedTicket.statusLog().getLast().date()
             )
@@ -284,7 +289,7 @@ public class TicketProcessingService {
         }
 
         publisher.publishEvent(new TicketStatusChanged(
-            ticket.id(),
+            checkNotNull(ticket.id()),
             ticket.status()
         ));
         return updatedTicket;

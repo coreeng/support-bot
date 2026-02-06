@@ -4,8 +4,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Objects;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import com.coreeng.supportbot.dbschema.tables.records.TicketRecord;
 import com.coreeng.supportbot.slack.SlackId;
@@ -136,7 +137,7 @@ public class JdbcTicketRepository implements TicketRepository {
             .fetchOne(TICKET.ID);
 
         if (ticketId == null) {
-            return findTicketByQuery(ticket.queryRef());
+            return Objects.requireNonNull(findTicketByQuery(ticket.queryRef()));
         }
 
         Ticket updatedTicket = ticket.withId(new TicketId(ticketId));
@@ -585,7 +586,7 @@ public class JdbcTicketRepository implements TicketRepository {
             .build();
     }
 
-    private AssigneeWrite toDbAssignee(String assigneePlain) {
+    private AssigneeWrite toDbAssignee(@Nullable String assigneePlain) {
         if (assigneePlain == null) {
             return new AssigneeWrite(null, "plain", null);
         }
@@ -598,7 +599,11 @@ public class JdbcTicketRepository implements TicketRepository {
             });
     }
 
-    private String decryptAssignee(String stored, String format) {
+    @Nullable
+    private String decryptAssignee(@Nullable String stored, @Nullable String format) {
+        if (stored == null) {
+            return null;
+        }
         return assigneeCrypto.decrypt(stored, format == null ? "plain" : format).orElse(null);
     }
 
@@ -622,7 +627,8 @@ public class JdbcTicketRepository implements TicketRepository {
             .execute();
     }
 
-    private String toDbTeam(TicketTeam team) {
+    @Nullable
+    private String toDbTeam(@Nullable TicketTeam team) {
         if (team == null) {
             return null;
         }
@@ -632,7 +638,8 @@ public class JdbcTicketRepository implements TicketRepository {
         };
     }
 
-    private TicketTeam fromDbTeam(String team) {
+    @Nullable
+    private TicketTeam fromDbTeam(@Nullable String team) {
         if (team == null) {
             return null;
         }
@@ -642,5 +649,4 @@ public class JdbcTicketRepository implements TicketRepository {
         return new TicketTeam.KnownTeam(team);
     }
 }
-
 

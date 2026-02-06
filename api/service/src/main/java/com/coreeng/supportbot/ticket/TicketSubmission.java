@@ -12,8 +12,10 @@ import org.jspecify.annotations.Nullable;
 public class TicketSubmission {
     private TicketId ticketId;
     private TicketStatus status;
+    @Nullable
     private TicketTeam authorsTeam;
     private ImmutableList<String> tags;
+    @Nullable
     private String impact;
     @Nullable
     private String assignedTo;

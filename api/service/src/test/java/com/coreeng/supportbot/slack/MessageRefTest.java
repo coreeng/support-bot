@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.slack;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,11 +37,17 @@ class MessageRefTest {
         assertEquals(MessageTs.of(threadTs), messageRef.threadTs());
     }
 
-    private static String createPermalink(String channelId, String tsLeft, String tsRight, String threadTs) {
+    private static String createPermalink(String channelId, String tsLeft, String tsRight, @Nullable String threadTs) {
             return createPermalink(channelId, tsLeft, tsRight, threadTs, null);
     }
 
-    private static String createPermalink(String channelId, String tsLeft, String tsRight, String threadTs, String cid) {
+    private static String createPermalink(
+        String channelId,
+        String tsLeft,
+        String tsRight,
+        @Nullable String threadTs,
+        @Nullable String cid
+    ) {
         return "https://cecg-group.slack.com/archives/" + channelId
             + "/p" + tsLeft + tsRight
             + (threadTs != null ? "?thread_ts=" + threadTs + "&cid=" + channelId : "")

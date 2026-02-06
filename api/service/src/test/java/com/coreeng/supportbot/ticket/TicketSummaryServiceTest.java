@@ -33,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 
+import static java.util.Objects.requireNonNull;
 import static com.slack.api.model.block.Blocks.section;
 import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
 import static com.slack.api.model.view.Views.view;
@@ -498,8 +499,9 @@ class TicketSummaryServiceTest {
     @Test
     void summaryView_handlesTombstoneMessage() {
         Ticket ticket = sampleTicket();
-        when(repository.findTicketById(ticket.id())).thenReturn(ticket);
-        when(escalationQueryService.listByTicketId(ticket.id())).thenReturn(ImmutableList.of());
+        TicketId sampleTicketId = requireNonNull(ticket.id());
+        when(repository.findTicketById(sampleTicketId)).thenReturn(ticket);
+        when(escalationQueryService.listByTicketId(sampleTicketId)).thenReturn(ImmutableList.of());
 
         Message tombstone = new Message();
         tombstone.setSubtype("tombstone");
@@ -508,7 +510,7 @@ class TicketSummaryServiceTest {
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(tombstone);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.test/permalink");
 
-        TicketSummaryView summary = service.summaryView(ticket.id());
+        TicketSummaryView summary = service.summaryView(sampleTicketId);
         TicketSummaryView.QuerySummaryView query = summary.query();
 
         assertEquals(ticket.queryTs(), query.messageTs());
@@ -524,8 +526,9 @@ class TicketSummaryServiceTest {
     @Test
     void summaryView_handlesGetMessageByTsFailure_andPermalinkSuccessAndFailure() {
         Ticket ticket = sampleTicket();
-        when(repository.findTicketById(ticket.id())).thenReturn(ticket);
-        when(escalationQueryService.listByTicketId(ticket.id())).thenReturn(ImmutableList.of());
+        TicketId sampleTicketId = requireNonNull(ticket.id());
+        when(repository.findTicketById(sampleTicketId)).thenReturn(ticket);
+        when(escalationQueryService.listByTicketId(sampleTicketId)).thenReturn(ImmutableList.of());
 
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class)))
             .thenThrow(new SlackException(new RuntimeException("boom")));
@@ -533,7 +536,7 @@ class TicketSummaryServiceTest {
             .thenReturn("https://slack.test/permalink")
             .thenThrow(new SlackException(new RuntimeException("permalink boom")));
 
-        TicketSummaryView first = service.summaryView(ticket.id());
+        TicketSummaryView first = service.summaryView(sampleTicketId);
         TicketSummaryView.QuerySummaryView firstQuery = first.query();
         assertEquals(ticket.queryTs(), firstQuery.messageTs());
         assertNull(firstQuery.senderId());
@@ -552,7 +555,7 @@ class TicketSummaryServiceTest {
         assertTrue(firstContextText.getText().contains("Unknown author"));
         assertTrue(firstContextText.getText().contains("View Message"));
 
-        TicketSummaryView second = service.summaryView(ticket.id());
+        TicketSummaryView second = service.summaryView(sampleTicketId);
         TicketSummaryView.QuerySummaryView secondQuery = second.query();
         assertNull(secondQuery.permalink());
 
@@ -569,8 +572,9 @@ class TicketSummaryServiceTest {
     @Test
     void summaryView_handlesPermalinkFailureWhenMessageFetchSucceeds() {
         Ticket ticket = sampleTicket();
-        when(repository.findTicketById(ticket.id())).thenReturn(ticket);
-        when(escalationQueryService.listByTicketId(ticket.id())).thenReturn(ImmutableList.of());
+        TicketId sampleTicketId = requireNonNull(ticket.id());
+        when(repository.findTicketById(sampleTicketId)).thenReturn(ticket);
+        when(escalationQueryService.listByTicketId(sampleTicketId)).thenReturn(ImmutableList.of());
 
         Message message = new Message();
         message.setUser("U123");
@@ -579,7 +583,7 @@ class TicketSummaryServiceTest {
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class)))
             .thenThrow(new SlackException(new RuntimeException("permalink boom")));
 
-        TicketSummaryView summary = service.summaryView(ticket.id());
+        TicketSummaryView summary = service.summaryView(sampleTicketId);
         TicketSummaryView.QuerySummaryView query = summary.query();
 
         assertEquals(ticket.queryTs(), query.messageTs());
@@ -600,4 +604,3 @@ class TicketSummaryServiceTest {
 
     }
 }
-

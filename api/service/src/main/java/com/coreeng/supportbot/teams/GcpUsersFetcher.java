@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -17,7 +16,7 @@ public class GcpUsersFetcher implements PlatformUsersFetcher {
 
     @Override
     public List<Membership> fetchMembershipsByGroupRef(String groupRef) {
-        List<Membership> result = new ArrayList<>();
+        ImmutableList.Builder<Membership> result = ImmutableList.builder();
         String groupId;
         try {
             var lookupResp = cloudIdentity.groups().lookup()
@@ -48,6 +47,6 @@ public class GcpUsersFetcher implements PlatformUsersFetcher {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return result;
+        return result.build();
     }
 }

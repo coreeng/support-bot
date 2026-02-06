@@ -6,7 +6,7 @@ import com.slack.api.model.block.LayoutBlock;
 
 public interface SlackMessage {
     /**
-     * @return Brief description of the message
+     * Returns a brief description of the message.
      */
     default String getText() {
         return "";

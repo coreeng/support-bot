@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.UUID;
 
 import static com.coreeng.supportbot.dbschema.Tables.RATINGS;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 @Component
@@ -20,7 +21,7 @@ public class JdbcRatingRepository implements RatingRepository {
 
     @Override
     public UUID insertRating(Rating rating) {
-        return dsl.insertInto(RATINGS)
+        return checkNotNull(dsl.insertInto(RATINGS)
                 .set(RATINGS.RATING, rating.rating())
                 .set(RATINGS.SUBMITTED_TS, rating.submittedTs())
                 .set(RATINGS.STATUS, TicketStatus.lookupLiteral(rating.status().name()))
@@ -28,7 +29,7 @@ public class JdbcRatingRepository implements RatingRepository {
                 .set(RATINGS.TAGS, rating.tags())
                 .set(RATINGS.IS_ESCALATED, rating.isEscalated())
                 .returningResult(RATINGS.ID)
-                .fetchOne(RATINGS.ID);
+                .fetchOne(RATINGS.ID));
     }
 
     @Override

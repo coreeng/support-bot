@@ -2,6 +2,7 @@ package com.coreeng.supportbot.ticket;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import org.jspecify.annotations.Nullable;
 
 public sealed interface TicketTeam {
     String notATenantCode = "Not a Tenant";
@@ -10,7 +11,8 @@ public sealed interface TicketTeam {
     String toCode();
 
     @JsonCreator
-    static TicketTeam fromCode(String code) {
+    @Nullable
+    static TicketTeam fromCode(@Nullable String code) {
         if (code == null) {
             return null;
         }

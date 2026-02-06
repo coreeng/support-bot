@@ -47,7 +47,8 @@ public class TicketTestController {
             ).toBuilder()
             .createdMessageTs(MessageTs.ofOrNull(ticketToCreate.createdMessageTs()))
             .build());
-        DetailedTicket detailedTicket = queryService.findDetailedById(ticket.id());
+        TicketId ticketId = requireNonNull(ticket.id());
+        DetailedTicket detailedTicket = queryService.findDetailedById(ticketId);
         String queryText = detailedTicket != null ? queryService.fetchQueryText(detailedTicket.ticket()) : null;
         return mapper.mapToUI(requireNonNull(detailedTicket), queryText);
     }

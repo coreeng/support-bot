@@ -595,3 +595,9 @@ ui/.next/
 .claude/
 .beads/
 .logs/
+
+# JDTLS LSP
+.settings/
+bin
+.classpath
+.project

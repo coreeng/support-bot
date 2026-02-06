@@ -3,7 +3,7 @@ package com.coreeng.supportbot.ticket;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.regex.Pattern;
 
 @Getter
