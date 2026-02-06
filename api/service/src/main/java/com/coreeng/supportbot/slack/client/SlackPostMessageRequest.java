@@ -3,7 +3,7 @@ package com.coreeng.supportbot.slack.client;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.slack.api.methods.request.chat.ChatPostMessageRequest;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public record SlackPostMessageRequest(
     SlackMessage message,

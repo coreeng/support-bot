@@ -2,7 +2,7 @@ package com.coreeng.supportbot.escalation;
 
 import lombok.Getter;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.regex.Pattern;
 
 @Getter

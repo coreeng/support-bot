@@ -2,7 +2,7 @@ package com.coreeng.supportbot.slack;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -30,6 +30,7 @@ public record MessageTs(
         return new MessageTs(ts);
     }
 
+    @Nullable
     public static MessageTs ofOrNull(@Nullable String ts) {
         return ts != null ? of(ts) : null;
     }

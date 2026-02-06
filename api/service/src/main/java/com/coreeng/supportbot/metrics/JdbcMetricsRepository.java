@@ -10,6 +10,7 @@ import static org.jooq.impl.DSL.count;
 import static org.jooq.impl.DSL.exists;
 import static org.jooq.impl.DSL.notExists;
 import static org.jooq.impl.DSL.selectOne;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.dbschema.enums.EscalationStatus;
 
@@ -74,14 +75,15 @@ public class JdbcMetricsRepository implements MetricsRepository {
 
     @Override
     public long getUnattendedQueryCount() {
-        return dsl.selectCount()
-                .from(QUERY)
-                .where(notExists(
-                        selectOne()
-                                .from(TICKET)
-                                .where(TICKET.QUERY_ID.eq(QUERY.ID))
-                ))
-                .fetchOne(0, Long.class);
+        Long count = dsl.selectCount()
+            .from(QUERY)
+            .where(notExists(
+                selectOne()
+                    .from(TICKET)
+                    .where(TICKET.QUERY_ID.eq(QUERY.ID))
+            ))
+            .fetchOne(0, Long.class);
+        return count != null ? count : 0L;
     }
 
     @Override

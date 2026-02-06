@@ -3,7 +3,7 @@ package com.coreeng.supportbot.sentiment;
 import lombok.Builder;
 import lombok.Getter;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.LocalDate;
 
 @Getter

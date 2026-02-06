@@ -16,6 +16,7 @@ import com.slack.api.model.view.View;
 import com.slack.api.model.view.ViewState;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -184,6 +185,7 @@ public class HomepageFilterMapper {
         return options;
     }
 
+    @Nullable
     private List<OptionObject> buildInitialTagOptions(HomepageFilter filter) {
         if (!filter.includeNoTags() && isEmpty(filter.tags())) {
             return null;

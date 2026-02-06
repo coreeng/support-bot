@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.ZoneId;
 
+import static java.util.Objects.requireNonNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -56,9 +57,10 @@ class RatingEventHandlerTest {
             .status(TicketStatus.opened)
             .build();
         Ticket created = ticketRepository.createTicketIfNotExists(ticket);
+        TicketId createdId = requireNonNull(created.id());
         MessageRef queryRef = created.queryRef();
 
-        TicketStatusChanged event = new TicketStatusChanged(created.id(), TicketStatus.closed);
+        TicketStatusChanged event = new TicketStatusChanged(createdId, TicketStatus.closed);
 
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(originalMessage);
         when(originalMessage.getUser()).thenReturn(userId);
@@ -68,7 +70,7 @@ class RatingEventHandlerTest {
 
         // Then
         verify(slackClient).getMessageByTs(SlackGetMessageByTsRequest.of(queryRef));
-        verify(slackService).postRatingRequest(queryRef, created.id(), userId);
+        verify(slackService).postRatingRequest(queryRef, createdId, userId);
     }
 
     @Test
@@ -105,9 +107,10 @@ class RatingEventHandlerTest {
             .status(TicketStatus.opened)
             .build();
         Ticket created = ticketRepository.createTicketIfNotExists(ticket);
+        TicketId createdId = requireNonNull(created.id());
         MessageRef queryRef = created.queryRef();
 
-        TicketStatusChanged event = new TicketStatusChanged(created.id(), TicketStatus.closed);
+        TicketStatusChanged event = new TicketStatusChanged(createdId, TicketStatus.closed);
 
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class)))
             .thenThrow(new RuntimeException("Slack API error"));
@@ -129,9 +132,10 @@ class RatingEventHandlerTest {
             .status(TicketStatus.opened)
             .build();
         Ticket created = ticketRepository.createTicketIfNotExists(ticket);
+        TicketId createdId = requireNonNull(created.id());
         MessageRef queryRef = created.queryRef();
 
-        TicketStatusChanged event = new TicketStatusChanged(created.id(), TicketStatus.closed);
+        TicketStatusChanged event = new TicketStatusChanged(createdId, TicketStatus.closed);
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(originalMessage);
         when(originalMessage.getUser()).thenReturn(userId);
 
@@ -139,7 +143,7 @@ class RatingEventHandlerTest {
         handler.onTicketStatusChange(event);
 
         // Then - verify rating request is called with exactly the right parameters
-        verify(slackService).postRatingRequest(queryRef, created.id(), userId);
+        verify(slackService).postRatingRequest(queryRef, createdId, userId);
         verify(slackService, times(1)).postRatingRequest(any(MessageRef.class), any(TicketId.class), any(String.class));
     }
 

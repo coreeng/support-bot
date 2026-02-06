@@ -46,6 +46,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 
 import static com.google.common.collect.Iterables.isEmpty;
@@ -117,7 +118,7 @@ public class SlackClientImpl implements SlackClient {
 
     @Override
     public String getPermalink(SlackGetMessageByTsRequest request) {
-        return permalinkCache.get(request, () -> {
+        return Objects.requireNonNull(permalinkCache.get(request, () -> {
             if (request.ts().mocked()) {
                 return "https://slack.com/" + request.channelId() + "/" + request.ts().ts();
             }
@@ -129,7 +130,7 @@ public class SlackClientImpl implements SlackClient {
                     .build()),
                 null);
             return response.getPermalink();
-        });
+        }));
     }
 
     @Override
@@ -168,13 +169,13 @@ public class SlackClientImpl implements SlackClient {
 
     @Override
     public User getUserById(SlackId.User userId) {
-        return userProfileCache.get(userId.id(), () -> doRequest(
+        return Objects.requireNonNull(userProfileCache.get(userId.id(), () -> doRequest(
             "users.info",
             () -> client.usersInfo(UsersInfoRequest.builder()
                 .user(userId.id())
                 .build()),
             null
-        ).getUser());
+        ).getUser()));
     }
 
     @Override

@@ -8,7 +8,7 @@ import io.fabric8.kubernetes.api.model.rbac.Subject;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,7 +57,7 @@ public class CorePlatformTeamsFetcher implements PlatformTeamsFetcher {
         return result;
     }
 
-    @NotNull
+    @NonNull
     private Optional<TeamAndGroupTuple> fetchTeamAndGroup(String rbPostfix, String nsName) {
         String rbName = nsName + rbPostfix;
         RoleBinding rb = k8sClient.rbac().roleBindings().inNamespace(nsName).withName(
