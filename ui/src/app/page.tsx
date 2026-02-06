@@ -13,7 +13,7 @@ import DashboardsPage from '@/components/dashboards/dashboards'
 import TeamSelector from '@/components/TeamSelector'
 import { signIn, signOut } from 'next-auth/react'
 import { LogOut, BookOpen } from 'lucide-react'
-import KnowledgeGapsPage from '@/components/knowledge/knowledge-gaps'
+import KnowledgeGapsPage from '@/components/knowledgegaps/knowledge-gaps'
 
 
 // 1. Define support sub-tabs
