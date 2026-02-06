@@ -158,8 +158,6 @@ tasks.withType<Test> {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    // Required for Error Prone on JDK 21; revisit and remove after JDK upgrade.
-    options.compilerArgs.add("-XDaddTypeAnnotationsToSymbol=true")
     options.compilerArgs.add("-Werror")
     options.errorprone(
         object : Action<ErrorProneOptions> {
