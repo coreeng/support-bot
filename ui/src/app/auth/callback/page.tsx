@@ -29,9 +29,16 @@ export default function AuthCallbackPage() {
     exchangedCodes.add(code)
 
     exchangeCodeForToken(code)
-      .then(async () => {
+      .then(async (token) => {
         // Refresh auth context to load the new user
         await refreshUserRef.current()
+        if (typeof window !== 'undefined' && window.opener && !window.opener.closed) {
+          // Send token to parent iframe (same-origin only)
+          const targetOrigin = window.location.origin
+          window.opener.postMessage({ type: 'auth:success', token }, targetOrigin)
+          window.close()
+          return
+        }
         // Redirect to home or the page they were trying to access
         const returnTo = sessionStorage.getItem('auth_return_to') || '/'
         sessionStorage.removeItem('auth_return_to')
