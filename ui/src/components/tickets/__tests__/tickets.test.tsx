@@ -53,10 +53,10 @@ const mockRegistry = {
     tags: [{ code: 'bug', label: 'Bug' }]
 };
 
-// Mock user context to provide a test user by default
-jest.mock('../../../contexts/UserContext', () => ({
-    UserProvider: ({ children }: { children: React.ReactNode }) => children,
-    useUser: () => ({
+// Mock auth context to provide a test user by default
+jest.mock('../../../contexts/AuthContext', () => ({
+    AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+    useAuth: () => ({
         user: 'test@example.com',
         isAuthenticated: true,
         isLoading: false,

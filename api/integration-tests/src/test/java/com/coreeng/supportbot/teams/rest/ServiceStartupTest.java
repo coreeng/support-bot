@@ -1,7 +1,11 @@
 package com.coreeng.supportbot.teams.rest;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.AfterAll;
@@ -13,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import io.fabric8.kubernetes.api.model.Pod;
 import io.restassured.RestAssured;
+import io.restassured.builder.RequestSpecBuilder;
 import static io.restassured.RestAssured.when;
 
 @Tag("integration")
@@ -60,6 +65,13 @@ public class ServiceStartupTest {
             } else {
                 RestAssured.baseURI = "http://" + config.service().deployment().name() + "." + config.namespace() + ".svc.cluster.local:" + config.portForwarding().remotePort();
             }
+
+            // Configure RestAssured with default auth bypass headers
+            RestAssured.requestSpecification = new RequestSpecBuilder()
+                .addHeader("X-Test-User", "test@integration.test")
+                .addHeader("X-Test-Role", "support")
+                .build();
+            logger.info("RestAssured configured with test auth bypass headers");
         } catch (Exception e) {
             logger.error("Error during setup", e);
             throw e;
@@ -133,11 +145,17 @@ public class ServiceStartupTest {
         env.put("DEPLOY_DB", "false");
         env.put("HELM_DRIVER", "configmap");
 
-        pb.inheritIO();
+        pb.redirectErrorStream(true);
         Process p = pb.start();
+        String output;
+        try (var reader = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+            output = reader.lines().collect(Collectors.joining("\n"));
+        }
         int code = p.waitFor();
+        logger.info("deploy-service.sh (action={}) output:\n{}", action, output);
         if (code != 0) {
-            throw new IllegalStateException("deploy-service.sh failed with exit code " + code + " (action=" + action + ")");
+            throw new IllegalStateException(
+                "deploy-service.sh failed with exit code " + code + " (action=" + action + ")\n--- script output ---\n" + output);
         }
     }
 }

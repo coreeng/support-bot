@@ -163,7 +163,7 @@ public class TicketSummaryViewMapper {
             .map(RenderingUtils::toOptionObject)
             .toList()
             : Arrays.stream(TicketStatus.values())
-            .filter(status -> !status.equals(TicketStatus.stale))
+            .filter(status -> status != TicketStatus.stale)
             .map(RenderingUtils::toOptionObject)
             .toList();
         return staticSelect(s -> s

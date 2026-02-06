@@ -26,7 +26,7 @@ import static com.slack.api.model.block.composition.BlockCompositions.plainText;
 @Component
 @RequiredArgsConstructor
 public class TicketTeamSuggestionHandler implements SlackBlockSuggestionHandler {
-    private final static int slackOptionsLimit = 100;
+    private static final int slackOptionsLimit = 100;
 
     private final TicketTeamSuggestionsService service;
     private final TicketSummaryViewMapper viewMapper;

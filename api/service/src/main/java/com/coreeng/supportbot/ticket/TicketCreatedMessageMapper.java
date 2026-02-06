@@ -26,9 +26,9 @@ import lombok.RequiredArgsConstructor;
 @Component
 @RequiredArgsConstructor
 public class TicketCreatedMessageMapper {
-    private final static String redHex = "#ff000d";
-    private final static String purpleHex = "#b200ed";
-    private final static String greenHex = "#00ff00";
+    private static final String redHex = "#ff000d";
+    private static final String purpleHex = "#b200ed";
+    private static final String greenHex = "#00ff00";
 
     private final TicketSummaryViewMapper summaryViewMapper;
     private final EscalateViewMapper escalateViewMapper;
