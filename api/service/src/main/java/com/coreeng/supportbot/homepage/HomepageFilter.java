@@ -9,7 +9,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.extern.jackson.Jacksonized;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @Getter
 @Builder(toBuilder = true)

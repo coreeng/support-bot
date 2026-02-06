@@ -3,7 +3,7 @@ package com.coreeng.supportbot.slack.client;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.slack.api.methods.request.chat.ChatPostEphemeralRequest;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import lombok.Builder;
 import lombok.Getter;

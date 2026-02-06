@@ -4,7 +4,7 @@ import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 import java.time.Instant;
 

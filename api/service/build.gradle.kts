@@ -6,6 +6,10 @@ import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.containers.wait.strategy.WaitAllStrategy
 import org.gradle.api.plugins.quality.Pmd
+import org.gradle.api.Action
+import net.ltgt.gradle.errorprone.CheckSeverity
+import net.ltgt.gradle.errorprone.ErrorProneOptions
+import net.ltgt.gradle.errorprone.errorprone
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -14,6 +18,7 @@ plugins {
     java
     pmd
 
+    id("net.ltgt.errorprone") version "4.3.0"
     id("org.springframework.boot") version "3.5.9"
     id("io.spring.dependency-management") version "1.1.7"
 
@@ -66,6 +71,8 @@ extra["mockito.version"] = "5.21.0"
 extra["asm.version"] = "9.9.1"
 
 val lombokVersion = "1.18.42"
+val errorProneVersion = "2.47.0"
+val nullAwayVersion = "0.13.1"
 
 dependencies {
     implementation("org.jspecify:jspecify:1.0.0")
@@ -133,6 +140,9 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok:${lombokVersion}")
     testCompileOnly("org.projectlombok:lombok:${lombokVersion}")
     testAnnotationProcessor("org.projectlombok:lombok:${lombokVersion}")
+
+    errorprone("com.google.errorprone:error_prone_core:${errorProneVersion}")
+    errorprone("com.uber.nullaway:nullaway:${nullAwayVersion}")
 }
 
 val mockitoAgent = configurations.create("mockitoAgent")
@@ -144,6 +154,30 @@ tasks.withType<Test> {
     jvmArgs(
         "-javaagent:${mockitoAgent.asPath}",
         "-XX:+EnableDynamicAgentLoading", "-Xshare:off"
+    )
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.errorprone(
+        object : Action<ErrorProneOptions> {
+            override fun execute(errorproneOptions: ErrorProneOptions) {
+                // Run only NullAway and treat service packages as null-checked by default.
+                errorproneOptions.disableAllChecks.set(true)
+                errorproneOptions.check("NullAway", CheckSeverity.ERROR)
+                errorproneOptions.option("NullAway:AnnotatedPackages", "com.coreeng.supportbot")
+                errorproneOptions.option(
+                    "NullAway:UnannotatedSubPackages",
+                    "com.coreeng.supportbot.dbschema"
+                )
+                errorproneOptions.option("NullAway:JSpecifyMode", true)
+                errorproneOptions.option("NullAway:HandleTestAssertionLibraries", true)
+                errorproneOptions.option(
+                    "NullAway:ExcludedFieldAnnotations",
+                    "org.mockito.Mock,org.mockito.Spy,org.mockito.Captor,org.mockito.InjectMocks"
+                )
+                errorproneOptions.excludedPaths.set(".*/com/coreeng/supportbot/dbschema/.*")
+            }
+        }
     )
 }
 

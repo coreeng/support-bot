@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import org.jooq.Condition;
 import org.jooq.DSLContext;
@@ -144,7 +144,7 @@ public class JdbcEscalationRepository implements EscalationRepository {
             ))
             .execute();
         if (escalationChanged == 0) {
-            return findById(escalation.id());
+            return checkNotNull(findById(escalation.id()));
         }
 
         dsl.insertInto(

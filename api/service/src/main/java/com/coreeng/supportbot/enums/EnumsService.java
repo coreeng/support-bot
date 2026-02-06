@@ -4,7 +4,7 @@ import com.coreeng.supportbot.config.EnumProps;
 import com.coreeng.supportbot.config.EnumerationValue;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 @Service

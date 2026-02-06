@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import java.util.List;
 import java.util.Set;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
@@ -165,17 +166,18 @@ class UsersControllerTest {
         assertThat(response.getBody()).hasSize(3);
 
         // Verify first member
-        SupportMemberUI ui1 = response.getBody().get(0);
+        List<SupportMemberUI> body = requireNonNull(response.getBody());
+        SupportMemberUI ui1 = body.get(0);
         assertThat(ui1.userId()).isEqualTo("U12345");
         assertThat(ui1.displayName()).isEqualTo("john.doe@example.com");
 
         // Verify second member
-        SupportMemberUI ui2 = response.getBody().get(1);
+        SupportMemberUI ui2 = body.get(1);
         assertThat(ui2.userId()).isEqualTo("U67890");
         assertThat(ui2.displayName()).isEqualTo("jane.smith@example.com");
 
         // Verify third member
-        SupportMemberUI ui3 = response.getBody().get(2);
+        SupportMemberUI ui3 = body.get(2);
         assertThat(ui3.userId()).isEqualTo("U11111");
         assertThat(ui3.displayName()).isEqualTo("bob.jones@example.com");
 
@@ -183,4 +185,3 @@ class UsersControllerTest {
         verifyNoMoreInteractions(supportTeamService);
     }
 }
-

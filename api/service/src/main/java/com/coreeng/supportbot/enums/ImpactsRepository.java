@@ -6,7 +6,7 @@ import org.jooq.DSLContext;
 import org.jooq.ResultQuery;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 
 import static com.coreeng.supportbot.dbschema.Tables.IMPACT;
