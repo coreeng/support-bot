@@ -1,1 +1,3 @@
 ---
+envVarsMap:
+  BACKEND_URL: http://support-bot:8080
