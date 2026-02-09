@@ -36,7 +36,7 @@ public class OAuth2AvailabilityChecker {
         } else {
             log.warn("OAuth2 credentials not configured and test-bypass is disabled. " +
                 "Users will not be able to authenticate. " +
-                "Set GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET or AZURE_AD_CLIENT_ID/AZURE_AD_CLIENT_SECRET, " +
+                "Set GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET or AZURE_CLIENT_ID/AZURE_CLIENT_SECRET, " +
                 "or enable security.test-bypass.enabled for testing.");
         }
     }
