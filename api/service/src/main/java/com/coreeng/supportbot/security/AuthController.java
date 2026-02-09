@@ -57,7 +57,7 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@AuthenticationPrincipal UserPrincipal principal) {
         if (principal != null) {
-            log.info("User logged out: {}", principal.email());
+            log.info("User logged out");
         }
         return ResponseEntity.ok().build();
     }

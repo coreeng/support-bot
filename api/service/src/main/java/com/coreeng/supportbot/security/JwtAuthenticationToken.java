@@ -3,7 +3,6 @@ package com.coreeng.supportbot.security;
 import com.google.common.collect.ImmutableList;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.util.Collection;
 
@@ -20,16 +19,16 @@ public class JwtAuthenticationToken extends AbstractAuthenticationToken {
 
     private static Collection<? extends GrantedAuthority> buildAuthorities(UserPrincipal principal) {
         var builder = ImmutableList.<GrantedAuthority>builder();
-        builder.add(new SimpleGrantedAuthority("ROLE_USER"));
+        builder.add(Role.user.grantedAuthority());
 
         if (principal.isLeadership()) {
-            builder.add(new SimpleGrantedAuthority("ROLE_LEADERSHIP"));
+            builder.add(Role.leadership.grantedAuthority());
         }
         if (principal.isSupportEngineer()) {
-            builder.add(new SimpleGrantedAuthority("ROLE_SUPPORT_ENGINEER"));
+            builder.add(Role.supportEngineer.grantedAuthority());
         }
         if (principal.isEscalation()) {
-            builder.add(new SimpleGrantedAuthority("ROLE_ESCALATION"));
+            builder.add(Role.escalation.grantedAuthority());
         }
         return builder.build();
     }
