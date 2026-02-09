@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
@@ -40,7 +41,7 @@ public class UsersController {
         // If the user is not a member of any platform teams, but is, for example, a support member,
         // return a minimal PlatformUser so the caller still gets their team memberships.
         if (user == null) {
-            user = new PlatformUser(email.toLowerCase(), new HashSet<>());
+            user = new PlatformUser(email.toLowerCase(Locale.ROOT), new HashSet<>());
         }
         return ResponseEntity.ok(mapper.mapToUI(user, teams));
     }
@@ -56,4 +57,3 @@ public class UsersController {
         return ResponseEntity.ok(members);
     }
 }
-

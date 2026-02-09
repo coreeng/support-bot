@@ -6,6 +6,7 @@ import com.coreeng.supportbot.sentiment.TicketSentimentResults;
 import com.coreeng.supportbot.ticket.TicketId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,12 +24,13 @@ public class SentimentAnalysisController {
     private final ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor();
 
     @PostMapping("/ticket/job")
+    @SuppressWarnings("FutureReturnValueIgnored")
     public void calculateSentiment() {
         executorService.submit(job::analyzeClosedTickets);
     }
 
     @GetMapping("/ticket/{id}")
-    public TicketSentimentResults getSentiment(@PathVariable("id") TicketId ticketId) {
+    public @Nullable TicketSentimentResults getSentiment(@PathVariable("id") TicketId ticketId) {
         return queryService.findByTicketId(ticketId);
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -72,11 +73,11 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private String extractEmail(OAuth2User oauth2User) {
         var email = oauth2User.getAttribute("email");
         if (email != null) {
-            return email.toString().toLowerCase();
+            return email.toString().toLowerCase(Locale.ROOT);
         }
         var preferredUsername = oauth2User.getAttribute("preferred_username");
         if (preferredUsername != null) {
-            return preferredUsername.toString().toLowerCase();
+            return preferredUsername.toString().toLowerCase(Locale.ROOT);
         }
         throw new IllegalStateException("Unable to extract email from OAuth2 user");
     }

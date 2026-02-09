@@ -9,7 +9,7 @@ import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -94,7 +94,9 @@ public class SentimentInMemoryRepository implements SentimentRepository {
         SentimentCounters othersSentiments = new SentimentCounters();
         for (Ticket ticket : tickets) {
             TicketSentimentResults sentiment = checkNotNull(sentiments.get(ticket.id()));
-            authorSentiments.increment(sentiment.authorSentiment());
+            if (sentiment.authorSentiment() != null) {
+                authorSentiments.increment(sentiment.authorSentiment());
+            }
             if (sentiment.supportSentiment() != null) {
                 supportSentiments.increment(sentiment.supportSentiment());
             }

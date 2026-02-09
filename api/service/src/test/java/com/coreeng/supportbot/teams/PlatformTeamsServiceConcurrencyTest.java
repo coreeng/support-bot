@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -39,7 +40,7 @@ class PlatformTeamsServiceConcurrencyTest {
         PlatformTeamsFetcher teamsFetcher = new FakeTeamsFetcher(teams);
         SlowUsersFetcher usersFetcher = new SlowUsersFetcher(
             perCallDelay,
-            groupRef -> List.of(new PlatformUsersFetcher.Membership(groupRef.toLowerCase() + "@test.com"))
+            groupRef -> List.of(new PlatformUsersFetcher.Membership(groupRef.toLowerCase(Locale.ROOT) + "@test.com"))
         );
 
         EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(escalationTeams);
@@ -73,9 +74,9 @@ class PlatformTeamsServiceConcurrencyTest {
             assertNotNull(team);
             assertTrue(team.groupRefs().contains(groupRef));
             assertEquals(1, team.users().size());
-            var user = service.findUserByEmail(groupRef.toLowerCase() + "@test.com");
+            var user = service.findUserByEmail(groupRef.toLowerCase(Locale.ROOT) + "@test.com");
             assertNotNull(user);
-            assertTrue(service.listTeamsByUserEmail(groupRef.toLowerCase() + "@test.com").stream()
+            assertTrue(service.listTeamsByUserEmail(groupRef.toLowerCase(Locale.ROOT) + "@test.com").stream()
                 .anyMatch(t -> t.name().equals(teamName)));
         }
     }

@@ -27,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -70,7 +71,7 @@ public class GenericPlatformTeamsFetcher implements PlatformTeamsFetcher {
             .withVersion(config.apiVersion())
             .withGroup(config.apiGroup())
             .withKind(config.kind())
-            .withPlural(config.kind().toLowerCase() + "s")
+            .withPlural(config.kind().toLowerCase(Locale.ROOT) + "s")
             .withNamespaced(Strings.isNotBlank(config.namespace()))
             .build();
         GenericKubernetesResourceList resourceList = k8sClient

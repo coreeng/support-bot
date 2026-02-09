@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.escalation;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static java.util.Objects.requireNonNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -58,7 +59,7 @@ class EscalationProcessingServiceTest {
         .thenReturn(Escalation.builder().id(null).build());
 
     // when
-    Escalation escalation = processingService.createEscalation(escalationRequest);
+    Escalation escalation = requireNonNull(processingService.createEscalation(escalationRequest));
 
     // then
     assertThat(escalation).isNotNull();
@@ -95,7 +96,7 @@ class EscalationProcessingServiceTest {
     when(escalationTeamsRegistry.findEscalationTeamByCode("some-team")).thenReturn(new EscalationTeam("some-team","someTeam","id"));
 
     // when
-    Escalation escalation = processingService.createEscalation(escalationRequest);
+    Escalation escalation = requireNonNull(processingService.createEscalation(escalationRequest));
 
     // then
     assertThat(escalation).isNotNull();
