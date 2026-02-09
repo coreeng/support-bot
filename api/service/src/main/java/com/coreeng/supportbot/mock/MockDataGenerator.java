@@ -5,6 +5,7 @@ import static java.lang.Math.round;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoField;
 import java.util.Arrays;
@@ -55,28 +56,27 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Order(200)
 public class MockDataGenerator implements ApplicationRunner {
-    private final static long secondsPerDay = 24 * 60 * 60;
-    private final static double avgTicketsPerDay = 35;
-    private final static double stdTicketsPerDay = 10;
-    private final static int maxTicketsPerDay = 50;
-    private final static double avgQueryResponseTimeSecs = 10 * 60;
-    private final static double stdQueryResponseTimeSecs = 5 * 60;
-    private final static double avgTicketReopenedTimes = 0.5;
-    private final static double stdTicketReopenedTimes = 2.0;
-    private final static long ticketChangeStatusDelayLowerBoundSecs = 60 * 60; //NOPMD - suppressed LongVariable
-    private final static long ticketChangeStatusDelayHigherBoundSecs = 3 * 60 * 60; //NOPMD - suppressed LongVariable
-    private final static long maxNumberOfEscalations = 3;
-    private final static double avgTicketEscalatedAfterSeconds = 30 * 60; //NOPMD - suppressed LongVariable
-    private final static double stdTicketEscalatedAfterSeconds = 5 * 60; //NOPMD - suppressed LongVariable
-    private final static double avgEscalationResolutionTime = 10 * 60; //NOPMD - suppressed LongVariable
-    private final static double stdEscalationResolutionTime = 2 * 60; //NOPMD - suppressed LongVariable
-    private final static double closedTicketIsEscalatedChance = 33.0; //NOPMD - suppressed LongVariable
+    private static final long secondsPerDay = 24 * 60 * 60;
+    private static final double avgTicketsPerDay = 35;
+    private static final double stdTicketsPerDay = 10;
+    private static final int maxTicketsPerDay = 50;
+    private static final double avgQueryResponseTimeSecs = 10 * 60;
+    private static final double stdQueryResponseTimeSecs = 5 * 60;
+    private static final double avgTicketReopenedTimes = 0.5;
+    private static final double stdTicketReopenedTimes = 2.0;
+    private static final long ticketChangeStatusDelayLowerBoundSecs = 60 * 60; //NOPMD - suppressed LongVariable
+    private static final long ticketChangeStatusDelayHigherBoundSecs = 3 * 60 * 60; //NOPMD - suppressed LongVariable
+    private static final long maxNumberOfEscalations = 3;
+    private static final double avgTicketEscalatedAfterSeconds = 30 * 60; //NOPMD - suppressed LongVariable
+    private static final double stdTicketEscalatedAfterSeconds = 5 * 60; //NOPMD - suppressed LongVariable
+    private static final double avgEscalationResolutionTime = 10 * 60; //NOPMD - suppressed LongVariable
+    private static final double stdEscalationResolutionTime = 2 * 60; //NOPMD - suppressed LongVariable
+    private static final double closedTicketIsEscalatedChance = 33.0; //NOPMD - suppressed LongVariable
 
     private final SlackTicketsProps ticketsProps;
     private final TicketRepository ticketRepository;
     private final EscalationRepository escalationRepository;
     @Nullable
-    @org.springframework.lang.Nullable
     private final SentimentRepository sentimentRepository;
     private final PlatformTeamsService platformTeamsService;
     private final ImpactsRegistry impactsRegistry;
@@ -96,7 +96,7 @@ public class MockDataGenerator implements ApplicationRunner {
         }
 
         Random random = new Random();
-        LocalDate nowDate = LocalDate.now();
+        LocalDate nowDate = LocalDate.now(ZoneId.systemDefault());
         LocalDate date = nowDate.minusWeeks(2);
 
         int ticketsGeneratedForDate = 0;
@@ -242,7 +242,7 @@ public class MockDataGenerator implements ApplicationRunner {
         Set<Tag> pickedTags = generatePickedTags(random);
 
         Escalation escalation = Escalation.createNew(
-            ticket.id(),
+            checkNotNull(ticket.id()),
             escalationTeam.code(),
             pickedTags.stream()
                 .map(Tag::code)
@@ -269,7 +269,7 @@ public class MockDataGenerator implements ApplicationRunner {
             ticket = generateFilledTicket(random, date);
         }
 
-        ImmutableList<Escalation> escalations = escalationRepository.listByTicketId(ticket.id());
+        ImmutableList<Escalation> escalations = escalationRepository.listByTicketId(checkNotNull(ticket.id()));
         for (Escalation escalation : escalations) {
             if (escalation.status() != EscalationStatus.resolved) {
                 Instant resolvedAt = getEscalationResolutionTime(random, escalation);
@@ -320,9 +320,9 @@ public class MockDataGenerator implements ApplicationRunner {
         if (sentimentRepository == null) {
             return;
         }
-        sentimentRepository.save(ticket.id(),
+        sentimentRepository.save(checkNotNull(ticket.id()),
             TicketSentimentResults.builder()
-                .ticketId(ticket.id())
+                .ticketId(checkNotNull(ticket.id()))
                 .authorSentiment(generateSentiment(random))
                 .supportSentiment(random.nextDouble() > 0.2
                     ? generateSentiment(random)
@@ -385,24 +385,17 @@ public class MockDataGenerator implements ApplicationRunner {
         escalated(20.0),
         closed(35.0);
 
-        static {
-            double runningChances = 0.0;
-            for (TicketProgression p : values()) {
-                runningChances += p.pickChances;
-                p.pickBorder = runningChances;
-            }
-        }
-
         private final double pickChances;
-        private double pickBorder;
 
         private static TicketProgression pick(Random random) {
             double totalChances = Arrays.stream(values())
                 .mapToDouble(TicketProgression::pickChances)
                 .sum();
             double r = random.nextDouble(totalChances);
+            double runningChances = 0.0;
             for (TicketProgression p : values()) {
-                if (r <= p.pickBorder()) {
+                runningChances += p.pickChances();
+                if (r <= runningChances) {
                     return p;
                 }
             }
@@ -410,6 +403,3 @@ public class MockDataGenerator implements ApplicationRunner {
         }
     }
 }
-
-
-

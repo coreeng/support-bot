@@ -6,6 +6,7 @@ import com.google.common.collect.ImmutableList;
 import lombok.Getter;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.jackson.Jacksonized;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDate;
 
@@ -77,6 +78,7 @@ public class StatsResult {
     @SuperBuilder
     @Jacksonized
     public static class RatingsValues {
+        @Nullable
         private Double average;
         private Integer count;
     }

@@ -61,15 +61,18 @@ public class RatingActionHandler implements SlackBlockActionHandler {
     }
 
     private void sendConfirmationReply(Rating rating, MessageRef threadRef) {
-        Message queryMessage = slackClient.getMessageByTs(new SlackGetMessageByTsRequest(threadRef.channelId(), threadRef.threadTs()));
+        Message queryMessage = slackClient.getMessageByTs(new SlackGetMessageByTsRequest(
+            threadRef.channelId(),
+            threadRef.actualThreadTs()
+        ));
         String userId = queryMessage.getUser();
 
         slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
             .message(SimpleSlackMessage.builder()
                 .text(String.format("Thank you for your %d star rating! Your feedback has been recorded.", rating.rating()))
-                .build())
+            .build())
             .channel(threadRef.channelId())
-            .threadTs(threadRef.threadTs())
+            .threadTs(threadRef.actualThreadTs())
             .userId(userId)
             .build()
         );

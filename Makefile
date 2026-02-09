@@ -8,6 +8,39 @@ P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui
 $(shell curl -fsSL "https://raw.githubusercontent.com/coreeng/p2p/v1/p2p.mk" -o ".p2p.mk")
 include .p2p.mk
 
+##@ Local Development
+
+.PHONY: run-local
+run-local: ## Run both API and UI locally (starts DB, Ctrl+C to stop)
+	@echo "Starting PostgreSQL..."
+	@docker compose -f api/service/docker-compose.yaml up -d db
+	@echo "Waiting for PostgreSQL to be ready..."
+	@until docker compose -f api/service/docker-compose.yaml exec -T db pg_isready -U postgres > /dev/null 2>&1; do sleep 1; done
+	@echo "PostgreSQL ready. Starting services..."
+	@trap 'kill 0' EXIT; \
+	(cd api && make run-local 2>&1 | sed 's/^/[API] /') & \
+	(cd ui && make run-local 2>&1 | sed 's/^/[UI]  /') & \
+	wait
+
+.PHONY: run-local-api
+run-local-api: ## Run only API locally (starts DB)
+	cd api && make run-local
+
+.PHONY: run-local-ui
+run-local-ui: ## Run only UI locally
+	cd ui && make run-local
+
+.PHONY: db-up
+db-up: ## Start PostgreSQL database container
+	@docker compose -f api/service/docker-compose.yaml up -d db
+	@echo "Waiting for PostgreSQL..."
+	@until docker compose -f api/service/docker-compose.yaml exec -T db pg_isready -U postgres > /dev/null 2>&1; do sleep 1; done
+	@echo "PostgreSQL ready."
+
+.PHONY: db-down
+db-down: ## Stop PostgreSQL database container
+	@docker compose -f api/service/docker-compose.yaml stop db
+
 ##@ General
 
 # The help target prints out all targets with their descriptions organized

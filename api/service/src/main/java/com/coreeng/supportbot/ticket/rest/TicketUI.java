@@ -10,7 +10,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.jackson.Jacksonized;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 
 @Getter
@@ -19,12 +19,14 @@ import java.time.Instant;
 public class TicketUI {
     private TicketId id;
     private Query query;
+    @Nullable
     private FormMessage formMessage;
     private String channelId;
     private TicketStatus status;
     private boolean escalated;
     @Nullable
     private TeamUI team;
+    @Nullable
     private String impact;
     private ImmutableList<String> tags;
     private ImmutableList<Log> logs;
@@ -41,7 +43,7 @@ public class TicketUI {
         @Nullable String text
     ) {}
     public record FormMessage(
-        MessageTs ts
+        @Nullable MessageTs ts
     ) {}
     public record Log(
         Instant date,

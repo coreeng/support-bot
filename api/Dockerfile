@@ -1,5 +1,5 @@
 ## Build stage
-FROM gradle:8.12.1-jdk21 AS build
+FROM gradle:9.3.1-jdk25 AS build
 WORKDIR /build
 
 # hadolint ignore=DL3008
@@ -26,7 +26,7 @@ RUN service postgresql start && sleep 6 && \
     ./gradlew -Ddocker=true :service:jooqCodegen :service:build -Pversion="${P2P_VERSION}" --no-daemon
 
 ## Final stage
-FROM registry.access.redhat.com/ubi8/openjdk-21-runtime:1.23
+FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24
 WORKDIR /app
 COPY --from=build /build/service/build/libs/service.jar /app/service.jar
 

@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,7 +55,7 @@ class EscalationControllerTest {
         // when
         Page<EscalationUI> result = controller.list(
                 0L, 10L, List.of(escalationId), ticketId,
-                LocalDate.now().minusDays(1), LocalDate.now(),
+                LocalDate.now(ZoneId.systemDefault()).minusDays(1), LocalDate.now(ZoneId.systemDefault()),
                 EscalationStatus.opened, "TeamA"
         );
 

@@ -4,12 +4,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import EditTicketModal from '../EditTicketModal';
 import * as hooks from '../../../lib/hooks';
 import * as api from '../../../lib/api';
-import { useUser } from '../../../contexts/UserContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
 // Mock the hooks
 jest.mock('../../../lib/hooks');
 jest.mock('../../../lib/api');
-jest.mock('../../../contexts/UserContext');
+jest.mock('../../../contexts/AuthContext');
 
 const mockUseTicket = hooks.useTicket as jest.MockedFunction<typeof hooks.useTicket>;
 const mockUseTenantTeams = hooks.useTenantTeams as jest.MockedFunction<typeof hooks.useTenantTeams>;
@@ -17,7 +17,7 @@ const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.us
 const mockUseSupportMembers = hooks.useSupportMembers as jest.MockedFunction<typeof hooks.useSupportMembers>;
 const mockUseAssignmentEnabled = hooks.useAssignmentEnabled as jest.MockedFunction<typeof hooks.useAssignmentEnabled>;
 const mockApiPatch = api.apiPatch as jest.MockedFunction<typeof api.apiPatch>;
-const mockUseUser = useUser as jest.MockedFunction<typeof useUser>;
+const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 
 const mockTicketDetails = {
     id: '123',
@@ -107,7 +107,7 @@ describe('EditTicketModal', () => {
 
     describe('Modal Visibility', () => {
         it('renders modal when open is true', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -132,7 +132,7 @@ describe('EditTicketModal', () => {
         });
 
         it('does not render modal when open is false', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -159,7 +159,7 @@ describe('EditTicketModal', () => {
 
     describe('Support Engineer Authorization', () => {
         it('shows edit controls for support engineers', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -186,7 +186,7 @@ describe('EditTicketModal', () => {
         });
 
         it('shows read-only view for non-support engineers', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: false,
                 user: null,
                 isLoading: false,
@@ -216,7 +216,7 @@ describe('EditTicketModal', () => {
         });
 
         it('displays read-only description for non-support engineers', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: false,
                 user: null,
                 isLoading: false,
@@ -241,7 +241,7 @@ describe('EditTicketModal', () => {
         });
 
         it('shows editable fields as dropdowns for support engineers', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -279,7 +279,7 @@ describe('EditTicketModal', () => {
         });
 
         it('shows read-only fields for non-support engineers', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: false,
                 user: null,
                 isLoading: false,
@@ -308,7 +308,7 @@ describe('EditTicketModal', () => {
 
     describe('Form Fields', () => {
         beforeEach(() => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -424,7 +424,7 @@ describe('EditTicketModal', () => {
 
     describe('Save Functionality', () => {
         beforeEach(() => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -558,7 +558,7 @@ describe('EditTicketModal', () => {
 
     describe('Loading States', () => {
         it('shows loading state when ticket data is loading', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -592,7 +592,7 @@ describe('EditTicketModal', () => {
 
     describe('Slack Link', () => {
         it('displays Open in Slack button when link exists', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -619,7 +619,7 @@ describe('EditTicketModal', () => {
         });
 
         it('does not display Open in Slack button when link does not exist', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -652,7 +652,7 @@ describe('EditTicketModal', () => {
 
     describe('Cancel Functionality', () => {
         it('closes modal when cancel is clicked', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -683,7 +683,7 @@ describe('EditTicketModal', () => {
 
     describe('Form Validation', () => {
         beforeEach(() => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -929,7 +929,7 @@ describe('EditTicketModal', () => {
 
     describe('Ticket Message Display', () => {
         it('displays ticket message when query.text is present', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -969,7 +969,7 @@ describe('EditTicketModal', () => {
         });
 
         it('does not display ticket message section when query.text is not present', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -1007,7 +1007,7 @@ describe('EditTicketModal', () => {
 
     describe('Escalation Warning', () => {
         it('shows warning when changing status to closed with unresolved escalations', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -1053,7 +1053,7 @@ describe('EditTicketModal', () => {
         });
 
         it('does not show warning when changing to closed with no escalations', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -1093,7 +1093,7 @@ describe('EditTicketModal', () => {
         });
 
         it('does not show warning when changing to closed with only resolved escalations', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -1135,7 +1135,7 @@ describe('EditTicketModal', () => {
         });
 
         it('does not show warning when ticket is already closed', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,
@@ -1173,7 +1173,7 @@ describe('EditTicketModal', () => {
         });
 
         it('shows correct pluralization for multiple unresolved escalations', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isSupportEngineer: true,
                 user: null,
                 isLoading: false,

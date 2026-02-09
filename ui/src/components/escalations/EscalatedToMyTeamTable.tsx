@@ -2,11 +2,11 @@
 
 import { useState, useMemo } from 'react'
 import { useEscalations, useRegistry } from '@/lib/hooks'
-import { useUser } from '@/contexts/UserContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 
 export default function EscalatedToMyTeamTable() {
-    const { isEscalationTeam, actualEscalationTeams } = useUser()
+    const { isEscalationTeam, actualEscalationTeams } = useAuth()
     const { selectedTeam } = useTeamFilter()
     const { data: escalationsData, isLoading, error } = useEscalations()
     const { data: registryData } = useRegistry()

@@ -19,7 +19,7 @@ import com.slack.api.methods.response.conversations.ConversationsRepliesResponse
 import com.slack.api.model.User;
 import lombok.RequiredArgsConstructor;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.Objects;
 
 import static com.coreeng.supportbot.ticket.TicketStatus.closed;
@@ -72,7 +72,8 @@ public class SentimentService {
             .filter(m -> m.getBotId() == null)
             .map(m -> {
                 String email = userIdToEmail.get(m.getUser());
-                String team = supportTeamService.isMemberByUserEmail(email)
+                boolean isSupportMember = email != null && supportTeamService.isMemberByUserEmail(email);
+                String team = isSupportMember
                     ? supportTeam.code()
                     : ticket.team() != null ? ticket.team().toCode() : null;
                 return Message.builder()
@@ -127,7 +128,7 @@ public class SentimentService {
     @Nullable
     private Sentiment calculateSupportTeamSentiment(String supportTeam, ImmutableList<SentimentResponse> messageSentiments) {
         ImmutableList<Sentiment> sentiments = messageSentiments.stream()
-            .filter(m -> m.message().team().equals(supportTeam))
+            .filter(m -> supportTeam.equals(m.message().team()))
             .map(SentimentResponse::sentiment)
             .collect(toImmutableList());
         if (sentiments.isEmpty()) {
@@ -152,7 +153,7 @@ public class SentimentService {
     @Nullable
     private Sentiment calculateOthersSentiment(String ticketAuthorId, String supportTeam, ImmutableList<SentimentResponse> messageSentiments) {
         ImmutableList<Sentiment> sentiments = messageSentiments.stream()
-            .filter(m -> !m.message().user().equals(ticketAuthorId) && !m.message().team().equals(supportTeam))
+            .filter(m -> !m.message().user().equals(ticketAuthorId) && !supportTeam.equals(m.message().team()))
             .map(SentimentResponse::sentiment)
             .collect(toImmutableList());
         if (sentiments.isEmpty()) {

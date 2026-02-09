@@ -11,6 +11,7 @@ import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketCreatedMessage;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketInMemoryRepository;
 import com.coreeng.supportbot.ticket.TicketProcessingService;
 import com.coreeng.supportbot.ticket.TicketSubmission;
@@ -30,6 +31,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.ZoneId;
 
+import static java.util.Objects.requireNonNull;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -177,9 +179,10 @@ public class TicketProcessingServiceTests {
         Ticket ticket = ticketRepository.findTicketByQuery(threadRef);
         assertNotNull(ticket);
         assertEquals(SlackId.user(userId), ticket.assignedTo());
+        TicketId ticketId = requireNonNull(ticket.id());
 
         TicketSubmission submission = TicketSubmission.builder()
-            .ticketId(ticket.id())
+            .ticketId(ticketId)
             .status(TicketStatus.opened)
             .authorsTeam(new TicketTeam.KnownTeam("platform"))
             .tags(ImmutableList.of("tag1"))
@@ -189,7 +192,7 @@ public class TicketProcessingServiceTests {
 
         ticketProcessingService.submit(submission);
 
-        Ticket afterSubmit = ticketRepository.findTicketById(ticket.id());
+        Ticket afterSubmit = ticketRepository.findTicketById(ticketId);
         assertNotNull(afterSubmit);
         assertEquals(SlackId.user(userId), afterSubmit.assignedTo(), "Assignment is preserved when update uses assignedTo(null)");
     }

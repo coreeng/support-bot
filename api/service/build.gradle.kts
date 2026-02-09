@@ -6,6 +6,10 @@ import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.containers.wait.strategy.WaitAllStrategy
 import org.gradle.api.plugins.quality.Pmd
+import org.gradle.api.Action
+import net.ltgt.gradle.errorprone.CheckSeverity
+import net.ltgt.gradle.errorprone.ErrorProneOptions
+import net.ltgt.gradle.errorprone.errorprone
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -14,10 +18,11 @@ plugins {
     java
     pmd
 
-    id("org.springframework.boot") version "3.4.5"
+    id("net.ltgt.errorprone") version "4.3.0"
+    id("org.springframework.boot") version "3.5.9"
     id("io.spring.dependency-management") version "1.1.7"
 
-    id("org.flywaydb.flyway") version "11.3.0"
+    id("org.flywaydb.flyway") version "12.0.0"
     id("org.jooq.jooq-codegen-gradle") version "3.19.18"
 }
 
@@ -26,7 +31,7 @@ version = project.findProperty("version")?.toString() ?: "0.0.1-SNAPSHOT"
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 // we only use result of the bootJar
@@ -42,7 +47,7 @@ pmd {
     isIgnoreFailures = false
     isConsoleOutput = true
     ruleSetFiles("${project.projectDir.absolutePath}/pmd-ruleset.xml")
-    toolVersion = "7.9.0"
+    toolVersion = "7.21.0"
 }
 
 tasks.withType<Pmd>().configureEach {
@@ -60,7 +65,14 @@ repositories {
     mavenCentral()
 }
 
-val lombokVersion = "1.18.+"
+// Java 25 compatibility: override transitive dependency versions
+extra["byte-buddy.version"] = "1.18.4"
+extra["mockito.version"] = "5.21.0"
+extra["asm.version"] = "9.9.1"
+
+val lombokVersion = "1.18.42"
+val errorProneVersion = "2.47.0"
+val nullAwayVersion = "0.13.1"
 
 dependencies {
     implementation("org.jspecify:jspecify:1.0.0")
@@ -70,6 +82,13 @@ dependencies {
     }
     implementation("org.springframework.boot:spring-boot-starter-jetty")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+
+    // Security + OAuth2 + JWT
+    implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+    implementation("io.jsonwebtoken:jjwt-api:0.12.6")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("org.springframework.boot:spring-boot-starter-cache")
 
@@ -114,12 +133,16 @@ dependencies {
     implementation("net.logstash.logback:logstash-logback-encoder:8.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     compileOnly("org.projectlombok:lombok:${lombokVersion}")
     annotationProcessor("org.projectlombok:lombok:${lombokVersion}")
     testCompileOnly("org.projectlombok:lombok:${lombokVersion}")
     testAnnotationProcessor("org.projectlombok:lombok:${lombokVersion}")
+
+    errorprone("com.google.errorprone:error_prone_core:${errorProneVersion}")
+    errorprone("com.uber.nullaway:nullaway:${nullAwayVersion}")
 }
 
 val mockitoAgent = configurations.create("mockitoAgent")
@@ -134,12 +157,35 @@ tasks.withType<Test> {
     )
 }
 
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.add("-Werror")
+    options.errorprone(
+        object : Action<ErrorProneOptions> {
+            override fun execute(errorproneOptions: ErrorProneOptions) {
+                errorproneOptions.check("NullAway", CheckSeverity.ERROR)
+                errorproneOptions.option("NullAway:AnnotatedPackages", "com.coreeng.supportbot")
+                errorproneOptions.option(
+                    "NullAway:UnannotatedSubPackages",
+                    "com.coreeng.supportbot.dbschema"
+                )
+                errorproneOptions.option("NullAway:JSpecifyMode", true)
+                errorproneOptions.option("NullAway:HandleTestAssertionLibraries", true)
+                errorproneOptions.option(
+                    "NullAway:ExcludedFieldAnnotations",
+                    "org.mockito.Mock,org.mockito.Spy,org.mockito.Captor,org.mockito.InjectMocks"
+                )
+                errorproneOptions.excludedPaths.set(".*/com/coreeng/supportbot/dbschema/.*")
+            }
+        }
+    )
+}
+
 buildscript {
     repositories {
         mavenCentral()
     }
     dependencies {
-        classpath("org.flywaydb:flyway-database-postgresql:11.3.0")
+        classpath("org.flywaydb:flyway-database-postgresql:12.0.0")
         classpath("org.postgresql:postgresql:42.7.5")
         classpath("org.testcontainers:postgresql:1.20.4")
         classpath("org.jooq:jooq-codegen:3.19.18")

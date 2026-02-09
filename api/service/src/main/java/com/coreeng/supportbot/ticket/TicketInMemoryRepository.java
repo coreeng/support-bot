@@ -6,9 +6,9 @@ import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -136,7 +136,8 @@ public class TicketInMemoryRepository implements TicketRepository {
 
     @Override
     public Ticket insertStatusLog(Ticket ticket, Instant at) {
-        return tickets.computeIfPresent(ticket.id(), (id, t) -> {
+        TicketId ticketId = checkNotNull(ticket.id());
+        return tickets.computeIfPresent(ticketId, (id, t) -> {
             Ticket newTicket = t.toBuilder()
                 .statusLog(
                     ImmutableList.<Ticket.StatusLog>builderWithExpectedSize(t.statusLog().size() + 1)
@@ -155,7 +156,7 @@ public class TicketInMemoryRepository implements TicketRepository {
         return findTicketsAndMap(query, Function.identity());
     }
 
-    @NotNull
+    @NonNull
     private <X> Page<X> findTicketsAndMap(TicketsQuery query, Function<Ticket, X> mapperFn) {
         checkNotNull(query);
         checkArgument(query.page() >= 0);
@@ -192,10 +193,11 @@ public class TicketInMemoryRepository implements TicketRepository {
     }
 
     private boolean filterTicket(Ticket ticket, TicketsQuery query) {
-        if (!query.ids().isEmpty() && !query.ids().contains(ticket.id())) {
+        TicketId ticketId = checkNotNull(ticket.id());
+        if (!query.ids().isEmpty() && !query.ids().contains(ticketId)) {
             return false;
         }
-        if (query.status() != null && !query.status().equals(ticket.status())) {
+        if (query.status() != null && query.status() != ticket.status()) {
             return false;
         }
         ZonedDateTime queryDate = ticket.queryTs().getDate().atZone(timezone);
@@ -206,7 +208,7 @@ public class TicketInMemoryRepository implements TicketRepository {
             return false;
         }
         if (query.escalated() != null) {
-            long escalationsCount = escalationQueryService.countNotResolvedByTicketId(ticket.id());
+            long escalationsCount = escalationQueryService.countNotResolvedByTicketId(ticketId);
             if (query.escalated()) {
                 if (escalationsCount == 0) {
                     return false;

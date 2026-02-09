@@ -9,7 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.eclipse.jetty.client.HttpClient;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,7 +26,7 @@ import java.time.ZoneId;
 public class SentimentConfig {
     private final ObjectMapper objectMapper;
 
-    @NotNull
+    @NonNull
     private static JettyClientHttpRequestFactory requestFactory() {
         HttpClient httpClient = new HttpClient();
         httpClient.setIdleTimeout(Duration.ofHours(1).toMillis());

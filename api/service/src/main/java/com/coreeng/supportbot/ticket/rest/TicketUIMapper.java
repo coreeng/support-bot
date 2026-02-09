@@ -15,7 +15,10 @@ import com.coreeng.supportbot.ticket.DetailedTicket;
 import com.coreeng.supportbot.ticket.TicketTeam;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
+
+import java.util.Objects;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
@@ -33,9 +36,9 @@ public class TicketUIMapper {
         return mapToUI(ticket, null);
     }
 
-    public TicketUI mapToUI(DetailedTicket ticket, String queryText) {
+    public TicketUI mapToUI(DetailedTicket ticket, @Nullable String queryText) {
         return TicketUI.builder()
-            .id(ticket.ticket().id())
+            .id(Objects.requireNonNull(ticket.ticket().id()))
             .query(new TicketUI.Query(
                 slackClient.getPermalink(new SlackGetMessageByTsRequest(
                     ticket.ticket().channelId(),
@@ -53,7 +56,7 @@ public class TicketUIMapper {
             .team(
                 switch (ticket.ticket().team()) {
                     case null -> null;
-                    case TicketTeam.UnknownTeam u -> new TeamUI(
+                    case TicketTeam.UnknownTeam _ -> new TeamUI(
                         TicketTeam.notATenantCode,
                         TicketTeam.notATenantCode,
                         ImmutableList.of()
@@ -89,12 +92,14 @@ public class TicketUIMapper {
     }
 
     // TODO: If team is deleted after ticket has been saved to to db, this returns null. We should potentially look at saving team info to database so deleted teams can still be displayed instead of returning null
+    @Nullable
     private TeamUI mapKnownTeamToUI(String code) {
         Team team = teamService.findTeamByCode(code);
         return team != null ? teamUIMapper.mapToUI(team) : null;
     }
 
-    private String getAssigneeEmail(SlackId.User assignedToUserId) {
+    @Nullable
+    private String getAssigneeEmail(SlackId.@Nullable User assignedToUserId) {
         if (assignedToUserId == null || !assignmentProps.enabled()) {
             return null;
         }

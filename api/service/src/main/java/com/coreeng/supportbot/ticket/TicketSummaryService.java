@@ -98,12 +98,13 @@ public class TicketSummaryService {
     }
 
 	    private ImmutableList<TicketSummaryView.EscalationView> getEscalationViews(Ticket ticket) {
+	        TicketId ticketId = checkNotNull(ticket.id());
 	        return escalationQueryService
-	            .listByTicketId(ticket.id()).stream()
+	            .listByTicketId(ticketId).stream()
 	            .sorted(comparing(Escalation::openedAt))
 	            .map(e -> TicketSummaryView.EscalationView.of(
 	                e,
-	                checkNotNull(escalationTeamsRegistry.findEscalationTeamByCode(e.team())).slackGroupId()
+	                checkNotNull(escalationTeamsRegistry.findEscalationTeamByCode(checkNotNull(e.team()))).slackGroupId()
 	            ))
 	            .collect(toImmutableList());
 	    }

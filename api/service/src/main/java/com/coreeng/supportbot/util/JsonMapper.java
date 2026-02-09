@@ -33,7 +33,7 @@ public class JsonMapper {
         try {
             return objectMapper.writeValueAsString(object);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e); //NOPMD - suppressed AvoidThrowingRawExceptionTypes - not expected to be caught
+            throw new RuntimeException(e);
         }
     }
 
@@ -41,7 +41,7 @@ public class JsonMapper {
         try {
             return objectMapper.readValue(json, clazz);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e); //NOPMD - suppressed AvoidThrowingRawExceptionTypes - not expected to be caught
+            throw new RuntimeException(e);
         }
     }
 }

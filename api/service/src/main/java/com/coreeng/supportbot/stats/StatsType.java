@@ -3,6 +3,7 @@ package com.coreeng.supportbot.stats;
 import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
 @Getter
 @RequiredArgsConstructor
@@ -16,6 +17,7 @@ public enum StatsType {
     @JsonValue
     private final String label;
 
+    @Nullable
     public static StatsType fromLabelOrNull(String str) {
         for (StatsType value : values()) {
             if (value.label().equals(str)) {

@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
+
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 @Service
@@ -20,7 +22,7 @@ public class TicketTeamSuggestionsService {
     private final PlatformTeamsService platformTeamsService;
 
     public TicketTeamsSuggestion getTeamSuggestions(String filterValue, SlackId entityId) {
-        String normalisedFilterValue = filterValue.toLowerCase();
+        String normalisedFilterValue = filterValue.toLowerCase(Locale.ROOT);
 
         ImmutableList<String> allTeams = getAllTeamsFiltered(normalisedFilterValue);
 
@@ -40,7 +42,7 @@ public class TicketTeamSuggestionsService {
 
         ImmutableList<String> authorTeams = platformTeamsService.listTeamsByUserEmail(userEmail).stream()
             .map(PlatformTeam::name)
-            .filter(t -> t.toLowerCase().contains(normalisedFilterValue))
+            .filter(t -> t.toLowerCase(Locale.ROOT).contains(normalisedFilterValue))
             .collect(toImmutableList());
 
         if (authorTeams.isEmpty()) {
@@ -60,7 +62,7 @@ public class TicketTeamSuggestionsService {
     }
 
     public TicketTeamsSuggestion getFallbackSuggestions(String filterValue) {
-        String normalisedFilterValue = filterValue.toLowerCase();
+        String normalisedFilterValue = filterValue.toLowerCase(Locale.ROOT);
         ImmutableList<String> allTeams = getAllTeamsFiltered(normalisedFilterValue);
         return new TicketTeamsSuggestion(ImmutableList.of(), allTeams);
     }
@@ -68,7 +70,7 @@ public class TicketTeamSuggestionsService {
     private ImmutableList<String> getAllTeamsFiltered(String normalisedFilterValue) {
         return platformTeamsService.listTeams().stream()
             .map(PlatformTeam::name)
-            .filter(t -> t.toLowerCase().contains(normalisedFilterValue))
+            .filter(t -> t.toLowerCase(Locale.ROOT).contains(normalisedFilterValue))
             .collect(toImmutableList());
     }
 }

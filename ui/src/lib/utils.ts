@@ -8,7 +8,6 @@ export function cn(...inputs: ClassValue[]) {
 
 // Re-export utility functions
 export * from './utils/query-params'
-export * from './utils/api-handler'
 export * from './utils/format'
 export * from './utils/chart'
 export * from './utils/distribution'

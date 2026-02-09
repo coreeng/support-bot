@@ -4,7 +4,7 @@ import com.google.common.collect.ImmutableList;
 import lombok.Builder;
 import lombok.Getter;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 @Getter
 @Builder
