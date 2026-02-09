@@ -2,7 +2,7 @@ package com.coreeng.supportbot.ticket;
 
 import com.google.common.collect.ImmutableList;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public record TicketEscalated(
     Ticket ticket,

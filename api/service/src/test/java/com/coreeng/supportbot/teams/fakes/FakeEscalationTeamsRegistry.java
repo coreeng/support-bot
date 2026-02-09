@@ -4,6 +4,7 @@ import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -17,8 +18,8 @@ public class FakeEscalationTeamsRegistry implements EscalationTeamsRegistry {
     }
 
     @Override
+    @Nullable
     public EscalationTeam findEscalationTeamByCode(String code) {
         return teams.stream().filter(t -> t.code().equals(code)).findFirst().orElse(null);
     }
 }
-

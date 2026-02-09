@@ -74,14 +74,15 @@ public class JdbcMetricsRepository implements MetricsRepository {
 
     @Override
     public long getUnattendedQueryCount() {
-        return dsl.selectCount()
-                .from(QUERY)
-                .where(notExists(
-                        selectOne()
-                                .from(TICKET)
-                                .where(TICKET.QUERY_ID.eq(QUERY.ID))
-                ))
-                .fetchOne(0, Long.class);
+        Long count = dsl.selectCount()
+            .from(QUERY)
+            .where(notExists(
+                selectOne()
+                    .from(TICKET)
+                    .where(TICKET.QUERY_ID.eq(QUERY.ID))
+            ))
+            .fetchOne(0, Long.class);
+        return count != null ? count : 0L;
     }
 
     @Override
@@ -99,17 +100,14 @@ public class JdbcMetricsRepository implements MetricsRepository {
                   AND first_open_ts > query_posted_ts
             )
             SELECT
-                percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) AS p50,
-                percentile_cont(0.9) WITHIN GROUP (ORDER BY duration) AS p90
+                COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY duration), 0.0) AS p50,
+                COALESCE(percentile_cont(0.9) WITHIN GROUP (ORDER BY duration), 0.0) AS p90
             FROM response_durations
             WHERE duration IS NOT NULL AND duration > 0
-            """).fetchOne();
-        if (result == null) {
-            return new ResponseSLAMetric(0.0, 0.0);
-        }
+            """).fetchSingle();
         return new ResponseSLAMetric(
-                result.get("p50", Double.class) != null ? result.get("p50", Double.class) : 0.0,
-                result.get("p90", Double.class) != null ? result.get("p90", Double.class) : 0.0
+                result.get("p50", Double.class),
+                result.get("p90", Double.class)
         );
     }
 
@@ -128,19 +126,16 @@ public class JdbcMetricsRepository implements MetricsRepository {
                   AND last_closed_ts > first_open_ts
             )
             SELECT
-                percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) AS p50,
-                percentile_cont(0.75) WITHIN GROUP (ORDER BY duration) AS p75,
-                percentile_cont(0.9) WITHIN GROUP (ORDER BY duration) AS p90
+                COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY duration), 0.0) AS p50,
+                COALESCE(percentile_cont(0.75) WITHIN GROUP (ORDER BY duration), 0.0) AS p75,
+                COALESCE(percentile_cont(0.9) WITHIN GROUP (ORDER BY duration), 0.0) AS p90
             FROM resolution_durations
             WHERE duration IS NOT NULL AND duration > 0
-            """).fetchOne();
-        if (result == null) {
-            return new ResolutionSLAMetric(0.0, 0.0, 0.0);
-        }
+            """).fetchSingle();
         return new ResolutionSLAMetric(
-                result.get("p50", Double.class) != null ? result.get("p50", Double.class) : 0.0,
-                result.get("p75", Double.class) != null ? result.get("p75", Double.class) : 0.0,
-                result.get("p90", Double.class) != null ? result.get("p90", Double.class) : 0.0
+                result.get("p50", Double.class),
+                result.get("p75", Double.class),
+                result.get("p90", Double.class)
         );
     }
 
@@ -166,16 +161,12 @@ public class JdbcMetricsRepository implements MetricsRepository {
     @Override
     public Double getLongestActiveTicketSeconds() {
         var result = dsl.resultQuery("""
-            SELECT MAX(EXTRACT(EPOCH FROM (NOW() - first_open_ts))) AS max_age_seconds
+            SELECT COALESCE(MAX(EXTRACT(EPOCH FROM (NOW() - first_open_ts))), 0.0) AS max_age_seconds
             FROM aggregated_ticket_data
             WHERE status IN ('opened', 'stale')
               AND first_open_ts IS NOT NULL
-            """).fetchOne();
-        if (result == null) {
-            return 0.0;
-        }
-        Double maxAge = result.get("max_age_seconds", Double.class);
-        return maxAge != null ? maxAge : 0.0;
+            """).fetchSingle();
+        return result.get("max_age_seconds", Double.class);
     }
 
     @Override
@@ -235,8 +226,8 @@ public class JdbcMetricsRepository implements MetricsRepository {
             )
             SELECT
                 tag,
-                percentile_cont(0.5) WITHIN GROUP (ORDER BY duration) AS p50,
-                percentile_cont(0.9) WITHIN GROUP (ORDER BY duration) AS p90
+                COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY duration), 0.0) AS p50,
+                COALESCE(percentile_cont(0.9) WITHIN GROUP (ORDER BY duration), 0.0) AS p90
             FROM tag_durations
             WHERE duration IS NOT NULL AND duration > 0
             GROUP BY tag
@@ -245,8 +236,8 @@ public class JdbcMetricsRepository implements MetricsRepository {
             """)
                 .fetch(r -> new ResolutionTimeByTagMetric(
                         r.get("tag", String.class),
-                        r.get("p50", Double.class) != null ? r.get("p50", Double.class) : 0.0,
-                        r.get("p90", Double.class) != null ? r.get("p90", Double.class) : 0.0
+                        r.get("p50", Double.class),
+                        r.get("p90", Double.class)
                 ));
     }
 }

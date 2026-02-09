@@ -3,6 +3,7 @@ package com.coreeng.supportbot.ticket;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
@@ -42,7 +43,7 @@ public class AssigneeCrypto {
     private final TicketAssignmentProps props;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public Optional<EncryptResult> encrypt(String userId) {
+    public Optional<EncryptResult> encrypt(@Nullable String userId) {
         if (userId == null) {
             return Optional.empty();
         }
@@ -79,7 +80,7 @@ public class AssigneeCrypto {
         }
     }
 
-    public Optional<String> decrypt(String stored, String format) {
+    public Optional<String> decrypt(@Nullable String stored, @Nullable String format) {
         if (stored == null) {
             return Optional.empty();
         }
@@ -142,6 +143,7 @@ public class AssigneeCrypto {
             && props.encryption().enabled();
     }
 
+    @Nullable
     private SecretKey deriveKey() {
         String keyStr = props.encryption() != null ? props.encryption().key() : null;
         if (keyStr == null || keyStr.isBlank()) {
@@ -163,7 +165,8 @@ public class AssigneeCrypto {
      * Compute deterministic HMAC-SHA256 hash of user ID for filtering/indexing.
      * Uses the encryption key to enhance security.
      */
-    public String computeHash(String userId) {
+    @Nullable
+    public String computeHash(@Nullable String userId) {
         if (userId == null) {
             return null;
         }

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.jackson.Jacksonized;
+import org.jspecify.annotations.Nullable;
 
 @Getter
 @Builder(toBuilder = true)
@@ -17,5 +18,6 @@ public class Message {
     @JsonProperty("thread_ts")
     private String threadTs;
     private String ts;
+    @Nullable
     private String team;
 }

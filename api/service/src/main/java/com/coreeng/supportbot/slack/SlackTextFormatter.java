@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,7 +29,7 @@ public class SlackTextFormatter {
     private static final Pattern specialMention = Pattern.compile("<!(here|channel|everyone)>");
 
     @Nullable
-    public String format(String text) {
+    public String format(@Nullable String text) {
         if (text == null || text.isBlank()) {
             return text;
         }
@@ -127,4 +127,3 @@ public class SlackTextFormatter {
         return fallbackId;
     }
 }
-

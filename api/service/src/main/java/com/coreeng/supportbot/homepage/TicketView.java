@@ -8,7 +8,7 @@ import com.google.common.collect.ImmutableList;
 import lombok.Builder;
 import lombok.Getter;
 
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 
 @Getter
@@ -16,6 +16,7 @@ import java.time.Instant;
 public class TicketView {
     private TicketId id;
     private TicketStatus status;
+    @Nullable
     private String queryPermalink;
     private Instant lastOpenedAt;
 

@@ -4,6 +4,7 @@ import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -73,7 +74,7 @@ public class TicketController {
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<?> updateTicket(@PathVariable TicketId id, @RequestBody TicketUpdateRequest request) {
+    public ResponseEntity<?> updateTicket(@PathVariable TicketId id, @Nullable @RequestBody TicketUpdateRequest request) {
         try {
             TicketUI ticket = ticketUpdateService.update(id, request);
             return ResponseEntity.ok(ticket);
