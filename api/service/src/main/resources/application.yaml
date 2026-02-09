@@ -45,8 +45,8 @@ spring:
             client-secret: ${GOOGLE_CLIENT_SECRET:}
             scope: openid, email, profile
           azure:
-            client-id: ${AZURE_AD_CLIENT_ID:}
-            client-secret: ${AZURE_AD_CLIENT_SECRET:}
+            client-id: ${AZURE_CLIENT_ID:}
+            client-secret: ${AZURE_CLIENT_SECRET:}
             scope: openid, email, profile
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
