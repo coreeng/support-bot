@@ -255,9 +255,10 @@ to create a secret for the registered application so that it can be used for aut
 
 ## Single Sign-On (SSO)
 
-SSO is supported via Google and Azure AD. One or both can be enabled depending on what your organisation uses.
-The API handles the full OAuth2 flow. A provider is enabled when both its client ID and client secret are set.
-Having no valid client ID and client secret set for any provider is not supported.
+SSO is supported via Google and Azure AD using the OAuth2 Authorisation Code flow that is faciliated by the API.
+One or both providers can be enabled depending on what your organisation uses.
+At least one provider must be configured. A provider is enabled when both its client ID and client secret are set.
+
 ### Environment variables
 
 Set these on the **API**:
@@ -272,15 +273,15 @@ Set these on the **API**:
 | `AZURE_AD_CLIENT_SECRET` | Azure AD client secret. |
 | `AZURE_AD_TENANT_ID` | Azure AD directory (tenant) ID. |
 
+> Note: The `AZURE_AD_*` variables above are for SSO (user login). They are separate from the
+> `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` variables used for
+> [Azure Cloud integration](#azure-cloud) (reading group memberships from Entra ID).
+
 Set this on the **UI**:
 
 | Variable | Description |
 |----------|-------------|
 | `BACKEND_URL` | Internal URL of the API, e.g. `http://support-bot:8080`. Defaults to `http://localhost:8080`. Used by the server-side proxy. |
-
-> Note: The `AZURE_AD_*` variables above are for SSO (user login). They are separate from the
-> `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` variables used for
-> [Azure Cloud integration](#azure-cloud) (reading group memberships from Entra ID).
 
 ### Google OAuth
 
@@ -309,3 +310,5 @@ Portal: https://portal.azure.com > Microsoft Entra ID > App registrations
    - `openid`
    - `profile`
    - `User.Read`
+
+> Note: The redirect URIs registered in each provider must match the API's publicly accessible URL.
