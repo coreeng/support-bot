@@ -44,13 +44,15 @@ public class AuthController {
             ))
             .toList();
 
+        var roles = principal.roles().stream()
+            .map(Enum::name)
+            .toList();
+
         return ResponseEntity.ok(new UserResponse(
             principal.email(),
             principal.name(),
             teams,
-            principal.isLeadership(),
-            principal.isSupportEngineer(),
-            principal.isEscalation()
+            roles
         ));
     }
 
@@ -70,9 +72,7 @@ public class AuthController {
         String email,
         String name,
         List<TeamResponse> teams,
-        boolean isLeadership,
-        boolean isSupportEngineer,
-        boolean isEscalation
+        List<String> roles
     ) {}
 
     public record TeamResponse(

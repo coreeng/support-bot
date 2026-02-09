@@ -18,19 +18,9 @@ public class JwtAuthenticationToken extends AbstractAuthenticationToken {
     }
 
     private static Collection<? extends GrantedAuthority> buildAuthorities(UserPrincipal principal) {
-        var builder = ImmutableList.<GrantedAuthority>builder();
-        builder.add(Role.user.grantedAuthority());
-
-        if (principal.isLeadership()) {
-            builder.add(Role.leadership.grantedAuthority());
-        }
-        if (principal.isSupportEngineer()) {
-            builder.add(Role.supportEngineer.grantedAuthority());
-        }
-        if (principal.isEscalation()) {
-            builder.add(Role.escalation.grantedAuthority());
-        }
-        return builder.build();
+        return principal.roles().stream()
+            .map(Role::grantedAuthority)
+            .collect(ImmutableList.toImmutableList());
     }
 
     @Override

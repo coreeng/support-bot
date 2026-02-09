@@ -27,9 +27,7 @@ export interface AuthUser {
   email: string
   name: string
   teams: AuthTeam[]
-  isLeadership: boolean
-  isSupportEngineer: boolean
-  isEscalation: boolean
+  roles: string[]
 }
 
 export function getToken(): string | null {
@@ -100,9 +98,7 @@ interface ApiUserResponse {
   email: string
   name: string
   teams: ApiTeamResponse[]
-  isLeadership: boolean
-  isSupportEngineer: boolean
-  isEscalation: boolean
+  roles: string[]
 }
 
 export async function fetchCurrentUser(): Promise<AuthUser | null> {

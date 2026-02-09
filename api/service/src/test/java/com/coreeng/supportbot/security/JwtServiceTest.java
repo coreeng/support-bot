@@ -31,7 +31,7 @@ class JwtServiceTest {
         var principal = new UserPrincipal(
             "user@example.com", "Test User",
             ImmutableList.of(new Team("Test Tenant", "test-tenant", ImmutableList.of(TeamType.tenant))),
-            false, false, false
+            ImmutableList.of(Role.user)
         );
 
         // when
@@ -50,7 +50,7 @@ class JwtServiceTest {
         var principal = new UserPrincipal(
             "user@example.com", "Test User",
             ImmutableList.of(new Team("Test Tenant", "test-tenant", ImmutableList.of(TeamType.tenant))),
-            false, false, false
+            ImmutableList.of(Role.user)
         );
 
         // when
@@ -71,7 +71,7 @@ class JwtServiceTest {
         var principal = new UserPrincipal(
             "support@example.com", "Support User",
             ImmutableList.of(new Team("Core Support", "core-support", ImmutableList.of(TeamType.support))),
-            false, true, false
+            ImmutableList.of(Role.user, Role.supportEngineer)
         );
 
         // when
@@ -89,7 +89,7 @@ class JwtServiceTest {
         var principal = new UserPrincipal(
             "lead@example.com", "Lead User",
             ImmutableList.of(new Team("Leadership", "leadership", ImmutableList.of(TeamType.leadership))),
-            true, true, false
+            ImmutableList.of(Role.user, Role.leadership, Role.supportEngineer)
         );
 
         // when
@@ -115,7 +115,7 @@ class JwtServiceTest {
         // given
         var principal = new UserPrincipal(
             "user@example.com", "Test User",
-            ImmutableList.of(), false, false, false
+            ImmutableList.of(), ImmutableList.of(Role.user)
         );
         var token = service.generateToken(principal);
 
