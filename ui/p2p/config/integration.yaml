@@ -2,11 +2,3 @@
 # Backend URLs for integration tests
 envVarsMap:
   BACKEND_URL: http://mock-backend:8080
-  DATABASE_URL: postgresql://mock-db:5432/testdb
-  NEXTAUTH_SECRET: ""  # Set from Kubernetes secret
-  NEXTAUTH_URL: ""  # Set from ingress configuration via --set flag in Makefile
-  AZURE_AD_CLIENT_ID: ""  # Set from Kubernetes secret
-  AZURE_AD_CLIENT_SECRET: ""  # Set from Kubernetes secret
-  AZURE_AD_TENANT_ID: ""  # Set from Kubernetes secret
-  GOOGLE_CLIENT_ID: ""  # Set from Kubernetes secret
-  GOOGLE_CLIENT_SECRET: ""  # Set from Kubernetes secret
