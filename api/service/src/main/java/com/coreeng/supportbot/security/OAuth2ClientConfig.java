@@ -23,7 +23,7 @@ public class OAuth2ClientConfig {
             @Value("${spring.security.oauth2.client.registration.google.client-secret:}") String googleClientSecret,
             @Value("${spring.security.oauth2.client.registration.azure.client-id:}") String azureClientId,
             @Value("${spring.security.oauth2.client.registration.azure.client-secret:}") String azureClientSecret,
-            @Value("${AZURE_AD_TENANT_ID:common}") String azureTenantId
+            @Value("${AZURE_TENANT_ID:common}") String azureTenantId
     ) {
         var registrations = new ArrayList<ClientRegistration>();
 
