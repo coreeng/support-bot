@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.jspecify.annotations.Nullable;
 
 @ConfigurationProperties(prefix = "ticket.assignment")
 public record TicketAssignmentProps(
@@ -15,9 +16,8 @@ public record TicketAssignmentProps(
 
     public record Encryption(
         boolean enabled,
-        String key
+        @Nullable String key
     ) {
     }
 }
-
 

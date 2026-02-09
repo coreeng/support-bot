@@ -1,0 +1,118 @@
+package com.coreeng.supportbot.security;
+
+import com.coreeng.supportbot.teams.SupportTeamService;
+import com.coreeng.supportbot.teams.Team;
+import com.coreeng.supportbot.teams.TeamService;
+import com.coreeng.supportbot.teams.TeamType;
+import com.google.common.collect.ImmutableList;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.io.IOException;
+import java.util.Locale;
+import java.util.regex.Pattern;
+
+@Slf4j
+@RequiredArgsConstructor
+public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
+    private static final Pattern leadershipPattern = Pattern.compile("leadership", Pattern.CASE_INSENSITIVE);
+    private static final Pattern supportPattern = Pattern.compile("support", Pattern.CASE_INSENSITIVE);
+    private static final Pattern escalationPattern = Pattern.compile("escalation", Pattern.CASE_INSENSITIVE);
+
+    private final SecurityProperties properties;
+    private final JwtService jwtService;
+    private final AuthCodeStore authCodeStore;
+    private final TeamService teamService;
+    private final SupportTeamService supportTeamService;
+
+    @Override
+    public void onAuthenticationSuccess(
+        HttpServletRequest request,
+        HttpServletResponse response,
+        Authentication authentication
+    ) throws IOException {
+        var oauth2User = (OAuth2User) authentication.getPrincipal();
+        var email = extractEmail(oauth2User);
+        var name = extractName(oauth2User);
+
+        log.info("OAuth2 login successful for user: {}", email);
+
+        var teams = teamService.listTeamsByUserEmail(email);
+        var isLeadership = computeIsLeadership(email, teams);
+        var isSupportEngineer = computeIsSupportEngineer(email, teams);
+        var isEscalation = computeIsEscalation(teams);
+
+        var principal = new UserPrincipal(
+            email,
+            name,
+            teams,
+            isLeadership,
+            isSupportEngineer,
+            isEscalation
+        );
+
+        var jwt = jwtService.generateToken(principal);
+        var code = authCodeStore.storeToken(jwt);
+
+        var redirectUri = UriComponentsBuilder
+            .fromUriString(properties.oauth2().redirectUri())
+            .queryParam("code", code)
+            .build()
+            .toUriString();
+
+        log.debug("Redirecting to UI with auth code");
+        response.sendRedirect(redirectUri);
+    }
+
+    private String extractEmail(OAuth2User oauth2User) {
+        var email = oauth2User.getAttribute("email");
+        if (email != null) {
+            return email.toString().toLowerCase(Locale.ROOT);
+        }
+        var preferredUsername = oauth2User.getAttribute("preferred_username");
+        if (preferredUsername != null) {
+            return preferredUsername.toString().toLowerCase(Locale.ROOT);
+        }
+        throw new IllegalStateException("Unable to extract email from OAuth2 user");
+    }
+
+    private String extractName(OAuth2User oauth2User) {
+        var name = oauth2User.getAttribute("name");
+        if (name != null) {
+            return name.toString();
+        }
+        var givenName = oauth2User.getAttribute("given_name");
+        var familyName = oauth2User.getAttribute("family_name");
+        if (givenName != null || familyName != null) {
+            return ((givenName != null ? givenName : "") + " " + (familyName != null ? familyName : "")).trim();
+        }
+        return extractEmail(oauth2User);
+    }
+
+    private boolean computeIsLeadership(String email, ImmutableList<Team> teams) {
+        return supportTeamService.isLeadershipMemberByUserEmail(email)
+            || hasTeamType(teams, leadershipPattern);
+    }
+
+    private boolean computeIsSupportEngineer(String email, ImmutableList<Team> teams) {
+        return supportTeamService.isMemberByUserEmail(email)
+            || hasTeamType(teams, supportPattern);
+    }
+
+    private boolean computeIsEscalation(ImmutableList<Team> teams) {
+        return hasTeamType(teams, escalationPattern);
+    }
+
+    private boolean hasTeamType(ImmutableList<Team> teams, Pattern pattern) {
+        return teams.stream()
+            .flatMap(t -> t.types().stream())
+            .map(TeamType::name)
+            .anyMatch(type -> pattern.matcher(type).find());
+    }
+}

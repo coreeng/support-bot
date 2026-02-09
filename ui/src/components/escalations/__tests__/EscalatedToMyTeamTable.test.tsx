@@ -10,17 +10,17 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import EscalatedToMyTeamTable from '../EscalatedToMyTeamTable';
 import * as hooks from '../../../lib/hooks';
-import * as UserContext from '../../../contexts/UserContext';
+import * as AuthContext from '../../../contexts/AuthContext';
 import * as TeamFilterContext from '../../../contexts/TeamFilterContext';
 
 // Mock hooks
 jest.mock('../../../lib/hooks');
-jest.mock('../../../contexts/UserContext');
+jest.mock('../../../contexts/AuthContext');
 jest.mock('../../../contexts/TeamFilterContext');
 
 const mockUseEscalations = hooks.useEscalations as jest.MockedFunction<typeof hooks.useEscalations>;
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>;
-const mockUseUser = UserContext.useUser as jest.MockedFunction<typeof UserContext.useUser>;
+const mockUseAuth = AuthContext.useAuth as jest.MockedFunction<typeof AuthContext.useAuth>;
 const mockUseTeamFilter = TeamFilterContext.useTeamFilter as jest.MockedFunction<typeof TeamFilterContext.useTeamFilter>;
 
 // Test data
@@ -103,7 +103,7 @@ describe('EscalatedToMyTeamTable', () => {
             error: null
         } as unknown as ReturnType<typeof hooks.useRegistry>);
 
-        mockUseUser.mockReturnValue({
+        mockUseAuth.mockReturnValue({
             isEscalationTeam: true,
             actualEscalationTeams: ['Core-platform'],
             user: null,
@@ -153,7 +153,7 @@ describe('EscalatedToMyTeamTable', () => {
         });
 
         it('should NOT show when actualEscalationTeams is empty', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
                 user: null,

@@ -16,18 +16,3 @@ export function buildDateQuery(dateFrom?: string, dateTo?: string): string {
     return params.toString() ? `?${params.toString()}` : ''
 }
 
-/**
- * Extracts date parameters from a NextRequest
- * @param request - NextRequest object
- * @returns Object with optional dateFrom and dateTo strings
- * @example
- * const { dateFrom, dateTo } = extractDateParams(request)
- */
-export function extractDateParams(request: Request): { dateFrom?: string; dateTo?: string } {
-    const { searchParams } = new URL(request.url)
-    return {
-        dateFrom: searchParams.get('dateFrom') || undefined,
-        dateTo: searchParams.get('dateTo') || undefined,
-    }
-}
-

@@ -13,12 +13,12 @@ import { render, screen, within, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import StatsPage from '../stats';
 import * as hooks from '../../../lib/hooks';
-import * as UserContext from '../../../contexts/UserContext';
+import * as AuthContext from '../../../contexts/AuthContext';
 import * as TeamFilterContext from '../../../contexts/TeamFilterContext';
 
 // Mock hooks
 jest.mock('../../../lib/hooks');
-jest.mock('../../../contexts/UserContext');
+jest.mock('../../../contexts/AuthContext');
 jest.mock('../../../contexts/TeamFilterContext');
 
 // Mock Recharts
@@ -40,7 +40,7 @@ jest.mock('../../escalations/EscalatedToMyTeamWidget', () => {
 
 const mockUseAllTickets = hooks.useAllTickets as jest.MockedFunction<typeof hooks.useAllTickets>;
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>;
-const mockUseUser = UserContext.useUser as jest.MockedFunction<typeof UserContext.useUser>;
+const mockUseAuth = AuthContext.useAuth as jest.MockedFunction<typeof AuthContext.useAuth>;
 const mockUseTeamFilter = TeamFilterContext.useTeamFilter as jest.MockedFunction<typeof TeamFilterContext.useTeamFilter>;
 
 // Test data
@@ -113,7 +113,7 @@ describe('StatsPage (Home Dashboard)', () => {
             error: null
         } as unknown as ReturnType<typeof hooks.useRegistry>);
 
-        mockUseUser.mockReturnValue({
+        mockUseAuth.mockReturnValue({
             user: {
                 email: 'user@example.com',
                 teams: [{ name: 'Team A', groupRefs: [] }]
@@ -193,7 +193,7 @@ describe('StatsPage (Home Dashboard)', () => {
                 effectiveTeams: [],
             allTeams: ['Team A', 'Team B'],
             initialized: true,            });
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 user: {
                     email: 'user@example.com',
                     teams: []
@@ -223,7 +223,7 @@ describe('StatsPage (Home Dashboard)', () => {
         });
 
         it('should show split view for escalation teams', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 user: {
                     email: 'escalation@example.com',
                     teams: [{ name: 'Core-platform', groupRefs: [] }]
@@ -256,7 +256,7 @@ describe('StatsPage (Home Dashboard)', () => {
         });
 
         it('should NOT show split view when escalation team selects non-escalation team', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 user: {
                     email: 'escalation@example.com',
                     teams: [
@@ -414,7 +414,7 @@ describe('StatsPage (Home Dashboard)', () => {
         });
 
         it('should show team name in title for escalation team view', () => {
-            mockUseUser.mockReturnValue({
+            mockUseAuth.mockReturnValue({
                 user: {
                     email: 'escalation@example.com',
                     teams: [{ name: 'Core-platform', groupRefs: [] }]

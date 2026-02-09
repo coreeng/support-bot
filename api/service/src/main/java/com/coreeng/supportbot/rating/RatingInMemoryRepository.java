@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
@@ -26,6 +27,7 @@ public class RatingInMemoryRepository implements RatingRepository {
         return ratings.values().stream().collect(toImmutableList());
     }
 
+    @Nullable
     public Rating findById(UUID ratingId) {
         return ratings.get(ratingId);
     }

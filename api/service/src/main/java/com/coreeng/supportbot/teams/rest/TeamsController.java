@@ -3,6 +3,7 @@ package com.coreeng.supportbot.teams.rest;
 import com.coreeng.supportbot.teams.*;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -19,7 +20,7 @@ public class TeamsController {
 
     @GetMapping
     public ImmutableList<TeamUI> listTeams(
-            @RequestParam(name = "type", required = false) TeamType type
+            @Nullable @RequestParam(name = "type", required = false) TeamType type
     ) {
         ImmutableList<Team> teams;
         if (type == null) {

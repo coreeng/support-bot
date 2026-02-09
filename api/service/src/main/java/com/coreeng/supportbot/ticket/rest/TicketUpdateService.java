@@ -7,6 +7,7 @@ import com.coreeng.supportbot.teams.PlatformTeamsService;
 import com.coreeng.supportbot.ticket.*;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 import static java.util.Objects.requireNonNull;
@@ -20,13 +21,14 @@ public class TicketUpdateService {
     private final TicketUIMapper mapper;
     private final PlatformTeamsService platformTeamsService;
 
-    public TicketUI update(TicketId ticketId, TicketUpdateRequest request) {
+    public TicketUI update(TicketId ticketId, @Nullable TicketUpdateRequest request) {
         ValidationResult validationResult = validate(request);
         if (!validationResult.isValid()) {
             throw new IllegalArgumentException(validationResult.errorMessage());
         }
+        TicketUpdateRequest validatedRequest = requireNonNull(request);
 
-        TicketSubmission submission = buildSubmission(ticketId, request);
+        TicketSubmission submission = buildSubmission(ticketId, validatedRequest);
         TicketSubmitResult result = ticketProcessingService.submit(submission);
 
         if (!(result instanceof TicketSubmitResult.Success)) {
@@ -40,16 +42,16 @@ public class TicketUpdateService {
     private TicketSubmission buildSubmission(TicketId ticketId, TicketUpdateRequest request) {
         return TicketSubmission.builder()
             .ticketId(ticketId)
-            .status(request.status())
-            .authorsTeam(TicketTeam.fromCode(request.authorsTeam()))
-            .tags(ImmutableList.copyOf(request.tags()))
-            .impact(request.impact())
+            .status(requireNonNull(request.status()))
+            .authorsTeam(TicketTeam.fromCode(requireNonNull(request.authorsTeam())))
+            .tags(ImmutableList.copyOf(requireNonNull(request.tags())))
+            .impact(requireNonNull(request.impact()))
             .assignedTo(request.assignedTo())
             .confirmed(true)
             .build();
     }
 
-    private ValidationResult validate(TicketUpdateRequest request) {
+    private ValidationResult validate(@Nullable TicketUpdateRequest request) {
         if (request == null) {
             return ValidationResult.invalid("Request body is required");
         }
@@ -80,7 +82,7 @@ public class TicketUpdateService {
         return ValidationResult.valid();
     }
 
-    record ValidationResult(boolean isValid, String errorMessage) {
+    record ValidationResult(boolean isValid, @Nullable String errorMessage) {
         static ValidationResult valid() {
             return new ValidationResult(true, null);
         }
@@ -90,4 +92,3 @@ public class TicketUpdateService {
         }
     }
 }
-

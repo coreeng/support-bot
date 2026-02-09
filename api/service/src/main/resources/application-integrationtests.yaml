@@ -1,3 +1,7 @@
+security:
+  test-bypass:
+    enabled: true
+
 spring:
   cloud:
     azure:

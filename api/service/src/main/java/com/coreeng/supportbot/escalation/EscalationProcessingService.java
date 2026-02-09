@@ -12,8 +12,11 @@ import java.time.Instant;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 @Service
 @RequiredArgsConstructor
@@ -25,10 +28,12 @@ public class EscalationProcessingService {
     private final EscalationTeamsRegistry escalationTeamsRegistry;
     private final SlackTicketsProps slackTicketsProps;
 
+    @Nullable
     public Escalation createEscalation(CreateEscalationRequest request) {
+        TicketId ticketId = checkNotNull(request.ticket().id());
         Escalation escalation = repository.createIfNotExists(
             Escalation.createNew(
-                request.ticket().id(),
+                ticketId,
                 request.team(),
                 request.tags(),
                 request.ticket().queryRef()
@@ -43,7 +48,8 @@ public class EscalationProcessingService {
             .addArgument(escalation::id)
             .log("Escalation created: {}");
 
-        EscalationTeam team = escalationTeamsRegistry.findEscalationTeamByCode(escalation.team());
+        String teamCode = checkNotNull(escalation.team());
+        EscalationTeam team = checkNotNull(escalationTeamsRegistry.findEscalationTeamByCode(teamCode));
         ChatPostMessageResponse messagePostResponse = slackClient.postMessage(new SlackPostMessageRequest(
             createdMessageMapper.renderMessage(new EscalationCreatedMessage(
                 escalation.id(),
@@ -74,7 +80,7 @@ public class EscalationProcessingService {
 
     public void resolveByTicketId(TicketId ticketId) {
         for (var escalation : repository.listByTicketId(ticketId)) {
-            if (EscalationStatus.resolved.equals(escalation.status())) {
+            if (escalation.status() == EscalationStatus.resolved) {
                 continue;
             }
             resolve(escalation);
@@ -85,7 +91,7 @@ public class EscalationProcessingService {
         repository.markResolved(escalation, Instant.now());
     }
 
-    @NotNull
+    @NonNull
     private Escalation findEscalation(EscalationId id) {
         Escalation escalation = repository.findById(id);
         if (escalation == null) {
