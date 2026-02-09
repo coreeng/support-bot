@@ -257,7 +257,7 @@ to create a secret for the registered application so that it can be used for aut
 
 SSO is supported via Google and Azure AD. One or both can be enabled depending on what your organisation uses.
 The API handles the full OAuth2 flow. A provider is enabled when both its client ID and client secret are set.
-
+Having no valid client ID and client secret set for any provider is not supported.
 ### Environment variables
 
 Set these on the **API**:
