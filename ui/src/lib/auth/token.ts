@@ -130,7 +130,7 @@ export async function fetchCurrentUser(): Promise<AuthUser | null> {
       ...data,
       teams: data.teams.map(team => ({
         ...team,
-        name: team.label,
+        name: team.code || team.label,
       })),
     }
   } catch {

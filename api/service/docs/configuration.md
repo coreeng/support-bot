@@ -265,7 +265,7 @@ Set these on the **API**:
 
 | Variable | Description |
 |----------|-------------|
-| `JWT_SECRET` | Signing key for JWTs. Must be at least 256 bits. A dev default is provided but must be changed in production. |
+| `JWT_SECRET` | Signing key for JWTs. Must be at least 256 bits. A default is provided for dev but **must** be set in production. |
 | `UI_ORIGIN` | Base URL of the UI, e.g. `https://support-bot-ui.example.com`. Defaults to `http://localhost:3000`. Used for CORS and OAuth2 redirect. |
 | `GOOGLE_CLIENT_ID` | Google OAuth2 client ID. Leave empty to disable Google SSO. |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret. |

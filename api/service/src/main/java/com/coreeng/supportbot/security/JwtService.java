@@ -27,6 +27,10 @@ public class JwtService {
 
     public JwtService(SecurityProperties properties) {
         this.properties = properties;
+        var jwtSecret = System.getenv("JWT_SECRET");
+        if (jwtSecret == null || jwtSecret.isBlank()) {
+            log.warn("JWT_SECRET environment variable is not set. Using insecure default. Set JWT_SECRET in production.");
+        }
         this.secretKey = Keys.hmacShaKeyFor(
             properties.jwt().secret().getBytes(StandardCharsets.UTF_8)
         );

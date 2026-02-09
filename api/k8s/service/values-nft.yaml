@@ -23,6 +23,8 @@ env:
     value: "supportbot"
   - name: DB_PASSWORD
     value: "supportbotpassword"
+  - name: JWT_SECRET
+    value: "nft-test-jwt-secret-minimum-256-bits-long"
 
 monitoring:
   enabled: true

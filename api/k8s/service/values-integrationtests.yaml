@@ -7,6 +7,8 @@ env:
     value: "supportbot"
   - name: DB_PASSWORD
     value: "supportbotpassword"
+  - name: JWT_SECRET
+    value: "integration-test-jwt-secret-min-256-bits"
   - name: SLACK_TICKET_CHANNEL_ID
     value: "C08CC3MCBKN"
   - name: SLACK_ESCALATION_CHANNEL_ID
