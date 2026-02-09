@@ -70,13 +70,19 @@ public class TestAuthBypassFilter extends OncePerRequestFilter {
             );
         }
 
-        return new UserPrincipal(
-            email,
-            "Test User",
-            teams,
-            isLeadership,
-            isSupportEngineer,
-            isEscalation
-        );
+        var roles = ImmutableList.<Role>builder();
+        roles.add(Role.user);
+
+        if (isLeadership) {
+            roles.add(Role.leadership);
+        }
+        if (isSupportEngineer) {
+            roles.add(Role.supportEngineer);
+        }
+        if (isEscalation) {
+            roles.add(Role.escalation);
+        }
+
+        return new UserPrincipal(email, "Test User", teams, roles.build());
     }
 }
