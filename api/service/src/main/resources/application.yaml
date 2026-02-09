@@ -52,7 +52,7 @@ spring:
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
         provider:
           azure:
-            issuer-uri: https://login.microsoftonline.com/${AZURE_AD_TENANT_ID:common}/v2.0
+            issuer-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID:common}/v2.0
   cloud:
 # Uncomment in case you require Azure integration
 #    azure:
