@@ -7,7 +7,18 @@ public record UserPrincipal(
     String email,
     String name,
     ImmutableList<Team> teams,
-    boolean isLeadership,
-    boolean isSupportEngineer,
-    boolean isEscalation
-) {}
+    ImmutableList<Role> roles
+) {
+
+    public boolean isLeadership() {
+        return roles.contains(Role.leadership);
+    }
+
+    public boolean isSupportEngineer() {
+        return roles.contains(Role.supportEngineer);
+    }
+
+    public boolean isEscalation() {
+        return roles.contains(Role.escalation);
+    }
+}

@@ -54,6 +54,11 @@ env:
       secretKeyRef:
         name: azure
         key: AZURE_CLIENT_SECRET
+  - name: JWT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: support-bot
+        key: JWT_SECRET
 
 configMap:
   create: true
