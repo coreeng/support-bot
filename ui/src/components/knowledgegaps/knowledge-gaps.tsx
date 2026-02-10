@@ -1,37 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { ExternalLink, BookOpen, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
-
-// Local component definitions to replace missing shadcn/ui components
-const Card = ({ className, children }: { className?: string; children: React.ReactNode }) => (
-    <div className={`rounded-xl border bg-card text-card-foreground shadow-sm ${className}`}>{children}</div>
-)
-
-const CardHeader = ({ className, children }: { className?: string; children: React.ReactNode }) => (
-    <div className={`flex flex-col space-y-1.5 p-6 ${className}`}>{children}</div>
-)
-
-const CardTitle = ({ className, children }: { className?: string; children: React.ReactNode }) => (
-    <div className={`font-semibold leading-none tracking-tight ${className}`}>{children}</div>
-)
-
-const CardContent = ({ className, children }: { className?: string; children: React.ReactNode }) => (
-    <div className={`p-6 pt-0 ${className}`}>{children}</div>
-)
-
-const Badge = ({ className, variant, children }: { className?: string; variant?: string; children: React.ReactNode }) => (
-    <div className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${className}`}>{children}</div>
-)
-
-const Progress = ({ value, className }: { value: number; className?: string }) => (
-    <div className={`relative w-full overflow-hidden rounded-full bg-gray-200 ${className}`}>
-        <div
-            className="h-full w-full flex-1 bg-blue-600 transition-all"
-            style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
-        />
-    </div>
-)
+import { ChevronDown, ChevronRight, ExternalLink, BarChart3 } from 'lucide-react'
 
 interface Query {
     text: string
@@ -52,88 +22,41 @@ interface SupportAreaSummary {
     supportAreas: AreaItem[]
 }
 
-// Component for individual Area Card to handle expanded state
-const AreaCard = ({ item, index, isGap }: { item: AreaItem; index: number; isGap: boolean }) => {
-    const [expanded, setExpanded] = useState(false)
-
-    return (
-        <Card className="overflow-hidden border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
-            <CardHeader className="bg-gray-50/50 pb-3">
-                <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold">
-                            {index + 1}
-                        </span>
-                        {item.name}
-                    </CardTitle>
-                    <div className="flex items-center gap-4">
-                        <div className="text-sm font-medium text-gray-500" title="Number of queries">
-                            {item.queryCount} Queries
-                        </div>
-                        <div className="flex items-center gap-2" title={`Coverage: ${item.coveragePercentage}%`}>
-                            <span className={`text-sm font-medium ${item.coveragePercentage < 50 ? 'text-green-600' :
-                                item.coveragePercentage < 80 ? 'text-yellow-600' : 'text-red-600'
-                                }`}>
-                                {item.coveragePercentage}% Coverage
-                            </span>
-                            <Progress
-                                value={item.coveragePercentage}
-                                className="w-20 h-1.5"
-                            />
-                        </div>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="pt-4">
-                <div className="space-y-3">
-                    <button
-                        onClick={() => setExpanded(!expanded)}
-                        className="flex items-center gap-2 text-sm font-medium text-gray-500 uppercase tracking-wider hover:text-gray-700 transition-colors focus:outline-none"
-                    >
-                        <AlertTriangle className="w-3 h-3" />
-                        Relevant Queries
-                        {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
-
-                    {expanded && (
-                        <ul className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                            {item.queries.map((query, qIndex) => (
-                                <li key={qIndex} className="group flex items-center justify-between p-2 rounded-md hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-colors">
-                                    <span className="text-gray-700 font-medium text-sm">
-                                        &quot;{query.text}&quot;
-                                    </span>
-                                    <a
-                                        href={query.link}
-                                        className="text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs font-medium hover:underline"
-                                    >
-                                        View Query <ExternalLink className="w-3 h-3" />
-                                    </a>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-            </CardContent>
-        </Card>
-    )
-}
-
 export default function KnowledgeGapsPage() {
     const [data, setData] = useState<SupportAreaSummary | null>(null)
     const [loading, setLoading] = useState(true)
     const [selectedPeriod, setSelectedPeriod] = useState<'Last Week' | 'Last Month' | 'Last Quarter' | 'Last Year'>('Last Week')
+    const [supportAreasExpanded, setSupportAreasExpanded] = useState(false)
+    const [knowledgeGapsExpanded, setKnowledgeGapsExpanded] = useState(false)
+    const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
 
     useEffect(() => {
-        // Mock data fetching
         const fetchData = async () => {
             setLoading(true)
-            // Simulate network delay
             await new Promise(resolve => setTimeout(resolve, 800))
 
             const mockData: SupportAreaSummary = {
                 timePeriod: selectedPeriod,
                 totalCoveragePercentage: selectedPeriod === 'Last Week' ? 83 : selectedPeriod === 'Last Month' ? 78 : 85,
                 knowledgeGaps: [
+                    {
+                        name: 'Connectivity and Networking',
+                        coveragePercentage: 90,
+                        queryCount: 28,
+                        queries: [
+                            { text: 'Firewall rules for output traffic', link: '#' },
+                            { text: 'DNS resolution issues', link: '#' }
+                        ]
+                    },
+                    {
+                        name: 'Monitoring & Troubleshooting Tenant Applications',
+                        coveragePercentage: 88,
+                        queryCount: 50,
+                        queries: [
+                            { text: 'How to view application logs?', link: '#' },
+                            { text: 'Setting up custom metrics', link: '#' }
+                        ]
+                    },
                     {
                         name: 'CI',
                         coveragePercentage: 75,
@@ -153,30 +76,12 @@ export default function KnowledgeGapsPage() {
                         ]
                     },
                     {
-                        name: 'Connectivity and Networking',
-                        coveragePercentage: 90,
-                        queryCount: 28,
-                        queries: [
-                            { text: 'Firewall rules for output traffic', link: '#' },
-                            { text: 'DNS resolution issues', link: '#' }
-                        ]
-                    },
-                    {
                         name: 'Deploying & Configuring Tenant Applications',
                         coveragePercentage: 45,
                         queryCount: 15,
                         queries: [
                             { text: 'Deployment failed with timeout', link: '#' },
                             { text: 'Configuring environment variables', link: '#' }
-                        ]
-                    },
-                    {
-                        name: 'Monitoring & Troubleshooting Tenant Applications',
-                        coveragePercentage: 88,
-                        queryCount: 50,
-                        queries: [
-                            { text: 'How to view application logs?', link: '#' },
-                            { text: 'Setting up custom metrics', link: '#' }
                         ]
                     }
                 ],
@@ -229,7 +134,6 @@ export default function KnowledgeGapsPage() {
                 ]
             }
 
-            // Sort data by coverage percentage (descending)
             mockData.knowledgeGaps.sort((a, b) => b.coveragePercentage - a.coveragePercentage)
             mockData.supportAreas.sort((a, b) => b.coveragePercentage - a.coveragePercentage)
 
@@ -240,12 +144,88 @@ export default function KnowledgeGapsPage() {
         fetchData()
     }, [selectedPeriod])
 
+    const toggleItemExpansion = (itemName: string) => {
+        setExpandedItems(prev => {
+            const next = new Set(prev)
+            if (next.has(itemName)) {
+                next.delete(itemName)
+            } else {
+                next.add(itemName)
+            }
+            return next
+        })
+    }
+
+    const renderAreaItem = (item: AreaItem, index: number) => {
+        const isExpanded = expandedItems.has(item.name)
+        
+        return (
+            <div key={item.name} className="border border-gray-200 rounded-lg bg-white hover:shadow-md transition-shadow">
+                <div className="p-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1">
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-semibold text-sm">
+                                {index + 1}
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-semibold text-gray-900 text-base">{item.name}</h3>
+                                <div className="flex items-center gap-4 mt-1">
+                                    <span className="text-sm text-gray-500">{item.queryCount.toLocaleString()} queries</span>
+                                    <span className={`text-sm font-medium ${
+                                        item.coveragePercentage < 50 ? 'text-green-600' :
+                                        item.coveragePercentage < 80 ? 'text-yellow-600' : 'text-red-600'
+                                    }`}>
+                                        {item.coveragePercentage}% coverage
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => toggleItemExpansion(item.name)}
+                            className="ml-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                        >
+                            {isExpanded ? (
+                                <ChevronDown className="w-5 h-5 text-gray-600" />
+                            ) : (
+                                <ChevronRight className="w-5 h-5 text-gray-600" />
+                            )}
+                        </button>
+                    </div>
+
+                    {isExpanded && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                            <h4 className="text-sm font-medium text-gray-700 mb-3">Relevant Support Queries</h4>
+                            <div className="space-y-2">
+                                {item.queries.map((query, qIndex) => (
+                                    <div 
+                                        key={qIndex}
+                                        className="flex items-start justify-between p-3 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors group"
+                                    >
+                                        <span className="text-sm text-gray-700 flex-1">{query.text}</span>
+                                        <a
+                                            href={query.link}
+                                            className="ml-3 flex-shrink-0 text-blue-600 hover:text-blue-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            aria-label="View query"
+                                        >
+                                            <ExternalLink className="w-4 h-4" />
+                                        </a>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        )
+    }
+
     if (loading) {
         return (
-            <div className="p-8 flex items-center justify-center">
-                <div className="text-center text-gray-500">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
-                    <p>Loading knowledge gaps...</p>
+            <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                    <p className="text-gray-600">Loading support area summary...</p>
                 </div>
             </div>
         )
@@ -254,24 +234,26 @@ export default function KnowledgeGapsPage() {
     if (!data) return null
 
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <BookOpen className="w-8 h-8 text-blue-600" />
-                        Support Area Summary
-                    </h1>
-                    <p className="text-gray-500 mt-1">
-                        Identify areas where with Knowledge Gaps that need to be addressed.
-                    </p>
-                </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-500">Period:</span>
+        <div className="h-full overflow-auto bg-gray-50">
+            <div className="max-w-7xl mx-auto p-8 space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                            <BarChart3 className="w-8 h-8 text-blue-600" />
+                            Support Area Summary
+                        </h1>
+                        <p className="text-gray-600 mt-2">
+                            Overview of support areas and knowledge gaps requiring attention
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-4 bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm">
+                        <label className="text-sm font-medium text-gray-700">Time Period:</label>
                         <select
                             value={selectedPeriod}
                             onChange={(e) => setSelectedPeriod(e.target.value as any)}
-                            className="text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 text-gray-900 py-1 pl-2 pr-8 border"
+                            className="text-sm border-gray-300 rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white"
                         >
                             <option value="Last Week">Last Week</option>
                             <option value="Last Month">Last Month</option>
@@ -279,44 +261,91 @@ export default function KnowledgeGapsPage() {
                             <option value="Last Year">Last Year</option>
                         </select>
                     </div>
+                </div>
 
-                    <div className="hidden sm:block h-4 w-px bg-gray-300"></div>
-
-                    <div className="flex items-center gap-3">
-                        <div className="text-sm font-medium text-gray-500">Coverage:</div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-lg font-bold text-gray-900">{data.totalCoveragePercentage}%</span>
-                            <div className="w-24">
-                                <Progress value={data.totalCoveragePercentage} className="h-2" />
+                {/* Overall Coverage */}
+                <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-sm font-medium text-gray-600">Overall Coverage</h2>
+                            <p className="text-4xl font-bold text-gray-900 mt-1">{data.totalCoveragePercentage}%</p>
+                        </div>
+                        <div className="w-32 h-32">
+                            <div className="relative w-full h-full">
+                                <svg className="w-full h-full transform -rotate-90">
+                                    <circle
+                                        cx="64"
+                                        cy="64"
+                                        r="56"
+                                        stroke="#e5e7eb"
+                                        strokeWidth="12"
+                                        fill="none"
+                                    />
+                                    <circle
+                                        cx="64"
+                                        cy="64"
+                                        r="56"
+                                        stroke="#3b82f6"
+                                        strokeWidth="12"
+                                        fill="none"
+                                        strokeDasharray={`${2 * Math.PI * 56}`}
+                                        strokeDashoffset={`${2 * Math.PI * 56 * (1 - data.totalCoveragePercentage / 100)}`}
+                                        strokeLinecap="round"
+                                    />
+                                </svg>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div className="space-y-6">
-                <div>
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <span className="w-1.5 h-6 bg-green-500 rounded-full"></span>
-                        Support Areas
-                    </h2>
-                    <div className="grid gap-6">
-                        {data.supportAreas.map((item, index) => (
-                            <AreaCard key={`support-${index}`} item={item} index={index} isGap={false} />
-                        ))}
-                    </div>
+                {/* Top 5 Support Areas */}
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                    <button
+                        onClick={() => setSupportAreasExpanded(!supportAreasExpanded)}
+                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-1 h-8 bg-blue-600 rounded-full"></div>
+                            <h2 className="text-xl font-semibold text-gray-900">Top 5 Support Areas</h2>
+                            <span className="text-sm text-gray-500">({data.supportAreas.length} areas)</span>
+                        </div>
+                        {supportAreasExpanded ? (
+                            <ChevronDown className="w-6 h-6 text-gray-400" />
+                        ) : (
+                            <ChevronRight className="w-6 h-6 text-gray-400" />
+                        )}
+                    </button>
+
+                    {supportAreasExpanded && (
+                        <div className="px-6 pb-6 space-y-3">
+                            {data.supportAreas.slice(0, 5).map((item, index) => renderAreaItem(item, index))}
+                        </div>
+                    )}
                 </div>
 
-                <div>
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <span className="w-1.5 h-6 bg-blue-500 rounded-full"></span>
-                        Top Knowledge Gaps
-                    </h2>
-                    <div className="grid gap-6">
-                        {data.knowledgeGaps.map((item, index) => (
-                            <AreaCard key={`gap-${index}`} item={item} index={index} isGap={true} />
-                        ))}
-                    </div>
+                {/* Top 5 Knowledge Gaps */}
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                    <button
+                        onClick={() => setKnowledgeGapsExpanded(!knowledgeGapsExpanded)}
+                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-1 h-8 bg-amber-600 rounded-full"></div>
+                            <h2 className="text-xl font-semibold text-gray-900">Top 5 Knowledge Gaps</h2>
+                            <span className="text-sm text-gray-500">({data.knowledgeGaps.length} gaps)</span>
+                        </div>
+                        {knowledgeGapsExpanded ? (
+                            <ChevronDown className="w-6 h-6 text-gray-400" />
+                        ) : (
+                            <ChevronRight className="w-6 h-6 text-gray-400" />
+                        )}
+                    </button>
+
+                    {knowledgeGapsExpanded && (
+                        <div className="px-6 pb-6 space-y-3">
+                            {data.knowledgeGaps.slice(0, 5).map((item, index) => renderAreaItem(item, index))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
