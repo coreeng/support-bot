@@ -20,7 +20,7 @@ management:
 
 security:
   jwt:
-    secret: ${JWT_SECRET:default-dev-secret-change-in-production-minimum-256-bits}
+    secret: ${JWT_SECRET}
     expiration: 24h
   oauth2:
     redirect-uri: ${UI_ORIGIN:http://localhost:3000}/auth/callback
@@ -45,14 +45,14 @@ spring:
             client-secret: ${GOOGLE_CLIENT_SECRET:}
             scope: openid, email, profile
           azure:
-            client-id: ${AZURE_AD_CLIENT_ID:}
-            client-secret: ${AZURE_AD_CLIENT_SECRET:}
+            client-id: ${AZURE_CLIENT_ID:}
+            client-secret: ${AZURE_CLIENT_SECRET:}
             scope: openid, email, profile
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
         provider:
           azure:
-            issuer-uri: https://login.microsoftonline.com/${AZURE_AD_TENANT_ID:common}/v2.0
+            issuer-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID:common}/v2.0
   cloud:
 # Uncomment in case you require Azure integration
 #    azure:

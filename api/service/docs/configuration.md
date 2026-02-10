@@ -263,19 +263,19 @@ At least one provider must be configured. A provider is enabled when both its cl
 
 Set these on the **API**:
 
-| Variable | Description |
-|----------|-------------|
-| `JWT_SECRET` | Signing key for JWTs. Must be at least 256 bits. A dev default is provided but must be changed in production. |
+| Variable | Description                                                                                                                            |
+|----------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `JWT_SECRET` | Signing key for JWTs. Must be at least 256 bits. **Required**  the app will fail to start if not set.                                  |
 | `UI_ORIGIN` | Base URL of the UI, e.g. `https://support-bot-ui.example.com`. Defaults to `http://localhost:3000`. Used for CORS and OAuth2 redirect. |
-| `GOOGLE_CLIENT_ID` | Google OAuth2 client ID. Leave empty to disable Google SSO. |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret. |
-| `AZURE_AD_CLIENT_ID` | Azure AD application (client) ID. Leave empty to disable Azure AD SSO. |
-| `AZURE_AD_CLIENT_SECRET` | Azure AD client secret. |
-| `AZURE_AD_TENANT_ID` | Azure AD directory (tenant) ID. |
+| `GOOGLE_CLIENT_ID` | Google OAuth2 client ID. Leave empty to disable Google SSO.                                                                            |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret.                                                                                                           |
+| `AZURE_CLIENT_ID` | Azure AD application (client) ID. Leave empty to disable Azure AD SSO.                                                                 |
+| `AZURE_CLIENT_SECRET` | Azure AD client secret.                                                                                                                |
+| `AZURE_TENANT_ID` | Azure AD directory (tenant) ID.                                                                                                        |
 
-> Note: The `AZURE_AD_*` variables above are for SSO (user login). They are separate from the
-> `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` variables used for
+> Note: The `AZURE_*` variables above are shared between SSO (user login) and
 > [Azure Cloud integration](#azure-cloud) (reading group memberships from Entra ID).
+> A single Azure AD app registration is used for both.
 
 Set this on the **UI**:
 
@@ -302,9 +302,9 @@ Portal: https://portal.azure.com > Microsoft Entra ID > App registrations
 2. Authentication > Add platform > Web > add redirect URIs:
    - `http://localhost:8080/login/oauth2/code/azure`
    - `https://<your-api-domain>/login/oauth2/code/azure`
-3. Overview > copy the Application (client) ID into `AZURE_AD_CLIENT_ID`
-4. Overview > copy the Directory (tenant) ID into `AZURE_AD_TENANT_ID`
-5. Certificates & secrets > New client secret > copy the value into `AZURE_AD_CLIENT_SECRET`
+3. Overview > copy the Application (client) ID into `AZURE_CLIENT_ID`
+4. Overview > copy the Directory (tenant) ID into `AZURE_TENANT_ID`
+5. Certificates & secrets > New client secret > copy the value into `AZURE_CLIENT_SECRET`
 6. API permissions > Add > Microsoft Graph > Delegated:
    - `email`
    - `openid`

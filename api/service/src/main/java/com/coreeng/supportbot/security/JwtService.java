@@ -38,10 +38,13 @@ public class JwtService {
 
         var teamsJson = principal.teams().stream()
             .map(team -> Map.of(
-                "label", team.label(),
                 "code", team.code(),
                 "types", team.types().stream().map(Enum::name).toList()
             ))
+            .toList();
+
+        var roles = principal.roles().stream()
+            .map(Enum::name)
             .toList();
 
         return Jwts.builder()
@@ -49,9 +52,7 @@ public class JwtService {
             .claim("email", principal.email())
             .claim("name", principal.name())
             .claim("teams", teamsJson)
-            .claim("isLeadership", principal.isLeadership())
-            .claim("isSupportEngineer", principal.isSupportEngineer())
-            .claim("isEscalation", principal.isEscalation())
+            .claim("roles", roles)
             .issuedAt(Date.from(now))
             .expiration(Date.from(expiration))
             .signWith(secretKey)
@@ -68,20 +69,10 @@ public class JwtService {
 
             var email = claims.getSubject();
             var name = claims.get("name", String.class);
-            var isLeadership = claims.get("isLeadership", Boolean.class);
-            var isSupportEngineer = claims.get("isSupportEngineer", Boolean.class);
-            var isEscalation = claims.get("isEscalation", Boolean.class);
-
             var teams = parseTeamsClaim(claims.get("teams"));
+            var parsedRoles = parseRoles(claims.get("roles"));
 
-            return Optional.of(new UserPrincipal(
-                email,
-                name,
-                teams,
-                Boolean.TRUE.equals(isLeadership),
-                Boolean.TRUE.equals(isSupportEngineer),
-                Boolean.TRUE.equals(isEscalation)
-            ));
+            return Optional.of(new UserPrincipal(email, name, teams, parsedRoles));
         } catch (JwtException | IllegalArgumentException e) {
             log.debug("JWT validation failed: {}", e.getMessage());
             return Optional.empty();
@@ -102,11 +93,30 @@ public class JwtService {
         return teams.build();
     }
 
+    private ImmutableList<Role> parseRoles(@Nullable Object rolesClaim) {
+        if (!(rolesClaim instanceof List<?> rolesRaw)) {
+            return ImmutableList.of(Role.user);
+        }
+
+        var builder = ImmutableList.<Role>builder();
+        for (Object roleRaw : rolesRaw) {
+            if (roleRaw != null) {
+                try {
+                    builder.add(Role.valueOf(roleRaw.toString()));
+                } catch (IllegalArgumentException e) {
+                    log.warn("Skipping unknown role in JWT: {}", roleRaw);
+                }
+            }
+        }
+
+        var parsed = builder.build();
+        return parsed.isEmpty() ? ImmutableList.of(Role.user) : parsed;
+    }
+
     private Team parseTeam(Map<?, ?> teamMap) {
-        var label = parseStringValue(teamMap.get("label"), "unknown");
-        var code = parseStringValue(teamMap.get("code"), label);
+        var code = parseStringValue(teamMap.get("code"), "unknown");
         var types = parseTeamTypes(teamMap.get("types"));
-        return new Team(label, code, types);
+        return new Team(code, code, types);
     }
 
     private ImmutableList<TeamType> parseTeamTypes(@Nullable Object typesClaim) {
