@@ -12,6 +12,9 @@ import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import Image from 'next/image'
 import DashboardsPage from '@/components/dashboards/dashboards'
 import TeamSelector from '@/components/TeamSelector'
+import { BookOpen } from 'lucide-react'
+import KnowledgeGapsPage from '@/components/knowledgegaps/knowledge-gaps'
+import { useKnowledgeGapsEnabled } from '@/lib/hooks'
 
 
 // 1. Define support sub-tabs
@@ -19,6 +22,7 @@ const supportSubTabs = [
     { key: 'home', label: 'Home', icon: <Home className="w-5 h-5 mr-2" /> },
     { key: 'tickets', label: 'Tickets', icon: <Ticket className="w-5 h-5 mr-2" /> },
     { key: 'escalations', label: 'Escalations', icon: <AlertCircle className="w-5 h-5 mr-2" /> },
+    { key: 'knowledge-gaps', label: 'Support Area Summary', icon: <BookOpen className="w-5 h-5 mr-2" /> },
     { key: 'health', label: 'Analytics & Operations', icon: <BarChart2 className="w-5 h-5 mr-2" /> },
     { key: 'sla', label: 'SLA Dashboard', icon: <BarChart2 className="w-5 h-5 mr-2" /> }
 ] as const
@@ -29,6 +33,7 @@ type SupportSubTabKey = typeof supportSubTabs[number]['key']
 export default function Dashboard() {
     const { user, isLoading, isAuthenticated, logout } = useAuth()
     const { hasFullAccess } = useTeamFilter()
+    const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled()
     const router = useRouter()
 
     // State
@@ -43,10 +48,18 @@ export default function Dashboard() {
         router.push('/login')
     }
 
-    // Show all tabs based on access level (same logic for iframe and non-iframe)
-    const supportTabs = hasFullAccess
-        ? supportSubTabs
-        : supportSubTabs.filter(tab => tab.key !== 'health' && tab.key !== 'sla')
+    // Show all tabs based on access level and feature flags
+    const supportTabs = supportSubTabs.filter(tab => {
+        // Filter out health and sla for non-full-access users
+        if (!hasFullAccess && (tab.key === 'health' || tab.key === 'sla')) {
+            return false
+        }
+        // Filter out knowledge-gaps if feature is disabled
+        if (tab.key === 'knowledge-gaps' && isKnowledgeGapsEnabled === false) {
+            return false
+        }
+        return true
+    })
 
     // Ensure activeSupportSubTab is valid
     useEffect(() => {
@@ -222,6 +235,7 @@ export default function Dashboard() {
                         {activeSupportSubTab === 'home' && <StatsPage />}
                         {activeSupportSubTab === 'tickets' && <TicketsPage />}
                         {activeSupportSubTab === 'escalations' && <EscalationsPage />}
+                        {activeSupportSubTab === 'knowledge-gaps' && isKnowledgeGapsEnabled && <KnowledgeGapsPage />}
                         {activeSupportSubTab === 'health' && hasFullAccess && <HealthPage />}
                         {activeSupportSubTab === 'sla' && <DashboardsPage />}
                     </div>

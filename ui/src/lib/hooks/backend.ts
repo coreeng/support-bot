@@ -1,7 +1,7 @@
 // src/lib/hooks/backend.ts
 import { useQuery } from '@tanstack/react-query'
 import { apiGet, apiPost } from '../api'
-import { AssignmentStatus, Escalation, EscalationTeam, PaginatedEscalations, PaginatedTickets, RawPaginatedEscalations, SupportMember, TicketWithLogs } from '@/lib/types'
+import { AnalysisData, AssignmentStatus, Escalation, EscalationTeam, KnowledgeGapsStatus, PaginatedEscalations, PaginatedTickets, RawPaginatedEscalations, SupportMember, TicketWithLogs } from '@/lib/types'
 
 /**
  * Backend API hooks for Spring Boot services
@@ -180,6 +180,30 @@ export function useAssignmentEnabled() {
             return response.enabled
         },
         staleTime: 5 * 60 * 1000, // Cache for 5 minutes since this rarely changes
+    })
+}
+
+// ===== Knowledge Gaps Hooks =====
+
+export function useKnowledgeGapsEnabled() {
+    return useQuery<boolean>({
+        queryKey: ['knowledge-gaps', 'enabled'],
+        queryFn: async () => {
+            const response: KnowledgeGapsStatus = await apiGet('/knowledge-gaps/enabled')
+            return response.enabled
+        },
+        staleTime: 5 * 60 * 1000, // Cache for 5 minutes since this rarely changes
+    })
+}
+
+export function useAnalysis() {
+    return useQuery<AnalysisData>({
+        queryKey: ['analysis'],
+        queryFn: async () => {
+            const response: AnalysisData = await apiGet('/analysis')
+            return response
+        },
+        staleTime: 2 * 60 * 1000, // Cache for 2 minutes
     })
 }
 
