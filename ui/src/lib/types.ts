@@ -104,9 +104,9 @@ export interface AggregatedTicketStats {
     escalated: number
 }
 
-export type RatingStats = { 
+export type RatingStats = {
   average: number
-  count: number 
+  count: number
 }
 
 export interface SupportMember {
@@ -115,6 +115,10 @@ export interface SupportMember {
 }
 
 export interface AssignmentStatus {
+    enabled: boolean
+}
+
+export interface KnowledgeGapsStatus {
     enabled: boolean
 }
 
