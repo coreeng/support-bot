@@ -252,3 +252,63 @@ You will need to register an application with the following parameters:
 
 You will also need
 to create a secret for the registered application so that it can be used for authentication by Support Bot.
+
+## Single Sign-On (SSO)
+
+SSO is supported via Google and Azure AD using the OAuth2 Authorisation Code flow that is faciliated by the API.
+One or both providers can be enabled depending on what your organisation uses.
+At least one provider must be configured. A provider is enabled when both its client ID and client secret are set.
+
+### Environment variables
+
+Set these on the **API**:
+
+| Variable | Description                                                                                                                            |
+|----------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `JWT_SECRET` | Signing key for JWTs. Must be at least 256 bits. **Required**  the app will fail to start if not set.                                  |
+| `UI_ORIGIN` | Base URL of the UI, e.g. `https://support-bot-ui.example.com`. Defaults to `http://localhost:3000`. Used for CORS and OAuth2 redirect. |
+| `GOOGLE_CLIENT_ID` | Google OAuth2 client ID. Leave empty to disable Google SSO.                                                                            |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret.                                                                                                           |
+| `AZURE_CLIENT_ID` | Azure AD application (client) ID. Leave empty to disable Azure AD SSO.                                                                 |
+| `AZURE_CLIENT_SECRET` | Azure AD client secret.                                                                                                                |
+| `AZURE_TENANT_ID` | Azure AD directory (tenant) ID.                                                                                                        |
+
+> Note: The `AZURE_*` variables above are shared between SSO (user login) and
+> [Azure Cloud integration](#azure-cloud) (reading group memberships from Entra ID).
+> A single Azure AD app registration is used for both.
+
+Set this on the **UI**:
+
+| Variable | Description |
+|----------|-------------|
+| `BACKEND_URL` | Internal URL of the API, e.g. `http://support-bot:8080`. Defaults to `http://localhost:8080`. Used by the server-side proxy. |
+
+### Google OAuth
+
+Console: https://console.cloud.google.com/apis/credentials
+
+1. Create Credentials > OAuth client ID > Web application
+2. Add redirect URIs:
+   - `http://localhost:8080/login/oauth2/code/google`
+   - `https://<your-api-domain>/login/oauth2/code/google`
+3. Copy the Client ID into `GOOGLE_CLIENT_ID`
+4. Copy the Client Secret into `GOOGLE_CLIENT_SECRET`
+
+### Azure AD
+
+Portal: https://portal.azure.com > Microsoft Entra ID > App registrations
+
+1. New registration > name it > single tenant
+2. Authentication > Add platform > Web > add redirect URIs:
+   - `http://localhost:8080/login/oauth2/code/azure`
+   - `https://<your-api-domain>/login/oauth2/code/azure`
+3. Overview > copy the Application (client) ID into `AZURE_CLIENT_ID`
+4. Overview > copy the Directory (tenant) ID into `AZURE_TENANT_ID`
+5. Certificates & secrets > New client secret > copy the value into `AZURE_CLIENT_SECRET`
+6. API permissions > Add > Microsoft Graph > Delegated:
+   - `email`
+   - `openid`
+   - `profile`
+   - `User.Read`
+
+> Note: The redirect URIs registered in each provider must match the API's publicly accessible URL.

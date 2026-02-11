@@ -41,21 +41,12 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         var email = extractEmail(oauth2User);
         var name = extractName(oauth2User);
 
-        log.info("OAuth2 login successful for user: {}", email);
+        log.info("OAuth2 login successful for user");
 
         var teams = teamService.listTeamsByUserEmail(email);
-        var isLeadership = computeIsLeadership(email, teams);
-        var isSupportEngineer = computeIsSupportEngineer(email, teams);
-        var isEscalation = computeIsEscalation(teams);
+        var roles = computeRoles(email, teams);
 
-        var principal = new UserPrincipal(
-            email,
-            name,
-            teams,
-            isLeadership,
-            isSupportEngineer,
-            isEscalation
-        );
+        var principal = new UserPrincipal(email, name, teams, roles);
 
         var jwt = jwtService.generateToken(principal);
         var code = authCodeStore.storeToken(jwt);
@@ -93,6 +84,23 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             return ((givenName != null ? givenName : "") + " " + (familyName != null ? familyName : "")).trim();
         }
         return extractEmail(oauth2User);
+    }
+
+    private ImmutableList<Role> computeRoles(String email, ImmutableList<Team> teams) {
+        var roles = ImmutableList.<Role>builder();
+        roles.add(Role.user);
+
+        if (computeIsLeadership(email, teams)) {
+            roles.add(Role.leadership);
+        }
+        if (computeIsSupportEngineer(email, teams)) {
+            roles.add(Role.supportEngineer);
+        }
+        if (computeIsEscalation(teams)) {
+            roles.add(Role.escalation);
+        }
+
+        return roles.build();
     }
 
     private boolean computeIsLeadership(String email, ImmutableList<Team> teams) {
