@@ -14,7 +14,7 @@ import com.coreeng.supportbot.analysis.AnalysisRepository.DimensionSummary;
 @Component
 public class DimensionMapper {
 
-    private static final String SLACK_LINK = "https://sky.slack.com/archives/C0CACLESZ/p1770295016842609";
+    private static final String SLACK_LINK = "https://some.slack.com/archives/ARCACLESD/p1770295016842609";
     private static final int COVERAGE_PERCENTAGE = 100;
 
     /**
