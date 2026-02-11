@@ -1,148 +1,14 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink, BarChart3 } from 'lucide-react'
-
-interface Query {
-    text: string
-    link: string
-}
-
-interface AreaItem {
-    name: string
-    coveragePercentage: number
-    queryCount: number
-    queries: Query[]
-}
-
-interface SupportAreaSummary {
-    timePeriod: 'Last Week' | 'Last Month' | 'Last Quarter' | 'Last Year'
-    totalCoveragePercentage: number
-    knowledgeGaps: AreaItem[]
-    supportAreas: AreaItem[]
-}
+import { useAnalysis } from '@/lib/hooks'
 
 export default function KnowledgeGapsPage() {
-    const [data, setData] = useState<SupportAreaSummary | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [selectedPeriod, setSelectedPeriod] = useState<'Last Week' | 'Last Month' | 'Last Quarter' | 'Last Year'>('Last Week')
+    const { data: analysisData, isLoading, error } = useAnalysis()
     const [supportAreasExpanded, setSupportAreasExpanded] = useState(false)
     const [knowledgeGapsExpanded, setKnowledgeGapsExpanded] = useState(false)
     const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
-
-    useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true)
-            await new Promise(resolve => setTimeout(resolve, 800))
-
-            const mockData: SupportAreaSummary = {
-                timePeriod: selectedPeriod,
-                totalCoveragePercentage: selectedPeriod === 'Last Week' ? 83 : selectedPeriod === 'Last Month' ? 78 : 85,
-                knowledgeGaps: [
-                    {
-                        name: 'Connectivity and Networking',
-                        coveragePercentage: 90,
-                        queryCount: 28,
-                        queries: [
-                            { text: 'Firewall rules for output traffic', link: '#' },
-                            { text: 'DNS resolution issues', link: '#' }
-                        ]
-                    },
-                    {
-                        name: 'Monitoring & Troubleshooting Tenant Applications',
-                        coveragePercentage: 88,
-                        queryCount: 50,
-                        queries: [
-                            { text: 'How to view application logs?', link: '#' },
-                            { text: 'Setting up custom metrics', link: '#' }
-                        ]
-                    },
-                    {
-                        name: 'CI',
-                        coveragePercentage: 75,
-                        queryCount: 42,
-                        queries: [
-                            { text: 'How do I fix the CI pipeline failure?', link: '#' },
-                            { text: 'What is the correct configuration for the build step?', link: '#' }
-                        ]
-                    },
-                    {
-                        name: 'Configuring Platform Features - Kafka and Dial',
-                        coveragePercentage: 60,
-                        queryCount: 35,
-                        queries: [
-                            { text: 'How to setup Kafka consumers?', link: '#' },
-                            { text: 'Dial configuration for new tenant', link: '#' }
-                        ]
-                    },
-                    {
-                        name: 'Deploying & Configuring Tenant Applications',
-                        coveragePercentage: 45,
-                        queryCount: 15,
-                        queries: [
-                            { text: 'Deployment failed with timeout', link: '#' },
-                            { text: 'Configuring environment variables', link: '#' }
-                        ]
-                    }
-                ],
-                supportAreas: [
-                    {
-                        name: 'Knowledge Gap',
-                        coveragePercentage: 56,
-                        queryCount: 2127,
-                        queries: [
-                            { text: 'Documentation missing for new API', link: '#' },
-                            { text: 'How to configure advanced settings?', link: '#' }
-                        ]
-                    },
-                    {
-                        name: 'Product Temporary Issue',
-                        coveragePercentage: 22,
-                        queryCount: 825,
-                        queries: [
-                            { text: 'Service temporarily unavailable', link: '#' },
-                            { text: '503 errors on login', link: '#' }
-                        ]
-                    },
-                    {
-                        name: 'Task Request',
-                        coveragePercentage: 13,
-                        queryCount: 493,
-                        queries: [
-                            { text: 'Please reset my API key', link: '#' },
-                            { text: 'Update billing address', link: '#' }
-                        ]
-                    },
-                    {
-                        name: 'Product Usability Problem',
-                        coveragePercentage: 5,
-                        queryCount: 196,
-                        queries: [
-                            { text: 'Cannot find the logout button', link: '#' },
-                            { text: 'Dashboard is confusing', link: '#' }
-                        ]
-                    },
-                    {
-                        name: 'Feature Request',
-                        coveragePercentage: 4,
-                        queryCount: 163,
-                        queries: [
-                            { text: 'Add dark mode support', link: '#' },
-                            { text: 'Export report to PDF', link: '#' }
-                        ]
-                    }
-                ]
-            }
-
-            mockData.knowledgeGaps.sort((a, b) => b.coveragePercentage - a.coveragePercentage)
-            mockData.supportAreas.sort((a, b) => b.coveragePercentage - a.coveragePercentage)
-
-            setData(mockData)
-            setLoading(false)
-        }
-
-        fetchData()
-    }, [selectedPeriod])
 
     const toggleItemExpansion = (itemName: string) => {
         setExpandedItems(prev => {
@@ -156,7 +22,7 @@ export default function KnowledgeGapsPage() {
         })
     }
 
-    const renderAreaItem = (item: AreaItem, index: number) => {
+    const renderAreaItem = (item: { name: string; coveragePercentage: number; queryCount: number; queries: { text: string; link: string }[] }, index: number) => {
         const isExpanded = expandedItems.has(item.name)
 
         return (
@@ -220,7 +86,7 @@ export default function KnowledgeGapsPage() {
         )
     }
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center h-full">
                 <div className="text-center">
@@ -231,71 +97,31 @@ export default function KnowledgeGapsPage() {
         )
     }
 
-    if (!data) return null
+    if (error) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                    <p className="text-red-600">Error loading analysis data</p>
+                    <p className="text-gray-600 text-sm mt-2">Please try again later</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (!analysisData) return null
 
     return (
         <div className="h-full overflow-auto bg-gray-50">
             <div className="max-w-7xl mx-auto p-8 space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                            <BarChart3 className="w-8 h-8 text-blue-600" />
-                            Support Area Summary
-                        </h1>
-                        <p className="text-gray-600 mt-2">
-                            Overview of support areas and knowledge gaps requiring attention
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-4 bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm">
-                        <label className="text-sm font-medium text-gray-700">Time Period:</label>
-                        <select
-                            value={selectedPeriod}
-                            onChange={(e) => setSelectedPeriod(e.target.value as any)}
-                            className="text-sm border-gray-300 rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white"
-                        >
-                            <option value="Last Week">Last Week</option>
-                            <option value="Last Month">Last Month</option>
-                            <option value="Last Quarter">Last Quarter</option>
-                            <option value="Last Year">Last Year</option>
-                        </select>
-                    </div>
-                </div>
-
-                {/* Overall Coverage */}
-                <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm" style={{ display: 'none' }}>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-sm font-medium text-gray-600">Overall Coverage</h2>
-                            <p className="text-4xl font-bold text-gray-900 mt-1">{data.totalCoveragePercentage}%</p>
-                        </div>
-                        <div className="w-32 h-32">
-                            <div className="relative w-full h-full">
-                                <svg className="w-full h-full transform -rotate-90">
-                                    <circle
-                                        cx="64"
-                                        cy="64"
-                                        r="56"
-                                        stroke="#e5e7eb"
-                                        strokeWidth="12"
-                                        fill="none"
-                                    />
-                                    <circle
-                                        cx="64"
-                                        cy="64"
-                                        r="56"
-                                        stroke="#3b82f6"
-                                        strokeWidth="12"
-                                        fill="none"
-                                        strokeDasharray={`${2 * Math.PI * 56}`}
-                                        strokeDashoffset={`${2 * Math.PI * 56 * (1 - data.totalCoveragePercentage / 100)}`}
-                                        strokeLinecap="round"
-                                    />
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                        <BarChart3 className="w-8 h-8 text-blue-600" />
+                        Support Area Summary
+                    </h1>
+                    <p className="text-gray-600 mt-2">
+                        Overview of support areas and knowledge gaps requiring attention
+                    </p>
                 </div>
 
                 {/* Top 5 Support Areas */}
@@ -307,7 +133,7 @@ export default function KnowledgeGapsPage() {
                         <div className="flex items-center gap-3">
                             <div className="w-1 h-8 bg-blue-600 rounded-full"></div>
                             <h2 className="text-xl font-semibold text-gray-900">Top 5 Support Areas</h2>
-                            <span className="text-sm text-gray-500">({data.supportAreas.length} areas)</span>
+                            <span className="text-sm text-gray-500">({analysisData.supportAreas.length} areas)</span>
                         </div>
                         {supportAreasExpanded ? (
                             <ChevronDown className="w-6 h-6 text-gray-400" />
@@ -318,7 +144,7 @@ export default function KnowledgeGapsPage() {
 
                     {supportAreasExpanded && (
                         <div className="px-6 pb-6 space-y-3">
-                            {data.supportAreas.slice(0, 5).map((item, index) => renderAreaItem(item, index))}
+                            {analysisData.supportAreas.slice(0, 5).map((item, index) => renderAreaItem(item, index))}
                         </div>
                     )}
                 </div>
@@ -332,7 +158,7 @@ export default function KnowledgeGapsPage() {
                         <div className="flex items-center gap-3">
                             <div className="w-1 h-8 bg-amber-600 rounded-full"></div>
                             <h2 className="text-xl font-semibold text-gray-900">Top 5 Knowledge Gaps</h2>
-                            <span className="text-sm text-gray-500">({data.knowledgeGaps.length} gaps)</span>
+                            <span className="text-sm text-gray-500">({analysisData.knowledgeGaps.length} gaps)</span>
                         </div>
                         {knowledgeGapsExpanded ? (
                             <ChevronDown className="w-6 h-6 text-gray-400" />
@@ -343,7 +169,7 @@ export default function KnowledgeGapsPage() {
 
                     {knowledgeGapsExpanded && (
                         <div className="px-6 pb-6 space-y-3">
-                            {data.knowledgeGaps.slice(0, 5).map((item, index) => renderAreaItem(item, index))}
+                            {analysisData.knowledgeGaps.slice(0, 5).map((item, index) => renderAreaItem(item, index))}
                         </div>
                     )}
                 </div>

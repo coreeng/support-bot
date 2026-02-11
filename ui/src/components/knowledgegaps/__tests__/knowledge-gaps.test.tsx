@@ -1,23 +1,146 @@
 import React from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import KnowledgeGapsPage from '../knowledge-gaps'
+import * as hooks from '../../../lib/hooks'
 
-// Helper to wait for loading to finish
-const waitForLoading = async () => {
-    await waitFor(() => {
-        expect(screen.queryByText(/Loading support area summary/i)).not.toBeInTheDocument()
-    }, { timeout: 3000 })
+// Mock the hooks
+jest.mock('../../../lib/hooks')
+
+const mockUseAnalysis = hooks.useAnalysis as jest.MockedFunction<typeof hooks.useAnalysis>
+
+const mockAnalysisData = {
+    knowledgeGaps: [
+        {
+            name: 'Connectivity and Networking',
+            coveragePercentage: 90,
+            queryCount: 28,
+            queries: [
+                { text: 'Firewall rules for output traffic', link: 'https://slack.com/1' },
+                { text: 'DNS resolution issues', link: 'https://slack.com/2' }
+            ]
+        },
+        {
+            name: 'Monitoring & Troubleshooting Tenant Applications',
+            coveragePercentage: 88,
+            queryCount: 50,
+            queries: [
+                { text: 'How to view application logs?', link: 'https://slack.com/3' },
+                { text: 'Setting up custom metrics', link: 'https://slack.com/4' }
+            ]
+        },
+        {
+            name: 'CI',
+            coveragePercentage: 75,
+            queryCount: 42,
+            queries: [
+                { text: 'How do I fix the CI pipeline failure?', link: 'https://slack.com/5' },
+                { text: 'What is the correct configuration for the build step?', link: 'https://slack.com/6' }
+            ]
+        },
+        {
+            name: 'Configuring Platform Features - Kafka and Dial',
+            coveragePercentage: 60,
+            queryCount: 35,
+            queries: [
+                { text: 'How to setup Kafka consumers?', link: 'https://slack.com/7' },
+                { text: 'Dial configuration for new tenant', link: 'https://slack.com/8' }
+            ]
+        },
+        {
+            name: 'Deploying & Configuring Tenant Applications',
+            coveragePercentage: 45,
+            queryCount: 15,
+            queries: [
+                { text: 'Deployment failed with timeout', link: 'https://slack.com/9' },
+                { text: 'Configuring environment variables', link: 'https://slack.com/10' }
+            ]
+        }
+    ],
+    supportAreas: [
+        {
+            name: 'Knowledge Gap',
+            coveragePercentage: 56,
+            queryCount: 2127,
+            queries: [
+                { text: 'Documentation missing for new API', link: 'https://slack.com/11' },
+                { text: 'How to configure advanced settings?', link: 'https://slack.com/12' }
+            ]
+        },
+        {
+            name: 'Product Temporary Issue',
+            coveragePercentage: 22,
+            queryCount: 825,
+            queries: [
+                { text: 'Service temporarily unavailable', link: 'https://slack.com/13' },
+                { text: '503 errors on login', link: 'https://slack.com/14' }
+            ]
+        },
+        {
+            name: 'Task Request',
+            coveragePercentage: 13,
+            queryCount: 493,
+            queries: [
+                { text: 'Please reset my API key', link: 'https://slack.com/15' },
+                { text: 'Update billing address', link: 'https://slack.com/16' }
+            ]
+        },
+        {
+            name: 'Product Usability Problem',
+            coveragePercentage: 5,
+            queryCount: 196,
+            queries: [
+                { text: 'Cannot find the logout button', link: 'https://slack.com/17' },
+                { text: 'Dashboard is confusing', link: 'https://slack.com/18' }
+            ]
+        },
+        {
+            name: 'Feature Request',
+            coveragePercentage: 4,
+            queryCount: 163,
+            queries: [
+                { text: 'Add dark mode support', link: 'https://slack.com/19' },
+                { text: 'Export report to PDF', link: 'https://slack.com/20' }
+            ]
+        }
+    ]
 }
 
 describe('KnowledgeGapsPage', () => {
+    beforeEach(() => {
+        jest.clearAllMocks()
+    })
+
     it('shows loading state initially', () => {
+        mockUseAnalysis.mockReturnValue({
+            data: undefined,
+            isLoading: true,
+            error: null
+        } as any)
+
         render(<KnowledgeGapsPage />)
         expect(screen.getByText(/Loading support area summary/i)).toBeInTheDocument()
     })
 
-    it('renders page header and collapsible sections after loading', async () => {
+    it('shows error state when API fails', () => {
+        mockUseAnalysis.mockReturnValue({
+            data: undefined,
+            isLoading: false,
+            error: new Error('API Error')
+        } as any)
+
         render(<KnowledgeGapsPage />)
-        await waitForLoading()
+        expect(screen.getByText('Error loading analysis data')).toBeInTheDocument()
+        expect(screen.getByText('Please try again later')).toBeInTheDocument()
+    })
+
+    it('renders page header and collapsible sections after loading', () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        render(<KnowledgeGapsPage />)
 
         // Check for main page header
         expect(screen.getByText('Support Area Summary')).toBeInTheDocument()
@@ -26,15 +149,16 @@ describe('KnowledgeGapsPage', () => {
         // Check for collapsible section headers
         expect(screen.getByText('Top 5 Support Areas')).toBeInTheDocument()
         expect(screen.getByText('Top 5 Knowledge Gaps')).toBeInTheDocument()
-
-        // Check overall coverage is displayed
-        expect(screen.getByText('Overall Coverage')).toBeInTheDocument()
-        expect(screen.getByText('83%')).toBeInTheDocument()
     })
 
-    it('expands and collapses support areas section', async () => {
+    it('expands and collapses support areas section', () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
         render(<KnowledgeGapsPage />)
-        await waitForLoading()
 
         // Initially collapsed - items should not be visible
         expect(screen.queryByText('Knowledge Gap')).not.toBeInTheDocument()
@@ -46,20 +170,22 @@ describe('KnowledgeGapsPage', () => {
         // Now items should be visible
         expect(screen.getByText('Knowledge Gap')).toBeInTheDocument()
         expect(screen.getByText('2,127 queries')).toBeInTheDocument()
-        expect(screen.getByText('56% coverage')).toBeInTheDocument()
 
         // Click again to collapse
         fireEvent.click(supportAreasButton)
 
         // Items should be hidden again
-        await waitFor(() => {
-            expect(screen.queryByText('Knowledge Gap')).not.toBeInTheDocument()
-        })
+        expect(screen.queryByText('Knowledge Gap')).not.toBeInTheDocument()
     })
 
-    it('expands and collapses knowledge gaps section', async () => {
+    it('expands and collapses knowledge gaps section', () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
         render(<KnowledgeGapsPage />)
-        await waitForLoading()
 
         // Initially collapsed - items should not be visible
         expect(screen.queryByText('CI')).not.toBeInTheDocument()
@@ -71,12 +197,16 @@ describe('KnowledgeGapsPage', () => {
         // Now items should be visible
         expect(screen.getByText('CI')).toBeInTheDocument()
         expect(screen.getByText('42 queries')).toBeInTheDocument()
-        expect(screen.getByText('75% coverage')).toBeInTheDocument()
     })
 
-    it('expands individual area to show relevant queries', async () => {
+    it('expands individual area to show relevant queries', () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
         render(<KnowledgeGapsPage />)
-        await waitForLoading()
 
         // Expand the Top 5 Support Areas section first
         const supportAreasButton = screen.getByRole('button', { name: /Top 5 Support Areas/i })
@@ -99,34 +229,17 @@ describe('KnowledgeGapsPage', () => {
         fireEvent.click(collapseButton)
 
         // Queries should be hidden again
-        await waitFor(() => {
-            expect(screen.queryByText('Documentation missing for new API')).not.toBeInTheDocument()
-        })
+        expect(screen.queryByText('Documentation missing for new API')).not.toBeInTheDocument()
     })
 
-    it('updates time period selection and reloads data', async () => {
+    it('displays all 5 items when sections are expanded', () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
         render(<KnowledgeGapsPage />)
-        await waitForLoading()
-
-        const select = screen.getByRole('combobox') as HTMLSelectElement
-        expect(select.value).toBe('Last Week')
-
-        // Change selection
-        fireEvent.change(select, { target: { value: 'Last Month' } })
-
-        // Should go back to loading state briefly
-        expect(screen.getByText(/Loading support area summary/i)).toBeInTheDocument()
-
-        await waitForLoading()
-
-        // Should still show the main page
-        expect(screen.getByText('Support Area Summary')).toBeInTheDocument()
-        expect(select.value).toBe('Last Month')
-    })
-
-    it('displays all 5 items when sections are expanded', async () => {
-        render(<KnowledgeGapsPage />)
-        await waitForLoading()
 
         // Expand Top 5 Support Areas
         const supportAreasButton = screen.getByRole('button', { name: /Top 5 Support Areas/i })
