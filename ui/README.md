@@ -18,7 +18,7 @@ Next.js frontend for the Support Bot platform.
    - `BACKEND_URL` — Support Bot API (default: `http://localhost:8080`)
    - `DATABASE_URL` — PostgreSQL connection string
    - `NEXTAUTH_URL`, `NEXTAUTH_SECRET` — NextAuth session config
-   - `AZURE_AD_CLIENT_ID`, `AZURE_AD_CLIENT_SECRET`, `AZURE_AD_TENANT_ID` — Azure AD OAuth
+   - `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID` — Azure AD OAuth
    - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — Google OAuth (optional)
 
 ## Development

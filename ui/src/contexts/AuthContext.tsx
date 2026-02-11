@@ -81,9 +81,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [refreshUser])
 
   const isAuthenticated = !!user && checkAuth()
-  const isLeadership = user?.isLeadership ?? false
-  const isSupportEngineer = user?.isSupportEngineer ?? false
-  const isEscalationTeam = user?.isEscalation ?? false
+  const isLeadership = user?.roles?.includes('leadership') ?? false
+  const isSupportEngineer = user?.roles?.includes('supportEngineer') ?? false
+  const isEscalationTeam = user?.roles?.includes('escalation') ?? false
 
   const actualEscalationTeams = useMemo(() => {
     if (!user || !isEscalationTeam) return []

@@ -45,9 +45,7 @@ describe('AuthContext', () => {
     const mockUser = {
       name: 'Test User',
       email: 'user@example.com',
-      isLeadership: false,
-      isSupportEngineer: true,
-      isEscalation: false,
+      roles: ['user', 'supportEngineer'],
       teams: [],
     }
 
@@ -103,9 +101,7 @@ describe('AuthContext', () => {
     const mockUser = {
       name: 'Test User',
       email: 'user@example.com',
-      isLeadership: false,
-      isSupportEngineer: true,
-      isEscalation: false,
+      roles: ['user', 'supportEngineer'],
       teams: [],
     }
 
@@ -138,9 +134,7 @@ describe('AuthContext', () => {
     mockFetchCurrentUser.mockResolvedValue({
       name: 'Popup User',
       email: 'popup@example.com',
-      isLeadership: false,
-      isSupportEngineer: true,
-      isEscalation: false,
+      roles: ['user', 'supportEngineer'],
       teams: [],
     })
 

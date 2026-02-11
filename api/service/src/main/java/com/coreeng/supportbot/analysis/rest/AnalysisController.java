@@ -1,0 +1,42 @@
+package com.coreeng.supportbot.analysis.rest;
+
+import java.util.List;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.coreeng.supportbot.analysis.AnalysisService;
+
+import lombok.RequiredArgsConstructor;
+
+/**
+ * REST controller for analysis data.
+ */
+@RestController
+@RequestMapping("/analysis")
+@RequiredArgsConstructor
+public class AnalysisController {
+
+    private final AnalysisService analysisService;
+    private final DimensionMapper dimensionMapper;
+
+    /**
+     * Get analysis data including knowledge gaps and support areas.
+     *
+     * @return AnalysisUI with knowledge gaps and support areas
+     */
+    @GetMapping
+    public AnalysisUI getAnalysis() {
+        List<DimensionSummaryUI> knowledgeGaps = dimensionMapper.mapToUI(
+            analysisService.getKnowledgeGapCategoriesWithSummaries()
+        );
+        
+        List<DimensionSummaryUI> supportAreas = dimensionMapper.mapToUI(
+            analysisService.getDriversWithSummaries()
+        );
+        
+        return new AnalysisUI(knowledgeGaps, supportAreas);
+    }
+}
+

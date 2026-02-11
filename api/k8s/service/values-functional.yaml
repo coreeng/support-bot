@@ -13,6 +13,8 @@ env:
     value: "supportbot"
   - name: DB_PASSWORD
     value: "supportbotpassword"
+  - name: JWT_SECRET
+    value: "functional-test-jwt-secret-minimum-256-bits"
 
 monitoring:
   enabled: true
