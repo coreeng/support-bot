@@ -14,8 +14,8 @@ import com.coreeng.supportbot.analysis.AnalysisRepository.DimensionSummary;
 @Component
 public class DimensionMapper {
 
-    private static final String SLACK_LINK = "https://some.slack.com/archives/ARCACLESD/p1770295016842609";
-    private static final int COVERAGE_PERCENTAGE = 100;
+    private static final String slackLink = "https://some.slack.com/archives/ARCACLESD/p1770295016842609";
+    private static final int coveragePercentage = 100;
 
     /**
      * Transform a list of DimensionSummary records to DimensionSummaryUI.
@@ -42,13 +42,13 @@ public class DimensionMapper {
                 List<DimensionSummaryUI.QuerySummary> queries = summaries.stream()
                     .map(summary -> new DimensionSummaryUI.QuerySummary(
                         summary.summary(),
-                        SLACK_LINK
+                            slackLink
                     ))
                     .toList();
 
                 return new DimensionSummaryUI(
                     dimension,
-                    COVERAGE_PERCENTAGE,
+                    coveragePercentage,
                     queryCount,
                     queries
                 );
