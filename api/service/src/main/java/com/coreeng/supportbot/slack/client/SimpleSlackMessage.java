@@ -11,8 +11,10 @@ import lombok.Getter;
 public class SimpleSlackMessage implements SlackMessage {
     @Builder.Default
     private String text = "";
+
     @Builder.Default
     private ImmutableList<LayoutBlock> blocks = ImmutableList.of();
+
     @Builder.Default
     private ImmutableList<Attachment> attachments = ImmutableList.of();
 

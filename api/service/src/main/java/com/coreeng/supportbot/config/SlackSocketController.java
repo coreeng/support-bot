@@ -6,11 +6,10 @@ import com.slack.api.socket_mode.SocketModeClient;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.CommandLineRunner;
-
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.CommandLineRunner;
 
 @Slf4j
 public class SlackSocketController implements CommandLineRunner {
@@ -20,24 +19,16 @@ public class SlackSocketController implements CommandLineRunner {
 
     private final AtomicBoolean shuttingDown = new AtomicBoolean(false);
 
-    public SlackSocketController(
-        App app,
-        SlackProps slackCreds,
-        MeterRegistry meterRegistry
-    ) throws IOException {
-        this.socketModeApp = new SocketModeApp(
-            slackCreds.creds().socketToken(),
-            app,
-            10
-        );
+    public SlackSocketController(App app, SlackProps slackCreds, MeterRegistry meterRegistry) throws IOException {
+        this.socketModeApp = new SocketModeApp(slackCreds.creds().socketToken(), app, 10);
 
         this.disconnectCounter = Counter.builder("slack_socket_disconnects_total")
-            .description("Total number of WebSocket disconnections")
-            .register(meterRegistry);
+                .description("Total number of WebSocket disconnections")
+                .register(meterRegistry);
 
         this.errorCounter = Counter.builder("slack_socket_errors_total")
-            .description("Total number of WebSocket errors")
-            .register(meterRegistry);
+                .description("Total number of WebSocket errors")
+                .register(meterRegistry);
     }
 
     @Override

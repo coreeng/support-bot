@@ -1,5 +1,9 @@
 package com.coreeng.supportbot.homepage;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.Comparator.comparing;
+
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
@@ -11,21 +15,16 @@ import com.coreeng.supportbot.teams.TeamMemberFetcher;
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.Nullable;
-import org.springframework.stereotype.Service;
-
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.ImmutableList.toImmutableList;
-import static java.util.Comparator.comparing;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
+import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
@@ -45,23 +44,21 @@ public class HomepageService {
         Map<TicketId, String> permalinkByTicketId = collectPermalinks(page.content());
 
         return HomepageView.builder()
-            .timestamp(Instant.now())
-            .tickets(
-                page.content().stream()
-                    .map(dt -> ticketToTicketView(dt, permalinkByTicketId.get(dt.ticket().id())))
-                    .collect(toImmutableList())
-            )
-            .totalTickets(page.totalElements())
-            .totalPages(page.totalPages())
-            .page(page.page())
-            .channelId(slackTicketsProps.channelId())
-            .state(state)
-            .build();
+                .timestamp(Instant.now())
+                .tickets(page.content().stream()
+                        .map(dt -> ticketToTicketView(
+                                dt, permalinkByTicketId.get(dt.ticket().id())))
+                        .collect(toImmutableList()))
+                .totalTickets(page.totalElements())
+                .totalPages(page.totalPages())
+                .page(page.page())
+                .channelId(slackTicketsProps.channelId())
+                .state(state)
+                .build();
     }
 
     private Map<TicketId, String> collectPermalinks(ImmutableList<DetailedTicket> tickets) {
-        record TicketPermalink(TicketId id, String permalink) {
-        }
+        record TicketPermalink(TicketId id, String permalink) {}
         CompletionService<TicketPermalink> completionService = new ExecutorCompletionService<>(executor);
         List<Future<TicketPermalink>> futures = new ArrayList<>(tickets.size());
         Map<TicketId, String> result = new HashMap<>();
@@ -70,21 +67,21 @@ public class HomepageService {
                 futures.add(completionService.submit(() -> {
                     Ticket ticket = t.ticket();
                     try {
-                        String permalink = slackClient.getPermalink(new SlackGetMessageByTsRequest(
-                            ticket.channelId(),
-                            ticket.queryTs()
-                        ));
+                        String permalink = slackClient.getPermalink(
+                                new SlackGetMessageByTsRequest(ticket.channelId(), ticket.queryTs()));
                         return new TicketPermalink(checkNotNull(ticket.id()), permalink);
                     } catch (Exception e) {
                         log.atError()
-                            .setCause(e)
-                            .addArgument(ticket::id)
-                            .log("Error while collecting permalink for ticket {}");
+                                .setCause(e)
+                                .addArgument(ticket::id)
+                                .log("Error while collecting permalink for ticket {}");
                         throw e;
                     }
                 }));
             }
-            for (int i = 0; i < futures.size(); i++) { //NOPMD - suppressed ForLoopCanBeForeach - the loop is not foreach in principle
+            for (int i = 0;
+                    i < futures.size();
+                    i++) { // NOPMD - suppressed ForLoopCanBeForeach - the loop is not foreach in principle
                 TicketPermalink tp = completionService.take().get();
                 result.put(tp.id(), tp.permalink());
             }
@@ -92,9 +89,7 @@ public class HomepageService {
             for (Future<TicketPermalink> f : futures) {
                 f.cancel(false);
             }
-            log.atError()
-                .setCause(e)
-                .log("Error while collecting permalinks");
+            log.atError().setCause(e).log("Error while collecting permalinks");
             throw new RuntimeException(e);
         }
         return result;
@@ -103,43 +98,40 @@ public class HomepageService {
     private TicketView ticketToTicketView(DetailedTicket t, @Nullable String permalink) {
         Ticket ticket = t.ticket();
         TicketView.TicketViewBuilder view = TicketView.builder()
-            .id(checkNotNull(ticket.id()))
-            .status(ticket.status())
-            .escalations(t.escalations())
-            .inquiringTeam(t.ticket().team() != null ? t.ticket().team().toCode() : null)
-            .impact(ticket.impact() != null ? impactsRegistry.findImpactByCode(ticket.impact()) : null)
-            .queryPermalink(permalink);
+                .id(checkNotNull(ticket.id()))
+                .status(ticket.status())
+                .escalations(t.escalations())
+                .inquiringTeam(t.ticket().team() != null ? t.ticket().team().toCode() : null)
+                .impact(ticket.impact() != null ? impactsRegistry.findImpactByCode(ticket.impact()) : null)
+                .queryPermalink(permalink);
 
         if (ticket.status() == TicketStatus.closed) {
-            view.closedAt(
-                ticket.statusLog().stream()
+            view.closedAt(ticket.statusLog().stream()
                     .filter(l -> l.status() == TicketStatus.closed)
                     .max(comparing(Ticket.StatusLog::date))
-                    .get().date()
-            );
+                    .get()
+                    .date());
         }
-        view.lastOpenedAt(
-            ticket.statusLog().stream()
+        view.lastOpenedAt(ticket.statusLog().stream()
                 .filter(l -> l.status() == TicketStatus.opened)
                 .max(comparing(Ticket.StatusLog::date))
-                .get().date()
-        );
+                .get()
+                .date());
 
         view.assignedTo(getAssigneeEmail(ticket.assignedTo()));
 
         return view.build();
     }
 
-    @Nullable
-    private String getAssigneeEmail(SlackId.@Nullable User assignedToUserId) {
+    @Nullable private String getAssigneeEmail(SlackId.@Nullable User assignedToUserId) {
         if (assignedToUserId == null || !assignmentProps.enabled()) {
             return null;
         }
 
         return supportTeamService.members().stream()
-            .filter(member -> assignedToUserId.equals(member.slackId()))
-            .findFirst()
-            .map(TeamMemberFetcher.TeamMember::email)
-            .orElse(null);
+                .filter(member -> assignedToUserId.equals(member.slackId()))
+                .findFirst()
+                .map(TeamMemberFetcher.TeamMember::email)
+                .orElse(null);
     }
 }

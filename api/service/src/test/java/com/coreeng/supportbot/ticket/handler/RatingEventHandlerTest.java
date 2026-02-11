@@ -1,5 +1,9 @@
 package com.coreeng.supportbot.ticket.handler;
 
+import static java.util.Objects.requireNonNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
@@ -12,27 +16,25 @@ import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketStatusChanged;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.slack.api.model.Message;
+import java.time.ZoneId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.ZoneId;
-
-import static java.util.Objects.requireNonNull;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class RatingEventHandlerTest {
 
     @Mock
     private TicketSlackService slackService;
+
     @Mock
     private SlackClient slackClient;
+
     @Mock
     private Message originalMessage;
+
     @Mock
     private EscalationQueryService escalationQueryService;
 
@@ -52,10 +54,10 @@ class RatingEventHandlerTest {
     void shouldPostRatingRequestWhenTicketClosed() {
         // Given: create a real ticket in memory repo
         Ticket ticket = Ticket.builder()
-            .channelId("C1234567890")
-            .queryTs(new MessageTs("1754593060", false))
-            .status(TicketStatus.opened)
-            .build();
+                .channelId("C1234567890")
+                .queryTs(new MessageTs("1754593060", false))
+                .status(TicketStatus.opened)
+                .build();
         Ticket created = ticketRepository.createTicketIfNotExists(ticket);
         TicketId createdId = requireNonNull(created.id());
         MessageRef queryRef = created.queryRef();
@@ -102,10 +104,10 @@ class RatingEventHandlerTest {
     void shouldHandleSlackClientException() {
         // Given
         Ticket ticket = Ticket.builder()
-            .channelId("C123")
-            .queryTs(new MessageTs("1754593000", false))
-            .status(TicketStatus.opened)
-            .build();
+                .channelId("C123")
+                .queryTs(new MessageTs("1754593000", false))
+                .status(TicketStatus.opened)
+                .build();
         Ticket created = ticketRepository.createTicketIfNotExists(ticket);
         TicketId createdId = requireNonNull(created.id());
         MessageRef queryRef = created.queryRef();
@@ -113,7 +115,7 @@ class RatingEventHandlerTest {
         TicketStatusChanged event = new TicketStatusChanged(createdId, TicketStatus.closed);
 
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class)))
-            .thenThrow(new RuntimeException("Slack API error"));
+                .thenThrow(new RuntimeException("Slack API error"));
 
         // When
         handler.onTicketStatusChange(event);
@@ -127,10 +129,10 @@ class RatingEventHandlerTest {
     void shouldPostRatingRequestWithCorrectParameters() {
         // Given
         Ticket ticket = Ticket.builder()
-            .channelId("C123")
-            .queryTs(new MessageTs("1754593100", false))
-            .status(TicketStatus.opened)
-            .build();
+                .channelId("C123")
+                .queryTs(new MessageTs("1754593100", false))
+                .status(TicketStatus.opened)
+                .build();
         Ticket created = ticketRepository.createTicketIfNotExists(ticket);
         TicketId createdId = requireNonNull(created.id());
         MessageRef queryRef = created.queryRef();

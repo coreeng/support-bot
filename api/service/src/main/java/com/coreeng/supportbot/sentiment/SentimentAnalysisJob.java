@@ -16,8 +16,8 @@ public class SentimentAnalysisJob {
     public void analyzeClosedTickets() {
         ImmutableList<TicketId> ticketIds = repository.listNotAnalysedClosedTickets();
         log.atInfo()
-            .addArgument(() -> ticketIds.size()) //NOPMD - suppressed LambdaCanBeMethodReference - It won't compile
-            .log("{} tickets to analyse for sentiment");
+                .addArgument(() -> ticketIds.size()) // NOPMD - suppressed LambdaCanBeMethodReference - It won't compile
+                .log("{} tickets to analyse for sentiment");
         for (TicketId ticketId : ticketIds) {
             try {
                 log.info("Analysing for sentiment ticket {}", ticketId);

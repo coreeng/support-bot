@@ -1,8 +1,12 @@
 package com.coreeng.supportbot.ticket.rest;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,11 +14,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
-
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AssignmentControllerTest {
@@ -70,19 +69,11 @@ class AssignmentControllerTest {
     @Test
     void shouldReturn400WhenServiceReturnsValidationError() {
         // given
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(new TicketId(1)),
-            "U12345"
-        );
-        
+        BulkReassignRequest request = new BulkReassignRequest(List.of(new TicketId(1)), "U12345");
+
         BulkReassignResultUI validationError = new BulkReassignResultUI(
-            0,
-            ImmutableList.of(),
-            0,
-            ImmutableList.of(),
-            "Assignment feature is disabled"
-        );
-        
+                0, ImmutableList.of(), 0, ImmutableList.of(), "Assignment feature is disabled");
+
         when(bulkReassignmentService.bulkReassign(request)).thenReturn(validationError);
 
         // when
@@ -91,7 +82,7 @@ class AssignmentControllerTest {
         // then
         assertThat(response.getStatusCode().value()).isEqualTo(400);
         assertThat(response.getBody()).isEqualTo(validationError);
-        
+
         verify(bulkReassignmentService).bulkReassign(request);
         verifyNoMoreInteractions(bulkReassignmentService);
     }
@@ -101,20 +92,12 @@ class AssignmentControllerTest {
         // given
         TicketId ticket1 = new TicketId(1);
         TicketId ticket2 = new TicketId(2);
-        
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(ticket1, ticket2),
-            "U12345"
-        );
-        
+
+        BulkReassignRequest request = new BulkReassignRequest(List.of(ticket1, ticket2), "U12345");
+
         BulkReassignResultUI successResult = new BulkReassignResultUI(
-            2,
-            ImmutableList.of(ticket1, ticket2),
-            0,
-            ImmutableList.of(),
-            "All tickets successfully reassigned"
-        );
-        
+                2, ImmutableList.of(ticket1, ticket2), 0, ImmutableList.of(), "All tickets successfully reassigned");
+
         when(bulkReassignmentService.bulkReassign(request)).thenReturn(successResult);
 
         // when
@@ -123,9 +106,8 @@ class AssignmentControllerTest {
         // then
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody()).isEqualTo(successResult);
-        
+
         verify(bulkReassignmentService).bulkReassign(request);
         verifyNoMoreInteractions(bulkReassignmentService);
     }
 }
-

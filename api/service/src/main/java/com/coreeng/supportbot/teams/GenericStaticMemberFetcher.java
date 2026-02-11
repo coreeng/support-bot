@@ -2,11 +2,10 @@ package com.coreeng.supportbot.teams;
 
 import com.coreeng.supportbot.slack.SlackId;
 import com.google.common.collect.ImmutableList;
-import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.Nullable;
-
 import java.util.List;
 import java.util.function.Function;
+import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 
 @Slf4j
 public class GenericStaticMemberFetcher<T> implements TeamMemberFetcher {
@@ -33,12 +32,14 @@ public class GenericStaticMemberFetcher<T> implements TeamMemberFetcher {
             return ImmutableList.of();
         }
         return staticMembers.stream()
-                .map(member -> new TeamMember(emailExtractor.apply(member), SlackId.user(slackIdExtractor.apply(member))))
+                .map(member ->
+                        new TeamMember(emailExtractor.apply(member), SlackId.user(slackIdExtractor.apply(member))))
                 .collect(ImmutableList.toImmutableList());
     }
 
     @Override
-    public ImmutableList<TeamMember> handleMembershipUpdate(SlackId.Group groupId, ImmutableList<SlackId.User> teamUsers) {
+    public ImmutableList<TeamMember> handleMembershipUpdate(
+            SlackId.Group groupId, ImmutableList<SlackId.User> teamUsers) {
         log.info("Ignoring membership update for static {} team", teamName);
         return ImmutableList.of();
     }

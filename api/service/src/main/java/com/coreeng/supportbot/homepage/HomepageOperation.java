@@ -1,9 +1,8 @@
 package com.coreeng.supportbot.homepage;
 
-import lombok.Getter;
-
-import org.jspecify.annotations.Nullable;
 import java.util.regex.Pattern;
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 
 @Getter
 public enum HomepageOperation {
@@ -12,7 +11,7 @@ public enum HomepageOperation {
     filter("homepage-filter"),
     refresh("homepage-refresh");
 
-    public static final Pattern pattern = Pattern.compile("^homepage-.+$");
+    public static final Pattern PATTERN = Pattern.compile("^homepage-.+$");
 
     private final String actionId;
 
@@ -20,8 +19,7 @@ public enum HomepageOperation {
         this.actionId = actionId;
     }
 
-    @Nullable
-    public static HomepageOperation fromActionIdOrNull(String actionId) {
+    @Nullable public static HomepageOperation fromActionIdOrNull(String actionId) {
         for (HomepageOperation value : values()) {
             if (value.actionId.equals(actionId)) {
                 return value;

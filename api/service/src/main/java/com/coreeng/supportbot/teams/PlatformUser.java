@@ -1,10 +1,9 @@
 package com.coreeng.supportbot.teams;
 
+import java.util.Set;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-
-import java.util.Set;
 
 @Getter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -12,6 +11,6 @@ import java.util.Set;
 public class PlatformUser {
     @EqualsAndHashCode.Include
     private final String email;
+
     private final Set<PlatformTeam> teams;
 }
-

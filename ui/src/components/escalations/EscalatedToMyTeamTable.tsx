@@ -2,15 +2,17 @@
 
 import { useState, useMemo } from 'react'
 import { useEscalations, useRegistry } from '@/lib/hooks'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
+import { useNow } from '@/hooks/useNow'
 
 export default function EscalatedToMyTeamTable() {
     const { isEscalationTeam, actualEscalationTeams } = useAuth()
     const { selectedTeam } = useTeamFilter()
     const { data: escalationsData, isLoading, error } = useEscalations()
     const { data: registryData } = useRegistry()
-    
+    const now = useNow()
+
     const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'resolved'>('all')
     const [impactFilter, setImpactFilter] = useState<string>('all')
     const [pageIndex, setPageIndex] = useState(0)
@@ -78,7 +80,7 @@ export default function EscalatedToMyTeamTable() {
     const formatDate = (isoString?: string) => isoString ? new Date(isoString).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '-'
     const formatDuration = (start?: string, end?: string) => {
         if (!start) return '-'
-        const endTime = end ? new Date(end).getTime() : Date.now()
+        const endTime = end ? new Date(end).getTime() : now
         const durationMs = endTime - new Date(start).getTime()
         const minutes = Math.floor(durationMs / 1000 / 60)
         const hours = Math.floor(minutes / 60)
@@ -176,7 +178,7 @@ export default function EscalatedToMyTeamTable() {
                             </thead>
                             <tbody className="divide-y">
                                 {paginatedEscalations.map(esc => {
-                                    const durationMs = esc.openedAt ? (esc.resolvedAt ? new Date(esc.resolvedAt).getTime() : Date.now()) - new Date(esc.openedAt).getTime() : 0
+                                    const durationMs = esc.openedAt ? (esc.resolvedAt ? new Date(esc.resolvedAt).getTime() : now) - new Date(esc.openedAt).getTime() : 0
                                     const durationMinutes = Math.floor(durationMs / 1000 / 60)
                                     return (
                                         <tr key={esc.id} className="hover:bg-purple-50 transition-colors">

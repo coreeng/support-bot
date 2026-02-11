@@ -5,6 +5,7 @@ import com.coreeng.supportbot.slack.UIOption;
 public interface EnumerationValue extends UIOption {
     @Override
     String label();
+
     String code();
 
     @Override

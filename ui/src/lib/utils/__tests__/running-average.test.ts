@@ -1,5 +1,4 @@
 // src/lib/utils/__tests__/running-average.test.ts
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { calculateRunningAverage } from '../running-average'
 
 describe('calculateRunningAverage', () => {

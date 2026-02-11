@@ -26,4 +26,3 @@ public interface AnalysisRepository {
      */
     record DimensionSummary(String dimension, long queryCount, String summary) {}
 }
-

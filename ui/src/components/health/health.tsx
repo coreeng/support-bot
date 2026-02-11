@@ -29,7 +29,6 @@ import {
     TicketWithLogs,
     SupportMember
 } from "@/lib/types";
-import { apiPost } from '@/lib/api'
 
 export default function HealthPage() {
     const {data: registryData} = useRegistry()
@@ -1373,7 +1372,19 @@ export default function HealthPage() {
                                                                             assignedTo: targetUserId
                                                                         }
                                                                         
-                                                                        const result: BulkReassignResult = await apiPost('/assignment/bulk-reassign', request)
+                                                                        const response = await fetch('/api/assignment/bulk-reassign', {
+                                                                            method: 'POST',
+                                                                            headers: {
+                                                                                'Content-Type': 'application/json',
+                                                                            },
+                                                                            body: JSON.stringify(request),
+                                                                        })
+
+                                                                        if (!response.ok) {
+                                                                            throw new Error(`Failed to bulk reassign: ${response.status}`)
+                                                                        }
+
+                                                                        const result: BulkReassignResult = await response.json()
                                                                         
                                                                         setReassignMessage({
                                                                             type: 'success', 

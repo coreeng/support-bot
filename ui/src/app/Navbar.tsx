@@ -1,6 +1,6 @@
 'use client'
 
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import TeamSelector from '@/components/TeamSelector'
 
@@ -8,9 +8,8 @@ export default function Navbar() {
     const { user, isLoading, isAuthenticated, logout } = useAuth()
     const router = useRouter()
 
-    const handleLogout = async () => {
-        await logout()
-        router.push('/login')
+    const handleLogout = () => {
+        logout()
     }
 
     if (isLoading) {

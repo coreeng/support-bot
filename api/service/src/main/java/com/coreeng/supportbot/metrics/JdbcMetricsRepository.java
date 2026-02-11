@@ -1,10 +1,5 @@
 package com.coreeng.supportbot.metrics;
 
-import java.util.List;
-
-import org.jooq.DSLContext;
-import org.jooq.Field;
-
 import static com.coreeng.supportbot.dbschema.Tables.*;
 import static org.jooq.impl.DSL.count;
 import static org.jooq.impl.DSL.exists;
@@ -12,11 +7,12 @@ import static org.jooq.impl.DSL.notExists;
 import static org.jooq.impl.DSL.selectOne;
 
 import com.coreeng.supportbot.dbschema.enums.EscalationStatus;
-
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-
-import lombok.RequiredArgsConstructor;
 
 @Repository
 @RequiredArgsConstructor
@@ -27,38 +23,42 @@ public class JdbcMetricsRepository implements MetricsRepository {
 
     @Override
     public List<TicketMetric> getTicketMetrics() {
-        Field<Boolean> escalated = exists(
-            selectOne()
-                .from(ESCALATION)
-                .where(ESCALATION.TICKET_ID.eq(TICKET.ID))
-                .and(ESCALATION.STATUS.ne(EscalationStatus.resolved))
-        ).as("escalated");
+        Field<Boolean> escalated = exists(selectOne()
+                        .from(ESCALATION)
+                        .where(ESCALATION.TICKET_ID.eq(TICKET.ID))
+                        .and(ESCALATION.STATUS.ne(EscalationStatus.resolved)))
+                .as("escalated");
 
-        return dsl.select(TICKET.STATUS, TICKET.IMPACT_CODE, TICKET.TEAM, escalated, TICKET.RATING_SUBMITTED, count().as("count"))
-            .from(TICKET)
-            .groupBy(TICKET.STATUS, TICKET.IMPACT_CODE, TICKET.TEAM, escalated, TICKET.RATING_SUBMITTED)
-            .fetch(r -> new TicketMetric(
-                r.get(TICKET.STATUS).getLiteral(),
-                r.get(TICKET.IMPACT_CODE) != null ? r.get(TICKET.IMPACT_CODE) : "unknown",
-                r.get(TICKET.TEAM) != null ? r.get(TICKET.TEAM) : "unassigned",
-                r.get(escalated),
-                r.get(TICKET.RATING_SUBMITTED),
-                r.get("count", Long.class)
-            ));
+        return dsl.select(
+                        TICKET.STATUS,
+                        TICKET.IMPACT_CODE,
+                        TICKET.TEAM,
+                        escalated,
+                        TICKET.RATING_SUBMITTED,
+                        count().as("count"))
+                .from(TICKET)
+                .groupBy(TICKET.STATUS, TICKET.IMPACT_CODE, TICKET.TEAM, escalated, TICKET.RATING_SUBMITTED)
+                .fetch(r -> new TicketMetric(
+                        r.get(TICKET.STATUS).getLiteral(),
+                        r.get(TICKET.IMPACT_CODE) != null ? r.get(TICKET.IMPACT_CODE) : "unknown",
+                        r.get(TICKET.TEAM) != null ? r.get(TICKET.TEAM) : "unassigned",
+                        r.get(escalated),
+                        r.get(TICKET.RATING_SUBMITTED),
+                        r.get("count", Long.class)));
     }
 
     @Override
     public List<EscalationMetric> getEscalationMetrics() {
         return dsl.select(ESCALATION.STATUS, ESCALATION.TEAM, TICKET.IMPACT_CODE, count().as("count"))
                 .from(ESCALATION)
-                .join(TICKET).on(ESCALATION.TICKET_ID.eq(TICKET.ID))
+                .join(TICKET)
+                .on(ESCALATION.TICKET_ID.eq(TICKET.ID))
                 .groupBy(ESCALATION.STATUS, ESCALATION.TEAM, TICKET.IMPACT_CODE)
                 .fetch(r -> new EscalationMetric(
                         r.get(ESCALATION.STATUS).getLiteral(),
                         r.get(ESCALATION.TEAM) != null ? r.get(ESCALATION.TEAM) : "unknown",
                         r.get(TICKET.IMPACT_CODE) != null ? r.get(TICKET.IMPACT_CODE) : "unknown",
-                        r.get("count", Long.class)
-                ));
+                        r.get("count", Long.class)));
     }
 
     @Override
@@ -66,22 +66,15 @@ public class JdbcMetricsRepository implements MetricsRepository {
         return dsl.select(RATINGS.RATING, count().as("count"))
                 .from(RATINGS)
                 .groupBy(RATINGS.RATING)
-                .fetch(r -> new RatingMetric(
-                        r.get(RATINGS.RATING),
-                        r.get("count", Long.class)
-                ));
+                .fetch(r -> new RatingMetric(r.get(RATINGS.RATING), r.get("count", Long.class)));
     }
 
     @Override
     public long getUnattendedQueryCount() {
         Long count = dsl.selectCount()
-            .from(QUERY)
-            .where(notExists(
-                selectOne()
-                    .from(TICKET)
-                    .where(TICKET.QUERY_ID.eq(QUERY.ID))
-            ))
-            .fetchOne(0, Long.class);
+                .from(QUERY)
+                .where(notExists(selectOne().from(TICKET).where(TICKET.QUERY_ID.eq(QUERY.ID))))
+                .fetchOne(0, Long.class);
         return count != null ? count : 0L;
     }
 
@@ -105,10 +98,7 @@ public class JdbcMetricsRepository implements MetricsRepository {
             FROM response_durations
             WHERE duration IS NOT NULL AND duration > 0
             """).fetchSingle();
-        return new ResponseSLAMetric(
-                result.get("p50", Double.class),
-                result.get("p90", Double.class)
-        );
+        return new ResponseSLAMetric(result.get("p50", Double.class), result.get("p90", Double.class));
     }
 
     @Override
@@ -133,10 +123,7 @@ public class JdbcMetricsRepository implements MetricsRepository {
             WHERE duration IS NOT NULL AND duration > 0
             """).fetchSingle();
         return new ResolutionSLAMetric(
-                result.get("p50", Double.class),
-                result.get("p75", Double.class),
-                result.get("p90", Double.class)
-        );
+                result.get("p50", Double.class), result.get("p75", Double.class), result.get("p90", Double.class));
     }
 
     @Override
@@ -152,10 +139,7 @@ public class JdbcMetricsRepository implements MetricsRepository {
             HAVING COUNT(*) > 0
             ORDER BY count DESC
             """)
-                .fetch(r -> new EscalationByTagMetric(
-                        r.get("tag", String.class),
-                        r.get("count", Long.class)
-                ));
+                .fetch(r -> new EscalationByTagMetric(r.get("tag", String.class), r.get("count", Long.class)));
     }
 
     @Override
@@ -201,10 +185,7 @@ public class JdbcMetricsRepository implements MetricsRepository {
             UNION ALL SELECT 'escalated', 'previous', lw.escalated FROM last_week lw
             """)
                 .fetch(r -> new WeeklyActivityMetric(
-                        r.get("type", String.class),
-                        r.get("week", String.class),
-                        r.get("count", Long.class)
-                ));
+                        r.get("type", String.class), r.get("week", String.class), r.get("count", Long.class)));
     }
 
     @Override
@@ -235,9 +216,6 @@ public class JdbcMetricsRepository implements MetricsRepository {
             ORDER BY p50 DESC
             """)
                 .fetch(r -> new ResolutionTimeByTagMetric(
-                        r.get("tag", String.class),
-                        r.get("p50", Double.class),
-                        r.get("p90", Double.class)
-                ));
+                        r.get("tag", String.class), r.get("p50", Double.class), r.get("p90", Double.class)));
     }
 }

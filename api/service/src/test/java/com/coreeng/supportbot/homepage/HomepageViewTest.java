@@ -1,5 +1,8 @@
 package com.coreeng.supportbot.homepage;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import com.coreeng.supportbot.config.HomepageProps;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketSummaryViewMapper;
@@ -7,12 +10,8 @@ import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.coreeng.supportbot.util.JsonMapper;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.block.HeaderBlock;
-
-import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.time.Instant;
+import org.junit.jupiter.api.Test;
 
 class HomepageViewTest {
     private final JsonMapper jsonMapper = new JsonMapper();
@@ -59,29 +58,25 @@ class HomepageViewTest {
     void renderUsefulLinksEmpty() {
         // given
         HomepageProps props = new HomepageProps(null);
-        HomepageViewMapper mapper = new HomepageViewMapper(
-            new TicketSummaryViewMapper(jsonMapper),
-            jsonMapper,
-            props
-        );
+        HomepageViewMapper mapper = new HomepageViewMapper(new TicketSummaryViewMapper(jsonMapper), jsonMapper, props);
         HomepageView homepage = HomepageView.builder()
-            .tickets(ImmutableList.of())
-            .page(0)
-            .totalPages(1)
-            .totalTickets(20)
-            .channelId("C123")
-            .timestamp(Instant.now())
-            .state(HomepageView.State.getDefault())
-            .build();
+                .tickets(ImmutableList.of())
+                .page(0)
+                .totalPages(1)
+                .totalTickets(20)
+                .channelId("C123")
+                .timestamp(Instant.now())
+                .state(HomepageView.State.getDefault())
+                .build();
 
         // when
         var view = mapper.render(homepage);
 
         // then
         boolean hasUsefulLinksHeader = view.renderBlocks().stream()
-            .filter(block -> block instanceof HeaderBlock)
-            .map(block -> (HeaderBlock) block)
-            .anyMatch(header -> header.getText().getText().contains("Useful Links"));
+                .filter(block -> block instanceof HeaderBlock)
+                .map(block -> (HeaderBlock) block)
+                .anyMatch(header -> header.getText().getText().contains("Useful Links"));
 
         assertThat(hasUsefulLinksHeader).isFalse();
     }
@@ -90,36 +85,30 @@ class HomepageViewTest {
     void renderUsefulLinksPresent() {
         // given
         var links = ImmutableList.of(
-          new HomepageProps.UsefulLink("Weekly Trends", "https://grafana.example.com/weekly", "Weekly overview"),
-          new HomepageProps.UsefulLink("Escalations", "https://grafana.example.com/escalations", null)
-        );
+                new HomepageProps.UsefulLink("Weekly Trends", "https://grafana.example.com/weekly", "Weekly overview"),
+                new HomepageProps.UsefulLink("Escalations", "https://grafana.example.com/escalations", null));
         HomepageProps props = new HomepageProps(links);
-        HomepageViewMapper mapper = new HomepageViewMapper(
-            new TicketSummaryViewMapper(jsonMapper),
-            jsonMapper,
-            props
-        );
+        HomepageViewMapper mapper = new HomepageViewMapper(new TicketSummaryViewMapper(jsonMapper), jsonMapper, props);
         HomepageView homepage = HomepageView.builder()
-            .tickets(ImmutableList.of())
-            .page(0)
-            .totalPages(1)
-            .totalTickets(20)
-            .channelId("C123")
-            .timestamp(Instant.now())
-            .state(HomepageView.State.getDefault())
-            .build();
+                .tickets(ImmutableList.of())
+                .page(0)
+                .totalPages(1)
+                .totalTickets(20)
+                .channelId("C123")
+                .timestamp(Instant.now())
+                .state(HomepageView.State.getDefault())
+                .build();
 
         // when
         var view = mapper.render(homepage);
 
         // then
         boolean hasUsefulLinksHeader = view.renderBlocks().stream()
-            .filter(block -> block instanceof HeaderBlock)
-            .map(block -> (HeaderBlock) block)
-            .anyMatch(header -> header.getText().getText().contains("Useful Links"));
+                .filter(block -> block instanceof HeaderBlock)
+                .map(block -> (HeaderBlock) block)
+                .anyMatch(header -> header.getText().getText().contains("Useful Links"));
 
         assertThat(hasUsefulLinksHeader).isTrue();
         assertThat(view.renderBlocks().toString()).contains("Weekly Trends", "Weekly overview", "Escalations");
-}
-
+    }
 }

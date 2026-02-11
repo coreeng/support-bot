@@ -1,5 +1,4 @@
 // src/components/dashboards/__tests__/EscalationSLASection.test.tsx
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { EscalationSLASection } from '../EscalationSLASection'

@@ -1,18 +1,17 @@
 package com.coreeng.supportbot.metrics;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MetricsServiceTest {
@@ -32,19 +31,19 @@ class MetricsServiceTest {
     @Test
     void registersMetricWithCorrectTags() {
         when(metricsRepository.getTicketMetrics())
-            .thenReturn(List.of(
-                    new TicketMetric("opened", "productionBlocking", "infra-integration", true, false, 5)
-            ));
+                .thenReturn(
+                        List.of(new TicketMetric("opened", "productionBlocking", "infra-integration", true, false, 5)));
 
         metricsService.refreshMetrics();
 
-        Gauge metric = meterRegistry.find("supportbot_tickets")
-            .tag("status", "opened")
-            .tag("impact", "productionBlocking")
-            .tag("team", "infra-integration")
-            .tag("escalated", "true")
-            .tag("rated", "false")
-            .gauge();
+        Gauge metric = meterRegistry
+                .find("supportbot_tickets")
+                .tag("status", "opened")
+                .tag("impact", "productionBlocking")
+                .tag("team", "infra-integration")
+                .tag("escalated", "true")
+                .tag("rated", "false")
+                .gauge();
 
         assertThat(metric).isNotNull();
         assertThat(metric.value()).isEqualTo(5.0);
@@ -53,13 +52,12 @@ class MetricsServiceTest {
     @Test
     void registersMetricEscalations() {
         when(metricsRepository.getEscalationMetrics())
-                .thenReturn(List.of(
-                        new EscalationMetric("pending", "infra-integration", "productionBlocking", 3)
-                ));
+                .thenReturn(List.of(new EscalationMetric("pending", "infra-integration", "productionBlocking", 3)));
 
         metricsService.refreshMetrics();
 
-        Gauge metric = meterRegistry.find("supportbot_escalations")
+        Gauge metric = meterRegistry
+                .find("supportbot_escalations")
                 .tag("status", "pending")
                 .tag("impact", "productionBlocking")
                 .tag("team", "infra-integration")
@@ -71,22 +69,17 @@ class MetricsServiceTest {
 
     @Test
     void registersRatingMetrics() {
-        when(metricsRepository.getRatingMetrics()).thenReturn(List.of(
-                new RatingMetric(4, 10),
-                new RatingMetric(5, 5)
-        ));
+        when(metricsRepository.getRatingMetrics()).thenReturn(List.of(new RatingMetric(4, 10), new RatingMetric(5, 5)));
 
         metricsService.refreshMetrics();
 
-        Gauge rating1 = meterRegistry.find("supportbot_ratings")
-                .tag("rating", "4")
-                .gauge();
+        Gauge rating1 =
+                meterRegistry.find("supportbot_ratings").tag("rating", "4").gauge();
         assertThat(rating1).isNotNull();
         assertThat(rating1.value()).isEqualTo(10.0);
 
-        Gauge rating2 = meterRegistry.find("supportbot_ratings")
-                .tag("rating", "5")
-                .gauge();
+        Gauge rating2 =
+                meterRegistry.find("supportbot_ratings").tag("rating", "5").gauge();
         assertThat(rating2).isNotNull();
         assertThat(rating2.value()).isEqualTo(5);
     }
@@ -104,18 +97,19 @@ class MetricsServiceTest {
 
     @Test
     void registersResponseSLAMetrics() {
-        when(metricsRepository.getResponseSLAMetrics())
-                .thenReturn(new ResponseSLAMetric(3600.0, 86_400.0));
+        when(metricsRepository.getResponseSLAMetrics()).thenReturn(new ResponseSLAMetric(3600.0, 86_400.0));
 
         metricsService.refreshMetrics();
 
-        Gauge p50 = meterRegistry.find("supportbot_response_sla_seconds")
+        Gauge p50 = meterRegistry
+                .find("supportbot_response_sla_seconds")
                 .tag("percentile", "p50")
                 .gauge();
         assertThat(p50).isNotNull();
         assertThat(p50.value()).isEqualTo(3600.0);
 
-        Gauge p90 = meterRegistry.find("supportbot_response_sla_seconds")
+        Gauge p90 = meterRegistry
+                .find("supportbot_response_sla_seconds")
                 .tag("percentile", "p90")
                 .gauge();
         assertThat(p90).isNotNull();
@@ -129,19 +123,22 @@ class MetricsServiceTest {
 
         metricsService.refreshMetrics();
 
-        Gauge p50 = meterRegistry.find("supportbot_resolution_sla_seconds")
+        Gauge p50 = meterRegistry
+                .find("supportbot_resolution_sla_seconds")
                 .tag("percentile", "p50")
                 .gauge();
         assertThat(p50).isNotNull();
         assertThat(p50.value()).isEqualTo(7200.0);
 
-        Gauge p75 = meterRegistry.find("supportbot_resolution_sla_seconds")
+        Gauge p75 = meterRegistry
+                .find("supportbot_resolution_sla_seconds")
                 .tag("percentile", "p75")
                 .gauge();
         assertThat(p75).isNotNull();
         assertThat(p75.value()).isEqualTo(86_400.0);
 
-        Gauge p90 = meterRegistry.find("supportbot_resolution_sla_seconds")
+        Gauge p90 = meterRegistry
+                .find("supportbot_resolution_sla_seconds")
                 .tag("percentile", "p90")
                 .gauge();
         assertThat(p90).isNotNull();
@@ -150,20 +147,21 @@ class MetricsServiceTest {
 
     @Test
     void registersEscalationsByTagMetrics() {
-        when(metricsRepository.getEscalationsByTag()).thenReturn(List.of(
-                new EscalationByTagMetric("networking", 10),
-                new EscalationByTagMetric("vault", 5)
-        ));
+        when(metricsRepository.getEscalationsByTag())
+                .thenReturn(
+                        List.of(new EscalationByTagMetric("networking", 10), new EscalationByTagMetric("vault", 5)));
 
         metricsService.refreshMetrics();
 
-        Gauge networking = meterRegistry.find("supportbot_escalations_by_tag")
+        Gauge networking = meterRegistry
+                .find("supportbot_escalations_by_tag")
                 .tag("tag", "networking")
                 .gauge();
         assertThat(networking).isNotNull();
         assertThat(networking.value()).isEqualTo(10.0);
 
-        Gauge vault = meterRegistry.find("supportbot_escalations_by_tag")
+        Gauge vault = meterRegistry
+                .find("supportbot_escalations_by_tag")
                 .tag("tag", "vault")
                 .gauge();
         assertThat(vault).isNotNull();
@@ -176,37 +174,41 @@ class MetricsServiceTest {
 
         metricsService.refreshMetrics();
 
-        Gauge metric = meterRegistry.find("supportbot_longest_active_ticket_seconds").gauge();
+        Gauge metric =
+                meterRegistry.find("supportbot_longest_active_ticket_seconds").gauge();
         assertThat(metric).isNotNull();
         assertThat(metric.value()).isEqualTo(604_800.0);
     }
 
     @Test
     void registersWeeklyActivityMetrics() {
-        when(metricsRepository.getWeeklyActivity()).thenReturn(List.of(
-                new WeeklyActivityMetric("opened", "current", 10),
-                new WeeklyActivityMetric("opened", "previous", 15),
-                new WeeklyActivityMetric("closed", "current", 8),
-                new WeeklyActivityMetric("closed", "previous", 12)
-        ));
+        when(metricsRepository.getWeeklyActivity())
+                .thenReturn(List.of(
+                        new WeeklyActivityMetric("opened", "current", 10),
+                        new WeeklyActivityMetric("opened", "previous", 15),
+                        new WeeklyActivityMetric("closed", "current", 8),
+                        new WeeklyActivityMetric("closed", "previous", 12)));
 
         metricsService.refreshMetrics();
 
-        Gauge openedCurrent = meterRegistry.find("supportbot_weekly_activity")
+        Gauge openedCurrent = meterRegistry
+                .find("supportbot_weekly_activity")
                 .tag("type", "opened")
                 .tag("week", "current")
                 .gauge();
         assertThat(openedCurrent).isNotNull();
         assertThat(openedCurrent.value()).isEqualTo(10.0);
 
-        Gauge openedPrevious = meterRegistry.find("supportbot_weekly_activity")
+        Gauge openedPrevious = meterRegistry
+                .find("supportbot_weekly_activity")
                 .tag("type", "opened")
                 .tag("week", "previous")
                 .gauge();
         assertThat(openedPrevious).isNotNull();
         assertThat(openedPrevious.value()).isEqualTo(15.0);
 
-        Gauge closedCurrent = meterRegistry.find("supportbot_weekly_activity")
+        Gauge closedCurrent = meterRegistry
+                .find("supportbot_weekly_activity")
                 .tag("type", "closed")
                 .tag("week", "current")
                 .gauge();
@@ -216,28 +218,31 @@ class MetricsServiceTest {
 
     @Test
     void registersResolutionTimeByTagMetrics() {
-        when(metricsRepository.getResolutionTimeByTag()).thenReturn(List.of(
-                new ResolutionTimeByTagMetric("networking", 3600.0, 7200.0),
-                new ResolutionTimeByTagMetric("vault", 1800.0, 5400.0)
-        ));
+        when(metricsRepository.getResolutionTimeByTag())
+                .thenReturn(List.of(
+                        new ResolutionTimeByTagMetric("networking", 3600.0, 7200.0),
+                        new ResolutionTimeByTagMetric("vault", 1800.0, 5400.0)));
 
         metricsService.refreshMetrics();
 
-        Gauge networkingP50 = meterRegistry.find("supportbot_resolution_time_by_tag_seconds")
+        Gauge networkingP50 = meterRegistry
+                .find("supportbot_resolution_time_by_tag_seconds")
                 .tag("tag", "networking")
                 .tag("percentile", "p50")
                 .gauge();
         assertThat(networkingP50).isNotNull();
         assertThat(networkingP50.value()).isEqualTo(3600.0);
 
-        Gauge networkingP90 = meterRegistry.find("supportbot_resolution_time_by_tag_seconds")
+        Gauge networkingP90 = meterRegistry
+                .find("supportbot_resolution_time_by_tag_seconds")
                 .tag("tag", "networking")
                 .tag("percentile", "p90")
                 .gauge();
         assertThat(networkingP90).isNotNull();
         assertThat(networkingP90.value()).isEqualTo(7200.0);
 
-        Gauge vaultP50 = meterRegistry.find("supportbot_resolution_time_by_tag_seconds")
+        Gauge vaultP50 = meterRegistry
+                .find("supportbot_resolution_time_by_tag_seconds")
                 .tag("tag", "vault")
                 .tag("percentile", "p50")
                 .gauge();

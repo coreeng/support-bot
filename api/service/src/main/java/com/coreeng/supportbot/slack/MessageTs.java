@@ -1,25 +1,23 @@
 package com.coreeng.supportbot.slack;
 
-import com.fasterxml.jackson.annotation.JsonValue;
-
-import org.jspecify.annotations.Nullable;
-import java.time.Instant;
-
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+import java.time.Instant;
+import org.jspecify.annotations.Nullable;
+
 public record MessageTs(
-    @JsonValue String ts,
-    // TODO: delete me when no more mocking data is required
-    boolean mocked
-) {
-    private static final String mockedPrefix = "MOCKED_";
+        @JsonValue String ts,
+        // TODO: delete me when no more mocking data is required
+        boolean mocked) {
+    private static final String MOCKED_PREFIX = "MOCKED_";
 
     public MessageTs {
         checkNotNull(ts);
     }
 
     public MessageTs(String ts) {
-        this(ts.replaceFirst("^" + mockedPrefix, ""), ts.startsWith(mockedPrefix));
+        this(ts.replaceFirst("^" + MOCKED_PREFIX, ""), ts.startsWith(MOCKED_PREFIX));
     }
 
     public static MessageTs mocked(String ts) {
@@ -30,15 +28,14 @@ public record MessageTs(
         return new MessageTs(ts);
     }
 
-    @Nullable
-    public static MessageTs ofOrNull(@Nullable String ts) {
+    @Nullable public static MessageTs ofOrNull(@Nullable String ts) {
         return ts != null ? of(ts) : null;
     }
 
     @Override
     public String ts() {
         if (mocked) {
-            return mockedPrefix + ts;
+            return MOCKED_PREFIX + ts;
         }
         return ts;
     }

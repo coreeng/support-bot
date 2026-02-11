@@ -1,10 +1,9 @@
 package com.coreeng.supportbot.ticket;
 
+import java.util.regex.Pattern;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-
 import org.jspecify.annotations.Nullable;
-import java.util.regex.Pattern;
 
 @Getter
 @RequiredArgsConstructor
@@ -13,12 +12,11 @@ public enum TicketViewType {
     summaryConfirm("ticket-summary-confirm"),
     escalate("ticket-escalate");
 
-    public static final Pattern namePattern = Pattern.compile("^ticket-.*$");
+    public static final Pattern NAME_PATTERN = Pattern.compile("^ticket-.*$");
 
     private final String callbackId;
 
-    @Nullable
-    public static TicketViewType fromCallbackIdOrNull(String callbackId) {
+    @Nullable public static TicketViewType fromCallbackIdOrNull(String callbackId) {
         for (TicketViewType value : values()) {
             if (value.callbackId.equals(callbackId)) {
                 return value;

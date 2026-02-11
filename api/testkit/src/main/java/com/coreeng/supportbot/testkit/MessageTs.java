@@ -2,16 +2,12 @@ package com.coreeng.supportbot.testkit;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
-import org.jspecify.annotations.NonNull;
-
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
+import org.jspecify.annotations.NonNull;
 
-public record MessageTs(
-    @NonNull
-    Instant instant
- ) {
-    private static final AtomicLong counter = new AtomicLong(0L);
+public record MessageTs(@NonNull Instant instant) {
+    private static final AtomicLong COUNTER = new AtomicLong(0L);
 
     /**
      * Creates a new MessageTs with the current epoch second and a monotonically
@@ -22,7 +18,7 @@ public record MessageTs(
      */
     public static MessageTs now() {
         long epochSecond = Instant.now().getEpochSecond();
-        long suffixMicros = counter.getAndIncrement() % 1_000_000L;
+        long suffixMicros = COUNTER.getAndIncrement() % 1_000_000L;
         Instant instant = Instant.ofEpochSecond(epochSecond, suffixMicros * 1_000L);
         return new MessageTs(instant);
     }

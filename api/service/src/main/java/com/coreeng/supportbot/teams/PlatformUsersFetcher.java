@@ -9,8 +9,5 @@ public interface PlatformUsersFetcher {
      */
     List<Membership> fetchMembershipsByGroupRef(String groupRef);
 
-    record Membership(
-        String email
-    ) {
-    }
+    record Membership(String email) {}
 }

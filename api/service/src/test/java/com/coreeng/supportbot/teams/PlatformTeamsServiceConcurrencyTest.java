@@ -1,19 +1,18 @@
 package com.coreeng.supportbot.teams;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.teams.fakes.FakeEscalationTeamsRegistry;
 import com.coreeng.supportbot.teams.fakes.FakeTeamsFetcher;
 import com.coreeng.supportbot.teams.fakes.SlowUsersFetcher;
-import org.junit.jupiter.api.Test;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class PlatformTeamsServiceConcurrencyTest {
     @Test
@@ -39,9 +38,9 @@ class PlatformTeamsServiceConcurrencyTest {
 
         PlatformTeamsFetcher teamsFetcher = new FakeTeamsFetcher(teams);
         SlowUsersFetcher usersFetcher = new SlowUsersFetcher(
-            perCallDelay,
-            groupRef -> List.of(new PlatformUsersFetcher.Membership(groupRef.toLowerCase(Locale.ROOT) + "@test.com"))
-        );
+                perCallDelay,
+                groupRef ->
+                        List.of(new PlatformUsersFetcher.Membership(groupRef.toLowerCase(Locale.ROOT) + "@test.com")));
 
         EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(escalationTeams);
 
@@ -56,14 +55,18 @@ class PlatformTeamsServiceConcurrencyTest {
 
         // Assert: concurrency never exceeded the configured gate
         int maxObserved = usersFetcher.maxObservedAtSameTime();
-        assertTrue(maxObserved <= maxConcurrency,
-            "Observed concurrency (" + maxObserved + ") should be <= maxConcurrency (" + maxConcurrency + ")");
+        assertTrue(
+                maxObserved <= maxConcurrency,
+                "Observed concurrency (" + maxObserved + ") should be <= maxConcurrency (" + maxConcurrency + ")");
 
         // allow for overhead/jitter: should be < serial and not wildly larger than the ideal parallel time
-        assertTrue(elapsedMillis < serialMillis,
-            "Elapsed (" + elapsedMillis + "ms) should be less than serial time (" + serialMillis + "ms)");
-        assertTrue(elapsedMillis <= idealParallelMillis + 100,
-            "Elapsed (" + elapsedMillis + "ms) should be around ideal parallel time (" + idealParallelMillis + "ms) with tolerance");
+        assertTrue(
+                elapsedMillis < serialMillis,
+                "Elapsed (" + elapsedMillis + "ms) should be less than serial time (" + serialMillis + "ms)");
+        assertTrue(
+                elapsedMillis <= idealParallelMillis + 100,
+                "Elapsed (" + elapsedMillis + "ms) should be around ideal parallel time (" + idealParallelMillis
+                        + "ms) with tolerance");
 
         // Sanity: structures are built correctly
         assertEquals(groups, service.listTeams().size());
@@ -77,7 +80,7 @@ class PlatformTeamsServiceConcurrencyTest {
             var user = service.findUserByEmail(groupRef.toLowerCase(Locale.ROOT) + "@test.com");
             assertNotNull(user);
             assertTrue(service.listTeamsByUserEmail(groupRef.toLowerCase(Locale.ROOT) + "@test.com").stream()
-                .anyMatch(t -> t.name().equals(teamName)));
+                    .anyMatch(t -> t.name().equals(teamName)));
         }
     }
 }

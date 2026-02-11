@@ -1,17 +1,16 @@
 package com.coreeng.supportbot.testkit;
 
+import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.matching.AnythingPattern;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
+import java.util.Map;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.text.StringSubstitutor;
-
-import java.util.Map;
-
-import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
-import static org.assertj.core.api.Assertions.assertThat;
 
 @Builder
 @Getter
@@ -27,8 +26,8 @@ public class RatingRequestMessage {
         @Override
         public MappingBuilder configureStub(MappingBuilder stubBuilder) {
             return stubBuilder
-                .withFormParam("text", new AnythingPattern())
-                .withFormParam("blocks", new AnythingPattern());
+                    .withFormParam("text", new AnythingPattern())
+                    .withFormParam("blocks", new AnythingPattern());
         }
 
         @Override
@@ -39,9 +38,7 @@ public class RatingRequestMessage {
             String blocksRaw = servedStub.getRequest().formParameter("blocks").firstValue();
             assertThatJson(blocksRaw).isEqualTo(buildExpectedBlocksJson());
 
-            return RatingRequestMessage.builder()
-                .ticketId(expectedTicketId)
-                .build();
+            return RatingRequestMessage.builder().ticketId(expectedTicketId).build();
         }
 
         private String buildExpectedBlocksJson() {
@@ -90,10 +87,7 @@ public class RatingRequestMessage {
                     ]
                   }
                 ]
-                """, Map.of(
-                    "ticketId", expectedTicketId
-            ));
+                """, Map.of("ticketId", expectedTicketId));
         }
     }
 }
-

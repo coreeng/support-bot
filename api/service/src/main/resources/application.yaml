@@ -23,9 +23,9 @@ security:
     secret: ${JWT_SECRET}
     expiration: 24h
   oauth2:
-    redirect-uri: ${UI_ORIGIN:http://localhost:3000}/auth/callback
+    redirect-uri: ${UI_ORIGIN:http://localhost:3000}/login
   cors:
-    allowed-origins: ${UI_ORIGIN:http://localhost:3000}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   test-bypass:
     enabled: false
 
@@ -52,6 +52,7 @@ spring:
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
         provider:
           azure:
+            tenant-id: ${AZURE_TENANT_ID:}
             issuer-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID:common}/v2.0
   cloud:
 # Uncomment in case you require Azure integration
@@ -165,6 +166,7 @@ platform-integration:
     enabled: false
     client:
       base-url: ""
+      log-level: ${AZURE_CLIENT_LOG_LEVEL:NONE}
   teams-scraping:
     static:
       enabled: true

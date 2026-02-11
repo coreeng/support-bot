@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.ticket.rest;
 
+import static java.util.Objects.requireNonNull;
+
 import com.coreeng.supportbot.enums.ImpactsRegistry;
 import com.coreeng.supportbot.enums.TicketImpact;
 import com.coreeng.supportbot.teams.PlatformTeam;
@@ -9,8 +11,6 @@ import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
-
-import static java.util.Objects.requireNonNull;
 
 @Service
 @RequiredArgsConstructor
@@ -41,14 +41,14 @@ public class TicketUpdateService {
 
     private TicketSubmission buildSubmission(TicketId ticketId, TicketUpdateRequest request) {
         return TicketSubmission.builder()
-            .ticketId(ticketId)
-            .status(requireNonNull(request.status()))
-            .authorsTeam(TicketTeam.fromCode(requireNonNull(request.authorsTeam())))
-            .tags(ImmutableList.copyOf(requireNonNull(request.tags())))
-            .impact(requireNonNull(request.impact()))
-            .assignedTo(request.assignedTo())
-            .confirmed(true)
-            .build();
+                .ticketId(ticketId)
+                .status(requireNonNull(request.status()))
+                .authorsTeam(TicketTeam.fromCode(requireNonNull(request.authorsTeam())))
+                .tags(ImmutableList.copyOf(requireNonNull(request.tags())))
+                .impact(requireNonNull(request.impact()))
+                .assignedTo(request.assignedTo())
+                .confirmed(true)
+                .build();
     }
 
     private ValidationResult validate(@Nullable TicketUpdateRequest request) {
@@ -61,7 +61,7 @@ public class TicketUpdateService {
         if (request.authorsTeam() == null || request.authorsTeam().isBlank()) {
             return ValidationResult.invalid("authorsTeam is required");
         }
-        boolean isNotATenant = TicketTeam.notATenantCode.equals(request.authorsTeam());
+        boolean isNotATenant = TicketTeam.NOT_A_TENANT_CODE.equals(request.authorsTeam());
         PlatformTeam team = platformTeamsService.findTeamByName(request.authorsTeam());
         if (!isNotATenant && team == null) {
             return ValidationResult.invalid("authorsTeam must be a valid team code");

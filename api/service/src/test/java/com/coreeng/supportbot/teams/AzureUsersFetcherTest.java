@@ -1,26 +1,23 @@
 package com.coreeng.supportbot.teams;
 
-import com.microsoft.graph.groups.GroupsRequestBuilder;
-import com.microsoft.graph.groups.item.GroupItemRequestBuilder;
-import com.microsoft.graph.groups.item.transitivemembers.graphuser.GraphUserRequestBuilder;
-import com.microsoft.graph.groups.item.transitivemembers.TransitiveMembersRequestBuilder;
-import com.microsoft.graph.models.User;
-import com.microsoft.graph.models.UserCollectionResponse;
-import com.microsoft.graph.serviceclient.GraphServiceClient;
-import org.junit.jupiter.api.Test;
-
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
-import java.util.List;
-import java.util.function.Consumer;
-
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.microsoft.graph.groups.GroupsRequestBuilder;
+import com.microsoft.graph.groups.item.GroupItemRequestBuilder;
+import com.microsoft.graph.groups.item.transitivemembers.TransitiveMembersRequestBuilder;
+import com.microsoft.graph.groups.item.transitivemembers.graphuser.GraphUserRequestBuilder;
+import com.microsoft.graph.models.User;
+import com.microsoft.graph.models.UserCollectionResponse;
+import com.microsoft.graph.serviceclient.GraphServiceClient;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.function.Consumer;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 class AzureUsersFetcherTest {
     @Test
@@ -65,7 +62,8 @@ class AzureUsersFetcherTest {
         when(groupRequestBuilder.transitiveMembers()).thenReturn(membersRequestBuilder);
         when(membersRequestBuilder.graphUser()).thenReturn(graphUserRequestBuilder);
 
-        ArgumentCaptor<Consumer<GraphUserRequestBuilder.GetRequestConfiguration>> reqConfigCaptor = ArgumentCaptor.captor();
+        ArgumentCaptor<Consumer<GraphUserRequestBuilder.GetRequestConfiguration>> reqConfigCaptor =
+                ArgumentCaptor.captor();
         when(graphUserRequestBuilder.get(reqConfigCaptor.capture())).thenReturn(mockResponse);
 
         AzureUsersFetcher fetcher = new AzureUsersFetcher(mockGraphClient);
@@ -82,7 +80,8 @@ class AzureUsersFetcherTest {
         requestConfigurationMock.queryParameters = mock(GraphUserRequestBuilder.GetQueryParameters.class);
         reqConfigCaptor.getValue().accept(requestConfigurationMock);
         assertEquals(4, requestConfigurationMock.queryParameters.select.length);
-        assertArrayEquals(new String[]{"mail", "accountEnabled", "deletedDateTime", "userPrincipalName"},
-            requestConfigurationMock.queryParameters.select);
+        assertArrayEquals(
+                new String[] {"mail", "accountEnabled", "deletedDateTime", "userPrincipalName"},
+                requestConfigurationMock.queryParameters.select);
     }
 }

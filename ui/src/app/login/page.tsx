@@ -1,79 +1,124 @@
-'use client'
+"use client";
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { getLoginUrl } from '@/lib/auth/token'
-import { useAuth } from '@/contexts/AuthContext'
+import { useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
+import { useAuth } from "@/hooks/useAuth";
 
-export default function LoginPage() {
-  const router = useRouter()
-  const { isAuthenticated, isLoading } = useAuth()
+
+function LoginContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  // Handle callback from backend OAuth
+  const code = searchParams.get("code");
+  const token = searchParams.get("token");
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const error = searchParams.get("error");
 
   useEffect(() => {
-    // Wait for auth state to be determined before redirecting
-    if (isLoading) return
+    if (isLoading) return;
 
-    // If already authenticated, redirect to home
+    // If we have a token from the new OAuth flow, use it
+    if (token) {
+      signIn("backend-token", {
+        token,
+        callbackUrl,
+        redirect: true,
+      });
+      return;
+    }
+
+    // If we have a code, exchange it via NextAuth (legacy flow)
+    if (code) {
+      signIn("backend-oauth", {
+        code,
+        callbackUrl,
+        redirect: true,
+      });
+      return;
+    }
+
+    // If already authenticated, redirect
     if (isAuthenticated) {
-      router.replace('/')
+      router.replace(callbackUrl);
     }
-  }, [isAuthenticated, isLoading, router])
+  }, [code, token, isAuthenticated, isLoading, callbackUrl, router]);
 
-  const handleLogin = (provider: 'google' | 'azure') => {
-    // Store the current path to return to after login
-    const returnTo = sessionStorage.getItem('auth_return_to') || '/'
-    if (!sessionStorage.getItem('auth_return_to')) {
-      sessionStorage.setItem('auth_return_to', '/')
-    }
+  const handleLogin = (provider: "google" | "azure") => {
+    // OAuth goes through API route - server handles redirect to backend
+    const oauthUrl = `/api/auth/start/${provider}`;
 
-    const loginUrl = getLoginUrl(provider)
+    // Check if we're in an iframe
     const isInIframe = (() => {
       try {
-        return window.self !== window.top
+        return window.self !== window.top;
       } catch {
-        return true
+        return true;
       }
-    })()
+    })();
 
     if (!isInIframe) {
-      // Redirect to API's OAuth endpoint
-      window.location.href = loginUrl
-      return
+      window.location.href = oauthUrl;
+      return;
     }
 
-    const width = 600
-    const height = 720
-    const left = window.screenX + (window.outerWidth - width) / 2
-    const top = window.screenY + (window.outerHeight - height) / 2
+    // Popup mode for iframes
+    const width = 600;
+    const height = 720;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
     const popup = window.open(
-      loginUrl,
-      'supportbot-auth',
+      oauthUrl,
+      "supportbot-auth",
       `popup=yes,width=${width},height=${height},left=${left},top=${top}`
-    )
+    );
 
     if (!popup) {
-      window.location.href = loginUrl
+      window.location.href = oauthUrl;
     } else {
-      popup.focus()
+      popup.focus();
     }
-  }
+  };
 
-  // Show loading state while checking auth
-  if (isLoading || isAuthenticated) {
+  // Show loading state
+  if (isLoading || code || token) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">
+            {code || token ? "Completing authentication..." : "Loading..."}
+          </p>
+        </div>
       </div>
-    )
+    );
+  }
+
+  // Show error if present
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-md w-full space-y-8 p-8 text-center">
+          <h2 className="text-2xl font-bold text-red-600">Authentication Error</h2>
+          <p className="text-gray-600">{error}</p>
+          <button
+            onClick={() => router.replace("/login")}
+            className="text-blue-600 hover:underline"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
       <div className="max-w-md w-full space-y-8 p-8">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Sign in
-          </h2>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Sign in</h2>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
             Choose your authentication method
           </p>
@@ -81,7 +126,7 @@ export default function LoginPage() {
 
         <div className="space-y-4">
           <button
-            onClick={() => handleLogin('google')}
+            onClick={() => handleLogin("google")}
             className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -106,7 +151,7 @@ export default function LoginPage() {
           </button>
 
           <button
-            onClick={() => handleLogin('azure')}
+            onClick={() => handleLogin("azure")}
             className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors"
           >
             <svg className="w-5 h-5" viewBox="0 0 23 23">
@@ -120,5 +165,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
-  )
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
+  );
 }

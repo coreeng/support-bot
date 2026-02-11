@@ -1,24 +1,23 @@
 package com.coreeng.supportbot.escalation;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.Collections.reverseOrder;
+import static java.util.Comparator.comparing;
+
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
-import lombok.RequiredArgsConstructor;
-
-import org.jspecify.annotations.Nullable;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.chrono.ChronoLocalDate;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
-
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.ImmutableList.toImmutableList;
-import static java.util.Collections.reverseOrder;
-import static java.util.Comparator.comparing;
+import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
 @RequiredArgsConstructor
 public class EscalationInMemoryRepository implements EscalationRepository {
@@ -28,15 +27,14 @@ public class EscalationInMemoryRepository implements EscalationRepository {
     private final ConcurrentMap<MessageTs, Escalation> escalationsByThreadTs = new ConcurrentHashMap<>();
     private final AtomicLong idSequence = new AtomicLong(1);
 
-    @Nullable
-    @Override
+    @Nullable @Override
     public Escalation createIfNotExists(Escalation escalation) {
         checkNotNull(escalation);
         checkArgument(escalation.id() == null);
 
         Escalation escalationWithId = escalation.toBuilder()
-            .id(new EscalationId(idSequence.getAndIncrement()))
-            .build();
+                .id(new EscalationId(idSequence.getAndIncrement()))
+                .build();
 
         if (escalation.threadTs() != null) {
             escalationsByThreadTs.computeIfAbsent(escalation.threadTs(), (threadTs) -> {
@@ -75,13 +73,12 @@ public class EscalationInMemoryRepository implements EscalationRepository {
         checkArgument(escalation.resolvedAt() == null);
 
         return update(escalation.toBuilder()
-            .resolvedAt(at)
-            .status(EscalationStatus.resolved)
-            .build());
+                .resolvedAt(at)
+                .status(EscalationStatus.resolved)
+                .build());
     }
 
-    @Nullable
-    @Override
+    @Nullable @Override
     public Escalation findById(EscalationId id) {
         return escalations.get(id);
     }
@@ -93,23 +90,21 @@ public class EscalationInMemoryRepository implements EscalationRepository {
 
     @Override
     public boolean existsByTicketId(TicketId ticketId) {
-        return escalations.values().stream()
-            .anyMatch(e -> ticketId.equals(e.ticketId()));
+        return escalations.values().stream().anyMatch(e -> ticketId.equals(e.ticketId()));
     }
 
     @Override
     public ImmutableList<Escalation> listByTicketId(TicketId ticketId) {
         return escalations.values().stream()
-            .filter(e -> ticketId.equals(e.ticketId()))
-            .collect(toImmutableList());
+                .filter(e -> ticketId.equals(e.ticketId()))
+                .collect(toImmutableList());
     }
 
     @Override
     public long countNotResolvedByTicketId(TicketId ticketId) {
         return escalations.values().stream()
-            .filter(e -> ticketId.equals(e.ticketId())
-                && e.status() != EscalationStatus.resolved)
-            .count();
+                .filter(e -> ticketId.equals(e.ticketId()) && e.status() != EscalationStatus.resolved)
+                .count();
     }
 
     @Override
@@ -119,25 +114,24 @@ public class EscalationInMemoryRepository implements EscalationRepository {
         checkArgument(query.pageSize() > 0);
 
         ImmutableList<Escalation> queryResult = escalations.values().stream()
-            .filter(e -> filterEscalation(e, query))
-            .sorted(reverseOrder(comparing(Escalation::openedAt)))
-            .collect(toImmutableList());
+                .filter(e -> filterEscalation(e, query))
+                .sorted(reverseOrder(comparing(Escalation::openedAt)))
+                .collect(toImmutableList());
         long fromIndex = query.page() * query.pageSize();
         long toIndex = Math.min(queryResult.size(), (query.page() + 1) * query.pageSize());
         return new Page<>(
-            queryResult.subList((int) fromIndex, (int) toIndex),
-            query.page(),
-            queryResult.size() / query.pageSize() + 1,
-            queryResult.size()
-        );
+                queryResult.subList((int) fromIndex, (int) toIndex),
+                query.page(),
+                queryResult.size() / query.pageSize() + 1,
+                queryResult.size());
     }
 
     private boolean filterEscalation(Escalation escalation, EscalationQuery query) {
-        if (!query.ids().isEmpty()
-            && !query.ids().contains(escalation.id())) {
+        if (!query.ids().isEmpty() && !query.ids().contains(escalation.id())) {
             return false;
         }
-        if (query.ticketIds() != null && !query.ticketIds().isEmpty()
+        if (query.ticketIds() != null
+                && !query.ticketIds().isEmpty()
                 && !query.ticketIds().contains(escalation.ticketId())) {
             return false;
         }

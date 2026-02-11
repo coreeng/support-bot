@@ -1,16 +1,16 @@
 package com.coreeng.supportbot.slack;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static java.lang.String.format;
+
 import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.SlackApiTextResponse;
 import org.jspecify.annotations.Nullable;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static java.lang.String.format;
-
 public class SlackException extends RuntimeException {
-    @Nullable
-    private final SlackApiTextResponse response;
+    @Nullable private final SlackApiTextResponse response;
+
     private final ImmutableList<String> errorDetails;
 
     public SlackException(Throwable cause) {
@@ -32,7 +32,8 @@ public class SlackException extends RuntimeException {
     @Override
     public String getMessage() {
         if (response != null) {
-            return format("""
+            return format(
+                    """
                     Slack API returned an error:%n\
                       Error: %s%n\
                       Details: %s%n\
@@ -40,18 +41,17 @@ public class SlackException extends RuntimeException {
                       Needed: %s%n\
                       Provided: %s%n\
                     """,
-                response.getError(),
-                errorDetails,
-                response.getWarning(),
-                response.getNeeded(),
-                response.getProvided());
+                    response.getError(),
+                    errorDetails,
+                    response.getWarning(),
+                    response.getNeeded(),
+                    response.getProvided());
         } else {
             return "Couldn't call Slack API";
         }
     }
 
-    @Nullable
-    public String getError() {
+    @Nullable public String getError() {
         if (response != null) {
             return response.getError();
         }
@@ -59,18 +59,15 @@ public class SlackException extends RuntimeException {
         return cause != null ? cause.getMessage() : null;
     }
 
-    @Nullable
-    public String getWarning() {
+    @Nullable public String getWarning() {
         return response != null ? response.getWarning() : null;
     }
 
-    @Nullable
-    public String getNeeded() {
+    @Nullable public String getNeeded() {
         return response != null ? response.getNeeded() : null;
     }
 
-    @Nullable
-    public String getProvided() {
+    @Nullable public String getProvided() {
         return response != null ? response.getProvided() : null;
     }
 }

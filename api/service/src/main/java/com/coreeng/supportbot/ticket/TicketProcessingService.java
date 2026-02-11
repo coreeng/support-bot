@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.ticket;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
@@ -18,8 +20,6 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -34,28 +34,22 @@ public class TicketProcessingService {
     public void handleMessagePosted(MessagePosted e) {
         if (isQueryEvent(e)) {
             repository.createQueryIfNotExists(e.messageRef());
-            log.atInfo()
-                .addArgument(e::messageRef)
-                .log("Query is created on message({})");
+            log.atInfo().addArgument(e::messageRef).log("Query is created on message({})");
             return;
         }
 
         MessageRef queryRef = e.messageRef().toThreadRef();
         Ticket ticket = repository.findTicketByQuery(queryRef);
         if (ticket == null) {
-            log.atDebug()
-                .addArgument(queryRef::ts)
-                .log("No ticket for query({}). Ignoring posted message.");
+            log.atDebug().addArgument(queryRef::ts).log("No ticket for query({}). Ignoring posted message.");
             return;
         }
 
         if (ticket.status() == TicketStatus.stale) {
-            Ticket updatedTicket = repository.updateTicket(
-                ticket.toBuilder()
+            Ticket updatedTicket = repository.updateTicket(ticket.toBuilder()
                     .status(TicketStatus.opened)
                     .lastInteractedAt(Instant.now())
-                    .build()
-            );
+                    .build());
             onStatusUpdate(updatedTicket);
         } else {
             TicketId ticketId = checkNotNull(ticket.id());
@@ -65,22 +59,18 @@ public class TicketProcessingService {
 
     public void handleMessageDeleted(MessageDeleted e) {
         if (!isQueryMessageRef(e.messageRef())) {
-            log.atDebug()
-                .addArgument(e::messageRef)
-                .log("Ignoring message deletion for non-query message({})");
+            log.atDebug().addArgument(e::messageRef).log("Ignoring message deletion for non-query message({})");
             return;
         }
 
         boolean deleted = repository.deleteQueryIfNoTicket(e.messageRef());
         if (deleted) {
             log.atInfo()
-                .addKeyValue("action", "query_deleted")
-                .addArgument(e::messageRef)
-                .log("Query deleted because message was deleted and no ticket exists({})");
+                    .addKeyValue("action", "query_deleted")
+                    .addArgument(e::messageRef)
+                    .log("Query deleted because message was deleted and no ticket exists({})");
         } else {
-            log.atInfo()
-                .addArgument(e::messageRef)
-                .log("Message deleted but query kept because ticket exists({})");
+            log.atInfo().addArgument(e::messageRef).log("Message deleted but query kept because ticket exists({})");
         }
     }
 
@@ -94,58 +84,52 @@ public class TicketProcessingService {
         }
 
         if (!Objects.equals(e.reaction(), slackTicketsProps.expectedInitialReaction())) {
-            log.atDebug()
-                .addArgument(e::reaction)
-                .log("Skipping event. Unexpected reaction({})");
+            log.atDebug().addArgument(e::reaction).log("Skipping event. Unexpected reaction({})");
             return;
         }
 
         // For reaction events, the Slack doesn't provide thread context.
         // We need to fetch the message to check if it's a thread reply.
         if (slackService.isThreadReply(e.messageRef())) {
-            log.atDebug()
-                .addArgument(e.messageRef()::ts)
-                .log("Skipping reaction on thread reply message({})");
+            log.atDebug().addArgument(e.messageRef()::ts).log("Skipping reaction on thread reply message({})");
             return;
         }
 
-        Ticket newTicket = Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId());
+        Ticket newTicket =
+                Ticket.createNew(e.messageRef().actualThreadTs(), e.messageRef().channelId());
         if (assignmentProps.enabled()) {
-            newTicket = newTicket.toBuilder()
-                .assignedTo(SlackId.user(e.userId()))
-                .build();
+            newTicket =
+                    newTicket.toBuilder().assignedTo(SlackId.user(e.userId())).build();
         } else {
             log.atDebug().log("Assignment disabled by config; skipping assignment");
         }
         newTicket = repository.createTicketIfNotExists(newTicket);
         TicketId newTicketId = checkNotNull(newTicket.id());
         log.atInfo()
-            .addKeyValue("ticketId", newTicketId.id())
-            .log("Ticket created on reaction to message({})", e.messageRef().actualThreadTs());
+                .addKeyValue("ticketId", newTicketId.id())
+                .log("Ticket created on reaction to message({})", e.messageRef().actualThreadTs());
 
-        slackService.markPostTracked(new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
+        slackService.markPostTracked(
+                new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()));
 
         if (newTicket.createdMessageTs() == null) {
             // It's not really idempotent, since it's not atomic (one thing can succeed while the other one fail)
             // In the worst case, multiple forms will be posted, which is not a big issue
             MessageRef postedMessageRef = slackService.postTicketForm(
-                new MessageRef(e.messageRef().actualThreadTs(), e.messageRef().channelId()),
-                new TicketCreatedMessage(
-                    newTicketId,
-                    newTicket.status(),
-                    newTicket.statusLog().getLast().date()
-                )
-            );
-            repository.updateTicket(
-                newTicket.toBuilder()
+                    new MessageRef(
+                            e.messageRef().actualThreadTs(), e.messageRef().channelId()),
+                    new TicketCreatedMessage(
+                            newTicketId,
+                            newTicket.status(),
+                            newTicket.statusLog().getLast().date()));
+            repository.updateTicket(newTicket.toBuilder()
                     .createdMessageTs(postedMessageRef.ts())
                     .lastInteractedAt(Instant.now())
-                    .build()
-            );
+                    .build());
         } else {
             log.atInfo()
-                .addArgument(() -> e.messageRef().actualThreadTs())
-                .log("Ticket form is already posted to message({})");
+                    .addArgument(() -> e.messageRef().actualThreadTs())
+                    .log("Ticket form is already posted to message({})");
         }
     }
 
@@ -156,34 +140,28 @@ public class TicketProcessingService {
         }
 
         if (!submission.confirmed()
-            && ticket.status() != TicketStatus.closed
-            && submission.status() == TicketStatus.closed) {
+                && ticket.status() != TicketStatus.closed
+                && submission.status() == TicketStatus.closed) {
             TicketId ticketId = checkNotNull(ticket.id());
             long unresolvedEscalations = escalationQueryService.countNotResolvedByTicketId(ticketId);
             if (unresolvedEscalations > 0) {
                 return new TicketSubmitResult.RequiresConfirmation(
-                    submission,
-                    new TicketSubmitResult.ConfirmationCause(unresolvedEscalations)
-                );
+                        submission, new TicketSubmitResult.ConfirmationCause(unresolvedEscalations));
             }
         }
 
-        Ticket updatedTicket = repository.updateTicket(
-            ticket.toBuilder()
+        Ticket updatedTicket = repository.updateTicket(ticket.toBuilder()
                 .status(submission.status())
                 .team(submission.authorsTeam())
                 .tags(submission.tags())
                 .impact(submission.impact())
-                .assignedTo(submission.assignedTo() != null
-                    ? SlackId.user(submission.assignedTo())
-                    : null)
+                .assignedTo(submission.assignedTo() != null ? SlackId.user(submission.assignedTo()) : null)
                 .lastInteractedAt(Instant.now())
-                .build()
-        );
+                .build());
 
         log.atInfo()
-            .addKeyValue("ticketId", checkNotNull(updatedTicket.id()).id())
-            .log("Ticket submitted");
+                .addKeyValue("ticketId", checkNotNull(updatedTicket.id()).id())
+                .log("Ticket submitted");
 
         if (ticket.status() != updatedTicket.status()) {
             onStatusUpdate(updatedTicket);
@@ -194,27 +172,16 @@ public class TicketProcessingService {
     public void escalate(EscalateRequest request) {
         Ticket ticket = repository.findTicketById(request.ticketId());
         if (ticket == null) {
-            log.atWarn()
-                .addArgument(request::ticketId)
-                .log("Trying to escalate non-existing ticket: {}");
+            log.atWarn().addArgument(request::ticketId).log("Trying to escalate non-existing ticket: {}");
             throw new IllegalArgumentException("Ticket doesn't exist");
         }
         if (ticket.status() == TicketStatus.closed) {
-            log.atWarn()
-                .addArgument(request::ticketId)
-                .log("Trying to escalate closed ticket: {}");
+            log.atWarn().addArgument(request::ticketId).log("Trying to escalate closed ticket: {}");
             throw new IllegalArgumentException("Ticket is closed");
         }
 
-        publisher.publishEvent(new TicketEscalated(
-            ticket,
-            request.team(),
-            request.threadPermalink(),
-            request.tags()
-        ));
-        log.atInfo()
-            .addKeyValue("ticketId", checkNotNull(ticket.id()).id())
-            .log("Ticket escalated");
+        publisher.publishEvent(new TicketEscalated(ticket, request.team(), request.threadPermalink(), request.tags()));
+        log.atInfo().addKeyValue("ticketId", checkNotNull(ticket.id()).id()).log("Ticket escalated");
         slackService.markTicketEscalated(ticket.queryRef());
     }
 
@@ -226,21 +193,17 @@ public class TicketProcessingService {
         }
         if (ticket.status() != TicketStatus.opened) {
             log.atWarn()
-                .addArgument(ticket::id)
-                .log("Ticket({}) can't be marked stale, because it's not open anymore.");
+                    .addArgument(ticket::id)
+                    .log("Ticket({}) can't be marked stale, because it's not open anymore.");
             return;
         }
 
-        log.atInfo()
-            .addKeyValue("ticketId", checkNotNull(ticket.id()).id())
-            .log("Marking ticket as stale");
+        log.atInfo().addKeyValue("ticketId", checkNotNull(ticket.id()).id()).log("Marking ticket as stale");
         slackService.warnStaleness(ticket.queryRef());
-        Ticket updatedTicket = repository.updateTicket(
-            ticket.toBuilder()
+        Ticket updatedTicket = repository.updateTicket(ticket.toBuilder()
                 .status(TicketStatus.stale)
                 .lastInteractedAt(Instant.now())
-                .build()
-        );
+                .build());
         onStatusUpdate(updatedTicket);
     }
 
@@ -251,9 +214,7 @@ public class TicketProcessingService {
             return;
         }
         if (ticket.status() != TicketStatus.stale) {
-            log.atWarn()
-                .addArgument(ticket::id)
-                .log("Ticket({}) is not stale, skipping remind");
+            log.atWarn().addArgument(ticket::id).log("Ticket({}) is not stale, skipping remind");
             return;
         }
 
@@ -262,36 +223,24 @@ public class TicketProcessingService {
         repository.touchTicketById(ticketId, Instant.now());
     }
 
-    @NonNull
-    private Ticket onStatusUpdate(Ticket ticket) {
+    @NonNull private Ticket onStatusUpdate(Ticket ticket) {
         Ticket updatedTicket = repository.insertStatusLog(ticket, Instant.now());
         log.atInfo()
-            .addKeyValue("ticketId", checkNotNull(updatedTicket.id()).id())
-            .log("Ticket status changed");
+                .addKeyValue("ticketId", checkNotNull(updatedTicket.id()).id())
+                .log("Ticket status changed");
         slackService.editTicketForm(
-            new MessageRef(Objects.requireNonNull(updatedTicket.createdMessageTs()), updatedTicket.channelId()),
-            new TicketCreatedMessage(
-                checkNotNull(updatedTicket.id()),
-                updatedTicket.status(),
-                updatedTicket.statusLog().getLast().date()
-            )
-        );
+                new MessageRef(Objects.requireNonNull(updatedTicket.createdMessageTs()), updatedTicket.channelId()),
+                new TicketCreatedMessage(
+                        checkNotNull(updatedTicket.id()),
+                        updatedTicket.status(),
+                        updatedTicket.statusLog().getLast().date()));
         if (updatedTicket.status() == TicketStatus.closed) {
-            slackService.markTicketClosed(new MessageRef(
-                updatedTicket.queryTs(),
-                updatedTicket.channelId()
-            ));
+            slackService.markTicketClosed(new MessageRef(updatedTicket.queryTs(), updatedTicket.channelId()));
         } else {
-            slackService.unmarkTicketClosed(new MessageRef(
-                updatedTicket.queryTs(),
-                updatedTicket.channelId()
-            ));
+            slackService.unmarkTicketClosed(new MessageRef(updatedTicket.queryTs(), updatedTicket.channelId()));
         }
 
-        publisher.publishEvent(new TicketStatusChanged(
-            checkNotNull(ticket.id()),
-            ticket.status()
-        ));
+        publisher.publishEvent(new TicketStatusChanged(checkNotNull(ticket.id()), ticket.status()));
         return updatedTicket;
     }
 
@@ -300,7 +249,6 @@ public class TicketProcessingService {
     }
 
     private boolean isQueryMessageRef(MessageRef messageRef) {
-        return Objects.equals(slackTicketsProps.channelId(), messageRef.channelId())
-            && !messageRef.isReply();
+        return Objects.equals(slackTicketsProps.channelId(), messageRef.channelId()) && !messageRef.isReply();
     }
 }

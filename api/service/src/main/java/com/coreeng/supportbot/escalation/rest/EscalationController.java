@@ -1,22 +1,21 @@
 package com.coreeng.supportbot.escalation.rest;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
+
 import com.coreeng.supportbot.escalation.*;
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import static com.google.common.collect.ImmutableList.toImmutableList;
 
 @RestController
 @RequestMapping("/escalation")
@@ -35,29 +34,30 @@ public class EscalationController {
             @Nullable @RequestParam(required = false) LocalDate dateFrom,
             @Nullable @RequestParam(required = false) LocalDate dateTo,
             @Nullable @RequestParam(required = false) EscalationStatus status,
-            @Nullable @RequestParam(required = false) String team
-    ) {
-        Page<Escalation> escalationsPage = escalationQueryService.findByQuery(
-                EscalationQuery.builder()
-                        .page(page)
-                        .pageSize(pageSize)
-                        .ids(ImmutableList.copyOf(ids))
-                        .ticketIds(ticketId != null ? ImmutableList.of(ticketId) : ImmutableList.of())
-                        .dateFrom(dateFrom)
-                        .dateTo(dateTo)
-                        .status(status)
-                        .team(team)
-                        .build()
-        );
+            @Nullable @RequestParam(required = false) String team) {
+        Page<Escalation> escalationsPage = escalationQueryService.findByQuery(EscalationQuery.builder()
+                .page(page)
+                .pageSize(pageSize)
+                .ids(ImmutableList.copyOf(ids))
+                .ticketIds(ticketId != null ? ImmutableList.of(ticketId) : ImmutableList.of())
+                .dateFrom(dateFrom)
+                .dateTo(dateTo)
+                .status(status)
+                .team(team)
+                .build());
 
-        ImmutableList<TicketId> ticketIds = escalationsPage.content().stream()
-                .map(Escalation::ticketId)
-                .collect(toImmutableList());
+        ImmutableList<TicketId> ticketIds =
+                escalationsPage.content().stream().map(Escalation::ticketId).collect(toImmutableList());
 
-        Map<TicketId, Ticket> ticketsById = ticketQueryService.findByQuery(
-                        TicketsQuery.builder().unlimited(true).ids(ticketIds).build()
-                ).content().stream()
-                .collect(Collectors.toMap(Ticket::id, t -> t));
+        Map<TicketId, Ticket> ticketsById =
+                ticketQueryService
+                        .findByQuery(TicketsQuery.builder()
+                                .unlimited(true)
+                                .ids(ticketIds)
+                                .build())
+                        .content()
+                        .stream()
+                        .collect(Collectors.toMap(Ticket::id, t -> t));
 
         ImmutableList<EscalationUI> uiList = escalationsPage.content().stream()
                 .map(esc -> {
@@ -66,9 +66,10 @@ public class EscalationController {
                     EscalationUI escalationUI = mapper.mapToUI(esc);
 
                     return escalationUI.toBuilder()
-                            .escalatingTeam(ticket != null && ticket.team() != null
-                                    ? ticket.team().toCode()
-                                    : null)
+                            .escalatingTeam(
+                                    ticket != null && ticket.team() != null
+                                            ? ticket.team().toCode()
+                                            : null)
                             .impact(ticket != null ? ticket.impact() : null)
                             .build();
                 })

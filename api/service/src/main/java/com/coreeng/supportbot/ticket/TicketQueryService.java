@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.ticket;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
+
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationQuery;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
@@ -14,12 +16,9 @@ import com.google.common.collect.Multimaps;
 import com.slack.api.model.Message;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import org.jspecify.annotations.Nullable;
-
-import static com.google.common.collect.ImmutableList.toImmutableList;
 
 @Service
 @RequiredArgsConstructor
@@ -38,44 +37,27 @@ public class TicketQueryService {
     public Page<DetailedTicket> findDetailedTicketByQuery(TicketsQuery query) {
         Page<Ticket> ticketsPage = repository.listTickets(query);
 
-        ImmutableList<TicketId> ticketIds = ticketsPage.content().stream()
-                .map(Ticket::id)
-                .collect(toImmutableList());
+        ImmutableList<TicketId> ticketIds =
+                ticketsPage.content().stream().map(Ticket::id).collect(toImmutableList());
 
         Page<Escalation> escalationsPage = escalationQueryService.findByQuery(
-                EscalationQuery.builder()
-                        .ticketIds(ticketIds)
-                        .unlimited(true)
-                        .build()
-        );
+                EscalationQuery.builder().ticketIds(ticketIds).unlimited(true).build());
 
-        Multimap<TicketId, Escalation> escalationsByTicket = Multimaps.index(
-                escalationsPage.content(),
-                Escalation::ticketId
-        );
+        Multimap<TicketId, Escalation> escalationsByTicket =
+                Multimaps.index(escalationsPage.content(), Escalation::ticketId);
 
         ImmutableList<DetailedTicket> detailedTickets = ticketsPage.content().stream()
-                .map(ticket -> new DetailedTicket(
-                        ticket,
-                        ImmutableList.copyOf(escalationsByTicket.get(ticket.id()))
-                ))
+                .map(ticket -> new DetailedTicket(ticket, ImmutableList.copyOf(escalationsByTicket.get(ticket.id()))))
                 .collect(toImmutableList());
 
-        return new Page<>(
-                detailedTickets,
-                ticketsPage.page(),
-                ticketsPage.totalPages(),
-                ticketsPage.totalElements()
-        );
+        return new Page<>(detailedTickets, ticketsPage.page(), ticketsPage.totalPages(), ticketsPage.totalElements());
     }
 
-    @Nullable
-    public Ticket findById(TicketId id) {
+    @Nullable public Ticket findById(TicketId id) {
         return repository.findTicketById(id);
     }
 
-    @Nullable
-    public DetailedTicket findDetailedById(TicketId id) {
+    @Nullable public DetailedTicket findDetailedById(TicketId id) {
         Ticket ticket = repository.findTicketById(id);
         if (ticket == null) {
             return null;
@@ -88,12 +70,10 @@ public class TicketQueryService {
         return repository.queryExists(queryRef);
     }
 
-    @Nullable
-    public String fetchQueryText(Ticket ticket) {
+    @Nullable public String fetchQueryText(Ticket ticket) {
         try {
-            Message message = slackClient.getMessageByTs(
-                new SlackGetMessageByTsRequest(ticket.channelId(), ticket.queryTs())
-            );
+            Message message =
+                    slackClient.getMessageByTs(new SlackGetMessageByTsRequest(ticket.channelId(), ticket.queryTs()));
             String rawText = message.getText();
             return textFormatter.format(rawText);
         } catch (Exception e) {

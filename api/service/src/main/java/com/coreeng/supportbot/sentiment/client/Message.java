@@ -15,9 +15,11 @@ public class Message {
     private String type;
     private String user;
     private String text;
+
     @JsonProperty("thread_ts")
     private String threadTs;
+
     private String ts;
-    @Nullable
-    private String team;
+
+    @Nullable private String team;
 }

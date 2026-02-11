@@ -14,12 +14,11 @@ public record RbacRestrictionMessage() implements SlackMessage {
 
     @Override
     public ImmutableList<LayoutBlock> renderBlocks() {
-        return ImmutableList.of(
-            SectionBlock.builder()
+        return ImmutableList.of(SectionBlock.builder()
                 .text(MarkdownTextObject.builder()
-                    .text(":red_circle: *Access Restricted*\nThis action is only available to support team members.")
-                    .build())
-                .build()
-        );
+                        .text(
+                                ":red_circle: *Access Restricted*\nThis action is only available to support team members.")
+                        .build())
+                .build());
     }
 }

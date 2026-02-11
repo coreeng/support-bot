@@ -1,18 +1,22 @@
 package com.coreeng.supportbot.testkit;
 
-import java.util.stream.Collectors;
-
 import com.google.common.collect.ImmutableList;
+import java.util.stream.Collectors;
 
 public interface ViewSubmission {
     String triggerId();
+
     String callbackId();
+
     String viewType();
+
     String privateMetadata();
+
     ImmutableList<Value> values();
 
     interface Value {
         String name();
+
         String renderJson();
     }
 
@@ -29,15 +33,11 @@ public interface ViewSubmission {
         @Override
         public String renderJson() {
             return String.format(
-                """
+                    """
                 {"type":"multi_static_select","selected_options":[%s]}
-                """,
-                values.stream()
-                    .map(v -> String.format("""
+                """, values.stream().map(v -> String.format("""
                         {"value":"%s"}
-                        """.strip(), v))
-                    .collect(Collectors.joining(","))
-            );
+                        """.strip(), v)).collect(Collectors.joining(",")));
         }
     }
 }

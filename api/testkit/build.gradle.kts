@@ -1,9 +1,16 @@
 plugins {
     `java-library`
+    checkstyle
 }
 
 repositories {
     mavenCentral()
+}
+
+checkstyle {
+    toolVersion = "10.25.0"
+    isIgnoreFailures = false
+    configFile = rootProject.file("config/checkstyle/checkstyle.xml")
 }
 
 java {
@@ -68,4 +75,3 @@ dependencies {
     // Guava
     api("com.google.guava:guava:33.4.0-jre")
 }
-

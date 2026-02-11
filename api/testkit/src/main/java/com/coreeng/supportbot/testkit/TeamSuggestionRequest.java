@@ -12,10 +12,11 @@ import org.jspecify.annotations.Nullable;
 @Getter
 public class TeamSuggestionRequest implements BlockSuggestionRequest {
     private final long ticketId;
-    @Nullable
-    private final String userId;
-    @Nullable
-    private final String botId;
+
+    @Nullable private final String userId;
+
+    @Nullable private final String botId;
+
     @Builder.Default
     private final String filterValue = "";
 
@@ -54,4 +55,3 @@ public class TeamSuggestionRequest implements BlockSuggestionRequest {
         return "ticket-summary";
     }
 }
-

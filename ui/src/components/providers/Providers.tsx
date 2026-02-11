@@ -5,9 +5,8 @@ import { ReactNode, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { ThemeProvider } from './theme-provider'
-import { AuthProvider } from '@/contexts/AuthContext'
+import { SessionProvider } from './SessionProvider'
 import { TeamFilterProvider } from '@/contexts/TeamFilterContext'
-import { AuthGuard } from '@/components/AuthGuard'
 
 type ProvidersProps = {
     children: ReactNode
@@ -23,16 +22,14 @@ export function GlobalProviders({ children }: ProvidersProps) {
     }))
 
     return (
-        <QueryClientProvider client={queryClient}>
-            <AuthProvider>
+        <SessionProvider>
+            <QueryClientProvider client={queryClient}>
                 <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light" disableTransitionOnChange>
-                    <AuthGuard>
-                        <TeamFilterProvider>
-                            {children}
-                        </TeamFilterProvider>
-                    </AuthGuard>
+                    <TeamFilterProvider>
+                        {children}
+                    </TeamFilterProvider>
                 </ThemeProvider>
-            </AuthProvider>
-        </QueryClientProvider>
+            </QueryClientProvider>
+        </SessionProvider>
     )
 }

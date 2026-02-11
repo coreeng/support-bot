@@ -1,5 +1,8 @@
 package com.coreeng.supportbot.ticket.rest;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackException;
@@ -16,6 +19,8 @@ import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.response.conversations.ConversationsOpenResponse;
 import com.slack.api.model.Conversation;
+import java.time.Instant;
+import java.util.List;
 import org.jooq.exception.DataAccessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,12 +29,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.Instant;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class BulkReassignmentServiceTest {
@@ -50,8 +49,7 @@ class BulkReassignmentServiceTest {
     void setUp() {
         service = new BulkReassignmentService(assignmentProps, ticketRepository, slackClient);
         // Lenient stubbing for SlackClient - notifications are optional and shouldn't break tests
-        ConversationsOpenResponse dmResponse = 
-            mock(ConversationsOpenResponse.class);
+        ConversationsOpenResponse dmResponse = mock(ConversationsOpenResponse.class);
         Conversation channel = mock(Conversation.class);
         lenient().when(channel.getId()).thenReturn("D12345");
         lenient().when(dmResponse.isOk()).thenReturn(true);
@@ -65,10 +63,7 @@ class BulkReassignmentServiceTest {
     void shouldRejectBulkReassignWhenAssignmentIsDisabled() {
         // given
         when(assignmentProps.enabled()).thenReturn(false);
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(new TicketId(1), new TicketId(2)),
-            "U12345"
-        );
+        BulkReassignRequest request = new BulkReassignRequest(List.of(new TicketId(1), new TicketId(2)), "U12345");
 
         // when
         BulkReassignResultUI result = service.bulkReassign(request);
@@ -86,10 +81,7 @@ class BulkReassignmentServiceTest {
     void shouldRejectBulkReassignWhenTicketIdsEmpty() {
         // given
         when(assignmentProps.enabled()).thenReturn(true);
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(),
-            "U12345"
-        );
+        BulkReassignRequest request = new BulkReassignRequest(List.of(), "U12345");
 
         // when
         BulkReassignResultUI result = service.bulkReassign(request);
@@ -107,10 +99,7 @@ class BulkReassignmentServiceTest {
     void shouldRejectBulkReassignWhenAssignedToIsBlank() {
         // given
         when(assignmentProps.enabled()).thenReturn(true);
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(new TicketId(1), new TicketId(2)),
-            ""
-        );
+        BulkReassignRequest request = new BulkReassignRequest(List.of(new TicketId(1), new TicketId(2)), "");
 
         // when
         BulkReassignResultUI result = service.bulkReassign(request);
@@ -138,12 +127,9 @@ class BulkReassignmentServiceTest {
 
         when(assignmentProps.enabled()).thenReturn(true);
         when(ticketRepository.listTickets(any(TicketsQuery.class)))
-            .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2, openTicket3), 0, 1, 3));
+                .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2, openTicket3), 0, 1, 3));
 
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(ticket1, ticket2, ticket3),
-            assignedTo
-        );
+        BulkReassignRequest request = new BulkReassignRequest(List.of(ticket1, ticket2, ticket3), assignedTo);
 
         // when
         BulkReassignResultUI result = service.bulkReassign(request);
@@ -177,15 +163,12 @@ class BulkReassignmentServiceTest {
 
         when(assignmentProps.enabled()).thenReturn(true);
         when(ticketRepository.listTickets(any(TicketsQuery.class)))
-            .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2, openTicket3), 0, 1, 3));
+                .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2, openTicket3), 0, 1, 3));
         when(ticketRepository.assign(ticket1, assignedTo)).thenReturn(true);
         when(ticketRepository.assign(ticket2, assignedTo)).thenThrow(new DataAccessException("Database error"));
         when(ticketRepository.assign(ticket3, assignedTo)).thenReturn(true);
 
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(ticket1, ticket2, ticket3),
-            assignedTo
-        );
+        BulkReassignRequest request = new BulkReassignRequest(List.of(ticket1, ticket2, ticket3), assignedTo);
 
         // when
         BulkReassignResultUI result = service.bulkReassign(request);
@@ -222,12 +205,9 @@ class BulkReassignmentServiceTest {
         when(assignmentProps.enabled()).thenReturn(true);
         // Database query with excludeClosed=true only returns non-closed tickets
         when(ticketRepository.listTickets(any(TicketsQuery.class)))
-            .thenReturn(new Page<>(ImmutableList.of(openTicket, staleTicket, anotherOpenTicket), 0, 1, 3));
+                .thenReturn(new Page<>(ImmutableList.of(openTicket, staleTicket, anotherOpenTicket), 0, 1, 3));
 
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(ticket1, ticket2, ticket3, ticket4),
-            assignedTo
-        );
+        BulkReassignRequest request = new BulkReassignRequest(List.of(ticket1, ticket2, ticket3, ticket4), assignedTo);
 
         // when
         BulkReassignResultUI result = service.bulkReassign(request);
@@ -260,12 +240,9 @@ class BulkReassignmentServiceTest {
         when(assignmentProps.enabled()).thenReturn(true);
         // ticket2 doesn't exist, so only ticket1 is returned
         when(ticketRepository.listTickets(any(TicketsQuery.class)))
-            .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
+                .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
 
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(ticket1, ticket2),
-            assignedTo
-        );
+        BulkReassignRequest request = new BulkReassignRequest(List.of(ticket1, ticket2), assignedTo);
 
         // when
         BulkReassignResultUI result = service.bulkReassign(request);
@@ -294,8 +271,7 @@ class BulkReassignmentServiceTest {
         Ticket openTicket1 = createTicket(ticket1, TicketStatus.opened);
         Ticket openTicket2 = createTicket(ticket2, TicketStatus.opened);
 
-        ConversationsOpenResponse dmResponse = 
-            mock(ConversationsOpenResponse.class);
+        ConversationsOpenResponse dmResponse = mock(ConversationsOpenResponse.class);
         Conversation channel = mock(Conversation.class);
         when(channel.getId()).thenReturn("D12345");
         when(dmResponse.isOk()).thenReturn(true);
@@ -303,27 +279,24 @@ class BulkReassignmentServiceTest {
 
         when(assignmentProps.enabled()).thenReturn(true);
         when(ticketRepository.listTickets(any(TicketsQuery.class)))
-            .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2), 0, 1, 2));
+                .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2), 0, 1, 2));
         when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class)))
-            .thenReturn("https://slack.com/permalink1", "https://slack.com/permalink2");
+                .thenReturn("https://slack.com/permalink1", "https://slack.com/permalink2");
 
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(ticket1, ticket2),
-            assignedTo
-        );
+        BulkReassignRequest request = new BulkReassignRequest(List.of(ticket1, ticket2), assignedTo);
 
         // when
         BulkReassignResultUI result = service.bulkReassign(request);
 
         // then
         assertThat(result.successCount()).isEqualTo(2);
-        
+
         ArgumentCaptor<SlackPostMessageRequest> messageCaptor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
         verify(slackClient).openDmConversation(SlackId.user(assignedTo));
         verify(slackClient, times(2)).getPermalink(any(SlackGetMessageByTsRequest.class));
         verify(slackClient).postMessage(messageCaptor.capture());
-        
+
         SlackPostMessageRequest sentMessage = messageCaptor.getValue();
         assertThat(sentMessage.channel()).isEqualTo("D12345");
         String messageText = sentMessage.message().getText();
@@ -340,13 +313,9 @@ class BulkReassignmentServiceTest {
 
         // Closed ticket is filtered out at database level due to excludeClosed=true
         when(assignmentProps.enabled()).thenReturn(true);
-        when(ticketRepository.listTickets(any(TicketsQuery.class)))
-            .thenReturn(new Page<>(ImmutableList.of(), 0, 1, 0));
+        when(ticketRepository.listTickets(any(TicketsQuery.class))).thenReturn(new Page<>(ImmutableList.of(), 0, 1, 0));
 
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(ticket1),
-            assignedTo
-        );
+        BulkReassignRequest request = new BulkReassignRequest(List.of(ticket1), assignedTo);
 
         // when
         BulkReassignResultUI result = service.bulkReassign(request);
@@ -365,20 +334,16 @@ class BulkReassignmentServiceTest {
 
         Ticket openTicket = createTicket(ticket1, TicketStatus.opened);
 
-        ConversationsOpenResponse dmResponse = 
-            mock(ConversationsOpenResponse.class);
+        ConversationsOpenResponse dmResponse = mock(ConversationsOpenResponse.class);
         when(dmResponse.isOk()).thenReturn(false);
         when(dmResponse.getError()).thenReturn("messages_tab_disabled");
 
         when(assignmentProps.enabled()).thenReturn(true);
         when(ticketRepository.listTickets(any(TicketsQuery.class)))
-            .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
+                .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
         when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
 
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(ticket1),
-            assignedTo
-        );
+        BulkReassignRequest request = new BulkReassignRequest(List.of(ticket1), assignedTo);
 
         // when
         BulkReassignResultUI result = service.bulkReassign(request);
@@ -397,20 +362,16 @@ class BulkReassignmentServiceTest {
 
         Ticket openTicket = createTicket(ticket1, TicketStatus.opened);
 
-        ConversationsOpenResponse dmResponse = 
-            mock(ConversationsOpenResponse.class);
+        ConversationsOpenResponse dmResponse = mock(ConversationsOpenResponse.class);
         when(dmResponse.isOk()).thenReturn(true);
         when(dmResponse.getChannel()).thenReturn(null);
 
         when(assignmentProps.enabled()).thenReturn(true);
         when(ticketRepository.listTickets(any(TicketsQuery.class)))
-            .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
+                .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
         when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
 
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(ticket1),
-            assignedTo
-        );
+        BulkReassignRequest request = new BulkReassignRequest(List.of(ticket1), assignedTo);
 
         // when
         BulkReassignResultUI result = service.bulkReassign(request);
@@ -429,8 +390,7 @@ class BulkReassignmentServiceTest {
 
         Ticket openTicket = createTicket(ticket1, TicketStatus.opened);
 
-        ConversationsOpenResponse dmResponse = 
-            mock(ConversationsOpenResponse.class);
+        ConversationsOpenResponse dmResponse = mock(ConversationsOpenResponse.class);
         Conversation channel = mock(Conversation.class);
         when(channel.getId()).thenReturn("D12345");
         when(dmResponse.isOk()).thenReturn(true);
@@ -438,17 +398,14 @@ class BulkReassignmentServiceTest {
 
         when(assignmentProps.enabled()).thenReturn(true);
         when(ticketRepository.listTickets(any(TicketsQuery.class)))
-            .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
+                .thenReturn(new Page<>(ImmutableList.of(openTicket), 0, 1, 1));
         when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class)))
-            .thenReturn("https://slack.com/permalink1");
+                .thenReturn("https://slack.com/permalink1");
         when(slackClient.postMessage(any(SlackPostMessageRequest.class)))
-            .thenThrow(new SlackException(new RuntimeException("Failed to post message")));
+                .thenThrow(new SlackException(new RuntimeException("Failed to post message")));
 
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(ticket1),
-            assignedTo
-        );
+        BulkReassignRequest request = new BulkReassignRequest(List.of(ticket1), assignedTo);
 
         // when
         BulkReassignResultUI result = service.bulkReassign(request);
@@ -469,19 +426,18 @@ class BulkReassignmentServiceTest {
 
         Ticket openTicket1 = createTicket(ticket1, TicketStatus.opened);
         Ticket openTicket2 = Ticket.builder()
-            .id(ticket2)
-            .channelId("C456")
-            .queryTs(MessageTs.of("789.012"))
-            .createdMessageTs(MessageTs.of("789.013"))
-            .status(TicketStatus.opened)
-            .impact("medium")
-            .tags(ImmutableList.of())
-            .lastInteractedAt(Instant.now())
-            .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
-            .build();
+                .id(ticket2)
+                .channelId("C456")
+                .queryTs(MessageTs.of("789.012"))
+                .createdMessageTs(MessageTs.of("789.013"))
+                .status(TicketStatus.opened)
+                .impact("medium")
+                .tags(ImmutableList.of())
+                .lastInteractedAt(Instant.now())
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+                .build();
 
-        ConversationsOpenResponse dmResponse = 
-            mock(ConversationsOpenResponse.class);
+        ConversationsOpenResponse dmResponse = mock(ConversationsOpenResponse.class);
         Conversation channel = mock(Conversation.class);
         when(channel.getId()).thenReturn("D12345");
         when(dmResponse.isOk()).thenReturn(true);
@@ -489,30 +445,27 @@ class BulkReassignmentServiceTest {
 
         when(assignmentProps.enabled()).thenReturn(true);
         when(ticketRepository.listTickets(any(TicketsQuery.class)))
-            .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2), 0, 1, 2));
+                .thenReturn(new Page<>(ImmutableList.of(openTicket1, openTicket2), 0, 1, 2));
         when(slackClient.openDmConversation(SlackId.user(assignedTo))).thenReturn(dmResponse);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class)))
-            .thenReturn("https://slack.com/permalink1", "https://slack.com/permalink2");
+                .thenReturn("https://slack.com/permalink1", "https://slack.com/permalink2");
 
-        BulkReassignRequest request = new BulkReassignRequest(
-            List.of(ticket1, ticket2),
-            assignedTo
-        );
+        BulkReassignRequest request = new BulkReassignRequest(List.of(ticket1, ticket2), assignedTo);
 
         // when
         service.bulkReassign(request);
 
         // then
-        ArgumentCaptor<SlackGetMessageByTsRequest> permalinkCaptor = 
-            ArgumentCaptor.forClass(SlackGetMessageByTsRequest.class);
+        ArgumentCaptor<SlackGetMessageByTsRequest> permalinkCaptor =
+                ArgumentCaptor.forClass(SlackGetMessageByTsRequest.class);
         verify(slackClient, times(2)).getPermalink(permalinkCaptor.capture());
-        
+
         List<SlackGetMessageByTsRequest> permalinkRequests = permalinkCaptor.getAllValues();
         assertThat(permalinkRequests.get(0).channelId()).isEqualTo("C123");
         assertThat(permalinkRequests.get(0).ts().ts()).isEqualTo("123.456");
         assertThat(permalinkRequests.get(1).channelId()).isEqualTo("C456");
         assertThat(permalinkRequests.get(1).ts().ts()).isEqualTo("789.012");
-        
+
         ArgumentCaptor<SlackPostMessageRequest> messageCaptor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
         verify(slackClient).postMessage(messageCaptor.capture());
         String messageText = messageCaptor.getValue().message().getText();
@@ -522,16 +475,15 @@ class BulkReassignmentServiceTest {
 
     private Ticket createTicket(TicketId ticketId, TicketStatus status) {
         return Ticket.builder()
-            .id(ticketId)
-            .channelId("C123")
-            .queryTs(MessageTs.of("123.456"))
-            .createdMessageTs(MessageTs.of("123.457"))
-            .status(status)
-            .impact("medium")
-            .tags(ImmutableList.of())
-            .lastInteractedAt(Instant.now())
-            .statusLog(ImmutableList.of(new Ticket.StatusLog(status, Instant.now())))
-            .build();
+                .id(ticketId)
+                .channelId("C123")
+                .queryTs(MessageTs.of("123.456"))
+                .createdMessageTs(MessageTs.of("123.457"))
+                .status(status)
+                .impact("medium")
+                .tags(ImmutableList.of())
+                .lastInteractedAt(Instant.now())
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(status, Instant.now())))
+                .build();
     }
 }
-

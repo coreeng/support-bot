@@ -1,9 +1,8 @@
 package com.coreeng.supportbot.teams.fakes;
 
 import com.coreeng.supportbot.teams.PlatformTeamsFetcher;
-import lombok.RequiredArgsConstructor;
-
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 public class FakeTeamsFetcher implements PlatformTeamsFetcher {
@@ -14,4 +13,3 @@ public class FakeTeamsFetcher implements PlatformTeamsFetcher {
         return teams;
     }
 }
-

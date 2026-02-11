@@ -12,5 +12,4 @@ public enum EscalationStatus {
     EscalationStatus(String label) {
         this.label = label;
     }
-
 }

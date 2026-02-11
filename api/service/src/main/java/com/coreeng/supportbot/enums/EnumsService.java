@@ -8,19 +8,12 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 @Service
-public class EnumsService implements
-    EscalationTeamsRegistry,
-    TagsRegistry,
-    ImpactsRegistry {
+public class EnumsService implements EscalationTeamsRegistry, TagsRegistry, ImpactsRegistry {
     private final ImpactsRepository impactsRepository;
     private final TagsRepository tagsRepository;
     private final ImmutableList<EscalationTeam> escalationTeams;
 
-    public EnumsService(
-        ImpactsRepository impactsRepository,
-        TagsRepository tagsRepository,
-        EnumProps enumProps
-    ) {
+    public EnumsService(ImpactsRepository impactsRepository, TagsRepository tagsRepository, EnumProps enumProps) {
         this.impactsRepository = impactsRepository;
         this.tagsRepository = tagsRepository;
         this.escalationTeams = ImmutableList.copyOf(enumProps.escalationTeams());
@@ -31,8 +24,7 @@ public class EnumsService implements
         return impactsRepository.listAll();
     }
 
-    @Nullable
-    @Override
+    @Nullable @Override
     public TicketImpact findImpactByCode(String code) {
         return impactsRepository.findImpactByCode(code);
     }
@@ -52,17 +44,12 @@ public class EnumsService implements
         return escalationTeams;
     }
 
-    @Nullable
-    @Override
+    @Nullable @Override
     public EscalationTeam findEscalationTeamByCode(String code) {
         return findByCode(code, escalationTeams);
     }
 
-    @Nullable
-    private <T extends EnumerationValue> T findByCode(String code, ImmutableList<T> values) {
-        return values.stream()
-            .filter(v -> code.equals(v.code()))
-            .findAny()
-            .orElse(null);
+    @Nullable private <T extends EnumerationValue> T findByCode(String code, ImmutableList<T> values) {
+        return values.stream().filter(v -> code.equals(v.code())).findAny().orElse(null);
     }
 }

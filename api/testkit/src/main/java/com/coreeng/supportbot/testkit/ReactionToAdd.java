@@ -8,17 +8,15 @@ import org.jspecify.annotations.Nullable;
 @Builder
 @Getter
 public class ReactionToAdd {
-    @Nullable
-    private final String userId;
-    @Nullable
-    private final String botId;
+    @Nullable private final String userId;
 
-    @NonNull
-    private final String teamId;
-    @NonNull
-    private final String channelId;
-    @NonNull
-    private final MessageTs ts;
-    @NonNull
-    private final String reaction;
+    @Nullable private final String botId;
+
+    @NonNull private final String teamId;
+
+    @NonNull private final String channelId;
+
+    @NonNull private final MessageTs ts;
+
+    @NonNull private final String reaction;
 }

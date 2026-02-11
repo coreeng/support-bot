@@ -1,24 +1,19 @@
 package com.coreeng.supportbot.slack;
 
-import com.slack.api.app_backend.interactive_components.payload.BlockActionPayload;
-import com.google.common.base.Splitter;
+import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.common.base.Splitter;
+import com.slack.api.app_backend.interactive_components.payload.BlockActionPayload;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
-public record MessageRef(
-    MessageTs ts,
-    @Nullable MessageTs threadTs,
-    String channelId
-) {
-    private static final Splitter slashSplitter = Splitter.on('/');
-    private static final Splitter ampSplitter = Splitter.on('&');
-    private static final Splitter equalsSplitter = Splitter.on('=').limit(2);
+public record MessageRef(MessageTs ts, @Nullable MessageTs threadTs, String channelId) {
+    private static final Splitter SLASH_SPLITTER = Splitter.on('/');
+    private static final Splitter AMP_SPLITTER = Splitter.on('&');
+    private static final Splitter EQUALS_SPLITTER = Splitter.on('=').limit(2);
 
     public MessageRef {
         checkNotNull(ts);
@@ -36,22 +31,21 @@ public record MessageRef(
     public static MessageRef from(BlockActionPayload payload) {
         if (payload.getContainer() != null) {
             return new MessageRef(
-                MessageTs.of(payload.getContainer().getMessageTs()),
-                MessageTs.ofOrNull(payload.getContainer().getThreadTs()),
-                payload.getChannel().getId()
-            );
+                    MessageTs.of(payload.getContainer().getMessageTs()),
+                    MessageTs.ofOrNull(payload.getContainer().getThreadTs()),
+                    payload.getChannel().getId());
         } else if (payload.getMessage() != null) {
             return new MessageRef(
-                MessageTs.of(payload.getMessage().getTs()),
-                MessageTs.ofOrNull(payload.getMessage().getThreadTs()),
-                payload.getChannel().getId()
-            );
+                    MessageTs.of(payload.getMessage().getTs()),
+                    MessageTs.ofOrNull(payload.getMessage().getThreadTs()),
+                    payload.getChannel().getId());
         }
         throw new IllegalArgumentException("Couldn't build a message ref from payload");
     }
 
     // Top level link: https://cecg-group.slack.com/archives/C0860GW8BSN/p1736330024278409
-    // Link to message in thread: https://cecg-group.slack.com/archives/C0860GW8BSN/p1736330215840179?thread_ts=1736330024.278409&cid=C0860GW8BSN
+    // Link to message in thread:
+    // https://cecg-group.slack.com/archives/C0860GW8BSN/p1736330215840179?thread_ts=1736330024.278409&cid=C0860GW8BSN
     public static MessageRef fromPermalink(String permalink) {
         URL url;
         try {
@@ -60,7 +54,7 @@ public record MessageRef(
             throw new InvalidPermalink(e);
         }
         String path = url.getPath();
-        List<String> parts = slashSplitter.splitToList(path);
+        List<String> parts = SLASH_SPLITTER.splitToList(path);
         if (parts.size() != 4) {
             throw new InvalidPermalink("Invalid path: " + path);
         }
@@ -74,14 +68,13 @@ public record MessageRef(
         return new MessageRef(ts, MessageTs.ofOrNull(threadTs), channelId);
     }
 
-    @Nullable
-    private static String extractThreadTs(URL url) {
+    @Nullable private static String extractThreadTs(URL url) {
         if (url.getQuery() == null) {
             return null;
         }
-        Iterable<String> queryParts = ampSplitter.split(url.getQuery());
+        Iterable<String> queryParts = AMP_SPLITTER.split(url.getQuery());
         for (String queryPart : queryParts) {
-            List<String> queryParamParts = equalsSplitter.splitToList(queryPart);
+            List<String> queryParamParts = EQUALS_SPLITTER.splitToList(queryPart);
             if (queryParamParts.size() == 2 && "thread_ts".equals(queryParamParts.get(0))) {
                 return queryParamParts.get(1);
             }

@@ -1,7 +1,6 @@
 package com.coreeng.supportbot.config;
 
 import java.util.List;
-
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -12,9 +11,5 @@ public record HomepageProps(List<UsefulLink> usefulLinks) {
     }
 
     public record UsefulLink(
-        String title,
-        String url,
-        @Nullable String description
-    ) {
-    }
+            String title, String url, @Nullable String description) {}
 }

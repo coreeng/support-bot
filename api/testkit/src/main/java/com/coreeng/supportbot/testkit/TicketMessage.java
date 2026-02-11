@@ -1,13 +1,7 @@
 package com.coreeng.supportbot.testkit;
 
-import java.io.IOException;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import org.apache.commons.text.StringSubstitutor;
+import static net.javacrumbs.jsonunit.assertj.JsonAssertions.JSON;
+import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -18,17 +12,21 @@ import com.github.tomakehurst.wiremock.http.FormParameter;
 import com.github.tomakehurst.wiremock.matching.AnythingPattern;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import com.jayway.jsonpath.JsonPath;
-
+import java.io.IOException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.Builder;
 import lombok.Getter;
-import static net.javacrumbs.jsonunit.assertj.JsonAssertions.JSON;
-import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
+import org.apache.commons.text.StringSubstitutor;
 
 @Builder
 @Getter
 public class TicketMessage {
-    public static final String fullSummaryButtonActionId = "ticket-summary-view";
-    public static final String escalateButtonActionId = "ticket-escalate";
+    public static final String FULL_SUMMARY_BUTTON_ACTION_ID = "ticket-summary-view";
+    public static final String ESCALATE_BUTTON_ACTION_ID = "ticket-escalate";
 
     private final long ticketId;
     private final String channelId;
@@ -43,26 +41,26 @@ public class TicketMessage {
         assertThat(ts).isEqualTo(response.formMessage().ts());
         assertThat(queryTs).isEqualTo(response.query().ts());
         assertThat(status.code()).isEqualTo(response.status());
-        assertThat(statusChangedAt)
-            .isEqualTo(response.logs().getLast().date().truncatedTo(ChronoUnit.SECONDS));
+        assertThat(statusChangedAt).isEqualTo(response.logs().getLast().date().truncatedTo(ChronoUnit.SECONDS));
     }
 
     public static class Receiver implements StubWithResult.Receiver<TicketMessage> {
-        private static final ObjectMapper objectMapper = new ObjectMapper();
-        private static final Pattern headerRegex = Pattern.compile("^Ticket Created: ID-(?<id>\\d+)$");
-        private static final Pattern statusRegex = Pattern.compile("^(?<status>Opened|Closed): <!date\\^(?<ts>[^\\^]+)\\^\\{date_short_pretty} at \\{time}\\|(?<tsString>[^>]+)>$");
+        private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+        private static final Pattern HEADER_REGEX = Pattern.compile("^Ticket Created: ID-(?<id>\\d+)$");
+        private static final Pattern STATUS_REGEX = Pattern.compile(
+                "^(?<status>Opened|Closed): <!date\\^(?<ts>[^\\^]+)\\^\\{date_short_pretty} at \\{time}\\|(?<tsString>[^>]+)>$");
 
         @Override
         public MappingBuilder configureStub(MappingBuilder stubBuilder) {
             return stubBuilder
-                .withFormParam("text", new AnythingPattern())
-                .withFormParam("blocks", new AnythingPattern())
-                .withFormParam("attachments", new AnythingPattern())
-                .withFormParam("link_names", new AnythingPattern())
-                .withFormParam("mrkdwn", new AnythingPattern())
-                .withFormParam("unfurl_links", new AnythingPattern())
-                .withFormParam("unfurl_media", new AnythingPattern())
-                .withFormParam("reply_broadcast", new AnythingPattern());
+                    .withFormParam("text", new AnythingPattern())
+                    .withFormParam("blocks", new AnythingPattern())
+                    .withFormParam("attachments", new AnythingPattern())
+                    .withFormParam("link_names", new AnythingPattern())
+                    .withFormParam("mrkdwn", new AnythingPattern())
+                    .withFormParam("unfurl_links", new AnythingPattern())
+                    .withFormParam("unfurl_media", new AnythingPattern())
+                    .withFormParam("reply_broadcast", new AnythingPattern());
         }
 
         @Override
@@ -75,33 +73,36 @@ public class TicketMessage {
             assertBlocks(blocksParam, ticketId);
             AttachmentView attachmentView = assertAttachmentsAndReturnView(attachmentsParam, ticketId);
 
-            JsonNode responseBody = objectMapper.readTree(servedStub.getResponse().getBody());
+            JsonNode responseBody =
+                    OBJECT_MAPPER.readTree(servedStub.getResponse().getBody());
             String channelId = responseBody.get("channel").asText();
             MessageTs ts = MessageTs.fromTsString(responseBody.get("ts").asText());
-            MessageTs threadTs = MessageTs.fromTsString(responseBody.get("message").get("thread_ts").asText());
+            MessageTs threadTs = MessageTs.fromTsString(
+                    responseBody.get("message").get("thread_ts").asText());
 
             return TicketMessage.builder()
-                .ticketId(ticketId)
-                .channelId(channelId)
-                .ts(ts)
-                .queryTs(threadTs)
-                .status(attachmentView.status())
-                .statusChangedAt(attachmentView.statusChangedAt())
-                .build();
+                    .ticketId(ticketId)
+                    .channelId(channelId)
+                    .ts(ts)
+                    .queryTs(threadTs)
+                    .status(attachmentView.status())
+                    .statusChangedAt(attachmentView.statusChangedAt())
+                    .build();
         }
 
         public long extractTicketIdFromText(String text) {
-            Matcher headerMatcher = headerRegex.matcher(text);
+            Matcher headerMatcher = HEADER_REGEX.matcher(text);
             assertThat(headerMatcher).matches();
             String ticketIdStr = headerMatcher.group("id");
             return Long.parseLong(ticketIdStr);
         }
 
-        private AttachmentView assertAttachmentsAndReturnView(FormParameter attachmentsParam, long ticketId) throws JsonProcessingException {
+        private AttachmentView assertAttachmentsAndReturnView(FormParameter attachmentsParam, long ticketId)
+                throws JsonProcessingException {
             assertThat(attachmentsParam).isNotNull();
             assertThat(attachmentsParam.getValues()).hasSize(1);
             String attachmentsRaw = attachmentsParam.getValues().getFirst();
-            JsonNode attachmentsJson = objectMapper.readTree(attachmentsRaw);
+            JsonNode attachmentsJson = OBJECT_MAPPER.readTree(attachmentsRaw);
 
             // Check if the ticket is closed or opened based on the color
             String color = JsonPath.read(attachmentsRaw, "$[0].color");
@@ -110,7 +111,8 @@ public class TicketMessage {
             // Build button elements dynamically based on ticket status
             String buttonElements = buildButtonElements(ticketId, expectedStatus);
 
-            String expectedJson = StringSubstitutor.replace("""
+            String expectedJson = StringSubstitutor.replace(
+                    """
                  [
                    {
                      "fallback": "#{json-unit.ignore}",
@@ -142,17 +144,14 @@ public class TicketMessage {
                        }
                      ]
                    }
-                ]""", Map.of(
-                "expectedColor", expectedStatus.colorHex(),
-                "buttonElements", buttonElements
-            ));
+                ]""", Map.of("expectedColor", expectedStatus.colorHex(), "buttonElements", buttonElements));
 
             assertThatJson(attachmentsJson).isEqualTo(expectedJson);
 
             String fallback = JsonPath.read(attachmentsRaw, "$[0].fallback");
             String messageHeader = JsonPath.read(attachmentsRaw, "$[0].blocks[1].text.text");
 
-            Matcher statusMatcher = statusRegex.matcher(messageHeader);
+            Matcher statusMatcher = STATUS_REGEX.matcher(messageHeader);
             assertThat(statusMatcher).matches();
             assertThat(fallback).isEqualTo(messageHeader);
             String status = statusMatcher.group("status");
@@ -162,16 +161,17 @@ public class TicketMessage {
             assertThat(status).isEqualTo(expectedStatus.label());
             Instant statusChangedAt = Instant.ofEpochSecond(Long.parseLong(statusTs));
             assertThat(statusChangedAt.truncatedTo(ChronoUnit.MINUTES).toString())
-                .isEqualTo(statusTsString);
+                    .isEqualTo(statusTsString);
             return new AttachmentView(statusChangedAt, expectedStatus);
         }
 
         private void assertBlocks(FormParameter blocksParam, long ticketId) {
             assertThat(blocksParam).isNotNull();
-            assertThat(blocksParam.getValues()).hasSize(1)
-                .first()
-                .asInstanceOf(JSON)
-                .isEqualTo(String.format("""
+            assertThat(blocksParam.getValues())
+                    .hasSize(1)
+                    .first()
+                    .asInstanceOf(JSON)
+                    .isEqualTo(String.format("""
                     [{"type":"section","text":{"type":"mrkdwn","text":"*Ticket Created*: `ID-%d`"}}]
                     """, ticketId));
         }
@@ -217,10 +217,6 @@ public class TicketMessage {
             }
         }
 
-        public record AttachmentView(
-            Instant statusChangedAt,
-            Ticket.Status status
-        ) {
-        }
+        public record AttachmentView(Instant statusChangedAt, Ticket.Status status) {}
     }
 }

@@ -1,19 +1,34 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { auth } from "@/auth";
+import { NextResponse } from "next/server";
 
-// Proxies /backend/* to the API service inside the cluster, avoiding CORS
-// issues with GCP IAP blocking unauthenticated OPTIONS preflights.
-//
-// next.config.ts rewrites bake environment variables at build time during
-// `next build`, so setting BACKEND_URL at runtime has no effect. Using a
-// proxy reads BACKEND_URL at runtime instead.
-export function proxy(request: NextRequest) {
-  const backendUrl = process.env.BACKEND_URL || 'http://localhost:8080'
-  const path = request.nextUrl.pathname.replace(/^\/backend/, '')
-  const url = new URL(path + request.nextUrl.search, backendUrl)
+/**
+ * Next.js 16 proxy (formerly middleware) for route protection.
+ * Redirects unauthenticated users to /login for protected routes.
+ */
+export const proxy = auth((req) => {
+  const { nextUrl, auth: session } = req;
+  const isLoggedIn = !!session?.user;
 
-  return NextResponse.rewrite(url)
-}
+  // Public routes that don't require authentication
+  const publicPaths = ["/login", "/api/auth", "/api/health"];
+  const isPublicPath = publicPaths.some((path) =>
+    nextUrl.pathname.startsWith(path)
+  );
+
+  if (isPublicPath) {
+    return NextResponse.next();
+  }
+
+  // Redirect unauthenticated users to login
+  if (!isLoggedIn) {
+    const loginUrl = new URL("/login", nextUrl.origin);
+    loginUrl.searchParams.set("callbackUrl", nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
+});
 
 export const config = {
-  matcher: '/backend/:path*',
-}
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};

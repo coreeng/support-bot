@@ -1,5 +1,4 @@
 // src/components/dashboards/__tests__/ResponseSLASection.test.tsx
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { render, screen } from '@testing-library/react'
 import { ResponseSLASection } from '../ResponseSLASection'
 

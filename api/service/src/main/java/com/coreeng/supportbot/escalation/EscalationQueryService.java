@@ -5,10 +5,9 @@ import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import org.jspecify.annotations.Nullable;
 
 @Service
 @RequiredArgsConstructor
@@ -24,8 +23,7 @@ public class EscalationQueryService {
         return repository.listByTicketId(ticketId);
     }
 
-    @Nullable
-    public Escalation findById(EscalationId escalationId) {
+    @Nullable public Escalation findById(EscalationId escalationId) {
         return repository.findById(escalationId);
     }
 

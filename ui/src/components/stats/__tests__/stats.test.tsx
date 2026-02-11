@@ -13,12 +13,12 @@ import { render, screen, within, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import StatsPage from '../stats';
 import * as hooks from '../../../lib/hooks';
-import * as AuthContext from '../../../contexts/AuthContext';
+import * as AuthHook from '../../../hooks/useAuth';
 import * as TeamFilterContext from '../../../contexts/TeamFilterContext';
 
 // Mock hooks
 jest.mock('../../../lib/hooks');
-jest.mock('../../../contexts/AuthContext');
+jest.mock('../../../hooks/useAuth');
 jest.mock('../../../contexts/TeamFilterContext');
 
 // Mock Recharts
@@ -40,7 +40,7 @@ jest.mock('../../escalations/EscalatedToMyTeamWidget', () => {
 
 const mockUseAllTickets = hooks.useAllTickets as jest.MockedFunction<typeof hooks.useAllTickets>;
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>;
-const mockUseAuth = AuthContext.useAuth as jest.MockedFunction<typeof AuthContext.useAuth>;
+const mockUseAuth = AuthHook.useAuth as jest.MockedFunction<typeof AuthHook.useAuth>;
 const mockUseTeamFilter = TeamFilterContext.useTeamFilter as jest.MockedFunction<typeof TeamFilterContext.useTeamFilter>;
 
 // Test data
@@ -115,8 +115,11 @@ describe('StatsPage (Home Dashboard)', () => {
 
         mockUseAuth.mockReturnValue({
             user: {
+                id: 'user-1',
                 email: 'user@example.com',
-                teams: [{ name: 'Team A', groupRefs: [] }]
+                name: 'Test User',
+                teams: [{ label: 'Team A', code: 'team-a', types: [], name: 'Team A' }],
+                roles: []
             },
             isLeadership: false,
             isSupportEngineer: false,
@@ -124,7 +127,7 @@ describe('StatsPage (Home Dashboard)', () => {
             actualEscalationTeams: [],
             isLoading: false,
             isAuthenticated: true,
-            isLoadingEscalationTeams: false
+            logout: jest.fn()
         });
 
         mockUseTeamFilter.mockReturnValue({
@@ -195,8 +198,11 @@ describe('StatsPage (Home Dashboard)', () => {
             initialized: true,            });
             mockUseAuth.mockReturnValue({
                 user: {
+                    id: 'user-1',
                     email: 'user@example.com',
-                    teams: []
+                    name: 'Test User',
+                    teams: [],
+                    roles: []
                 },
                 isLeadership: false,
                 isSupportEngineer: false,
@@ -204,7 +210,7 @@ describe('StatsPage (Home Dashboard)', () => {
                 actualEscalationTeams: [],
                 isLoading: false,
                 isAuthenticated: true,
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             render(<StatsPage />, { wrapper: Wrapper });
@@ -225,8 +231,11 @@ describe('StatsPage (Home Dashboard)', () => {
         it('should show split view for escalation teams', () => {
             mockUseAuth.mockReturnValue({
                 user: {
+                    id: 'escalation-user',
                     email: 'escalation@example.com',
-                    teams: [{ name: 'Core-platform', groupRefs: [] }]
+                    name: 'Escalation User',
+                    teams: [{ label: 'Core-platform', code: 'core-platform', types: ['escalation'], name: 'Core-platform' }],
+                    roles: ['escalation']
                 },
                 isLeadership: false,
                 isSupportEngineer: false,
@@ -234,7 +243,7 @@ describe('StatsPage (Home Dashboard)', () => {
                 actualEscalationTeams: ['Core-platform'],
                 isLoading: false,
                 isAuthenticated: true,
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTeamFilter.mockReturnValue({
@@ -258,11 +267,14 @@ describe('StatsPage (Home Dashboard)', () => {
         it('should NOT show split view when escalation team selects non-escalation team', () => {
             mockUseAuth.mockReturnValue({
                 user: {
+                    id: 'escalation-user',
                     email: 'escalation@example.com',
+                    name: 'Escalation User',
                     teams: [
-                        { name: 'Core-platform', groupRefs: [] },
-                        { name: 'Team A', groupRefs: [] }
-                    ]
+                        { label: 'Core-platform', code: 'core-platform', types: ['escalation'], name: 'Core-platform' },
+                        { label: 'Team A', code: 'team-a', types: [], name: 'Team A' }
+                    ],
+                    roles: ['escalation']
                 },
                 isLeadership: false,
                 isSupportEngineer: false,
@@ -270,7 +282,7 @@ describe('StatsPage (Home Dashboard)', () => {
                 actualEscalationTeams: ['Core-platform'],
                 isLoading: false,
                 isAuthenticated: true,
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTeamFilter.mockReturnValue({
@@ -416,8 +428,11 @@ describe('StatsPage (Home Dashboard)', () => {
         it('should show team name in title for escalation team view', () => {
             mockUseAuth.mockReturnValue({
                 user: {
+                    id: 'escalation-user',
                     email: 'escalation@example.com',
-                    teams: [{ name: 'Core-platform', groupRefs: [] }]
+                    name: 'Escalation User',
+                    teams: [{ label: 'Core-platform', code: 'core-platform', types: ['escalation'], name: 'Core-platform' }],
+                    roles: ['escalation']
                 },
                 isLeadership: false,
                 isSupportEngineer: false,
@@ -425,7 +440,7 @@ describe('StatsPage (Home Dashboard)', () => {
                 actualEscalationTeams: ['Core-platform'],
                 isLoading: false,
                 isAuthenticated: true,
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTeamFilter.mockReturnValue({

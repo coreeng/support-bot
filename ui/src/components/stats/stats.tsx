@@ -6,7 +6,7 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, PieLabelRend
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import {TicketImpact} from "@/lib/types";
 import EscalatedToMyTeamWidget from '@/components/escalations/EscalatedToMyTeamWidget'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
 
 export default function StatsPage() {

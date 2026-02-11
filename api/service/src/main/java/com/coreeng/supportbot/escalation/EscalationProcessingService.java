@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.escalation;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
@@ -7,16 +9,13 @@ import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.ticket.TicketId;
-import java.time.Instant;
-
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 @Service
 @RequiredArgsConstructor
@@ -28,40 +27,27 @@ public class EscalationProcessingService {
     private final EscalationTeamsRegistry escalationTeamsRegistry;
     private final SlackTicketsProps slackTicketsProps;
 
-    @Nullable
-    public Escalation createEscalation(CreateEscalationRequest request) {
+    @Nullable public Escalation createEscalation(CreateEscalationRequest request) {
         TicketId ticketId = checkNotNull(request.ticket().id());
-        Escalation escalation = repository.createIfNotExists(
-            Escalation.createNew(
-                ticketId,
-                request.team(),
-                request.tags(),
-                request.ticket().queryRef()
-            )
-        );
+        Escalation escalation = repository.createIfNotExists(Escalation.createNew(
+                ticketId, request.team(), request.tags(), request.ticket().queryRef()));
         if (escalation == null || escalation.id() == null) {
             log.warn("Escalation already exists");
             return escalation;
         }
 
-        log.atInfo()
-            .addArgument(escalation::id)
-            .log("Escalation created: {}");
+        log.atInfo().addArgument(escalation::id).log("Escalation created: {}");
 
         String teamCode = checkNotNull(escalation.team());
         EscalationTeam team = checkNotNull(escalationTeamsRegistry.findEscalationTeamByCode(teamCode));
         ChatPostMessageResponse messagePostResponse = slackClient.postMessage(new SlackPostMessageRequest(
-            createdMessageMapper.renderMessage(new EscalationCreatedMessage(
-                escalation.id(),
-                team
-            )),
-            slackTicketsProps.channelId(),
-            request.ticket().queryTs()
-        ));
+                createdMessageMapper.renderMessage(new EscalationCreatedMessage(escalation.id(), team)),
+                slackTicketsProps.channelId(),
+                request.ticket().queryTs()));
 
         escalation = escalation.toBuilder()
-            .createdMessageTs(MessageTs.of(messagePostResponse.getTs()))
-            .build();
+                .createdMessageTs(MessageTs.of(messagePostResponse.getTs()))
+                .build();
         escalation = repository.update(escalation);
 
         return escalation;
@@ -70,9 +56,7 @@ public class EscalationProcessingService {
     public void resolve(EscalationId id) {
         Escalation escalation = findEscalation(id);
         if (escalation.status() != EscalationStatus.opened) {
-            log.atWarn()
-                .addArgument(escalation::id)
-                .log("Escalation is already resolved: {}");
+            log.atWarn().addArgument(escalation::id).log("Escalation is already resolved: {}");
             return;
         }
         resolve(escalation);
@@ -91,8 +75,7 @@ public class EscalationProcessingService {
         repository.markResolved(escalation, Instant.now());
     }
 
-    @NonNull
-    private Escalation findEscalation(EscalationId id) {
+    @NonNull private Escalation findEscalation(EscalationId id) {
         Escalation escalation = repository.findById(id);
         if (escalation == null) {
             log.warn("Escalation not found by id: {}", id);

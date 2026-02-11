@@ -8,24 +8,21 @@ import org.jspecify.annotations.Nullable;
 @Builder
 @Getter
 public class MessageToGet {
-    @NonNull
-    private final String description;
-    @NonNull
-    private final String channelId;
-    @NonNull
-    private final MessageTs ts;
-    @NonNull
-    private final MessageTs threadTs;
-    @NonNull
-    @Builder.Default
+    @NonNull private final String description;
+
+    @NonNull private final String channelId;
+
+    @NonNull private final MessageTs ts;
+
+    @NonNull private final MessageTs threadTs;
+
+    @NonNull @Builder.Default
     private final String text = "";
 
     // Either userId or botId is not null
-    @Nullable
-    private final String userId;
-    @Nullable
-    private final String botId;
+    @Nullable private final String userId;
 
-    @NonNull
-    private final String blocksJson;
+    @Nullable private final String botId;
+
+    @NonNull private final String blocksJson;
 }

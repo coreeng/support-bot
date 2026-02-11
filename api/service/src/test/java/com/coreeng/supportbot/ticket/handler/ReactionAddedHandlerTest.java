@@ -1,29 +1,30 @@
 package com.coreeng.supportbot.ticket.handler;
 
-import com.slack.api.app_backend.events.payload.ReactionAddedPayload;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
-import org.mockito.Mock;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.ticket.TicketProcessingService;
 import com.slack.api.app_backend.events.payload.EventsApiPayload;
+import com.slack.api.app_backend.events.payload.ReactionAddedPayload;
 import com.slack.api.bolt.context.builtin.EventContext;
 import com.slack.api.model.event.ReactionAddedEvent;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class ReactionAddedHandlerTest {
     @Mock
     private TicketProcessingService ticketProcessingService;
+
     @Mock
     private RbacService rbacService;
 
@@ -87,4 +88,4 @@ class ReactionAddedHandlerTest {
         verify(rbacService).isSupportBySlackId(SlackId.user(userId));
         verify(ticketProcessingService).handleReactionAdded(any(ReactionAdded.class));
     }
-} 
+}

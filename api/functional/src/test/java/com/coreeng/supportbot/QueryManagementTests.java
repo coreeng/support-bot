@@ -1,23 +1,21 @@
 package com.coreeng.supportbot;
 
-import java.time.Duration;
-
+import static com.coreeng.supportbot.testkit.UserRole.support;
+import static com.coreeng.supportbot.testkit.UserRole.tenant;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-
-import com.coreeng.supportbot.testkit.TestKitExtension;
-import com.coreeng.supportbot.testkit.TicketByIdQuery;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.coreeng.supportbot.testkit.MessageTs;
 import com.coreeng.supportbot.testkit.SlackMessage;
 import com.coreeng.supportbot.testkit.SlackTestKit;
 import com.coreeng.supportbot.testkit.SupportBotClient;
 import com.coreeng.supportbot.testkit.TestKit;
+import com.coreeng.supportbot.testkit.TestKitExtension;
+import com.coreeng.supportbot.testkit.TicketByIdQuery;
 import com.coreeng.supportbot.testkit.TicketMessage;
-import static com.coreeng.supportbot.testkit.UserRole.support;
-import static com.coreeng.supportbot.testkit.UserRole.tenant;
+import java.time.Duration;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(TestKitExtension.class)
 public class QueryManagementTests {
@@ -30,15 +28,12 @@ public class QueryManagementTests {
         SlackTestKit asTenant = testKit.as(tenant).slack();
 
         // when
-        SlackMessage tenantsMessage = asTenant.postMessage(
-            MessageTs.now(),
-            "Please, help me with my query!"
-        );
+        SlackMessage tenantsMessage = asTenant.postMessage(MessageTs.now(), "Please, help me with my query!");
 
         // then
-        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-            supportBotClient.assertQueryExistsByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts())
-        );
+        await().atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> supportBotClient.assertQueryExistsByMessageRef(
+                        tenantsMessage.channelId(), tenantsMessage.ts()));
     }
 
     @Test
@@ -47,23 +42,20 @@ public class QueryManagementTests {
         SlackTestKit asTenant = testKit.as(tenant).slack();
 
         // when: post a query
-        SlackMessage tenantsMessage = asTenant.postMessage(
-            MessageTs.now(),
-            "Please, help me with my query!"
-        );
+        SlackMessage tenantsMessage = asTenant.postMessage(MessageTs.now(), "Please, help me with my query!");
 
         // then: query should exist
-        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-            supportBotClient.assertQueryExistsByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts())
-        );
+        await().atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> supportBotClient.assertQueryExistsByMessageRef(
+                        tenantsMessage.channelId(), tenantsMessage.ts()));
 
         // when: delete the query message
         asTenant.deleteMessage(tenantsMessage);
 
         // then: query should no longer exist
-        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-            supportBotClient.assertQueryDoesNotExistByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts())
-        );
+        await().atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> supportBotClient.assertQueryDoesNotExistByMessageRef(
+                        tenantsMessage.channelId(), tenantsMessage.ts()));
     }
 
     @Test
@@ -73,31 +65,25 @@ public class QueryManagementTests {
 
         // when: post a query
         MessageTs queryTs = MessageTs.now();
-        SlackMessage tenantsQuery = asTenant.postMessage(
-            queryTs,
-            "Please, help me with my query!"
-        );
+        SlackMessage tenantsQuery = asTenant.postMessage(queryTs, "Please, help me with my query!");
 
         // then: query should exist
-        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-            supportBotClient.assertQueryExistsByMessageRef(tenantsQuery.channelId(), tenantsQuery.ts())
-        );
+        await().atMost(Duration.ofSeconds(5))
+                .untilAsserted(() ->
+                        supportBotClient.assertQueryExistsByMessageRef(tenantsQuery.channelId(), tenantsQuery.ts()));
 
         // when: post a thread reply
         MessageTs replyTs = MessageTs.now();
-        SlackMessage threadReply = asTenant.postThreadReply(
-            replyTs,
-            queryTs,
-            "Here is some additional information"
-        );
+        SlackMessage threadReply = asTenant.postThreadReply(replyTs, queryTs, "Here is some additional information");
 
         // when: delete the thread reply
         asTenant.deleteThreadReply(threadReply, queryTs);
 
         // then: query should still exist (only thread reply was deleted, not the query)
-        await().pollDelay(Duration.ofMillis(500)).atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-            supportBotClient.assertQueryExistsByMessageRef(tenantsQuery.channelId(), tenantsQuery.ts())
-        );
+        await().pollDelay(Duration.ofMillis(500))
+                .atMost(Duration.ofSeconds(5))
+                .untilAsserted(() ->
+                        supportBotClient.assertQueryExistsByMessageRef(tenantsQuery.channelId(), tenantsQuery.ts()));
     }
 
     @Test
@@ -113,9 +99,9 @@ public class QueryManagementTests {
         SlackMessage tenantsMessage = asTenantSlack.postMessage(queryTs, queryMessage);
 
         // then: query should exist
-        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
-            supportBotClient.assertQueryExistsByMessageRef(tenantsMessage.channelId(), tenantsMessage.ts())
-        );
+        await().atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> supportBotClient.assertQueryExistsByMessageRef(
+                        tenantsMessage.channelId(), tenantsMessage.ts()));
 
         // when: support creates a ticket by reacting with eyes
         MessageTs ticketMessageTs = MessageTs.now();
@@ -141,4 +127,3 @@ public class QueryManagementTests {
         });
     }
 }
-

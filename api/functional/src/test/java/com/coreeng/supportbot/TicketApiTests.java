@@ -1,15 +1,14 @@
 package com.coreeng.supportbot;
 
-import com.coreeng.supportbot.testkit.*;
-import com.google.common.collect.ImmutableList;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-
-import java.time.Duration;
-
 import static com.coreeng.supportbot.testkit.UserRole.support;
 import static com.coreeng.supportbot.testkit.UserRole.tenant;
 import static org.assertj.core.api.Assertions.assertThat;
+
+import com.coreeng.supportbot.testkit.*;
+import com.google.common.collect.ImmutableList;
+import java.time.Duration;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(com.coreeng.supportbot.testkit.TestKitExtension.class)
 public class TicketApiTests {
@@ -24,9 +23,7 @@ public class TicketApiTests {
         String messageText = "Functional test query text";
 
         // when
-        Ticket ticket = asSupport.ticket().create(builder -> builder
-                .message(messageText)
-        );
+        Ticket ticket = asSupport.ticket().create(builder -> builder.message(messageText));
 
         // then
         var ticketResponse = supportBotClient.assertTicketExists(TicketByIdQuery.fromTicket(ticket));
@@ -37,9 +34,7 @@ public class TicketApiTests {
     public void whenTicketIsUpdated_viaApi_thenFieldsChange() {
         // given
         TestKit.RoledTestKit asTenant = testKit.as(tenant);
-        Ticket ticket = asTenant.ticket().create(builder -> builder
-                .message("Initial query")
-        );
+        Ticket ticket = asTenant.ticket().create(builder -> builder.message("Initial query"));
 
         var closeStubs = ticket.stubCloseFlow("ticket closed");
 
@@ -51,8 +46,7 @@ public class TicketApiTests {
                         .authorsTeam("wow")
                         .tags(ImmutableList.of("ingresses", "networking"))
                         .impact("productionBlocking")
-                        .build()
-        );
+                        .build());
 
         // then
         assertThat(updated.status()).isEqualTo("closed");
@@ -66,40 +60,42 @@ public class TicketApiTests {
     public void whenTicketsAreBulkReassigned_assigneeIsUpdatedForOpenTickets() {
         // given
         TestKit.RoledTestKit asTenant = testKit.as(tenant);
-        
+
         // Create 3 open tickets
         Ticket ticket1 = asTenant.ticket().create(builder -> builder.message("Query 1"));
         Ticket ticket2 = asTenant.ticket().create(builder -> builder.message("Query 2"));
         Ticket ticket3 = asTenant.ticket().create(builder -> builder.message("Query 3"));
-        
+
         String newAssignee = "U0123456782"; // Sana Chernobog
         String dmChannelId = "D" + newAssignee;
         Stub openDmStub = slackWiremock.stubConversationsOpen("bulk reassign: open dm", newAssignee);
         Stub notifyStub = slackWiremock.stubChatPostMessage("bulk reassign: notify assignee", dmChannelId);
-        
+
         // when
-        var result = supportBotClient.bulkReassign(
-            SupportBotClient.BulkReassignRequest.builder()
+        var result = supportBotClient.bulkReassign(SupportBotClient.BulkReassignRequest.builder()
                 .ticketIds(ImmutableList.of(ticket1.id(), ticket2.id(), ticket3.id()))
                 .assignedTo(newAssignee)
-                .build()
-        );
+                .build());
 
         // then
         assertThat(result.successCount()).isEqualTo(3);
         assertThat(result.failureCount()).isEqualTo(0);
         assertThat(result.skippedCount()).isEqualTo(0);
-        assertThat(result.successfulTicketIds()).containsExactlyInAnyOrder(
-            ticket1.id(), ticket2.id(), ticket3.id()
-        );
-        
+        assertThat(result.successfulTicketIds()).containsExactlyInAnyOrder(ticket1.id(), ticket2.id(), ticket3.id());
+
         // Verify tickets are reassigned
-        assertThat(supportBotClient.assertTicketExists(TicketByIdQuery.fromTicket(ticket1)).assignedTo())
-            .isEqualTo("sana.chernobog@company.com");
-        assertThat(supportBotClient.assertTicketExists(TicketByIdQuery.fromTicket(ticket2)).assignedTo())
-            .isEqualTo("sana.chernobog@company.com");
-        assertThat(supportBotClient.assertTicketExists(TicketByIdQuery.fromTicket(ticket3)).assignedTo())
-            .isEqualTo("sana.chernobog@company.com");
+        assertThat(supportBotClient
+                        .assertTicketExists(TicketByIdQuery.fromTicket(ticket1))
+                        .assignedTo())
+                .isEqualTo("sana.chernobog@company.com");
+        assertThat(supportBotClient
+                        .assertTicketExists(TicketByIdQuery.fromTicket(ticket2))
+                        .assignedTo())
+                .isEqualTo("sana.chernobog@company.com");
+        assertThat(supportBotClient
+                        .assertTicketExists(TicketByIdQuery.fromTicket(ticket3))
+                        .assignedTo())
+                .isEqualTo("sana.chernobog@company.com");
 
         openDmStub.assertIsCalled();
         notifyStub.assertIsCalled();
