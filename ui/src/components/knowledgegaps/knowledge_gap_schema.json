@@ -1,0 +1,131 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Support Area Summary",
+    "type": "object",
+    "properties": {
+        "supportAreaSummary": {
+            "type": "object",
+            "properties": {
+                "timePeriod": {
+                    "type": "string",
+                    "enum": [
+                        "Last Week",
+                        "Last Month",
+                        "Last Quarter",
+                        "Last Year"
+                    ],
+                    "description": "Time period for which the knowledge gaps are identified"
+                },
+                "totalCoveragePercentage": {
+                    "type": "number",
+                    "description": "% Coverage of the all knowledge areas that these 5 cover"
+                },
+                "knowledgeGaps": {
+                    "type": "array",
+                    "description": "List of knowledge gaps",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Name of the knowledge gap"
+                            },
+                            "coveragePercentage": {
+                                "type": "number",
+                                "description": "% Coverage of this knowledge gap"
+                            },
+                            "queryCount": {
+                                "type": "number",
+                                "description": "Number of queries in this knowledge gap"
+                            },
+                            "queries": {
+                                "type": "array",
+                                "description": "List of Queries",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "text": {
+                                            "type": "string",
+                                            "description": "Query text"
+                                        },
+                                        "link": {
+                                            "type": "string",
+                                            "description": "Query Link"
+                                        }
+                                    },
+                                    "required": [
+                                        "text",
+                                        "link"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "coveragePercentage",
+                            "queryCount",
+                            "queries"
+                        ]
+                    }
+                },
+                "supportAreas": {
+                    "type": "array",
+                    "description": "List of support areas",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Name of the support area"
+                            },
+                            "coveragePercentage": {
+                                "type": "number",
+                                "description": "% Coverage of this support area"
+                            },
+                            "queryCount": {
+                                "type": "number",
+                                "description": "Number of queries in this support area"
+                            },
+                            "queries": {
+                                "type": "array",
+                                "description": "List of Queries",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "text": {
+                                            "type": "string",
+                                            "description": "Query text"
+                                        },
+                                        "link": {
+                                            "type": "string",
+                                            "description": "Query Link"
+                                        }
+                                    },
+                                    "required": [
+                                        "text",
+                                        "link"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "coveragePercentage",
+                            "queryCount",
+                            "queries"
+                        ]
+                    }
+                }
+            },
+            "required": [
+                "timePeriod",
+                "totalCoveragePercentage",
+                "knowledgeGaps",
+                "supportAreas"
+            ]
+        }
+    },
+    "required": [
+        "supportAreaSummary"
+    ]
+}

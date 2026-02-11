@@ -233,3 +233,6 @@ rbac:
 metrics:
   enabled: false
   refresh-interval: 60s
+
+knowledge-gaps:
+  enabled: true
