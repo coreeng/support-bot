@@ -1,5 +1,4 @@
 // src/components/dashboards/__tests__/TimeSeriesChart.test.tsx
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { render, screen } from '@testing-library/react'
 import { TimeSeriesChart } from '../TimeSeriesChart'
 

@@ -3,12 +3,11 @@ package com.coreeng.supportbot.stats;
 import com.coreeng.supportbot.sentiment.TicketSentimentCountPerDate;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.google.common.collect.ImmutableList;
+import java.time.LocalDate;
 import lombok.Getter;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.jackson.Jacksonized;
 import org.jspecify.annotations.Nullable;
-
-import java.time.LocalDate;
 
 @Getter
 @SuperBuilder
@@ -19,9 +18,9 @@ public class StatsResult {
     public static class TicketTimeline extends StatsResult {
         @JsonUnwrapped
         private StatsRequest.TicketTimeline request;
+
         private ImmutableList<DatedValue<Long>> values;
     }
-
 
     @Getter
     @SuperBuilder
@@ -29,9 +28,9 @@ public class StatsResult {
     public static class TicketAmount extends StatsResult {
         @JsonUnwrapped
         private StatsRequest.TicketAmount request;
+
         private ImmutableList<CategorisedValue> values;
     }
-
 
     @Getter
     @SuperBuilder
@@ -39,6 +38,7 @@ public class StatsResult {
     public static class TicketGeneral extends StatsResult {
         @JsonUnwrapped
         private StatsRequest.TicketGeneral request;
+
         private double avgResponseTimeSecs;
         private double avgResolutionTimeSecs;
         private double largestActiveTicketSecs;
@@ -51,6 +51,7 @@ public class StatsResult {
     public static class TicketSentimentCounts extends StatsResult {
         @JsonUnwrapped
         private StatsRequest.TicketSentimentCounts request;
+
         private ImmutableList<TicketSentimentCountPerDate> values;
     }
 
@@ -60,9 +61,9 @@ public class StatsResult {
     public static class Ratings extends StatsResult {
         @JsonUnwrapped
         private StatsRequest.Ratings request;
+
         private RatingsValues values;
         private ImmutableList<WeeklyRating> weekly;
-
     }
 
     @Getter
@@ -78,20 +79,12 @@ public class StatsResult {
     @SuperBuilder
     @Jacksonized
     public static class RatingsValues {
-        @Nullable
-        private Double average;
+        @Nullable private Double average;
+
         private Integer count;
     }
 
-    public record DatedValue<T>(
-        LocalDate date,
-        T value
-    ) {
-    }
+    public record DatedValue<T>(LocalDate date, T value) {}
 
-    public record CategorisedValue(
-        String category,
-        long value
-    ) {
-    }
+    public record CategorisedValue(String category, long value) {}
 }

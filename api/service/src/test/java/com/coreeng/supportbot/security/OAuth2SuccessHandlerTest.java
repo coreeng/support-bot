@@ -26,20 +26,26 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 @ExtendWith(MockitoExtension.class)
 class OAuth2SuccessHandlerTest {
 
-    private static final String testSecret = "test-jwt-secret-for-unit-tests-minimum-256-bits";
+    private static final String TEST_SECRET = "test-jwt-secret-for-unit-tests-minimum-256-bits";
 
-    @Mock private TeamService teamService;
-    @Mock private SupportTeamService supportTeamService;
-    @Mock private HttpServletRequest request;
-    @Mock private HttpServletResponse response;
+    @Mock
+    private TeamService teamService;
+
+    @Mock
+    private SupportTeamService supportTeamService;
+
+    @Mock
+    private HttpServletRequest request;
+
+    @Mock
+    private HttpServletResponse response;
 
     private OAuth2SuccessHandler createHandler() {
         var props = new SecurityProperties(
-            new SecurityProperties.JwtProperties(testSecret, Duration.ofHours(24)),
-            new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
-            new SecurityProperties.CorsProperties("http://localhost:3000"),
-            new SecurityProperties.TestBypassProperties(false)
-        );
+                new SecurityProperties.JwtProperties(TEST_SECRET, Duration.ofHours(24)),
+                new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
+                new SecurityProperties.CorsProperties(null),
+                new SecurityProperties.TestBypassProperties(false));
         var jwtService = new JwtService(props);
         var authCodeStore = new AuthCodeStore();
         return new OAuth2SuccessHandler(props, jwtService, authCodeStore, teamService, supportTeamService);
@@ -64,18 +70,16 @@ class OAuth2SuccessHandlerTest {
         handler.onAuthenticationSuccess(request, response, auth);
 
         // then
-        verify(response).sendRedirect(argThat(url ->
-            url.startsWith("http://localhost:3000/auth/callback?code=")
-        ));
+        verify(response).sendRedirect(argThat(url -> url.startsWith("http://localhost:3000/auth/callback?code=")));
     }
 
     @Test
     void onAuthenticationSuccess_supportEngineerRole() throws Exception {
         // given
         var handler = createHandler();
-        when(teamService.listTeamsByUserEmail("support@example.com")).thenReturn(ImmutableList.of(
-            new Team("Core Support", "core-support", ImmutableList.of(TeamType.support))
-        ));
+        when(teamService.listTeamsByUserEmail("support@example.com"))
+                .thenReturn(
+                        ImmutableList.of(new Team("Core Support", "core-support", ImmutableList.of(TeamType.SUPPORT))));
         when(supportTeamService.isMemberByUserEmail("support@example.com")).thenReturn(true);
         var auth = mockAuth(Map.of("email", "support@example.com", "name", "Support User"));
 
@@ -93,10 +97,11 @@ class OAuth2SuccessHandlerTest {
     void onAuthenticationSuccess_leadershipRole() throws Exception {
         // given
         var handler = createHandler();
-        when(teamService.listTeamsByUserEmail("lead@example.com")).thenReturn(ImmutableList.of(
-            new Team("Leadership", "leadership", ImmutableList.of(TeamType.leadership))
-        ));
-        when(supportTeamService.isLeadershipMemberByUserEmail("lead@example.com")).thenReturn(true);
+        when(teamService.listTeamsByUserEmail("lead@example.com"))
+                .thenReturn(
+                        ImmutableList.of(new Team("Leadership", "leadership", ImmutableList.of(TeamType.LEADERSHIP))));
+        when(supportTeamService.isLeadershipMemberByUserEmail("lead@example.com"))
+                .thenReturn(true);
         var auth = mockAuth(Map.of("email", "lead@example.com", "name", "Lead User"));
 
         // when

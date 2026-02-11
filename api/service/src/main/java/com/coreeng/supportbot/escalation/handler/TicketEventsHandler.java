@@ -27,15 +27,15 @@ public class TicketEventsHandler {
     public void onTicketEscalated(TicketEscalated event) {
         try {
             processingService.createEscalation(CreateEscalationRequest.builder()
-                .ticket(event.ticket())
-                .team(event.team())
-                .tags(event.tags())
-                .build());
+                    .ticket(event.ticket())
+                    .team(event.team())
+                    .tags(event.tags())
+                    .build());
         } catch (Exception e) {
             log.atError()
-                .addArgument(() -> event.ticket().id())
-                .setCause(e)
-                .log("Couldn't create escalation for ticket({})");
+                    .addArgument(() -> event.ticket().id())
+                    .setCause(e)
+                    .log("Couldn't create escalation for ticket({})");
         }
     }
 }

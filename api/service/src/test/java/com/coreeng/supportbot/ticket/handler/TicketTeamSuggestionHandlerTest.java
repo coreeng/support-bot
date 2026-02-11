@@ -1,5 +1,8 @@
 package com.coreeng.supportbot.ticket.handler;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.teams.PlatformTeam;
@@ -16,23 +19,20 @@ import com.slack.api.bolt.context.builtin.BlockSuggestionContext;
 import com.slack.api.bolt.request.builtin.BlockSuggestionRequest;
 import com.slack.api.model.User;
 import com.slack.api.model.view.View;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-import java.util.Set;
-import java.util.stream.IntStream;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class TicketTeamSuggestionHandlerTest {
     @Mock
     private SlackClient slackClient;
+
     @Mock
     private PlatformTeamsService platformTeamsService;
 
@@ -43,9 +43,8 @@ class TicketTeamSuggestionHandlerTest {
     void setUp() {
         jsonMapper = new JsonMapper();
         handler = new TicketTeamSuggestionHandler(
-            new TicketTeamSuggestionsService(slackClient, platformTeamsService),
-            new TicketSummaryViewMapper(jsonMapper)
-        );
+                new TicketTeamSuggestionsService(slackClient, platformTeamsService),
+                new TicketSummaryViewMapper(jsonMapper));
     }
 
     @Test
@@ -191,17 +190,19 @@ class TicketTeamSuggestionHandlerTest {
         BlockSuggestionContext ctx = mock(BlockSuggestionContext.class);
         mockSlackUserEmail("U123", "user@example.com");
 
-        ImmutableList<String> userTeamNames = ImmutableList.copyOf(IntStream.range(0, 150).mapToObj(i -> "U" + i).toList());
-        ImmutableList<String> otherTeamNames = ImmutableList.copyOf(IntStream.range(0, 150).mapToObj(i -> "O" + i).toList());
+        ImmutableList<String> userTeamNames = ImmutableList.copyOf(
+                IntStream.range(0, 150).mapToObj(i -> "U" + i).toList());
+        ImmutableList<String> otherTeamNames = ImmutableList.copyOf(
+                IntStream.range(0, 150).mapToObj(i -> "O" + i).toList());
 
         ImmutableList<PlatformTeam> allTeams = ImmutableList.<PlatformTeam>builder()
-            .addAll(userTeamNames.stream().map(this::team).toList())
-            .addAll(otherTeamNames.stream().map(this::team).toList())
-            .build();
+                .addAll(userTeamNames.stream().map(this::team).toList())
+                .addAll(otherTeamNames.stream().map(this::team).toList())
+                .build();
 
         when(platformTeamsService.listTeams()).thenReturn(allTeams);
         when(platformTeamsService.listTeamsByUserEmail("user@example.com"))
-            .thenReturn(userTeamNames.stream().map(this::team).collect(ImmutableList.toImmutableList()));
+                .thenReturn(userTeamNames.stream().map(this::team).collect(ImmutableList.toImmutableList()));
 
         // when
         BlockSuggestionResponse resp = handler.apply(req, ctx);
@@ -226,7 +227,7 @@ class TicketTeamSuggestionHandlerTest {
     @Test
     void slackbotAuthor_usesFallbackSuggestions() {
         // given
-        BlockSuggestionRequest req = mockSuggestionRequest("", SlackId.slackbot.id());
+        BlockSuggestionRequest req = mockSuggestionRequest("", SlackId.SLACKBOT.id());
         BlockSuggestionContext ctx = mock(BlockSuggestionContext.class);
 
         PlatformTeam t1 = team("Team A");
@@ -253,8 +254,7 @@ class TicketTeamSuggestionHandlerTest {
         PlatformTeam t1 = team("Team A");
         PlatformTeam t2 = team("Team B");
         when(platformTeamsService.listTeams()).thenReturn(ImmutableList.of(t1, t2));
-        when(slackClient.getUserById(new SlackId.User("U123")))
-            .thenThrow(new RuntimeException("boom"));
+        when(slackClient.getUserById(new SlackId.User("U123"))).thenThrow(new RuntimeException("boom"));
 
         // when
         BlockSuggestionResponse resp = handler.apply(req, ctx);
@@ -277,10 +277,9 @@ class TicketTeamSuggestionHandlerTest {
     private BlockSuggestionRequest mockSuggestionRequest(String value, String metadataAuthorId) {
         BlockSuggestionRequest req = mock(BlockSuggestionRequest.class, RETURNS_DEEP_STUBS);
         when(req.getPayload().getValue()).thenReturn(value);
-        String metaJson = jsonMapper.toJsonString(new TicketSummaryView.Metadata(42L, new SlackId.User(metadataAuthorId)));
-        View view = View.builder()
-            .privateMetadata(metaJson)
-            .build();
+        String metaJson =
+                jsonMapper.toJsonString(new TicketSummaryView.Metadata(42L, new SlackId.User(metadataAuthorId)));
+        View view = View.builder().privateMetadata(metaJson).build();
         when(req.getPayload().getView()).thenReturn(view);
         return req;
     }

@@ -28,8 +28,7 @@ public class AssignmentController {
         if (result.successCount() == 0 && result.skippedCount() == 0) {
             return ResponseEntity.badRequest().body(result);
         }
-        
+
         return ResponseEntity.ok(result);
     }
 }
-

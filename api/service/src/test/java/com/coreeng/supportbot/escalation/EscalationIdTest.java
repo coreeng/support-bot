@@ -1,9 +1,9 @@
 package com.coreeng.supportbot.escalation;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import com.coreeng.supportbot.util.JsonMapper;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class EscalationIdTest {
     private final JsonMapper jsonMapper = new JsonMapper();

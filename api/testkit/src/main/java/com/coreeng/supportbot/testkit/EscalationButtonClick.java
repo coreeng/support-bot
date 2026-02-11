@@ -1,21 +1,19 @@
 package com.coreeng.supportbot.testkit;
 
-import org.jspecify.annotations.NonNull;
-
 import lombok.Builder;
 import lombok.Getter;
+import org.jspecify.annotations.NonNull;
 
 @Builder
 @Getter
 public class EscalationButtonClick implements MessageButtonClick {
-    @NonNull
-    private final String triggerId;
-    @NonNull
-    private final Ticket ticket;
+    @NonNull private final String triggerId;
+
+    @NonNull private final Ticket ticket;
 
     @Override
     public String actionId() {
-        return TicketMessage.escalateButtonActionId;
+        return TicketMessage.ESCALATE_BUTTON_ACTION_ID;
     }
 
     @Override
@@ -25,5 +23,3 @@ public class EscalationButtonClick implements MessageButtonClick {
                 """, ticket.id());
     }
 }
-
-

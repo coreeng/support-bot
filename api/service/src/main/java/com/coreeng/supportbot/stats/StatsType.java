@@ -17,8 +17,7 @@ public enum StatsType {
     @JsonValue
     private final String label;
 
-    @Nullable
-    public static StatsType fromLabelOrNull(String str) {
+    @Nullable public static StatsType fromLabelOrNull(String str) {
         for (StatsType value : values()) {
             if (value.label().equals(str)) {
                 return value;

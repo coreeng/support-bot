@@ -1,7 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.slack.UIOption;
-
 import lombok.Getter;
 
 @Getter

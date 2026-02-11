@@ -12,27 +12,26 @@ import org.junit.jupiter.api.Test;
 
 class JwtServiceTest {
 
-    private static final String testSecret = "test-jwt-secret-for-unit-tests-minimum-256-bits";
+    private static final String TEST_SECRET = "test-jwt-secret-for-unit-tests-minimum-256-bits";
 
     private final JwtService service = createService(Duration.ofHours(24));
 
     private static JwtService createService(Duration expiration) {
         return new JwtService(new SecurityProperties(
-            new SecurityProperties.JwtProperties(testSecret, expiration),
-            new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
-            new SecurityProperties.CorsProperties("http://localhost:3000"),
-            new SecurityProperties.TestBypassProperties(false)
-        ));
+                new SecurityProperties.JwtProperties(TEST_SECRET, expiration),
+                new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
+                new SecurityProperties.CorsProperties(null),
+                new SecurityProperties.TestBypassProperties(false)));
     }
 
     @Test
     void generateToken_validJwt() {
         // given
         var principal = new UserPrincipal(
-            "user@example.com", "Test User",
-            ImmutableList.of(new Team("Test Tenant", "test-tenant", ImmutableList.of(TeamType.tenant))),
-            ImmutableList.of(Role.user)
-        );
+                "user@example.com",
+                "Test User",
+                ImmutableList.of(new Team("Test Tenant", "test-tenant", ImmutableList.of(TeamType.TENANT))),
+                ImmutableList.of(Role.USER));
 
         // when
         var token = service.generateToken(principal);
@@ -48,10 +47,10 @@ class JwtServiceTest {
     void generateToken_tenantRole() {
         // given
         var principal = new UserPrincipal(
-            "user@example.com", "Test User",
-            ImmutableList.of(new Team("Test Tenant", "test-tenant", ImmutableList.of(TeamType.tenant))),
-            ImmutableList.of(Role.user)
-        );
+                "user@example.com",
+                "Test User",
+                ImmutableList.of(new Team("Test Tenant", "test-tenant", ImmutableList.of(TeamType.TENANT))),
+                ImmutableList.of(Role.USER));
 
         // when
         var result = service.validateToken(service.generateToken(principal));
@@ -62,17 +61,18 @@ class JwtServiceTest {
         assertFalse(result.get().isSupportEngineer());
         assertFalse(result.get().isEscalation());
         assertEquals("test-tenant", result.get().teams().get(0).code());
-        assertEquals(ImmutableList.of(TeamType.tenant), result.get().teams().get(0).types());
+        assertEquals(
+                ImmutableList.of(TeamType.TENANT), result.get().teams().get(0).types());
     }
 
     @Test
     void generateToken_supportRole() {
         // given
         var principal = new UserPrincipal(
-            "support@example.com", "Support User",
-            ImmutableList.of(new Team("Core Support", "core-support", ImmutableList.of(TeamType.support))),
-            ImmutableList.of(Role.user, Role.supportEngineer)
-        );
+                "support@example.com",
+                "Support User",
+                ImmutableList.of(new Team("Core Support", "core-support", ImmutableList.of(TeamType.SUPPORT))),
+                ImmutableList.of(Role.USER, Role.SUPPORT_ENGINEER));
 
         // when
         var result = service.validateToken(service.generateToken(principal));
@@ -87,10 +87,10 @@ class JwtServiceTest {
     void generateToken_leadershipRole() {
         // given
         var principal = new UserPrincipal(
-            "lead@example.com", "Lead User",
-            ImmutableList.of(new Team("Leadership", "leadership", ImmutableList.of(TeamType.leadership))),
-            ImmutableList.of(Role.user, Role.leadership, Role.supportEngineer)
-        );
+                "lead@example.com",
+                "Lead User",
+                ImmutableList.of(new Team("Leadership", "leadership", ImmutableList.of(TeamType.LEADERSHIP))),
+                ImmutableList.of(Role.USER, Role.LEADERSHIP, Role.SUPPORT_ENGINEER));
 
         // when
         var result = service.validateToken(service.generateToken(principal));
@@ -113,10 +113,8 @@ class JwtServiceTest {
     @Test
     void validateToken_tamperedToken_returnsEmpty() {
         // given
-        var principal = new UserPrincipal(
-            "user@example.com", "Test User",
-            ImmutableList.of(), ImmutableList.of(Role.user)
-        );
+        var principal =
+                new UserPrincipal("user@example.com", "Test User", ImmutableList.of(), ImmutableList.of(Role.USER));
         var token = service.generateToken(principal);
 
         // when

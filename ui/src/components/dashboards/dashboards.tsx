@@ -41,17 +41,17 @@ const sections = [
 
 export default function DashboardsPage() {
     // Active section (tab-based navigation)
-    const [activeSection, setActiveSection] = useState<SectionKey>('response')
-    
-    // Sync with URL query params
-    useEffect(() => {
+    const [activeSection, setActiveSection] = useState<SectionKey>(() => {
+        // Only runs on client during initial render
+        if (typeof window === 'undefined') return 'response'
         const params = new URLSearchParams(window.location.search)
         const section = params.get('section') as SectionKey
         if (section && sections.some(s => s.key === section)) {
-            setActiveSection(section)
+            return section
         }
-    }, [])
-    
+        return 'response'
+    })
+
     useEffect(() => {
         const params = new URLSearchParams(window.location.search)
         params.set('section', activeSection)
@@ -113,19 +113,6 @@ export default function DashboardsPage() {
         }
         setDateFilterMode('custom')
     }
-    
-    // Also ensure dates are valid when dateFilterMode is custom and dates change
-    // This prevents invalid date ranges from causing all tickets to be fetched
-    useEffect(() => {
-        if (dateFilterMode === 'custom' && (!isDateRangeValid || !startDate || !endDate)) {
-            // If custom mode is active but dates are invalid, preserve a valid range
-            const end = new Date()
-            const start = new Date()
-            start.setDate(end.getDate() - 7)
-            if (!startDate) setStartDate(start.toISOString().split('T')[0])
-            if (!endDate) setEndDate(end.toISOString().split('T')[0])
-        }
-    }, [dateFilterMode, isDateRangeValid, startDate, endDate])
 
     // Response SLAs - only load when section is active and date range is valid
     const { data: firstResponsePercentiles, refetch: refetchFirstResponse, isFetching: isFetchingFirstResponse } = useFirstResponsePercentiles(

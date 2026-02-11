@@ -13,12 +13,8 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
-import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -34,32 +30,37 @@ public class SecurityConfig {
     private final OAuth2AvailabilityChecker oauth2AvailabilityChecker;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(AbstractHttpConfigurer::disable)
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                // Public endpoints
-                .requestMatchers("/oauth2/**", "/login/**").permitAll()
-                .requestMatchers("/auth/token").permitAll()
-                .requestMatchers("/health", "/prometheus").permitAll()
-                // Slack webhook endpoint - uses Slack's own signing secret verification
-                .requestMatchers("/slack/events").permitAll()
-                // Dashboard restricted to leadership or support engineers
-                .requestMatchers("/dashboard/**").hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
-                // All other endpoints require authentication
-                .anyRequest().authenticated()
-            )
-            .oauth2Login(oauth2 -> {
-                if (oauth2AvailabilityChecker.isOAuth2Available()) {
-                    oauth2.successHandler(oauth2SuccessHandler());
-                } else {
-                    oauth2.disable();
-                }
-            })
-            .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(testAuthBypassFilter(), JwtAuthenticationFilter.class);
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, CorsConfigurationSource corsConfigurationSource)
+            throws Exception {
+        http.csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        // Public endpoints
+                        .requestMatchers("/oauth2/**", "/login/**")
+                        .permitAll()
+                        .requestMatchers("/auth/token", "/auth/oauth-url", "/auth/oauth/exchange")
+                        .permitAll()
+                        .requestMatchers("/health", "/prometheus")
+                        .permitAll()
+                        // Slack webhook endpoint - uses Slack's own signing secret verification
+                        .requestMatchers("/slack/events")
+                        .permitAll()
+                        // Dashboard restricted to leadership or support engineers
+                        .requestMatchers("/dashboard/**")
+                        .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
+                        // All other endpoints require authentication
+                        .anyRequest()
+                        .authenticated())
+                .oauth2Login(oauth2 -> {
+                    if (oauth2AvailabilityChecker.isOAuth2Available()) {
+                        oauth2.successHandler(oauth2SuccessHandler());
+                    } else {
+                        oauth2.disable();
+                    }
+                })
+                .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(testAuthBypassFilter(), JwtAuthenticationFilter.class);
 
         return http.build();
     }
@@ -76,32 +77,11 @@ public class SecurityConfig {
 
     @Bean
     public OAuth2SuccessHandler oauth2SuccessHandler() {
-        return new OAuth2SuccessHandler(
-            properties,
-            jwtService,
-            authCodeStore,
-            teamService,
-            supportTeamService
-        );
+        return new OAuth2SuccessHandler(properties, jwtService, authCodeStore, teamService, supportTeamService);
     }
 
     @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        var configuration = new CorsConfiguration();
-
-        var origins = properties.cors().allowedOrigins();
-        if (origins != null && !origins.isBlank()) {
-            configuration.setAllowedOrigins(Arrays.asList(origins.split(",")));
-        }
-
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setExposedHeaders(List.of("Authorization"));
-        configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
-
-        var source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
     }
 }

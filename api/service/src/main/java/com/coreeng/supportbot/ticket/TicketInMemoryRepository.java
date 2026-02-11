@@ -1,14 +1,16 @@
 package com.coreeng.supportbot.ticket;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.Collections.reverseOrder;
+import static java.util.Comparator.comparing;
+
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
-import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
-
-import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -22,12 +24,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
-
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.ImmutableList.toImmutableList;
-import static java.util.Collections.reverseOrder;
-import static java.util.Comparator.comparing;
+import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @RequiredArgsConstructor
 public class TicketInMemoryRepository implements TicketRepository {
@@ -82,8 +81,8 @@ public class TicketInMemoryRepository implements TicketRepository {
 
         return ticketsByQuery.computeIfPresent(updatedTicket.queryRef(), (key, t) -> {
             Ticket newTicket = updatedTicket.toBuilder()
-                .assignedTo(updatedTicket.assignedTo() != null ? updatedTicket.assignedTo() : t.assignedTo())
-                .build();
+                    .assignedTo(updatedTicket.assignedTo() != null ? updatedTicket.assignedTo() : t.assignedTo())
+                    .build();
             tickets.put(newTicket.id(), newTicket);
             return newTicket;
         });
@@ -94,12 +93,12 @@ public class TicketInMemoryRepository implements TicketRepository {
         checkNotNull(id);
 
         return tickets.computeIfPresent(id, (key, t) -> {
-            Ticket touchedTicket = t.toBuilder()
-                .lastInteractedAt(timestamp)
-                .build();
-            ticketsByQuery.put(t.queryRef(), touchedTicket);
-            return touchedTicket;
-        }) != null;
+                    Ticket touchedTicket =
+                            t.toBuilder().lastInteractedAt(timestamp).build();
+                    ticketsByQuery.put(t.queryRef(), touchedTicket);
+                    return touchedTicket;
+                })
+                != null;
     }
 
     @Override
@@ -112,23 +111,21 @@ public class TicketInMemoryRepository implements TicketRepository {
         checkNotNull(slackUserId);
 
         return tickets.computeIfPresent(ticketId, (id, t) -> {
-            Ticket updated = t.toBuilder()
-                .assignedTo(SlackId.user(slackUserId))
-                .build();
-            ticketsByQuery.put(t.queryRef(), updated);
-            return updated;
-        }) != null;
+                    Ticket updated =
+                            t.toBuilder().assignedTo(SlackId.user(slackUserId)).build();
+                    ticketsByQuery.put(t.queryRef(), updated);
+                    return updated;
+                })
+                != null;
     }
 
-    @Nullable
-    @Override
+    @Nullable @Override
     public Ticket findTicketById(TicketId ticketId) {
         checkNotNull(ticketId);
         return tickets.get(ticketId);
     }
 
-    @Nullable
-    @Override
+    @Nullable @Override
     public Ticket findTicketByQuery(MessageRef queryRef) {
         checkNotNull(queryRef);
         return ticketsByQuery.get(queryRef);
@@ -139,13 +136,12 @@ public class TicketInMemoryRepository implements TicketRepository {
         TicketId ticketId = checkNotNull(ticket.id());
         return tickets.computeIfPresent(ticketId, (id, t) -> {
             Ticket newTicket = t.toBuilder()
-                .statusLog(
-                    ImmutableList.<Ticket.StatusLog>builderWithExpectedSize(t.statusLog().size() + 1)
-                        .addAll(t.statusLog())
-                        .add(new Ticket.StatusLog(t.status(), at))
-                        .build()
-                )
-                .build();
+                    .statusLog(ImmutableList.<Ticket.StatusLog>builderWithExpectedSize(
+                                    t.statusLog().size() + 1)
+                            .addAll(t.statusLog())
+                            .add(new Ticket.StatusLog(t.status(), at))
+                            .build())
+                    .build();
             ticketsByQuery.put(ticket.queryRef(), newTicket);
             return newTicket;
         });
@@ -156,22 +152,22 @@ public class TicketInMemoryRepository implements TicketRepository {
         return findTicketsAndMap(query, Function.identity());
     }
 
-    @NonNull
-    private <X> Page<X> findTicketsAndMap(TicketsQuery query, Function<Ticket, X> mapperFn) {
+    @NonNull private <X> Page<X> findTicketsAndMap(TicketsQuery query, Function<Ticket, X> mapperFn) {
         checkNotNull(query);
         checkArgument(query.page() >= 0);
         checkArgument(query.pageSize() > 0);
 
-        Comparator<Ticket> order = switch (query.order()) {
-            case asc -> comparing(t -> t.queryTs().getDate());
-            case desc -> reverseOrder(comparing(t -> t.queryTs().getDate()));
-            case null -> comparing(t -> 0);
-        };
+        Comparator<Ticket> order =
+                switch (query.order()) {
+                    case asc -> comparing(t -> t.queryTs().getDate());
+                    case desc -> reverseOrder(comparing(t -> t.queryTs().getDate()));
+                    case null -> comparing(t -> 0);
+                };
         ImmutableList<X> queryResult = tickets.values().stream()
-            .filter(t -> filterTicket(t, query))
-            .sorted(order)
-            .map(mapperFn)
-            .collect(toImmutableList());
+                .filter(t -> filterTicket(t, query))
+                .sorted(order)
+                .map(mapperFn)
+                .collect(toImmutableList());
 
         ImmutableList<X> elements;
         long page;
@@ -186,10 +182,7 @@ public class TicketInMemoryRepository implements TicketRepository {
             page = query.page();
             totalPages = queryResult.size() / query.pageSize() + 1;
         }
-        return new Page<>(
-            elements,
-            page, totalPages, queryResult.size()
-        );
+        return new Page<>(elements, page, totalPages, queryResult.size());
     }
 
     private boolean filterTicket(Ticket ticket, TicketsQuery query) {
@@ -219,8 +212,8 @@ public class TicketInMemoryRepository implements TicketRepository {
         }
         if (query.includeNoTags() || !query.tags().isEmpty()) {
             boolean matchesNoTags = query.includeNoTags() && ticket.tags().isEmpty();
-            boolean matchesSelectedTags = !query.tags().isEmpty()
-                && new HashSet<>(ticket.tags()).containsAll(query.tags());
+            boolean matchesSelectedTags =
+                    !query.tags().isEmpty() && new HashSet<>(ticket.tags()).containsAll(query.tags());
             if (!matchesNoTags && !matchesSelectedTags) {
                 return false;
             }
@@ -252,18 +245,20 @@ public class TicketInMemoryRepository implements TicketRepository {
     public ImmutableList<TicketId> listStaleTicketIds(Instant checkAt, Duration timeToStale) {
         Instant stalenessThreshold = checkAt.minus(timeToStale);
         return tickets.values().stream()
-            .filter(t -> t.status() == TicketStatus.opened && t.lastInteractedAt().isBefore(stalenessThreshold))
-            .map(Ticket::id)
-            .collect(toImmutableList());
+                .filter(t -> t.status() == TicketStatus.opened
+                        && t.lastInteractedAt().isBefore(stalenessThreshold))
+                .map(Ticket::id)
+                .collect(toImmutableList());
     }
 
     @Override
     public ImmutableList<TicketId> listStaleTicketIdsToRemindOf(Instant checkAt, Duration reminderInterval) {
         Instant reminderThreshold = checkAt.minus(reminderInterval);
         return tickets.values().stream()
-            .filter(t -> t.status() == TicketStatus.stale && t.lastInteractedAt().isBefore(reminderThreshold))
-            .map(Ticket::id)
-            .collect(toImmutableList());
+                .filter(t ->
+                        t.status() == TicketStatus.stale && t.lastInteractedAt().isBefore(reminderThreshold))
+                .map(Ticket::id)
+                .collect(toImmutableList());
     }
 
     @Override

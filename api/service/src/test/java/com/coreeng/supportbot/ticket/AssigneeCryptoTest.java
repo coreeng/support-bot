@@ -1,19 +1,17 @@
 package com.coreeng.supportbot.ticket;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 public class AssigneeCryptoTest {
 
     @Test
     public void shouldReturnPlainWhenEncryptionDisabled() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(false, null));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         String userId = "U123456";
 
@@ -29,10 +27,7 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldReturnEmptyWhenEncryptionEnabledButNoKey() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, null)
-        );
+        TicketAssignmentProps props = new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, null));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         String userId = "U123456";
 
@@ -46,10 +41,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldReturnEmptyWhenEncryptionEnabledButBlankKey() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "   ")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "   "));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         String userId = "U123456";
 
@@ -63,10 +56,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldReturnEmptyWhenUserIdIsNull() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "test-key")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "test-key"));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
 
         // when
@@ -79,10 +70,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldEncryptWhenEncryptionEnabledWithValidKey() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "my-secret-key-123")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "my-secret-key-123"));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         String userId = "U123456";
 
@@ -100,10 +89,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldRoundTripEncryptAndDecrypt() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "my-secret-key-123")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "my-secret-key-123"));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         String originalUserId = "U987654321";
 
@@ -120,10 +107,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldDecryptPlainValue() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(false, null));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         String plainUserId = "U123456";
 
@@ -138,23 +123,20 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldReturnEmptyWhenDecryptingWithWrongKey() {
         // given
-        TicketAssignmentProps encryptProps = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "key-1")
-        );
+        TicketAssignmentProps encryptProps =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "key-1"));
         AssigneeCrypto cryptoEncrypt = new AssigneeCrypto(encryptProps);
         String userId = "U123456";
         var encrypted = cryptoEncrypt.encrypt(userId);
         assertTrue(encrypted.isPresent());
 
-        TicketAssignmentProps decryptProps = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "different-key-2")
-        );
+        TicketAssignmentProps decryptProps =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "different-key-2"));
         AssigneeCrypto cryptoDecrypt = new AssigneeCrypto(decryptProps);
 
         // when
-        var decrypted = cryptoDecrypt.decrypt(encrypted.get().value(), encrypted.get().format());
+        var decrypted =
+                cryptoDecrypt.decrypt(encrypted.get().value(), encrypted.get().format());
 
         // then
         assertTrue(decrypted.isEmpty(), "Decryption with wrong key should fail gracefully");
@@ -163,23 +145,20 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldReturnEmptyWhenDecryptingEncryptedValueButEncryptionDisabled() {
         // given
-        TicketAssignmentProps encryptProps = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "my-key")
-        );
+        TicketAssignmentProps encryptProps =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "my-key"));
         AssigneeCrypto cryptoEncrypt = new AssigneeCrypto(encryptProps);
         String userId = "U123456";
         var encrypted = cryptoEncrypt.encrypt(userId);
         assertTrue(encrypted.isPresent());
 
-        TicketAssignmentProps decryptProps = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps decryptProps =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(false, null));
         AssigneeCrypto cryptoDecrypt = new AssigneeCrypto(decryptProps);
 
         // when
-        var decrypted = cryptoDecrypt.decrypt(encrypted.get().value(), encrypted.get().format());
+        var decrypted =
+                cryptoDecrypt.decrypt(encrypted.get().value(), encrypted.get().format());
 
         // then
         assertTrue(decrypted.isEmpty(), "Should not decrypt when encryption is disabled");
@@ -188,10 +167,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldReturnEmptyWhenDecryptingWithUnknownFormat() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "my-key")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "my-key"));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
 
         // when
@@ -204,10 +181,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldReturnEmptyWhenDecryptingNullValue() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "my-key")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "my-key"));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
 
         // when
@@ -220,10 +195,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldReturnEmptyWhenDecryptingCorruptedPayload() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "my-key")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "my-key"));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         String corruptedValue = "enc_v1:not-valid-base64!@#$";
 
@@ -237,10 +210,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldReturnEmptyWhenDecryptingTooShortPayload() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "my-key")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "my-key"));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         // Base64 encoding of a very short byte array (shorter than IV length of 12 bytes)
         String shortPayload = "enc_v1:AQID"; // only 3 bytes
@@ -255,10 +226,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldHandleDecryptWithNullFormat() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(false, null));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         String plainValue = "U123456";
 
@@ -273,10 +242,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldProduceDifferentCiphertextsForSameInput() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "my-key")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "my-key"));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         String userId = "U123456";
 
@@ -287,9 +254,11 @@ public class AssigneeCryptoTest {
         // then
         assertTrue(result1.isPresent());
         assertTrue(result2.isPresent());
-        assertNotEquals(result1.get().value(), result2.get().value(),
-            "Each encryption should use unique IV, producing different ciphertext");
-        
+        assertNotEquals(
+                result1.get().value(),
+                result2.get().value(),
+                "Each encryption should use unique IV, producing different ciphertext");
+
         // but both should decrypt to the same value
         var decrypted1 = crypto.decrypt(result1.get().value(), result1.get().format());
         var decrypted2 = crypto.decrypt(result2.get().value(), result2.get().format());
@@ -302,10 +271,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldComputeHmacHashWhenKeyIsPresent() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "my-secret-key")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "my-secret-key"));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         String userId = "U123456";
 
@@ -321,10 +288,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldReturnNullHashWhenKeyIsNull() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(false, null));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         String userId = "U123456";
 
@@ -338,10 +303,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldReturnNullHashWhenKeyIsBlank() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "   ")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "   "));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         String userId = "U123456";
 
@@ -355,10 +318,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldReturnNullHashWhenUserIdIsNull() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "my-secret-key")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "my-secret-key"));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
 
         // when
@@ -371,10 +332,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldProduceDeterministicHmacHash() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "my-secret-key")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "my-secret-key"));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
         String userId = "U123456";
 
@@ -391,10 +350,8 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldProduceDifferentHashesForDifferentInputs() {
         // given
-        TicketAssignmentProps props = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "my-secret-key")
-        );
+        TicketAssignmentProps props =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "my-secret-key"));
         AssigneeCrypto crypto = new AssigneeCrypto(props);
 
         // when
@@ -410,16 +367,12 @@ public class AssigneeCryptoTest {
     @Test
     public void shouldProduceDifferentHashesForDifferentKeys() {
         // given
-        TicketAssignmentProps props1 = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "key-1")
-        );
+        TicketAssignmentProps props1 =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "key-1"));
         AssigneeCrypto crypto1 = new AssigneeCrypto(props1);
 
-        TicketAssignmentProps props2 = new TicketAssignmentProps(
-            true,
-            new TicketAssignmentProps.Encryption(true, "key-2")
-        );
+        TicketAssignmentProps props2 =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(true, "key-2"));
         AssigneeCrypto crypto2 = new AssigneeCrypto(props2);
         String userId = "U123456";
 
@@ -430,8 +383,9 @@ public class AssigneeCryptoTest {
         // then
         assertNotNull(hash1);
         assertNotNull(hash2);
-        assertNotEquals(hash1, hash2, 
-            "HMAC should produce different hashes with different keys (prevents rainbow table attacks)");
+        assertNotEquals(
+                hash1,
+                hash2,
+                "HMAC should produce different hashes with different keys (prevents rainbow table attacks)");
     }
 }
-

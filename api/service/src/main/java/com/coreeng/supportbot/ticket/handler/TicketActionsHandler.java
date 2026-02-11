@@ -1,5 +1,8 @@
 package com.coreeng.supportbot.ticket.handler;
 
+import static com.slack.api.model.view.Views.view;
+
+import com.coreeng.supportbot.rbac.RbacRestrictionMessage;
 import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackBlockActionHandler;
@@ -7,7 +10,6 @@ import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.coreeng.supportbot.ticket.EscalateViewMapper;
-import com.coreeng.supportbot.rbac.RbacRestrictionMessage;
 import com.coreeng.supportbot.ticket.TicketEscalateInput;
 import com.coreeng.supportbot.ticket.TicketOperation;
 import com.coreeng.supportbot.ticket.TicketSummaryService;
@@ -19,13 +21,10 @@ import com.slack.api.app_backend.interactive_components.payload.BlockActionPaylo
 import com.slack.api.bolt.context.builtin.ActionContext;
 import com.slack.api.bolt.request.builtin.BlockActionRequest;
 import com.slack.api.methods.request.views.ViewsOpenRequest;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
-import java.util.regex.Pattern;
-
-import static com.slack.api.model.view.Views.view;
 
 @Component
 @Slf4j
@@ -39,7 +38,7 @@ public class TicketActionsHandler implements SlackBlockActionHandler {
 
     @Override
     public Pattern getPattern() {
-        return TicketOperation.namePattern;
+        return TicketOperation.NAME_PATTERN;
     }
 
     @Override
@@ -47,15 +46,14 @@ public class TicketActionsHandler implements SlackBlockActionHandler {
         BlockActionPayload payload = req.getPayload();
         if (!rbacService.isSupportBySlackId(SlackId.user(context.getRequestUserId()))) {
             log.atInfo()
-                .addArgument(context::getRequestUserId)
-                .log("Rejecting escalation request. User({}) is not a support team member");
+                    .addArgument(context::getRequestUserId)
+                    .log("Rejecting escalation request. User({}) is not a support team member");
             slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
-                .message(new RbacRestrictionMessage())
-                .channel(payload.getChannel().getId())
-                .threadTs(MessageTs.ofOrNull(payload.getMessage().getThreadTs()))
-                .userId(context.getRequestUserId())
-                .build()
-            );
+                    .message(new RbacRestrictionMessage())
+                    .channel(payload.getChannel().getId())
+                    .threadTs(MessageTs.ofOrNull(payload.getMessage().getThreadTs()))
+                    .userId(context.getRequestUserId())
+                    .build());
             return;
         }
 
@@ -72,29 +70,25 @@ public class TicketActionsHandler implements SlackBlockActionHandler {
     private void openSummaryView(ActionContext context, BlockActionPayload.Action action) {
         TicketSummaryViewInput input = summaryViewMapper.parseTriggerInput(action.getValue());
         TicketSummaryView summary = ticketSummaryService.summaryView(input.ticketId());
-        slackClient.viewsOpen(
-            ViewsOpenRequest.builder()
+        slackClient.viewsOpen(ViewsOpenRequest.builder()
                 .triggerId(context.getTriggerId())
-                .view(view(v -> summaryViewMapper.render(summary, v)
-                    .callbackId(TicketViewType.summary.callbackId())
-                    .type("modal")
-                    .clearOnClose(true)
-                ))
-                .build()
-        );
+                .view(view(v -> summaryViewMapper
+                        .render(summary, v)
+                        .callbackId(TicketViewType.summary.callbackId())
+                        .type("modal")
+                        .clearOnClose(true)))
+                .build());
     }
 
     private void escalateTicket(ActionContext context, BlockActionPayload.Action action) {
         TicketEscalateInput input = escalateViewMapper.parseTriggerInput(action.getValue());
-        slackClient.viewsOpen(
-            ViewsOpenRequest.builder()
+        slackClient.viewsOpen(ViewsOpenRequest.builder()
                 .triggerId(context.getTriggerId())
-                .view(view(v -> escalateViewMapper.render(input, v)
-                    .callbackId(TicketViewType.escalate.callbackId())
-                    .type("modal")
-                    .clearOnClose(true)
-                ))
-                .build()
-        );
+                .view(view(v -> escalateViewMapper
+                        .render(input, v)
+                        .callbackId(TicketViewType.escalate.callbackId())
+                        .type("modal")
+                        .clearOnClose(true)))
+                .build());
     }
 }

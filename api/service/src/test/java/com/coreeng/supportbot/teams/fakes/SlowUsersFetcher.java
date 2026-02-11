@@ -1,7 +1,6 @@
 package com.coreeng.supportbot.teams.fakes;
 
 import com.coreeng.supportbot.teams.PlatformUsersFetcher;
-
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
@@ -43,4 +42,3 @@ public class SlowUsersFetcher implements PlatformUsersFetcher {
         return maxObserved.get();
     }
 }
-

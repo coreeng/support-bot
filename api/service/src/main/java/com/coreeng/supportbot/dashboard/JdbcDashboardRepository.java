@@ -6,12 +6,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-
+import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-
-import lombok.RequiredArgsConstructor;
 
 /**
  * JDBC implementation of DashboardRepository using JOOQ for raw SQL queries.
@@ -23,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 public class JdbcDashboardRepository implements DashboardRepository {
 
     private final DSLContext dsl;
-    private static final DateTimeFormatter isoDate = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ISO_LOCAL_DATE;
 
     // ===== Response SLAs =====
 
@@ -46,14 +44,15 @@ public class JdbcDashboardRepository implements DashboardRepository {
             ORDER BY ticket_id
             """.formatted(dateFilter);
 
-        return dsl.resultQuery(sql)
-            .fetch(r -> {
-                Double d = r.get("duration", Double.class);
-                return d != null && d > 0 ? d : null;
-            })
-            .stream()
-            .filter(d -> d != null)
-            .toList();
+        return dsl
+                .resultQuery(sql)
+                .fetch(r -> {
+                    Double d = r.get("duration", Double.class);
+                    return d != null && d > 0 ? d : null;
+                })
+                .stream()
+                .filter(d -> d != null)
+                .toList();
     }
 
     @Override
@@ -87,9 +86,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
             return new ResponsePercentiles(0.0, 0.0);
         }
         return new ResponsePercentiles(
-            nullToZero(result.get("p50", Double.class)),
-            nullToZero(result.get("p90", Double.class))
-        );
+                nullToZero(result.get("p50", Double.class)), nullToZero(result.get("p90", Double.class)));
     }
 
     @Override
@@ -142,10 +139,9 @@ public class JdbcDashboardRepository implements DashboardRepository {
             return new ResolutionPercentiles(0.0, 0.0, 0.0);
         }
         return new ResolutionPercentiles(
-            nullToZero(result.get("p50", Double.class)),
-            nullToZero(result.get("p75", Double.class)),
-            nullToZero(result.get("p90", Double.class))
-        );
+                nullToZero(result.get("p50", Double.class)),
+                nullToZero(result.get("p75", Double.class)),
+                nullToZero(result.get("p90", Double.class)));
     }
 
     @Override
@@ -194,17 +190,16 @@ public class JdbcDashboardRepository implements DashboardRepository {
         // Bucket definitions matching the UI
         record BucketDef(String label, double minSeconds, double maxSeconds) {}
         var bucketDefs = List.of(
-            new BucketDef("< 15 min", 0, 900),
-            new BucketDef("15-30 min", 900, 1800),
-            new BucketDef("30-60 min", 1800, 3600),
-            new BucketDef("1-2 hours", 3600, 7200),
-            new BucketDef("2-4 hours", 7_200, 14_400),
-            new BucketDef("4-8 hours", 14_400, 28_800),
-            new BucketDef("8-24 hours", 28_800, 86_400),
-            new BucketDef("1-3 days", 86_400, 259_200),
-            new BucketDef("3-7 days", 259_200, 604_800),
-            new BucketDef("> 7 days", 604_800, Double.POSITIVE_INFINITY)
-        );
+                new BucketDef("< 15 min", 0, 900),
+                new BucketDef("15-30 min", 900, 1800),
+                new BucketDef("30-60 min", 1800, 3600),
+                new BucketDef("1-2 hours", 3600, 7200),
+                new BucketDef("2-4 hours", 7_200, 14_400),
+                new BucketDef("4-8 hours", 14_400, 28_800),
+                new BucketDef("8-24 hours", 28_800, 86_400),
+                new BucketDef("1-3 days", 86_400, 259_200),
+                new BucketDef("3-7 days", 259_200, 604_800),
+                new BucketDef("> 7 days", 604_800, Double.POSITIVE_INFINITY));
 
         List<ResolutionDurationBucket> result = new ArrayList<>();
         for (var row : rows) {
@@ -214,11 +209,10 @@ public class JdbcDashboardRepository implements DashboardRepository {
                 int idx = Math.max(0, Math.min(bucket - 1, bucketDefs.size() - 1));
                 var def = bucketDefs.get(idx);
                 result.add(new ResolutionDurationBucket(
-                    def.label,
-                    count,
-                    def.minSeconds / 60.0,
-                    def.maxSeconds == Double.POSITIVE_INFINITY ? Double.POSITIVE_INFINITY : def.maxSeconds / 60.0
-                ));
+                        def.label,
+                        count,
+                        def.minSeconds / 60.0,
+                        def.maxSeconds == Double.POSITIVE_INFINITY ? Double.POSITIVE_INFINITY : def.maxSeconds / 60.0));
             }
         }
         return result;
@@ -255,12 +249,14 @@ public class JdbcDashboardRepository implements DashboardRepository {
             """.formatted(dateFilter);
 
         return dsl.resultQuery(sql)
-            .fetch(r -> new WeeklyResolutionTimes(
-                r.get("week", java.sql.Timestamp.class).toLocalDateTime().toLocalDate().format(isoDate),
-                nullToZero(r.get("p50", Double.class)),
-                nullToZero(r.get("p75", Double.class)),
-                nullToZero(r.get("p90", Double.class))
-            ));
+                .fetch(r -> new WeeklyResolutionTimes(
+                        r.get("week", java.sql.Timestamp.class)
+                                .toLocalDateTime()
+                                .toLocalDate()
+                                .format(ISO_DATE),
+                        nullToZero(r.get("p50", Double.class)),
+                        nullToZero(r.get("p75", Double.class)),
+                        nullToZero(r.get("p90", Double.class))));
     }
 
     @Override
@@ -288,31 +284,30 @@ public class JdbcDashboardRepository implements DashboardRepository {
         }
         String p50 = result.get("p50", String.class);
         String p90 = result.get("p90", String.class);
-        return new UnresolvedTicketAges(
-            p50 != null ? p50 : "0 seconds",
-            p90 != null ? p90 : "0 seconds"
-        );
+        return new UnresolvedTicketAges(p50 != null ? p50 : "0 seconds", p90 != null ? p90 : "0 seconds");
     }
 
     @Override
     public List<IncomingVsResolved> getIncomingVsResolvedRate(LocalDate dateFrom, LocalDate dateTo) {
         // Default to last 7 days if no date range
-        LocalDate start = dateFrom != null ? dateFrom : LocalDate.now(ZoneId.systemDefault()).minusDays(7);
+        LocalDate start = dateFrom != null
+                ? dateFrom
+                : LocalDate.now(ZoneId.systemDefault()).minusDays(7);
         LocalDate end = dateTo != null ? dateTo : LocalDate.now(ZoneId.systemDefault());
 
         long diffDays = java.time.temporal.ChronoUnit.DAYS.between(start, end);
         boolean useDailyInterval = diffDays > 60;
 
         String truncFunc = useDailyInterval
-            ? "date_trunc('day', query_posted_ts::timestamptz)"
-            : "date_trunc('hour', query_posted_ts::timestamptz)";
+                ? "date_trunc('day', query_posted_ts::timestamptz)"
+                : "date_trunc('hour', query_posted_ts::timestamptz)";
         String truncFuncResolved = useDailyInterval
-            ? "date_trunc('day', last_closed_ts::timestamptz)"
-            : "date_trunc('hour', last_closed_ts::timestamptz)";
+                ? "date_trunc('day', last_closed_ts::timestamptz)"
+                : "date_trunc('hour', last_closed_ts::timestamptz)";
         String interval = useDailyInterval ? "'1 day'::interval" : "'1 hour'::interval";
 
-        String startStr = start.format(isoDate);
-        String endStr = end.format(isoDate);
+        String startStr = start.format(ISO_DATE);
+        String endStr = end.format(ISO_DATE);
 
         String sql = """
             WITH time_series AS (
@@ -353,18 +348,27 @@ public class JdbcDashboardRepository implements DashboardRepository {
               AND ts.time_bucket <= '%s'::timestamptz + INTERVAL '1 day'
             ORDER BY ts.time_bucket
             """.formatted(
-                startStr, endStr, interval,
-                truncFunc, startStr, endStr, truncFunc,
-                truncFuncResolved, startStr, endStr, truncFuncResolved,
-                startStr, endStr
-            );
+                        startStr,
+                        endStr,
+                        interval,
+                        truncFunc,
+                        startStr,
+                        endStr,
+                        truncFunc,
+                        truncFuncResolved,
+                        startStr,
+                        endStr,
+                        truncFuncResolved,
+                        startStr,
+                        endStr);
 
         return dsl.resultQuery(sql)
-            .fetch(r -> new IncomingVsResolved(
-                r.get("time_bucket", java.sql.Timestamp.class).toInstant().toString(),
-                nullToZero(r.get("incoming", Long.class)),
-                nullToZero(r.get("resolved", Long.class))
-            ));
+                .fetch(r -> new IncomingVsResolved(
+                        r.get("time_bucket", java.sql.Timestamp.class)
+                                .toInstant()
+                                .toString(),
+                        nullToZero(r.get("incoming", Long.class)),
+                        nullToZero(r.get("resolved", Long.class))));
     }
 
     // ===== Escalation SLAs =====
@@ -392,14 +396,13 @@ public class JdbcDashboardRepository implements DashboardRepository {
             LIMIT 15
             """.formatted(dateFilter);
 
-        return dsl.resultQuery(sql)
-            .fetch(r -> new TagDuration(
-                r.get("tag", String.class),
-                nullToZero(r.get("avg_duration", Double.class))
-            ))
-            .stream()
-            .filter(td -> td.avgDuration() > 0)
-            .toList();
+        return dsl
+                .resultQuery(sql)
+                .fetch(r ->
+                        new TagDuration(r.get("tag", String.class), nullToZero(r.get("avg_duration", Double.class))))
+                .stream()
+                .filter(td -> td.avgDuration() > 0)
+                .toList();
     }
 
     @Override
@@ -420,14 +423,12 @@ public class JdbcDashboardRepository implements DashboardRepository {
             LIMIT 15
             """.formatted(dateFilter);
 
-        return dsl.resultQuery(sql)
-            .fetch(r -> new TagCount(
-                r.get("tag", String.class),
-                nullToZero(r.get("count", Long.class))
-            ))
-            .stream()
-            .filter(tc -> tc.count() > 0)
-            .toList();
+        return dsl
+                .resultQuery(sql)
+                .fetch(r -> new TagCount(r.get("tag", String.class), nullToZero(r.get("count", Long.class))))
+                .stream()
+                .filter(tc -> tc.count() > 0)
+                .toList();
     }
 
     @Override
@@ -446,10 +447,12 @@ public class JdbcDashboardRepository implements DashboardRepository {
             """.formatted(dateFilter);
 
         return dsl.resultQuery(sql)
-            .fetch(r -> new DateEscalations(
-                r.get("escalation_date", java.sql.Timestamp.class).toLocalDateTime().toLocalDate().format(isoDate),
-                nullToZero(r.get("escalations", Long.class))
-            ));
+                .fetch(r -> new DateEscalations(
+                        r.get("escalation_date", java.sql.Timestamp.class)
+                                .toLocalDateTime()
+                                .toLocalDate()
+                                .format(ISO_DATE),
+                        nullToZero(r.get("escalations", Long.class))));
     }
 
     @Override
@@ -470,14 +473,13 @@ public class JdbcDashboardRepository implements DashboardRepository {
             LIMIT 10
             """.formatted(dateFilter);
 
-        return dsl.resultQuery(sql)
-            .fetch(r -> new TeamEscalations(
-                r.get("team_name", String.class),
-                nullToZero(r.get("total_escalations", Long.class))
-            ))
-            .stream()
-            .filter(te -> te.totalEscalations() > 0)
-            .toList();
+        return dsl
+                .resultQuery(sql)
+                .fetch(r -> new TeamEscalations(
+                        r.get("team_name", String.class), nullToZero(r.get("total_escalations", Long.class))))
+                .stream()
+                .filter(te -> te.totalEscalations() > 0)
+                .toList();
     }
 
     @Override
@@ -497,14 +499,13 @@ public class JdbcDashboardRepository implements DashboardRepository {
             ORDER BY total_escalations DESC
             """.formatted(dateFilter);
 
-        return dsl.resultQuery(sql)
-            .fetch(r -> new ImpactEscalations(
-                r.get("impact_level", String.class),
-                nullToZero(r.get("total_escalations", Long.class))
-            ))
-            .stream()
-            .filter(ie -> ie.totalEscalations() > 0)
-            .toList();
+        return dsl
+                .resultQuery(sql)
+                .fetch(r -> new ImpactEscalations(
+                        r.get("impact_level", String.class), nullToZero(r.get("total_escalations", Long.class))))
+                .stream()
+                .filter(ie -> ie.totalEscalations() > 0)
+                .toList();
     }
 
     // ===== Weekly Trends =====
@@ -529,13 +530,15 @@ public class JdbcDashboardRepository implements DashboardRepository {
             GROUP BY w.week
             ORDER BY w.week
             """)
-            .fetch(r -> new WeeklyTicketCounts(
-                r.get("week", java.sql.Timestamp.class).toLocalDateTime().toLocalDate().format(isoDate),
-                nullToZero(r.get("opened", Long.class)),
-                nullToZero(r.get("closed", Long.class)),
-                nullToZero(r.get("escalated", Long.class)),
-                nullToZero(r.get("stale", Long.class))
-            ));
+                .fetch(r -> new WeeklyTicketCounts(
+                        r.get("week", java.sql.Timestamp.class)
+                                .toLocalDateTime()
+                                .toLocalDate()
+                                .format(ISO_DATE),
+                        nullToZero(r.get("opened", Long.class)),
+                        nullToZero(r.get("closed", Long.class)),
+                        nullToZero(r.get("escalated", Long.class)),
+                        nullToZero(r.get("stale", Long.class))));
     }
 
     @Override
@@ -566,22 +569,17 @@ public class JdbcDashboardRepository implements DashboardRepository {
             SELECT 'stale' AS metric, cw.stale AS this_week, lw.stale AS last_week FROM current_week cw, last_week lw
             UNION ALL
             SELECT 'escalated' AS metric, cw.escalated AS this_week, lw.escalated AS last_week FROM current_week cw, last_week lw
-            """)
-            .fetch(r -> {
-                long thisWeek = nullToZero(r.get("this_week", Long.class));
-                long lastWeek = nullToZero(r.get("last_week", Long.class));
-                return new WeeklyComparison(
-                    r.get("metric", String.class),
-                    thisWeek,
-                    lastWeek,
-                    thisWeek - lastWeek
-                );
-            });
+            """).fetch(r -> {
+            long thisWeek = nullToZero(r.get("this_week", Long.class));
+            long lastWeek = nullToZero(r.get("last_week", Long.class));
+            return new WeeklyComparison(r.get("metric", String.class), thisWeek, lastWeek, thisWeek - lastWeek);
+        });
     }
 
     @Override
     public List<TagCount> getTopEscalatedTagsThisWeek() {
-        return dsl.resultQuery("""
+        return dsl
+                .resultQuery("""
             SELECT
                 unnest(ed.tags) AS tag,
                 COUNT(*) AS count
@@ -593,13 +591,10 @@ public class JdbcDashboardRepository implements DashboardRepository {
             ORDER BY count DESC
             LIMIT 10
             """)
-            .fetch(r -> new TagCount(
-                r.get("tag", String.class),
-                nullToZero(r.get("count", Long.class))
-            ))
-            .stream()
-            .filter(tc -> tc.count() > 0)
-            .toList();
+                .fetch(r -> new TagCount(r.get("tag", String.class), nullToZero(r.get("count", Long.class))))
+                .stream()
+                .filter(tc -> tc.count() > 0)
+                .toList();
     }
 
     @Override
@@ -634,23 +629,23 @@ public class JdbcDashboardRepository implements DashboardRepository {
             LIMIT 15
             """.formatted(dateFilter);
 
-        return dsl.resultQuery(sql)
-            .fetch(r -> new TagResolutionTime(
-                r.get("tag", String.class),
-                nullToZero(r.get("p50", Double.class)),
-                nullToZero(r.get("p90", Double.class))
-            ))
-            .stream()
-            .filter(tr -> tr.p50() > 0 && tr.p90() > 0)
-            .toList();
+        return dsl
+                .resultQuery(sql)
+                .fetch(r -> new TagResolutionTime(
+                        r.get("tag", String.class),
+                        nullToZero(r.get("p50", Double.class)),
+                        nullToZero(r.get("p90", Double.class))))
+                .stream()
+                .filter(tr -> tr.p50() > 0 && tr.p90() > 0)
+                .toList();
     }
 
     // ===== Helpers =====
 
     private String buildDateFilter(LocalDate dateFrom, LocalDate dateTo, String column) {
         if (dateFrom != null && dateTo != null) {
-            return "AND " + column + "::date >= '" + dateFrom.format(isoDate) + "'::date " +
-                   "AND " + column + "::date <= '" + dateTo.format(isoDate) + "'::date";
+            return "AND " + column + "::date >= '" + dateFrom.format(ISO_DATE) + "'::date " + "AND " + column
+                    + "::date <= '" + dateTo.format(ISO_DATE) + "'::date";
         }
         return "";
     }

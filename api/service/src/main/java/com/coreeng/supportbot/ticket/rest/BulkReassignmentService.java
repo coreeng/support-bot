@@ -1,12 +1,14 @@
 package com.coreeng.supportbot.ticket.rest;
 
+import static java.lang.String.format;
+
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.SlackId;
-import com.coreeng.supportbot.slack.client.SlackClient;
-import com.coreeng.supportbot.slack.client.SlackMessage;
 import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
+import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import com.coreeng.supportbot.slack.client.SlackMessage;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
@@ -14,16 +16,13 @@ import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.exception.DataAccessException;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.function.Function;
-
-import static java.lang.String.format;
 
 @Slf4j
 @Service
@@ -47,21 +46,16 @@ public class BulkReassignmentService {
         processReassignments(request, ticketMap, successfulIds, skippedIds);
 
         ImmutableList<TicketId> successfulTicketIds = successfulIds.build();
-        
+
         // Send notification to assignee if any tickets were successfully assigned
         if (!successfulTicketIds.isEmpty()) {
             sendAssignmentNotification(request.assignedTo(), successfulTicketIds, ticketMap);
         }
 
-        return buildResult(
-            request.ticketIds().size(),
-            successfulTicketIds,
-            skippedIds.build()
-        );
+        return buildResult(request.ticketIds().size(), successfulTicketIds, skippedIds.build());
     }
 
-    @Nullable
-    private BulkReassignResultUI validateRequest(BulkReassignRequest request) {
+    @Nullable private BulkReassignResultUI validateRequest(BulkReassignRequest request) {
         if (!assignmentProps.enabled()) {
             return createEmptyResult("Assignment feature is disabled");
         }
@@ -86,16 +80,14 @@ public class BulkReassignmentService {
 
         ImmutableList<Ticket> tickets = ticketRepository.listTickets(query).content();
 
-        return tickets.stream()
-                .collect(ImmutableMap.toImmutableMap(Ticket::id, Function.identity()));
+        return tickets.stream().collect(ImmutableMap.toImmutableMap(Ticket::id, Function.identity()));
     }
 
     private void processReassignments(
             BulkReassignRequest request,
             ImmutableMap<TicketId, Ticket> ticketMap,
             ImmutableList.Builder<TicketId> successfulIds,
-            ImmutableList.Builder<TicketId> skippedIds
-    ) {
+            ImmutableList.Builder<TicketId> skippedIds) {
         for (TicketId ticketId : request.ticketIds()) {
             if (shouldSkipTicket(ticketId, ticketMap, skippedIds)) {
                 continue;
@@ -110,10 +102,7 @@ public class BulkReassignmentService {
     }
 
     private boolean shouldSkipTicket(
-            TicketId ticketId,
-            ImmutableMap<TicketId, Ticket> ticketMap,
-            ImmutableList.Builder<TicketId> skippedIds
-    ) {
+            TicketId ticketId, ImmutableMap<TicketId, Ticket> ticketMap, ImmutableList.Builder<TicketId> skippedIds) {
         if (!ticketMap.containsKey(ticketId)) {
             log.warn("Ticket {} not found or is CLOSED, skipping", ticketId);
             skippedIds.add(ticketId);
@@ -129,28 +118,23 @@ public class BulkReassignmentService {
             return true;
         } catch (DataAccessException e) {
             if (log.isWarnEnabled()) {
-                log.warn("Failed to assign ticket {} to {} due to database error: {}", ticketId, assignedTo, e.getMessage());
+                log.warn(
+                        "Failed to assign ticket {} to {} due to database error: {}",
+                        ticketId,
+                        assignedTo,
+                        e.getMessage());
             }
             return false;
         }
     }
 
     private BulkReassignResultUI buildResult(
-            int totalRequested,
-            ImmutableList<TicketId> successfulIds,
-            ImmutableList<TicketId> skippedIds
-    ) {
+            int totalRequested, ImmutableList<TicketId> successfulIds, ImmutableList<TicketId> skippedIds) {
         int successCount = successfulIds.size();
         int skippedCount = skippedIds.size();
         String message = buildResultMessage(totalRequested, successCount, skippedCount);
 
-        return new BulkReassignResultUI(
-                successCount,
-                successfulIds,
-                skippedCount,
-                skippedIds,
-                message
-        );
+        return new BulkReassignResultUI(successCount, successfulIds, skippedCount, skippedIds, message);
     }
 
     private String buildResultMessage(int totalRequested, int successCount, int skippedCount) {
@@ -159,8 +143,8 @@ public class BulkReassignmentService {
         } else if (successCount == 0) {
             return "No tickets were reassigned (all were skipped or failed)";
         } else {
-            return format("%d of %d tickets successfully reassigned, %d skipped",
-                    successCount, totalRequested, skippedCount);
+            return format(
+                    "%d of %d tickets successfully reassigned, %d skipped", successCount, totalRequested, skippedCount);
         }
     }
 
@@ -169,28 +153,31 @@ public class BulkReassignmentService {
     }
 
     private void sendAssignmentNotification(
-        String assignedToUserId,
-        ImmutableList<TicketId> successfulTicketIds,
-        ImmutableMap<TicketId, Ticket> ticketMap
-    ) {
+            String assignedToUserId,
+            ImmutableList<TicketId> successfulTicketIds,
+            ImmutableMap<TicketId, Ticket> ticketMap) {
         try {
             // Open DM conversation with the assignee
             var dmResponse = slackClient.openDmConversation(SlackId.user(assignedToUserId));
             if (!dmResponse.isOk() || dmResponse.getChannel() == null) {
                 if (log.isWarnEnabled()) {
-                    log.warn("Failed to open DM conversation with user {}: {}", assignedToUserId, dmResponse.getError());
+                    log.warn(
+                            "Failed to open DM conversation with user {}: {}", assignedToUserId, dmResponse.getError());
                 }
                 return;
             }
 
             String dmChannelId = dmResponse.getChannel().getId();
-            
+
             SlackMessage message = buildAssignmentNotificationMessage(successfulTicketIds, ticketMap);
-            
+
             // Send the message to the DM channel
             slackClient.postMessage(new SlackPostMessageRequest(message, dmChannelId, null));
             if (log.isInfoEnabled()) {
-                log.info("Sent assignment notification to user {} for {} tickets", assignedToUserId, successfulTicketIds.size());
+                log.info(
+                        "Sent assignment notification to user {} for {} tickets",
+                        assignedToUserId,
+                        successfulTicketIds.size());
             }
         } catch (SlackException e) {
             if (log.isWarnEnabled()) {
@@ -200,30 +187,23 @@ public class BulkReassignmentService {
     }
 
     private SlackMessage buildAssignmentNotificationMessage(
-        ImmutableList<TicketId> ticketIds,
-        ImmutableMap<TicketId, Ticket> ticketMap
-    ) {
-        String header = format("*You have been assigned to %d ticket%s:*\n\n", 
-            ticketIds.size(), 
-            ticketIds.size() == 1 ? "" : "s");
+            ImmutableList<TicketId> ticketIds, ImmutableMap<TicketId, Ticket> ticketMap) {
+        String header = format(
+                "*You have been assigned to %d ticket%s:*\n\n", ticketIds.size(), ticketIds.size() == 1 ? "" : "s");
 
         StringBuilder ticketList = new StringBuilder(header);
 
         ticketIds.forEach(ticketId -> {
             Ticket ticket = ticketMap.get(ticketId);
             if (ticket != null) {
-                String permalink = slackClient.getPermalink(new SlackGetMessageByTsRequest(
-                    ticket.channelId(),
-                    ticket.queryTs()
-                ));
+                String permalink =
+                        slackClient.getPermalink(new SlackGetMessageByTsRequest(ticket.channelId(), ticket.queryTs()));
                 ticketList.append(format("• <%s|Ticket %s>\n", permalink, ticketId.render()));
             } else {
                 ticketList.append(format("• Ticket %s\n", ticketId.render()));
             }
         });
 
-        return SimpleSlackMessage.builder()
-            .text(ticketList.toString())
-            .build();
+        return SimpleSlackMessage.builder().text(ticketList.toString()).build();
     }
 }

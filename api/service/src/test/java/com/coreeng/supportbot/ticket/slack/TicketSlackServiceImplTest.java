@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.ticket.slack;
 
+import static org.mockito.Mockito.verifyNoInteractions;
+
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.rating.RatingRequestMessageMapper;
 import com.coreeng.supportbot.slack.MessageRef;
@@ -14,17 +16,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.mockito.Mockito.verifyNoInteractions;
-
 @ExtendWith(MockitoExtension.class)
 class TicketSlackServiceImplTest {
 
     @Mock
     private SlackClient slackClient;
+
     @Mock
     private SlackTicketsProps slackTicketsProps;
+
     @Mock
     private TicketCreatedMessageMapper createdMessageMapper;
+
     @Mock
     private RatingRequestMessageMapper ratingReqMessageMapper;
 
@@ -32,14 +35,15 @@ class TicketSlackServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new TicketSlackServiceImpl(slackClient, slackTicketsProps, createdMessageMapper, ratingReqMessageMapper);
+        service = new TicketSlackServiceImpl(
+                slackClient, slackTicketsProps, createdMessageMapper, ratingReqMessageMapper);
     }
 
     @Test
     void postRatingRequest_skipsWhenUserIsSlackbot() {
         MessageRef queryRef = new MessageRef(new MessageTs("1754593000", false), "C123");
         TicketId ticketId = new TicketId(42L);
-        String userId = SlackId.slackbot.id();
+        String userId = SlackId.SLACKBOT.id();
 
         service.postRatingRequest(queryRef, ticketId, userId);
 

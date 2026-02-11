@@ -18,19 +18,15 @@ public class EscalationCreatedMessageMapper {
 
     public SimpleSlackMessage renderMessage(EscalationCreatedMessage message) {
         return SimpleSlackMessage.builder()
-            .blocks(renderBlocks(message))
-            .text(getTextMessage(message))
-            .build();
+                .blocks(renderBlocks(message))
+                .text(getTextMessage(message))
+                .build();
     }
 
     private ImmutableList<LayoutBlock> renderBlocks(EscalationCreatedMessage message) {
-        String str = "\nEscalated to team: " + message.team().label()
-                     + "("+ "<!subteam^" +message.team().slackGroupId() + ">)";
-        return ImmutableList.of(
-            section(s -> s
-                .text(markdownText(str))
-            )
-        );
+        String str = "\nEscalated to team: " + message.team().label() + "(" + "<!subteam^"
+                + message.team().slackGroupId() + ">)";
+        return ImmutableList.of(section(s -> s.text(markdownText(str))));
     }
 
     private String getTextMessage(EscalationCreatedMessage message) {
@@ -39,4 +35,5 @@ public class EscalationCreatedMessageMapper {
 
     public EscalationResolveInput parseTriggerInput(String json) {
         return jsonMapper.fromJsonString(json, EscalationResolveInput.class);
-    }}
+    }
+}

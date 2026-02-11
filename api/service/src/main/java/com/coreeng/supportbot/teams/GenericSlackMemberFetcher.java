@@ -3,12 +3,11 @@ package com.coreeng.supportbot.teams;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.google.common.collect.ImmutableList;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -19,13 +18,12 @@ public class GenericSlackMemberFetcher implements TeamMemberFetcher {
     @Override
     public ImmutableList<TeamMember> loadInitialMembers(SlackId.Group groupId) {
         ImmutableList<String> teamMembers = slackClient.getGroupMembers(groupId);
-        return loadMembersFromUserIds(teamMembers.stream()
-                .map(SlackId::user)
-                .collect(ImmutableList.toImmutableList()));
+        return loadMembersFromUserIds(teamMembers.stream().map(SlackId::user).collect(ImmutableList.toImmutableList()));
     }
 
     @Override
-    public ImmutableList<TeamMember> handleMembershipUpdate(SlackId.Group groupId, ImmutableList<SlackId.User> teamUsers) {
+    public ImmutableList<TeamMember> handleMembershipUpdate(
+            SlackId.Group groupId, ImmutableList<SlackId.User> teamUsers) {
         return loadMembersFromUserIds(teamUsers);
     }
 
@@ -33,10 +31,8 @@ public class GenericSlackMemberFetcher implements TeamMemberFetcher {
         ExecutorCompletionService<TeamMember> completionService = new ExecutorCompletionService<>(executor);
         long totalTasks = 0;
         for (SlackId.User userId : teamUserIds) {
-            completionService.submit(() -> new TeamMember(
-                    slackClient.getUserById(userId).getProfile().getEmail(),
-                    userId
-            ));
+            completionService.submit(() ->
+                    new TeamMember(slackClient.getUserById(userId).getProfile().getEmail(), userId));
             totalTasks += 1;
         }
         ImmutableList.Builder<TeamMember> result = ImmutableList.builder();
@@ -51,5 +47,3 @@ public class GenericSlackMemberFetcher implements TeamMemberFetcher {
         return result.build();
     }
 }
-
-

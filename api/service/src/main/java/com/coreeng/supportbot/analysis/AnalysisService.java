@@ -1,10 +1,8 @@
 package com.coreeng.supportbot.analysis;
 
 import java.util.List;
-
-import org.springframework.stereotype.Service;
-
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
 /**
  * Service for analysis data operations.
@@ -33,4 +31,3 @@ public class AnalysisService {
         return analysisRepository.getDriversWithSummaries();
     }
 }
-

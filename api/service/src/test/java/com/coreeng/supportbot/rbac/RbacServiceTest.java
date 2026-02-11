@@ -2,15 +2,15 @@ package com.coreeng.supportbot.rbac;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -105,4 +105,4 @@ class RbacServiceTest {
         assertFalse(result);
         verify(supportTeamService).isMemberByUserEmail(email);
     }
-} 
+}

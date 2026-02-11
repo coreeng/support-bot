@@ -6,15 +6,15 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HelmClient {
-    private static final Logger log = LoggerFactory.getLogger(HelmClient.class);
+    private static final Logger LOG = LoggerFactory.getLogger(HelmClient.class);
 
-    public void install(String releaseName, String chartPath, String namespace, Map<String, String> values) throws IOException, InterruptedException {
-        log.info("Attempting to deploy Helm chart...");
+    public void install(String releaseName, String chartPath, String namespace, Map<String, String> values)
+            throws IOException, InterruptedException {
+        LOG.info("Attempting to deploy Helm chart...");
         List<String> command = new ArrayList<>();
         command.add("helm");
         command.add("install");
@@ -38,23 +38,26 @@ public class HelmClient {
         if (helmExitCode != 0) {
             throw new RuntimeException("Helm install failed with exit code " + helmExitCode);
         }
-        log.info("Helm chart deployed successfully.");
+        LOG.info("Helm chart deployed successfully.");
     }
 
     public void uninstall(String releaseName, String namespace) throws IOException, InterruptedException {
-        log.info("Uninstalling Helm release...");
-        Process helmUninstallProcess = new ProcessBuilder("helm", "uninstall", releaseName, "--namespace", namespace).inheritIO().start();
+        LOG.info("Uninstalling Helm release...");
+        Process helmUninstallProcess = new ProcessBuilder("helm", "uninstall", releaseName, "--namespace", namespace)
+                .inheritIO()
+                .start();
         helmUninstallProcess.waitFor();
-        log.info("Helm release uninstalled.");
+        LOG.info("Helm release uninstalled.");
     }
 
     public boolean isReleaseDeployed(String releaseName, String namespace) throws IOException, InterruptedException {
-        log.info("Checking for existing Helm release...");
+        LOG.info("Checking for existing Helm release...");
         Process helmListProcess = new ProcessBuilder("helm", "list", "-n", namespace, "-f", releaseName).start();
         String helmListOutput = new BufferedReader(new InputStreamReader(helmListProcess.getInputStream()))
-                .lines().collect(java.util.stream.Collectors.joining("\n"));
+                .lines()
+                .collect(java.util.stream.Collectors.joining("\n"));
         int helmListExitCode = helmListProcess.waitFor();
-        log.info("Helm list output:\n{}", helmListOutput);
+        LOG.info("Helm list output:\n{}", helmListOutput);
         return helmListExitCode == 0 && helmListOutput.contains(releaseName);
     }
 }

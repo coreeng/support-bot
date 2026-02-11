@@ -1,5 +1,8 @@
 package com.coreeng.supportbot.ticket.handler;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.slack.api.model.block.composition.BlockCompositions.plainText;
+
 import com.coreeng.supportbot.slack.SlackBlockSuggestionHandler;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.ticket.TicketField;
@@ -13,20 +16,16 @@ import com.slack.api.app_backend.interactive_components.response.Option;
 import com.slack.api.app_backend.interactive_components.response.OptionGroup;
 import com.slack.api.bolt.context.builtin.BlockSuggestionContext;
 import com.slack.api.bolt.request.builtin.BlockSuggestionRequest;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
-import java.util.regex.Pattern;
-
-import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.slack.api.model.block.composition.BlockCompositions.plainText;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class TicketTeamSuggestionHandler implements SlackBlockSuggestionHandler {
-    private static final int slackOptionsLimit = 100;
+    private static final int SLACK_OPTIONS_LIMIT = 100;
 
     private final TicketTeamSuggestionsService service;
     private final TicketSummaryViewMapper viewMapper;
@@ -39,26 +38,27 @@ public class TicketTeamSuggestionHandler implements SlackBlockSuggestionHandler 
     @Override
     public BlockSuggestionResponse apply(BlockSuggestionRequest req, BlockSuggestionContext ctx) {
         String value = req.getPayload().getValue();
-        TicketSummaryView.Metadata metadata = viewMapper.parseMetadata(req.getPayload().getView().getPrivateMetadata());
+        TicketSummaryView.Metadata metadata =
+                viewMapper.parseMetadata(req.getPayload().getView().getPrivateMetadata());
         SlackId authorId = metadata.authorId();
         TicketTeamsSuggestion teamsSuggestion;
 
-        if (authorId != null && !SlackId.slackbot.equals(authorId)) {
+        if (authorId != null && !SlackId.SLACKBOT.equals(authorId)) {
             try {
                 teamsSuggestion = service.getTeamSuggestions(value, authorId);
             } catch (Exception e) {
                 log.atError()
-                    .setCause(e)
-                    .addKeyValue("authorId", authorId.id())
-                    .addKeyValue("ticketId", metadata.ticketId())
-                    .log("Error getting team suggestions, returning fallback with all teams");
+                        .setCause(e)
+                        .addKeyValue("authorId", authorId.id())
+                        .addKeyValue("ticketId", metadata.ticketId())
+                        .log("Error getting team suggestions, returning fallback with all teams");
                 teamsSuggestion = service.getFallbackSuggestions(value);
             }
         } else {
             log.atDebug()
-                .addKeyValue("authorId", authorId != null ? authorId.id() : "null")
-                .addKeyValue("ticketId", metadata.ticketId())
-                .log("Author id is null or slackbot, returning fallback with all teams");
+                    .addKeyValue("authorId", authorId != null ? authorId.id() : "null")
+                    .addKeyValue("ticketId", metadata.ticketId())
+                    .log("Author id is null or slackbot, returning fallback with all teams");
             teamsSuggestion = service.getFallbackSuggestions(value);
         }
 
@@ -68,41 +68,26 @@ public class TicketTeamSuggestionHandler implements SlackBlockSuggestionHandler 
     private BlockSuggestionResponse renderTeamSuggestions(TicketTeamsSuggestion teams) {
         ImmutableList.Builder<OptionGroup> optionGroupsBuilder = ImmutableList.builderWithExpectedSize(2);
         if (!teams.userTeams().isEmpty()) {
-            optionGroupsBuilder.add(
-                OptionGroup.builder()
+            optionGroupsBuilder.add(OptionGroup.builder()
                     .label(plainText("Suggested teams"))
-                    .options(
-                        teams.userTeams().stream()
-                            .limit(slackOptionsLimit)
-                            .map(t -> Option.builder()
-                                .text(plainText(t))
-                                .value(t)
-                                .build())
-                            .collect(toImmutableList())
-                    )
-                    .build()
-
-            );
+                    .options(teams.userTeams().stream()
+                            .limit(SLACK_OPTIONS_LIMIT)
+                            .map(t ->
+                                    Option.builder().text(plainText(t)).value(t).build())
+                            .collect(toImmutableList()))
+                    .build());
         }
         if (!teams.otherTeams().isEmpty()) {
-            optionGroupsBuilder.add(
-                OptionGroup.builder()
+            optionGroupsBuilder.add(OptionGroup.builder()
                     .label(plainText("Others"))
-                    .options(
-                        teams.otherTeams().stream()
-                            .limit(slackOptionsLimit)
-                            .map(t -> Option.builder()
-                                .text(plainText(t))
-                                .value(t)
-                                .build())
-                            .collect(toImmutableList())
-                    )
-                    .build()
-            );
+                    .options(teams.otherTeams().stream()
+                            .limit(SLACK_OPTIONS_LIMIT)
+                            .map(t ->
+                                    Option.builder().text(plainText(t)).value(t).build())
+                            .collect(toImmutableList()))
+                    .build());
         }
         ImmutableList<OptionGroup> optionGroups = optionGroupsBuilder.build();
-        return BlockSuggestionResponse.builder()
-            .optionGroups(optionGroups)
-            .build();
+        return BlockSuggestionResponse.builder().optionGroups(optionGroups).build();
     }
 }

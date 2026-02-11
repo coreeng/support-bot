@@ -8,6 +8,7 @@ public enum TicketField {
     assignee("ticket-change-assignee");
 
     private final String actionId;
+
     TicketField(String actionId) {
         this.actionId = actionId;
     }
