@@ -158,7 +158,7 @@ export default function KnowledgeGapsPage() {
 
     const renderAreaItem = (item: AreaItem, index: number) => {
         const isExpanded = expandedItems.has(item.name)
-        
+
         return (
             <div key={item.name} className="border border-gray-200 rounded-lg bg-white hover:shadow-md transition-shadow">
                 <div className="p-4">
@@ -174,7 +174,7 @@ export default function KnowledgeGapsPage() {
                                     <span className={`text-sm font-medium ${
                                         item.coveragePercentage < 50 ? 'text-green-600' :
                                         item.coveragePercentage < 80 ? 'text-yellow-600' : 'text-red-600'
-                                    }`}>
+                                    }`} style={{ display: 'none' }}>
                                         {item.coveragePercentage}% coverage
                                     </span>
                                 </div>
@@ -198,7 +198,7 @@ export default function KnowledgeGapsPage() {
                             <h4 className="text-sm font-medium text-gray-700 mb-3">Relevant Support Queries</h4>
                             <div className="space-y-2">
                                 {item.queries.map((query, qIndex) => (
-                                    <div 
+                                    <div
                                         key={qIndex}
                                         className="flex items-start justify-between p-3 rounded-md bg-gray-50 hover:bg-gray-100 transition-colors group"
                                     >
@@ -264,7 +264,7 @@ export default function KnowledgeGapsPage() {
                 </div>
 
                 {/* Overall Coverage */}
-                <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+                <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm" style={{ display: 'none' }}>
                     <div className="flex items-center justify-between">
                         <div>
                             <h2 className="text-sm font-medium text-gray-600">Overall Coverage</h2>
