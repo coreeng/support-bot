@@ -217,30 +217,38 @@ describe("useAuth", () => {
   });
 
   describe("logout", () => {
-    it("calls signOut with /login callback URL", () => {
+    it("calls signOut with redirect: false and navigates to /login", async () => {
       const user = createTestUser();
       mockUseSession.mockReturnValue(mockAuthenticatedSession(user));
+      mockSignOut.mockResolvedValue({ url: "" });
 
       const { result } = renderHook(() => useAuth());
 
-      act(() => {
+      // Call logout and wait for promise to resolve
+      await act(async () => {
         result.current.logout();
+        // Flush the promise queue
+        await Promise.resolve();
       });
 
       expect(mockSignOut).toHaveBeenCalledTimes(1);
-      expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
+      // Note: window.location.href assignment triggers a navigation in real browsers
+      // but in jsdom it's a no-op. We verify signOut was called correctly.
     });
 
-    it("logout is callable even when unauthenticated", () => {
+    it("logout is callable even when unauthenticated", async () => {
       mockUseSession.mockReturnValue(mockUnauthenticatedSession());
+      mockSignOut.mockResolvedValue({ url: "" });
 
       const { result } = renderHook(() => useAuth());
 
-      act(() => {
+      await act(async () => {
         result.current.logout();
+        await Promise.resolve();
       });
 
-      expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+      expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
     });
   });
 

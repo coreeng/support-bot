@@ -5,6 +5,9 @@ import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
 import com.google.common.collect.ImmutableList;
+import com.nimbusds.jwt.SignedJWT;
+import java.text.ParseException;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -78,7 +81,18 @@ public class OAuthExchangeService {
                 throw new IllegalStateException("Failed to fetch user info");
             }
 
-            var userInfo = userInfoResponse.getBody();
+            var userInfo = new HashMap<>(userInfoResponse.getBody());
+
+            // Merge ID token claims (Azure's userinfo endpoint often omits email/preferred_username)
+            var idToken = (String) response.get("id_token");
+            if (idToken != null) {
+                try {
+                    var claims = SignedJWT.parse(idToken).getJWTClaimsSet().getClaims();
+                    claims.forEach(userInfo::putIfAbsent);
+                } catch (ParseException e) {
+                    log.warn("Failed to parse id_token claims", e);
+                }
+            }
 
             // Extract email and name
             var email = extractEmail(userInfo);

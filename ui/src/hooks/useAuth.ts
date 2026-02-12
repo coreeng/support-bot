@@ -33,8 +33,9 @@ export function useAuth(): UseAuthReturn {
       .map((t: AuthTeam) => t.code || t.label);
   }, [user, isEscalationTeam]);
 
-  const logout = () => {
-    signOut({ callbackUrl: "/login" });
+  const logout = async () => {
+    await signOut({ redirect: false });
+    window.location.href = "/login";
   };
 
   return {
