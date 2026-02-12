@@ -120,3 +120,76 @@ configMap:
   annotations: {}
   data:
     # your properties for application.yaml
+
+# UI deployment (disabled by default for backward compatibility)
+ui:
+  enabled: false
+
+  image:
+    repository: support-bot-ui
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts:
+      - host: support-bot-ui.example
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  livenessProbe:
+    httpGet:
+      path: /livez
+      port: 3000
+    failureThreshold: 3
+    periodSeconds: 20
+    successThreshold: 1
+    timeoutSeconds: 1
+
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 3000
+    failureThreshold: 3
+    periodSeconds: 20
+    successThreshold: 1
+    timeoutSeconds: 1
+
+  podAnnotations: {}
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    runAsGroup: 1001
+    fsGroup: 1001
+    seccompProfile:
+      type: RuntimeDefault
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  env: []

@@ -1,6 +1,9 @@
 ---
-# Backend URLs for integration tests
-envVarsMap:
-  BACKEND_URL: http://mock-backend:8080
-  AUTH_SECRET: "integration-test-secret-not-for-production-use"
-  NEXTAUTH_URL: http://support-bot-ui:3000
+ui:
+  env:
+    - name: BACKEND_URL
+      value: "http://mock-backend:8080"
+    - name: AUTH_SECRET
+      value: "integration-test-secret-not-for-production-use"
+    - name: NEXTAUTH_URL
+      value: "http://support-bot-ui:3000"

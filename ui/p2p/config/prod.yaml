@@ -1,3 +1,5 @@
 ---
-envVarsMap:
-  BACKEND_URL: http://support-bot:8080
+ui:
+  env:
+    - name: BACKEND_URL
+      value: "http://support-bot:8080"
