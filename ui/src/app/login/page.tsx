@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, Suspense } from "react";
+import { useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,6 +10,7 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading } = useAuth();
+  const authAttemptedRef = useRef(false);
 
   // Handle callback from backend OAuth
   const code = searchParams.get("code");
@@ -20,8 +21,12 @@ function LoginContent() {
   useEffect(() => {
     if (isLoading) return;
 
+    // Don't retry if we already attempted authentication with this token/code
+    if (authAttemptedRef.current) return;
+
     // If we have a token from the new OAuth flow, use it
     if (token) {
+      authAttemptedRef.current = true;
       signIn("backend-token", {
         token,
         callbackUrl,
@@ -32,6 +37,7 @@ function LoginContent() {
 
     // If we have a code, exchange it via NextAuth (legacy flow)
     if (code) {
+      authAttemptedRef.current = true;
       signIn("backend-oauth", {
         code,
         callbackUrl,
@@ -82,8 +88,8 @@ function LoginContent() {
     }
   };
 
-  // Show loading state
-  if (isLoading || code || token) {
+  // Show loading state (but not if auth already failed - let error screen show)
+  if (isLoading || ((code || token) && !error)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
