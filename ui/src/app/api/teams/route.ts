@@ -19,9 +19,9 @@ function mapTeam(team: BackendTeam) {
 }
 
 export async function GET(request: NextRequest) {
-  const type = request.nextUrl.searchParams.get("type");
+  const type = request.nextUrl.searchParams.get("type")?.toUpperCase();
 
-  if (type !== "escalation" && type !== "tenant") {
+  if (type !== "ESCALATION" && type !== "TENANT") {
     return errorResponse("Invalid type parameter", 400);
   }
 
