@@ -1,19 +1,18 @@
 package com.coreeng.supportbot.stats;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+
 import com.coreeng.supportbot.rating.Rating;
 import com.coreeng.supportbot.rating.RatingService;
 import com.google.common.collect.ImmutableList;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.LocalDate;
-import java.time.ZoneOffset;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class RatingsCollectorTest {
@@ -42,9 +41,9 @@ class RatingsCollectorTest {
         when(ratingService.getAllRatings()).thenReturn(ImmutableList.of(r1, r2, r3));
 
         StatsRequest.Ratings req = StatsRequest.Ratings.builder()
-            .from(LocalDate.of(2024, 1, 1))
-            .to(LocalDate.of(2024, 1, 31))
-            .build();
+                .from(LocalDate.of(2024, 1, 1))
+                .to(LocalDate.of(2024, 1, 31))
+                .build();
 
         StatsResult.Ratings result = (StatsResult.Ratings) collector.calculateResults(req);
 
@@ -72,9 +71,9 @@ class RatingsCollectorTest {
         when(ratingService.getAllRatings()).thenReturn(ImmutableList.of(before, inRange, after));
 
         StatsRequest.Ratings req = StatsRequest.Ratings.builder()
-            .from(LocalDate.of(2024, 1, 1))
-            .to(LocalDate.of(2024, 1, 31))
-            .build();
+                .from(LocalDate.of(2024, 1, 1))
+                .to(LocalDate.of(2024, 1, 31))
+                .build();
 
         StatsResult.Ratings result = (StatsResult.Ratings) collector.calculateResults(req);
 
@@ -99,10 +98,6 @@ class RatingsCollectorTest {
 
     private Rating rating(int value, LocalDate date) {
         long epoch = date.atStartOfDay(ZoneOffset.UTC).toEpochSecond();
-        return Rating.builder()
-            .rating(value)
-            .submittedTs(Long.toString(epoch))
-            .build();
+        return Rating.builder().rating(value).submittedTs(Long.toString(epoch)).build();
     }
 }
-

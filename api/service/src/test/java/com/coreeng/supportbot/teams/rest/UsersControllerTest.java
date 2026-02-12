@@ -1,5 +1,9 @@
 package com.coreeng.supportbot.teams.rest;
 
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.teams.PlatformTeam;
 import com.coreeng.supportbot.teams.PlatformTeamsService;
@@ -10,6 +14,8 @@ import com.coreeng.supportbot.teams.TeamMemberFetcher;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
 import com.google.common.collect.ImmutableList;
+import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,13 +23,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
-
-import java.util.List;
-import java.util.Set;
-
-import static java.util.Objects.requireNonNull;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UsersControllerTest {
@@ -55,8 +54,8 @@ class UsersControllerTest {
         PlatformTeam platformTeam = new PlatformTeam("team1", Set.of("group-1"), Set.of());
         PlatformUser user = new PlatformUser(email, Set.of(platformTeam));
 
-        Team supportTeam = new Team("Support Team", "support", ImmutableList.of(TeamType.support));
-        Team tenantTeam = new Team("team1", "team1", ImmutableList.of(TeamType.tenant));
+        Team supportTeam = new Team("Support Team", "support", ImmutableList.of(TeamType.SUPPORT));
+        Team tenantTeam = new Team("team1", "team1", ImmutableList.of(TeamType.TENANT));
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(user);
         when(teamService.listTeamsByUserEmail(email)).thenReturn(ImmutableList.of(tenantTeam, supportTeam));
@@ -82,7 +81,7 @@ class UsersControllerTest {
     void shouldReturnSupportOnlyUserWhenNoPlatformUser() {
         // given
         String email = "support-only@test.com";
-        Team supportTeam = new Team("Support Team", "support", ImmutableList.of(TeamType.support));
+        Team supportTeam = new Team("Support Team", "support", ImmutableList.of(TeamType.SUPPORT));
 
         when(platformTeamsService.findUserByEmail(email)).thenReturn(null);
         when(teamService.listTeamsByUserEmail(email)).thenReturn(ImmutableList.of(supportTeam));
@@ -142,18 +141,12 @@ class UsersControllerTest {
     @Test
     void shouldReturnSupportMembersList() {
         // given
-        TeamMemberFetcher.TeamMember member1 = new TeamMemberFetcher.TeamMember(
-            "john.doe@example.com",
-            SlackId.user("U12345")
-        );
-        TeamMemberFetcher.TeamMember member2 = new TeamMemberFetcher.TeamMember(
-            "jane.smith@example.com",
-            SlackId.user("U67890")
-        );
-        TeamMemberFetcher.TeamMember member3 = new TeamMemberFetcher.TeamMember(
-            "bob.jones@example.com",
-            SlackId.user("U11111")
-        );
+        TeamMemberFetcher.TeamMember member1 =
+                new TeamMemberFetcher.TeamMember("john.doe@example.com", SlackId.user("U12345"));
+        TeamMemberFetcher.TeamMember member2 =
+                new TeamMemberFetcher.TeamMember("jane.smith@example.com", SlackId.user("U67890"));
+        TeamMemberFetcher.TeamMember member3 =
+                new TeamMemberFetcher.TeamMember("bob.jones@example.com", SlackId.user("U11111"));
 
         when(supportTeamService.members()).thenReturn(ImmutableList.of(member1, member2, member3));
 

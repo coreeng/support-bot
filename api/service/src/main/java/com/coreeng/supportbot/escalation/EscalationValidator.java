@@ -4,12 +4,11 @@ import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-
 import org.jspecify.annotations.Nullable;
-import java.util.Objects;
+import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
@@ -19,8 +18,7 @@ public class EscalationValidator {
     private final SlackClient slackClient;
     private final EscalationQueryService queryService;
 
-    @Nullable
-    public String validateThreadPermalinkForCreation(@Nullable String threadPermalink) {
+    @Nullable public String validateThreadPermalinkForCreation(@Nullable String threadPermalink) {
         if (threadPermalink == null) {
             return null;
         }
@@ -37,9 +35,9 @@ public class EscalationValidator {
             slackClient.getMessageByTs(SlackGetMessageByTsRequest.of(threadRef));
         } catch (Exception e) {
             log.atWarn()
-                .setCause(e)
-                .addArgument(threadPermalink)
-                .log("Couldn't fetch message by the link provided by user: {}");
+                    .setCause(e)
+                    .addArgument(threadPermalink)
+                    .log("Couldn't fetch message by the link provided by user: {}");
             return "Couldn't find a message by the permalink";
         }
         if (queryService.existsByThreadTs(threadRef.ts())) {
@@ -48,5 +46,3 @@ public class EscalationValidator {
         return null;
     }
 }
-
-

@@ -1,12 +1,10 @@
 package com.coreeng.supportbot.analysis;
 
 import java.util.List;
-
+import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-
-import lombok.RequiredArgsConstructor;
 
 /**
  * JDBC implementation of AnalysisRepository using JOOQ.
@@ -49,11 +47,10 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
             """;
 
         return dsl.resultQuery(sql)
-            .fetch(r -> new DimensionSummary(
-                r.get("dimension", String.class),
-                r.get("query_count", Long.class),
-                r.get("summary", String.class)
-            ));
+                .fetch(r -> new DimensionSummary(
+                        r.get("dimension", String.class),
+                        r.get("query_count", Long.class),
+                        r.get("summary", String.class)));
     }
 
     @Override
@@ -85,11 +82,9 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
             """;
 
         return dsl.resultQuery(sql)
-            .fetch(r -> new DimensionSummary(
-                r.get("dimension", String.class),
-                r.get("query_count", Long.class),
-                r.get("summary", String.class)
-            ));
+                .fetch(r -> new DimensionSummary(
+                        r.get("dimension", String.class),
+                        r.get("query_count", Long.class),
+                        r.get("summary", String.class)));
     }
 }
-

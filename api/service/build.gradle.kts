@@ -5,7 +5,6 @@ import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.containers.wait.strategy.WaitAllStrategy
-import org.gradle.api.plugins.quality.Pmd
 import org.gradle.api.Action
 import net.ltgt.gradle.errorprone.CheckSeverity
 import net.ltgt.gradle.errorprone.ErrorProneOptions
@@ -16,7 +15,7 @@ import java.time.temporal.ChronoUnit
 
 plugins {
     java
-    pmd
+    checkstyle
 
     id("net.ltgt.errorprone") version "4.3.0"
     id("org.springframework.boot") version "3.5.9"
@@ -34,6 +33,12 @@ java {
         languageVersion = JavaLanguageVersion.of(25)
     }
 }
+
+checkstyle {
+    toolVersion = "10.25.0"
+    isIgnoreFailures = false
+    configFile = rootProject.file("config/checkstyle/checkstyle.xml")
+}
 // we only use result of the bootJar
 tasks.getByName<Jar>("jar") {
     enabled = false
@@ -41,18 +46,6 @@ tasks.getByName<Jar>("jar") {
 
 tasks.named<BootJar>("bootJar") {
     archiveFileName.set("service.jar")
-}
-
-pmd {
-    isIgnoreFailures = false
-    isConsoleOutput = true
-    ruleSetFiles("${project.projectDir.absolutePath}/pmd-ruleset.xml")
-    toolVersion = "7.21.0"
-}
-
-tasks.withType<Pmd>().configureEach {
-    // Exclude the generated package
-    exclude("**/com/coreeng/supportbot/dbschema/**")
 }
 
 configurations {
@@ -89,6 +82,7 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.37")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("org.springframework.boot:spring-boot-starter-cache")
 
@@ -162,6 +156,28 @@ tasks.withType<JavaCompile>().configureEach {
     options.errorprone(
         object : Action<ErrorProneOptions> {
             override fun execute(errorproneOptions: ErrorProneOptions) {
+                // Disabled checks (per project standards)
+                errorproneOptions.disable(
+                    "UnusedVariable",
+                    "UnusedMethod",
+                    "FieldCanBeStatic",
+                    "ImmutableEnumChecker",
+                    "MissingSummary",
+                    "UnusedNestedClass",
+                    // UnnecessarilyFullyQualified false-positives on Lombok's @Builder.Default
+                    "UnnecessarilyFullyQualified",
+                    // CanIgnoreReturnValueSuggester false-positives on repository update patterns
+                    "CanIgnoreReturnValueSuggester"
+                )
+
+                // Elevated to ERROR
+                errorproneOptions.error(
+                    "UnusedException",
+                    "FutureReturnValueIgnored",
+                    "StreamResourceLeak"
+                )
+
+                // NullAway configuration
                 errorproneOptions.check("NullAway", CheckSeverity.ERROR)
                 errorproneOptions.option("NullAway:AnnotatedPackages", "com.coreeng.supportbot")
                 errorproneOptions.option(
@@ -174,6 +190,8 @@ tasks.withType<JavaCompile>().configureEach {
                     "NullAway:ExcludedFieldAnnotations",
                     "org.mockito.Mock,org.mockito.Spy,org.mockito.Captor,org.mockito.InjectMocks"
                 )
+
+                // Exclude generated code
                 errorproneOptions.excludedPaths.set(".*/com/coreeng/supportbot/dbschema/.*")
             }
         }

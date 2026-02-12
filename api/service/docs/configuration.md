@@ -9,7 +9,7 @@ Support Bot docker image will contain a jar file under `/application` folder.
 Since it's a Spring Boot application, you can mount your `application.yaml` with configurations to `/application/application.yaml`
 and the app should automatically find your configuration.
 
-Support Bot already has the default configuration provided. 
+Support Bot already has the default configuration provided.
 You might want to adjust it for your own needs.
 In the next section, you'll find default values and configuration options specific to Support Bot.
 
@@ -145,7 +145,7 @@ team:
   leadership:
     name: Support Leadership # Label showed on the UI
     code: support-leadership # Slack group ID of the support leadership team
-  
+
 homepage: # Bot homepage configuration
   useful-links: # Adds a "Useful Links" section to the Slack Home tab
     - title: Weekly Trends # Link title
@@ -164,7 +164,7 @@ homepage: # Bot homepage configuration
 ai: # AI powered features
   sentiment-analysis: # Analyze tenant and support sentiment per ticket
     enabled: false
-    
+
 rbac: # Restrict ticket creation/editing for tenants
   enabled: true
 
@@ -237,7 +237,7 @@ to create a GCP Service Account with [Groups Reader](https://support.google.com/
 
 In GCP Service Accounts identified by emails, and they usually have a domain distinct from your organization domain.
 In case you face problems assigning the [Groups Reader](https://support.google.com/a/answer/2405986?hl=en) role an email
-outside your organization, you should try to create a Google Group under your domain, 
+outside your organization, you should try to create a Google Group under your domain,
 assign the role to the newly created group and make the Service Account a member of the group.
 
 > Note: Support Bot to GCP is purely server-to-server communication, meaning you don't need to configure domain-wide delegation.
@@ -309,6 +309,5 @@ Portal: https://portal.azure.com > Microsoft Entra ID > App registrations
    - `email`
    - `openid`
    - `profile`
-   - `User.Read`
 
 > Note: The redirect URIs registered in each provider must match the API's publicly accessible URL.

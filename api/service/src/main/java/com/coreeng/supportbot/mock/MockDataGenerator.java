@@ -1,17 +1,9 @@
 package com.coreeng.supportbot.mock;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.lang.Math.max;
 import static java.lang.Math.round;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.temporal.ChronoField;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Random;
-import java.util.Set;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
@@ -29,16 +21,27 @@ import com.coreeng.supportbot.sentiment.client.Sentiment;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.teams.PlatformTeam;
-import com.coreeng.supportbot.ticket.TicketTeam;
 import com.coreeng.supportbot.teams.PlatformTeamsService;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
+import com.coreeng.supportbot.ticket.TicketTeam;
 import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoField;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Random;
+import java.util.Set;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -46,9 +49,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.ImmutableList.toImmutableList;
-import lombok.extern.slf4j.Slf4j;
 
 @Component
 @ConditionalOnProperty("mock-data.enabled")
@@ -56,28 +56,29 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Order(200)
 public class MockDataGenerator implements ApplicationRunner {
-    private static final long secondsPerDay = 24 * 60 * 60;
-    private static final double avgTicketsPerDay = 35;
-    private static final double stdTicketsPerDay = 10;
-    private static final int maxTicketsPerDay = 50;
-    private static final double avgQueryResponseTimeSecs = 10 * 60;
-    private static final double stdQueryResponseTimeSecs = 5 * 60;
-    private static final double avgTicketReopenedTimes = 0.5;
-    private static final double stdTicketReopenedTimes = 2.0;
-    private static final long ticketChangeStatusDelayLowerBoundSecs = 60 * 60; //NOPMD - suppressed LongVariable
-    private static final long ticketChangeStatusDelayHigherBoundSecs = 3 * 60 * 60; //NOPMD - suppressed LongVariable
-    private static final long maxNumberOfEscalations = 3;
-    private static final double avgTicketEscalatedAfterSeconds = 30 * 60; //NOPMD - suppressed LongVariable
-    private static final double stdTicketEscalatedAfterSeconds = 5 * 60; //NOPMD - suppressed LongVariable
-    private static final double avgEscalationResolutionTime = 10 * 60; //NOPMD - suppressed LongVariable
-    private static final double stdEscalationResolutionTime = 2 * 60; //NOPMD - suppressed LongVariable
-    private static final double closedTicketIsEscalatedChance = 33.0; //NOPMD - suppressed LongVariable
+    private static final long SECONDS_PER_DAY = 24 * 60 * 60;
+    private static final double AVG_TICKETS_PER_DAY = 35;
+    private static final double STD_TICKETS_PER_DAY = 10;
+    private static final int MAX_TICKETS_PER_DAY = 50;
+    private static final double AVG_QUERY_RESPONSE_TIME_SECS = 10 * 60;
+    private static final double STD_QUERY_RESPONSE_TIME_SECS = 5 * 60;
+    private static final double AVG_TICKET_REOPENED_TIMES = 0.5;
+    private static final double STD_TICKET_REOPENED_TIMES = 2.0;
+    private static final long TICKET_CHANGE_STATUS_DELAY_LOWER_BOUND_SECS = 60 * 60;
+    private static final long TICKET_CHANGE_STATUS_DELAY_HIGHER_BOUND_SECS = 3 * 60 * 60;
+    private static final long MAX_NUMBER_OF_ESCALATIONS = 3;
+    private static final double AVG_TICKET_ESCALATED_AFTER_SECONDS = 30 * 60;
+    private static final double STD_TICKET_ESCALATED_AFTER_SECONDS = 5 * 60;
+    private static final double AVG_ESCALATION_RESOLUTION_TIME = 10 * 60;
+    private static final double STD_ESCALATION_RESOLUTION_TIME = 2 * 60;
+    private static final double CLOSED_TICKET_IS_ESCALATED_CHANCE = 33.0;
 
     private final SlackTicketsProps ticketsProps;
     private final TicketRepository ticketRepository;
     private final EscalationRepository escalationRepository;
-    @Nullable
-    private final SentimentRepository sentimentRepository;
+
+    @Nullable private final SentimentRepository sentimentRepository;
+
     private final PlatformTeamsService platformTeamsService;
     private final ImpactsRegistry impactsRegistry;
     private final TagsRegistry tagsRegistry;
@@ -86,12 +87,12 @@ public class MockDataGenerator implements ApplicationRunner {
     @Transactional
     @Override
     public void run(ApplicationArguments args) {
-        Page<Ticket> existingTickets = ticketRepository.listTickets(TicketsQuery.builder()
-            .build());
+        Page<Ticket> existingTickets =
+                ticketRepository.listTickets(TicketsQuery.builder().build());
         if (existingTickets.totalElements() > 0) {
             log.atWarn()
-                .addArgument(existingTickets::totalElements)
-                .log("Skipping mock data generation because there are already existing tickets: {}");
+                    .addArgument(existingTickets::totalElements)
+                    .log("Skipping mock data generation because there are already existing tickets: {}");
             return;
         }
 
@@ -120,9 +121,7 @@ public class MockDataGenerator implements ApplicationRunner {
                 date = date.plusDays(1);
             }
         }
-        log.atInfo()
-            .addArgument(totalTicketsGenerated)
-            .log("Total tickets generated: {}");
+        log.atInfo().addArgument(totalTicketsGenerated).log("Total tickets generated: {}");
     }
 
     private int getNextTicketsToGenerateForDate(Random random, LocalDate date) {
@@ -130,11 +129,7 @@ public class MockDataGenerator implements ApplicationRunner {
         if (dayOfWeek == 6 || dayOfWeek == 7) {
             return 0;
         }
-        return Math.clamp(
-            round(random.nextGaussian(avgTicketsPerDay, stdTicketsPerDay)),
-            0,
-            maxTicketsPerDay
-        );
+        return Math.clamp(round(random.nextGaussian(AVG_TICKETS_PER_DAY, STD_TICKETS_PER_DAY)), 0, MAX_TICKETS_PER_DAY);
     }
 
     private void generateQuery(Random random, LocalDate date) {
@@ -144,16 +139,12 @@ public class MockDataGenerator implements ApplicationRunner {
 
     private Ticket generateCreatedTicket(Random random, LocalDate date) {
         MessageTs queryTs = generateMessageTsAt(random, date);
-        MessageTs createdMessageTs = generateMessageTsAfter(random, queryTs.getDate(), avgQueryResponseTimeSecs, stdQueryResponseTimeSecs);
-        return ticketRepository.createTicketIfNotExists(
-            Ticket.createNew(queryTs, ticketsProps.channelId()).toBuilder()
+        MessageTs createdMessageTs = generateMessageTsAfter(
+                random, queryTs.getDate(), AVG_QUERY_RESPONSE_TIME_SECS, STD_QUERY_RESPONSE_TIME_SECS);
+        return ticketRepository.createTicketIfNotExists(Ticket.createNew(queryTs, ticketsProps.channelId()).toBuilder()
                 .createdMessageTs(createdMessageTs)
-                .statusLog(ImmutableList.of(new Ticket.StatusLog(
-                    TicketStatus.opened,
-                    createdMessageTs.getDate()
-                )))
-                .build()
-        );
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, createdMessageTs.getDate())))
+                .build());
     }
 
     private Ticket generateFilledTicket(Random random, LocalDate date) {
@@ -167,13 +158,15 @@ public class MockDataGenerator implements ApplicationRunner {
         ImmutableList<TicketImpact> impacts = impactsRegistry.listAllImpacts();
         int impactI = random.nextInt(0, impacts.size());
 
-        long reopenedTimes = round(max(0.0, random.nextGaussian(avgTicketReopenedTimes, stdTicketReopenedTimes)));
+        long reopenedTimes = round(max(0.0, random.nextGaussian(AVG_TICKET_REOPENED_TIMES, STD_TICKET_REOPENED_TIMES)));
         Instant nextStatusChangeDate = ticket.statusLog().getLast().date();
         for (int i = 0; i < reopenedTimes; i++) {
-            long delaySecs = random.nextLong(ticketChangeStatusDelayLowerBoundSecs, ticketChangeStatusDelayHigherBoundSecs);
+            long delaySecs = random.nextLong(
+                    TICKET_CHANGE_STATUS_DELAY_LOWER_BOUND_SECS, TICKET_CHANGE_STATUS_DELAY_HIGHER_BOUND_SECS);
             nextStatusChangeDate = nextStatusChangeDate.plusSeconds(delaySecs);
             Instant closedLogAt = nextStatusChangeDate;
-            delaySecs = random.nextLong(ticketChangeStatusDelayLowerBoundSecs, ticketChangeStatusDelayHigherBoundSecs);
+            delaySecs = random.nextLong(
+                    TICKET_CHANGE_STATUS_DELAY_LOWER_BOUND_SECS, TICKET_CHANGE_STATUS_DELAY_HIGHER_BOUND_SECS);
             nextStatusChangeDate = nextStatusChangeDate.plusSeconds(delaySecs);
             Instant openedLogAt = nextStatusChangeDate;
             if (nextStatusChangeDate.isAfter(Instant.now())) {
@@ -181,78 +174,50 @@ public class MockDataGenerator implements ApplicationRunner {
             }
 
             ticket = ticketRepository.insertStatusLog(
-                ticket.toBuilder()
-                    .status(TicketStatus.closed)
-                    .build(),
-                closedLogAt
-            );
+                    ticket.toBuilder().status(TicketStatus.closed).build(), closedLogAt);
             ticket = ticketRepository.insertStatusLog(
-                ticket.toBuilder()
-                    .status(TicketStatus.opened)
-                    .build(),
-                openedLogAt
-            );
+                    ticket.toBuilder().status(TicketStatus.opened).build(), openedLogAt);
         }
 
         Ticket updatedTicket = ticket.toBuilder()
-            .team(TicketTeam.fromCode(teams.get(teamsI).name()))
-            .tags(
-                pickedTags.stream()
-                    .map(Tag::code)
-                    .collect(toImmutableList())
-            )
-            .impact(impacts.get(impactI).code())
-            .lastInteractedAt(ticket.statusLog().getLast().date())
-            .build();
+                .team(TicketTeam.fromCode(teams.get(teamsI).name()))
+                .tags(pickedTags.stream().map(Tag::code).collect(toImmutableList()))
+                .impact(impacts.get(impactI).code())
+                .lastInteractedAt(ticket.statusLog().getLast().date())
+                .build();
         return ticketRepository.updateTicket(updatedTicket);
     }
 
     private Ticket generateEscalatedTicket(Random random, LocalDate date) {
         Ticket ticket = generateFilledTicket(random, date);
-        long escalationsAmount = random.nextLong(1, maxNumberOfEscalations + 1);
+        long escalationsAmount = random.nextLong(1, MAX_NUMBER_OF_ESCALATIONS + 1);
         ImmutableList<EscalationTeam> escalationTeams = escalationTeamsRegistry.listAllEscalationTeams();
         Set<EscalationTeam> escalationTeamsToUse = new HashSet<>();
         while (escalationTeamsToUse.size() < escalationsAmount) {
             escalationTeamsToUse.add(escalationTeams.get(random.nextInt(0, escalationTeams.size())));
         }
-        for (EscalationTeam escalationTeam: escalationTeamsToUse) {
-            generateEscalation(
-                random,
-                ticket.statusLog().getFirst().date(),
-                ticket,
-                escalationTeam
-            );
+        for (EscalationTeam escalationTeam : escalationTeamsToUse) {
+            generateEscalation(random, ticket.statusLog().getFirst().date(), ticket, escalationTeam);
         }
         return ticket;
     }
 
-    private void generateEscalation(Random random,
-                                    Instant afterDate,
-                                    Ticket ticket,
-                                    EscalationTeam escalationTeam) {
+    private void generateEscalation(Random random, Instant afterDate, Ticket ticket, EscalationTeam escalationTeam) {
         MessageTs escalationTs = generateMessageTsAfter(
-            random,
-            afterDate,
-            avgTicketEscalatedAfterSeconds,
-            stdTicketEscalatedAfterSeconds
-        );
+                random, afterDate, AVG_TICKET_ESCALATED_AFTER_SECONDS, STD_TICKET_ESCALATED_AFTER_SECONDS);
         MessageTs createdMessageTs = messageTsFromInstant(random, escalationTs.getDate());
-
 
         Set<Tag> pickedTags = generatePickedTags(random);
 
         Escalation escalation = Escalation.createNew(
-            checkNotNull(ticket.id()),
-            escalationTeam.code(),
-            pickedTags.stream()
-                .map(Tag::code)
-                .collect(toImmutableList()),
-            ticket.queryRef()
-        );
+                checkNotNull(ticket.id()),
+                escalationTeam.code(),
+                pickedTags.stream().map(Tag::code).collect(toImmutableList()),
+                ticket.queryRef());
         escalation = escalation.toBuilder()
-            .openedAt(escalationTs.getDate())
-            .createdMessageTs(createdMessageTs)
-            .build();
+                .openedAt(escalationTs.getDate())
+                .createdMessageTs(createdMessageTs)
+                .build();
         escalation = checkNotNull(escalationRepository.createIfNotExists(escalation));
 
         if (random.nextBoolean()) {
@@ -263,7 +228,7 @@ public class MockDataGenerator implements ApplicationRunner {
 
     private void generateClosedTicket(Random random, LocalDate date) {
         Ticket ticket;
-        if (closedTicketIsEscalatedChance <= random.nextDouble(0.0, 100.0)) {
+        if (CLOSED_TICKET_IS_ESCALATED_CHANCE <= random.nextDouble(0.0, 100.0)) {
             ticket = generateEscalatedTicket(random, date);
         } else {
             ticket = generateFilledTicket(random, date);
@@ -277,27 +242,21 @@ public class MockDataGenerator implements ApplicationRunner {
             }
         }
 
-        long closeDelay = random.nextLong(ticketChangeStatusDelayLowerBoundSecs, ticketChangeStatusDelayHigherBoundSecs);
+        long closeDelay = random.nextLong(
+                TICKET_CHANGE_STATUS_DELAY_LOWER_BOUND_SECS, TICKET_CHANGE_STATUS_DELAY_HIGHER_BOUND_SECS);
         Instant closeDate = ticket.statusLog().getLast().date().plusSeconds(closeDelay);
-        ticket = ticketRepository.updateTicket(
-            ticket.toBuilder()
+        ticket = ticketRepository.updateTicket(ticket.toBuilder()
                 .status(TicketStatus.closed)
                 .lastInteractedAt(closeDate)
-                .build()
-        );
-        ticket = ticketRepository.insertStatusLog(
-            ticket,
-            min(closeDate, Instant.now())
-        );
+                .build());
+        ticket = ticketRepository.insertStatusLog(ticket, min(closeDate, Instant.now()));
 
         generateSentimentForTicket(random, ticket);
     }
 
     private Instant getEscalationResolutionTime(Random random, Escalation escalation) {
-        long resolutionSecs = round(max(0.0, random.nextGaussian(
-            avgEscalationResolutionTime,
-            stdEscalationResolutionTime
-        )));
+        long resolutionSecs =
+                round(max(0.0, random.nextGaussian(AVG_ESCALATION_RESOLUTION_TIME, STD_ESCALATION_RESOLUTION_TIME)));
         return escalation.openedAt().plusSeconds(resolutionSecs);
     }
 
@@ -320,18 +279,14 @@ public class MockDataGenerator implements ApplicationRunner {
         if (sentimentRepository == null) {
             return;
         }
-        sentimentRepository.save(checkNotNull(ticket.id()),
-            TicketSentimentResults.builder()
-                .ticketId(checkNotNull(ticket.id()))
-                .authorSentiment(generateSentiment(random))
-                .supportSentiment(random.nextDouble() > 0.2
-                    ? generateSentiment(random)
-                    : null)
-                .othersSentiment(random.nextDouble() > 0.5
-                    ? generateSentiment(random)
-                    : null)
-                .build()
-        );
+        sentimentRepository.save(
+                checkNotNull(ticket.id()),
+                TicketSentimentResults.builder()
+                        .ticketId(checkNotNull(ticket.id()))
+                        .authorSentiment(generateSentiment(random))
+                        .supportSentiment(random.nextDouble() > 0.2 ? generateSentiment(random) : null)
+                        .othersSentiment(random.nextDouble() > 0.5 ? generateSentiment(random) : null)
+                        .build());
     }
 
     private Sentiment generateSentiment(Random random) {
@@ -340,14 +295,11 @@ public class MockDataGenerator implements ApplicationRunner {
         double negativeSentiment = random.nextDouble();
         double sentimentSum = positiveSentiment + neutralSentiment + negativeSentiment;
         return new Sentiment(
-            positiveSentiment / sentimentSum,
-            neutralSentiment / sentimentSum,
-            negativeSentiment / sentimentSum
-        );
+                positiveSentiment / sentimentSum, neutralSentiment / sentimentSum, negativeSentiment / sentimentSum);
     }
 
     private MessageTs generateMessageTsAt(Random random, LocalDate date) {
-        LocalTime time = LocalTime.ofSecondOfDay(random.nextLong(secondsPerDay));
+        LocalTime time = LocalTime.ofSecondOfDay(random.nextLong(SECONDS_PER_DAY));
         ZoneOffset offset = Instant.now().atZone(ZoneOffset.UTC).getOffset();
         Instant queryCreatedDate = date.atTime(time).toInstant(offset);
         return messageTsFromInstant(random, queryCreatedDate);
@@ -389,8 +341,8 @@ public class MockDataGenerator implements ApplicationRunner {
 
         private static TicketProgression pick(Random random) {
             double totalChances = Arrays.stream(values())
-                .mapToDouble(TicketProgression::pickChances)
-                .sum();
+                    .mapToDouble(TicketProgression::pickChances)
+                    .sum();
             double r = random.nextDouble(totalChances);
             double runningChances = 0.0;
             for (TicketProgression p : values()) {

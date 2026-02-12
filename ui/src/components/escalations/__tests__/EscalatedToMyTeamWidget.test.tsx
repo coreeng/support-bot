@@ -10,12 +10,12 @@ import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import EscalatedToMyTeamWidget from '../EscalatedToMyTeamWidget';
 import * as hooks from '../../../lib/hooks';
-import * as AuthContext from '../../../contexts/AuthContext';
+import * as AuthHook from '../../../hooks/useAuth';
 import * as TeamFilterContext from '../../../contexts/TeamFilterContext';
 
 // Mock hooks
 jest.mock('../../../lib/hooks');
-jest.mock('../../../contexts/AuthContext');
+jest.mock('../../../hooks/useAuth');
 jest.mock('../../../contexts/TeamFilterContext');
 
 // Mock Recharts to avoid rendering issues in tests
@@ -30,7 +30,7 @@ jest.mock('recharts', () => ({
 
 const mockUseEscalations = hooks.useEscalations as jest.MockedFunction<typeof hooks.useEscalations>;
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>;
-const mockUseAuth = AuthContext.useAuth as jest.MockedFunction<typeof AuthContext.useAuth>;
+const mockUseAuth = AuthHook.useAuth as jest.MockedFunction<typeof AuthHook.useAuth>;
 const mockUseTeamFilter = TeamFilterContext.useTeamFilter as jest.MockedFunction<typeof TeamFilterContext.useTeamFilter>;
 
 // Test data
@@ -105,7 +105,7 @@ describe('EscalatedToMyTeamWidget', () => {
                 isAuthenticated: false,
                 isLeadership: false,
                 isSupportEngineer: false,
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTeamFilter.mockReturnValue({
@@ -138,7 +138,7 @@ describe('EscalatedToMyTeamWidget', () => {
                 isAuthenticated: false,
                 isLeadership: false,
                 isSupportEngineer: false,
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTeamFilter.mockReturnValue({
@@ -171,7 +171,7 @@ describe('EscalatedToMyTeamWidget', () => {
                 isAuthenticated: false,
                 isLeadership: false,
                 isSupportEngineer: false,
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTeamFilter.mockReturnValue({
@@ -204,7 +204,7 @@ describe('EscalatedToMyTeamWidget', () => {
                 isAuthenticated: false,
                 isLeadership: false,
                 isSupportEngineer: false,
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTeamFilter.mockReturnValue({
@@ -239,7 +239,7 @@ describe('EscalatedToMyTeamWidget', () => {
                 isAuthenticated: false,
                 isLeadership: false,
                 isSupportEngineer: false,
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTeamFilter.mockReturnValue({
@@ -318,7 +318,7 @@ describe('EscalatedToMyTeamWidget', () => {
                 isAuthenticated: false,
                 isLeadership: false,
                 isSupportEngineer: false,
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTeamFilter.mockReturnValue({

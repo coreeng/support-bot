@@ -1,11 +1,11 @@
 package com.coreeng.supportbot.config;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.joran.JoranConfigurator;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
-
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 class LoggingConfigurationTest {
 
@@ -17,7 +17,6 @@ class LoggingConfigurationTest {
     @Test
     void shouldParsePlainTextLoggingConfiguration() {
         assertDoesNotThrow(() -> loadLogbackConfig("logback.xml"));
-
     }
 
     private void loadLogbackConfig(String configFile) throws Exception {

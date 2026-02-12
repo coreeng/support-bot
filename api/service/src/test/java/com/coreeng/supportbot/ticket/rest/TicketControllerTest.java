@@ -1,5 +1,8 @@
 package com.coreeng.supportbot.ticket.rest;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+
 import com.coreeng.supportbot.ticket.*;
 import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,9 +12,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TicketControllerTest {
@@ -39,12 +39,7 @@ class TicketControllerTest {
     void shouldReturnOkWhenUpdateSucceeds() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
-            TicketStatus.closed,
-            "core-support",
-            ImmutableList.of("bug", "urgent"),
-            "production-blocking",
-            null
-        );
+                TicketStatus.closed, "core-support", ImmutableList.of("bug", "urgent"), "production-blocking", null);
 
         TicketUI mockTicketUI = mock(TicketUI.class);
         when(ticketUpdateService.update(ticketId, request)).thenReturn(mockTicketUI);
@@ -61,16 +56,11 @@ class TicketControllerTest {
     @Test
     void shouldReturnBadRequestWhenValidationFails() {
         // given
-        TicketUpdateRequest request = new TicketUpdateRequest(
-            null,
-            "core-support",
-            ImmutableList.of("bug"),
-            "production-blocking",
-            null
-        );
+        TicketUpdateRequest request =
+                new TicketUpdateRequest(null, "core-support", ImmutableList.of("bug"), "production-blocking", null);
 
         when(ticketUpdateService.update(ticketId, request))
-            .thenThrow(new IllegalArgumentException("status is required"));
+                .thenThrow(new IllegalArgumentException("status is required"));
 
         // when
         ResponseEntity<?> response = controller.updateTicket(ticketId, request);
@@ -85,15 +75,10 @@ class TicketControllerTest {
     void shouldReturnBadRequestWhenSubmitFails() {
         // given
         TicketUpdateRequest request = new TicketUpdateRequest(
-            TicketStatus.closed,
-            "core-support",
-            ImmutableList.of("bug"),
-            "production-blocking",
-            null
-        );
+                TicketStatus.closed, "core-support", ImmutableList.of("bug"), "production-blocking", null);
 
         when(ticketUpdateService.update(ticketId, request))
-            .thenThrow(new IllegalStateException("Update failed: unresolved escalations"));
+                .thenThrow(new IllegalStateException("Update failed: unresolved escalations"));
 
         // when
         ResponseEntity<?> response = controller.updateTicket(ticketId, request);

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTicket, useTenantTeams, useRegistry, useSupportMembers, useAssignmentEnabled } from '@/lib/hooks'
 import { TicketWithLogs, TicketImpact, TicketTag, Escalation, SupportMember } from '@/lib/types'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 import {
     Dialog,
     DialogContent,
@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Ticket, AlertCircle, Tag, User, Clock, Slack, X, MessageSquare } from 'lucide-react'
-import { apiPatch } from '@/lib/api'
 import SlackMessageRenderer from '@/components/ui/SlackMessageRenderer'
 
 interface EditTicketModalProps {
@@ -153,7 +152,17 @@ export default function EditTicketModal({
                 updatePayload.assignedTo = assignedUserId
             }
 
-            await apiPatch(`/ticket/${ticketId}`, updatePayload)
+            const response = await fetch(`/api/tickets/${ticketId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updatePayload),
+            })
+
+            if (!response.ok) {
+                throw new Error(`Failed to update ticket: ${response.status}`)
+            }
             
             // Close modal and refresh
             onOpenChange(false)

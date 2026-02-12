@@ -15,14 +15,14 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class JsonMapper {
     private final ObjectMapper objectMapper = new ObjectMapper()
-        .setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.NONE)
-        .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
-        .setVisibility(PropertyAccessor.SETTER, JsonAutoDetect.Visibility.ANY)
-        .setVisibility(PropertyAccessor.CREATOR, JsonAutoDetect.Visibility.ANY)
-        .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-        .configure(SerializationFeature.FAIL_ON_UNWRAPPED_TYPE_IDENTIFIERS, false)
-        .registerModule(new JavaTimeModule())
-        .registerModule(new GuavaModule());
+            .setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.NONE)
+            .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
+            .setVisibility(PropertyAccessor.SETTER, JsonAutoDetect.Visibility.ANY)
+            .setVisibility(PropertyAccessor.CREATOR, JsonAutoDetect.Visibility.ANY)
+            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+            .configure(SerializationFeature.FAIL_ON_UNWRAPPED_TYPE_IDENTIFIERS, false)
+            .registerModule(new JavaTimeModule())
+            .registerModule(new GuavaModule());
 
     @VisibleForTesting
     public ObjectMapper getObjectMapper() {

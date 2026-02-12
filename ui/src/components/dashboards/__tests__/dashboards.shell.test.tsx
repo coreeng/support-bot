@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { within } from '@testing-library/react'
 import DashboardsPage from '../dashboards'
 
-jest.mock('../../../contexts/AuthContext', () => ({
+jest.mock('../../../hooks/useAuth', () => ({
   useAuth: () => ({
     user: {
       email: 'test@example.com',

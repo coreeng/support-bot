@@ -1,19 +1,12 @@
 package com.coreeng.supportbot.ticket.handler;
 
-import java.util.concurrent.ExecutorService;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.SlackId;
@@ -26,19 +19,30 @@ import com.slack.api.app_backend.views.response.ViewSubmissionResponse;
 import com.slack.api.bolt.context.builtin.ViewSubmissionContext;
 import com.slack.api.bolt.request.builtin.ViewSubmissionRequest;
 import com.slack.api.model.view.View;
+import java.util.concurrent.ExecutorService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class TicketViewsSubmissionHandlerTest {
     @Mock
     private TicketProcessingService ticketProcessingService;
+
     @Mock
     private TicketSummaryViewMapper ticketSummaryViewMapper;
+
     @Mock
     private EscalateViewMapper escalateViewMapper;
+
     @Mock
     private TicketConfirmSubmissionMapper confirmSubmissionMapper;
+
     @Mock
     private ExecutorService executor;
+
     @Mock
     private RbacService rbacService;
 
@@ -47,13 +51,12 @@ class TicketViewsSubmissionHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new TicketViewsSubmissionHandler(
-            ticketProcessingService,
-            ticketSummaryViewMapper,
-            escalateViewMapper,
-            confirmSubmissionMapper,
-            executor,
-            rbacService
-        );
+                ticketProcessingService,
+                ticketSummaryViewMapper,
+                escalateViewMapper,
+                confirmSubmissionMapper,
+                executor,
+                rbacService);
     }
 
     @Test
@@ -72,7 +75,8 @@ class TicketViewsSubmissionHandlerTest {
         // then
         assertEquals(new ViewSubmissionResponse(), response);
         verify(rbacService).isSupportBySlackId(SlackId.user(userId));
-        verifyNoInteractions(ticketProcessingService, ticketSummaryViewMapper, escalateViewMapper, confirmSubmissionMapper);
+        verifyNoInteractions(
+                ticketProcessingService, ticketSummaryViewMapper, escalateViewMapper, confirmSubmissionMapper);
     }
 
     @Test
@@ -82,12 +86,9 @@ class TicketViewsSubmissionHandlerTest {
 
         ViewSubmissionContext context = mock(ViewSubmissionContext.class);
         ViewSubmissionRequest request = mock(ViewSubmissionRequest.class);
-        ViewSubmissionPayload payload = ViewSubmissionPayload
-            .builder()
-            .view(View.builder()
-                .callbackId("something-random")
-                .build())
-            .build();
+        ViewSubmissionPayload payload = ViewSubmissionPayload.builder()
+                .view(View.builder().callbackId("something-random").build())
+                .build();
 
         when(context.getRequestUserId()).thenReturn(userId);
         when(rbacService.isSupportBySlackId(SlackId.user(userId))).thenReturn(true);
@@ -101,4 +102,4 @@ class TicketViewsSubmissionHandlerTest {
         assertFalse(response.getErrors().isEmpty());
         assertNull(response.getView());
     }
-} 
+}

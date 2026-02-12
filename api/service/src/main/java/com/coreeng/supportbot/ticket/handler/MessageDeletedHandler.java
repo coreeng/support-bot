@@ -24,4 +24,3 @@ public class MessageDeletedHandler implements SlackEventHandler<MessageDeletedEv
         ticketProcessingService.handleMessageDeleted(MessageDeleted.fromMessageDeletedEvent(event));
     }
 }
-

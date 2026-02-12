@@ -1,5 +1,9 @@
 package com.coreeng.supportbot.rating;
 
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.Ticket;
@@ -7,23 +11,19 @@ import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketInMemoryRepository;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.google.common.collect.ImmutableList;
+import java.time.ZoneId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.ZoneId;
-
-import static java.util.Objects.requireNonNull;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
-
 @ExtendWith(MockitoExtension.class)
 class RatingServiceSaveTest {
 
     private RatingInMemoryRepository ratingRepository;
     private TicketInMemoryRepository ticketRepository;
+
     @Mock
     private EscalationQueryService escalationQueryService;
 
@@ -39,10 +39,10 @@ class RatingServiceSaveTest {
     @Test
     void returnsNull_whenTicketAlreadyRated() {
         Ticket ticket = Ticket.builder()
-            .channelId("C123")
-            .queryTs(MessageTs.of("111.222"))
-            .status(TicketStatus.closed)
-            .build();
+                .channelId("C123")
+                .queryTs(MessageTs.of("111.222"))
+                .status(TicketStatus.closed)
+                .build();
         Ticket created = ticketRepository.createTicketIfNotExists(ticket);
         TicketId createdId = requireNonNull(created.id());
         ticketRepository.markTicketAsRated(createdId);
@@ -66,12 +66,12 @@ class RatingServiceSaveTest {
     @Test
     void savesRating_andMarksTicketRated_whenNotEscalated() {
         Ticket ticket = Ticket.builder()
-            .channelId("C123")
-            .queryTs(MessageTs.of("111.222"))
-            .status(TicketStatus.closed)
-            .impact("production blocking")
-            .tags(ImmutableList.of("ingress", "api"))
-            .build();
+                .channelId("C123")
+                .queryTs(MessageTs.of("111.222"))
+                .status(TicketStatus.closed)
+                .impact("production blocking")
+                .tags(ImmutableList.of("ingress", "api"))
+                .build();
         Ticket created = ticketRepository.createTicketIfNotExists(ticket);
         TicketId createdId = requireNonNull(created.id());
 
@@ -102,12 +102,12 @@ class RatingServiceSaveTest {
     @Test
     void savesRating_andMarksTicketRated_whenEscalated() {
         Ticket ticket = Ticket.builder()
-            .channelId("C123")
-            .queryTs(MessageTs.of("333.444"))
-            .status(TicketStatus.closed)
-            .impact("bau")
-            .tags(ImmutableList.of("ui"))
-            .build();
+                .channelId("C123")
+                .queryTs(MessageTs.of("333.444"))
+                .status(TicketStatus.closed)
+                .impact("bau")
+                .tags(ImmutableList.of("ui"))
+                .build();
         Ticket created = ticketRepository.createTicketIfNotExists(ticket);
         TicketId createdId = requireNonNull(created.id());
 

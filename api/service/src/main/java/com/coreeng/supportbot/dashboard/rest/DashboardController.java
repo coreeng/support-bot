@@ -1,18 +1,15 @@
 package com.coreeng.supportbot.dashboard.rest;
 
+import com.coreeng.supportbot.dashboard.DashboardRepository;
+import com.coreeng.supportbot.dashboard.DashboardRepository.*;
 import java.time.LocalDate;
 import java.util.List;
-
+import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.coreeng.supportbot.dashboard.DashboardRepository;
-import com.coreeng.supportbot.dashboard.DashboardRepository.*;
-
-import lombok.RequiredArgsConstructor;
 
 /**
  * REST controller for dashboard analytics and SLA metrics.

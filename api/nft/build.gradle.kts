@@ -51,7 +51,7 @@ gatling {
 }
 
 tasks.register("gatlingRunIntegrated") {
-	// Ensure the service and all Gatling runtime dependencies are built
+    // Ensure the service and all Gatling runtime dependencies are built
     dependsOn(":testkit:jar")
     dependsOn(":service:bootJar")
     finalizedBy("gatlingRun")

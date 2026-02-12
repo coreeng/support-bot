@@ -4,11 +4,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import EscalationsPage from '../escalations'
 import * as hooks from '../../../lib/hooks'
 import * as TeamFilterContext from '../../../contexts/TeamFilterContext'
-import * as AuthContext from '../../../contexts/AuthContext'
+import * as AuthHook from '../../../hooks/useAuth'
 
 jest.mock('../../../lib/hooks')
 jest.mock('../../../contexts/TeamFilterContext')
-jest.mock('../../../contexts/AuthContext')
+jest.mock('../../../hooks/useAuth')
 jest.mock('../EscalatedToMyTeamTable', () => {
     const Mock = () => <div data-testid="escalated-to-my-team-table" />
     Mock.displayName = 'MockEscalatedToMyTeamTable'
@@ -19,7 +19,7 @@ const mockUseEscalations = hooks.useEscalations as jest.MockedFunction<typeof ho
 const mockUseEscalationTeams = hooks.useEscalationTeams as jest.MockedFunction<typeof hooks.useEscalationTeams>
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>
 const mockUseTeamFilter = TeamFilterContext.useTeamFilter as jest.MockedFunction<typeof TeamFilterContext.useTeamFilter>
-const mockUseAuth = AuthContext.useAuth as jest.MockedFunction<typeof AuthContext.useAuth>
+const mockUseAuth = AuthHook.useAuth as jest.MockedFunction<typeof AuthHook.useAuth>
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -59,7 +59,7 @@ describe('EscalationsPage', () => {
             isEscalationTeam: true,
             isSupportEngineer: false,
             actualEscalationTeams: ['Escalation Team 2 Test'],
-            isLoadingEscalationTeams: false,
+            logout: jest.fn()
         })
     })
 
@@ -112,7 +112,7 @@ describe('EscalationsPage', () => {
             isEscalationTeam: false,
             isSupportEngineer: false,
             actualEscalationTeams: [],
-            isLoadingEscalationTeams: false,
+            logout: jest.fn()
         })
 
         mockUseEscalations.mockReturnValue({
@@ -165,7 +165,7 @@ describe('EscalationsPage', () => {
             isEscalationTeam: true,
             isSupportEngineer: false,
             actualEscalationTeams: ['Escalation Team 2 Test'],
-            isLoadingEscalationTeams: false,
+            logout: jest.fn()
         })
 
         // Same ticket escalated twice

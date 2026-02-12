@@ -1,5 +1,9 @@
 package com.coreeng.supportbot.sentiment;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.stream.Collectors.groupingBy;
+
 import com.coreeng.supportbot.sentiment.client.Sentiment;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
@@ -8,18 +12,13 @@ import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
-import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.Nullable;
-
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.ImmutableList.toImmutableList;
-import static java.util.stream.Collectors.groupingBy;
+import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
 @RequiredArgsConstructor
 public class SentimentInMemoryRepository implements SentimentRepository {
@@ -36,17 +35,16 @@ public class SentimentInMemoryRepository implements SentimentRepository {
     @Override
     public ImmutableList<TicketId> listNotAnalysedClosedTickets() {
         Page<Ticket> closedTickets = ticketQueryService.findByQuery(TicketsQuery.builder()
-            .unlimited(true)
-            .status(TicketStatus.closed)
-            .build());
+                .unlimited(true)
+                .status(TicketStatus.closed)
+                .build());
         return closedTickets.content().stream()
-            .map(Ticket::id)
-            .filter(tId -> !sentiments.containsKey(tId))
-            .collect(toImmutableList());
+                .map(Ticket::id)
+                .filter(tId -> !sentiments.containsKey(tId))
+                .collect(toImmutableList());
     }
 
-    @Nullable
-    @Override
+    @Nullable @Override
     public TicketSentimentResults findByTicketId(TicketId ticketId) {
         return sentiments.get(ticketId);
     }
@@ -54,20 +52,20 @@ public class SentimentInMemoryRepository implements SentimentRepository {
     @Override
     public ImmutableList<TicketSentimentCountPerDate> countBetweenDates(LocalDate from, LocalDate to) {
         Page<Ticket> tickets = ticketQueryService.findByQuery(TicketsQuery.builder()
-            .ids(ImmutableList.copyOf(sentiments.keySet()))
-            .unlimited(true)
-            .dateFrom(from)
-            .dateTo(to)
-            .build());
+                .ids(ImmutableList.copyOf(sentiments.keySet()))
+                .unlimited(true)
+                .dateFrom(from)
+                .dateTo(to)
+                .build());
 
         return tickets.content().stream()
-            .filter(t -> sentiments.containsKey(t.id()))
-            .collect(groupingBy(
-                t -> LocalDate.ofInstant(t.statusLog().getLast().date(), timezone)
-            ))
-            .entrySet().stream()
-            .map(e -> countSentiments(e.getKey(), e.getValue()))
-            .collect(toImmutableList());
+                .filter(t -> sentiments.containsKey(t.id()))
+                .collect(groupingBy(
+                        t -> LocalDate.ofInstant(t.statusLog().getLast().date(), timezone)))
+                .entrySet()
+                .stream()
+                .map(e -> countSentiments(e.getKey(), e.getValue()))
+                .collect(toImmutableList());
     }
 
     private TicketSentimentCountPerDate countSentiments(LocalDate date, List<Ticket> tickets) {
@@ -106,10 +104,10 @@ public class SentimentInMemoryRepository implements SentimentRepository {
         }
 
         return TicketSentimentCountPerDate.builder()
-            .date(date)
-            .authorSentiments(authorSentiments.toModel())
-            .supportSentiments(supportSentiments.toModel())
-            .othersSentiments(othersSentiments.toModel())
-            .build();
+                .date(date)
+                .authorSentiments(authorSentiments.toModel())
+                .supportSentiments(supportSentiments.toModel())
+                .othersSentiments(othersSentiments.toModel())
+                .build();
     }
 }

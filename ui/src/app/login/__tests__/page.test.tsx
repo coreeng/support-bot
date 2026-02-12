@@ -1,13 +1,14 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { useRouter } from 'next/navigation'
 import LoginPage from '../page'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '../../../hooks/useAuth'
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  useSearchParams: jest.fn(() => new URLSearchParams()),
 }))
 
-jest.mock('../../../contexts/AuthContext', () => ({
+jest.mock('../../../hooks/useAuth', () => ({
   useAuth: jest.fn(),
 }))
 

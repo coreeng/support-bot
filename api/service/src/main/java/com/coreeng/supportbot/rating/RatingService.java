@@ -5,14 +5,13 @@ import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketRepository;
 import com.google.common.collect.ImmutableList;
+import java.time.Instant;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -24,8 +23,7 @@ public class RatingService {
     private final EscalationQueryService escalationQueryService;
 
     @Transactional
-    @Nullable
-    public Rating save(TicketId ticketId, int rating) {
+    @Nullable public Rating save(TicketId ticketId, int rating) {
         log.info("Attempt to submit rating for ticket {}", ticketId);
 
         if (ticketRepository.isTicketRated(ticketId)) {
@@ -44,22 +42,21 @@ public class RatingService {
 
         // Create and submit the rating
         Rating ratingRecord = Rating.builder()
-            .rating(rating)
-            .submittedTs(String.valueOf(Instant.now().getEpochSecond()))
-            .status(ticket.status())
-            .impact(ticket.impact())
-            .tags(ticket.tags())
-            .isEscalated(isEscalated)
-            .build();
+                .rating(rating)
+                .submittedTs(String.valueOf(Instant.now().getEpochSecond()))
+                .status(ticket.status())
+                .impact(ticket.impact())
+                .tags(ticket.tags())
+                .isEscalated(isEscalated)
+                .build();
 
         UUID ratingId = repository.insertRating(ratingRecord);
         ticketRepository.markTicketAsRated(ticketId);
 
         log.info("Successfully recorded rating for ticket {}", ticketId);
-        return ratingRecord.toBuilder()
-            .id(ratingId)
-            .build();
+        return ratingRecord.toBuilder().id(ratingId).build();
     }
+
     public ImmutableList<Rating> getAllRatings() {
         return repository.getAllRatings();
     }

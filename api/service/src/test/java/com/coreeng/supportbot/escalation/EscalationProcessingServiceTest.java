@@ -1,7 +1,7 @@
 package com.coreeng.supportbot.escalation;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -22,87 +22,90 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class EscalationProcessingServiceTest {
-  private EscalationProcessingService processingService;
+    private EscalationProcessingService processingService;
 
-  @Mock private EscalationRepository escalationRepository;
-  @Mock private EscalationCreatedMessageMapper escalationMapper;
-  @Mock private SlackClient slackClient;
-  @Mock private EscalationTeamsRegistry escalationTeamsRegistry;
-  @Mock private SlackTicketsProps slackTicketsProps;
+    @Mock
+    private EscalationRepository escalationRepository;
 
-  @BeforeEach
-  public void setup() {
-    processingService =
-        new EscalationProcessingService(
-            escalationRepository,
-            escalationMapper,
-            slackClient,
-            escalationTeamsRegistry,
-            slackTicketsProps);
-  }
+    @Mock
+    private EscalationCreatedMessageMapper escalationMapper;
 
-  @Test
-  public void escalationShouldBeReturnedWithNoIdGivenDatabaseDidNotInsert() {
-    // given
-    CreateEscalationRequest escalationRequest =
-        CreateEscalationRequest.builder()
-            .ticket(Ticket.builder()
-                .id(new TicketId(1))
-                .queryTs(MessageTs.of("1234567890.123456"))
-                .channelId("test-channel")
-                .build())
-            .team("some-team")
-            .tags(ImmutableList.of("tag-1", "tag-2"))
-            .build();
+    @Mock
+    private SlackClient slackClient;
 
-    when(escalationRepository.createIfNotExists(any(Escalation.class)))
-        .thenReturn(Escalation.builder().id(null).build());
+    @Mock
+    private EscalationTeamsRegistry escalationTeamsRegistry;
 
-    // when
-    Escalation escalation = requireNonNull(processingService.createEscalation(escalationRequest));
+    @Mock
+    private SlackTicketsProps slackTicketsProps;
 
-    // then
-    assertThat(escalation).isNotNull();
-    assertThat(escalation.id()).isNull();
-  }
+    @BeforeEach
+    public void setup() {
+        processingService = new EscalationProcessingService(
+                escalationRepository, escalationMapper, slackClient, escalationTeamsRegistry, slackTicketsProps);
+    }
 
-  @Test
-  public void shouldReturnExpectedEscalationWhenDatabaseInsertHappens() {
-    // given
-    CreateEscalationRequest escalationRequest =
-        CreateEscalationRequest.builder()
-            .ticket(Ticket.builder()
-                .id(new TicketId(1))
-                .queryTs(MessageTs.of("1234567890.123456"))
-                .channelId("test-channel")
-                .build())
-            .team("some-team")
-            .tags(ImmutableList.of("tag-1", "tag-2"))
-            .build();
-    Escalation expectedEscalation =
-        Escalation.builder()
-            .id(new EscalationId(1))
-            .ticketId(new TicketId(1))
-            .status(EscalationStatus.opened)
-            .team("some-team")
-            .tags(ImmutableList.of("tag-1", "tag-2"))
-            .build();
-    ChatPostMessageResponse chatPostMessageResponse = new ChatPostMessageResponse();
-    chatPostMessageResponse.setTs("ts");
-    when(escalationRepository.createIfNotExists(any(Escalation.class)))
-        .thenReturn(expectedEscalation.toBuilder().id(new EscalationId(1)).build());
-    when(slackClient.postMessage(any())).thenReturn(chatPostMessageResponse);
-    when(escalationRepository.update(any(Escalation.class))).thenReturn(expectedEscalation);
-    when(escalationTeamsRegistry.findEscalationTeamByCode("some-team")).thenReturn(new EscalationTeam("some-team","someTeam","id"));
+    @Test
+    public void escalationShouldBeReturnedWithNoIdGivenDatabaseDidNotInsert() {
+        // given
+        CreateEscalationRequest escalationRequest = CreateEscalationRequest.builder()
+                .ticket(Ticket.builder()
+                        .id(new TicketId(1))
+                        .queryTs(MessageTs.of("1234567890.123456"))
+                        .channelId("test-channel")
+                        .build())
+                .team("some-team")
+                .tags(ImmutableList.of("tag-1", "tag-2"))
+                .build();
 
-    // when
-    Escalation escalation = requireNonNull(processingService.createEscalation(escalationRequest));
+        when(escalationRepository.createIfNotExists(any(Escalation.class)))
+                .thenReturn(Escalation.builder().id(null).build());
 
-    // then
-    assertThat(escalation).isNotNull();
-    assertThat(escalation.id()).isEqualTo(expectedEscalation.id());
-    assertThat(escalation.status()).isEqualTo(expectedEscalation.status());
-    assertThat(escalation.team()).isEqualTo(expectedEscalation.team());
-    assertThat(escalation.tags()).isEqualTo(expectedEscalation.tags());
-  }
+        // when
+        Escalation escalation = requireNonNull(processingService.createEscalation(escalationRequest));
+
+        // then
+        assertThat(escalation).isNotNull();
+        assertThat(escalation.id()).isNull();
+    }
+
+    @Test
+    public void shouldReturnExpectedEscalationWhenDatabaseInsertHappens() {
+        // given
+        CreateEscalationRequest escalationRequest = CreateEscalationRequest.builder()
+                .ticket(Ticket.builder()
+                        .id(new TicketId(1))
+                        .queryTs(MessageTs.of("1234567890.123456"))
+                        .channelId("test-channel")
+                        .build())
+                .team("some-team")
+                .tags(ImmutableList.of("tag-1", "tag-2"))
+                .build();
+        Escalation expectedEscalation = Escalation.builder()
+                .id(new EscalationId(1))
+                .ticketId(new TicketId(1))
+                .status(EscalationStatus.opened)
+                .team("some-team")
+                .tags(ImmutableList.of("tag-1", "tag-2"))
+                .build();
+        ChatPostMessageResponse chatPostMessageResponse = new ChatPostMessageResponse();
+        chatPostMessageResponse.setTs("ts");
+        when(escalationRepository.createIfNotExists(any(Escalation.class)))
+                .thenReturn(
+                        expectedEscalation.toBuilder().id(new EscalationId(1)).build());
+        when(slackClient.postMessage(any())).thenReturn(chatPostMessageResponse);
+        when(escalationRepository.update(any(Escalation.class))).thenReturn(expectedEscalation);
+        when(escalationTeamsRegistry.findEscalationTeamByCode("some-team"))
+                .thenReturn(new EscalationTeam("some-team", "someTeam", "id"));
+
+        // when
+        Escalation escalation = requireNonNull(processingService.createEscalation(escalationRequest));
+
+        // then
+        assertThat(escalation).isNotNull();
+        assertThat(escalation.id()).isEqualTo(expectedEscalation.id());
+        assertThat(escalation.status()).isEqualTo(expectedEscalation.status());
+        assertThat(escalation.team()).isEqualTo(expectedEscalation.team());
+        assertThat(escalation.tags()).isEqualTo(expectedEscalation.tags());
+    }
 }

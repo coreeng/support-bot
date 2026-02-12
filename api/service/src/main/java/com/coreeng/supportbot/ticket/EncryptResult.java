@@ -6,6 +6,4 @@ package com.coreeng.supportbot.ticket;
  * @param value The encrypted or plain value to store
  * @param format "plain" or "enc_v1" indicating storage format
  */
-public record EncryptResult(String value, String format) {
-}
-
+public record EncryptResult(String value, String format) {}

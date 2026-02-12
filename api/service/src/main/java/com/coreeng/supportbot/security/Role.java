@@ -6,10 +6,10 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @Getter
 public enum Role {
-    user("ROLE_USER"),
-    leadership("ROLE_LEADERSHIP"),
-    supportEngineer("ROLE_SUPPORT_ENGINEER"),
-    escalation("ROLE_ESCALATION");
+    USER("ROLE_USER"),
+    LEADERSHIP("ROLE_LEADERSHIP"),
+    SUPPORT_ENGINEER("ROLE_SUPPORT_ENGINEER"),
+    ESCALATION("ROLE_ESCALATION");
 
     private final String authority;
 

@@ -15,32 +15,29 @@ import com.slack.api.bolt.context.builtin.ActionContext;
 import com.slack.api.bolt.request.builtin.BlockActionRequest;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.model.Message;
-
+import java.io.IOException;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
-import java.util.regex.Pattern;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class RatingActionHandler implements SlackBlockActionHandler {
-    public static final String actionId = "rating-submit";
-
+    public static final String ACTION_ID = "rating-submit";
 
     private final RatingRequestMessageMapper mapper;
     private final RatingService service;
     private final SlackClient slackClient;
 
     public static String actionId(int rating) {
-        return actionId + "-" + rating;
+        return ACTION_ID + "-" + rating;
     }
 
     @Override
     public Pattern getPattern() {
-        return Pattern.compile("^" + actionId + "-\\d" + "$");
+        return Pattern.compile("^" + ACTION_ID + "-\\d" + "$");
     }
 
     @Override
@@ -61,20 +58,18 @@ public class RatingActionHandler implements SlackBlockActionHandler {
     }
 
     private void sendConfirmationReply(Rating rating, MessageRef threadRef) {
-        Message queryMessage = slackClient.getMessageByTs(new SlackGetMessageByTsRequest(
-            threadRef.channelId(),
-            threadRef.actualThreadTs()
-        ));
+        Message queryMessage = slackClient.getMessageByTs(
+                new SlackGetMessageByTsRequest(threadRef.channelId(), threadRef.actualThreadTs()));
         String userId = queryMessage.getUser();
 
         slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
-            .message(SimpleSlackMessage.builder()
-                .text(String.format("Thank you for your %d star rating! Your feedback has been recorded.", rating.rating()))
-            .build())
-            .channel(threadRef.channelId())
-            .threadTs(threadRef.actualThreadTs())
-            .userId(userId)
-            .build()
-        );
+                .message(SimpleSlackMessage.builder()
+                        .text(String.format(
+                                "Thank you for your %d star rating! Your feedback has been recorded.", rating.rating()))
+                        .build())
+                .channel(threadRef.channelId())
+                .threadTs(threadRef.actualThreadTs())
+                .userId(userId)
+                .build());
     }
 }

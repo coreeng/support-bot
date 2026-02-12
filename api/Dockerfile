@@ -15,6 +15,8 @@ COPY gradle gradle
 RUN ./gradlew --no-daemon
 
 COPY service service
+COPY config config
+COPY build.gradle.kts .
 
 ARG P2P_VERSION
 

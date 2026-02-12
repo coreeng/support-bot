@@ -1,5 +1,9 @@
 package com.coreeng.supportbot.slack.client;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.coreeng.supportbot.slack.SlackId;
 import com.slack.api.methods.MethodsClient;
 import com.slack.api.methods.request.conversations.ConversationsInfoRequest;
@@ -12,10 +16,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.Cache;
 import org.springframework.cache.concurrent.ConcurrentMapCache;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 class SlackClientImplTest {
 
@@ -35,7 +35,8 @@ class SlackClientImplTest {
         groupCache = new ConcurrentMapCache("group");
         channelCache = new ConcurrentMapCache("channel");
         meterRegistry = new SimpleMeterRegistry();
-        slackClient = new SlackClientImpl(methodsClient, permalinkCache, userCache, groupCache, channelCache, meterRegistry);
+        slackClient =
+                new SlackClientImpl(methodsClient, permalinkCache, userCache, groupCache, channelCache, meterRegistry);
     }
 
     @Test
@@ -76,7 +77,7 @@ class SlackClientImplTest {
     public void shouldReturnNullWhenGroupNameLookupFails() throws Exception {
         // Given
         when(methodsClient.usergroupsList(any(UsergroupsListRequest.class)))
-            .thenThrow(new java.io.IOException("IO error"));
+                .thenThrow(new java.io.IOException("IO error"));
 
         // When
         String result = slackClient.getGroupName(SlackId.group("S1"));
@@ -106,7 +107,8 @@ class SlackClientImplTest {
         ConversationsInfoResponse response = new ConversationsInfoResponse();
         response.setOk(true);
         response.setChannel(channel);
-        when(methodsClient.conversationsInfo(any(ConversationsInfoRequest.class))).thenReturn(response);
+        when(methodsClient.conversationsInfo(any(ConversationsInfoRequest.class)))
+                .thenReturn(response);
 
         // When
         String result1 = slackClient.getChannelName("C1");
@@ -122,7 +124,7 @@ class SlackClientImplTest {
     public void shouldReturnNullWhenChannelNameLookupFails() throws Exception {
         // Given
         when(methodsClient.conversationsInfo(any(ConversationsInfoRequest.class)))
-            .thenThrow(new java.io.IOException("IO error"));
+                .thenThrow(new java.io.IOException("IO error"));
 
         // When
         String result = slackClient.getChannelName("C1");
@@ -131,4 +133,3 @@ class SlackClientImplTest {
         assertThat(result).isNull();
     }
 }
-

@@ -1,21 +1,19 @@
 package com.coreeng.supportbot.testkit;
 
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import org.apache.commons.text.StringSubstitutor;
+import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
-
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
+import org.apache.commons.text.StringSubstitutor;
 
 public class EscalationForm {
     @RequiredArgsConstructor
     public static class Receiver implements StubWithResult.Receiver<EscalationForm> {
-        private final static ObjectMapper objectMapper = new ObjectMapper();
+        private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
         private final Ticket ticket;
 
@@ -26,7 +24,8 @@ public class EscalationForm {
 
         @Override
         public EscalationForm assertAndExtractResult(ServeEvent servedStub) {
-            String rawView = servedStub.getRequest().formParameter("view").getValues().getFirst();
+            String rawView =
+                    servedStub.getRequest().formParameter("view").getValues().getFirst();
             String expectedView = buildExpectedViewJson();
             assertThatJson(rawView).isEqualTo(expectedView);
             return new EscalationForm();
@@ -34,33 +33,25 @@ public class EscalationForm {
 
         private String buildExpectedViewJson() {
             String tagOptions = ticket.config().tags().stream()
-                .map(tag -> String.format(
-                    """
+                    .map(tag -> String.format("""
                         {
                           "text": {"type": "plain_text", "text": %s},
                           "value": %s
-                        }""",
-                    safeJson(tag.label()),
-                    safeJson(tag.code())
-                ))
-                .collect(Collectors.joining(",\n"));
+                        }""", safeJson(tag.label()), safeJson(tag.code())))
+                    .collect(Collectors.joining(",\n"));
 
             String teamOptions = ticket.config().escalationTeams().stream()
-                .map(team -> String.format(
-                    """
+                    .map(team -> String.format("""
                         {
                           "text": {"type": "plain_text", "text": %s},
                           "value": %s
-                        }""",
-                    safeJson(team.label()),
-                    safeJson(team.code())
-                ))
-                .collect(Collectors.joining(",\n"));
+                        }""", safeJson(team.label()), safeJson(team.code())))
+                    .collect(Collectors.joining(",\n"));
 
             String privateMetadataQuoted = safeJson(String.format("{\"ticketId\":%d}", ticket.id()));
 
             return StringSubstitutor.replace(
-                """
+                    """
                 {
                   "type": "modal",
                   "title": { "type": "plain_text", "text": ${titleText}, "emoji": false },
@@ -95,23 +86,19 @@ public class EscalationForm {
                   "private_metadata": ${privateMetadata}
                 }
                 """,
-                Map.of(
-                    "titleText", safeJson("Escalate Ticket ID-" + ticket.id()),
-                    "tagOptions", tagOptions,
-                    "teamOptions", teamOptions,
-                    "privateMetadata", privateMetadataQuoted
-                )
-            );
+                    Map.of(
+                            "titleText", safeJson("Escalate Ticket ID-" + ticket.id()),
+                            "tagOptions", tagOptions,
+                            "teamOptions", teamOptions,
+                            "privateMetadata", privateMetadataQuoted));
         }
 
         private String safeJson(String value) {
             try {
-                return objectMapper.writeValueAsString(value);
+                return OBJECT_MAPPER.writeValueAsString(value);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         }
     }
 }
-
-

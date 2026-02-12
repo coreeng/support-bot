@@ -7,6 +7,4 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @EnableConfigurationProperties(SupportLeadershipTeamProps.class)
 @RequiredArgsConstructor
-public class SupportLeadershipTeamConfig {
-
-}
+public class SupportLeadershipTeamConfig {}

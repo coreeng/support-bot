@@ -601,3 +601,5 @@ ui/.next/
 bin
 .classpath
 .project
+
+.vscode

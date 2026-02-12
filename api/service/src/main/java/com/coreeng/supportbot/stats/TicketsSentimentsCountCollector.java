@@ -20,10 +20,11 @@ public class TicketsSentimentsCountCollector implements StatsCollector<StatsRequ
 
     @Override
     public StatsResult calculateResults(StatsRequest.TicketSentimentCounts request) {
-        ImmutableList<TicketSentimentCountPerDate> results = sentimentRepository.countBetweenDates(request.from(), request.to());
+        ImmutableList<TicketSentimentCountPerDate> results =
+                sentimentRepository.countBetweenDates(request.from(), request.to());
         return StatsResult.TicketSentimentCounts.builder()
-            .request(request)
-            .values(results)
-            .build();
+                .request(request)
+                .values(results)
+                .build();
     }
 }

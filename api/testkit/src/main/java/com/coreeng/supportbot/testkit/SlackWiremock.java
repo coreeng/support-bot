@@ -1,21 +1,5 @@
 package com.coreeng.supportbot.testkit;
 
-import java.net.Socket;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
-
-import org.apache.commons.text.StringSubstitutor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-
-import com.coreeng.supportbot.testkit.matcher.UrlDecodedPattern;
-import com.github.tomakehurst.wiremock.WireMockServer;
-import com.github.tomakehurst.wiremock.client.WireMock;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.and;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
@@ -25,26 +9,36 @@ import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
+import com.coreeng.supportbot.testkit.matcher.UrlDecodedPattern;
+import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.stubbing.StubMapping;
-
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import org.apache.commons.text.StringSubstitutor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Wiremock implementation for Slack service.
  * Handles mocking of Slack API endpoints.
  */
 public class SlackWiremock extends WireMockServer {
-    private static final Logger logger = LoggerFactory.getLogger(SlackWiremock.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(SlackWiremock.class);
 
     private final Config.SlackMock config;
     private final Set<UUID> permanentStubIds = new HashSet<>();
 
     public SlackWiremock(Config.SlackMock config) {
         super(WireMockConfiguration.options()
-            .port(config.port())
-            .globalTemplating(true)
-            .maxRequestJournalEntries(1000)
-            .extensions(new MessageTsHelperExtension()));
+                .port(config.port())
+                .globalTemplating(true)
+                .maxRequestJournalEntries(1000)
+                .extensions(new MessageTsHelperExtension()));
         this.config = config;
     }
 
@@ -53,23 +47,23 @@ public class SlackWiremock extends WireMockServer {
         super.start();
         setupAppInitMocks();
         capturePermanentStubs();
-        logger.info("Started Slack Wiremock server on port {}", this.port());
+        LOGGER.info("Started Slack Wiremock server on port {}", this.port());
     }
 
     @Override
     public void stop() {
         super.stop();
-        logger.info("Stopped Slack Wiremock server");
+        LOGGER.info("Stopped Slack Wiremock server");
     }
 
     private void setupAppInitMocks() {
-        logger.info("Setting up initial Slack API stubs");
+        LOGGER.info("Setting up initial Slack API stubs");
         stubAuthTest("initial mock");
     }
 
     private void capturePermanentStubs() {
         getStubMappings().forEach(stub -> permanentStubIds.add(stub.getId()));
-        logger.info("Captured {} permanent stubs", permanentStubIds.size());
+        LOGGER.info("Captured {} permanent stubs", permanentStubIds.size());
     }
 
     /**
@@ -80,13 +74,13 @@ public class SlackWiremock extends WireMockServer {
      */
     public void assertNoTestStubsRemaining() {
         List<StubMapping> remainingTestStubs = getStubMappings().stream()
-            .filter(stub -> !permanentStubIds.contains(stub.getId()))
-            .toList();
+                .filter(stub -> !permanentStubIds.contains(stub.getId()))
+                .toList();
 
         if (!remainingTestStubs.isEmpty()) {
             String details = remainingTestStubs.stream()
-                .map(s -> "  - " + s.getName() + " (" + s.getRequest().getUrl() + ")")
-                .collect(Collectors.joining("\n"));
+                    .map(s -> "  - " + s.getName() + " (" + s.getRequest().getUrl() + ")")
+                    .collect(Collectors.joining("\n"));
             fail("Test left %d stubs uncleaned:\n%s".formatted(remainingTestStubs.size(), details));
         }
     }
@@ -97,15 +91,15 @@ public class SlackWiremock extends WireMockServer {
      */
     public void cleanupTestStubs() {
         List<StubMapping> testStubs = getStubMappings().stream()
-            .filter(stub -> !permanentStubIds.contains(stub.getId()))
-            .toList();
+                .filter(stub -> !permanentStubIds.contains(stub.getId()))
+                .toList();
 
         for (StubMapping stub : testStubs) {
             removeStubMapping(stub);
         }
 
         if (!testStubs.isEmpty()) {
-            logger.debug("Cleaned up {} test stubs", testStubs.size());
+            LOGGER.debug("Cleaned up {} test stubs", testStubs.size());
         }
     }
 
@@ -120,8 +114,8 @@ public class SlackWiremock extends WireMockServer {
 
         if (!unmatchedRequests.isEmpty()) {
             String details = unmatchedRequests.stream()
-                .map(req -> "  - " + req.getMethod().getName() + " " + req.getUrl())
-                .collect(Collectors.joining("\n"));
+                    .map(req -> "  - " + req.getMethod().getName() + " " + req.getUrl())
+                    .collect(Collectors.joining("\n"));
             fail("Test had %d unhandled requests:\n%s".formatted(unmatchedRequests.size(), details));
         }
     }
@@ -132,19 +126,19 @@ public class SlackWiremock extends WireMockServer {
     public void clearRequestJournal() {
         resetRequests();
 
-        logger.debug("Cleared request journal");
+        LOGGER.debug("Cleared request journal");
     }
 
     public void stubAuthTest(String description) {
         givenThat(post("/api/auth.test")
-            .withName(description)
-            .willReturn(okJson(new StringSubstitutor(Map.of(
-                "url", config.serverUrl(),
-                "team", config.team(),
-                "teamId", config.teamId(),
-                "userId", config.supportBotUserId(),
-                "botId", config.supportBotId()
-            )).replace("""
+                .withName(description)
+                .willReturn(okJson(new StringSubstitutor(Map.of(
+                                "url", config.serverUrl(),
+                                "team", config.team(),
+                                "teamId", config.teamId(),
+                                "userId", config.supportBotUserId(),
+                                "botId", config.supportBotId()))
+                        .replace("""
                 {
                   "ok":true,
                   "url":"${url}",
@@ -159,28 +153,27 @@ public class SlackWiremock extends WireMockServer {
     public Stub stubConversationsOpen(String description, String expectedUserId) {
         String channelId = "D" + expectedUserId;
         StubMapping stubMapping = givenThat(post("/api/conversations.open")
-            .withName(description)
-            .withFormParam("users", equalTo(expectedUserId))
-            .willReturn(okJson("""
+                .withName(description)
+                .withFormParam("users", equalTo(expectedUserId))
+                .willReturn(okJson("""
                 {
                   "ok": true,
                   "channel": {
                     "id": "%s"
                   }
-                }""".formatted(channelId)))
-        );
+                }""".formatted(channelId))));
         return Stub.builder()
-            .mapping(stubMapping)
-            .wireMockServer(this)
-            .description(description)
-            .build();
+                .mapping(stubMapping)
+                .wireMockServer(this)
+                .description(description)
+                .build();
     }
 
     public Stub stubChatPostMessage(String description, String expectedChannelId) {
         StubMapping stubMapping = givenThat(post("/api/chat.postMessage")
-            .withName(description)
-            .withFormParam("channel", equalTo(expectedChannelId))
-            .willReturn(okJson("""
+                .withName(description)
+                .withFormParam("channel", equalTo(expectedChannelId))
+                .willReturn(okJson("""
                 {
                   "ok": true,
                   "channel": "%s",
@@ -189,60 +182,59 @@ public class SlackWiremock extends WireMockServer {
                     "type": "message",
                     "text": "UNSET_BY_TESTS"
                   }
-                }""".formatted(expectedChannelId)))
-        );
+                }""".formatted(expectedChannelId))));
         return Stub.builder()
-            .mapping(stubMapping)
-            .wireMockServer(this)
-            .description(description)
-            .build();
+                .mapping(stubMapping)
+                .wireMockServer(this)
+                .description(description)
+                .build();
     }
 
     public Stub stubReactionAdd(ReactionAddedExpectation expectation) {
         StubMapping stubMapping = givenThat(post("/api/reactions.add")
-            .withName(expectation.description())
-            .withFormParam("name", equalTo(expectation.reaction()))
-            .withFormParam("channel", equalTo(expectation.channelId()))
-            .withFormParam("timestamp", equalTo(expectation.ts().toString()))
-            .willReturn(okJson("""
+                .withName(expectation.description())
+                .withFormParam("name", equalTo(expectation.reaction()))
+                .withFormParam("channel", equalTo(expectation.channelId()))
+                .withFormParam("timestamp", equalTo(expectation.ts().toString()))
+                .willReturn(okJson("""
                 {"ok":true}
-                """))
-        );
+                """)));
         return Stub.builder()
-            .mapping(stubMapping)
-            .wireMockServer(this)
-            .description(expectation.description())
-            .build();
+                .mapping(stubMapping)
+                .wireMockServer(this)
+                .description(expectation.description())
+                .build();
     }
 
     public Stub stubReactionRemove(ReactionAddedExpectation expectation) {
         StubMapping stubMapping = givenThat(post("/api/reactions.remove")
-            .withName(expectation.description())
-            .withFormParam("name", equalTo(expectation.reaction()))
-            .withFormParam("channel", equalTo(expectation.channelId()))
-            .withFormParam("timestamp", equalTo(expectation.ts().toString()))
-            .willReturn(okJson("""
+                .withName(expectation.description())
+                .withFormParam("name", equalTo(expectation.reaction()))
+                .withFormParam("channel", equalTo(expectation.channelId()))
+                .withFormParam("timestamp", equalTo(expectation.ts().toString()))
+                .willReturn(okJson("""
                 {"ok":true}
-                """))
-        );
+                """)));
         return Stub.builder()
-            .mapping(stubMapping)
-            .wireMockServer(this)
-            .description(expectation.description())
-            .build();
+                .mapping(stubMapping)
+                .wireMockServer(this)
+                .description(expectation.description())
+                .build();
     }
 
     public <T> StubWithResult<T> stubMessagePosted(ThreadMessagePostedExpectation<T> expectation) {
-        StubMapping mapping = givenThat(expectation.receiver().configureStub(post("/api/chat.postMessage"))
-            .withName(expectation.description())
-            .withFormParam("channel", equalTo(expectation.channelId()))
-            .withFormParam("thread_ts", equalTo(expectation.threadTs().toString()))
-            .willReturn(aResponse()
-                .withTransformers("response-template")
-                .withStatus(200)
-                .withHeader("Content-Type", "application/json")
-                .withTransformerParameter("newTs", expectation.newMessageTs())
-                .withBody("""
+        StubMapping mapping = givenThat(expectation
+                .receiver()
+                .configureStub(post("/api/chat.postMessage"))
+                .withName(expectation.description())
+                .withFormParam("channel", equalTo(expectation.channelId()))
+                .withFormParam("thread_ts", equalTo(expectation.threadTs().toString()))
+                .willReturn(aResponse()
+                        .withTransformers("response-template")
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withTransformerParameter("newTs", expectation.newMessageTs())
+                        .withBody("""
                     {{formData request.body 'formArgs' urlDecode=true}}
                     {
                       "ok": true,
@@ -262,26 +254,28 @@ public class SlackWiremock extends WireMockServer {
                         "blocks": {{formArgs.blocks}}
                       }
                     }
-                    """))
-        );
+                    """)));
         return StubWithResult.<T>builder()
-            .mapping(mapping)
-            .wireMockServer(this)
-            .receiver(expectation.receiver())
-            .description(expectation.description())
-            .build();
+                .mapping(mapping)
+                .wireMockServer(this)
+                .receiver(expectation.receiver())
+                .description(expectation.description())
+                .build();
     }
 
     public <T> StubWithResult<T> stubMessageUpdated(MessageUpdatedExpectation<T> expectation) {
-        StubMapping stubMapping = givenThat(expectation.receiver().configureStub(post("/api/chat.update"))
-            .withName(expectation.description())
-            .withFormParam("channel", equalTo(expectation.channelId()))
-            .withFormParam("ts", equalTo(expectation.ts().toString()))
-            .willReturn(aResponse()
-                .withTransformers("response-template")
-                .withStatus(200)
-                .withHeader("Content-Type", "application/json")
-                .withBody(StringSubstitutor.replace("""
+        StubMapping stubMapping = givenThat(expectation
+                .receiver()
+                .configureStub(post("/api/chat.update"))
+                .withName(expectation.description())
+                .withFormParam("channel", equalTo(expectation.channelId()))
+                .withFormParam("ts", equalTo(expectation.ts().toString()))
+                .willReturn(aResponse()
+                        .withTransformers("response-template")
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(StringSubstitutor.replace(
+                                """
                     {{formData request.body 'formArgs' urlDecode=true}}
                     {
                       "ok": true,
@@ -303,38 +297,36 @@ public class SlackWiremock extends WireMockServer {
                         "blocks": {{formArgs.blocks}}
                       }
                     }
-                    """, Map.of(
-                        "thread_ts", expectation.threadTs().toString()
-                    )))));
+                    """, Map.of("thread_ts", expectation.threadTs().toString())))));
         return StubWithResult.<T>builder()
-            .mapping(stubMapping)
-            .wireMockServer(this)
-            .receiver(expectation.receiver())
-            .description(expectation.description())
-            .build();
+                .mapping(stubMapping)
+                .wireMockServer(this)
+                .receiver(expectation.receiver())
+                .description(expectation.description())
+                .build();
     }
 
     public Stub stubGetPermalink(String description, String channelId, MessageTs ts, String permalink) {
         StubMapping stubMapping = givenThat(post("/api/chat.getPermalink")
-            .withName(description)
-            .withFormParam("channel", equalTo(channelId))
-            .withFormParam("message_ts", equalTo(ts.toString()))
-            .willReturn(okJson(StringSubstitutor.replace("""
+                .withName(description)
+                .withFormParam("channel", equalTo(channelId))
+                .withFormParam("message_ts", equalTo(ts.toString()))
+                .willReturn(okJson(StringSubstitutor.replace(
+                        """
                 {
                   "ok": true,
                   "channel": "${channelId}",
                   "permalink": "${permalink}"
                 }
-                """, Map.of(
-                "channelId", channelId,
-                "permalink", permalink
-            ))))
-        );
+                """,
+                        Map.of(
+                                "channelId", channelId,
+                                "permalink", permalink)))));
         return Stub.builder()
-            .mapping(stubMapping)
-            .wireMockServer(this)
-            .description(description)
-            .build();
+                .mapping(stubMapping)
+                .wireMockServer(this)
+                .description(description)
+                .build();
     }
 
     public Stub stubGetPermalink(String description, String channelId, MessageTs ts) {
@@ -342,7 +334,8 @@ public class SlackWiremock extends WireMockServer {
     }
 
     public Stub stubGetMessage(MessageToGet message) {
-        String responseJson = StringSubstitutor.replace("""
+        String responseJson = StringSubstitutor.replace(
+                """
             {
                 "ok": true,
                 "oldest": "${ts}",
@@ -359,33 +352,28 @@ public class SlackWiremock extends WireMockServer {
                     }
                 ]
             }
-            """, Map.of(
-            "userId", message.userId() != null
-                ? "\"" + message.userId() + "\""
-                : "null",
-            "botId", message.botId() != null
-                ? "\"" + message.botId() + "\""
-                : "null",
-            "text", message.text().replace("\"", "\\\""),
-            "team", config.team(),
-            "blocks", message.blocksJson(),
-            "ts", message.ts(),
-            "threadTs", message.threadTs()
-        ));
+            """,
+                Map.of(
+                        "userId", message.userId() != null ? "\"" + message.userId() + "\"" : "null",
+                        "botId", message.botId() != null ? "\"" + message.botId() + "\"" : "null",
+                        "text", message.text().replace("\"", "\\\""),
+                        "team", config.team(),
+                        "blocks", message.blocksJson(),
+                        "ts", message.ts(),
+                        "threadTs", message.threadTs()));
         StubMapping stubMapping = givenThat(post("/api/conversations.history")
-            .withName(message.description())
-            .withFormParam("channel", equalTo(message.channelId()))
-            .withFormParam("limit", equalTo("1"))
-            .withFormParam("oldest", equalTo(message.ts().toString()))
-            .withFormParam("inclusive", equalTo("1"))
-            .withFormParam("include_all_metadata", equalTo("0"))
-            .willReturn(okJson(responseJson))
-        );
+                .withName(message.description())
+                .withFormParam("channel", equalTo(message.channelId()))
+                .withFormParam("limit", equalTo("1"))
+                .withFormParam("oldest", equalTo(message.ts().toString()))
+                .withFormParam("inclusive", equalTo("1"))
+                .withFormParam("include_all_metadata", equalTo("0"))
+                .willReturn(okJson(responseJson)));
         return Stub.builder()
-            .mapping(stubMapping)
-            .wireMockServer(this)
-            .description(message.description())
-            .build();
+                .mapping(stubMapping)
+                .wireMockServer(this)
+                .description(message.description())
+                .build();
     }
 
     /**
@@ -398,7 +386,8 @@ public class SlackWiremock extends WireMockServer {
         // But in case there are multiple messages, it sets it for all of them,
         if (conversationReplies.reply() != null) {
             assertThat(conversationReplies.threadTs()).isNotNull();
-            messages = StringSubstitutor.replace("""
+            messages = StringSubstitutor.replace(
+                    """
                 [
                     {
                         "type": "message",
@@ -411,13 +400,14 @@ public class SlackWiremock extends WireMockServer {
                         "thread_ts": ${threadTsValue}
                     }
                 ]
-                """, Map.of(
-                    "ts", conversationReplies.ts().toString(),
-                    "threadTsValue", conversationReplies.threadTs().toString(),
-                    "replyTs", conversationReplies.reply().toString()
-            ));
+                """,
+                    Map.of(
+                            "ts", conversationReplies.ts().toString(),
+                            "threadTsValue", conversationReplies.threadTs().toString(),
+                            "replyTs", conversationReplies.reply().toString()));
         } else {
-            messages = StringSubstitutor.replace("""
+            messages = StringSubstitutor.replace(
+                    """
                 [
                     {
                         "type": "message",
@@ -425,36 +415,32 @@ public class SlackWiremock extends WireMockServer {
                         "thread_ts": null
                     }
                 ]
-                """, Map.of(
-                "ts", conversationReplies.ts().toString()
-            ));
+                """, Map.of("ts", conversationReplies.ts().toString()));
         }
         StubMapping stubMapping = givenThat(post("/api/conversations.replies")
-            .withName(conversationReplies.description())
-            .withFormParam("channel", equalTo(conversationReplies.channelId()))
-            .withFormParam("ts", equalTo(conversationReplies.ts().toString()))
-            .withFormParam("limit", equalTo("1"))
-            .willReturn(okJson(StringSubstitutor.replace("""
+                .withName(conversationReplies.description())
+                .withFormParam("channel", equalTo(conversationReplies.channelId()))
+                .withFormParam("ts", equalTo(conversationReplies.ts().toString()))
+                .withFormParam("limit", equalTo("1"))
+                .willReturn(okJson(StringSubstitutor.replace("""
                     {
                         "ok": true,
                         "messages": ${messages}
                     }
-                    """, Map.of(
-                        "messages", messages
-                    )))
-        ));
+                    """, Map.of("messages", messages)))));
         return Stub.builder()
-            .mapping(stubMapping)
-            .wireMockServer(this)
-            .description(conversationReplies.description())
-            .build();
+                .mapping(stubMapping)
+                .wireMockServer(this)
+                .description(conversationReplies.description())
+                .build();
     }
 
     public Stub stubGetUserProfileById(UserProfileToGet userProfile) {
         StubMapping stubMapping = givenThat(post("/api/users.info")
-            .withName(userProfile.description())
-            .withFormParam("user", equalTo(userProfile.userId()))
-            .willReturn(okJson(StringSubstitutor.replace("""
+                .withName(userProfile.description())
+                .withFormParam("user", equalTo(userProfile.userId()))
+                .willReturn(okJson(StringSubstitutor.replace(
+                        """
                 {
                     "ok": true,
                     "user": {
@@ -465,49 +451,52 @@ public class SlackWiremock extends WireMockServer {
                         }
                     }
                 }
-                """, Map.of(
-                    "userId", userProfile.userId(),
-                    "email", userProfile.email()
-                )))
-        ));
+                """,
+                        Map.of(
+                                "userId", userProfile.userId(),
+                                "email", userProfile.email())))));
         return Stub.builder()
-            .mapping(stubMapping)
-            .wireMockServer(this)
-            .description(userProfile.description())
-            .build();
+                .mapping(stubMapping)
+                .wireMockServer(this)
+                .description(userProfile.description())
+                .build();
     }
 
     public <T> StubWithResult<T> stubEphemeralMessagePosted(EphemeralMessageExpectation<T> expectation) {
-        StubMapping stubMapping = givenThat(expectation.receiver().configureStub(post("/api/chat.postEphemeral"))
-            .withName(expectation.description())
-            .withFormParam("channel", equalTo(expectation.channelId()))
-            .withFormParam("thread_ts", equalTo(expectation.threadTs().toString()))
-            .withFormParam("user", equalTo(expectation.userId()))
-            .willReturn(okJson("""
+        StubMapping stubMapping = givenThat(expectation
+                .receiver()
+                .configureStub(post("/api/chat.postEphemeral"))
+                .withName(expectation.description())
+                .withFormParam("channel", equalTo(expectation.channelId()))
+                .withFormParam("thread_ts", equalTo(expectation.threadTs().toString()))
+                .withFormParam("user", equalTo(expectation.userId()))
+                .willReturn(okJson("""
                 {"ok": true, "message_ts": "1234567890.123456"}
-                """))
-        );
+                """)));
         return StubWithResult.<T>builder()
-            .mapping(stubMapping)
-            .wireMockServer(this)
-            .receiver(expectation.receiver())
-            .description(expectation.description())
-            .build();
+                .mapping(stubMapping)
+                .wireMockServer(this)
+                .receiver(expectation.receiver())
+                .description(expectation.description())
+                .build();
     }
 
     public <T> StubWithResult<T> stubViewsOpen(ViewsOpenExpectation<T> expectation) {
-        StubMapping mapping = givenThat(expectation.receiver().configureStub(post("/api/views.open"))
-            .withName(expectation.description())
-            .withFormParam("trigger_id", equalTo(expectation.triggerId()))
-            .withFormParam("view", new UrlDecodedPattern(and(
-                matchingJsonPath("$.type", equalTo(expectation.viewType())),
-                matchingJsonPath("$.callback_id", equalTo(expectation.viewCallbackId()))
-            )))
-            .willReturn(aResponse()
-                .withTransformers("response-template")
-                .withStatus(200)
-                .withHeader("Content-Type", "application/json")
-                .withBody("""
+        StubMapping mapping = givenThat(expectation
+                .receiver()
+                .configureStub(post("/api/views.open"))
+                .withName(expectation.description())
+                .withFormParam("trigger_id", equalTo(expectation.triggerId()))
+                .withFormParam(
+                        "view",
+                        new UrlDecodedPattern(and(
+                                matchingJsonPath("$.type", equalTo(expectation.viewType())),
+                                matchingJsonPath("$.callback_id", equalTo(expectation.viewCallbackId())))))
+                .willReturn(aResponse()
+                        .withTransformers("response-template")
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
                     {{formData request.body 'formArgs' urlDecode=true}}
                     {{parseJson formArgs.view 'formArgView'}}
                     {
@@ -530,14 +519,13 @@ public class SlackWiremock extends WireMockServer {
                         "submit": {{toJson formArgView.submit}}
                       }
                     }
-                    """))
-        );
+                    """)));
         return StubWithResult.<T>builder()
-            .mapping(mapping)
-            .wireMockServer(this)
-            .receiver(expectation.receiver())
-            .description(expectation.description())
-            .build();
+                .mapping(mapping)
+                .wireMockServer(this)
+                .receiver(expectation.receiver())
+                .description(expectation.description())
+                .build();
     }
 
     /**
@@ -561,14 +549,14 @@ public class SlackWiremock extends WireMockServer {
          */
         public void stubTicketFormPosted() {
             givenThat(post("/api/chat.postMessage")
-                .withName("permanent-ticket-form-posted")
-                // Match any channel - permanent stubs are broad
-                .willReturn(aResponse()
-                    .withTransformers("response-template")
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withUniformRandomDelay(300, 350)
-                    .withBody("""
+                    .withName("permanent-ticket-form-posted")
+                    // Match any channel - permanent stubs are broad
+                    .willReturn(aResponse()
+                            .withTransformers("response-template")
+                            .withStatus(200)
+                            .withHeader("Content-Type", "application/json")
+                            .withUniformRandomDelay(300, 350)
+                            .withBody("""
                         {{formData request.body 'formArgs' urlDecode=true}}
                         {{#assign 'generatedTs'}}{{messageTs}}{{/assign}}
                         {
@@ -588,7 +576,7 @@ public class SlackWiremock extends WireMockServer {
                           }
                         }
                         """)));
-            logger.info("Set up permanent stub for chat.postMessage (ticket form)");
+            LOGGER.info("Set up permanent stub for chat.postMessage (ticket form)");
         }
 
         /**
@@ -598,13 +586,13 @@ public class SlackWiremock extends WireMockServer {
          */
         public void stubMessageUpdated() {
             givenThat(post("/api/chat.update")
-                .withName("permanent-message-updated")
-                .willReturn(aResponse()
-                    .withTransformers("response-template")
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withUniformRandomDelay(300, 400)
-                    .withBody("""
+                    .withName("permanent-message-updated")
+                    .willReturn(aResponse()
+                            .withTransformers("response-template")
+                            .withStatus(200)
+                            .withHeader("Content-Type", "application/json")
+                            .withUniformRandomDelay(300, 400)
+                            .withBody("""
                         {{formData request.body 'formArgs' urlDecode=true}}
                         {
                           "ok": true,
@@ -621,7 +609,7 @@ public class SlackWiremock extends WireMockServer {
                           }
                         }
                         """)));
-            logger.info("Set up permanent stub for chat.update");
+            LOGGER.info("Set up permanent stub for chat.update");
         }
 
         /**
@@ -631,13 +619,13 @@ public class SlackWiremock extends WireMockServer {
          */
         public void stubViewsOpen() {
             givenThat(post("/api/views.open")
-                .withName("permanent-views-open")
-                .willReturn(aResponse()
-                    .withTransformers("response-template")
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withUniformRandomDelay(80, 120)
-                    .withBody("""
+                    .withName("permanent-views-open")
+                    .willReturn(aResponse()
+                            .withTransformers("response-template")
+                            .withStatus(200)
+                            .withHeader("Content-Type", "application/json")
+                            .withUniformRandomDelay(80, 120)
+                            .withBody("""
                         {{formData request.body 'formArgs' urlDecode=true}}
                         {{parseJson formArgs.view 'formArgView'}}
                         {
@@ -661,7 +649,7 @@ public class SlackWiremock extends WireMockServer {
                           }
                         }
                         """)));
-            logger.info("Set up permanent stub for views.open");
+            LOGGER.info("Set up permanent stub for views.open");
         }
 
         /**
@@ -670,15 +658,15 @@ public class SlackWiremock extends WireMockServer {
          */
         public void stubReactionAdd() {
             givenThat(post("/api/reactions.add")
-                .withName("permanent-reaction-add")
-                .willReturn(aResponse()
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withUniformRandomDelay(100, 150)
-                    .withBody("""
+                    .withName("permanent-reaction-add")
+                    .willReturn(aResponse()
+                            .withStatus(200)
+                            .withHeader("Content-Type", "application/json")
+                            .withUniformRandomDelay(100, 150)
+                            .withBody("""
                         {"ok": true}
                         """)));
-            logger.info("Set up permanent stub for reactions.add");
+            LOGGER.info("Set up permanent stub for reactions.add");
         }
 
         /**
@@ -687,13 +675,13 @@ public class SlackWiremock extends WireMockServer {
          */
         public void stubGetPermalink() {
             givenThat(post("/api/chat.getPermalink")
-                .withName("permanent-get-permalink")
-                .willReturn(aResponse()
-                    .withTransformers("response-template")
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withUniformRandomDelay(50, 80)
-                    .withBody("""
+                    .withName("permanent-get-permalink")
+                    .willReturn(aResponse()
+                            .withTransformers("response-template")
+                            .withStatus(200)
+                            .withHeader("Content-Type", "application/json")
+                            .withUniformRandomDelay(50, 80)
+                            .withBody("""
                         {{formData request.body 'formArgs' urlDecode=true}}
                         {
                           "ok": true,
@@ -701,7 +689,7 @@ public class SlackWiremock extends WireMockServer {
                           "permalink": "https://slack.com/messages/{{formArgs.channel}}/{{formArgs.message_ts}}"
                         }
                         """)));
-            logger.info("Set up permanent stub for chat.getPermalink");
+            LOGGER.info("Set up permanent stub for chat.getPermalink");
         }
 
         /**
@@ -710,13 +698,13 @@ public class SlackWiremock extends WireMockServer {
          */
         public void stubGetMessage() {
             givenThat(post("/api/conversations.history")
-                .withName("permanent-get-message")
-                .willReturn(aResponse()
-                    .withTransformers("response-template")
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withUniformRandomDelay(100, 150)
-                    .withBody(StringSubstitutor.replace("""
+                    .withName("permanent-get-message")
+                    .willReturn(aResponse()
+                            .withTransformers("response-template")
+                            .withStatus(200)
+                            .withHeader("Content-Type", "application/json")
+                            .withUniformRandomDelay(100, 150)
+                            .withBody(StringSubstitutor.replace("""
                         {{formData request.body 'formArgs' urlDecode=true}}
                         {
                           "ok": true,
@@ -733,10 +721,8 @@ public class SlackWiremock extends WireMockServer {
                             }
                           ]
                         }
-                        """, Map.of(
-                            "team", config.team()
-                        )))));
-            logger.info("Set up permanent stub for conversations.history");
+                        """, Map.of("team", config.team())))));
+            LOGGER.info("Set up permanent stub for conversations.history");
         }
 
         /**
@@ -745,13 +731,13 @@ public class SlackWiremock extends WireMockServer {
          */
         public void stubConversationsReplies() {
             givenThat(post("/api/conversations.replies")
-                .withName("permanent-conversations-replies")
-                .willReturn(aResponse()
-                    .withTransformers("response-template")
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withUniformRandomDelay(100, 150)
-                    .withBody("""
+                    .withName("permanent-conversations-replies")
+                    .willReturn(aResponse()
+                            .withTransformers("response-template")
+                            .withStatus(200)
+                            .withHeader("Content-Type", "application/json")
+                            .withUniformRandomDelay(100, 150)
+                            .withBody("""
                         {{formData request.body 'formArgs' urlDecode=true}}
                         {
                           "ok": true,
@@ -764,7 +750,7 @@ public class SlackWiremock extends WireMockServer {
                           ]
                         }
                         """)));
-            logger.info("Set up permanent stub for conversations.replies");
+            LOGGER.info("Set up permanent stub for conversations.replies");
         }
 
         /**
@@ -773,15 +759,15 @@ public class SlackWiremock extends WireMockServer {
          */
         public void stubEphemeralMessage() {
             givenThat(post("/api/chat.postEphemeral")
-                .withName("permanent-ephemeral-message")
-                .willReturn(aResponse()
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withUniformRandomDelay(120, 200)
-                    .withBody("""
+                    .withName("permanent-ephemeral-message")
+                    .willReturn(aResponse()
+                            .withStatus(200)
+                            .withHeader("Content-Type", "application/json")
+                            .withUniformRandomDelay(120, 200)
+                            .withBody("""
                         {"ok": true, "message_ts": "1234567890.123456"}
                         """)));
-            logger.info("Set up permanent stub for chat.postEphemeral");
+            LOGGER.info("Set up permanent stub for chat.postEphemeral");
         }
 
         /**
@@ -790,13 +776,13 @@ public class SlackWiremock extends WireMockServer {
          */
         public void stubUsersInfo() {
             givenThat(post("/api/users.info")
-                .withName("permanent-users-info")
-                .willReturn(aResponse()
-                    .withTransformers("response-template")
-                    .withStatus(200)
-                    .withHeader("Content-Type", "application/json")
-                    .withUniformRandomDelay(40, 60)
-                    .withBody("""
+                    .withName("permanent-users-info")
+                    .willReturn(aResponse()
+                            .withTransformers("response-template")
+                            .withStatus(200)
+                            .withHeader("Content-Type", "application/json")
+                            .withUniformRandomDelay(40, 60)
+                            .withBody("""
                         {{formData request.body 'formArgs' urlDecode=true}}
                         {
                           "ok": true,
@@ -809,7 +795,7 @@ public class SlackWiremock extends WireMockServer {
                           }
                         }
                         """)));
-            logger.info("Set up permanent stub for users.info");
+            LOGGER.info("Set up permanent stub for users.info");
         }
 
         /**
@@ -826,7 +812,7 @@ public class SlackWiremock extends WireMockServer {
             stubConversationsReplies();
             stubEphemeralMessage();
             stubUsersInfo();
-            logger.info("Set up all permanent NFT stubs");
+            LOGGER.info("Set up all permanent NFT stubs");
         }
     }
 }

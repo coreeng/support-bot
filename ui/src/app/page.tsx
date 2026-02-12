@@ -1,13 +1,13 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import StatsPage from '@/components/stats/stats'
 import TicketsPage from '@/components/tickets/tickets'
 import EscalationsPage from '@/components/escalations/escalations'
 import HealthPage from '@/components/health/health'
 import { AlertCircle, BarChart2, Home, Ticket, Headphones, ChevronDown, ChevronRight, ChevronLeft, LogOut } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import Image from 'next/image'
 import DashboardsPage from '@/components/dashboards/dashboards'
@@ -61,16 +61,15 @@ export default function Dashboard() {
         return true
     })
 
-    // Ensure activeSupportSubTab is valid
-    useEffect(() => {
-        if (!supportTabs.some(tab => tab.key === activeSupportSubTab)) {
-            setActiveSupportSubTab('home')
-        }
-    }, [supportTabs, activeSupportSubTab])
+    // Compute effective tab - fallback to 'home' if current tab is not in available tabs
+    const effectiveTab = supportTabs.some(tab => tab.key === activeSupportSubTab)
+        ? activeSupportSubTab
+        : 'home'
 
 
-    // Show loading state (AuthGuard handles redirect for unauthenticated users)
-    if (isLoading || !isAuthenticated || !user) {
+    // Show loading state while session is being fetched
+    // Note: proxy.ts redirects unauthenticated users to /login before this page renders
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center h-screen bg-gray-50">
                 <div className="text-center">
@@ -140,7 +139,7 @@ export default function Dashboard() {
                             {supportExpanded && !sidebarCollapsed && (
                                 <div className="bg-gray-800/50">
                                     {supportTabs.map(tab => {
-                                        const isActive = activeSupportSubTab === tab.key
+                                        const isActive = effectiveTab === tab.key
                                         return (
                                             <button
                                                 key={tab.key}
@@ -232,12 +231,12 @@ export default function Dashboard() {
                 <div className="flex-1 overflow-auto">
                     {/* Content */}
                     <div className="h-full">
-                        {activeSupportSubTab === 'home' && <StatsPage />}
-                        {activeSupportSubTab === 'tickets' && <TicketsPage />}
-                        {activeSupportSubTab === 'escalations' && <EscalationsPage />}
-                        {activeSupportSubTab === 'knowledge-gaps' && isKnowledgeGapsEnabled && <KnowledgeGapsPage />}
-                        {activeSupportSubTab === 'health' && hasFullAccess && <HealthPage />}
-                        {activeSupportSubTab === 'sla' && <DashboardsPage />}
+                        {effectiveTab === 'home' && <StatsPage />}
+                        {effectiveTab === 'tickets' && <TicketsPage />}
+                        {effectiveTab === 'escalations' && <EscalationsPage />}
+                        {effectiveTab === 'knowledge-gaps' && isKnowledgeGapsEnabled && <KnowledgeGapsPage />}
+                        {effectiveTab === 'health' && hasFullAccess && <HealthPage />}
+                        {effectiveTab === 'sla' && <DashboardsPage />}
                     </div>
                 </div>
             </div>

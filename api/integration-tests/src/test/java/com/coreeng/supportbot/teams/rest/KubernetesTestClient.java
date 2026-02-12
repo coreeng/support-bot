@@ -7,21 +7,20 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import io.fabric8.kubernetes.client.LocalPortForward;
 import io.fabric8.kubernetes.client.dsl.NonDeletingOperation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.net.Socket;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class KubernetesTestClient implements AutoCloseable {
 
-    private static final Logger logger = LoggerFactory.getLogger(KubernetesTestClient.class);
-    
-    private static final int deploymentTimeoutMinutes = 10;
-    private static final int portForwardTimeoutSeconds = 120;
-    private static final int portForwardRetryIntervalMs = 1000;
-    
+    private static final Logger LOGGER = LoggerFactory.getLogger(KubernetesTestClient.class);
+
+    private static final int DEPLOYMENT_TIMEOUT_MINUTES = 10;
+    private static final int PORT_FORWARD_TIMEOUT_SECONDS = 120;
+    private static final int PORT_FORWARD_RETRY_INTERVAL_MS = 1000;
+
     private final KubernetesClient client;
     private LocalPortForward localPortForward;
 
@@ -30,32 +29,38 @@ public class KubernetesTestClient implements AutoCloseable {
     }
 
     public void waitUntilDeploymentReady(String deploymentName, String namespace) {
-        logger.info("Waiting for deployment {} to be ready...", deploymentName);
+        LOGGER.info("Waiting for deployment {} to be ready...", deploymentName);
         try {
-            client.apps().deployments().inNamespace(namespace).withName(deploymentName)
-                .waitUntilReady(deploymentTimeoutMinutes, TimeUnit.MINUTES);
-            logger.info("Deployment {} ready.", deploymentName);
+            client.apps()
+                    .deployments()
+                    .inNamespace(namespace)
+                    .withName(deploymentName)
+                    .waitUntilReady(DEPLOYMENT_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+            LOGGER.info("Deployment {} ready.", deploymentName);
         } catch (Exception e) {
             throw new RuntimeException("Deployment " + deploymentName + " failed to become ready within timeout", e);
         }
     }
 
     public Pod getPodForDeployment(String deploymentName, String namespace) {
-        logger.info("Getting pod for deployment {}...", deploymentName);
+        LOGGER.info("Getting pod for deployment {}...", deploymentName);
         try {
-            var pods = client.pods().inNamespace(namespace)
-                .withLabel("app.kubernetes.io/name", deploymentName)
-                .list().getItems();
-            
+            var pods = client.pods()
+                    .inNamespace(namespace)
+                    .withLabel("app.kubernetes.io/name", deploymentName)
+                    .list()
+                    .getItems();
+
             if (pods.isEmpty()) {
                 throw new RuntimeException("No pods found for deployment " + deploymentName);
             }
-            
+
             Pod pod = pods.getFirst();
             if (!"Running".equals(pod.getStatus().getPhase())) {
-                throw new RuntimeException("Pod for deployment " + deploymentName + " is not running. Current phase: " + pod.getStatus().getPhase());
+                throw new RuntimeException("Pod for deployment " + deploymentName + " is not running. Current phase: "
+                        + pod.getStatus().getPhase());
             }
-            logger.info("Pod {} is running.", pod.getMetadata().getName());
+            LOGGER.info("Pod {} is running.", pod.getMetadata().getName());
             return pod;
         } catch (Exception e) {
             throw new RuntimeException("Failed to get pod for deployment " + deploymentName, e);
@@ -63,29 +68,35 @@ public class KubernetesTestClient implements AutoCloseable {
     }
 
     public String getDeploymentLogs(String name, String namespace) {
-        logger.info("Getting deployment logs for {}...", name);
+        LOGGER.info("Getting deployment logs for {}...", name);
         try {
-            return client.apps().deployments().inNamespace(namespace).withName(name).getLog(true);
+            return client.apps()
+                    .deployments()
+                    .inNamespace(namespace)
+                    .withName(name)
+                    .getLog(true);
         } catch (Exception e) {
-            logger.warn("Failed to retrieve logs for deployment {}: {}", name, e.getMessage());
+            LOGGER.warn("Failed to retrieve logs for deployment {}: {}", name, e.getMessage());
             return "[Failed to retrieve logs: " + e.getMessage() + "]";
         }
     }
 
-    public void portForward(String podName, String namespace, int localPort, int remotePort) throws InterruptedException {
-        logger.info("Starting port-forward for pod {}...", podName);
-        localPortForward = client.pods().inNamespace(namespace).withName(podName).portForward(remotePort, localPort);
+    public void portForward(String podName, String namespace, int localPort, int remotePort)
+            throws InterruptedException {
+        LOGGER.info("Starting port-forward for pod {}...", podName);
+        localPortForward =
+                client.pods().inNamespace(namespace).withName(podName).portForward(remotePort, localPort);
 
         // Wait for port-forward to establish and be accessible
         boolean portForwardReady = false;
-        for (int i = 0; i < portForwardTimeoutSeconds; i++) {
+        for (int i = 0; i < PORT_FORWARD_TIMEOUT_SECONDS; i++) {
             try (Socket ignored = new Socket("localhost", localPort)) {
                 portForwardReady = true;
-                logger.info("Port-forward is ready.");
+                LOGGER.info("Port-forward is ready.");
                 break;
             } catch (IOException e) {
-                logger.info("Waiting for port-forward to be ready... (attempt {})", i + 1);
-                Thread.sleep(portForwardRetryIntervalMs);
+                LOGGER.info("Waiting for port-forward to be ready... (attempt {})", i + 1);
+                Thread.sleep(PORT_FORWARD_RETRY_INTERVAL_MS);
             }
         }
 
@@ -95,33 +106,37 @@ public class KubernetesTestClient implements AutoCloseable {
     }
 
     public void createOrUpdateConfigMap(String configMapName, String namespace, ConfigMapTeamData data) {
-        logger.info("Creating ConfigMap: name={}, namespace={}, data.name={}, data.groupRef={}", 
-                   configMapName, namespace, data.name(), data.groupRef());
+        LOGGER.info(
+                "Creating ConfigMap: name={}, namespace={}, data.name={}, data.groupRef={}",
+                configMapName,
+                namespace,
+                data.name(),
+                data.groupRef());
 
         try {
             ConfigMap configMap = new ConfigMapBuilder()
-                .withNewMetadata()
-                .withName(configMapName)
-                .withNamespace(namespace)
-                .endMetadata()
-                .addToData("name", data.name())
-                .addToData("groupRef", data.groupRef())
-                .build();
+                    .withNewMetadata()
+                    .withName(configMapName)
+                    .withNamespace(namespace)
+                    .endMetadata()
+                    .addToData("name", data.name())
+                    .addToData("groupRef", data.groupRef())
+                    .build();
 
             client.configMaps().inNamespace(namespace).resource(configMap).createOr(NonDeletingOperation::update);
-            logger.info("ConfigMap created.");
+            LOGGER.info("ConfigMap created.");
         } catch (Exception e) {
             throw new RuntimeException("Failed to create ConfigMap " + configMapName + " in namespace " + namespace, e);
         }
     }
 
     public void deleteConfigMap(String name, String namespace) {
-        logger.info("Deleting ConfigMap {} in namespace {}...", name, namespace);
+        LOGGER.info("Deleting ConfigMap {} in namespace {}...", name, namespace);
         try {
             client.configMaps().inNamespace(namespace).withName(name).delete();
-            logger.info("ConfigMap {} deleted.", name);
+            LOGGER.info("ConfigMap {} deleted.", name);
         } catch (Exception e) {
-            logger.warn("Failed to delete ConfigMap {}: {}", name, e.getMessage());
+            LOGGER.warn("Failed to delete ConfigMap {}: {}", name, e.getMessage());
         }
     }
 
@@ -130,16 +145,16 @@ public class KubernetesTestClient implements AutoCloseable {
         if (localPortForward != null) {
             try {
                 localPortForward.close();
-                logger.info("Port-forward closed.");
+                LOGGER.info("Port-forward closed.");
             } catch (IOException e) {
-                logger.error("Error closing port-forward: {}", e.getMessage());
+                LOGGER.error("Error closing port-forward: {}", e.getMessage());
             }
         }
         try {
             client.close();
-            logger.info("Kubernetes client closed.");
+            LOGGER.info("Kubernetes client closed.");
         } catch (Exception e) {
-            logger.error("Error closing Kubernetes client: {}", e.getMessage());
+            LOGGER.error("Error closing Kubernetes client: {}", e.getMessage());
         }
     }
 }

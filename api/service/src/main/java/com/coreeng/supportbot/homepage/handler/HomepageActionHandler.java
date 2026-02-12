@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.homepage.handler;
 
+import static com.slack.api.model.view.Views.view;
+
 import com.coreeng.supportbot.homepage.HomepageFilterMapper;
 import com.coreeng.supportbot.homepage.HomepageOperation;
 import com.coreeng.supportbot.homepage.HomepageService;
@@ -13,14 +15,11 @@ import com.slack.api.bolt.context.builtin.ActionContext;
 import com.slack.api.bolt.request.builtin.BlockActionRequest;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.request.views.ViewsOpenRequest;
+import java.io.IOException;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
-import java.util.regex.Pattern;
-
-import static com.slack.api.model.view.Views.view;
 
 @Component
 @RequiredArgsConstructor
@@ -33,7 +32,7 @@ public class HomepageActionHandler implements SlackBlockActionHandler {
 
     @Override
     public Pattern getPattern() {
-        return HomepageOperation.pattern;
+        return HomepageOperation.PATTERN;
     }
 
     @Override
@@ -46,52 +45,40 @@ public class HomepageActionHandler implements SlackBlockActionHandler {
                     HomepageView.State currentState = viewMapper.parseMetadataOrDefault(metadataJson);
                     HomepageView homepageView = homepageService.getTicketsView(currentState);
                     slackClient.updateHomeView(
-                        new SlackId.User(req.getPayload().getUser().getId()),
-                        viewMapper.render(homepageView)
-                    );
+                            new SlackId.User(req.getPayload().getUser().getId()), viewMapper.render(homepageView));
                 }
                 case nextPage -> {
                     String metadataJson = req.getPayload().getView().getPrivateMetadata();
                     HomepageView.State currentState = viewMapper.parseMetadataOrDefault(metadataJson);
-                    HomepageView homepageView = homepageService.getTicketsView(
-                        currentState.toBuilder()
+                    HomepageView homepageView = homepageService.getTicketsView(currentState.toBuilder()
                             .page(currentState.page() + 1)
-                            .build()
-                    );
+                            .build());
                     slackClient.updateHomeView(
-                        new SlackId.User(req.getPayload().getUser().getId()),
-                        viewMapper.render(homepageView)
-                    );
+                            new SlackId.User(req.getPayload().getUser().getId()), viewMapper.render(homepageView));
                 }
                 case previousPage -> {
                     String metadataJson = req.getPayload().getView().getPrivateMetadata();
                     HomepageView.State currentState = viewMapper.parseMetadataOrDefault(metadataJson);
-                    HomepageView homepageView = homepageService.getTicketsView(
-                        currentState.toBuilder()
+                    HomepageView homepageView = homepageService.getTicketsView(currentState.toBuilder()
                             .page(currentState.page() - 1)
                             .build());
                     slackClient.updateHomeView(
-                        new SlackId.User(req.getPayload().getUser().getId()),
-                        viewMapper.render(homepageView)
-                    );
+                            new SlackId.User(req.getPayload().getUser().getId()), viewMapper.render(homepageView));
                 }
                 case filter -> {
                     String metadataJson = req.getPayload().getView().getPrivateMetadata();
                     HomepageView.State currentState = viewMapper.parseMetadataOrDefault(metadataJson);
-                    slackClient.viewsOpen(
-                        ViewsOpenRequest.builder()
+                    slackClient.viewsOpen(ViewsOpenRequest.builder()
                             .triggerId(context.getTriggerId())
-                            .view(view(v -> filterMapper.render(currentState, v)
-                                .callbackId(HomepageOperation.filter.actionId())
-                                .type("modal")
-                                .clearOnClose(true)
-                            ))
-                            .build()
-                    );
+                            .view(view(v -> filterMapper
+                                    .render(currentState, v)
+                                    .callbackId(HomepageOperation.filter.actionId())
+                                    .type("modal")
+                                    .clearOnClose(true)))
+                            .build());
                 }
-                case null, default -> log.atWarn()
-                    .addArgument(action::getActionId)
-                    .log("Unknown actionId detected - {}");
+                case null, default ->
+                    log.atWarn().addArgument(action::getActionId).log("Unknown actionId detected - {}");
             }
         }
     }

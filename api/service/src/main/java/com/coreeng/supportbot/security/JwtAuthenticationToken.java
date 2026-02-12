@@ -1,10 +1,9 @@
 package com.coreeng.supportbot.security;
 
 import com.google.common.collect.ImmutableList;
+import java.util.Collection;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
-
-import java.util.Collection;
 
 public class JwtAuthenticationToken extends AbstractAuthenticationToken {
     private final UserPrincipal principal;
@@ -18,9 +17,7 @@ public class JwtAuthenticationToken extends AbstractAuthenticationToken {
     }
 
     private static Collection<? extends GrantedAuthority> buildAuthorities(UserPrincipal principal) {
-        return principal.roles().stream()
-            .map(Role::grantedAuthority)
-            .collect(ImmutableList.toImmutableList());
+        return principal.roles().stream().map(Role::grantedAuthority).collect(ImmutableList.toImmutableList());
     }
 
     @Override

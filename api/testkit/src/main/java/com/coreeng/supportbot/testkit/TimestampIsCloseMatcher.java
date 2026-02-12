@@ -1,10 +1,9 @@
 package com.coreeng.supportbot.testkit;
 
+import java.math.BigDecimal;
 import net.javacrumbs.jsonunit.core.ParametrizedMatcher;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.Description;
-
-import java.math.BigDecimal;
 
 public class TimestampIsCloseMatcher extends BaseMatcher<Object> implements ParametrizedMatcher {
     private long timestamp;

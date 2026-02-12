@@ -1,12 +1,11 @@
 package com.coreeng.supportbot.stats;
 
-import com.google.common.collect.ImmutableMap;
-import org.springframework.stereotype.Service;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.function.Function;
-
-import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import org.springframework.stereotype.Service;
 
 @Service
 public class StatsService {
@@ -14,10 +13,7 @@ public class StatsService {
 
     public StatsService(List<StatsCollector<?>> statsCollectorMap) {
         this.statsCollectorMap = statsCollectorMap.stream()
-            .collect(toImmutableMap(
-                StatsCollector::getSupportedType,
-                Function.identity()
-            ));
+                .collect(toImmutableMap(StatsCollector::getSupportedType, Function.identity()));
     }
 
     public StatsResult calculate(StatsRequest request) {

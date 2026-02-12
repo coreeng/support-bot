@@ -1,50 +1,35 @@
 package com.coreeng.supportbot.teams.rest;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-
-public record Config(
-    ServiceConfig service,
-    String namespace,
-    PortForwardingConfig portForwarding
-) {
+public record Config(ServiceConfig service, String namespace, PortForwardingConfig portForwarding) {
     private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
 
     public record DeploymentScriptConfig(
-        String releaseName,
-        String chartPath,
-        String valuesFilePath,
-        String scriptPath
-    ) {}
+            String releaseName, String chartPath, String valuesFilePath, String scriptPath) {}
 
     public record ImageConfig(
-        @JsonProperty("repository") String repository,
-        @JsonProperty("tag") String tag
-    ) {}
+            @JsonProperty("repository") String repository,
+            @JsonProperty("tag") String tag) {}
 
     public record ServiceConfig(
-        @JsonProperty("deployment") DeploymentConfig deployment,
-        @JsonProperty("image") ImageConfig image,
-        @JsonProperty("deploymentScript") DeploymentScriptConfig deploymentScript
-    ) {}
+            @JsonProperty("deployment") DeploymentConfig deployment,
+            @JsonProperty("image") ImageConfig image,
+            @JsonProperty("deploymentScript") DeploymentScriptConfig deploymentScript) {}
 
     public record PortForwardingConfig(
-        @JsonProperty("enabled") boolean enabled,
-        @JsonProperty("localPort") int localPort,
-        @JsonProperty("remotePort") int remotePort
-    ) {}
+            @JsonProperty("enabled") boolean enabled,
+            @JsonProperty("localPort") int localPort,
+            @JsonProperty("remotePort") int remotePort) {}
 
-    public record DeploymentConfig(
-        String name
-    ) {}
-
+    public record DeploymentConfig(String name) {}
 
     private static Config load(String configPath) throws IOException {
         InputStream inputStream = null;
@@ -56,7 +41,8 @@ public record Config(
             }
 
             if (inputStream == null) {
-                throw new IllegalArgumentException("Configuration file not found in filesystem or classpath: " + configPath);
+                throw new IllegalArgumentException(
+                        "Configuration file not found in filesystem or classpath: " + configPath);
             }
 
             return YAML_MAPPER.readValue(inputStream, Config.class);

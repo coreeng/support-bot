@@ -1,0 +1,91 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+    Checkstyle configuration for idiomatic Java naming conventions.
+-->
+<module name="Checker">
+    <property name="severity" value="error"/>
+    <property name="fileExtensions" value="java"/>
+
+    <!-- Exclude generated code -->
+    <module name="BeforeExecutionExclusionFileFilter">
+        <property name="fileNamePattern" value=".*[\\/]dbschema[\\/].*"/>
+    </module>
+
+    <module name="TreeWalker">
+        <!-- File name must match the outer type name -->
+        <module name="OuterTypeFilename"/>
+        <!-- === Naming Conventions === -->
+
+        <!-- Constants (static final) and enum values: UPPER_SNAKE_CASE -->
+        <module name="ConstantName">
+            <property name="format" value="^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"/>
+            <property name="applyToPublic" value="true"/>
+            <property name="applyToProtected" value="true"/>
+            <property name="applyToPackage" value="true"/>
+            <property name="applyToPrivate" value="true"/>
+            <message key="name.invalidPattern"
+                value="Constant ''{0}'' must match pattern ''{1}'' (UPPER_SNAKE_CASE)."/>
+        </module>
+
+        <!-- Type names (classes, interfaces, enums, records): PascalCase -->
+        <module name="TypeName">
+            <property name="format" value="^[A-Z][a-zA-Z0-9]*$"/>
+            <message key="name.invalidPattern"
+                value="Type ''{0}'' must match pattern ''{1}'' (PascalCase)."/>
+        </module>
+
+        <!-- Method names: lowerCamelCase (production code only) -->
+        <!-- Test methods may use underscores for readability (e.g., when_condition_then_result) -->
+        <module name="MethodName">
+            <property name="id" value="MethodNameMain"/>
+            <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+            <message key="name.invalidPattern"
+                value="Method ''{0}'' must match pattern ''{1}'' (lowerCamelCase)."/>
+        </module>
+        <module name="SuppressionXpathSingleFilter">
+            <property name="id" value="MethodNameMain"/>
+            <property name="files" value=".*[\\/]src[\\/]test[\\/].*"/>
+        </module>
+
+        <!-- Instance/static non-final fields: lowerCamelCase -->
+        <module name="MemberName">
+            <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+            <message key="name.invalidPattern"
+                value="Member ''{0}'' must match pattern ''{1}'' (lowerCamelCase)."/>
+        </module>
+
+        <!-- Method parameters: lowerCamelCase -->
+        <module name="ParameterName">
+            <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+            <message key="name.invalidPattern"
+                value="Parameter ''{0}'' must match pattern ''{1}'' (lowerCamelCase)."/>
+        </module>
+
+        <!-- Local variables: lowerCamelCase -->
+        <module name="LocalVariableName">
+            <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+            <message key="name.invalidPattern"
+                value="Local variable ''{0}'' must match pattern ''{1}'' (lowerCamelCase)."/>
+        </module>
+
+        <!-- Package names: lowercase, no underscores -->
+        <module name="PackageName">
+            <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+            <message key="name.invalidPattern"
+                value="Package ''{0}'' must match pattern ''{1}'' (lowercase)."/>
+        </module>
+
+        <!-- === Import Checks === -->
+
+        <!-- Block internal JDK APIs -->
+        <module name="IllegalImport">
+            <property name="illegalPkgs" value="sun"/>
+            <message key="import.illegal"
+                value="Import from internal JDK package ''{0}'' is not allowed."/>
+        </module>
+    </module>
+</module>

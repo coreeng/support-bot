@@ -7,17 +7,16 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.Nullable;
-import org.springframework.stereotype.Service;
-
-import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javax.crypto.SecretKey;
+import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
+import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
@@ -27,9 +26,7 @@ public class JwtService {
 
     public JwtService(SecurityProperties properties) {
         this.properties = properties;
-        this.secretKey = Keys.hmacShaKeyFor(
-            properties.jwt().secret().getBytes(StandardCharsets.UTF_8)
-        );
+        this.secretKey = Keys.hmacShaKeyFor(properties.jwt().secret().getBytes(StandardCharsets.UTF_8));
     }
 
     public String generateToken(UserPrincipal principal) {
@@ -37,35 +34,32 @@ public class JwtService {
         var expiration = now.plus(properties.jwt().expiration());
 
         var teamsJson = principal.teams().stream()
-            .map(team -> Map.of(
-                "code", team.code(),
-                "types", team.types().stream().map(Enum::name).toList()
-            ))
-            .toList();
+                .map(team -> Map.of(
+                        "code", team.code(),
+                        "types", team.types().stream().map(Enum::name).toList()))
+                .toList();
 
-        var roles = principal.roles().stream()
-            .map(Enum::name)
-            .toList();
+        var roles = principal.roles().stream().map(Enum::name).toList();
 
         return Jwts.builder()
-            .subject(principal.email())
-            .claim("email", principal.email())
-            .claim("name", principal.name())
-            .claim("teams", teamsJson)
-            .claim("roles", roles)
-            .issuedAt(Date.from(now))
-            .expiration(Date.from(expiration))
-            .signWith(secretKey)
-            .compact();
+                .subject(principal.email())
+                .claim("email", principal.email())
+                .claim("name", principal.name())
+                .claim("teams", teamsJson)
+                .claim("roles", roles)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(expiration))
+                .signWith(secretKey)
+                .compact();
     }
 
     public Optional<UserPrincipal> validateToken(String token) {
         try {
             Claims claims = Jwts.parser()
-                .verifyWith(secretKey)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
 
             var email = claims.getSubject();
             var name = claims.get("name", String.class);
@@ -95,7 +89,7 @@ public class JwtService {
 
     private ImmutableList<Role> parseRoles(@Nullable Object rolesClaim) {
         if (!(rolesClaim instanceof List<?> rolesRaw)) {
-            return ImmutableList.of(Role.user);
+            return ImmutableList.of(Role.USER);
         }
 
         var builder = ImmutableList.<Role>builder();
@@ -110,7 +104,7 @@ public class JwtService {
         }
 
         var parsed = builder.build();
-        return parsed.isEmpty() ? ImmutableList.of(Role.user) : parsed;
+        return parsed.isEmpty() ? ImmutableList.of(Role.USER) : parsed;
     }
 
     private Team parseTeam(Map<?, ?> teamMap) {
@@ -121,7 +115,7 @@ public class JwtService {
 
     private ImmutableList<TeamType> parseTeamTypes(@Nullable Object typesClaim) {
         if (!(typesClaim instanceof List<?> typesRaw)) {
-            return ImmutableList.of(TeamType.tenant);
+            return ImmutableList.of(TeamType.TENANT);
         }
 
         var types = ImmutableList.<TeamType>builder();
@@ -130,17 +124,17 @@ public class JwtService {
         }
 
         var parsedTypes = types.build();
-        return parsedTypes.isEmpty() ? ImmutableList.of(TeamType.tenant) : parsedTypes;
+        return parsedTypes.isEmpty() ? ImmutableList.of(TeamType.TENANT) : parsedTypes;
     }
 
     private TeamType parseTeamType(@Nullable Object typeRaw) {
         if (typeRaw == null) {
-            return TeamType.tenant;
+            return TeamType.TENANT;
         }
         try {
             return TeamType.valueOf(typeRaw.toString());
         } catch (IllegalArgumentException e) {
-            return TeamType.tenant;
+            return TeamType.TENANT;
         }
     }
 
