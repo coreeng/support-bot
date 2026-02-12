@@ -156,7 +156,7 @@ ui:
 
   livenessProbe:
     httpGet:
-      path: /livez
+      path: /api/health
       port: 3000
     failureThreshold: 3
     periodSeconds: 20
@@ -165,7 +165,7 @@ ui:
 
   readinessProbe:
     httpGet:
-      path: /readyz
+      path: /api/health
       port: 3000
     failureThreshold: 3
     periodSeconds: 20
