@@ -6,7 +6,7 @@ metadata:
   labels:
     app: mock-backend
 data:
-  # /team?type=escalation - escalation teams
+  # /team?type=ESCALATION - escalation teams
   # These teams appear in authorization tests
   # Priority: Must come before catch-all to match correctly
   "01-team-escalation.json": |
@@ -17,7 +17,7 @@ data:
         "urlPathPattern": "/team$",
         "queryParameters": {
           "type": {
-            "equalTo": "escalation"
+            "equalTo": "ESCALATION"
           }
         }
       },
@@ -41,7 +41,7 @@ data:
       }
     }
   
-  # /team?type=tenant - Tenant teams
+  # /team?type=TENANT - Tenant teams
   "02-team-tenant.json": |
     {
       "priority": 1,
@@ -50,7 +50,7 @@ data:
         "urlPathPattern": "/team$",
         "queryParameters": {
           "type": {
-            "equalTo": "tenant"
+            "equalTo": "TENANT"
           }
         }
       },
