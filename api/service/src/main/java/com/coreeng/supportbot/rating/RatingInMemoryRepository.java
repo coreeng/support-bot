@@ -1,13 +1,12 @@
 package com.coreeng.supportbot.rating;
 
-import com.google.common.collect.ImmutableList;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-
-import static com.google.common.collect.ImmutableList.toImmutableList;
 
 public class RatingInMemoryRepository implements RatingRepository {
     private final Map<UUID, Rating> ratings = new HashMap<>();
@@ -15,9 +14,7 @@ public class RatingInMemoryRepository implements RatingRepository {
     @Override
     public UUID insertRating(Rating rating) {
         UUID id = UUID.randomUUID();
-        Rating savedRating = rating.toBuilder()
-                .id(id)
-                .build();
+        Rating savedRating = rating.toBuilder().id(id).build();
         ratings.put(id, savedRating);
         return id;
     }
@@ -27,8 +24,7 @@ public class RatingInMemoryRepository implements RatingRepository {
         return ratings.values().stream().collect(toImmutableList());
     }
 
-    @Nullable
-    public Rating findById(UUID ratingId) {
+    @Nullable public Rating findById(UUID ratingId) {
         return ratings.get(ratingId);
     }
 

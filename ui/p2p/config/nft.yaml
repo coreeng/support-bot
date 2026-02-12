@@ -26,3 +26,5 @@ envVarsMap:
   VUS: "100"
   REQ_PER_SECOND: "300"
   BACKEND_URL: http://mock-backend:8080
+  AUTH_SECRET: "nft-test-secret-not-for-production-use"
+  NEXTAUTH_URL: http://support-bot-ui:3000

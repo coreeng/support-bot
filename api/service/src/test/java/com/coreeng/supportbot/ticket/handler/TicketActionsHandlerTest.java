@@ -1,5 +1,9 @@
 package com.coreeng.supportbot.ticket.handler;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.*;
+
 import com.coreeng.supportbot.rbac.RbacRestrictionMessage;
 import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.SlackId;
@@ -12,6 +16,7 @@ import com.slack.api.app_backend.interactive_components.payload.BlockActionPaylo
 import com.slack.api.bolt.context.builtin.ActionContext;
 import com.slack.api.bolt.request.builtin.BlockActionRequest;
 import com.slack.api.model.Message;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,22 +24,20 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class TicketActionsHandlerTest {
     @Mock
     private TicketSummaryViewMapper summaryViewMapper;
+
     @Mock
     private EscalateViewMapper escalateViewMapper;
+
     @Mock
     private SlackClient slackClient;
+
     @Mock
     private TicketSummaryService ticketSummaryService;
+
     @Mock
     private RbacService rbacService;
 
@@ -43,12 +46,7 @@ class TicketActionsHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new TicketActionsHandler(
-            summaryViewMapper,
-            escalateViewMapper,
-            slackClient,
-            ticketSummaryService,
-            rbacService
-        );
+                summaryViewMapper, escalateViewMapper, slackClient, ticketSummaryService, rbacService);
     }
 
     @Test
@@ -65,10 +63,8 @@ class TicketActionsHandlerTest {
 
         ActionContext context = mock(ActionContext.class);
         BlockActionRequest request = mock(BlockActionRequest.class);
-        BlockActionPayload payload = BlockActionPayload.builder()
-            .channel(channel)
-            .message(message)
-            .build();
+        BlockActionPayload payload =
+                BlockActionPayload.builder().channel(channel).message(message).build();
 
         when(rbacService.isSupportBySlackId(SlackId.user(userId))).thenReturn(false);
         when(context.getRequestUserId()).thenReturn(userId);
@@ -100,9 +96,8 @@ class TicketActionsHandlerTest {
 
         ActionContext context = mock(ActionContext.class);
         BlockActionRequest request = mock(BlockActionRequest.class);
-        BlockActionPayload payload = BlockActionPayload.builder()
-            .actions(List.of())
-            .build();
+        BlockActionPayload payload =
+                BlockActionPayload.builder().actions(List.of()).build();
 
         when(context.getRequestUserId()).thenReturn(userId);
         when(rbacService.isSupportBySlackId(SlackId.user(userId))).thenReturn(true);
@@ -115,4 +110,4 @@ class TicketActionsHandlerTest {
         verify(rbacService).isSupportBySlackId(SlackId.user(userId));
         verifyNoInteractions(summaryViewMapper, escalateViewMapper, ticketSummaryService, slackClient);
     }
-} 
+}

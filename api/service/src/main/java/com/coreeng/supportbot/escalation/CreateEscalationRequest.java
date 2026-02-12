@@ -10,6 +10,7 @@ import lombok.Getter;
 public class CreateEscalationRequest {
     private Ticket ticket;
     private String team;
+
     @Builder.Default
     private ImmutableList<String> tags = ImmutableList.of();
 }

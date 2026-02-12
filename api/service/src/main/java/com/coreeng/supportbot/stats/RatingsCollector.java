@@ -3,15 +3,14 @@ package com.coreeng.supportbot.stats;
 import com.coreeng.supportbot.rating.Rating;
 import com.coreeng.supportbot.rating.RatingService;
 import com.google.common.collect.ImmutableList;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
@@ -29,13 +28,12 @@ public class RatingsCollector implements StatsCollector<StatsRequest.Ratings> {
         ImmutableList<Rating> filtered = filterByRange(allRatings, request);
 
         int count = filtered.size();
-        Double average = count > 0
-                ? filtered.stream().mapToInt(Rating::rating).average().orElse(0.0)
-                : null;
+        Double average =
+                count > 0 ? filtered.stream().mapToInt(Rating::rating).average().orElse(0.0) : null;
 
         // group by week start (Monday)
-        Map<LocalDate, List<Rating>> byWeek = filtered.stream()
-                .collect(Collectors.groupingBy(r -> weekStartOf(r.submittedTs())));
+        Map<LocalDate, List<Rating>> byWeek =
+                filtered.stream().collect(Collectors.groupingBy(r -> weekStartOf(r.submittedTs())));
 
         ImmutableList<StatsResult.WeeklyRating> weekly = byWeek.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())

@@ -6,28 +6,29 @@ import io.fabric8.kubernetes.api.model.NamespaceList;
 import io.fabric8.kubernetes.api.model.rbac.RoleBinding;
 import io.fabric8.kubernetes.api.model.rbac.Subject;
 import io.fabric8.kubernetes.client.KubernetesClient;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 
 @Slf4j
 @RequiredArgsConstructor
 public class CorePlatformTeamsFetcher implements PlatformTeamsFetcher {
-    private static final ImmutableList<String> roleBindingPostfixes = ImmutableList.of("-admin", "-admin-viewer", "-viewer");
+    private static final ImmutableList<String> ROLE_BINDING_POSTFIXES =
+            ImmutableList.of("-admin", "-admin-viewer", "-viewer");
 
     private final ExecutorService executor;
     private final KubernetesClient k8sClient;
 
     @Override
     public List<TeamAndGroupTuple> fetchTeams() {
-        ExecutorCompletionService<Optional<TeamAndGroupTuple>> completionService = new ExecutorCompletionService<>(executor);
+        ExecutorCompletionService<Optional<TeamAndGroupTuple>> completionService =
+                new ExecutorCompletionService<>(executor);
         int futuresCount = 0;
         NamespaceList nses = k8sClient.namespaces().list();
         for (Namespace ns : nses.getItems()) {
@@ -41,7 +42,7 @@ public class CorePlatformTeamsFetcher implements PlatformTeamsFetcher {
             }
 
             String nsName = ns.getMetadata().getName();
-            for (String rbPostfix : roleBindingPostfixes) {
+            for (String rbPostfix : ROLE_BINDING_POSTFIXES) {
                 futuresCount += 1;
                 completionService.submit(() -> fetchTeamAndGroup(rbPostfix, nsName));
             }
@@ -57,26 +58,29 @@ public class CorePlatformTeamsFetcher implements PlatformTeamsFetcher {
         return result;
     }
 
-    @NonNull
-    private Optional<TeamAndGroupTuple> fetchTeamAndGroup(String rbPostfix, String nsName) {
+    @NonNull private Optional<TeamAndGroupTuple> fetchTeamAndGroup(String rbPostfix, String nsName) {
         String rbName = nsName + rbPostfix;
-        RoleBinding rb = k8sClient.rbac().roleBindings().inNamespace(nsName).withName(
-            rbName
-        ).get();
+        RoleBinding rb = k8sClient
+                .rbac()
+                .roleBindings()
+                .inNamespace(nsName)
+                .withName(rbName)
+                .get();
         if (rb == null) {
-            log.warn("Found namespaces({}) that look like tenant namespace, but missing rolebinding({})",
-                nsName, rbName
-            );
+            log.warn(
+                    "Found namespaces({}) that look like tenant namespace, but missing rolebinding({})",
+                    nsName,
+                    rbName);
             return Optional.empty();
         }
         Subject saSubject = rb.getSubjects().stream()
-            .filter(s -> "ServiceAccount".equals(s.getKind()))
-            .findFirst()
-            .orElse(null);
+                .filter(s -> "ServiceAccount".equals(s.getKind()))
+                .findFirst()
+                .orElse(null);
         Subject groupSubject = rb.getSubjects().stream()
-            .filter(s -> "Group".equals(s.getKind()))
-            .findFirst()
-            .orElse(null);
+                .filter(s -> "Group".equals(s.getKind()))
+                .findFirst()
+                .orElse(null);
         if (saSubject != null && groupSubject != null) {
             return Optional.of(new TeamAndGroupTuple(nsName, groupSubject.getName()));
         }

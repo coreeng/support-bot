@@ -1,10 +1,9 @@
 package com.coreeng.supportbot.escalation.rest;
 
 import com.coreeng.supportbot.escalation.EscalationId;
+import java.util.Locale;
 import org.springframework.format.Formatter;
 import org.springframework.stereotype.Component;
-
-import java.util.Locale;
 
 @Component
 public class EscalationIdFormatter implements Formatter<EscalationId> {

@@ -1,5 +1,17 @@
 package com.coreeng.supportbot.ticket;
 
+import static com.coreeng.supportbot.slack.RenderingUtils.toOptionObject;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.collect.Iterables.isEmpty;
+import static com.slack.api.model.block.Blocks.*;
+import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
+import static com.slack.api.model.block.composition.BlockCompositions.plainText;
+import static com.slack.api.model.block.element.BlockElements.*;
+import static com.slack.api.model.view.Views.*;
+import static java.lang.String.format;
+
 import com.coreeng.supportbot.slack.RenderingUtils;
 import com.coreeng.supportbot.util.JsonMapper;
 import com.google.common.collect.ImmutableList;
@@ -12,29 +24,16 @@ import com.slack.api.model.block.element.RichTextSectionElement;
 import com.slack.api.model.block.element.StaticSelectElement;
 import com.slack.api.model.view.View;
 import com.slack.api.model.view.ViewState;
-import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
-import org.springframework.stereotype.Component;
-
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-
-import static com.coreeng.supportbot.slack.RenderingUtils.toOptionObject;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.collect.ImmutableMap.toImmutableMap;
-import static com.google.common.collect.Iterables.isEmpty;
-import static com.slack.api.model.block.Blocks.*;
-import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
-import static com.slack.api.model.block.composition.BlockCompositions.plainText;
-import static com.slack.api.model.block.element.BlockElements.*;
-import static com.slack.api.model.view.Views.*;
-import static java.lang.String.format;
+import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
@@ -58,119 +57,89 @@ public class TicketSummaryViewMapper {
         checkNotNull(viewBuilder);
 
         return viewBuilder
-            .title(viewTitle(t -> t
-                .type("plain_text")
-                .text(format("Ticket %s Summary", summaryView.ticketId().render()))))
-            .submit(viewSubmit(s -> s
-                .type("plain_text")
-                .text("Apply Changes")
-            ))
-            .close(viewClose(c -> c
-                .type("plain_text")
-                .text("Close")
-            ))
-            .privateMetadata(jsonMapper.toJsonString(summaryView.metadata()))
-            .blocks(ImmutableList.<LayoutBlock>builder()
-                .add(header(h -> h.text(plainText("Ticket Summary"))))
-                .addAll(summaryView.query().blocks())
-                .addAll(asBlocks(
-                    context(List.of(
-                        markdownText(t -> t
-                            .verbatim(false)
-	                            .text(buildQueryContextLine(summaryView))
-	                        )
-                    )),
-                    divider(),
-                    header(h -> h.text(plainText("Status History"))),
-                    richText(r -> r
-                        .elements(List.of(richTextSection(s -> s
-                            .elements(renderStatusHistory(summaryView.statusLogs()))
-                        )))
-                    ),
-                    divider(),
-                    header(h -> h.text(plainText("Escalations")))
-                ))
-                .addAll(
-                    isEmpty(summaryView.escalations())
-                        ? renderNoEscalations()
-                        : summaryView.escalations().stream()
-                        .flatMap(e -> renderEscalation(e).stream())
-                        .toList()
-                )
-                .addAll(asBlocks(
-                    header(h -> h.text(plainText("Modify Ticket"))),
-                    input(i -> i
-                        .label(plainText("Change Status"))
-                        .element(statusPicker(summaryView))
-                        .optional(false)),
-                    input(i -> i
-                        .label(plainText("Select the Author's Team"))
-                        .optional(false)
-                        .element(renderDynamicTeamsInput(summaryView.currentTeam()))
-                    ),
-                    input(i -> i
-                        .label(plainText("Select Tags"))
-                        .optional(false)
-                        .hint(plainText("Select all applicable tags."))
-                        .element(multiStaticSelect(s -> s
-                            .actionId(TicketField.tags.actionId())
-                            .initialOptions(
-                                isEmpty(summaryView.currentTags())
-                                    ? null
-                                    : summaryView.currentTags().stream()
-                                    .map(RenderingUtils::toOptionObject)
-                                    .toList())
-                            .options(summaryView.tags().stream()
-                                .map(RenderingUtils::toOptionObject)
-                                .toList())
-                        ))),
-                    input(i -> i
-                        .label(plainText("Change Impact"))
-                        .optional(false)
-                        .element(staticSelect(s -> s
-                            .actionId(TicketField.impact.actionId())
-                            .placeholder(plainText("Not Evaluated"))
-                            .initialOption(summaryView.currentImpact() != null
-                                ? toOptionObject(summaryView.currentImpact())
-                                : null)
-                            .options(summaryView.impacts().stream()
-                                .map(RenderingUtils::toOptionObject)
-                                .toList())
-                        )))
-                ))
-                .addAll(renderAssigneeInput(summaryView))
-                .build()
-            );
+                .title(viewTitle(t -> t.type("plain_text")
+                        .text(format("Ticket %s Summary", summaryView.ticketId().render()))))
+                .submit(viewSubmit(s -> s.type("plain_text").text("Apply Changes")))
+                .close(viewClose(c -> c.type("plain_text").text("Close")))
+                .privateMetadata(jsonMapper.toJsonString(summaryView.metadata()))
+                .blocks(ImmutableList.<LayoutBlock>builder()
+                        .add(header(h -> h.text(plainText("Ticket Summary"))))
+                        .addAll(summaryView.query().blocks())
+                        .addAll(asBlocks(
+                                context(List.of(
+                                        markdownText(t -> t.verbatim(false).text(buildQueryContextLine(summaryView))))),
+                                divider(),
+                                header(h -> h.text(plainText("Status History"))),
+                                richText(r -> r.elements(List.of(richTextSection(
+                                        s -> s.elements(renderStatusHistory(summaryView.statusLogs())))))),
+                                divider(),
+                                header(h -> h.text(plainText("Escalations")))))
+                        .addAll(
+                                isEmpty(summaryView.escalations())
+                                        ? renderNoEscalations()
+                                        : summaryView.escalations().stream()
+                                                .flatMap(e -> renderEscalation(e).stream())
+                                                .toList())
+                        .addAll(asBlocks(
+                                header(h -> h.text(plainText("Modify Ticket"))),
+                                input(i -> i.label(plainText("Change Status"))
+                                        .element(statusPicker(summaryView))
+                                        .optional(false)),
+                                input(i -> i.label(plainText("Select the Author's Team"))
+                                        .optional(false)
+                                        .element(renderDynamicTeamsInput(summaryView.currentTeam()))),
+                                input(i -> i.label(plainText("Select Tags"))
+                                        .optional(false)
+                                        .hint(plainText("Select all applicable tags."))
+                                        .element(multiStaticSelect(s -> s.actionId(TicketField.tags.actionId())
+                                                .initialOptions(
+                                                        isEmpty(summaryView.currentTags())
+                                                                ? null
+                                                                : summaryView.currentTags().stream()
+                                                                        .map(RenderingUtils::toOptionObject)
+                                                                        .toList())
+                                                .options(summaryView.tags().stream()
+                                                        .map(RenderingUtils::toOptionObject)
+                                                        .toList())))),
+                                input(i -> i.label(plainText("Change Impact"))
+                                        .optional(false)
+                                        .element(staticSelect(s -> s.actionId(TicketField.impact.actionId())
+                                                .placeholder(plainText("Not Evaluated"))
+                                                .initialOption(
+                                                        summaryView.currentImpact() != null
+                                                                ? toOptionObject(summaryView.currentImpact())
+                                                                : null)
+                                                .options(summaryView.impacts().stream()
+                                                        .map(RenderingUtils::toOptionObject)
+                                                        .toList()))))))
+                        .addAll(renderAssigneeInput(summaryView))
+                        .build());
     }
 
-	    private String buildQueryContextLine(TicketSummaryView summaryView) {
-	        TicketSummaryView.QuerySummaryView query = summaryView.query();
-	        String authorText = query.senderId() != null
-	            ? "<@" + query.senderId().id() + ">"
-	            : "Unknown author";
-	        String dateText = formatSlackDate(query.messageTs().getDate());
-	        String permalink = query.permalink();
-	        if (StringUtils.isNotBlank(permalink)) {
-	            return format("Sent by %s | %s | <%s|View Message>\n", authorText, dateText, permalink);
-	        } else {
-	            return format("Sent by %s | %s\n", authorText, dateText);
-	        }
-	    }
+    private String buildQueryContextLine(TicketSummaryView summaryView) {
+        TicketSummaryView.QuerySummaryView query = summaryView.query();
+        String authorText = query.senderId() != null ? "<@" + query.senderId().id() + ">" : "Unknown author";
+        String dateText = formatSlackDate(query.messageTs().getDate());
+        String permalink = query.permalink();
+        if (StringUtils.isNotBlank(permalink)) {
+            return format("Sent by %s | %s | <%s|View Message>\n", authorText, dateText, permalink);
+        } else {
+            return format("Sent by %s | %s\n", authorText, dateText);
+        }
+    }
 
     private StaticSelectElement statusPicker(TicketSummaryView summaryView) {
         List<OptionObject> statusOptions = summaryView.currentStatus() == TicketStatus.stale
-            ? Arrays.stream(TicketStatus.values())
-            .map(RenderingUtils::toOptionObject)
-            .toList()
-            : Arrays.stream(TicketStatus.values())
-            .filter(status -> status != TicketStatus.stale)
-            .map(RenderingUtils::toOptionObject)
-            .toList();
-        return staticSelect(s -> s
-            .actionId(TicketField.status.actionId())
-            .initialOption(toOptionObject(summaryView.currentStatus()))
-            .options(statusOptions)
-        );
+                ? Arrays.stream(TicketStatus.values())
+                        .map(RenderingUtils::toOptionObject)
+                        .toList()
+                : Arrays.stream(TicketStatus.values())
+                        .filter(status -> status != TicketStatus.stale)
+                        .map(RenderingUtils::toOptionObject)
+                        .toList();
+        return staticSelect(s -> s.actionId(TicketField.status.actionId())
+                .initialOption(toOptionObject(summaryView.currentStatus()))
+                .options(statusOptions));
     }
 
     private ImmutableList<RichTextElement> renderStatusHistory(ImmutableList<Ticket.StatusLog> statusLogs) {
@@ -179,22 +148,20 @@ public class TicketSummaryViewMapper {
         for (int i = 0; i < statusLogs.size(); i++) {
             Ticket.StatusLog item = statusLogs.get(i);
             elements.add(RichTextSectionElement.Emoji.builder()
-                .name(item.status().emoji())
-                .build());
+                    .name(item.status().emoji())
+                    .build());
 
             str.setLength(0);
             str.append(" ");
-            str.append(item.status().label())
-                .append(": ");
-            elements.add(RichTextSectionElement.Text.builder()
-                .text(str.toString())
-                .build());
+            str.append(item.status().label()).append(": ");
+            elements.add(
+                    RichTextSectionElement.Text.builder().text(str.toString()).build());
 
             elements.add(RichTextSectionElement.Date.builder()
-                .timestamp((int) item.date().getEpochSecond())
-                .format("{date_short_pretty} at {time}")
-                .fallback(item.date().truncatedTo(ChronoUnit.MINUTES).toString())
-                .build());
+                    .timestamp((int) item.date().getEpochSecond())
+                    .format("{date_short_pretty} at {time}")
+                    .fallback(item.date().truncatedTo(ChronoUnit.MINUTES).toString())
+                    .build());
 
             str.setLength(0);
             str.append("\n");
@@ -202,51 +169,35 @@ public class TicketSummaryViewMapper {
                 // padding as spaces is applied so that bar is nicely aligned with the circle emoji
                 str.append("  |\n");
             }
-            elements.add(RichTextSectionElement.Text.builder()
-                .text(str.toString())
-                .build());
+            elements.add(
+                    RichTextSectionElement.Text.builder().text(str.toString()).build());
         }
         return elements.build();
     }
 
     private ImmutableList<LayoutBlock> renderEscalation(TicketSummaryView.EscalationView escalation) {
         return ImmutableList.of(
-            section(s -> s
-                .fields(ImmutableList.of(
-                    plainText(t -> t
-                        .text("Status: " + escalation.status().label())
-                    ),
-                    markdownText(t -> t
-                        .text("Team: <!subteam^" + escalation.teamSlackGroupId() + ">")
-                    )
-                ))
-            ),
-            divider()
-        );
+                section(s -> s.fields(ImmutableList.of(
+                        plainText(t -> t.text("Status: " + escalation.status().label())),
+                        markdownText(t -> t.text("Team: <!subteam^" + escalation.teamSlackGroupId() + ">"))))),
+                divider());
     }
 
     private ImmutableList<LayoutBlock> renderNoEscalations() {
         return ImmutableList.of(
-            context(c -> c
-                .elements(ImmutableList.of(
-                    plainText("No escalations for this ticket")
-                ))
-            ),
-            divider()
-        );
+                context(c -> c.elements(ImmutableList.of(plainText("No escalations for this ticket")))), divider());
     }
 
     private ExternalSelectElement renderDynamicTeamsInput(@Nullable String currentTeam) {
-        return externalSelect(s -> s
-            .actionId(TicketField.team.actionId())
-            .initialOption(
-                currentTeam != null
-                    ? OptionObject.builder()
-                    .text(plainText(currentTeam))
-                    .value(currentTeam)
-                    .build()
-                    : null)
-            .minQueryLength(0));
+        return externalSelect(s -> s.actionId(TicketField.team.actionId())
+                .initialOption(
+                        currentTeam != null
+                                ? OptionObject.builder()
+                                        .text(plainText(currentTeam))
+                                        .value(currentTeam)
+                                        .build()
+                                : null)
+                .minQueryLength(0));
     }
 
     private ImmutableList<LayoutBlock> renderAssigneeInput(TicketSummaryView summaryView) {
@@ -254,45 +205,37 @@ public class TicketSummaryViewMapper {
             return ImmutableList.of();
         }
 
-        return ImmutableList.of(
-            input(i -> i
-                .label(plainText("Assigned To"))
+        return ImmutableList.of(input(i -> i.label(plainText("Assigned To"))
                 .optional(true)
                 .hint(plainText("Select a support team member to assign this ticket to"))
-                .element(staticSelect(s -> s
-                    .actionId(TicketField.assignee.actionId())
-                    .placeholder(plainText("Unassigned"))
-                    .initialOption(summaryView.currentAssignee() != null
-                        ? summaryView.availableAssignees().stream()
-                            .filter(a -> a.userId().equals(summaryView.currentAssignee()))
-                            .findFirst()
-                            .map(a -> OptionObject.builder()
-                                .text(plainText(a.displayName()))
-                                .value(a.userId())
-                                .build())
-                            .orElse(null)
-                        : null)
-                    .options(summaryView.availableAssignees().stream()
-                        .map(a -> OptionObject.builder()
-                            .text(plainText(a.displayName()))
-                            .value(a.userId())
-                            .build())
-                        .toList())
-                )))
-        );
+                .element(staticSelect(s -> s.actionId(TicketField.assignee.actionId())
+                        .placeholder(plainText("Unassigned"))
+                        .initialOption(
+                                summaryView.currentAssignee() != null
+                                        ? summaryView.availableAssignees().stream()
+                                                .filter(a -> a.userId().equals(summaryView.currentAssignee()))
+                                                .findFirst()
+                                                .map(a -> OptionObject.builder()
+                                                        .text(plainText(a.displayName()))
+                                                        .value(a.userId())
+                                                        .build())
+                                                .orElse(null)
+                                        : null)
+                        .options(summaryView.availableAssignees().stream()
+                                .map(a -> OptionObject.builder()
+                                        .text(plainText(a.displayName()))
+                                        .value(a.userId())
+                                        .build())
+                                .toList())))));
     }
 
     public TicketSubmission extractSubmittedValues(View view) {
         checkNotNull(view);
 
         var metadata = parseMetadata(view.getPrivateMetadata());
-        ImmutableMap<String, ViewState.Value> passedValues = view.getState().getValues().entrySet()
-            .stream()
-            .flatMap(entry -> entry.getValue().entrySet().stream())
-            .collect(toImmutableMap(
-                Map.Entry::getKey,
-                Map.Entry::getValue
-            ));
+        ImmutableMap<String, ViewState.Value> passedValues = view.getState().getValues().entrySet().stream()
+                .flatMap(entry -> entry.getValue().entrySet().stream())
+                .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
 
         ViewState.Value teamValue = checkNotNull(passedValues.get(TicketField.team.actionId()));
         ViewState.Value statusValue = checkNotNull(passedValues.get(TicketField.status.actionId()));
@@ -301,31 +244,29 @@ public class TicketSummaryViewMapper {
         ViewState.Value assigneeValue = passedValues.get(TicketField.assignee.actionId());
 
         return TicketSubmission.builder()
-            .ticketId(new TicketId(metadata.ticketId()))
-            .status(TicketStatus.valueOf(statusValue.getSelectedOption().getValue()))
-            .authorsTeam(TicketTeam.fromCode(teamValue.getSelectedOption().getValue()))
-            .tags(
-                tagsValue != null && !isEmpty(tagsValue.getSelectedOptions())
-                    ? tagsValue.getSelectedOptions().stream()
-                    .map(ViewState.SelectedOption::getValue)
-                    .collect(toImmutableList())
-                    : ImmutableList.of()
-            )
-            .impact(
-                impactValue != null && impactValue.getSelectedOption() != null
-                    ? impactValue.getSelectedOption().getValue()
-                    : null
-            )
-            .assignedTo(
-                assigneeValue != null && assigneeValue.getSelectedOption() != null
-                    ? assigneeValue.getSelectedOption().getValue()
-                    : null
-            )
-            .confirmed(false)
-            .build();
+                .ticketId(new TicketId(metadata.ticketId()))
+                .status(TicketStatus.valueOf(statusValue.getSelectedOption().getValue()))
+                .authorsTeam(TicketTeam.fromCode(teamValue.getSelectedOption().getValue()))
+                .tags(
+                        tagsValue != null && !isEmpty(tagsValue.getSelectedOptions())
+                                ? tagsValue.getSelectedOptions().stream()
+                                        .map(ViewState.SelectedOption::getValue)
+                                        .collect(toImmutableList())
+                                : ImmutableList.of())
+                .impact(
+                        impactValue != null && impactValue.getSelectedOption() != null
+                                ? impactValue.getSelectedOption().getValue()
+                                : null)
+                .assignedTo(
+                        assigneeValue != null && assigneeValue.getSelectedOption() != null
+                                ? assigneeValue.getSelectedOption().getValue()
+                                : null)
+                .confirmed(false)
+                .build();
     }
 
     private String formatSlackDate(Instant instant) {
-        return "<!date^" + instant.getEpochSecond() + "^{date_short_pretty} at {time}|" + instant.truncatedTo(ChronoUnit.MINUTES) + ">";
+        return "<!date^" + instant.getEpochSecond() + "^{date_short_pretty} at {time}|"
+                + instant.truncatedTo(ChronoUnit.MINUTES) + ">";
     }
 }

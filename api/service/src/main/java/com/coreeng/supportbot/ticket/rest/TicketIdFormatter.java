@@ -1,10 +1,9 @@
 package com.coreeng.supportbot.ticket.rest;
 
 import com.coreeng.supportbot.ticket.TicketId;
+import java.util.Locale;
 import org.springframework.format.Formatter;
 import org.springframework.stereotype.Component;
-
-import java.util.Locale;
 
 @Component
 public class TicketIdFormatter implements Formatter<TicketId> {

@@ -1,10 +1,17 @@
 plugins {
     id("java")
     id("application")
+    checkstyle
 }
 
 repositories {
     mavenCentral()
+}
+
+checkstyle {
+    toolVersion = "10.25.0"
+    isIgnoreFailures = false
+    configFile = rootProject.file("config/checkstyle/checkstyle.xml")
 }
 
 dependencies {
@@ -24,7 +31,7 @@ dependencies {
     testRuntimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:2.25.0")
     testRuntimeOnly("org.apache.logging.log4j:log4j-core:2.25.0")
     testRuntimeOnly("org.junit.platform:junit-platform-console")
-    
+
     testImplementation("org.awaitility:awaitility:4.3.+")
     testImplementation("org.assertj:assertj-core:3.27.3")
 }

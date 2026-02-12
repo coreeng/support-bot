@@ -2,25 +2,24 @@ package com.coreeng.supportbot.escalation.handler;
 
 import com.coreeng.supportbot.escalation.EscalationCreatedMessageMapper;
 import com.coreeng.supportbot.escalation.EscalationOperation;
-import com.coreeng.supportbot.escalation.EscalationResolveInput;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
+import com.coreeng.supportbot.escalation.EscalationResolveInput;
+import com.coreeng.supportbot.rbac.RbacRestrictionMessage;
 import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackBlockActionHandler;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
-import com.coreeng.supportbot.rbac.RbacRestrictionMessage;
 import com.slack.api.app_backend.interactive_components.payload.BlockActionPayload;
 import com.slack.api.bolt.context.builtin.ActionContext;
 import com.slack.api.bolt.request.builtin.BlockActionRequest;
 import com.slack.api.methods.SlackApiException;
+import java.io.IOException;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
-import java.util.regex.Pattern;
 
 @Component
 @RequiredArgsConstructor
@@ -33,7 +32,7 @@ public class EscalationActionHandler implements SlackBlockActionHandler {
 
     @Override
     public Pattern getPattern() {
-        return EscalationOperation.pattern;
+        return EscalationOperation.PATTERN;
     }
 
     @Override
@@ -43,12 +42,11 @@ public class EscalationActionHandler implements SlackBlockActionHandler {
         if (!rbacService.isSupportBySlackId(SlackId.user(userId))) {
             log.info("Skipping escalation action. User({}) is not a support team member", userId);
             slackClient.postEphemeralMessage(SlackPostEphemeralMessageRequest.builder()
-                .message(new RbacRestrictionMessage())
-                .channel(payload.getChannel().getId())
-                .threadTs(MessageTs.ofOrNull(payload.getMessage().getThreadTs()))
-                .userId(userId)
-                .build()
-            );
+                    .message(new RbacRestrictionMessage())
+                    .channel(payload.getChannel().getId())
+                    .threadTs(MessageTs.ofOrNull(payload.getMessage().getThreadTs()))
+                    .userId(userId)
+                    .build());
             return;
         }
 
@@ -60,9 +58,7 @@ public class EscalationActionHandler implements SlackBlockActionHandler {
                     processingService.resolve(input.escalationId());
                 }
                 case null -> {
-                    log.atWarn()
-                        .addArgument(action.getActionId())
-                        .log("Unknown escalation action: {}");
+                    log.atWarn().addArgument(action.getActionId()).log("Unknown escalation action: {}");
                 }
             }
         }

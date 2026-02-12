@@ -3,10 +3,9 @@ package com.coreeng.supportbot.teams.fakes;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.google.common.collect.ImmutableList;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-
-import java.util.List;
 
 @RequiredArgsConstructor
 public class FakeEscalationTeamsRegistry implements EscalationTeamsRegistry {
@@ -18,8 +17,7 @@ public class FakeEscalationTeamsRegistry implements EscalationTeamsRegistry {
     }
 
     @Override
-    @Nullable
-    public EscalationTeam findEscalationTeamByCode(String code) {
+    @Nullable public EscalationTeam findEscalationTeamByCode(String code) {
         return teams.stream().filter(t -> t.code().equals(code)).findFirst().orElse(null);
     }
 }

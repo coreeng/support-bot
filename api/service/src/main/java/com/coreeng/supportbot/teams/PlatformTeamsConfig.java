@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.teams;
 
-
 import com.azure.core.credential.TokenCredential;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.util.JsonMapper;
@@ -16,6 +15,11 @@ import io.fabric8.kubernetes.client.Config;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import io.fabric8.kubernetes.client.http.HttpClient;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.util.List;
+import java.util.concurrent.Executors;
 import lombok.RequiredArgsConstructor;
 import okhttp3.logging.HttpLoggingInterceptor;
 import org.apache.logging.log4j.util.Strings;
@@ -26,17 +30,10 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.util.List;
-import java.util.concurrent.Executors;
-
 @Configuration
 @ConditionalOnProperty(
-    name = {"enabled"},
-    prefix = "platform-integration"
-)
+        name = {"enabled"},
+        prefix = "platform-integration")
 @EnableConfigurationProperties({
     PlatformTeamsConfig.GcpProps.class,
     GenericPlatformTeamsFetcher.Config.class,
@@ -52,17 +49,15 @@ public class PlatformTeamsConfig {
     private final StaticPlatformUsersProps staticPlatformUsersProps;
 
     @Bean
-    public PlatformTeamsService platformTeamsService(PlatformTeamsFetcher teamsFetcher, PlatformUsersFetcher usersFetcher, PlatformTeamsFetchProps fetchProps) {
+    public PlatformTeamsService platformTeamsService(
+            PlatformTeamsFetcher teamsFetcher, PlatformUsersFetcher usersFetcher, PlatformTeamsFetchProps fetchProps) {
         return new PlatformTeamsService(teamsFetcher, usersFetcher, escalationTeamsRegistry, fetchProps);
     }
 
     @Bean
     @ConditionalOnProperty("platform-integration.teams-scraping.core-platform.enabled")
     public PlatformTeamsFetcher corePlatformTeamsFetcher(KubernetesClient kubernetesClient) {
-        return new CorePlatformTeamsFetcher(
-            Executors.newVirtualThreadPerTaskExecutor(),
-            kubernetesClient
-        );
+        return new CorePlatformTeamsFetcher(Executors.newVirtualThreadPerTaskExecutor(), kubernetesClient);
     }
 
     @Bean
@@ -73,20 +68,19 @@ public class PlatformTeamsConfig {
 
     @Bean
     @ConditionalOnProperty("platform-integration.teams-scraping.k8s-generic.enabled")
-    public PlatformTeamsFetcher k8sGenericTeamsFetcher(GenericPlatformTeamsFetcher.Config config, JsonMapper jsonMapper, KubernetesClient kubernetesClient) {
+    public PlatformTeamsFetcher k8sGenericTeamsFetcher(
+            GenericPlatformTeamsFetcher.Config config, JsonMapper jsonMapper, KubernetesClient kubernetesClient) {
         return new GenericPlatformTeamsFetcher(config, kubernetesClient, jsonMapper);
     }
 
     @Bean
     @ConditionalOnProperty("platform-integration.gcp.enabled")
-    public PlatformUsersFetcher gcpUsersFetcher(
-        CredentialsProvider gcpCredsProvider
-    ) throws IOException {
+    public PlatformUsersFetcher gcpUsersFetcher(CredentialsProvider gcpCredsProvider) throws IOException {
         var cloundIdentityBuilder = new CloudIdentity.Builder(
-            Utils.getDefaultTransport(),
-            Utils.getDefaultJsonFactory(),
-            new HttpCredentialsAdapter(gcpCredsProvider.getCredentials())
-        ).setApplicationName(gcpProps.appName());
+                        Utils.getDefaultTransport(),
+                        Utils.getDefaultJsonFactory(),
+                        new HttpCredentialsAdapter(gcpCredsProvider.getCredentials()))
+                .setApplicationName(gcpProps.appName());
         if (Strings.isNotEmpty(gcpProps.client().baseUrl())) {
             cloundIdentityBuilder.setRootUrl(gcpProps.client().baseUrl());
         }
@@ -96,30 +90,18 @@ public class PlatformTeamsConfig {
     @Bean
     @ConditionalOnProperty("platform-integration.azure.enabled")
     public PlatformUsersFetcher azureUsersFetcher(
-        TokenCredential credential,
-        @Value("${platform-integration.azure.client.base-url}") String baseUrl
-    ) {
-        String azureClientLogLevel = System.getenv("AZURE_CLIENT_LOG_LEVEL");
-        if (Strings.isBlank(azureClientLogLevel)) {
-            azureClientLogLevel = "NONE";
-        }
-        var client = new GraphServiceClient(
-            new BaseGraphRequestAdapter(
+            TokenCredential credential,
+            @Value("${platform-integration.azure.client.base-url}") String baseUrl,
+            @Value("${platform-integration.azure.client.log-level}") String azureClientLogLevel) {
+        var client = new GraphServiceClient(new BaseGraphRequestAdapter(
                 new AzureIdentityAuthenticationProvider(
-                    credential,
-                    new String[]{},
-                    "https://graph.microsoft.com/.default"
-                ),
+                        credential, new String[] {}, "https://graph.microsoft.com/.default"),
                 null,
                 "v1.0",
                 GraphClientFactory.create(GraphServiceClient.getGraphClientOptions())
-                    .addInterceptor(
-                        new HttpLoggingInterceptor()
-                            .setLevel(HttpLoggingInterceptor.Level.valueOf(azureClientLogLevel))
-                    )
-                    .build()
-            )
-        );
+                        .addInterceptor(new HttpLoggingInterceptor()
+                                .setLevel(HttpLoggingInterceptor.Level.valueOf(azureClientLogLevel)))
+                        .build()));
         if (Strings.isNotEmpty(baseUrl)) {
             client.getRequestAdapter().setBaseUrl(baseUrl);
         }
@@ -134,9 +116,8 @@ public class PlatformTeamsConfig {
 
     @Bean
     public KubernetesClient k8sClient(
-        @Value("${platform-integration.kubernetes.base-url}") String baseUrl,
-        @Value("${platform-integration.kubernetes.disable-http-proxy}") boolean disableHttpProxy
-    ) {
+            @Value("${platform-integration.kubernetes.base-url}") String baseUrl,
+            @Value("${platform-integration.kubernetes.disable-http-proxy}") boolean disableHttpProxy) {
         Config config = Config.autoConfigure(null);
 
         if (disableHttpProxy) {
@@ -147,30 +128,21 @@ public class PlatformTeamsConfig {
             config.setMasterUrl(baseUrl);
         }
 
-        KubernetesClientBuilder k8sClientBuilder = new KubernetesClientBuilder()
-            .withConfig(config);
+        KubernetesClientBuilder k8sClientBuilder = new KubernetesClientBuilder().withConfig(config);
         k8sClientBuilder.withHttpClientBuilderConsumer(b -> {
             // required for local runs.
             // for some reason, this client ignores the proxy if it's configured as http, but cluster url is https
             if (config.getHttpProxy() != null && Strings.isBlank(baseUrl)) {
                 URI httpProxy = URI.create(config.getHttpProxy());
                 b.proxyAddress(InetSocketAddress.createUnresolved(httpProxy.getHost(), httpProxy.getPort()))
-                    .proxyType(HttpClient.ProxyType.HTTP);
+                        .proxyType(HttpClient.ProxyType.HTTP);
             }
         });
         return k8sClientBuilder.build();
     }
 
     @ConfigurationProperties("platform-integration.gcp")
-    record GcpProps(
-        String appName,
-        List<String> scopes,
-        ClientProps client
-    ) {
-    }
+    record GcpProps(String appName, List<String> scopes, ClientProps client) {}
 
-    public record ClientProps(
-        String baseUrl
-    ) {
-    }
+    public record ClientProps(String baseUrl) {}
 }

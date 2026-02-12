@@ -1,16 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
 import com.coreeng.supportbot.config.TicketAssignmentProps;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.Nullable;
-import org.springframework.stereotype.Component;
-
-import javax.crypto.Cipher;
-import javax.crypto.Mac;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
@@ -19,6 +9,15 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Optional;
+import javax.crypto.Cipher;
+import javax.crypto.Mac;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
+import org.springframework.stereotype.Component;
 
 /**
  * Helper for assignee encryption/decryption.
@@ -35,10 +34,10 @@ import java.util.Optional;
 @Component
 public class AssigneeCrypto {
 
-    private static final String encPrefix = "enc_v1:";
-    private static final String aesGcm = "AES/GCM/NoPadding";
-    private static final int gcmTagLength = 128; // bits
-    private static final int ivLength = 12; // bytes
+    private static final String ENC_PREFIX = "enc_v1:";
+    private static final String AES_GCM = "AES/GCM/NoPadding";
+    private static final int GCM_TAG_LENGTH = 128; // bits
+    private static final int IV_LENGTH = 12; // bytes
 
     private final TicketAssignmentProps props;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -57,12 +56,12 @@ public class AssigneeCrypto {
             return Optional.empty();
         }
 
-        byte[] iv = new byte[ivLength];
+        byte[] iv = new byte[IV_LENGTH];
         secureRandom.nextBytes(iv);
 
         try {
-            Cipher cipher = Cipher.getInstance(aesGcm);
-            GCMParameterSpec spec = new GCMParameterSpec(gcmTagLength, iv);
+            Cipher cipher = Cipher.getInstance(AES_GCM);
+            GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
             cipher.init(Cipher.ENCRYPT_MODE, key, spec);
             byte[] ciphertext = cipher.doFinal(userId.getBytes(StandardCharsets.UTF_8));
 
@@ -70,7 +69,7 @@ public class AssigneeCrypto {
             System.arraycopy(iv, 0, payload, 0, iv.length);
             System.arraycopy(ciphertext, 0, payload, iv.length, ciphertext.length);
 
-            String encoded = encPrefix + Base64.getEncoder().encodeToString(payload);
+            String encoded = ENC_PREFIX + Base64.getEncoder().encodeToString(payload);
             return Optional.of(new EncryptResult(encoded, "enc_v1"));
         } catch (Exception e) {
             if (log.isWarnEnabled()) {
@@ -102,7 +101,7 @@ public class AssigneeCrypto {
             return Optional.empty();
         }
 
-        String payloadStr = stored.startsWith(encPrefix) ? stored.substring(encPrefix.length()) : stored;
+        String payloadStr = stored.startsWith(ENC_PREFIX) ? stored.substring(ENC_PREFIX.length()) : stored;
         byte[] payload;
         try {
             payload = Base64.getDecoder().decode(payloadStr);
@@ -113,19 +112,19 @@ public class AssigneeCrypto {
             return Optional.empty();
         }
 
-        if (payload.length <= ivLength) {
+        if (payload.length <= IV_LENGTH) {
             log.warn("Invalid payload length for encrypted assignee");
             return Optional.empty();
         }
 
-        byte[] iv = new byte[ivLength];
-        byte[] ciphertext = new byte[payload.length - ivLength];
-        System.arraycopy(payload, 0, iv, 0, ivLength);
-        System.arraycopy(payload, ivLength, ciphertext, 0, ciphertext.length);
+        byte[] iv = new byte[IV_LENGTH];
+        byte[] ciphertext = new byte[payload.length - IV_LENGTH];
+        System.arraycopy(payload, 0, iv, 0, IV_LENGTH);
+        System.arraycopy(payload, IV_LENGTH, ciphertext, 0, ciphertext.length);
 
         try {
-            Cipher cipher = Cipher.getInstance(aesGcm);
-            GCMParameterSpec spec = new GCMParameterSpec(gcmTagLength, iv);
+            Cipher cipher = Cipher.getInstance(AES_GCM);
+            GCMParameterSpec spec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
             cipher.init(Cipher.DECRYPT_MODE, key, spec);
             byte[] plaintext = cipher.doFinal(ciphertext);
             return Optional.of(new String(plaintext, StandardCharsets.UTF_8));
@@ -138,13 +137,10 @@ public class AssigneeCrypto {
     }
 
     private boolean encryptionEnabled() {
-        return props != null
-            && props.encryption() != null
-            && props.encryption().enabled();
+        return props != null && props.encryption() != null && props.encryption().enabled();
     }
 
-    @Nullable
-    private SecretKey deriveKey() {
+    @Nullable private SecretKey deriveKey() {
         String keyStr = props.encryption() != null ? props.encryption().key() : null;
         if (keyStr == null || keyStr.isBlank()) {
             return null;
@@ -165,27 +161,23 @@ public class AssigneeCrypto {
      * Compute deterministic HMAC-SHA256 hash of user ID for filtering/indexing.
      * Uses the encryption key to enhance security.
      */
-    @Nullable
-    public String computeHash(@Nullable String userId) {
+    @Nullable public String computeHash(@Nullable String userId) {
         if (userId == null) {
             return null;
         }
-        
+
         String keyStr = props.encryption() != null ? props.encryption().key() : null;
         if (keyStr == null || keyStr.isBlank()) {
             log.warn("Cannot compute assignee hash without encryption key");
             return null;
         }
-        
+
         try {
             Mac hmac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec keySpec = new SecretKeySpec(
-                keyStr.getBytes(StandardCharsets.UTF_8), 
-                "HmacSHA256"
-            );
+            SecretKeySpec keySpec = new SecretKeySpec(keyStr.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             hmac.init(keySpec);
             byte[] hashBytes = hmac.doFinal(userId.getBytes(StandardCharsets.UTF_8));
-            
+
             StringBuilder hex = new StringBuilder();
             for (byte b : hashBytes) {
                 hex.append(String.format("%02x", b));
@@ -198,5 +190,4 @@ public class AssigneeCrypto {
             return null;
         }
     }
-
 }

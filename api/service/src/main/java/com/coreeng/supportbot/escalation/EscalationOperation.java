@@ -1,15 +1,14 @@
 package com.coreeng.supportbot.escalation;
 
-import lombok.Getter;
-
-import org.jspecify.annotations.Nullable;
 import java.util.regex.Pattern;
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 
 @Getter
 public enum EscalationOperation {
     resolve("escalation-resolve");
 
-    public static final Pattern pattern = Pattern.compile("^escalation-.*$");
+    public static final Pattern PATTERN = Pattern.compile("^escalation-.*$");
 
     private final String actionId;
 
@@ -17,8 +16,7 @@ public enum EscalationOperation {
         this.actionId = actionId;
     }
 
-    @Nullable
-    public static EscalationOperation fromActionIdOrNull(String actionId) {
+    @Nullable public static EscalationOperation fromActionIdOrNull(String actionId) {
         for (EscalationOperation value : values()) {
             if (value.actionId.equals(actionId)) {
                 return value;

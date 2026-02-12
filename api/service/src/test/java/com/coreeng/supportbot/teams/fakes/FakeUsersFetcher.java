@@ -1,13 +1,12 @@
 package com.coreeng.supportbot.teams.fakes;
 
 import com.coreeng.supportbot.teams.PlatformUsersFetcher;
-import lombok.Builder;
-import lombok.Singular;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.Builder;
+import lombok.Singular;
 
 @Builder
 public class FakeUsersFetcher implements PlatformUsersFetcher {
@@ -39,4 +38,3 @@ public class FakeUsersFetcher implements PlatformUsersFetcher {
         return calls.values().stream().mapToInt(Integer::intValue).sum();
     }
 }
-

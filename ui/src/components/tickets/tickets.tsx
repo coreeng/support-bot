@@ -162,8 +162,19 @@ export default function TicketsPage() {
         })
     }, [ticketsContent, hasFullAccess, effectiveTeams, statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter])
 
-    // Reset page when filters change
-    useEffect(() => setCurrentPage(0), [statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter, dateFilter, customDateRange])
+    // Create a fingerprint of current filters to detect changes
+    const filterFingerprint = JSON.stringify([statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter, dateFilter, customDateRange])
+
+    // Track previous fingerprint to detect changes
+    const [prevFilterFingerprint, setPrevFilterFingerprint] = useState(filterFingerprint)
+
+    // Reset page when filters change (during render, not in effect)
+    if (prevFilterFingerprint !== filterFingerprint) {
+        setPrevFilterFingerprint(filterFingerprint)
+        if (currentPage !== 0) {
+            setCurrentPage(0)
+        }
+    }
 
     // Client-side pagination for non-superusers
     const paginatedTickets = useMemo(() => {

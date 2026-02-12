@@ -1,36 +1,34 @@
 package com.coreeng.supportbot.testkit;
 
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
-
 import com.google.common.collect.ImmutableList;
-
 import lombok.Builder;
 import lombok.Getter;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Builder
 @Getter
 public class FullSummaryFormSubmission implements ViewSubmission {
-    public static final String callbackId = "ticket-summary";
+    public static final String CALLBACK_ID = "ticket-summary";
 
-    @NonNull
-    private final String triggerId;
+    @NonNull private final String triggerId;
+
     private final long ticketId;
-    @NonNull
-    private final Values values;
+
+    @NonNull private final Values values;
 
     @Builder
     @Getter
     public static class Values {
         private final Ticket.@NonNull Status status;
-        @NonNull
-        private final String team;
-        @NonNull
-        private final ImmutableList<@NonNull String> tags;
-        @NonNull
-        private final String impact;
-        @Nullable
-        private final String assignedTo;  // Slack user ID, optional
+
+        @NonNull private final String team;
+
+        @NonNull private final ImmutableList<@NonNull String> tags;
+
+        @NonNull private final String impact;
+
+        @Nullable private final String assignedTo; // Slack user ID, optional
     }
 
     @Override
@@ -40,21 +38,22 @@ public class FullSummaryFormSubmission implements ViewSubmission {
 
     @Override
     public String callbackId() {
-        return callbackId;
+        return CALLBACK_ID;
     }
 
     @Override
     public ImmutableList<@NonNull Value> values() {
         ImmutableList.Builder<Value> builder = ImmutableList.<Value>builder()
-            .add(new StaticSelectValue("ticket-change-status", values.status().code()))
-            .add(new StaticSelectValue("ticket-change-team", values.team()))
-            .add(new MultiStaticSelectValue("ticket-change-tags", values.tags()))
-            .add(new StaticSelectValue("ticket-change-impact", values.impact()));
-        
+                .add(new StaticSelectValue(
+                        "ticket-change-status", values.status().code()))
+                .add(new StaticSelectValue("ticket-change-team", values.team()))
+                .add(new MultiStaticSelectValue("ticket-change-tags", values.tags()))
+                .add(new StaticSelectValue("ticket-change-impact", values.impact()));
+
         if (values.assignedTo() != null) {
             builder.add(new StaticSelectValue("ticket-change-assignee", values.assignedTo()));
         }
-        
+
         return builder.build();
     }
 

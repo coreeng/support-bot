@@ -6,9 +6,5 @@ import java.util.List;
 public interface PlatformTeamsFetcher {
     List<TeamAndGroupTuple> fetchTeams();
 
-    record TeamAndGroupTuple(
-        String name,
-        String groupRef
-    ) {
-    }
+    record TeamAndGroupTuple(String name, String groupRef) {}
 }

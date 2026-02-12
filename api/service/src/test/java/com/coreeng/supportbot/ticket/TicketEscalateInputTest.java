@@ -1,9 +1,9 @@
 package com.coreeng.supportbot.ticket;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.coreeng.supportbot.util.JsonMapper;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 public class TicketEscalateInputTest {
     private final JsonMapper jsonMapper = new JsonMapper();

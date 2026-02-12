@@ -31,26 +31,15 @@ public class EscalationTestController {
         if (ticket == null) {
             return ResponseEntity.notFound().build();
         }
-        Escalation escalation = Escalation.createNew(
-                ticketId,
-                req.team(),
-                ImmutableList.copyOf(req.tags()),
-                ticket.queryRef()
-            ).toBuilder()
-            .createdMessageTs(MessageTs.of(req.createdMessageTs()))
-            .build();
+        Escalation escalation =
+                Escalation.createNew(ticketId, req.team(), ImmutableList.copyOf(req.tags()), ticket.queryRef())
+                        .toBuilder()
+                        .createdMessageTs(MessageTs.of(req.createdMessageTs()))
+                        .build();
         escalationRepository.createIfNotExists(escalation);
 
         return ResponseEntity.ok().build();
     }
 
-    public record EscalationToCreate(
-        long ticketId,
-        String team,
-        String createdMessageTs,
-        ImmutableList<String> tags
-    ) {
-    }
+    public record EscalationToCreate(long ticketId, String team, String createdMessageTs, ImmutableList<String> tags) {}
 }
-
-

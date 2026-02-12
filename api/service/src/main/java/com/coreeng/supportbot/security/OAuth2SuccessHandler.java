@@ -7,6 +7,9 @@ import com.coreeng.supportbot.teams.TeamType;
 import com.google.common.collect.ImmutableList;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Locale;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -14,16 +17,12 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.io.IOException;
-import java.util.Locale;
-import java.util.regex.Pattern;
-
 @Slf4j
 @RequiredArgsConstructor
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
-    private static final Pattern leadershipPattern = Pattern.compile("leadership", Pattern.CASE_INSENSITIVE);
-    private static final Pattern supportPattern = Pattern.compile("support", Pattern.CASE_INSENSITIVE);
-    private static final Pattern escalationPattern = Pattern.compile("escalation", Pattern.CASE_INSENSITIVE);
+    private static final Pattern LEADERSHIP_PATTERN = Pattern.compile("leadership", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SUPPORT_PATTERN = Pattern.compile("support", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ESCALATION_PATTERN = Pattern.compile("escalation", Pattern.CASE_INSENSITIVE);
 
     private final SecurityProperties properties;
     private final JwtService jwtService;
@@ -33,10 +32,8 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     @Override
     public void onAuthenticationSuccess(
-        HttpServletRequest request,
-        HttpServletResponse response,
-        Authentication authentication
-    ) throws IOException {
+            HttpServletRequest request, HttpServletResponse response, Authentication authentication)
+            throws IOException {
         var oauth2User = (OAuth2User) authentication.getPrincipal();
         var email = extractEmail(oauth2User);
         var name = extractName(oauth2User);
@@ -51,11 +48,10 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         var jwt = jwtService.generateToken(principal);
         var code = authCodeStore.storeToken(jwt);
 
-        var redirectUri = UriComponentsBuilder
-            .fromUriString(properties.oauth2().redirectUri())
-            .queryParam("code", code)
-            .build()
-            .toUriString();
+        var redirectUri = UriComponentsBuilder.fromUriString(properties.oauth2().redirectUri())
+                .queryParam("code", code)
+                .build()
+                .toUriString();
 
         log.debug("Redirecting to UI with auth code");
         response.sendRedirect(redirectUri);
@@ -88,39 +84,37 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     private ImmutableList<Role> computeRoles(String email, ImmutableList<Team> teams) {
         var roles = ImmutableList.<Role>builder();
-        roles.add(Role.user);
+        roles.add(Role.USER);
 
         if (computeIsLeadership(email, teams)) {
-            roles.add(Role.leadership);
+            roles.add(Role.LEADERSHIP);
         }
         if (computeIsSupportEngineer(email, teams)) {
-            roles.add(Role.supportEngineer);
+            roles.add(Role.SUPPORT_ENGINEER);
         }
         if (computeIsEscalation(teams)) {
-            roles.add(Role.escalation);
+            roles.add(Role.ESCALATION);
         }
 
         return roles.build();
     }
 
     private boolean computeIsLeadership(String email, ImmutableList<Team> teams) {
-        return supportTeamService.isLeadershipMemberByUserEmail(email)
-            || hasTeamType(teams, leadershipPattern);
+        return supportTeamService.isLeadershipMemberByUserEmail(email) || hasTeamType(teams, LEADERSHIP_PATTERN);
     }
 
     private boolean computeIsSupportEngineer(String email, ImmutableList<Team> teams) {
-        return supportTeamService.isMemberByUserEmail(email)
-            || hasTeamType(teams, supportPattern);
+        return supportTeamService.isMemberByUserEmail(email) || hasTeamType(teams, SUPPORT_PATTERN);
     }
 
     private boolean computeIsEscalation(ImmutableList<Team> teams) {
-        return hasTeamType(teams, escalationPattern);
+        return hasTeamType(teams, ESCALATION_PATTERN);
     }
 
     private boolean hasTeamType(ImmutableList<Team> teams, Pattern pattern) {
         return teams.stream()
-            .flatMap(t -> t.types().stream())
-            .map(TeamType::name)
-            .anyMatch(type -> pattern.matcher(type).find());
+                .flatMap(t -> t.types().stream())
+                .map(TeamType::name)
+                .anyMatch(type -> pattern.matcher(type).find());
     }
 }

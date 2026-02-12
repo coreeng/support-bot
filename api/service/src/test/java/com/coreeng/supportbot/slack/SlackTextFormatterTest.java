@@ -1,13 +1,13 @@
 package com.coreeng.supportbot.slack;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.slack.api.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 class SlackTextFormatterTest {
 
@@ -271,7 +271,8 @@ class SlackTextFormatterTest {
         when(slackClient.getChannelName("C08E1PXF9U4")).thenReturn("general");
 
         // When
-        String result = formatter.format("Hello <@U123>! Check <#C08E1PXF9U4|general> and visit <https://example.com|Example>");
+        String result =
+                formatter.format("Hello <@U123>! Check <#C08E1PXF9U4|general> and visit <https://example.com|Example>");
 
         // Then
         assertThat(result).isEqualTo("Hello @Alice! Check #general and visit Example (https://example.com)");
@@ -286,10 +287,13 @@ class SlackTextFormatterTest {
         when(slackClient.getChannelName("C08E1PXF9U4")).thenReturn("general");
 
         // When
-        String result = formatter.format("Hello <@U123> and <!subteam^S08948NBMED>! Check <#C08E1PXF9U4> and <!here>! Visit <https://example.com|link>");
+        String result = formatter.format(
+                "Hello <@U123> and <!subteam^S08948NBMED>! Check <#C08E1PXF9U4> and <!here>! Visit <https://example.com|link>");
 
         // Then
-        assertThat(result).isEqualTo("Hello @Alice and @core-support! Check #general and @here! Visit link (https://example.com)");
+        assertThat(result)
+                .isEqualTo(
+                        "Hello @Alice and @core-support! Check #general and @here! Visit link (https://example.com)");
     }
 
     @Test
@@ -323,4 +327,3 @@ class SlackTextFormatterTest {
         return user;
     }
 }
-

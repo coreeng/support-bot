@@ -1,13 +1,19 @@
 package com.coreeng.supportbot.escalation.rest;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+
 import com.coreeng.supportbot.escalation.*;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketQueryService;
-import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.coreeng.supportbot.ticket.TicketTeam;
+import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -15,54 +21,55 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class EscalationControllerTest {
 
-    private static final EscalationId escalationId = new EscalationId(1);
-    private static final TicketId ticketId = new TicketId(1);
+    private static final EscalationId ESCALATION_ID = new EscalationId(1);
+    private static final TicketId TICKET_ID = new TicketId(1);
 
-    @Mock private EscalationQueryService escalationQueryService;
-    @Mock private TicketQueryService ticketQueryService;
-    @Mock private EscalationUIMapper mapper;
+    @Mock
+    private EscalationQueryService escalationQueryService;
 
-    @InjectMocks private EscalationController controller;
+    @Mock
+    private TicketQueryService ticketQueryService;
+
+    @Mock
+    private EscalationUIMapper mapper;
+
+    @InjectMocks
+    private EscalationController controller;
 
     @Test
     void shouldReturnMappedEscalationsWithTickets() {
         // given
         Escalation escalation = mock(Escalation.class);
-        when(escalation.ticketId()).thenReturn(ticketId);
+        when(escalation.ticketId()).thenReturn(TICKET_ID);
 
         Ticket ticket = mock(Ticket.class);
-        when(ticket.id()).thenReturn(ticketId);
+        when(ticket.id()).thenReturn(TICKET_ID);
         when(ticket.team()).thenReturn(TicketTeam.fromCode("TeamA"));
 
-        EscalationUI mapped = EscalationUI.builder().id(escalationId).build();
+        EscalationUI mapped = EscalationUI.builder().id(ESCALATION_ID).build();
         when(mapper.mapToUI(escalation)).thenReturn(mapped);
 
-        when(escalationQueryService.findByQuery(any()))
-                .thenReturn(new Page<>(ImmutableList.of(escalation), 0, 1, 1));
-        when(ticketQueryService.findByQuery(any()))
-                .thenReturn(new Page<>(ImmutableList.of(ticket), 0, 1, 1));
+        when(escalationQueryService.findByQuery(any())).thenReturn(new Page<>(ImmutableList.of(escalation), 0, 1, 1));
+        when(ticketQueryService.findByQuery(any())).thenReturn(new Page<>(ImmutableList.of(ticket), 0, 1, 1));
 
         // when
         Page<EscalationUI> result = controller.list(
-                0L, 10L, List.of(escalationId), ticketId,
-                LocalDate.now(ZoneId.systemDefault()).minusDays(1), LocalDate.now(ZoneId.systemDefault()),
-                EscalationStatus.opened, "TeamA"
-        );
+                0L,
+                10L,
+                List.of(ESCALATION_ID),
+                TICKET_ID,
+                LocalDate.now(ZoneId.systemDefault()).minusDays(1),
+                LocalDate.now(ZoneId.systemDefault()),
+                EscalationStatus.opened,
+                "TeamA");
 
         // then
         assertThat(result.content()).hasSize(1);
         EscalationUI ui = result.content().get(0);
-        assertThat(ui.id()).isEqualTo(escalationId);
+        assertThat(ui.id()).isEqualTo(ESCALATION_ID);
         assertThat(ui.escalatingTeam()).isEqualTo("TeamA");
 
         verify(escalationQueryService).findByQuery(any(EscalationQuery.class));
@@ -74,10 +81,8 @@ class EscalationControllerTest {
     @Test
     void shouldHandleEmptyEscalations() {
         // given
-        when(escalationQueryService.findByQuery(any()))
-                .thenReturn(new Page<>(ImmutableList.of(), 0, 1, 0));
-        when(ticketQueryService.findByQuery(any()))
-                .thenReturn(new Page<>(ImmutableList.of(), 0, 1, 0));
+        when(escalationQueryService.findByQuery(any())).thenReturn(new Page<>(ImmutableList.of(), 0, 1, 0));
+        when(ticketQueryService.findByQuery(any())).thenReturn(new Page<>(ImmutableList.of(), 0, 1, 0));
 
         // when
         Page<EscalationUI> result = controller.list(0L, 10L, List.of(), null, null, null, null, null);
@@ -94,21 +99,19 @@ class EscalationControllerTest {
     @Test
     void shouldPassCorrectQueryToEscalationService() {
         // given
-        when(escalationQueryService.findByQuery(any()))
-                .thenReturn(new Page<>(ImmutableList.of(), 2, 1, 0));
-        when(ticketQueryService.findByQuery(any()))
-                .thenReturn(new Page<>(ImmutableList.of(), 0, 1, 0));
+        when(escalationQueryService.findByQuery(any())).thenReturn(new Page<>(ImmutableList.of(), 2, 1, 0));
+        when(ticketQueryService.findByQuery(any())).thenReturn(new Page<>(ImmutableList.of(), 0, 1, 0));
 
         // when
         controller.list(
-                2L, 5L,
+                2L,
+                5L,
                 List.of(new EscalationId(1), new EscalationId(2)),
                 null,
                 LocalDate.of(2024, 1, 1),
                 LocalDate.of(2024, 12, 31),
                 EscalationStatus.resolved,
-                "Ops"
-        );
+                "Ops");
 
         // then
         ArgumentCaptor<EscalationQuery> captor = ArgumentCaptor.forClass(EscalationQuery.class);

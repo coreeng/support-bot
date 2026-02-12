@@ -2,14 +2,13 @@ package com.coreeng.supportbot.slack;
 
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.slack.api.model.User;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-
-import org.jspecify.annotations.Nullable;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
+import org.springframework.stereotype.Component;
 
 /**
  * Formats Slack's internal text format to human-readable text.
@@ -21,25 +20,24 @@ import java.util.regex.Pattern;
 public class SlackTextFormatter {
     private final SlackClient slackClient;
 
-    private static final Pattern userMention = Pattern.compile("<@([UW][A-Z0-9]+)>");
-    private static final Pattern subteamMention = Pattern.compile("<!subteam\\^([A-Z0-9]+)(?:\\|@([^>]*))?>");
-    private static final Pattern channelMention = Pattern.compile("<#([C][A-Z0-9]+)(?:\\|([^>]*))?>");
-    private static final Pattern link = Pattern.compile("<(https?://[^|>]+)(?:\\|([^>]*))?>");
+    private static final Pattern USER_MENTION = Pattern.compile("<@([UW][A-Z0-9]+)>");
+    private static final Pattern SUBTEAM_MENTION = Pattern.compile("<!subteam\\^([A-Z0-9]+)(?:\\|@([^>]*))?>");
+    private static final Pattern CHANNEL_MENTION = Pattern.compile("<#([C][A-Z0-9]+)(?:\\|([^>]*))?>");
+    private static final Pattern LINK = Pattern.compile("<(https?://[^|>]+)(?:\\|([^>]*))?>");
     // Special mentions we actively support
-    private static final Pattern specialMention = Pattern.compile("<!(here|channel|everyone)>");
+    private static final Pattern SPECIAL_MENTION = Pattern.compile("<!(here|channel|everyone)>");
 
-    @Nullable
-    public String format(@Nullable String text) {
+    @Nullable public String format(@Nullable String text) {
         if (text == null || text.isBlank()) {
             return text;
         }
 
         String result = text;
-        result = replace(result, userMention, this::formatUserMention);
-        result = replace(result, subteamMention, this::formatSubteamMention);
-        result = replace(result, channelMention, this::formatChannelMention);
-        result = replace(result, link, this::formatLink);
-        result = replace(result, specialMention, m -> "@" + m.group(1));
+        result = replace(result, USER_MENTION, this::formatUserMention);
+        result = replace(result, SUBTEAM_MENTION, this::formatSubteamMention);
+        result = replace(result, CHANNEL_MENTION, this::formatChannelMention);
+        result = replace(result, LINK, this::formatLink);
+        result = replace(result, SPECIAL_MENTION, m -> "@" + m.group(1));
         return result;
     }
 
@@ -69,11 +67,11 @@ public class SlackTextFormatter {
     private String formatSubteamMention(Matcher matcher) {
         String subteamId = matcher.group(1);
         String handle = matcher.group(2);
-        
+
         if (handle != null && !handle.isBlank()) {
             return "@" + handle;
         }
-        
+
         try {
             String groupName = slackClient.getGroupName(SlackId.group(subteamId));
             return "@" + (groupName != null ? groupName : "group-" + subteamId);
@@ -88,11 +86,11 @@ public class SlackTextFormatter {
     private String formatChannelMention(Matcher matcher) {
         String channelId = matcher.group(1);
         String channelName = matcher.group(2);
-        
+
         if (channelName != null && !channelName.isBlank()) {
             return "#" + channelName;
         }
-        
+
         try {
             String name = slackClient.getChannelName(channelId);
             return "#" + (name != null && !name.isBlank() ? name : channelId);
