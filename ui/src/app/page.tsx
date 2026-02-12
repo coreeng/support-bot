@@ -16,16 +16,51 @@ import { BookOpen } from 'lucide-react'
 import KnowledgeGapsPage from '@/components/knowledgegaps/knowledge-gaps'
 import { useKnowledgeGapsEnabled } from '@/lib/hooks'
 
+// Types for tab visibility requirements
+type TabVisibilityRequirements = {
+    requiresFullAccess?: boolean
+    requiresRoles?: string[]
+    requiresFeatureFlag?: 'knowledgeGaps'
+}
 
-// 1. Define support sub-tabs
-const supportSubTabs = [
+type SupportTab = {
+    key: string
+    label: string
+    icon: React.ReactNode
+    visibility?: TabVisibilityRequirements
+}
+
+// 1. Define support sub-tabs with visibility requirements
+// Note: Home, Tickets, and Escalations are always visible to all users
+const supportSubTabs: SupportTab[] = [
+    // Always visible tabs
     { key: 'home', label: 'Home', icon: <Home className="w-5 h-5 mr-2" /> },
     { key: 'tickets', label: 'Tickets', icon: <Ticket className="w-5 h-5 mr-2" /> },
     { key: 'escalations', label: 'Escalations', icon: <AlertCircle className="w-5 h-5 mr-2" /> },
-    { key: 'knowledge-gaps', label: 'Support Area Summary', icon: <BookOpen className="w-5 h-5 mr-2" /> },
-    { key: 'health', label: 'Analytics & Operations', icon: <BarChart2 className="w-5 h-5 mr-2" /> },
-    { key: 'sla', label: 'SLA Dashboard', icon: <BarChart2 className="w-5 h-5 mr-2" /> }
-] as const
+    
+    // Restricted tabs (only visible when leadership/support team is selected)
+    {
+        key: 'knowledge-gaps',
+        label: 'Support Area Summary',
+        icon: <BookOpen className="w-5 h-5 mr-2" />,
+        visibility: {
+            requiresFullAccess: true,
+            requiresFeatureFlag: 'knowledgeGaps'
+        }
+    },
+    {
+        key: 'health',
+        label: 'Analytics & Operations',
+        icon: <BarChart2 className="w-5 h-5 mr-2" />,
+        visibility: { requiresFullAccess: true }
+    },
+    {
+        key: 'sla',
+        label: 'SLA Dashboard',
+        icon: <BarChart2 className="w-5 h-5 mr-2" />,
+        visibility: { requiresFullAccess: true }
+    }
+]
 
 // 2. Derive TabKey types
 type SupportSubTabKey = typeof supportSubTabs[number]['key']
@@ -48,18 +83,39 @@ export default function Dashboard() {
         router.push('/login')
     }
 
-    // Show all tabs based on access level and feature flags
-    const supportTabs = supportSubTabs.filter(tab => {
-        // Filter out health and sla for non-full-access users
-        if (!hasFullAccess && (tab.key === 'health' || tab.key === 'sla')) {
+    // Helper function to check if a tab should be visible
+    const isTabVisible = (tab: SupportTab): boolean => {
+        if (!tab.visibility) {
+            return true // No restrictions
+        }
+
+        const { requiresFullAccess, requiresRoles, requiresFeatureFlag } = tab.visibility
+
+        // Check full access requirement
+        if (requiresFullAccess && !hasFullAccess) {
             return false
         }
-        // Filter out knowledge-gaps if feature is disabled
-        if (tab.key === 'knowledge-gaps' && isKnowledgeGapsEnabled === false) {
-            return false
+
+        // Check role requirement
+        if (requiresRoles && requiresRoles.length > 0) {
+            const hasRequiredRole = requiresRoles.some(role => user?.roles?.includes(role))
+            if (!hasRequiredRole) {
+                return false
+            }
         }
+
+        // Check feature flag requirement
+        if (requiresFeatureFlag === 'knowledgeGaps') {
+            if (isKnowledgeGapsEnabled !== true) {
+                return false
+            }
+        }
+
         return true
-    })
+    }
+
+    // Show all tabs based on access level and feature flags
+    const supportTabs = supportSubTabs.filter(isTabVisible)
 
     // Ensure activeSupportSubTab is valid
     useEffect(() => {
