@@ -1,6 +1,6 @@
 'use client'
-import { createContext, useContext, ReactNode, useState, useEffect, useMemo } from 'react'
-import { useAuth } from './AuthContext'
+import { createContext, useContext, ReactNode, useState, useMemo } from 'react'
+import { useAuth } from '@/hooks/useAuth'
 
 type TeamFilterContextType = {
     selectedTeam: string | null  // null = "All Teams", string = specific team
@@ -15,22 +15,23 @@ const TeamFilterContext = createContext<TeamFilterContextType | undefined>(undef
 
 export const TeamFilterProvider = ({ children }: { children: ReactNode }) => {
     const { user, isLeadership, isSupportEngineer } = useAuth()
-    const [selectedTeam, setSelectedTeam] = useState<string | null>(null)
-    const [initialized, setInitialized] = useState(false)
 
-    // Initialize selectedTeam based on user role (only once)
-    useEffect(() => {
-        if (user && !initialized) {
-            // Everyone starts with their first team
-            if (user.teams.length > 0) {
-                const firstTeam = user.teams[0].name
-                setSelectedTeam(firstTeam)
-            } else {
-                setSelectedTeam(null)
-            }
-            setInitialized(true)
+    // Track if we've done one-time initialization
+    const [hasInitialized, setHasInitialized] = useState(false)
+
+    // Initialize selectedTeam lazily based on user
+    const [selectedTeam, setSelectedTeam] = useState<string | null>(null)
+
+    // Derive initialized state
+    const initialized = hasInitialized || !!user
+
+    // One-time initialization during render when user becomes available
+    if (user && !hasInitialized) {
+        setHasInitialized(true)
+        if (selectedTeam === null && user.teams.length > 0) {
+            setSelectedTeam(user.teams[0].name)
         }
-    }, [user, isLeadership, isSupportEngineer, initialized])
+    }
 
     // Helper: Check if a team is a pure role group by types (leadership/support)
     const isPureRoleGroup = (team: { name: string; types?: string[] } | null) => {

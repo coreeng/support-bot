@@ -15,7 +15,6 @@ const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.us
 const mockUseAssignmentEnabled = hooks.useAssignmentEnabled as jest.MockedFunction<typeof hooks.useAssignmentEnabled>;
 
 // Helper to create mock ticket with recent dates
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createMockTicket = (id: string, status: string, teamName: string, impact: string): any => {
     const now = new Date();
     const recentDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); // Yesterday
@@ -53,9 +52,8 @@ const mockRegistry = {
     tags: [{ code: 'bug', label: 'Bug' }]
 };
 
-// Mock auth context to provide a test user by default
-jest.mock('../../../contexts/AuthContext', () => ({
-    AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+// Mock auth hook to provide a test user by default
+jest.mock('../../../hooks/useAuth', () => ({
     useAuth: () => ({
         user: 'test@example.com',
         isAuthenticated: true,

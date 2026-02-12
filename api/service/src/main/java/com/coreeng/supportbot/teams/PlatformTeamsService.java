@@ -1,5 +1,8 @@
 package com.coreeng.supportbot.teams;
 
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static java.util.stream.Collectors.joining;
+
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.google.common.collect.ImmutableList;
@@ -7,10 +10,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.Nullable;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -27,9 +26,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static java.util.stream.Collectors.joining;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -51,23 +50,20 @@ public class PlatformTeamsService {
 
         // Build team objects and collect unique group refs
         for (var t : teams) {
-            PlatformTeam team = teamByName.computeIfAbsent(t.name(), k -> new PlatformTeam(
-                t.name(),
-                new HashSet<>(),
-                new HashSet<>()
-            ));
+            PlatformTeam team = teamByName.computeIfAbsent(
+                    t.name(), k -> new PlatformTeam(t.name(), new HashSet<>(), new HashSet<>()));
             team.groupRefs().add(t.groupRef());
         }
 
         Set<String> uniqueGroupRefs = teams.stream()
-            .map(PlatformTeamsFetcher.TeamAndGroupTuple::groupRef)
-            .collect(Collectors.toSet());
+                .map(PlatformTeamsFetcher.TeamAndGroupTuple::groupRef)
+                .collect(Collectors.toSet());
 
         int maxConcurrency = Math.max(1, fetchProps.maxConcurrency());
         Duration timeout = fetchProps.timeout();
 
         Map<String, List<PlatformUsersFetcher.Membership>> membershipsByGroupRef =
-            fetchMembershipsInParallel(uniqueGroupRefs, maxConcurrency, timeout);
+                fetchMembershipsInParallel(uniqueGroupRefs, maxConcurrency, timeout);
 
         // Materialize users and relations on the main thread
         Map<String, List<PlatformUser>> fetchedGroupUsers = new HashMap<>();
@@ -78,10 +74,7 @@ public class PlatformTeamsService {
             for (PlatformUsersFetcher.Membership m : memberships) {
                 String normalisedEmail = m.email().toLowerCase(Locale.ROOT);
                 PlatformUser user = usersByEmail.computeIfAbsent(
-                    normalisedEmail, k -> new PlatformUser(
-                        normalisedEmail,
-                        new HashSet<>()
-                    ));
+                        normalisedEmail, k -> new PlatformUser(normalisedEmail, new HashSet<>()));
                 users.add(user);
             }
             fetchedGroupUsers.put(groupRef, users);
@@ -99,18 +92,15 @@ public class PlatformTeamsService {
         }
 
         log.atInfo()
-            .addArgument(teamByName::size)
-            .addArgument(groupIdToUsers::size)
-            .addArgument(usersByEmail::size)
-            .addArgument(() -> Duration.between(start, Instant.now()))
-            .log("Finished fetching teams info. Teams({}), Groups({}), Users({}), Elapsed({})");
+                .addArgument(teamByName::size)
+                .addArgument(groupIdToUsers::size)
+                .addArgument(usersByEmail::size)
+                .addArgument(() -> Duration.between(start, Instant.now()))
+                .log("Finished fetching teams info. Teams({}), Groups({}), Users({}), Elapsed({})");
     }
 
     private Map<String, List<PlatformUsersFetcher.Membership>> fetchMembershipsInParallel(
-        Set<String> groupRefs,
-        int maxConcurrency,
-        @Nullable Duration timeout
-    ) {
+            Set<String> groupRefs, int maxConcurrency, @Nullable Duration timeout) {
         if (groupRefs.isEmpty()) {
             log.warn("No groupRefs to fetch, possibly a configuration issue.");
             return ImmutableMap.of();
@@ -121,32 +111,34 @@ public class PlatformTeamsService {
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             Semaphore gate = new Semaphore(maxConcurrency);
             for (String groupRef : groupRefs) {
-                CompletableFuture<List<PlatformUsersFetcher.Membership>> future =
-                    CompletableFuture.supplyAsync(() -> {
-                        boolean acquired = false;
-                        try {
-                            gate.acquire();
-                            acquired = true;
-                            return usersFetcher.fetchMembershipsByGroupRef(groupRef);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            throw new RuntimeException(e);
-                        } catch (Exception e) {
-                            log.atWarn()
-                                .setCause(e)
-                                .addKeyValue("groupRef", groupRef)
-                                .log("Failed to fetch group members");
-                            return ImmutableList.of();
-                        } finally {
-                            if (acquired) {
-                                gate.release();
+                CompletableFuture<List<PlatformUsersFetcher.Membership>> future = CompletableFuture.supplyAsync(
+                        () -> {
+                            boolean acquired = false;
+                            try {
+                                gate.acquire();
+                                acquired = true;
+                                return usersFetcher.fetchMembershipsByGroupRef(groupRef);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                throw new RuntimeException(e);
+                            } catch (Exception e) {
+                                log.atWarn()
+                                        .setCause(e)
+                                        .addKeyValue("groupRef", groupRef)
+                                        .log("Failed to fetch group members");
+                                return ImmutableList.of();
+                            } finally {
+                                if (acquired) {
+                                    gate.release();
+                                }
                             }
-                        }
-                    }, executor);
+                        },
+                        executor);
                 futures.put(groupRef, future);
             }
 
-            CompletableFuture<Void> all = CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0]));
+            CompletableFuture<Void> all =
+                    CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0]));
             try {
                 if (timeout != null) {
                     all.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -174,12 +166,11 @@ public class PlatformTeamsService {
     }
 
     private void validateEscalationTeamsMapping(List<PlatformTeamsFetcher.TeamAndGroupTuple> teams) {
-        ImmutableSet<String> teamNames = teams.stream()
-            .map(PlatformTeamsFetcher.TeamAndGroupTuple::name)
-            .collect(toImmutableSet());
+        ImmutableSet<String> teamNames =
+                teams.stream().map(PlatformTeamsFetcher.TeamAndGroupTuple::name).collect(toImmutableSet());
         ImmutableSet<String> escalationTeamNames = escalationTeamsRegistry.listAllEscalationTeams().stream()
-            .map(EscalationTeam::code)
-            .collect(toImmutableSet());
+                .map(EscalationTeam::code)
+                .collect(toImmutableSet());
         var setsDiff = Sets.difference(escalationTeamNames, teamNames);
         if (!setsDiff.isEmpty()) {
             if (fetchProps.ignoreUnknownTeams()) {
@@ -187,10 +178,8 @@ public class PlatformTeamsService {
                     Found unknown escalation teams: {}.
                     Ensure that it's expected that these teams are not found among platform teams.""", setsDiff);
             } else {
-                throw new IllegalStateException("Unknown escalation teams specified: " +
-                                                setsDiff.stream()
-                                                    .collect(joining(", ", "[", "]"))
-                );
+                throw new IllegalStateException("Unknown escalation teams specified: "
+                        + setsDiff.stream().collect(joining(", ", "[", "]")));
             }
         }
     }
@@ -207,13 +196,11 @@ public class PlatformTeamsService {
         return ImmutableList.copyOf(user.teams());
     }
 
-    @Nullable
-    public PlatformTeam findTeamByName(String name) {
+    @Nullable public PlatformTeam findTeamByName(String name) {
         return teamByName.get(name);
     }
 
-    @Nullable
-    public PlatformUser findUserByEmail(String email) {
+    @Nullable public PlatformUser findUserByEmail(String email) {
         return usersByEmail.get(email.toLowerCase(Locale.ROOT));
     }
 }

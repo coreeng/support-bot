@@ -1,17 +1,16 @@
 package com.coreeng.supportbot.ticket.rest;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
+
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
+import java.time.LocalDate;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.LocalDate;
-import java.util.List;
-
-import static com.google.common.collect.ImmutableList.toImmutableList;
 
 @RestController
 @RequestMapping("/ticket")
@@ -32,8 +31,7 @@ public class TicketController {
             @RequestParam(required = false) Boolean escalated,
             @RequestParam(required = false, defaultValue = "") List<String> impacts,
             @RequestParam(required = false, defaultValue = "") List<String> teams,
-            @RequestParam(required = false) String assignedTo
-    ) {
+            @RequestParam(required = false) String assignedTo) {
         TicketsQuery ticketQuery = TicketsQuery.builder()
                 .page(page)
                 .pageSize(pageSize)
@@ -49,16 +47,14 @@ public class TicketController {
 
         Page<DetailedTicket> detailedTicketsPage = queryService.findDetailedTicketByQuery(ticketQuery);
 
-        ImmutableList<TicketUI> ticketUIs = detailedTicketsPage.content().stream()
-                .map(mapper::mapToUI)
-                .collect(toImmutableList());
+        ImmutableList<TicketUI> ticketUIs =
+                detailedTicketsPage.content().stream().map(mapper::mapToUI).collect(toImmutableList());
 
         Page<TicketUI> ticketUIPage = new Page<>(
                 ticketUIs,
                 detailedTicketsPage.page(),
                 detailedTicketsPage.totalPages(),
-                detailedTicketsPage.totalElements()
-        );
+                detailedTicketsPage.totalElements());
 
         return ResponseEntity.ok(ticketUIPage);
     }
@@ -74,7 +70,8 @@ public class TicketController {
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<?> updateTicket(@PathVariable TicketId id, @Nullable @RequestBody TicketUpdateRequest request) {
+    public ResponseEntity<?> updateTicket(
+            @PathVariable TicketId id, @Nullable @RequestBody TicketUpdateRequest request) {
         try {
             TicketUI ticket = ticketUpdateService.update(id, request);
             return ResponseEntity.ok(ticket);

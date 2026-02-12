@@ -1,18 +1,17 @@
 package com.coreeng.supportbot.teams;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.User;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 class GenericSlackMemberFetcherTest {
 
@@ -60,9 +59,11 @@ class GenericSlackMemberFetcherTest {
 
         // Then
         assertThat(result).hasSize(2);
-        assertThat(result).extracting(TeamMemberFetcher.TeamMember::email)
+        assertThat(result)
+                .extracting(TeamMemberFetcher.TeamMember::email)
                 .containsExactlyInAnyOrder("user1@example.com", "user2@example.com");
-        assertThat(result).extracting(TeamMemberFetcher.TeamMember::slackId)
+        assertThat(result)
+                .extracting(TeamMemberFetcher.TeamMember::slackId)
                 .containsExactlyInAnyOrder(SlackId.user("U1"), SlackId.user("U2"));
         verify(slackClient).getGroupMembers(SlackId.group("GROUP_ID"));
         verify(slackClient).getUserById(SlackId.user("U1"));
@@ -73,9 +74,8 @@ class GenericSlackMemberFetcherTest {
     void loadInitialMembersHandlesMultipleUsers() {
         // Given
         ImmutableList<String> userIdStrings = ImmutableList.of("U1", "U2", "U3", "U4", "U5");
-        ImmutableList<SlackId.User> userIds = userIdStrings.stream()
-                .map(SlackId::user)
-                .collect(ImmutableList.toImmutableList());
+        ImmutableList<SlackId.User> userIds =
+                userIdStrings.stream().map(SlackId::user).collect(ImmutableList.toImmutableList());
         when(slackClient.getGroupMembers(SlackId.group("LARGE_GROUP"))).thenReturn(userIdStrings);
 
         for (SlackId.User userId : userIds) {
@@ -106,9 +106,11 @@ class GenericSlackMemberFetcherTest {
 
         // Then
         assertThat(result).hasSize(2);
-        assertThat(result).extracting(TeamMemberFetcher.TeamMember::email)
+        assertThat(result)
+                .extracting(TeamMemberFetcher.TeamMember::email)
                 .containsExactlyInAnyOrder("updated1@example.com", "updated2@example.com");
-        assertThat(result).extracting(TeamMemberFetcher.TeamMember::slackId)
+        assertThat(result)
+                .extracting(TeamMemberFetcher.TeamMember::slackId)
                 .containsExactlyInAnyOrder(SlackId.user("U10"), SlackId.user("U20"));
         verify(slackClient, never()).getGroupMembers(any(SlackId.Group.class));
         verify(slackClient).getUserById(SlackId.user("U10"));

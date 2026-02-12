@@ -44,11 +44,9 @@ public interface SlackClient {
 
     ImmutableList<String> getGroupMembers(SlackId.Group groupId);
 
-    @Nullable
-    String getGroupName(SlackId.Group groupId);
+    @Nullable String getGroupName(SlackId.Group groupId);
 
-    @Nullable
-    String getChannelName(String channelId);
+    @Nullable String getChannelName(String channelId);
 
     ConversationsOpenResponse openDmConversation(SlackId.User userId);
 }

@@ -1,18 +1,17 @@
 package com.coreeng.supportbot.testkit;
 
+import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
-
 import lombok.RequiredArgsConstructor;
-import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 
 @RequiredArgsConstructor
 public class SummaryCloseConfirm {
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final long ticketId;
     private final long numberOfOpenEscalations;
@@ -32,13 +31,13 @@ public class SummaryCloseConfirm {
             { "type": "plain_text", "text": "Cancel", "emoji": false }
         """);
 
-        String expectedText = "Ticket has `" + numberOfOpenEscalations + "` unresolved escalations." +
-            " Closing the ticket will close all related escalations.\n" +
-            "Are you sure?";
+        String expectedText = "Ticket has `" + numberOfOpenEscalations + "` unresolved escalations."
+                + " Closing the ticket will close all related escalations.\n"
+                + "Are you sure?";
 
-        var expectedBlocks = objectMapper.createArrayNode();
-        var section = objectMapper.createObjectNode();
-        var text = objectMapper.createObjectNode();
+        var expectedBlocks = OBJECT_MAPPER.createArrayNode();
+        var section = OBJECT_MAPPER.createObjectNode();
+        var text = OBJECT_MAPPER.createObjectNode();
         section.put("type", "section");
         text.put("type", "mrkdwn");
         text.put("text", expectedText);
@@ -46,13 +45,12 @@ public class SummaryCloseConfirm {
         expectedBlocks.add(section);
         assertThatJson(viewJson.get("blocks")).isEqualTo(expectedBlocks);
 
-        assertThatNoException()
-            .isThrownBy(() -> {
-                JsonNode pm = objectMapper.readTree(privateMetadataRaw);
-                String assignedToJson = expected.assignedTo() != null 
-                    ? String.format("\"%s\"", expected.assignedTo())
-                    : "null";
-                String expectedPmJson = String.format("""
+        assertThatNoException().isThrownBy(() -> {
+            JsonNode pm = OBJECT_MAPPER.readTree(privateMetadataRaw);
+            String assignedToJson =
+                    expected.assignedTo() != null ? String.format("\"%s\"", expected.assignedTo()) : "null";
+            String expectedPmJson = String.format(
+                    """
                     {
                       "ticketId": %d,
                       "status": "%s",
@@ -66,12 +64,11 @@ public class SummaryCloseConfirm {
                     ticketId,
                     expected.status(),
                     expected.team(),
-                    objectMapper.writeValueAsString(expected.tags()),
+                    OBJECT_MAPPER.writeValueAsString(expected.tags()),
                     expected.impact(),
-                    assignedToJson
-                );
-                assertThatJson(pm).isEqualTo(expectedPmJson);
-            });
+                    assignedToJson);
+            assertThatJson(pm).isEqualTo(expectedPmJson);
+        });
         return this;
     }
 
@@ -105,11 +102,12 @@ public class SummaryCloseConfirm {
         };
     }
 
-    public record Receiver(long ticketId, long numberOfOpenEscalations) implements ViewSubmissionResponseReceiver<SummaryCloseConfirm> {
+    public record Receiver(long ticketId, long numberOfOpenEscalations)
+            implements ViewSubmissionResponseReceiver<SummaryCloseConfirm> {
         @Override
         public SummaryCloseConfirm parse(String responseBody) {
             try {
-                JsonNode root = objectMapper.readTree(responseBody);
+                JsonNode root = OBJECT_MAPPER.readTree(responseBody);
                 JsonNode payload = root.has("payload") ? root.get("payload") : root;
                 assertThat(payload.get("response_action").asText()).isEqualTo("update");
                 JsonNode view = payload.get("view");
@@ -119,7 +117,5 @@ public class SummaryCloseConfirm {
                 throw new RuntimeException(e);
             }
         }
-        }
+    }
 }
-
-

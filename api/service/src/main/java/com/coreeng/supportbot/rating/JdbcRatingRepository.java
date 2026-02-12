@@ -1,18 +1,17 @@
 package com.coreeng.supportbot.rating;
 
+import static com.coreeng.supportbot.dbschema.Tables.RATINGS;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+
 import com.coreeng.supportbot.dbschema.enums.TicketStatus;
 import com.google.common.collect.ImmutableList;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.ResultQuery;
 import org.springframework.stereotype.Component;
-
-import java.util.UUID;
-
-import static com.coreeng.supportbot.dbschema.Tables.RATINGS;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 
 @Component
 @RequiredArgsConstructor
@@ -34,16 +33,12 @@ public class JdbcRatingRepository implements RatingRepository {
 
     @Override
     public ImmutableList<Rating> getAllRatings() {
-        return fetchRatings(
-                dsl.select()
-                        .from(RATINGS)
-        );
+        return fetchRatings(dsl.select().from(RATINGS));
     }
 
     private ImmutableList<Rating> fetchRatings(ResultQuery<?> query) {
         try (var stream = query.stream()) {
-            return stream.map(this::mapToRating)
-                    .collect(toImmutableList());
+            return stream.map(this::mapToRating).collect(toImmutableList());
         }
     }
 
@@ -52,7 +47,8 @@ public class JdbcRatingRepository implements RatingRepository {
                 .id(record.getValue(RATINGS.ID))
                 .rating(record.getValue(RATINGS.RATING))
                 .submittedTs(record.getValue(RATINGS.SUBMITTED_TS))
-                .status(com.coreeng.supportbot.ticket.TicketStatus.valueOf(record.getValue(RATINGS.STATUS).toString()))
+                .status(com.coreeng.supportbot.ticket.TicketStatus.valueOf(
+                        record.getValue(RATINGS.STATUS).toString()))
                 .impact(record.getValue(RATINGS.IMPACT))
                 .tags(record.getValue(RATINGS.TAGS))
                 .isEscalated(record.getValue(RATINGS.IS_ESCALATED))

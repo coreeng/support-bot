@@ -5,26 +5,20 @@ import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 import com.fasterxml.jackson.databind.jsontype.impl.TypeIdResolverBase;
+import java.time.LocalDate;
 import lombok.Getter;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.jackson.Jacksonized;
 import org.jspecify.annotations.Nullable;
 
-import java.time.LocalDate;
-
 @Getter
 @SuperBuilder(toBuilder = true)
-@JsonTypeInfo(
-    use = JsonTypeInfo.Id.CUSTOM,
-    include = JsonTypeInfo.As.PROPERTY,
-    property = "type"
-)
+@JsonTypeInfo(use = JsonTypeInfo.Id.CUSTOM, include = JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonTypeIdResolver(StatsRequest.TypeIdResolver.class)
 public class StatsRequest {
     protected StatsType type;
     protected LocalDate from;
     protected LocalDate to;
-
 
     @Getter
     @SuperBuilder(toBuilder = true)
@@ -37,7 +31,8 @@ public class StatsRequest {
         }
 
         public enum Metric {
-            opened, active
+            opened,
+            active
         }
     }
 
@@ -52,7 +47,8 @@ public class StatsRequest {
         }
 
         public enum GroupBy {
-            status, impact
+            status,
+            impact
         }
     }
 
@@ -68,7 +64,7 @@ public class StatsRequest {
     @Getter
     @SuperBuilder(toBuilder = true)
     @Jacksonized
-    public static class TicketSentimentCounts extends StatsRequest{
+    public static class TicketSentimentCounts extends StatsRequest {
         {
             type = StatsType.ticketSentimentsCount;
         }
@@ -88,14 +84,15 @@ public class StatsRequest {
         @Override
         public JavaType typeFromId(DatabindContext context, String id) {
             StatsType type = StatsType.fromLabelOrNull(id);
-            Class<?> subClass = switch (type) {
-                case ticketTimeline -> TicketTimeline.class;
-                case ticketsAmount -> TicketAmount.class;
-                case ticketGeneral -> TicketGeneral.class;
-                case ticketSentimentsCount -> TicketSentimentCounts.class;
-                case ticketRating -> Ratings.class;
-                case null -> throw new IllegalArgumentException("Unknown type-id: " + id);
-            };
+            Class<?> subClass =
+                    switch (type) {
+                        case ticketTimeline -> TicketTimeline.class;
+                        case ticketsAmount -> TicketAmount.class;
+                        case ticketGeneral -> TicketGeneral.class;
+                        case ticketSentimentsCount -> TicketSentimentCounts.class;
+                        case ticketRating -> Ratings.class;
+                        case null -> throw new IllegalArgumentException("Unknown type-id: " + id);
+                    };
             return context.constructType(subClass);
         }
 
@@ -111,10 +108,10 @@ public class StatsRequest {
         public String idFromValueAndType(Object value, Class<?> suggestedType) {
             return idFromValue(value);
         }
+
         @Override
         public JsonTypeInfo.@Nullable Id getMechanism() {
             return null;
         }
-
     }
 }

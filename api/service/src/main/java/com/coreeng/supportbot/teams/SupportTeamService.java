@@ -18,29 +18,23 @@ public class SupportTeamService {
 
     @Getter
     private ImmutableList<TeamMemberFetcher.TeamMember> members = ImmutableList.of();
+
     @Getter
     private ImmutableList<TeamMemberFetcher.TeamMember> leadershipMembers = ImmutableList.of();
 
     @PostConstruct
     void init() {
         this.members = supportTeamFetcher.loadInitialMembers(SlackId.group(supportTeamProps.slackGroupId()));
-        this.leadershipMembers = leadershipTeamFetcher.loadInitialMembers(SlackId.group(leadershipTeamProps.slackGroupId()));
+        this.leadershipMembers =
+                leadershipTeamFetcher.loadInitialMembers(SlackId.group(leadershipTeamProps.slackGroupId()));
     }
 
     public Team getTeam() {
-        return new Team(
-                supportTeamProps.name(),
-                supportTeamProps.code(),
-                ImmutableList.of(TeamType.support)
-        );
+        return new Team(supportTeamProps.name(), supportTeamProps.code(), ImmutableList.of(TeamType.SUPPORT));
     }
 
     public Team getLeadershipTeam() {
-        return new Team(
-                leadershipTeamProps.name(),
-                leadershipTeamProps.code(),
-                ImmutableList.of(TeamType.leadership)
-        );
+        return new Team(leadershipTeamProps.name(), leadershipTeamProps.code(), ImmutableList.of(TeamType.LEADERSHIP));
     }
 
     public boolean isMemberByUserEmail(String email) {
@@ -61,18 +55,14 @@ public class SupportTeamService {
                     supportTeamFetcher.handleMembershipUpdate(groupId, teamUsers);
             if (!updatedMembers.isEmpty()) {
                 this.members = updatedMembers;
-                log.atInfo()
-                        .addArgument(updatedMembers::size)
-                        .log("Updated support team members to {} entries");
+                log.atInfo().addArgument(updatedMembers::size).log("Updated support team members to {} entries");
             }
         } else if (leadershipTeamProps.slackGroupId().equals(groupId.id())) {
             ImmutableList<TeamMemberFetcher.TeamMember> updatedMembers =
                     leadershipTeamFetcher.handleMembershipUpdate(groupId, teamUsers);
             if (!updatedMembers.isEmpty()) {
                 this.leadershipMembers = updatedMembers;
-                log.atInfo()
-                        .addArgument(updatedMembers::size)
-                        .log("Updated leadership team members to {} entries");
+                log.atInfo().addArgument(updatedMembers::size).log("Updated leadership team members to {} entries");
             }
         }
     }

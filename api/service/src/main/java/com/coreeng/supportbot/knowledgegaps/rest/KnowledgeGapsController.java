@@ -18,4 +18,3 @@ public class KnowledgeGapsController {
         return ResponseEntity.ok(new KnowledgeGapsStatusUI(knowledgeGapsProps.enabled()));
     }
 }
-

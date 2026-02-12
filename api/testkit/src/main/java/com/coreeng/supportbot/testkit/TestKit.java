@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.testkit;
 
-
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
@@ -21,7 +20,8 @@ public class TestKit {
      */
     public static TestKit create(Config config) {
         SlackWiremock slackWiremock = new SlackWiremock(config.mocks().slack());
-        SupportBotClient supportBotClient = new SupportBotClient(config.supportBot().baseUrl(), slackWiremock);
+        SupportBotClient supportBotClient =
+                new SupportBotClient(config.supportBot().baseUrl(), slackWiremock);
         SupportBotSlackClient supportBotSlackClient = new SupportBotSlackClient(config, slackWiremock);
         return new TestKit(slackWiremock, supportBotSlackClient, supportBotClient, config);
     }
@@ -66,7 +66,7 @@ public class TestKit {
 
     @RequiredArgsConstructor
     public class RoledTestKit {
-        private final static String workflowBotId = "B0123456789";
+        private static final String WORKFLOW_BOT_ID = "B0123456789";
 
         private final UserRole role;
 
@@ -91,7 +91,7 @@ public class TestKit {
             return switch (role) {
                 case tenant, support -> null;
                 case supportBot -> config.mocks().slack().supportBotId();
-                case workflow -> workflowBotId;
+                case workflow -> WORKFLOW_BOT_ID;
             };
         }
 
@@ -99,12 +99,12 @@ public class TestKit {
             return switch (role) {
                 case tenant -> config.nonSupportUsers().getFirst();
                 case support -> config.supportUsers().getFirst();
-                case supportBot -> new Config.User(
-                    "support.bot@cecg.io",
-                    config.mocks().slack().supportBotUserId(),
-                    config.mocks().slack().supportBotId()
-                );
-                case workflow -> new Config.User(null, null, workflowBotId);
+                case supportBot ->
+                    new Config.User(
+                            "support.bot@cecg.io",
+                            config.mocks().slack().supportBotUserId(),
+                            config.mocks().slack().supportBotId());
+                case workflow -> new Config.User(null, null, WORKFLOW_BOT_ID);
             };
         }
 

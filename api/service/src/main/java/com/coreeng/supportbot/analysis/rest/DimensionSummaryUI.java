@@ -10,21 +10,12 @@ import java.util.List;
  * @param queryCount Number of queries in this dimension
  * @param queries List of query summaries
  */
-public record DimensionSummaryUI(
-    String name,
-    int coveragePercentage,
-    long queryCount,
-    List<QuerySummary> queries
-) {
+public record DimensionSummaryUI(String name, int coveragePercentage, long queryCount, List<QuerySummary> queries) {
     /**
      * Individual query summary.
      *
      * @param text The summary text
      * @param link Link to the Slack thread
      */
-    public record QuerySummary(
-        String text,
-        String link
-    ) {}
+    public record QuerySummary(String text, String link) {}
 }
-

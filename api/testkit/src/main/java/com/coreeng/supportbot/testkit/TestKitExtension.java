@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.testkit;
 
+import java.lang.reflect.Field;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
@@ -8,16 +9,14 @@ import org.junit.jupiter.api.extension.TestInstancePostProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Field;
-
 /**
  * JUnit extension that injects wiremock instances into test classes based on field types.
  * Supports injection of WiremockManager and individual wiremock instances.
  * Also verifies that all test stubs are cleaned up after each test.
  */
 public class TestKitExtension implements TestInstancePostProcessor, ParameterResolver, AfterEachCallback {
-    static final ExtensionContext.Namespace namespace = ExtensionContext.Namespace.create(TestKitExtension.class);
-    private static final Logger logger = LoggerFactory.getLogger(TestKitExtension.class);
+    static final ExtensionContext.Namespace NAMESPACE = ExtensionContext.Namespace.create(TestKitExtension.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(TestKitExtension.class);
 
     @Override
     public void postProcessTestInstance(Object testInstance, ExtensionContext context) throws Exception {
@@ -29,8 +28,11 @@ public class TestKitExtension implements TestInstancePostProcessor, ParameterRes
             if (valueToInject != null) {
                 field.setAccessible(true);
                 field.set(testInstance, valueToInject);
-                logger.debug("Injected {} into field {} of class {}",
-                    field.getType().getSimpleName(), field.getName(), testClass.getSimpleName());
+                LOGGER.debug(
+                        "Injected {} into field {} of class {}",
+                        field.getType().getSimpleName(),
+                        field.getName(),
+                        testClass.getSimpleName());
             }
         }
     }
@@ -45,8 +47,10 @@ public class TestKitExtension implements TestInstancePostProcessor, ParameterRes
         Class<?> parameterType = parameterContext.getParameter().getType();
         Object value = getValueForField(parameterType, extensionContext);
         if (value != null) {
-            logger.debug("Resolved parameter of type {} for method {}",
-                parameterType.getSimpleName(), parameterContext.getDeclaringExecutable().getName());
+            LOGGER.debug(
+                    "Resolved parameter of type {} for method {}",
+                    parameterType.getSimpleName(),
+                    parameterContext.getDeclaringExecutable().getName());
         }
         return value;
     }
@@ -70,11 +74,11 @@ public class TestKitExtension implements TestInstancePostProcessor, ParameterRes
     }
 
     private Object getValueForField(Class<?> fieldType, ExtensionContext extensionContext) {
-        Object result = extensionContext.getStore(namespace).get(fieldType, fieldType);
+        Object result = extensionContext.getStore(NAMESPACE).get(fieldType, fieldType);
         if (result != null) {
             return result;
         }
-        logger.debug("No instance of type {} available for injection", fieldType.getSimpleName());
+        LOGGER.debug("No instance of type {} available for injection", fieldType.getSimpleName());
         return null;
     }
 }

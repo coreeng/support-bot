@@ -1,17 +1,15 @@
 package com.coreeng.supportbot.testkit;
 
-import org.jspecify.annotations.NonNull;
-
 import lombok.Builder;
 import lombok.Getter;
+import org.jspecify.annotations.NonNull;
 
 @Builder
 @Getter
 public class FullSummaryButtonClick implements MessageButtonClick {
-    @NonNull
-    private final String triggerId;
-    @NonNull
-    private final Long ticketId;
+    @NonNull private final String triggerId;
+
+    @NonNull private final Long ticketId;
 
     @Override
     public String privateMetadata() {
@@ -21,6 +19,6 @@ public class FullSummaryButtonClick implements MessageButtonClick {
 
     @Override
     public String actionId() {
-        return TicketMessage.fullSummaryButtonActionId;
+        return TicketMessage.FULL_SUMMARY_BUTTON_ACTION_ID;
     }
 }

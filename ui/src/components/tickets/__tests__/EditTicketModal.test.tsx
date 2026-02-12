@@ -3,21 +3,21 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import EditTicketModal from '../EditTicketModal';
 import * as hooks from '../../../lib/hooks';
-import * as api from '../../../lib/api';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '../../../hooks/useAuth';
 
 // Mock the hooks
 jest.mock('../../../lib/hooks');
-jest.mock('../../../lib/api');
-jest.mock('../../../contexts/AuthContext');
+jest.mock('../../../hooks/useAuth');
 
 const mockUseTicket = hooks.useTicket as jest.MockedFunction<typeof hooks.useTicket>;
 const mockUseTenantTeams = hooks.useTenantTeams as jest.MockedFunction<typeof hooks.useTenantTeams>;
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>;
 const mockUseSupportMembers = hooks.useSupportMembers as jest.MockedFunction<typeof hooks.useSupportMembers>;
 const mockUseAssignmentEnabled = hooks.useAssignmentEnabled as jest.MockedFunction<typeof hooks.useAssignmentEnabled>;
-const mockApiPatch = api.apiPatch as jest.MockedFunction<typeof api.apiPatch>;
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+
+// Mock fetch for API calls
+const mockFetch = jest.fn();
 
 const mockTicketDetails = {
     id: '123',
@@ -102,7 +102,11 @@ describe('EditTicketModal', () => {
             error: null
         } as unknown as ReturnType<typeof hooks.useAssignmentEnabled>);
 
-        mockApiPatch.mockResolvedValue(mockTicketDetails);
+        global.fetch = mockFetch;
+        mockFetch.mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(mockTicketDetails),
+        } as Response);
     });
 
     describe('Modal Visibility', () => {
@@ -115,7 +119,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             render(
@@ -140,7 +144,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             render(
@@ -167,7 +171,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             render(
@@ -194,7 +198,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             render(
@@ -224,7 +228,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             render(
@@ -249,7 +253,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             render(
@@ -287,7 +291,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             render(
@@ -316,7 +320,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
         });
 
@@ -432,7 +436,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
         });
 
@@ -456,11 +460,15 @@ describe('EditTicketModal', () => {
             fireEvent.click(saveButton);
 
             await waitFor(() => {
-                expect(mockApiPatch).toHaveBeenCalledWith('/ticket/123', expect.objectContaining({
-                    status: 'closed',
-                    authorsTeam: 'Engineering',
-                    tags: ['bug', 'urgent'],
-                    impact: 'high'
+                expect(mockFetch).toHaveBeenCalledWith('/api/tickets/123', expect.objectContaining({
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        status: 'closed',
+                        authorsTeam: 'Engineering',
+                        tags: ['bug', 'urgent'],
+                        impact: 'high'
+                    })
                 }));
             });
         });
@@ -504,7 +512,10 @@ describe('EditTicketModal', () => {
         });
 
         it('displays error message when save fails', async () => {
-            mockApiPatch.mockRejectedValue(new Error('Failed to update ticket'));
+            mockFetch.mockResolvedValue({
+                ok: false,
+                status: 500,
+            } as Response);
 
             render(
                 <EditTicketModal
@@ -532,7 +543,7 @@ describe('EditTicketModal', () => {
             const patchPromise = new Promise((resolve) => {
                 resolvePatch = resolve;
             });
-            mockApiPatch.mockReturnValue(patchPromise as Promise<unknown>);
+            mockFetch.mockReturnValue(patchPromise as Promise<Response>);
 
             render(
                 <EditTicketModal
@@ -566,7 +577,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTicket.mockReturnValue({
@@ -600,7 +611,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             render(
@@ -627,7 +638,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTicket.mockReturnValue({
@@ -660,7 +671,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             render(
@@ -691,7 +702,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
         });
 
@@ -937,7 +948,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTicket.mockReturnValue({
@@ -977,7 +988,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTicket.mockReturnValue({
@@ -1015,7 +1026,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTicket.mockReturnValue({
@@ -1061,7 +1072,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTicket.mockReturnValue({
@@ -1101,7 +1112,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTicket.mockReturnValue({
@@ -1143,7 +1154,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTicket.mockReturnValue({
@@ -1181,7 +1192,7 @@ describe('EditTicketModal', () => {
                 isLeadership: false,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
-                isLoadingEscalationTeams: false
+                logout: jest.fn()
             });
 
             mockUseTicket.mockReturnValue({

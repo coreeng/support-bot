@@ -1,16 +1,15 @@
 package com.coreeng.supportbot.teams;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+
 import com.coreeng.supportbot.config.SupportTeamProps;
 import com.coreeng.supportbot.slack.client.SlackClient;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 class SupportTeamConfigTest {
 
@@ -29,20 +28,12 @@ class SupportTeamConfigTest {
         supportTeamProps = new SupportTeamProps("Support", "support", "SUPPORT_GROUP");
         leadershipTeamProps = new SupportLeadershipTeamProps("Leadership", "leadership", "LEADERSHIP_GROUP");
         staticSupportProps = new StaticSupportTeamProps(
-                true,
-                List.of(new StaticSupportTeamProps.StaticSupportMember("support@example.com", "S1"))
-        );
+                true, List.of(new StaticSupportTeamProps.StaticSupportMember("support@example.com", "S1")));
         staticLeadershipProps = new StaticLeadershipTeamProps(
-                true,
-                List.of(new StaticLeadershipTeamProps.StaticSupportMember("leader@example.com", "L1"))
-        );
-        
-        config = new SupportTeamConfig(
-                supportTeamProps,
-                leadershipTeamProps,
-                staticSupportProps,
-                staticLeadershipProps
-        );
+                true, List.of(new StaticLeadershipTeamProps.StaticSupportMember("leader@example.com", "L1")));
+
+        config =
+                new SupportTeamConfig(supportTeamProps, leadershipTeamProps, staticSupportProps, staticLeadershipProps);
     }
 
     @Test
@@ -153,4 +144,3 @@ class SupportTeamConfigTest {
         assertThat(service).isNotNull();
     }
 }
-

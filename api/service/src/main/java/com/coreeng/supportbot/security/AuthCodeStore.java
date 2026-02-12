@@ -2,22 +2,21 @@ package com.coreeng.supportbot.security;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import org.springframework.stereotype.Component;
-
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Optional;
+import org.springframework.stereotype.Component;
 
 @Component
 public class AuthCodeStore {
-    private static final int codeLength = 32;
-    private static final Duration codeExpiry = Duration.ofSeconds(60);
+    private static final int CODE_LENGTH = 32;
+    private static final Duration CODE_EXPIRY = Duration.ofSeconds(60);
 
     private final Cache<String, String> codeToJwt = Caffeine.newBuilder()
-        .expireAfterWrite(codeExpiry)
-        .maximumSize(10_000)
-        .build();
+            .expireAfterWrite(CODE_EXPIRY)
+            .maximumSize(10_000)
+            .build();
     private final SecureRandom secureRandom = new SecureRandom();
 
     public String storeToken(String jwt) {
@@ -36,7 +35,7 @@ public class AuthCodeStore {
     }
 
     private String generateCode() {
-        var bytes = new byte[codeLength];
+        var bytes = new byte[CODE_LENGTH];
         secureRandom.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }

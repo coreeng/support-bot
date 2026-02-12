@@ -1,14 +1,7 @@
 package com.coreeng.supportbot.teams;
 
+import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.time.Duration;
-
 @ConfigurationProperties("platform-integration.fetch")
-public record PlatformTeamsFetchProps(
-    int maxConcurrency,
-    Duration timeout,
-    boolean ignoreUnknownTeams
-) {
-}
-
+public record PlatformTeamsFetchProps(int maxConcurrency, Duration timeout, boolean ignoreUnknownTeams) {}

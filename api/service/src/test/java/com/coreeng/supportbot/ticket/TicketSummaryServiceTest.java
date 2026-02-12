@@ -1,5 +1,15 @@
 package com.coreeng.supportbot.ticket;
 
+import static com.slack.api.model.block.Blocks.section;
+import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
+import static com.slack.api.model.view.Views.view;
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
@@ -25,29 +35,19 @@ import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.SectionBlock;
 import com.slack.api.model.block.composition.MarkdownTextObject;
 import com.slack.api.model.view.View;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Instant;
-
-import static java.util.Objects.requireNonNull;
-import static com.slack.api.model.block.Blocks.section;
-import static com.slack.api.model.block.composition.BlockCompositions.markdownText;
-import static com.slack.api.model.view.Views.view;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class TicketSummaryServiceTest {
 
     @Mock
     private TicketRepository repository;
+
     @Mock
     private SlackClient slackClient;
 
@@ -82,15 +82,15 @@ class TicketSummaryServiceTest {
         queryTs = MessageTs.of("1234567890.123456");
 
         ticket = Ticket.builder()
-            .id(ticketId)
-            .channelId(channelId)
-            .queryTs(queryTs)
-            .status(TicketStatus.opened)
-            .team(TicketTeam.fromCode("core-team"))
-            .tags(ImmutableList.of("bug", "urgent"))
-            .impact("production-blocking")
-            .assignedTo(null)
-            .build();
+                .id(ticketId)
+                .channelId(channelId)
+                .queryTs(queryTs)
+                .status(TicketStatus.opened)
+                .team(TicketTeam.fromCode("core-team"))
+                .tags(ImmutableList.of("bug", "urgent"))
+                .impact("production-blocking")
+                .assignedTo(null)
+                .build();
 
         slackMessage = new Message();
         slackMessage.setTs(queryTs.ts());
@@ -103,20 +103,17 @@ class TicketSummaryServiceTest {
         JsonMapper jsonMapper = new JsonMapper();
         summaryViewMapper = new TicketSummaryViewMapper(jsonMapper);
 
-        TicketAssignmentProps defaultAssignmentProps = new TicketAssignmentProps(
-            false,
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps defaultAssignmentProps =
+                new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
         service = new TicketSummaryService(
-            repository,
-            slackClient,
-            escalationQueryService,
-            tagsRegistry,
-            impactsRegistry,
-            escalationTeamsRegistry,
-            supportTeamService,
-            defaultAssignmentProps
-        );
+                repository,
+                slackClient,
+                escalationQueryService,
+                tagsRegistry,
+                impactsRegistry,
+                escalationTeamsRegistry,
+                supportTeamService,
+                defaultAssignmentProps);
 
         lenient().when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of());
         lenient().when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
@@ -125,32 +122,26 @@ class TicketSummaryServiceTest {
     @Test
     void shouldReturnSummaryViewWhenAssignmentDisabled() {
         // given
-        TicketAssignmentProps assignmentProps = new TicketAssignmentProps(
-            false, 
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps assignmentProps =
+                new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
         service = new TicketSummaryService(
-            repository,
-            slackClient,
-            escalationQueryService,
-            tagsRegistry,
-            impactsRegistry,
-            escalationTeamsRegistry,
-            supportTeamService,
-            assignmentProps
-        );
+                repository,
+                slackClient,
+                escalationQueryService,
+                tagsRegistry,
+                impactsRegistry,
+                escalationTeamsRegistry,
+                supportTeamService,
+                assignmentProps);
 
         when(repository.findTicketById(ticketId)).thenReturn(ticket);
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
         when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
-        when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of(
-            new Tag("Bug", "bug"),
-            new Tag("Urgent", "urgent")
-        ));
-        when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of(
-            new TicketImpact("Production Blocking", "production-blocking")
-        ));
+        when(tagsRegistry.listAllTags())
+                .thenReturn(ImmutableList.of(new Tag("Bug", "bug"), new Tag("Urgent", "urgent")));
+        when(impactsRegistry.listAllImpacts())
+                .thenReturn(ImmutableList.of(new TicketImpact("Production Blocking", "production-blocking")));
 
         // when
         TicketSummaryView result = service.summaryView(ticketId);
@@ -165,29 +156,24 @@ class TicketSummaryServiceTest {
     @Test
     void shouldReturnSummaryViewWithAssigneeFieldsWhenEnabled() {
         // given
-        TicketAssignmentProps assignmentProps = new TicketAssignmentProps(
-            true, 
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps assignmentProps =
+                new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(false, null));
         service = new TicketSummaryService(
-            repository,
-            slackClient,
-            escalationQueryService,
-            tagsRegistry,
-            impactsRegistry,
-            escalationTeamsRegistry,
-            supportTeamService,
-            assignmentProps
-        );
+                repository,
+                slackClient,
+                escalationQueryService,
+                tagsRegistry,
+                impactsRegistry,
+                escalationTeamsRegistry,
+                supportTeamService,
+                assignmentProps);
 
-        Ticket assignedTicket = ticket.toBuilder()
-            .assignedTo(SlackId.user("U789012"))
-            .build();
+        Ticket assignedTicket =
+                ticket.toBuilder().assignedTo(SlackId.user("U789012")).build();
 
         ImmutableList<TeamMemberFetcher.TeamMember> members = ImmutableList.of(
-            new TeamMemberFetcher.TeamMember("alice@example.com", SlackId.user("U789012")),
-            new TeamMemberFetcher.TeamMember("bob@example.com", SlackId.user("U789013"))
-        );
+                new TeamMemberFetcher.TeamMember("alice@example.com", SlackId.user("U789012")),
+                new TeamMemberFetcher.TeamMember("bob@example.com", SlackId.user("U789013")));
 
         when(repository.findTicketById(ticketId)).thenReturn(assignedTicket);
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
@@ -214,52 +200,50 @@ class TicketSummaryServiceTest {
     @Test
     void shouldIncludeEscalationsInSummary() {
         // given
-        TicketAssignmentProps assignmentProps = new TicketAssignmentProps(
-            false, 
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps assignmentProps =
+                new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
         service = new TicketSummaryService(
-            repository,
-            slackClient,
-            escalationQueryService,
-            tagsRegistry,
-            impactsRegistry,
-            escalationTeamsRegistry,
-            supportTeamService,
-            assignmentProps
-        );
+                repository,
+                slackClient,
+                escalationQueryService,
+                tagsRegistry,
+                impactsRegistry,
+                escalationTeamsRegistry,
+                supportTeamService,
+                assignmentProps);
 
         Escalation escalation1 = Escalation.builder()
-            .id(new EscalationId(1L))
-            .ticketId(ticketId)
-            .channelId(channelId)
-            .threadTs(MessageTs.of("1111111111.111111"))
-            .team("platform-team")
-            .openedAt(Instant.parse("2024-01-01T10:00:00Z"))
-            .build();
+                .id(new EscalationId(1L))
+                .ticketId(ticketId)
+                .channelId(channelId)
+                .threadTs(MessageTs.of("1111111111.111111"))
+                .team("platform-team")
+                .openedAt(Instant.parse("2024-01-01T10:00:00Z"))
+                .build();
 
         Escalation escalation2 = Escalation.builder()
-            .id(new EscalationId(2L))
-            .ticketId(ticketId)
-            .channelId(channelId)
-            .threadTs(MessageTs.of("2222222222.222222"))
-            .team("security-team")
-            .openedAt(Instant.parse("2024-01-01T11:00:00Z"))
-            .build();
+                .id(new EscalationId(2L))
+                .ticketId(ticketId)
+                .channelId(channelId)
+                .threadTs(MessageTs.of("2222222222.222222"))
+                .team("security-team")
+                .openedAt(Instant.parse("2024-01-01T11:00:00Z"))
+                .build();
 
         when(repository.findTicketById(ticketId)).thenReturn(ticket);
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class)))
-            .thenReturn("https://slack.com/query-permalink")
-            .thenReturn("https://slack.com/escalation1-permalink")
-            .thenReturn("https://slack.com/escalation2-permalink");
-        when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of(escalation2, escalation1)); // reversed order
+                .thenReturn("https://slack.com/query-permalink")
+                .thenReturn("https://slack.com/escalation1-permalink")
+                .thenReturn("https://slack.com/escalation2-permalink");
+        when(escalationQueryService.listByTicketId(ticketId))
+                .thenReturn(ImmutableList.of(escalation2, escalation1)); // reversed order
         when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of());
         when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
         when(escalationTeamsRegistry.findEscalationTeamByCode("platform-team"))
-            .thenReturn(new EscalationTeam("Platform Team", "platform-team", "platform-support"));
+                .thenReturn(new EscalationTeam("Platform Team", "platform-team", "platform-support"));
         when(escalationTeamsRegistry.findEscalationTeamByCode("security-team"))
-            .thenReturn(new EscalationTeam("Security Team", "security-team", "security-group"));
+                .thenReturn(new EscalationTeam("Security Team", "security-team", "security-group"));
 
         // when
         TicketSummaryView result = service.summaryView(ticketId);
@@ -274,20 +258,17 @@ class TicketSummaryServiceTest {
     @Test
     void shouldIncludeQuerySummaryInView() {
         // given
-        TicketAssignmentProps assignmentProps = new TicketAssignmentProps(
-            false, 
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps assignmentProps =
+                new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
         service = new TicketSummaryService(
-            repository,
-            slackClient,
-            escalationQueryService,
-            tagsRegistry,
-            impactsRegistry,
-            escalationTeamsRegistry,
-            supportTeamService,
-            assignmentProps
-        );
+                repository,
+                slackClient,
+                escalationQueryService,
+                tagsRegistry,
+                impactsRegistry,
+                escalationTeamsRegistry,
+                supportTeamService,
+                assignmentProps);
 
         when(repository.findTicketById(ticketId)).thenReturn(ticket);
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
@@ -310,20 +291,17 @@ class TicketSummaryServiceTest {
     @Test
     void shouldHandleBotMessage() {
         // given
-        TicketAssignmentProps assignmentProps = new TicketAssignmentProps(
-            false, 
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps assignmentProps =
+                new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
         service = new TicketSummaryService(
-            repository,
-            slackClient,
-            escalationQueryService,
-            tagsRegistry,
-            impactsRegistry,
-            escalationTeamsRegistry,
-            supportTeamService,
-            assignmentProps
-        );
+                repository,
+                slackClient,
+                escalationQueryService,
+                tagsRegistry,
+                impactsRegistry,
+                escalationTeamsRegistry,
+                supportTeamService,
+                assignmentProps);
 
         Message botMessage = new Message();
         botMessage.setTs(queryTs.ts());
@@ -348,56 +326,48 @@ class TicketSummaryServiceTest {
     @Test
     void shouldThrowExceptionWhenTicketNotFound() {
         // given
-        TicketAssignmentProps assignmentProps = new TicketAssignmentProps(
-            false, 
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps assignmentProps =
+                new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
         service = new TicketSummaryService(
-            repository,
-            slackClient,
-            escalationQueryService,
-            tagsRegistry,
-            impactsRegistry,
-            escalationTeamsRegistry,
-            supportTeamService,
-            assignmentProps
-        );
+                repository,
+                slackClient,
+                escalationQueryService,
+                tagsRegistry,
+                impactsRegistry,
+                escalationTeamsRegistry,
+                supportTeamService,
+                assignmentProps);
 
         when(repository.findTicketById(ticketId)).thenReturn(null);
 
         // when/then
         assertThatThrownBy(() -> service.summaryView(ticketId))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("Ticket not found");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Ticket not found");
     }
 
     @Test
     void shouldFilterSelectedTagsCorrectly() {
         // given
-        TicketAssignmentProps assignmentProps = new TicketAssignmentProps(
-            false, 
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps assignmentProps =
+                new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
         service = new TicketSummaryService(
-            repository,
-            slackClient,
-            escalationQueryService,
-            tagsRegistry,
-            impactsRegistry,
-            escalationTeamsRegistry,
-            supportTeamService,
-            assignmentProps
-        );
+                repository,
+                slackClient,
+                escalationQueryService,
+                tagsRegistry,
+                impactsRegistry,
+                escalationTeamsRegistry,
+                supportTeamService,
+                assignmentProps);
 
         when(repository.findTicketById(ticketId)).thenReturn(ticket);
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
         when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
-        when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of(
-            new Tag("Bug", "bug"),
-            new Tag("Urgent", "urgent"),
-            new Tag("Feature", "feature")
-        ));
+        when(tagsRegistry.listAllTags())
+                .thenReturn(ImmutableList.of(
+                        new Tag("Bug", "bug"), new Tag("Urgent", "urgent"), new Tag("Feature", "feature")));
         when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
 
         // when
@@ -406,37 +376,33 @@ class TicketSummaryServiceTest {
         // then
         assertThat(result.tags()).hasSize(3);
         assertThat(result.currentTags()).hasSize(2);
-        assertThat(result.currentTags().stream().map(Tag::code))
-            .containsExactlyInAnyOrder("bug", "urgent");
+        assertThat(result.currentTags().stream().map(Tag::code)).containsExactlyInAnyOrder("bug", "urgent");
     }
 
     @Test
     void shouldFilterSelectedImpactCorrectly() {
         // given
-        TicketAssignmentProps assignmentProps = new TicketAssignmentProps(
-            false, 
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps assignmentProps =
+                new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
         service = new TicketSummaryService(
-            repository,
-            slackClient,
-            escalationQueryService,
-            tagsRegistry,
-            impactsRegistry,
-            escalationTeamsRegistry,
-            supportTeamService,
-            assignmentProps
-        );
+                repository,
+                slackClient,
+                escalationQueryService,
+                tagsRegistry,
+                impactsRegistry,
+                escalationTeamsRegistry,
+                supportTeamService,
+                assignmentProps);
 
         when(repository.findTicketById(ticketId)).thenReturn(ticket);
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
         when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
         when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of());
-        when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of(
-            new TicketImpact("Production Blocking", "production-blocking"),
-            new TicketImpact("Minor Issue", "minor-issue")
-        ));
+        when(impactsRegistry.listAllImpacts())
+                .thenReturn(ImmutableList.of(
+                        new TicketImpact("Production Blocking", "production-blocking"),
+                        new TicketImpact("Minor Issue", "minor-issue")));
 
         // when
         TicketSummaryView result = service.summaryView(ticketId);
@@ -450,33 +416,27 @@ class TicketSummaryServiceTest {
     @Test
     void shouldHandleNullImpact() {
         // given
-        TicketAssignmentProps assignmentProps = new TicketAssignmentProps(
-            false, 
-            new TicketAssignmentProps.Encryption(false, null)
-        );
+        TicketAssignmentProps assignmentProps =
+                new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
         service = new TicketSummaryService(
-            repository,
-            slackClient,
-            escalationQueryService,
-            tagsRegistry,
-            impactsRegistry,
-            escalationTeamsRegistry,
-            supportTeamService,
-            assignmentProps
-        );
+                repository,
+                slackClient,
+                escalationQueryService,
+                tagsRegistry,
+                impactsRegistry,
+                escalationTeamsRegistry,
+                supportTeamService,
+                assignmentProps);
 
-        Ticket ticketWithoutImpact = ticket.toBuilder()
-            .impact(null)
-            .build();
+        Ticket ticketWithoutImpact = ticket.toBuilder().impact(null).build();
 
         when(repository.findTicketById(ticketId)).thenReturn(ticketWithoutImpact);
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
         when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
         when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of());
-        when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of(
-            new TicketImpact("Production Blocking", "production-blocking")
-        ));
+        when(impactsRegistry.listAllImpacts())
+                .thenReturn(ImmutableList.of(new TicketImpact("Production Blocking", "production-blocking")));
 
         // when
         TicketSummaryView result = service.summaryView(ticketId);
@@ -487,13 +447,13 @@ class TicketSummaryServiceTest {
 
     private Ticket sampleTicket() {
         return Ticket.builder()
-            .id(new TicketId(1))
-            .channelId("C123")
-            .queryTs(MessageTs.of("123.456"))
-            .createdMessageTs(MessageTs.of("123.456"))
-            .status(TicketStatus.opened)
-            .lastInteractedAt(Instant.EPOCH)
-            .build();
+                .id(new TicketId(1))
+                .channelId("C123")
+                .queryTs(MessageTs.of("123.456"))
+                .createdMessageTs(MessageTs.of("123.456"))
+                .status(TicketStatus.opened)
+                .lastInteractedAt(Instant.EPOCH)
+                .build();
     }
 
     @Test
@@ -508,7 +468,8 @@ class TicketSummaryServiceTest {
         tombstone.setText("This message was deleted");
 
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(tombstone);
-        when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.test/permalink");
+        when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class)))
+                .thenReturn("https://slack.test/permalink");
 
         TicketSummaryView summary = service.summaryView(sampleTicketId);
         TicketSummaryView.QuerySummaryView query = summary.query();
@@ -516,10 +477,8 @@ class TicketSummaryServiceTest {
         assertEquals(ticket.queryTs(), query.messageTs());
         assertNull(query.senderId());
         assertEquals("https://slack.test/permalink", query.permalink());
-        ImmutableList<LayoutBlock> expectedBlocks = ImmutableList.of(
-            section(s -> s.text(markdownText(t ->
-                t.text("This message was deleted"))))
-        );
+        ImmutableList<LayoutBlock> expectedBlocks =
+                ImmutableList.of(section(s -> s.text(markdownText(t -> t.text("This message was deleted")))));
         assertEquals(expectedBlocks, query.blocks());
     }
 
@@ -531,27 +490,27 @@ class TicketSummaryServiceTest {
         when(escalationQueryService.listByTicketId(sampleTicketId)).thenReturn(ImmutableList.of());
 
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class)))
-            .thenThrow(new SlackException(new RuntimeException("boom")));
+                .thenThrow(new SlackException(new RuntimeException("boom")));
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class)))
-            .thenReturn("https://slack.test/permalink")
-            .thenThrow(new SlackException(new RuntimeException("permalink boom")));
+                .thenReturn("https://slack.test/permalink")
+                .thenThrow(new SlackException(new RuntimeException("permalink boom")));
 
         TicketSummaryView first = service.summaryView(sampleTicketId);
         TicketSummaryView.QuerySummaryView firstQuery = first.query();
         assertEquals(ticket.queryTs(), firstQuery.messageTs());
         assertNull(firstQuery.senderId());
         assertEquals("https://slack.test/permalink", firstQuery.permalink());
-        ImmutableList<LayoutBlock> expectedFirstBlocks = ImmutableList.of(
-            section(s -> s.text(markdownText(t -> t.text("Couldn't fetch the message"))))
-        );
+        ImmutableList<LayoutBlock> expectedFirstBlocks =
+                ImmutableList.of(section(s -> s.text(markdownText(t -> t.text("Couldn't fetch the message")))));
         assertEquals(expectedFirstBlocks, firstQuery.blocks());
 
         View firstView = view(v -> summaryViewMapper.render(first, v).type("modal"));
         ContextBlock firstContext = (ContextBlock) firstView.getBlocks().stream()
-            .filter(b -> b instanceof ContextBlock)
-            .findFirst()
-            .orElseThrow();
-        MarkdownTextObject firstContextText = (MarkdownTextObject) firstContext.getElements().get(0);
+                .filter(b -> b instanceof ContextBlock)
+                .findFirst()
+                .orElseThrow();
+        MarkdownTextObject firstContextText =
+                (MarkdownTextObject) firstContext.getElements().get(0);
         assertTrue(firstContextText.getText().contains("Unknown author"));
         assertTrue(firstContextText.getText().contains("View Message"));
 
@@ -561,10 +520,11 @@ class TicketSummaryServiceTest {
 
         View secondView = view(v -> summaryViewMapper.render(second, v).type("modal"));
         ContextBlock secondContext = (ContextBlock) secondView.getBlocks().stream()
-            .filter(b -> b instanceof ContextBlock)
-            .findFirst()
-            .orElseThrow();
-        MarkdownTextObject secondContextText = (MarkdownTextObject) secondContext.getElements().getFirst();
+                .filter(b -> b instanceof ContextBlock)
+                .findFirst()
+                .orElseThrow();
+        MarkdownTextObject secondContextText =
+                (MarkdownTextObject) secondContext.getElements().getFirst();
         assertTrue(secondContextText.getText().contains("Unknown author"));
         assertFalse(secondContextText.getText().contains("View Message"));
     }
@@ -581,26 +541,25 @@ class TicketSummaryServiceTest {
         message.setText("Hello");
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(message);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class)))
-            .thenThrow(new SlackException(new RuntimeException("permalink boom")));
+                .thenThrow(new SlackException(new RuntimeException("permalink boom")));
 
         TicketSummaryView summary = service.summaryView(sampleTicketId);
         TicketSummaryView.QuerySummaryView query = summary.query();
 
         assertEquals(ticket.queryTs(), query.messageTs());
-        ImmutableList<LayoutBlock> expectedBlocks = ImmutableList.of(
-            section(s -> s.text(markdownText(t -> t.text("Hello"))))
-        );
+        ImmutableList<LayoutBlock> expectedBlocks =
+                ImmutableList.of(section(s -> s.text(markdownText(t -> t.text("Hello")))));
         assertEquals(expectedBlocks, query.blocks());
         assertNull(query.permalink());
 
         View view = view(v -> summaryViewMapper.render(summary, v).type("modal"));
         ContextBlock context = (ContextBlock) view.getBlocks().stream()
-            .filter(b -> b instanceof ContextBlock)
-            .findFirst()
-            .orElseThrow();
-        MarkdownTextObject contextText = (MarkdownTextObject) context.getElements().get(0);
+                .filter(b -> b instanceof ContextBlock)
+                .findFirst()
+                .orElseThrow();
+        MarkdownTextObject contextText =
+                (MarkdownTextObject) context.getElements().get(0);
         assertTrue(contextText.getText().contains("<@U123>"));
         assertFalse(contextText.getText().contains("View Message"));
-
     }
 }

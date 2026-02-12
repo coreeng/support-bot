@@ -2,7 +2,7 @@ import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import TeamSelector from '../TeamSelector'
 
-jest.mock('../../contexts/AuthContext', () => ({
+jest.mock('../../hooks/useAuth', () => ({
   useAuth: jest.fn(),
 }))
 
@@ -10,7 +10,7 @@ jest.mock('../../contexts/TeamFilterContext', () => ({
   useTeamFilter: jest.fn(),
 }))
 
-const mockUseAuth = jest.requireMock('../../contexts/AuthContext').useAuth as jest.Mock
+const mockUseAuth = jest.requireMock('../../hooks/useAuth').useAuth as jest.Mock
 const mockUseTeamFilter = jest.requireMock('../../contexts/TeamFilterContext').useTeamFilter as jest.Mock
 
 const baseTeamFilter = () => ({

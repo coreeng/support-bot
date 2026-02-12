@@ -8,7 +8,6 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.extern.jackson.Jacksonized;
-
 import org.jspecify.annotations.Nullable;
 
 @Getter
@@ -16,22 +15,24 @@ import org.jspecify.annotations.Nullable;
 @EqualsAndHashCode
 @Jacksonized
 public class HomepageFilter {
-    @Nullable
-    private final TicketStatus status;
+    @Nullable private final TicketStatus status;
+
     @Builder.Default
     private final TicketsQuery.Order order = TicketsQuery.Order.desc;
-    @Nullable
-    private final Timeframe timeframe;
+
+    @Nullable private final Timeframe timeframe;
+
     @Builder.Default
     private final ImmutableList<String> tags = ImmutableList.of();
+
     @Builder.Default
     private final boolean includeNoTags = false;
-    @Nullable
-    private final String impact;
-    @Nullable
-    private final String escalationTeam;
-    @Nullable
-    private final String assignedTo;
+
+    @Nullable private final String impact;
+
+    @Nullable private final String escalationTeam;
+
+    @Nullable private final String assignedTo;
 
     @Getter
     public enum Timeframe implements UIOption {

@@ -2,7 +2,6 @@ package com.coreeng.supportbot.rbac;
 
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.teams.SupportTeamService;
-
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor

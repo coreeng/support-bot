@@ -1,28 +1,25 @@
 package com.coreeng.supportbot.testkit;
 
-import org.jspecify.annotations.NonNull;
-
 import com.google.common.collect.ImmutableList;
-
 import lombok.Builder;
 import lombok.Getter;
+import org.jspecify.annotations.NonNull;
 
 @Builder
 @Getter
 public class EscalationFormSubmission implements ViewSubmission {
-    @NonNull
-    private final String triggerId;
+    @NonNull private final String triggerId;
+
     private final long ticketId;
-    @NonNull
-    private final Values values;
+
+    @NonNull private final Values values;
 
     @Builder
     @Getter
     public static class Values {
-        @NonNull
-        private final String team;
-        @NonNull
-        private final ImmutableList<String> tags;
+        @NonNull private final String team;
+
+        @NonNull private final ImmutableList<String> tags;
     }
 
     @Override
@@ -45,10 +42,7 @@ public class EscalationFormSubmission implements ViewSubmission {
     @Override
     public ImmutableList<Value> values() {
         return ImmutableList.of(
-            new StaticSelectValue("escalation-team", values.team()),
-            new MultiStaticSelectValue("escalation-tags", values.tags())
-        );
+                new StaticSelectValue("escalation-team", values.team()),
+                new MultiStaticSelectValue("escalation-tags", values.tags()));
     }
 }
-
-
