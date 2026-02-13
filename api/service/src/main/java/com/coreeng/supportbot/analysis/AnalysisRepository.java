@@ -22,7 +22,27 @@ public interface AnalysisRepository {
     List<DimensionSummary> getDriversWithSummaries();
 
     /**
+     * Delete all existing analysis records.
+     *
+     * @return Number of records deleted
+     */
+    int deleteAll();
+
+    /**
+     * Batch insert analysis records.
+     *
+     * @param records List of analysis records to insert
+     * @return Number of records inserted
+     */
+    int batchInsert(List<AnalysisRecord> records);
+
+    /**
      * DTO for dimension with summary (used for both categories and drivers)
      */
     record DimensionSummary(String dimension, long queryCount, String summary) {}
+
+    /**
+     * DTO for analysis record to be inserted
+     */
+    record AnalysisRecord(int ticketId, String driver, String category, String feature, String summary) {}
 }

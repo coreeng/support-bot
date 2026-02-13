@@ -138,10 +138,9 @@ public class SlackClientImpl implements SlackClient {
     @Override
     public ConversationsHistoryResponse getHistoryPage(ConversationsHistoryRequest request) {
         return doRequest(
-            "conversations.history",
-            () -> client.conversationsHistory(request),
-            response -> errorDetailsOrEmpty(response.getResponseMetadata())
-        );
+                "conversations.history",
+                () -> client.conversationsHistory(request),
+                response -> errorDetailsOrEmpty(response.getResponseMetadata()));
     }
 
     @Override

@@ -7,16 +7,15 @@ import com.slack.api.methods.request.conversations.ConversationsRepliesRequest;
 import com.slack.api.methods.response.conversations.ConversationsHistoryResponse;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
 import com.slack.api.model.Message;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 /**
  * Service for fetching all messages from a Slack thread using the conversations.replies API.
@@ -26,11 +25,11 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ThreadService {
 
-    private static final int pageLimit = 200; // Recommended page size for Slack API
-    private static final String whiteCheckMarkEmoji = "white_check_mark";
+    private static final int PAGE_LIMIT = 200; // Recommended page size for Slack API
+    private static final String WHITE_CHECK_MARK_EMOJI = "white_check_mark";
 
     // Pattern to match Slack user/workspace mentions like <@U12345678> or @W12345678 or U12345678
-    private static final Pattern slackMentionPattern = Pattern.compile("<?@?[UW][A-Z0-9]{8,}>?");
+    private static final Pattern SLACK_MENTION_PATTERN = Pattern.compile("<?@?[UW][A-Z0-9]{8,}>?");
 
     private final SlackClient slackClient;
 
@@ -59,10 +58,10 @@ public class ThreadService {
             log.debug("Fetching page {} for thread: channel={}, threadTs={}", pageCount, channelId, threadTs);
 
             ConversationsRepliesRequest.ConversationsRepliesRequestBuilder requestBuilder =
-                ConversationsRepliesRequest.builder()
-                    .channel(channelId)
-                    .ts(threadTs)
-                    .limit(pageLimit);
+                    ConversationsRepliesRequest.builder()
+                            .channel(channelId)
+                            .ts(threadTs)
+                            .limit(PAGE_LIMIT);
 
             if (cursor != null) {
                 requestBuilder.cursor(cursor);
@@ -72,7 +71,8 @@ public class ThreadService {
 
             if (response.getMessages() != null) {
                 allMessages.addAll(response.getMessages());
-                log.debug("Fetched {} messages in page {}", response.getMessages().size(), pageCount);
+                log.debug(
+                        "Fetched {} messages in page {}", response.getMessages().size(), pageCount);
             }
 
             // Check if there are more pages
@@ -85,14 +85,18 @@ public class ThreadService {
             }
         }
 
-        log.info("Fetched total of {} messages from thread in {} pages: channel={}, threadTs={}",
-                 allMessages.size(), pageCount, channelId, threadTs);
+        log.info(
+                "Fetched total of {} messages from thread in {} pages: channel={}, threadTs={}",
+                allMessages.size(),
+                pageCount,
+                channelId,
+                threadTs);
 
         // Extract text from all messages, filtering out null/empty texts
         ImmutableList<String> messageTexts = allMessages.stream()
-            .map(Message::getText)
-            .filter(text -> text != null && !text.isEmpty())
-            .collect(ImmutableList.toImmutableList());
+                .map(Message::getText)
+                .filter(text -> text != null && !text.isEmpty())
+                .collect(ImmutableList.toImmutableList());
 
         log.debug("Extracted {} non-empty message texts", messageTexts.size());
 
@@ -114,8 +118,8 @@ public class ThreadService {
 
         // Remove Slack mentions from each message and join with double newlines
         String result = messageTexts.stream()
-            .map(text -> slackMentionPattern.matcher(text).replaceAll(""))
-            .collect(Collectors.joining("\n\n"));
+                .map(text -> SLACK_MENTION_PATTERN.matcher(text).replaceAll(""))
+                .collect(Collectors.joining("\n\n"));
 
         log.debug("Processed thread text, final length: {} characters", result.length());
 
@@ -149,10 +153,10 @@ public class ThreadService {
             log.debug("Fetching history page {} for channel {}", pageCount, channelId);
 
             ConversationsHistoryRequest.ConversationsHistoryRequestBuilder requestBuilder =
-                ConversationsHistoryRequest.builder()
-                    .channel(channelId)
-                    .oldest(oldestTimestamp)
-                    .limit(pageLimit);
+                    ConversationsHistoryRequest.builder()
+                            .channel(channelId)
+                            .oldest(oldestTimestamp)
+                            .limit(PAGE_LIMIT);
 
             if (cursor != null) {
                 requestBuilder.cursor(cursor);
@@ -161,7 +165,10 @@ public class ThreadService {
             ConversationsHistoryResponse response = slackClient.getHistoryPage(requestBuilder.build());
 
             if (response.getMessages() != null) {
-                log.debug("Processing {} messages from page {}", response.getMessages().size(), pageCount);
+                log.debug(
+                        "Processing {} messages from page {}",
+                        response.getMessages().size(),
+                        pageCount);
 
                 for (Message message : response.getMessages()) {
                     // Check if message has white_check_mark reaction
@@ -205,12 +212,12 @@ public class ThreadService {
         log.debug("Processing {} threads to extract text", threadTimestamps.size());
 
         ImmutableList<ThreadData> threadDataList = threadTimestamps.stream()
-            .map(threadTs -> {
-                log.debug("Fetching text for thread: {}", threadTs);
-                String text = getThreadAsText(channelId, threadTs);
-                return new ThreadData(threadTs, text);
-            })
-            .collect(ImmutableList.toImmutableList());
+                .map(threadTs -> {
+                    log.debug("Fetching text for thread: {}", threadTs);
+                    String text = getThreadAsText(channelId, threadTs);
+                    return new ThreadData(threadTs, text);
+                })
+                .collect(ImmutableList.toImmutableList());
 
         log.info("Successfully processed {} threads with text", threadDataList.size());
 
@@ -225,8 +232,6 @@ public class ThreadService {
             return false;
         }
 
-        return message.getReactions().stream()
-            .anyMatch(reaction -> whiteCheckMarkEmoji.equals(reaction.getName()));
+        return message.getReactions().stream().anyMatch(reaction -> WHITE_CHECK_MARK_EMOJI.equals(reaction.getName()));
     }
 }
-

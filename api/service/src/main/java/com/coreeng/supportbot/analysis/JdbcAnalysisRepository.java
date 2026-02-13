@@ -1,5 +1,8 @@
 package com.coreeng.supportbot.analysis;
 
+import static com.coreeng.supportbot.dbschema.Tables.ANALYSIS;
+import static org.jooq.impl.DSL.row;
+
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
@@ -86,5 +89,31 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("dimension", String.class),
                         r.get("query_count", Long.class),
                         r.get("summary", String.class)));
+    }
+
+    @Override
+    @Transactional
+    public int deleteAll() {
+        return dsl.deleteFrom(ANALYSIS).execute();
+    }
+
+    @Override
+    @Transactional
+    public int batchInsert(List<AnalysisRecord> records) {
+        if (records.isEmpty()) {
+            return 0;
+        }
+
+        return dsl.insertInto(
+                        ANALYSIS,
+                        ANALYSIS.TICKET_ID,
+                        ANALYSIS.DRIVER,
+                        ANALYSIS.CATEGORY,
+                        ANALYSIS.FEATURE,
+                        ANALYSIS.SUMMARY)
+                .valuesOfRows(records.stream()
+                        .map(r -> row(r.ticketId(), r.driver(), r.category(), r.feature(), r.summary()))
+                        .toList())
+                .execute();
     }
 }
