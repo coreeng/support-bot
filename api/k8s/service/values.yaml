@@ -88,6 +88,13 @@ tolerations: []
 
 affinity: {}
 
+# Auth allow-list configuration (optional).
+# When both lists are empty, all SSO-authenticated users are allowed.
+# Rendered into the ConfigMap application.yaml under security.allow-list.
+auth:
+  allowedDomains: []
+  allowedEmails: []
+
 # Environment variables
 env:
   - name: DB_URL
