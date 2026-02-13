@@ -1,15 +1,19 @@
 'use client'
 
-import React, { useState } from 'react'
-import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download } from 'lucide-react'
+import React, { useState, useRef } from 'react'
+import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload } from 'lucide-react'
 import { useAnalysis } from '@/lib/hooks'
+import { useToast } from '@/components/ui/toast'
 
 export default function KnowledgeGapsPage() {
     const { data: analysisData, isLoading, error } = useAnalysis()
+    const { showToast } = useToast()
     const [supportAreasExpanded, setSupportAreasExpanded] = useState(false)
     const [knowledgeGapsExpanded, setKnowledgeGapsExpanded] = useState(false)
     const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
     const [isDownloading, setIsDownloading] = useState(false)
+    const [isUploading, setIsUploading] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     const toggleItemExpansion = (itemName: string) => {
         setExpandedItems(prev => {
@@ -42,9 +46,46 @@ export default function KnowledgeGapsPage() {
             document.body.removeChild(a)
         } catch (error) {
             console.error('Error downloading export:', error)
-            alert('Failed to download export. Please try again.')
+            showToast('Failed to download export. Please try again.', 'error')
         } finally {
             setIsDownloading(false)
+        }
+    }
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click()
+    }
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0]
+        if (!file) return
+
+        setIsUploading(true)
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+
+            const response = await fetch('/api/summary-data/import', {
+                method: 'POST',
+                body: formData,
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to upload file')
+            }
+
+            const result = await response.json()
+            showToast(`Import successful! ${result.recordsImported} records imported.`, 'success')
+
+            // Reset the file input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ''
+            }
+        } catch (error) {
+            console.error('Error uploading file:', error)
+            showToast('Failed to upload file. Please try again.', 'error')
+        } finally {
+            setIsUploading(false)
         }
     }
 
@@ -150,14 +191,31 @@ export default function KnowledgeGapsPage() {
                             Overview of support areas and knowledge gaps requiring attention
                         </p>
                     </div>
-                    <button
-                        onClick={handleExportDownload}
-                        disabled={isDownloading}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                    >
-                        <Download className="w-4 h-4" />
-                        {isDownloading ? 'Downloading...' : 'Export Data'}
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".tsv,.txt"
+                            onChange={handleFileChange}
+                            className="hidden"
+                        />
+                        <button
+                            onClick={handleExportDownload}
+                            disabled={isDownloading}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <Download className="w-4 h-4" />
+                            {isDownloading ? 'Downloading...' : 'Export Data'}
+                        </button>
+                        <button
+                            onClick={handleImportClick}
+                            disabled={isUploading}
+                            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <Upload className="w-4 h-4" />
+                            {isUploading ? 'Uploading...' : 'Import Data'}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Top 5 Support Areas */}
