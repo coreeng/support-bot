@@ -1,30 +1,25 @@
 # ADR: Summary Data Export/Import for Knowledge Gap Analysis
 
-**Status:** Implemented
-**Date:** 2026-02-13
-**Authors:** Support Bot Team
-
 ## Context
 
-The support bot collects Slack thread data from the support channel.
 To enable external AI-powered analysis of support patterns and knowledge gaps, we need a way to:
 
 1. Export raw thread data for processing by external AI tools
-2. Import structured analysis results back into the bot DB
-3. Display aggregated insights in the UI
-
-The analysis workflow involves transforming unstructured thread conversations into structured taxonomy data using AI prompts, which helps identify:
-- Knowledge gaps
-- Temporary platform issues
-- Product usability issues
-- Feature requests
-- Task requests requiring platform team intervention
+2. Get AI prompt for analysis
+3. Import structured analysis results back into the bot DB
+4. Display aggregated insights in the UI
 
 ## Decision
 
-We implemented three new REST endpoints for summary data operations:
+We implemented three new REST endpoints for summary data operations.
 
-### 1. Export Endpoint: `GET /summary-data/export`
+**Access Control:**
+- Requires authenticated session
+- User must have `LEADERSHIP` or `SUPPORT_ENGINEER` role
+- Returns 401 Unauthorized if not authenticated
+- Returns 403 Forbidden if user lacks required roles
+
+### 1. Service Export Endpoint: `GET /summary-data/export`
 
 **Purpose:** Export Slack thread texts as a ZIP file for external analysis.
 
@@ -50,7 +45,7 @@ GET /api/summary-data/export?days=31
   └── 1234567890.345678.txt
 ```
 
-### 2. Import Endpoint: `POST /summary-data/import`
+### 2. Service Import Endpoint: `POST /summary-data/import`
 
 **Purpose:** Import AI-analyzed data in TSV format.
 
@@ -79,23 +74,17 @@ CREATE TABLE analysis (
 - Performs upsert operation (INSERT ... ON CONFLICT UPDATE) by `ticket_id`
 - Allows updating existing analysis records with new insights
 
-### 3. Prompt Endpoint: `GET /api/prompt`
+### 3. React Prompt Endpoint: `GET /api/prompt`
 
-**Purpose:** Download the AI classification prompt file with role-based access control.
+**Purpose:** Download the AI analysis prompt file.
 
 **Input:**
-- None (requires authenticated session)
+- None
 
 **Output:**
 - Markdown file: `gap_analysis_taxonomy_summary-prompt.md`
 - Content-Type: `text/markdown; charset=utf-8`
 - Content-Disposition: `attachment; filename="gap_analysis_taxonomy_summary-prompt.md"`
-
-**Access Control:**
-- Requires authenticated session
-- User must have `LEADERSHIP` or `SUPPORT_ENGINEER` role
-- Returns 401 Unauthorized if not authenticated
-- Returns 403 Forbidden if user lacks required roles
 
 **Implementation:**
 - Next.js API route at `ui/src/app/api/prompt/route.ts`
@@ -104,14 +93,39 @@ CREATE TABLE analysis (
 - Matches access control of `/analysis` endpoint
 - File is not accessible via direct URL (protected by API route)
 
-**Example:**
-```bash
-GET /api/prompt
-Authorization: Bearer <jwt-token>
-→ Returns: gap_analysis_taxonomy_summary-prompt.md (219 lines)
+### 4. Service Analysis Endpoint `GET /analysis`
+
+**Purpose:** Download the AI analysis prompt file.
+
+**Input:**
+- None
+
+**Output:**
+- JSON response required by Support Area Summary page
+
+```json
+{
+  "knowledgeGaps": [
+    {
+      "name": "CI",
+      "queryCount": 35,
+      "coveragePercentage": 75,
+      "queries": []
+    }
+  ],
+  "supportAreas": [
+    {
+      "name": "Knowledge Gap",
+      "queryCount": 127,
+      "coveragePercentage": 56,
+      "queries": []
+    }
+  ]
+}
 ```
 
-### 4. AI Transformation Workflow
+
+### 5. AI Transformation Workflow
 
 **Process:**
 ```
@@ -198,8 +212,6 @@ NOTE: the header row must be present
 
 ## Access Control
 
-### Endpoint Access Matrix
-
 All endpoints require OAuth token mapped to a user with `SUPPORT_ENGINEER` or `LEADERSHIP` role.
 
 | Endpoint               | Access Control | Roles Required                     |
@@ -246,27 +258,6 @@ All endpoints require OAuth token mapped to a user with `SUPPORT_ENGINEER` or `L
 - **Import Data** button (green) - Uploads TSV file via `/api/summary-data/import`
 - Toast notifications for user feedback
 
-**Analysis Display:** `GET /analysis` endpoint provides:
-```json
-{
-  "knowledgeGaps": [
-    {
-      "name": "CI",
-      "queryCount": 42,
-      "coveragePercentage": 75,
-      "queries": [...]
-    }
-  ],
-  "supportAreas": [
-    {
-      "name": "Knowledge Gap",
-      "queryCount": 2127,
-      "coveragePercentage": 56,
-      "queries": [...]
-    }
-  ]
-}
-```
 
 ## Taxonomy
 
