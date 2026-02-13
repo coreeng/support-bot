@@ -35,11 +35,11 @@ public class SummaryDataController {
      * Export summary data as a zip file containing thread texts.
      * Each file in the zip is named with the thread timestamp.
      *
-     * @param days Number of days to look back (default: 30)
+     * @param days Number of days to look back (default: 31)
      * @return Zip file containing thread texts
      */
     @GetMapping(value = "/export", produces = "application/zip")
-    public ResponseEntity<StreamingResponseBody> exportSummaryData(@RequestParam(defaultValue = "10") int days) {
+    public ResponseEntity<StreamingResponseBody> exportSummaryData(@RequestParam(defaultValue = "31") int days) {
 
         log.info("Exporting summary data for last {} days from channel {}", days, slackTicketsProps.channelId());
 

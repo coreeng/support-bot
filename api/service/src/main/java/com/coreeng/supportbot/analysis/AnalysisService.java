@@ -36,23 +36,19 @@ public class AnalysisService {
 
     /**
      * Import analysis data from a list of records.
-     * Deletes all existing data and inserts new records in a single transaction.
+     * Inserts new records or updates existing records based on ticket_id.
      *
      * @param records List of analysis records to import
-     * @return Number of records imported
+     * @return Number of records affected
      */
     @Transactional
     public int importAnalysisData(List<AnalysisRepository.AnalysisRecord> records) {
         log.info("Starting analysis data import with {} records", records.size());
 
-        // Delete all existing records
-        int deletedCount = analysisRepository.deleteAll();
-        log.info("Deleted {} existing analysis records", deletedCount);
+        // Upsert records (insert new or update existing based on ticket_id)
+        int affectedCount = analysisRepository.batchUpsert(records);
+        log.info("Upserted {} analysis records", affectedCount);
 
-        // Insert new records
-        int insertedCount = analysisRepository.batchInsert(records);
-        log.info("Inserted {} new analysis records", insertedCount);
-
-        return insertedCount;
+        return affectedCount;
     }
 }

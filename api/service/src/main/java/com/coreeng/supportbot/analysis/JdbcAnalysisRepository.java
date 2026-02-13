@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.analysis;
 
 import static com.coreeng.supportbot.dbschema.Tables.ANALYSIS;
+import static org.jooq.impl.DSL.excluded;
 import static org.jooq.impl.DSL.row;
 
 import java.util.List;
@@ -93,13 +94,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
 
     @Override
     @Transactional
-    public int deleteAll() {
-        return dsl.deleteFrom(ANALYSIS).execute();
-    }
-
-    @Override
-    @Transactional
-    public int batchInsert(List<AnalysisRecord> records) {
+    public int batchUpsert(List<AnalysisRecord> records) {
         if (records.isEmpty()) {
             return 0;
         }
@@ -114,6 +109,12 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                 .valuesOfRows(records.stream()
                         .map(r -> row(r.ticketId(), r.driver(), r.category(), r.feature(), r.summary()))
                         .toList())
+                .onConflict(ANALYSIS.TICKET_ID)
+                .doUpdate()
+                .set(ANALYSIS.DRIVER, excluded(ANALYSIS.DRIVER))
+                .set(ANALYSIS.CATEGORY, excluded(ANALYSIS.CATEGORY))
+                .set(ANALYSIS.FEATURE, excluded(ANALYSIS.FEATURE))
+                .set(ANALYSIS.SUMMARY, excluded(ANALYSIS.SUMMARY))
                 .execute();
     }
 }
