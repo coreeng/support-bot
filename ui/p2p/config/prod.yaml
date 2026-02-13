@@ -1,3 +1,6 @@
 ---
-envVarsMap:
-  BACKEND_URL: http://support-bot:8080
+# AUTH_SECRET and NEXTAUTH_URL are provided by the consuming repo's overlay config
+ui:
+  env:
+    - name: BACKEND_URL
+      value: "http://support-bot:8080"
