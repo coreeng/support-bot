@@ -31,7 +31,11 @@ export async function GET(request: NextRequest) {
   if (!response.ok) {
     console.error("OAuth code exchange failed:", response.status);
     const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
-    loginUrl.searchParams.set("error", "Token exchange failed");
+    if (response.status === 403) {
+      loginUrl.searchParams.set("error", "user_not_allowed");
+    } else {
+      loginUrl.searchParams.set("error", "Token exchange failed");
+    }
     return NextResponse.redirect(loginUrl);
   }
 
