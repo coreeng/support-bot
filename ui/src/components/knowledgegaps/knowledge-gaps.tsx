@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef } from 'react'
-import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload } from 'lucide-react'
+import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText } from 'lucide-react'
 import { useAnalysis } from '@/lib/hooks'
 import { useToast } from '@/components/ui/toast'
 
@@ -50,6 +50,15 @@ export default function KnowledgeGapsPage() {
         } finally {
             setIsDownloading(false)
         }
+    }
+
+    const handlePromptDownload = () => {
+        const a = document.createElement('a')
+        a.href = '/gap_analysis_taxonomy_summary-prompt.md'
+        a.download = 'gap_analysis_taxonomy_summary-prompt.md'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
     }
 
     const handleImportClick = () => {
@@ -206,6 +215,13 @@ export default function KnowledgeGapsPage() {
                         >
                             <Download className="w-4 h-4" />
                             {isDownloading ? 'Downloading...' : 'Export Data'}
+                        </button>
+                        <button
+                            onClick={handlePromptDownload}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            <FileText className="w-4 h-4" />
+                            Get Prompt
                         </button>
                         <button
                             onClick={handleImportClick}

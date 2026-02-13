@@ -152,9 +152,10 @@ describe('KnowledgeGapsPage', () => {
         expect(screen.getByText('Support Area Summary')).toBeInTheDocument()
         expect(screen.getByText('Overview of support areas and knowledge gaps requiring attention')).toBeInTheDocument()
 
-        // Check for import and export buttons
+        // Check for import, export, and prompt buttons
         expect(screen.getByText('Import Data')).toBeInTheDocument()
         expect(screen.getByText('Export Data')).toBeInTheDocument()
+        expect(screen.getByText('Prompt')).toBeInTheDocument()
 
         // Check for collapsible section headers
         expect(screen.getByText('Top 5 Support Areas')).toBeInTheDocument()
@@ -366,5 +367,25 @@ describe('KnowledgeGapsPage', () => {
 
         // Verify success toast is shown
         expect(await screen.findByText('Import successful! 42 records imported.')).toBeInTheDocument()
+    })
+
+    it('handles prompt button click to download analysis prompt', () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        // Mock HTMLAnchorElement click
+        const mockClick = jest.fn()
+        HTMLAnchorElement.prototype.click = mockClick
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        const promptButton = screen.getByText('Prompt')
+        fireEvent.click(promptButton)
+
+        // Verify download was triggered
+        expect(mockClick).toHaveBeenCalled()
     })
 })
