@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,16 +42,22 @@ class OAuth2SuccessHandlerTest {
     @Mock
     private HttpServletResponse response;
 
-    private OAuth2SuccessHandler createHandler() {
+    private OAuth2SuccessHandler createHandler(List<String> allowedEmails, List<String> allowedDomains) {
         var props = new SecurityProperties(
                 new SecurityProperties.JwtProperties(TEST_SECRET, Duration.ofHours(24)),
                 new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
                 new SecurityProperties.CorsProperties(null),
                 new SecurityProperties.TestBypassProperties(false),
-                new SecurityProperties.AllowListProperties(List.of(), List.of()));
+                new SecurityProperties.AllowListProperties(allowedEmails, allowedDomains));
         var jwtService = new JwtService(props);
         var authCodeStore = new AuthCodeStore();
-        return new OAuth2SuccessHandler(props, jwtService, authCodeStore, teamService, supportTeamService);
+        var allowListService = new AllowListService(props);
+        return new OAuth2SuccessHandler(
+                props, jwtService, authCodeStore, teamService, supportTeamService, allowListService);
+    }
+
+    private OAuth2SuccessHandler createHandler() {
+        return createHandler(List.of(), List.of());
     }
 
     private Authentication mockAuth(Map<String, Object> attributes) {
@@ -126,5 +133,20 @@ class OAuth2SuccessHandlerTest {
         // then
         verify(teamService).listTeamsByUserEmail("azureuser@example.com");
         verify(response).sendRedirect(argThat(url -> url.contains("code=")));
+    }
+
+    @Test
+    void onAuthenticationSuccess_userNotInAllowList_redirectsWithError() throws Exception {
+        // given — allow-list restricts to @allowed.com only
+        var handler = createHandler(List.of(), List.of("allowed.com"));
+        var auth = mockAuth(Map.of("email", "user@blocked.com", "name", "Blocked User"));
+
+        // when
+        handler.onAuthenticationSuccess(request, response, auth);
+
+        // then — redirect with error, NOT with code
+        verify(response)
+                .sendRedirect(argThat(url -> url.equals("http://localhost:3000/auth/callback?error=user_not_allowed")));
+        verify(teamService, never()).listTeamsByUserEmail(anyString());
     }
 }
