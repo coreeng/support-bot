@@ -98,8 +98,8 @@ public class OAuthExchangeService {
             // Extract email and name
             var email = extractEmail(userInfo);
             if (!allowListService.isAllowed(email)) {
-                log.warn("User not in allow list");
-                throw new UserNotAllowedException(email);
+                log.warn("Allow-list rejected user during OAuth exchange");
+                throw new UserNotAllowedException();
             }
             var name = extractName(userInfo);
 

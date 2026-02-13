@@ -38,7 +38,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         var oauth2User = (OAuth2User) authentication.getPrincipal();
         var email = extractEmail(oauth2User);
         if (!allowListService.isAllowed(email)) {
-            log.warn("User not in allow list");
+            log.warn("Allow-list rejected user during OAuth2 redirect login");
             var redirectUri = UriComponentsBuilder.fromUriString(
                             properties.oauth2().redirectUri())
                     .queryParam("error", "user_not_allowed")

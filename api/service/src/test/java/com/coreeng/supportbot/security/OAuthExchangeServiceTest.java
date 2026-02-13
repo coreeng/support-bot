@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.security;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -103,7 +104,7 @@ class OAuthExchangeServiceTest {
         var token = service.exchangeCodeForToken("google", "auth-code", "http://localhost:3000/callback");
 
         // then
-        assert token != null && !token.isBlank();
+        assertFalse(token == null || token.isBlank());
     }
 
     @Test
@@ -117,6 +118,6 @@ class OAuthExchangeServiceTest {
         var token = service.exchangeCodeForToken("google", "auth-code", "http://localhost:3000/callback");
 
         // then
-        assert token != null && !token.isBlank();
+        assertFalse(token == null || token.isBlank());
     }
 }

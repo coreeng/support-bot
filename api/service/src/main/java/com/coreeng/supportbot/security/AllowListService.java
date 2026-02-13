@@ -30,10 +30,11 @@ public class AllowListService {
         if (emails.isEmpty() && domains.isEmpty()) {
             return true;
         }
-        if (emails.contains(email)) {
+        var normalized = email.toLowerCase(Locale.ROOT);
+        if (emails.contains(normalized)) {
             return true;
         }
-        var domain = email.substring(email.indexOf('@') + 1);
+        var domain = normalized.substring(normalized.indexOf('@') + 1);
         return domains.contains(domain);
     }
 }

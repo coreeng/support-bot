@@ -79,10 +79,13 @@ public class AuthController {
             log.warn("Invalid OAuth provider: {}", request.provider());
             return ResponseEntity.badRequest().build();
         } catch (UserNotAllowedException e) {
-            log.warn("User not in allow list");
+            log.warn("Allow-list rejected user during direct OAuth exchange");
             return ResponseEntity.status(403).build();
         } catch (IllegalStateException e) {
             log.error("OAuth exchange failed", e);
+            return ResponseEntity.status(500).build();
+        } catch (Exception e) {
+            log.error("Unexpected error during OAuth exchange", e);
             return ResponseEntity.status(500).build();
         }
     }
