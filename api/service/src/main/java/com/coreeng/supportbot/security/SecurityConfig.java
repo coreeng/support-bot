@@ -46,11 +46,8 @@ public class SecurityConfig {
                         // Slack webhook endpoint - uses Slack's own signing secret verification
                         .requestMatchers("/slack/events")
                         .permitAll()
-                        // SXummary data endpoints
-                        .requestMatchers("/summary-data/export", "/summary-data/import")
-                        .permitAll()
                         // Dashboard restricted to leadership or support engineers
-                        .requestMatchers("/dashboard/**")
+                        .requestMatchers("/dashboard/**", "/summary-data/**", "/analysis")
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // All other endpoints require authentication
                         .anyRequest()
