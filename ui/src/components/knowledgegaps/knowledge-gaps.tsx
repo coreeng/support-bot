@@ -54,7 +54,7 @@ export default function KnowledgeGapsPage() {
 
     const handlePromptDownload = () => {
         const a = document.createElement('a')
-        a.href = '/gap_analysis_taxonomy_summary-prompt.md'
+        a.href = '/api/prompt'
         a.download = 'gap_analysis_taxonomy_summary-prompt.md'
         document.body.appendChild(a)
         a.click()

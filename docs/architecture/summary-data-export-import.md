@@ -22,7 +22,7 @@ The analysis workflow involves transforming unstructured thread conversations in
 
 ## Decision
 
-We implemented two new REST endpoints for summary data operations:
+We implemented three new REST endpoints for summary data operations:
 
 ### 1. Export Endpoint: `GET /summary-data/export`
 
@@ -79,13 +79,46 @@ CREATE TABLE analysis (
 - Performs upsert operation (INSERT ... ON CONFLICT UPDATE) by `ticket_id`
 - Allows updating existing analysis records with new insights
 
-### 3. AI Transformation Workflow
+### 3. Prompt Endpoint: `GET /api/prompt`
+
+**Purpose:** Download the AI classification prompt file with role-based access control.
+
+**Input:**
+- None (requires authenticated session)
+
+**Output:**
+- Markdown file: `gap_analysis_taxonomy_summary-prompt.md`
+- Content-Type: `text/markdown; charset=utf-8`
+- Content-Disposition: `attachment; filename="gap_analysis_taxonomy_summary-prompt.md"`
+
+**Access Control:**
+- Requires authenticated session
+- User must have `LEADERSHIP` or `SUPPORT_ENGINEER` role
+- Returns 401 Unauthorized if not authenticated
+- Returns 403 Forbidden if user lacks required roles
+
+**Implementation:**
+- Next.js API route at `ui/src/app/api/prompt/route.ts`
+- Reads prompt file from `ui/src/data/gap_analysis_taxonomy_summary-prompt.md` (not in public directory)
+- Uses NextAuth session to verify user roles
+- Matches access control of `/analysis` endpoint
+- File is not accessible via direct URL (protected by API route)
+
+**Example:**
+```bash
+GET /api/prompt
+Authorization: Bearer <jwt-token>
+→ Returns: gap_analysis_taxonomy_summary-prompt.md (219 lines)
+```
+
+### 4. AI Transformation Workflow
 
 **Process:**
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 1. EXPORT                                                           │
 │    GET /summary-data/export?days=31                                 │
+│    (requires LEADERSHIP or SUPPORT_ENGINEER role)                   │
 │    → content.zip (thread text files)                                │
 └────────────────────────────┬────────────────────────────────────────┘
                              │
@@ -94,7 +127,7 @@ CREATE TABLE analysis (
 │ 2. GET PROMPT                                                       │
 │    Download gap_analysis_taxonomy_summary-prompt.md                 │
 │    - Click "Get Prompt" button in UI, OR                            │
-│    - GET /gap_analysis_taxonomy_summary-prompt.md                   │
+│    - GET /api/prompt (requires LEADERSHIP or SUPPORT_ENGINEER role) │
 │    → Contains AI instructions for classification                    │
 └────────────────────────────┬────────────────────────────────────────┘
                              │
@@ -117,6 +150,7 @@ CREATE TABLE analysis (
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 5. IMPORT                                                           │
 │    POST /summary-data/import (file=analysis.tsv)                    │
+│    (requires LEADERSHIP or SUPPORT_ENGINEER role)                   │
 │    → Upserts records into analysis table                            │
 └────────────────────────────┬────────────────────────────────────────┘
                              │
@@ -124,6 +158,7 @@ CREATE TABLE analysis (
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 6. VISUALIZATION                                                    │
 │    GET /analysis → UI displays aggregated insights                  │
+│    (requires LEADERSHIP or SUPPORT_ENGINEER role)                   │
 │    - Top 5 Support Areas (by Driver)                                │
 │    - Top 5 Knowledge Gaps (by Category)                             │
 └─────────────────────────────────────────────────────────────────────┘
@@ -165,12 +200,13 @@ NOTE: the header row must be present
 
 ### Endpoint Access Matrix
 
-Both endpoints require OAuth token mapped to a user with `SUPPORT_ENGINEER` or `LEADERSHIP` role.
+All endpoints require OAuth token mapped to a user with `SUPPORT_ENGINEER` or `LEADERSHIP` role.
 
 | Endpoint               | Access Control | Roles Required                     |
 |------------------------|----------------|------------------------------------|
 | `/summary-data/export` | Restricted     | `LEADERSHIP` or `SUPPORT_ENGINEER` |
 | `/summary-data/import` | Restricted     | `LEADERSHIP` or `SUPPORT_ENGINEER` |
+| `/api/prompt`          | Restricted     | `LEADERSHIP` or `SUPPORT_ENGINEER` |
 | `/analysis`            | Restricted     | `LEADERSHIP` or `SUPPORT_ENGINEER` |
 
 ## Implementation Details
@@ -200,13 +236,14 @@ Both endpoints require OAuth token mapped to a user with `SUPPORT_ENGINEER` or `
 ### Frontend Components
 
 **API Routes:**
-- `ui/src/app/api/summary-data/export/route.ts` - Proxies export request
-- `ui/src/app/api/summary-data/import/route.ts` - Proxies import request
+- `ui/src/app/api/summary-data/export/route.ts` - Proxies export request to backend
+- `ui/src/app/api/summary-data/import/route.ts` - Proxies import request to backend
+- `ui/src/app/api/prompt/route.ts` - Serves prompt file with role-based access control
 
 **UI Component:** `ui/src/components/knowledgegaps/knowledge-gaps.tsx`
-- **Export Data** button (blue) - Downloads ZIP file
-- **Prompt** button (blue) - Downloads AI prompt guide
-- **Import Data** button (green) - Uploads TSV file
+- **Export Data** button (blue) - Downloads ZIP file via `/api/summary-data/export`
+- **Get Prompt** button (blue) - Downloads AI prompt guide via `/api/prompt`
+- **Import Data** button (green) - Uploads TSV file via `/api/summary-data/import`
 - Toast notifications for user feedback
 
 **Analysis Display:** `GET /analysis` endpoint provides:
@@ -275,6 +312,7 @@ Both endpoints require OAuth token mapped to a user with `SUPPORT_ENGINEER` or `
 ✅ **Privacy-Aware:** Removes PII (names, mentions) from exported data
 ✅ **UI Integration:** Results displayed in Knowledge Gaps page
 ✅ **Trend Analysis:** Compare exports over time to track improvement
+✅ **Role-Based Access Control:** Prompt file protected by API route, not accessible via direct URL
 
 ### Negative
 

@@ -155,7 +155,7 @@ describe('KnowledgeGapsPage', () => {
         // Check for import, export, and prompt buttons
         expect(screen.getByText('Import Data')).toBeInTheDocument()
         expect(screen.getByText('Export Data')).toBeInTheDocument()
-        expect(screen.getByText('Prompt')).toBeInTheDocument()
+        expect(screen.getByText('Get Prompt')).toBeInTheDocument()
 
         // Check for collapsible section headers
         expect(screen.getByText('Top 5 Support Areas')).toBeInTheDocument()
@@ -382,7 +382,7 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
-        const promptButton = screen.getByText('Prompt')
+        const promptButton = screen.getByText('Get Prompt')
         fireEvent.click(promptButton)
 
         // Verify download was triggered
