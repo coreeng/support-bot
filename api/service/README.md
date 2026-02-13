@@ -76,7 +76,7 @@ When importing the analysis results, the bot will merge new analysis records wit
 
 ```bash
 mkdir content || truue
-curl http://localhost:8080/summary-data/export?days=10 | bsdtar -xf - -C content
+curl -s http://localhost:8080/summary-data/export?days=10 | bsdtar -xf - -C content
 ```
 
 This will create a file for each thread in the `content` directory.
@@ -89,7 +89,7 @@ This will allow you to provide fresh analysis based on the latest thread content
 ### Import Analysis Data
 
 ```bash
-curl -F "file=@../analysis-data/analysis.tsv" http://localhost:8080/summary-data/import
+curl -s -F "file=@../analysis-data/analysis.tsv" http://localhost:8080/summary-data/import
 ```
 
 This will merge analysis records with the records in the database by ticket ID

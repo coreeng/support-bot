@@ -1,20 +1,29 @@
 package com.coreeng.supportbot.summarydata;
 
 import com.coreeng.supportbot.slack.client.SlackClient;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.request.conversations.ConversationsHistoryRequest;
 import com.slack.api.methods.request.conversations.ConversationsRepliesRequest;
 import com.slack.api.methods.response.conversations.ConversationsHistoryResponse;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
 import com.slack.api.model.Message;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 /**
@@ -31,7 +40,44 @@ public class ThreadService {
     // Pattern to match Slack user/workspace mentions like <@U12345678> or @W12345678 or U12345678
     private static final Pattern SLACK_MENTION_PATTERN = Pattern.compile("<?@?[UW][A-Z0-9]{8,}>?");
 
+    // Pattern to match capitalized words that might be names
+    private static final Pattern NAME_PATTERN = Pattern.compile("\\b([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)*)\\b");
+
+    // Common words that are capitalized but not names (to avoid false positives)
+    // Loaded from common-words.txt resource file at startup
+    private static final Set<String> COMMON_WORDS = loadCommonWords();
+
     private final SlackClient slackClient;
+
+    /**
+     * Loads common words from the common-words.txt resource file.
+     * This method is called once at class initialization time.
+     *
+     * @return Set of common capitalized words that should not be treated as names
+     */
+    private static Set<String> loadCommonWords() {
+        try {
+            ClassPathResource resource = new ClassPathResource("commonly-capitalised-words.txt");
+            Set<String> words = new HashSet<>();
+
+            try (BufferedReader reader =
+                    new BufferedReader(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (!line.isEmpty() && !line.startsWith("#")) {
+                        words.add(line);
+                    }
+                }
+            }
+
+            log.info("Loaded {} common words from common-words.txt", words.size());
+            return Set.copyOf(words); // Return immutable set
+        } catch (IOException e) {
+            log.error("Failed to load common-words.txt, using empty set", e);
+            return Set.of(); // Return empty set on error
+        }
+    }
 
     /**
      * Record containing thread timestamp and its text content.
@@ -104,6 +150,89 @@ public class ThreadService {
     }
 
     /**
+     * Remove human names from text using NLP-based pattern matching.
+     * Processes each line independently to preserve conversation structure.
+     * Identifies and removes:
+     * - Capitalized words that appear to be names (e.g., "Oleg", "John Smith")
+     * - Common name patterns in sentences
+     *
+     * @param text Text containing potential human names
+     * @return Text with names removed, preserving line delimiters
+     */
+    private String removeHumanNames(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+
+        // Process each line independently to preserve conversation structure
+        Iterable<String> lines = Splitter.on('\n').split(text);
+        List<String> processedLines = new ArrayList<>();
+
+        for (String line : lines) {
+            // Skip empty lines
+            if (line.trim().isEmpty()) {
+                processedLines.add(line);
+                continue;
+            }
+
+            // Find capitalized words that might be names
+            Matcher matcher = NAME_PATTERN.matcher(line);
+            StringBuffer processedLine = new StringBuffer();
+
+            while (matcher.find()) {
+                String match = matcher.group(1);
+
+                // Split multi-word names
+                List<String> words = Splitter.onPattern("\\s+").splitToList(match);
+
+                // Filter out common words
+                List<String> filteredWords = words.stream()
+                        .filter(word -> !COMMON_WORDS.contains(word))
+                        .collect(Collectors.toList());
+
+                // If all words were common words, keep the original
+                if (filteredWords.isEmpty()) {
+                    matcher.appendReplacement(processedLine, Matcher.quoteReplacement(match));
+                    continue;
+                }
+
+                // Check if it's at start of line
+                boolean isStartOfLine = line.trim().startsWith(match);
+
+                // If it's a multi-word capitalized phrase (likely a name), remove it
+                if (words.size() > 1) {
+                    matcher.appendReplacement(processedLine, "");
+                    continue;
+                }
+
+                // Single word: remove if not at start of line or if it's clearly a name
+                if (!isStartOfLine || !filteredWords.isEmpty()) {
+                    // Additional heuristic: if the word is short (2-15 chars) and capitalized, likely a name
+                    if (match.length() >= 2 && match.length() <= 15 && match.matches("^[A-Z][a-z]+$")) {
+                        matcher.appendReplacement(processedLine, "");
+                        continue;
+                    }
+                }
+
+                matcher.appendReplacement(processedLine, Matcher.quoteReplacement(match));
+            }
+            matcher.appendTail(processedLine);
+
+            // Clean up extra whitespace within the line
+            String cleanedLine = processedLine
+                    .toString()
+                    .replaceAll("\\s+", " ") // Collapse multiple spaces
+                    .replaceAll("\\s+([.,!?;:])", "$1") // Remove space before punctuation
+                    .trim();
+
+            processedLines.add(cleanedLine);
+        }
+
+        // Join lines back with original line delimiters
+        return String.join("\n", processedLines);
+    }
+
+    /**
      * Fetches all messages from a Slack thread, removes Slack user/workspace mentions,
      * and joins them into a single string with double newline separators.
      *
@@ -116,9 +245,10 @@ public class ThreadService {
 
         ImmutableList<String> messageTexts = getAllThreadMessageTexts(channelId, threadTs);
 
-        // Remove Slack mentions from each message and join with double newlines
+        // Remove Slack mentions and human names from each message, then join with double newlines
         String result = messageTexts.stream()
                 .map(text -> SLACK_MENTION_PATTERN.matcher(text).replaceAll(""))
+                .map(this::removeHumanNames)
                 .collect(Collectors.joining("\n\n"));
 
         log.debug("Processed thread text, final length: {} characters", result.length());
