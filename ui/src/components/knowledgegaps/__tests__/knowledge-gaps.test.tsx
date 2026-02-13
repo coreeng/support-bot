@@ -146,6 +146,9 @@ describe('KnowledgeGapsPage', () => {
         expect(screen.getByText('Support Area Summary')).toBeInTheDocument()
         expect(screen.getByText('Overview of support areas and knowledge gaps requiring attention')).toBeInTheDocument()
 
+        // Check for export button
+        expect(screen.getByText('Export Data')).toBeInTheDocument()
+
         // Check for collapsible section headers
         expect(screen.getByText('Top 5 Support Areas')).toBeInTheDocument()
         expect(screen.getByText('Top 5 Knowledge Gaps')).toBeInTheDocument()
@@ -262,5 +265,51 @@ describe('KnowledgeGapsPage', () => {
         expect(screen.getByText('CI')).toBeInTheDocument()
         expect(screen.getByText('Configuring Platform Features - Kafka and Dial')).toBeInTheDocument()
         expect(screen.getByText('Deploying & Configuring Tenant Applications')).toBeInTheDocument()
+    })
+
+    it('handles export button click', async () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        // Mock fetch
+        const mockFetch = jest.fn(() =>
+            Promise.resolve({
+                ok: true,
+                blob: () => Promise.resolve(new Blob(['test'], { type: 'application/zip' }))
+            } as Response)
+        )
+        global.fetch = mockFetch
+
+        // Mock URL.createObjectURL and revokeObjectURL
+        const mockCreateObjectURL = jest.fn(() => 'blob:test-url')
+        const mockRevokeObjectURL = jest.fn()
+        global.URL.createObjectURL = mockCreateObjectURL
+        global.URL.revokeObjectURL = mockRevokeObjectURL
+
+        // Mock HTMLAnchorElement click
+        const mockClick = jest.fn()
+        HTMLAnchorElement.prototype.click = mockClick
+
+        render(<KnowledgeGapsPage />)
+
+        const exportButton = screen.getByText('Export Data')
+        fireEvent.click(exportButton)
+
+        // Wait for async operations
+        await screen.findByText('Downloading...')
+
+        // Verify fetch was called
+        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/export?days=31')
+
+        // Wait for button to return to normal state
+        await screen.findByText('Export Data')
+
+        // Verify download was triggered
+        expect(mockClick).toHaveBeenCalled()
+        expect(mockCreateObjectURL).toHaveBeenCalled()
+        expect(mockRevokeObjectURL).toHaveBeenCalled()
     })
 })

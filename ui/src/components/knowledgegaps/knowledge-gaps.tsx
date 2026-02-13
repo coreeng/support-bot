@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { ChevronDown, ChevronRight, ExternalLink, BarChart3 } from 'lucide-react'
+import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download } from 'lucide-react'
 import { useAnalysis } from '@/lib/hooks'
 
 export default function KnowledgeGapsPage() {
@@ -9,6 +9,7 @@ export default function KnowledgeGapsPage() {
     const [supportAreasExpanded, setSupportAreasExpanded] = useState(false)
     const [knowledgeGapsExpanded, setKnowledgeGapsExpanded] = useState(false)
     const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+    const [isDownloading, setIsDownloading] = useState(false)
 
     const toggleItemExpansion = (itemName: string) => {
         setExpandedItems(prev => {
@@ -20,6 +21,31 @@ export default function KnowledgeGapsPage() {
             }
             return next
         })
+    }
+
+    const handleExportDownload = async () => {
+        setIsDownloading(true)
+        try {
+            const response = await fetch('/api/summary-data/export?days=31')
+            if (!response.ok) {
+                throw new Error('Failed to download export')
+            }
+
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = 'content.zip'
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+        } catch (error) {
+            console.error('Error downloading export:', error)
+            alert('Failed to download export. Please try again.')
+        } finally {
+            setIsDownloading(false)
+        }
     }
 
     const renderAreaItem = (item: { name: string; coveragePercentage: number; queryCount: number; queries: { text: string; link: string }[] }, index: number) => {
@@ -114,14 +140,24 @@ export default function KnowledgeGapsPage() {
         <div className="h-full overflow-auto bg-gray-50">
             <div className="max-w-7xl mx-auto p-8 space-y-6">
                 {/* Header */}
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                        <BarChart3 className="w-8 h-8 text-blue-600" />
-                        Support Area Summary
-                    </h1>
-                    <p className="text-gray-600 mt-2">
-                        Overview of support areas and knowledge gaps requiring attention
-                    </p>
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                            <BarChart3 className="w-8 h-8 text-blue-600" />
+                            Support Area Summary
+                        </h1>
+                        <p className="text-gray-600 mt-2">
+                            Overview of support areas and knowledge gaps requiring attention
+                        </p>
+                    </div>
+                    <button
+                        onClick={handleExportDownload}
+                        disabled={isDownloading}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <Download className="w-4 h-4" />
+                        {isDownloading ? 'Downloading...' : 'Export Data'}
+                    </button>
                 </div>
 
                 {/* Top 5 Support Areas */}
