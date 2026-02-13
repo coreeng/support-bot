@@ -15,6 +15,7 @@ import com.google.common.collect.ImmutableList;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,7 +46,8 @@ class OAuth2SuccessHandlerTest {
                 new SecurityProperties.JwtProperties(TEST_SECRET, Duration.ofHours(24)),
                 new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
                 new SecurityProperties.CorsProperties(null),
-                new SecurityProperties.TestBypassProperties(false));
+                new SecurityProperties.TestBypassProperties(false),
+                new SecurityProperties.AllowListProperties(List.of(), List.of()));
         var jwtService = new JwtService(props);
         var authCodeStore = new AuthCodeStore();
         return new OAuth2SuccessHandler(props, jwtService, authCodeStore, teamService, supportTeamService);
