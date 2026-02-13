@@ -60,3 +60,21 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "support-bot.ui.fullname" -}}
+{{- printf "%s-ui" (include "support-bot.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "support-bot.ui.labels" -}}
+helm.sh/chart: {{ include "support-bot.chart" . }}
+{{ include "support-bot.ui.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{- define "support-bot.ui.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "support-bot.name" . }}-ui
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

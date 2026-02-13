@@ -1,24 +1,29 @@
 ---
-envVarsMap:
-  NODE_ENV: test
-  BACKEND_URL: http://mock-backend:8080
-  AUTH_SECRET: "functional-test-secret-not-for-production-use"
-  NEXTAUTH_URL: http://support-bot-ui:3000
+ui:
+  env:
+    - name: NODE_ENV
+      value: "test"
+    - name: BACKEND_URL
+      value: "http://mock-backend:8080"
+    - name: AUTH_SECRET
+      value: "functional-test-secret-not-for-production-use"
+    - name: NEXTAUTH_URL
+      value: "http://support-bot-ui:3000"
 
-resources:
-  requests:
-    cpu: 500m
-    memory: 512Mi
-  limits:
-    memory: 1Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
 
-livenessProbe:
-  failureThreshold: 3
-  periodSeconds: 10
-  timeoutSeconds: 3
-  initialDelaySeconds: 10
-readinessProbe:
-  failureThreshold: 3
-  periodSeconds: 10
-  timeoutSeconds: 3
-  initialDelaySeconds: 10
+  livenessProbe:
+    failureThreshold: 3
+    periodSeconds: 10
+    timeoutSeconds: 3
+    initialDelaySeconds: 10
+  readinessProbe:
+    failureThreshold: 3
+    periodSeconds: 10
+    timeoutSeconds: 3
+    initialDelaySeconds: 10

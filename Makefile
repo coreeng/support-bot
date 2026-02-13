@@ -147,8 +147,8 @@ push-extended-test: ## Uses promoted image (no push needed)
 deploy-integration:
 	echo "Service deployment is managed by tests"
 
-.PHONY: deploy-nft
-deploy-nft: ## Deploy service and DB for nft tests
+.PHONY: deploy-api-nft
+deploy-api-nft: ## Deploy service and DB for nft tests
 	NAMESPACE="$(p2p_namespace)" \
 	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
 	SERVICE_IMAGE_TAG="$(p2p_version)" \
@@ -181,22 +181,24 @@ deploy-api-functional: ## Deploy service and DB for functional tests, then run t
 	./api/scripts/deploy-service.sh
 
 .PHONY: deploy-ui-%
-deploy-ui-%:
-	helm repo add core-platform-assets https://coreeng.github.io/core-platform-assets
-	helm upgrade --install "$(p2p_app_name)-ui" core-platform-assets/core-platform-app -n "$(p2p_namespace)" \
-		-f <(envsubst < ui/p2p/config/common.yaml) \
-		-f <(envsubst < ui/p2p/config/$*.yaml) \
-		--set nameOverride="$(p2p_app_name)-ui" \
-		--set tenantName="$(p2p_tenant_name)" \
-		--set image.repository="$(p2p_registry)/$(p2p_app_name)-ui" \
+deploy-ui-%: ## Add UI to existing API deployment
+	helm upgrade --install "$(p2p_app_name)" ./api/k8s/service -n "$(p2p_namespace)" \
+		-f api/k8s/service/values-$*.yaml \
+		-f ui/p2p/config/common.yaml \
+		-f ui/p2p/config/$*.yaml \
+		--set image.repository="$(p2p_registry)/$(p2p_app_name)" \
 		--set image.tag="$(p2p_version)" \
-		--set ingress.appUrlSuffix="$(p2p_app_url_suffix)" \
-		--set ingress.domain="$(BASE_DOMAIN)" \
+		--set ui.image.repository="$(p2p_registry)/$(p2p_app_name)-ui" \
+		--set ui.image.tag="$(p2p_version)" \
+		--set "ui.ingress.hosts[0].host=$(p2p_app_name)-ui$(p2p_app_url_suffix).$(BASE_DOMAIN)" \
 		--atomic \
 		--timeout 10m
 
 .PHONY: deploy-functional
 deploy-functional: deploy-api-functional deploy-ui-functional
+
+.PHONY: deploy-nft
+deploy-nft: deploy-api-nft deploy-ui-nft
 
 .PHONY: deploy-extended-test
 deploy-extended-test: deploy-api-extended-test deploy-ui-extended-test

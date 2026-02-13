@@ -1,14 +1,26 @@
 ---
-# Increase resources for NFT load testing
-replicaCount: 2
+ui:
+  replicaCount: 2
 
-resources:
-  requests:
-    cpu: 1500m
-    memory: 2000Mi
-  limits:
-    cpu: 1500m
-    memory: 2000Mi
+  resources:
+    requests:
+      cpu: 1500m
+      memory: 2000Mi
+    limits:
+      cpu: 1500m
+      memory: 2000Mi
+
+  env:
+    - name: VUS
+      value: "100"
+    - name: REQ_PER_SECOND
+      value: "300"
+    - name: BACKEND_URL
+      value: "http://mock-backend:8080"
+    - name: AUTH_SECRET
+      value: "nft-test-secret-not-for-production-use"
+    - name: NEXTAUTH_URL
+      value: "http://support-bot-ui:3000"
 
 # Configure k6 test pod resources (injector)
 tests:
@@ -20,11 +32,3 @@ tests:
       limits:
         cpu: 1000m
         memory: 3Gi
-
-# Override NFT defaults and provide backend URLs
-envVarsMap:
-  VUS: "100"
-  REQ_PER_SECOND: "300"
-  BACKEND_URL: http://mock-backend:8080
-  AUTH_SECRET: "nft-test-secret-not-for-production-use"
-  NEXTAUTH_URL: http://support-bot-ui:3000
