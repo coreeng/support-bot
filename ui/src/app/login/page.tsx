@@ -5,6 +5,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useAuth } from "@/hooks/useAuth";
 
+/**
+ * Sanitize a callback URL to prevent open-redirect attacks.
+ * Only relative paths (starting with "/" but not "//") are allowed.
+ * Anything else (absolute URLs, protocol-relative, javascript: etc.) falls back to "/".
+ */
+export function sanitizeCallbackUrl(url: string | null | undefined): string {
+  if (typeof url === "string" && url.startsWith("/") && !url.startsWith("//")) {
+    return url;
+  }
+  return "/";
+}
 
 function LoginContent() {
   const router = useRouter();
@@ -15,8 +26,23 @@ function LoginContent() {
   // Handle callback from backend OAuth
   const code = searchParams.get("code");
   const token = searchParams.get("token");
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const error = searchParams.get("error");
+
+  // Iframe: listen for auth completion from popup
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === "auth:success") {
+        // Popup completed signIn — session cookie is already set (shared origin).
+        // Sanitize the callbackUrl from the message to prevent open redirects.
+        const targetUrl = sanitizeCallbackUrl(event.data.callbackUrl);
+        window.location.href = targetUrl;
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   useEffect(() => {
     if (isLoading) return;
@@ -24,9 +50,30 @@ function LoginContent() {
     // Don't retry if we already attempted authentication with this token/code
     if (authAttemptedRef.current) return;
 
+    // Detect if we're in a popup opened by the iframe
+    const isPopup = !!window.opener && !window.opener.closed;
+
     // If we have a token from the new OAuth flow, use it
     if (token) {
       authAttemptedRef.current = true;
+
+      if (isPopup) {
+        // Popup: complete signIn here (first-party context, no CSRF issues),
+        // then notify the iframe and close.
+        signIn("backend-token", { token, redirect: false }).then((result) => {
+          if (result?.error) {
+            router.replace(`/login?error=${encodeURIComponent(result.error)}`);
+            return;
+          }
+          window.opener!.postMessage(
+            { type: "auth:success", callbackUrl },
+            window.location.origin
+          );
+          window.close();
+        });
+        return;
+      }
+
       signIn("backend-token", {
         token,
         callbackUrl,
@@ -38,6 +85,22 @@ function LoginContent() {
     // If we have a code, exchange it via NextAuth (legacy flow)
     if (code) {
       authAttemptedRef.current = true;
+
+      if (isPopup) {
+        signIn("backend-oauth", { code, redirect: false }).then((result) => {
+          if (result?.error) {
+            router.replace(`/login?error=${encodeURIComponent(result.error)}`);
+            return;
+          }
+          window.opener!.postMessage(
+            { type: "auth:success", callbackUrl },
+            window.location.origin
+          );
+          window.close();
+        });
+        return;
+      }
+
       signIn("backend-oauth", {
         code,
         callbackUrl,
