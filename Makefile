@@ -147,8 +147,8 @@ push-extended-test: ## Uses promoted image (no push needed)
 deploy-integration:
 	echo "Service deployment is managed by tests"
 
-.PHONY: deploy-nft
-deploy-nft: ## Deploy service and DB for nft tests
+.PHONY: deploy-api-nft
+deploy-api-nft: ## Deploy service and DB for nft tests
 	NAMESPACE="$(p2p_namespace)" \
 	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
 	SERVICE_IMAGE_TAG="$(p2p_version)" \
@@ -196,6 +196,9 @@ deploy-ui-%: ## Add UI to existing API deployment
 
 .PHONY: deploy-functional
 deploy-functional: deploy-api-functional deploy-ui-functional
+
+.PHONY: deploy-nft
+deploy-nft: deploy-api-nft deploy-ui-nft
 
 .PHONY: deploy-extended-test
 deploy-extended-test: deploy-api-extended-test deploy-ui-extended-test
