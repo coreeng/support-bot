@@ -13,4 +13,16 @@ data:
 #trivy:ignore:AVD-KSV-0109 ConfigMap contains placeholder refs; real secrets are provided via K8s Secrets
   application.yaml: |
     {{- toYaml .Values.configMap.config | nindent 4 }}
+    {{- with .Values.auth.allowedEmails }}
+    security.allow-list.emails:
+    {{- range . }}
+      - {{ . | quote }}
+    {{- end }}
+    {{- end }}
+    {{- with .Values.auth.allowedDomains }}
+    security.allow-list.domains:
+    {{- range . }}
+      - {{ . | quote }}
+    {{- end }}
+    {{- end }}
 {{- end }}
