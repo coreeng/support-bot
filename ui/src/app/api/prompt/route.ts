@@ -1,14 +1,32 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { readFile } from "fs/promises";
 import { join } from "path";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await auth();
 
   // Check authentication
   if (!session?.user) {
     return new NextResponse("Unauthorized", { status: 401 });
+  }
+
+  // Validate CSRF token for GET requests that export sensitive data
+  const csrfTokenFromHeader = request.headers.get("X-CSRF-Token");
+  const csrfCookieName = process.env.NODE_ENV === "production"
+    ? "__Host-authjs.csrf-token"
+    : "authjs.csrf-token";
+  const csrfCookieValue = request.cookies.get(csrfCookieName)?.value;
+
+  if (!csrfTokenFromHeader || !csrfCookieValue) {
+    return new NextResponse("Missing CSRF token", { status: 403 });
+  }
+
+  // NextAuth CSRF token format: "token|hash"
+  const cookieToken = csrfCookieValue.split("|")[0];
+
+  if (csrfTokenFromHeader !== cookieToken) {
+    return new NextResponse("Invalid CSRF token", { status: 403 });
   }
 
   // Check roles - must be LEADERSHIP or SUPPORT_ENGINEER

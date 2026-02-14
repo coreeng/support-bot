@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText } from 'lucide-react'
+import { getCsrfToken } from 'next-auth/react'
 import { useAnalysis } from '@/lib/hooks'
 import { useToast } from '@/components/ui/toast'
 
@@ -30,7 +31,14 @@ export default function KnowledgeGapsPage() {
     const handleExportDownload = async () => {
         setIsDownloading(true)
         try {
-            const response = await fetch('/api/summary-data/export?days=31')
+            // Get CSRF token for protection against cross-site request forgery
+            const csrfToken = await getCsrfToken()
+
+            const response = await fetch('/api/summary-data/export?days=31', {
+                headers: {
+                    'X-CSRF-Token': csrfToken || '',
+                },
+            })
             if (!response.ok) {
                 throw new Error('Failed to download export')
             }
@@ -52,13 +60,34 @@ export default function KnowledgeGapsPage() {
         }
     }
 
-    const handlePromptDownload = () => {
-        const a = document.createElement('a')
-        a.href = '/api/prompt'
-        a.download = 'gap_analysis_taxonomy_summary-prompt.md'
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
+    const handlePromptDownload = async () => {
+        try {
+            // Get CSRF token for protection against cross-site request forgery
+            const csrfToken = await getCsrfToken()
+
+            const response = await fetch('/api/prompt', {
+                headers: {
+                    'X-CSRF-Token': csrfToken || '',
+                },
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to download prompt')
+            }
+
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = 'gap_analysis_taxonomy_summary-prompt.md'
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+        } catch (error) {
+            console.error('Error downloading prompt:', error)
+            showToast('Failed to download prompt. Please try again.', 'error')
+        }
     }
 
     const handleImportClick = () => {
@@ -71,11 +100,17 @@ export default function KnowledgeGapsPage() {
 
         setIsUploading(true)
         try {
+            // Get CSRF token for protection against cross-site request forgery
+            const csrfToken = await getCsrfToken()
+
             const formData = new FormData()
             formData.append('file', file)
 
             const response = await fetch('/api/summary-data/import', {
                 method: 'POST',
+                headers: {
+                    'X-CSRF-Token': csrfToken || '',
+                },
                 body: formData,
             })
 
