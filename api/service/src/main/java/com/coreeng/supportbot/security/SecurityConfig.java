@@ -28,6 +28,7 @@ public class SecurityConfig {
     private final TeamService teamService;
     private final SupportTeamService supportTeamService;
     private final OAuth2AvailabilityChecker oauth2AvailabilityChecker;
+    private final AllowListService allowListService;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, CorsConfigurationSource corsConfigurationSource)
@@ -77,7 +78,8 @@ public class SecurityConfig {
 
     @Bean
     public OAuth2SuccessHandler oauth2SuccessHandler() {
-        return new OAuth2SuccessHandler(properties, jwtService, authCodeStore, teamService, supportTeamService);
+        return new OAuth2SuccessHandler(
+                properties, jwtService, authCodeStore, teamService, supportTeamService, allowListService);
     }
 
     @Bean

@@ -29,6 +29,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private final AuthCodeStore authCodeStore;
     private final TeamService teamService;
     private final SupportTeamService supportTeamService;
+    private final AllowListService allowListService;
 
     @Override
     public void onAuthenticationSuccess(
@@ -36,6 +37,16 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             throws IOException {
         var oauth2User = (OAuth2User) authentication.getPrincipal();
         var email = extractEmail(oauth2User);
+        if (!allowListService.isAllowed(email)) {
+            log.warn("Allow-list rejected user during OAuth2 redirect login");
+            var redirectUri = UriComponentsBuilder.fromUriString(
+                            properties.oauth2().redirectUri())
+                    .queryParam("error", "user_not_allowed")
+                    .build()
+                    .toUriString();
+            response.sendRedirect(redirectUri);
+            return;
+        }
         var name = extractName(oauth2User);
 
         log.info("OAuth2 login successful for user");

@@ -28,6 +28,9 @@ security:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   test-bypass:
     enabled: false
+  allow-list:
+    emails: ${ALLOWED_EMAILS:}
+    domains: ${ALLOWED_DOMAINS:}
 
 spring:
   lifecycle:

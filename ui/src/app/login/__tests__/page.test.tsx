@@ -80,6 +80,16 @@ describe('LoginPage', () => {
     expect(screen.getByText('TokenExpired')).toBeInTheDocument()
   })
 
+  it('shows not-onboarded message for user_not_allowed error', () => {
+    mockUseSearchParams.mockReturnValue(new URLSearchParams('error=user_not_allowed') as any)
+
+    render(<LoginPage />)
+
+    expect(screen.getByText('Access Restricted')).toBeInTheDocument()
+    expect(screen.getByText(/not been onboarded/)).toBeInTheDocument()
+    expect(screen.queryByText('Authentication Error')).not.toBeInTheDocument()
+  })
+
   // -------------------------------------------------------------------
   // sanitizeCallbackUrl — open-redirect prevention
   // -------------------------------------------------------------------

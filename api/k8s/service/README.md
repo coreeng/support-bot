@@ -87,6 +87,27 @@ configMap:
       key: value
 ```
 
+## Auth Allow-List
+
+Restrict SSO login to specific email addresses and/or domains:
+
+```yaml
+auth:
+  allowedDomains:
+    - example.com
+    - corp.io
+  allowedEmails:
+    - external.contractor@partner.com
+    - special.user@other.org
+```
+
+- `auth.allowedEmails` (list): Email addresses allowed to log in. Default `[]`.
+- `auth.allowedDomains` (list): Email domains allowed to log in (any user `@domain`). Default `[]`.
+
+When both lists are empty (the default), all SSO-authenticated users are allowed. When either list is configured, only matching users can log in. Users not in the allow-list see an "Access Restricted" page.
+
+These values are rendered into the ConfigMap `application.yaml` under `security.allow-list`.
+
 ## Health and Metrics
 
 - Health endpoint: `/health` on port `8081` (used by liveness/readiness).

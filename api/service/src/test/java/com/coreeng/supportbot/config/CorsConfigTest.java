@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.security.SecurityProperties;
 import java.time.Duration;
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -17,7 +18,8 @@ class CorsConfigTest {
                 new SecurityProperties.JwtProperties("test-secret-minimum-256-bits-for-testing", Duration.ofHours(1)),
                 new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
                 new SecurityProperties.CorsProperties(allowedOrigins),
-                new SecurityProperties.TestBypassProperties(false));
+                new SecurityProperties.TestBypassProperties(false),
+                new SecurityProperties.AllowListProperties(List.of(), List.of()));
     }
 
     @Test

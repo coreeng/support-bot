@@ -8,6 +8,7 @@ import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamType;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class JwtServiceTest {
@@ -21,7 +22,8 @@ class JwtServiceTest {
                 new SecurityProperties.JwtProperties(TEST_SECRET, expiration),
                 new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
                 new SecurityProperties.CorsProperties(null),
-                new SecurityProperties.TestBypassProperties(false)));
+                new SecurityProperties.TestBypassProperties(false),
+                new SecurityProperties.AllowListProperties(List.of(), List.of())));
     }
 
     @Test
