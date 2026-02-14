@@ -131,18 +131,19 @@ CREATE TABLE analysis (
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 1. EXPORT                                                           │
-│    GET /summary-data/export?days=31                                 │
+│    GET /api/summary-data/export?days=31                             │
 │    (requires LEADERSHIP or SUPPORT_ENGINEER role)                   │
+│    (requires CSRF token in X-CSRF-Token header)                     │
 │    → content.zip (thread text files)                                │
 └────────────────────────────┬────────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 2. GET PROMPT                                                       │
-│    Download gap_analysis_taxonomy_summary-prompt.md                 │
-│    - Click "Get Prompt" button in UI, OR                            │
-│    - GET /api/prompt (requires LEADERSHIP or SUPPORT_ENGINEER role) │
-│    → Contains AI instructions for classification                    │
+│    GET /api/prompt                                                  │
+│    (requires LEADERSHIP or SUPPORT_ENGINEER role)                   │
+│    (requires CSRF token in X-CSRF-Token header)                     │
+│    → gap_analysis_taxonomy_summary-prompt.md                        │
 └────────────────────────────┬────────────────────────────────────────┘
                              │
                              ▼
@@ -163,18 +164,20 @@ CREATE TABLE analysis (
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 5. IMPORT                                                           │
-│    POST /summary-data/import (file=analysis.tsv)                    │
+│    POST /api/summary-data/import (file=analysis.tsv)                │
 │    (requires LEADERSHIP or SUPPORT_ENGINEER role)                   │
+│    (requires CSRF token in X-CSRF-Token header)                     │
 │    → Upserts records into analysis table                            │
 └────────────────────────────┬────────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 6. VISUALIZATION                                                    │
-│    GET /analysis → UI displays aggregated insights                  │
+│    GET /api/analysis                                                │
 │    (requires LEADERSHIP or SUPPORT_ENGINEER role)                   │
-│    - Top 5 Support Areas (by Driver)                                │
-│    - Top 5 Knowledge Gaps (by Category)                             │
+│    → JSON response                                                  │
+│      - Top 5 Support Areas (by Driver)                              │
+│      - Top 5 Knowledge Gaps (by Category)                           │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
