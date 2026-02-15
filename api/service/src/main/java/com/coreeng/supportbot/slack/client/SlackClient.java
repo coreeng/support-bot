@@ -2,6 +2,7 @@ package com.coreeng.supportbot.slack.client;
 
 import com.coreeng.supportbot.slack.SlackId;
 import com.google.common.collect.ImmutableList;
+import com.slack.api.methods.request.conversations.ConversationsHistoryRequest;
 import com.slack.api.methods.request.conversations.ConversationsRepliesRequest;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
@@ -9,6 +10,7 @@ import com.slack.api.methods.request.views.ViewsOpenRequest;
 import com.slack.api.methods.response.chat.ChatPostEphemeralResponse;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.chat.ChatUpdateResponse;
+import com.slack.api.methods.response.conversations.ConversationsHistoryResponse;
 import com.slack.api.methods.response.conversations.ConversationsOpenResponse;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
 import com.slack.api.methods.response.reactions.ReactionsAddResponse;
@@ -35,6 +37,8 @@ public interface SlackClient {
     String getPermalink(SlackGetMessageByTsRequest request);
 
     ConversationsRepliesResponse getThreadPage(ConversationsRepliesRequest request);
+
+    ConversationsHistoryResponse getHistoryPage(ConversationsHistoryRequest request);
 
     ViewsOpenResponse viewsOpen(ViewsOpenRequest request);
 

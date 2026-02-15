@@ -125,6 +125,7 @@ dependencies {
     implementation("com.azure.spring:spring-cloud-azure-starter:5.22.0")
 
     implementation("net.logstash.logback:logstash-logback-encoder:8.0")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
