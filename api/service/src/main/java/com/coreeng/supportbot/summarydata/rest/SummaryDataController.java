@@ -4,6 +4,7 @@ import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.summarydata.ThreadService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -28,6 +29,7 @@ public class SummaryDataController {
     private final ThreadService threadService;
     private final SlackTicketsProps slackTicketsProps;
     private final AnalysisService analysisService;
+    private final ObjectMapper objectMapper;
 
     /**
      * Export summary data as a zip file containing thread texts.
@@ -77,21 +79,20 @@ public class SummaryDataController {
     }
 
     /**
-     * Import analysis data from a TSV file.
+     * Import analysis data from a JSONL file.
      * The file should have the structure: ticket_id, Driver, Category, Feature, Summary
      *
-     * @param file TSV file to import
+     * @param file JSONL file to import
      * @return Response with the number of records imported
      */
     @PostMapping("/import")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('LEADERSHIP', 'SUPPORT_ENGINEER')")
     public ResponseEntity<ImportResponse> importAnalysisData(@RequestParam("file") MultipartFile file) {
         log.info("Received import request for file: {}", file.getOriginalFilename());
 
         try {
-            // Parse TSV file
-            List<AnalysisRepository.AnalysisRecord> records = parseTsvFile(file);
-            log.info("Parsed {} records from TSV file", records.size());
+            // Parse JSONL file
+            List<AnalysisRepository.AnalysisRecord> records = parseJsonlFile(file);
+            log.info("Parsed {} records from JSONL file", records.size());
 
             // Import data using AnalysisService
             int importedCount = analysisService.importAnalysisData(records);
@@ -106,55 +107,26 @@ public class SummaryDataController {
     }
 
     /**
-     * Parse TSV file into AnalysisRecord objects.
+     * Parse JSONL file into AnalysisRecord objects.
      *
-     * @param file TSV file to parse
+     * @param file JSONL file to parse
      * @return List of AnalysisRecord objects
      * @throws Exception if parsing fails
      */
-    private List<AnalysisRepository.AnalysisRecord> parseTsvFile(MultipartFile file) throws Exception {
+    private List<AnalysisRepository.AnalysisRecord> parseJsonlFile(MultipartFile file) throws Exception {
         List<AnalysisRepository.AnalysisRecord> records = new ArrayList<>();
 
         try (BufferedReader reader =
                 new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
 
-            // Skip header line
-            String headerLine = reader.readLine();
-            if (headerLine == null) {
-                throw new IllegalArgumentException("File is empty");
-            }
-
-            log.debug("TSV header: {}", headerLine);
-
-            // Read data lines
             String line;
-            int lineNumber = 1;
             while ((line = reader.readLine()) != null) {
-                lineNumber++;
-
-                // Skip empty lines
-                if (line.trim().isEmpty()) {
-                    continue;
-                }
-
-                String[] fields = line.split("\t", -1); // -1 to keep trailing empty strings
-
-                if (fields.length < 5) {
-                    log.warn("Skipping line {} - insufficient fields (expected 5, got {})", lineNumber, fields.length);
-                    continue;
-                }
-
                 try {
-                    int ticketId = Integer.parseInt(fields[0].trim());
-                    String driver = fields[1].trim();
-                    String category = fields[2].trim();
-                    String feature = fields[3].trim();
-                    String summary = fields[4].trim();
-
-                    records.add(new AnalysisRepository.AnalysisRecord(ticketId, driver, category, feature, summary));
-
+                    AnalysisRepository.AnalysisRecord record =
+                            objectMapper.readValue(line, AnalysisRepository.AnalysisRecord.class);
+                    records.add(record);
                 } catch (NumberFormatException e) {
-                    log.warn("Skipping line {} - invalid ticket_id: {}", lineNumber, fields[0]);
+                    log.warn("Skipping line {} - invalid ticket_id", line);
                 }
             }
         }

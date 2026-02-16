@@ -21,15 +21,15 @@ function parseMarkdownToJson(mdContent) {
 
   for (const line of lines) {
     if (line.startsWith('Ticket:')) {
-      result.ticket = line.replace('Ticket:', '').trim();
+      result.ticketId = line.replace('Ticket:', '').trim();
     } else if (line.startsWith('Primary Driver:')) {
-      result.primaryDriver = line.replace('Primary Driver:', '').trim();
+      result.driver = line.replace('Primary Driver:', '').trim();
     } else if (line.startsWith('Category:')) {
       result.category = line.replace('Category:', '').trim();
     } else if (line.startsWith('Platform Feature:')) {
-      result.platformFeature = line.replace('Platform Feature:', '').trim();
+      result.feature = line.replace('Platform Feature:', '').trim();
     } else if (line.startsWith('Reason:')) {
-      result.reason = line.replace('Reason:', '').trim();
+      result.summary = line.replace('Reason:', '').trim();
     }
   }
 

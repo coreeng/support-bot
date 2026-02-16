@@ -252,7 +252,7 @@ export default function KnowledgeGapsPage() {
                             <input
                                 ref={fileInputRef}
                                 type="file"
-                                accept=".tsv,.txt"
+                                accept=".jsonl"
                                 onChange={handleFileChange}
                                 className="hidden"
                             />

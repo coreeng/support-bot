@@ -6,6 +6,7 @@ To enable external AI-powered analysis of support patterns and knowledge gaps, w
 
 1. Export raw thread data for processing by external AI tools
 2. Get AI prompt for analysis
+3. Run AI analysis on the exported data
 3. Import structured analysis results back into the bot DB
 4. Display aggregated insights in the UI
 
@@ -41,11 +42,11 @@ GET /api/summary-data/export?days=31
 
 ### 2. Service Import Endpoint: `POST /summary-data/import`
 
-**Purpose:** Import AI-analyzed data in TSV format.
+**Purpose:** Import AI-analyzed data in JSONL format.
 
 **Input:**
 - multipart/formdata with `file` field
-- TSV file with columns: `ticket_id`, `Driver`, `Category`, `Feature`, `Summary`
+- JSONL file with fields: `ticketId`, `driver`, `sategory`, `feature`, `summary`
 
 **Output:**
 - JSON response: `{ "recordsImported": 30, "message": "Import successful" }`
@@ -121,7 +122,27 @@ CREATE TABLE analysis (
 
 ### 5. AI Transformation Workflow
 
+**Pre-requisites:**
+
+1. Node.js 22+ is installed
+2. Auggie is installed
+
+```bash
+brew install nodejs@22
+
+npm install -g @augmentcode/auggie-sdk
+```
+
 **Process:**
+
+1. Download thread content by using the Export Data button in the UI - this will create `content.zip` in your `Downloads` folder
+2. Download prompt by using Get Prompt button in the UI - this will download gap_analysis_taxonomy_summary-prompt.md in your `Downloads` folder
+3. Move both `content.,zip` and he prompt file into api/analysis directory
+4. Unzip `content.zip` by running `unzip content.zip -d content`
+5. Run the analysis by executing `run.sh` in api/analysis directory - this will create `analysis.jsonl` file in the same directory
+6. Import the analysis by uploading the analysis.jsonl file using the Import Data button in the UI
+7. Updates analysis will be shown on the Support Area Summary page
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 1. EXPORT                                                           │
@@ -143,22 +164,21 @@ CREATE TABLE analysis (
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 3. EXTRACT                                                          │
-│    unzip content.zip → individual .txt files                        │
+│    Copy and unzip content.zip into api/analysis/content directory   │
+│    Copy prompt into analysis directory                              │
 └────────────────────────────┬────────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 4. AI ANALYSIS (External)                                           │
-│    For each thread file:                                            │
-│    - Apply AI prompt (gap_analysis_taxonomy_summary-prompt.md)      │
-│    - Extract: Ticket ID, Driver, Category, Feature, Summary         │
-│    - Append to analysis.tsv                                         │
+│    Execute run.sh inside api/analysis directory                     │
+│    This will produce analysis.jsonl file                            │
 └────────────────────────────┬────────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 5. IMPORT                                                           │
-│    POST /api/summary-data/import (file=analysis.tsv)                │
+│    POST /api/summary-data/import (file=analysis.jsonl)              │
 │    (requires SUPPORT_ENGINEER role)                                 │
 │    (requires CSRF token in X-CSRF-Token header)                     │
 │    → Upserts records into analysis table                            │
@@ -174,38 +194,6 @@ CREATE TABLE analysis (
 │      - Top 5 Knowledge Gaps (by Category)                           │
 └─────────────────────────────────────────────────────────────────────┘
 ```
-
-**AI Prompt Structure:**
-
-The prompt (`gap_analysis_taxonomy_summary-prompt.md`) guides AI to:
-
-**Step 1:** Determine Primary Support Driver (choose ONE):
-- **Knowledge Gap** - Tenant unaware of existing features
-- **Product Usability Problem** - UX/documentation issues
-- **Product Temporary Issue** - Transient outages/incidents
-- **Feature Request** - Genuinely missing capability
-- **Task Request** - Requires platform team authority
-
-**Step 2:** Classify into:
-- **Category** - One of 10 categories (CI, CD, Networking, etc.)
-- **Platform Feature** - Specific feature or "None"
-- **Summary** - 1-2 sentence description
-
-**Output Format:**
-```
-Ticket: 1234
-Primary Driver: Knowledge Gap
-Category: CI
-Platform Feature: Artifactory
-Reason: Tenant attempted to use docker login for Artifactory authentication instead of using the platform-provided credential helper.
-```
-
-**Converted to TSV:**
-```tsv
-ticket_id	Driver	Category	Feature	Summary
-1234	Knowledge Gap	CI	Artifactory	Tenant attempted to use docker login for Artifactory authentication instead of using the platform-provided credential helper.
-```
-NOTE: the header row must be present
 
 ## Access Control
 
@@ -223,7 +211,7 @@ NOTE: the header row must be present
 **Controller:** `SummaryDataController.java`
 - Handles HTTP requests for export/import
 - Streams ZIP file for export
-- Parses TSV for import
+- Parses JSONL for import
 
 **Service:** `ThreadService.java`
 - Fetches threads from Slack API
@@ -250,7 +238,7 @@ NOTE: the header row must be present
 **UI Component:** `ui/src/components/knowledgegaps/knowledge-gaps.tsx`
 - **Export Data** button (blue) - Downloads ZIP file via `/api/summary-data/export`
 - **Get Prompt** button (blue) - Downloads AI prompt guide via `/api/prompt`
-- **Import Data** button (green) - Uploads TSV file via `/api/summary-data/import`
+- **Import Data** button (green) - Uploads JSONL file via `/api/summary-data/import`
 - Toast notifications for user feedback
 
 

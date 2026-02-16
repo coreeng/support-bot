@@ -23,5 +23,4 @@ echo "Found $TXT_FILE_COUNT .txt file(s) in content directory"
 echo "Proceeding with analysis..."
 echo ""
 
-npm install
 npm run process
