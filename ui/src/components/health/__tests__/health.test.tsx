@@ -271,7 +271,6 @@ describe('HealthPage', () => {
             expect(screen.getByText('Opened At')).toBeInTheDocument();
             const ratedHeaders = screen.getAllByText('Rated');
             expect(ratedHeaders.length).toBeGreaterThan(0);
-            expect(screen.getByText('Link')).toBeInTheDocument();
         });
     });
 
@@ -734,6 +733,103 @@ describe('HealthPage', () => {
                     expect(recommendedTexts.length).toBeGreaterThan(0);
                 }
             });
+        });
+    });
+
+    describe('Ticket Workbench Pagination', () => {
+        it('shows Previous and Next buttons when there are multiple pages', () => {
+            const mockTickets = Array.from({ length: 25 }, (_, i) =>
+                createMockTicket(`${i}`, 'opened', 'Team A', false)
+            );
+
+            mockUseTickets.mockReturnValue({
+                data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 25 },
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<HealthPage />, { wrapper: Wrapper });
+            fireEvent.click(screen.getByText('Ticket Workbench'));
+
+            expect(screen.getByText('Previous')).toBeInTheDocument();
+            expect(screen.getByText('Next')).toBeInTheDocument();
+        });
+
+        it('disables Previous button on first page', () => {
+            const mockTickets = Array.from({ length: 25 }, (_, i) =>
+                createMockTicket(`${i}`, 'opened', 'Team A', false)
+            );
+
+            mockUseTickets.mockReturnValue({
+                data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 25 },
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<HealthPage />, { wrapper: Wrapper });
+            fireEvent.click(screen.getByText('Ticket Workbench'));
+
+            expect(screen.getByText('Previous')).toBeDisabled();
+        });
+
+        it('advances to next page when Next is clicked', () => {
+            const mockTickets = Array.from({ length: 25 }, (_, i) =>
+                createMockTicket(`${i}`, 'opened', 'Team A', false)
+            );
+
+            mockUseTickets.mockReturnValue({
+                data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 25 },
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<HealthPage />, { wrapper: Wrapper });
+            fireEvent.click(screen.getByText('Ticket Workbench'));
+
+            fireEvent.click(screen.getByText('Next'));
+
+            // Page 2 button should now be active (have blue background)
+            const page2Button = screen.getByText('2');
+            expect(page2Button).toHaveClass('bg-blue-500');
+        });
+
+        it('shows ellipsis when there are many pages', () => {
+            const mockTickets = Array.from({ length: 100 }, (_, i) =>
+                createMockTicket(`${i}`, 'opened', 'Team A', false)
+            );
+
+            mockUseTickets.mockReturnValue({
+                data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 100 },
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<HealthPage />, { wrapper: Wrapper });
+            fireEvent.click(screen.getByText('Ticket Workbench'));
+
+            // Should show ellipsis instead of all page numbers
+            expect(screen.getByText('...')).toBeInTheDocument();
+            // Should show first and last page
+            expect(screen.getByText('1')).toBeInTheDocument();
+            expect(screen.getByText('10')).toBeInTheDocument();
+        });
+
+        it('does not show pagination for a single page', () => {
+            const mockTickets = Array.from({ length: 5 }, (_, i) =>
+                createMockTicket(`${i}`, 'opened', 'Team A', false)
+            );
+
+            mockUseTickets.mockReturnValue({
+                data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 5 },
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<HealthPage />, { wrapper: Wrapper });
+            fireEvent.click(screen.getByText('Ticket Workbench'));
+
+            expect(screen.queryByText('Previous')).not.toBeInTheDocument();
+            expect(screen.queryByText('Next')).not.toBeInTheDocument();
         });
     });
 

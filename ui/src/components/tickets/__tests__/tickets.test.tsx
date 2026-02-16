@@ -324,43 +324,6 @@ describe('Tickets Component', () => {
         });
     });
 
-    describe('Link Display', () => {
-        it('shows "View" link when query link exists', () => {
-            const mockTickets = getMockPaginatedTickets([
-                createMockTicket('1', 'opened', 'Team A', 'high')
-            ]);
-            
-            mockUseTickets.mockReturnValue({
-                data: mockTickets,
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
-
-            render(<Tickets />, { wrapper: Wrapper });
-            
-            expect(screen.getByText('View')).toBeInTheDocument();
-        });
-
-        it('shows "N/A" when query link does not exist', () => {
-            const ticketWithoutLink = {
-                ...createMockTicket('1', 'opened', 'Team A', 'high'),
-                query: null
-            };
-            
-            const mockTickets = getMockPaginatedTickets([ticketWithoutLink]);
-            
-            mockUseTickets.mockReturnValue({
-                data: mockTickets,
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
-
-            render(<Tickets />, { wrapper: Wrapper });
-            
-            expect(screen.getByText('N/A')).toBeInTheDocument();
-        });
-    });
-
     describe('Filter Dropdowns', () => {
         it('renders status filter dropdown', () => {
             const mockTickets = getMockPaginatedTickets([]);

@@ -19,7 +19,7 @@ public class EscalationUI {
 
     @Nullable private String escalatingTeam;
 
-    @Nullable private String threadLink;
+    private boolean hasThread;
 
     private Instant openedAt;
 

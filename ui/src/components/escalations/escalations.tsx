@@ -264,7 +264,18 @@ export default function EscalationsPage() {
                                 <td className="px-4 py-2 text-sm">
                                     {esc.tags?.length ? esc.tags.map((tag, i) => <span key={i} className="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2 py-0.5 rounded mr-1">{tag}</span>) : '-'}
                                 </td>
-                                <td className="px-4 py-2 text-sm">{esc.threadLink ? <a href={esc.threadLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View</a> : '-'}</td>
+                                <td className="px-4 py-2 text-sm">
+                                    {esc.hasThread ? (
+                                        <a
+                                            href={`/api/escalations/${esc.id}/permalink`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:underline"
+                                        >
+                                            View
+                                        </a>
+                                    ) : '-'}
+                                </td>
                             </tr>
                         )
                     })}

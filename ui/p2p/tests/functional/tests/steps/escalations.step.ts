@@ -32,7 +32,7 @@ Given('the backend has escalation data', async function (this: CustomWorld) {
             resolvedAt: null,
             impact: 'high',
             tags: ['bug'],
-            threadLink: 'http://slack.com/thread-1',
+            hasThread: true,
             openedAt: '2024-01-01T10:00:00Z'
         },
         {
@@ -43,7 +43,7 @@ Given('the backend has escalation data', async function (this: CustomWorld) {
             resolvedAt: '2024-01-02T12:00:00Z',
             impact: 'medium',
             tags: ['feature'],
-            threadLink: 'http://slack.com/thread-2',
+            hasThread: true,
             openedAt: '2024-01-01T11:00:00Z'
         },
         {
@@ -54,7 +54,7 @@ Given('the backend has escalation data', async function (this: CustomWorld) {
             resolvedAt: null,
             impact: 'low',
             tags: ['question'],
-            threadLink: 'http://slack.com/thread-3',
+            hasThread: true,
             openedAt: '2024-01-01T12:00:00Z'
         }
     ]);
@@ -71,7 +71,7 @@ Given('there are escalations for {string} and {string}', async function (this: C
             resolvedAt: null,
             impact: 'high',
             tags: ['bug'],
-            threadLink: 'http://slack.com/thread-1',
+            hasThread: true,
             openedAt: '2024-01-01T10:00:00Z'
         },
         {
@@ -82,7 +82,7 @@ Given('there are escalations for {string} and {string}', async function (this: C
             resolvedAt: null,
             impact: 'medium',
             tags: ['feature'],
-            threadLink: 'http://slack.com/thread-2',
+            hasThread: true,
             openedAt: '2024-01-02T10:00:00Z'
         }
     ]);
@@ -98,7 +98,7 @@ Given('there are ongoing and resolved escalations for {string}', async function 
             resolvedAt: null,
             impact: 'high',
             tags: ['bug'],
-            threadLink: 'http://slack.com/thread-1',
+            hasThread: true,
             openedAt: '2024-01-01T10:00:00Z'
         },
         {
@@ -109,7 +109,7 @@ Given('there are ongoing and resolved escalations for {string}', async function 
             resolvedAt: '2024-01-02T12:00:00Z',
             impact: 'medium',
             tags: ['feature'],
-            threadLink: 'http://slack.com/thread-2',
+            hasThread: true,
             openedAt: '2024-01-01T11:00:00Z'
         }
     ]);
@@ -125,7 +125,7 @@ Given('there are high and medium impact escalations for {string}', async functio
             resolvedAt: null,
             impact: 'high',
             tags: ['bug'],
-            threadLink: 'http://slack.com/thread-1',
+            hasThread: true,
             openedAt: '2024-01-01T10:00:00Z'
         },
         {
@@ -136,7 +136,7 @@ Given('there are high and medium impact escalations for {string}', async functio
             resolvedAt: null,
             impact: 'medium',
             tags: ['feature'],
-            threadLink: 'http://slack.com/thread-2',
+            hasThread: true,
             openedAt: '2024-01-02T10:00:00Z'
         }
     ]);

@@ -37,7 +37,7 @@ public class TicketUI {
     @Nullable private String assignedTo;
 
     public record Query(
-            String link,
+            @Nullable String link,
             Instant date,
             MessageTs ts,
             @Nullable String text) {}

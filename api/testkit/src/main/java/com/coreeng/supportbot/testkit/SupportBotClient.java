@@ -246,7 +246,7 @@ public class SupportBotClient {
     @Getter
     @Jacksonized
     public static class Escalation {
-        private String threadLink;
+        private boolean hasThread;
         private Team team;
         private ImmutableList<@NonNull String> tags;
         private Instant openedAt;

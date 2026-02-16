@@ -158,10 +158,39 @@ export function useAssignmentEnabled() {
 
 // ===== Escalation Hooks =====
 
-export function useEscalations(page: number = 0, pageSize: number = 50) {
+export function useEscalations(pageSize: number = 50) {
   return useQuery<PaginatedEscalations>({
-    queryKey: ["escalations", page, pageSize],
-    queryFn: () => apiGet(`/escalations?page=${page}&pageSize=${pageSize}`),
+    queryKey: ["escalations", pageSize],
+    queryFn: async () => {
+      const first = await apiGet<PaginatedEscalations>(
+        `/escalations?page=0&pageSize=${pageSize}`
+      );
+      const totalPages = first.totalPages ?? 1;
+
+      if (totalPages <= 1) return first;
+
+      const pagesToFetch = [];
+      for (let p = 1; p < totalPages; p++) {
+        pagesToFetch.push(
+          apiGet<PaginatedEscalations>(
+            `/escalations?page=${p}&pageSize=${pageSize}`
+          )
+        );
+      }
+
+      const rest = await Promise.all(pagesToFetch);
+      const allContent = [
+        ...(first.content || []),
+        ...rest.flatMap((res) => res.content || []),
+      ];
+
+      return {
+        page: 0,
+        totalPages,
+        totalElements: allContent.length,
+        content: allContent,
+      };
+    },
   });
 }
 

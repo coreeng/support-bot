@@ -6,7 +6,7 @@ export * from './types/dashboard'
 interface RawEscalation {
     id: number | { id: number }
     ticketId: number | { id: number }
-    threadLink: string
+    hasThread: boolean
     openedAt: string
     resolvedAt: string | null
     escalatingTeam: string
@@ -29,7 +29,7 @@ export interface RawPaginatedEscalations {
 export interface Escalation {
     id: string   // stringify the EscalationId
     ticketId: string
-    threadLink: string
+    hasThread: boolean
     openedAt: string
     resolvedAt: string | null
     team: { name: string } | null

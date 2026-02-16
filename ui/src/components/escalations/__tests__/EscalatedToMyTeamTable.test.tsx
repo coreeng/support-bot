@@ -32,7 +32,7 @@ const mockEscalations = [
         impact: 'high',
         tags: ['bug', 'urgent'],
         ticketId: 'ticket-1',
-        threadLink: 'http://slack.com/thread-1',
+        hasThread: true,
         openedAt: '2024-01-01T10:00:00Z'
     },
     {
@@ -42,7 +42,7 @@ const mockEscalations = [
         impact: 'medium',
         tags: ['feature'],
         ticketId: 'ticket-2',
-        threadLink: 'http://slack.com/thread-2',
+        hasThread: true,
         openedAt: '2024-01-01T11:00:00Z'
     },
     {
@@ -52,7 +52,7 @@ const mockEscalations = [
         impact: 'low',
         tags: ['bug', 'question'],
         ticketId: 'ticket-3',
-        threadLink: 'http://slack.com/thread-3',
+        hasThread: true,
         openedAt: '2024-01-01T12:00:00Z'
     },
     {
@@ -62,7 +62,7 @@ const mockEscalations = [
         impact: 'high',
         tags: ['bug'],
         ticketId: 'ticket-4',
-        threadLink: 'http://slack.com/thread-4',
+        hasThread: true,
         openedAt: '2024-01-01T13:00:00Z'
     }
 ];
