@@ -328,8 +328,8 @@ describe('KnowledgeGapsPage', () => {
         // Wait for async operations
         await screen.findByText('Downloading...')
 
-        // Verify fetch was called
-        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/export?days=31', {
+        // Verify fetch was called with default value of 7 days (Week)
+        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/export?days=7', {
             headers: {
                 'X-CSRF-Token': 'mock-csrf-token',
             },
@@ -353,8 +353,8 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
-        // Find the select dropdown
-        const select = screen.getByDisplayValue('Month')
+        // Find the select dropdown - default is Week (7 days)
+        const select = screen.getByDisplayValue('Week')
         expect(select).toBeInTheDocument()
 
         // Verify all options are present
@@ -393,9 +393,9 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
-        // Change the time period to Week (7 days)
-        const select = screen.getByDisplayValue('Month')
-        fireEvent.change(select, { target: { value: '7' } })
+        // Change the time period to Month (31 days)
+        const select = screen.getByDisplayValue('Week')
+        fireEvent.change(select, { target: { value: '31' } })
 
         // Click export button
         const exportButton = screen.getByText('Export Data')
@@ -404,8 +404,8 @@ describe('KnowledgeGapsPage', () => {
         // Wait for the fetch to be called
         await new Promise(resolve => setTimeout(resolve, 100))
 
-        // Verify fetch was called with days=7
-        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/export?days=7', {
+        // Verify fetch was called with days=31
+        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/export?days=31', {
             headers: {
                 'X-CSRF-Token': 'mock-csrf-token',
             },
@@ -441,7 +441,7 @@ describe('KnowledgeGapsPage', () => {
         renderWithToast(<KnowledgeGapsPage />)
 
         // Change the time period to Quarter (92 days)
-        const select = screen.getByDisplayValue('Month')
+        const select = screen.getByDisplayValue('Week')
         fireEvent.change(select, { target: { value: '92' } })
 
         // Click export button
