@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.summarydata;
 
+import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
@@ -113,7 +114,23 @@ public class ThreadService {
                 requestBuilder.cursor(cursor);
             }
 
-            ConversationsRepliesResponse response = slackClient.getThreadPage(requestBuilder.build());
+            ConversationsRepliesResponse response;
+            try {
+                response = slackClient.getThreadPage(requestBuilder.build());
+            } catch (SlackException e) {
+                if ("rate_limited".equals(e.getError())) {
+                    log.warn("Rate limited on page {}, waiting 60 seconds before retry", pageCount);
+                    try {
+                        Thread.sleep(60000); // Wait 60 seconds
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("Interrupted while waiting for rate limit", ie);
+                    }
+                    response = slackClient.getThreadPage(requestBuilder.build()); // Retry once
+                } else {
+                    throw e;
+                }
+            }
 
             if (response.getMessages() != null) {
                 allMessages.addAll(response.getMessages());
@@ -292,7 +309,23 @@ public class ThreadService {
                 requestBuilder.cursor(cursor);
             }
 
-            ConversationsHistoryResponse response = slackClient.getHistoryPage(requestBuilder.build());
+            ConversationsHistoryResponse response;
+            try {
+                response = slackClient.getHistoryPage(requestBuilder.build());
+            } catch (SlackException e) {
+                if ("rate_limited".equals(e.getError())) {
+                    log.warn("Rate limited on page {}, waiting 2 seconds before retry", pageCount);
+                    try {
+                        Thread.sleep(2000);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("Interrupted while waiting for rate limit", ie);
+                    }
+                    response = slackClient.getHistoryPage(requestBuilder.build()); // Retry once
+                } else {
+                    throw e;
+                }
+            }
 
             if (response.getMessages() != null) {
                 log.debug(
@@ -316,6 +349,13 @@ public class ThreadService {
             if (hasMore && response.getResponseMetadata() != null) {
                 cursor = response.getResponseMetadata().getNextCursor();
                 log.debug("More messages available, cursor: {}", cursor);
+                try {
+                    // Slack allows 1 request per second
+                    Thread.sleep(1100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             } else {
                 hasMore = false;
             }
