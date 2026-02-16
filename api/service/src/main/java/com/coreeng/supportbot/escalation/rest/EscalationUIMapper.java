@@ -20,6 +20,7 @@ public class EscalationUIMapper {
         return EscalationUI.builder()
                 .id(checkNotNull(escalation.id()))
                 .ticketId(escalation.ticketId())
+                .hasThread(escalation.threadTs() != null)
                 .openedAt(escalation.openedAt())
                 .resolvedAt(escalation.resolvedAt())
                 .team(team != null ? teamUIMapper.mapToUI(team) : null)

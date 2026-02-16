@@ -158,12 +158,12 @@ export function useAssignmentEnabled() {
 
 // ===== Escalation Hooks =====
 
-export function useEscalations(page: number = 0, pageSize: number = 50) {
+export function useEscalations(pageSize: number = 50) {
   return useQuery<PaginatedEscalations>({
-    queryKey: ["escalations", page, pageSize],
+    queryKey: ["escalations", pageSize],
     queryFn: async () => {
       const first = await apiGet<PaginatedEscalations>(
-        `/escalations?page=${page}&pageSize=${pageSize}`
+        `/escalations?page=0&pageSize=${pageSize}`
       );
       const totalPages = first.totalPages ?? 1;
 

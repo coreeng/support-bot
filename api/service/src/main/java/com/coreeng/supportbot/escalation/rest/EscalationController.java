@@ -3,7 +3,6 @@ package com.coreeng.supportbot.escalation.rest;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.coreeng.supportbot.escalation.*;
-import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.ticket.*;
@@ -96,7 +95,7 @@ public class EscalationController {
             String permalink = slackClient.getPermalink(
                     new SlackGetMessageByTsRequest(escalation.channelId(), escalation.threadTs()));
             return ResponseEntity.ok(Map.of("permalink", permalink));
-        } catch (SlackException ex) {
+        } catch (Exception ex) {
             log.atError()
                     .setCause(ex)
                     .addKeyValue("escalationId", id)

@@ -265,21 +265,16 @@ export default function EscalationsPage() {
                                     {esc.tags?.length ? esc.tags.map((tag, i) => <span key={i} className="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2 py-0.5 rounded mr-1">{tag}</span>) : '-'}
                                 </td>
                                 <td className="px-4 py-2 text-sm">
-                                    <button
-                                        className="text-blue-600 hover:underline"
-                                        onClick={async () => {
-                                            try {
-                                                const res = await fetch(`/api/escalations/${esc.id}/permalink`)
-                                                if (!res.ok) throw new Error('Failed to fetch permalink')
-                                                const { permalink } = await res.json()
-                                                window.open(permalink, '_blank', 'noopener,noreferrer')
-                                            } catch {
-                                                alert('Unable to load Slack link. Please try again.')
-                                            }
-                                        }}
-                                    >
-                                        View
-                                    </button>
+                                    {esc.hasThread ? (
+                                        <a
+                                            href={`/api/escalations/${esc.id}/permalink`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:underline"
+                                        >
+                                            View
+                                        </a>
+                                    ) : '-'}
                                 </td>
                             </tr>
                         )

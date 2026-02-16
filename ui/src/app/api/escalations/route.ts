@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     return {
       id: String(id),
       ticketId: String(ticketId),
-      threadLink: e.threadLink,
+      hasThread: !!e.hasThread,
       openedAt: e.openedAt,
       resolvedAt: e.resolvedAt,
       escalatingTeam: e.escalatingTeam,

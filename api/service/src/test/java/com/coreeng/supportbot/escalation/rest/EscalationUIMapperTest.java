@@ -1,12 +1,15 @@
 package com.coreeng.supportbot.escalation.rest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationStatus;
+import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
@@ -38,15 +41,28 @@ class EscalationUIMapperTest {
     }
 
     @Test
-    void mapToUIReturnsNullThreadLink() {
+    void mapToUIHasThreadWhenThreadTsPresent() {
         // given
-        Escalation escalation = escalation().build();
+        Escalation escalation =
+                escalation().threadTs(new MessageTs("1234.5678")).build();
 
         // when
         EscalationUI result = escalationUIMapper.mapToUI(escalation);
 
         // then
-        assertNull(result.threadLink());
+        assertTrue(result.hasThread());
+    }
+
+    @Test
+    void mapToUIHasNoThreadWhenThreadTsNull() {
+        // given
+        Escalation escalation = escalation().threadTs(null).build();
+
+        // when
+        EscalationUI result = escalationUIMapper.mapToUI(escalation);
+
+        // then
+        assertFalse(result.hasThread());
     }
 
     @Test
