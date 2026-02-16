@@ -5,8 +5,10 @@ import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, F
 import { getCsrfToken } from 'next-auth/react'
 import { useAnalysis } from '@/lib/hooks'
 import { useToast } from '@/components/ui/toast'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function KnowledgeGapsPage() {
+    const { isSupportEngineer } = useAuth()
     const { data: analysisData, isLoading, error } = useAnalysis()
     const { showToast } = useToast()
     const [supportAreasExpanded, setSupportAreasExpanded] = useState(false)
@@ -14,6 +16,7 @@ export default function KnowledgeGapsPage() {
     const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
     const [isDownloading, setIsDownloading] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
+    const [selectedDays, setSelectedDays] = useState<number>(7)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const toggleItemExpansion = (itemName: string) => {
@@ -34,7 +37,7 @@ export default function KnowledgeGapsPage() {
             // Get CSRF token for protection against cross-site request forgery
             const csrfToken = await getCsrfToken()
 
-            const response = await fetch('/api/summary-data/export?days=31', {
+            const response = await fetch(`/api/summary-data/export?days=${selectedDays}`, {
                 headers: {
                     'X-CSRF-Token': csrfToken || '',
                 },
@@ -235,38 +238,49 @@ export default function KnowledgeGapsPage() {
                             Overview of support areas and knowledge gaps requiring attention
                         </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".tsv,.txt"
-                            onChange={handleFileChange}
-                            className="hidden"
-                        />
-                        <button
-                            onClick={handleExportDownload}
-                            disabled={isDownloading}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                        >
-                            <Download className="w-4 h-4" />
-                            {isDownloading ? 'Downloading...' : 'Export Data'}
-                        </button>
-                        <button
-                            onClick={handlePromptDownload}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                            <FileText className="w-4 h-4" />
-                            Get Prompt
-                        </button>
-                        <button
-                            onClick={handleImportClick}
-                            disabled={isUploading}
-                            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                        >
-                            <Upload className="w-4 h-4" />
-                            {isUploading ? 'Uploading...' : 'Import Data'}
-                        </button>
-                    </div>
+                    {isSupportEngineer && (
+                        <div className="flex items-center gap-3">
+                            <select
+                                value={selectedDays}
+                                onChange={(e) => setSelectedDays(Number(e.target.value))}
+                                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                                <option value={7}>Week</option>
+                                <option value={31}>Month</option>
+                                <option value={92}>Quarter</option>
+                            </select>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".tsv,.txt"
+                                onChange={handleFileChange}
+                                className="hidden"
+                            />
+                            <button
+                                onClick={handleExportDownload}
+                                disabled={isDownloading}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <Download className="w-4 h-4" />
+                                {isDownloading ? 'Downloading...' : 'Export Data'}
+                            </button>
+                            <button
+                                onClick={handlePromptDownload}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                <FileText className="w-4 h-4" />
+                                Get Prompt
+                            </button>
+                            <button
+                                onClick={handleImportClick}
+                                disabled={isUploading}
+                                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <Upload className="w-4 h-4" />
+                                {isUploading ? 'Uploading...' : 'Import Data'}
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Top 5 Support Areas */}

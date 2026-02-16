@@ -6,7 +6,6 @@ import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -16,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 /**
  * REST controller for summary data export and import operations.
@@ -39,42 +37,43 @@ public class SummaryDataController {
      * @return Zip file containing thread texts
      */
     @GetMapping(value = "/export", produces = "application/zip")
-    public ResponseEntity<StreamingResponseBody> exportSummaryData(@RequestParam(defaultValue = "31") int days) {
+    public ResponseEntity<byte[]> exportSummaryData(@RequestParam(defaultValue = "31") int days) {
 
         log.info("Exporting summary data for last {} days from channel {}", days, slackTicketsProps.channelId());
 
-        StreamingResponseBody body = out -> {
-            try (var zip = new java.util.zip.ZipOutputStream(out)) {
-                // Fetch all threads with white_check_mark from the configured channel
-                ImmutableList<ThreadService.ThreadData> threads =
-                        threadService.getThreadsWithCheckMarkAsText(slackTicketsProps.channelId(), days);
+        // Fetch all threads with white_check_mark from the configured channel
+        ImmutableList<ThreadService.ThreadData> threads =
+                threadService.getThreadsWithCheckMarkAsText(slackTicketsProps.channelId(), days);
 
-                log.info("Found {} threads to export", threads.size());
+        log.info("Found {} threads to export", threads.size());
 
-                // Add each thread as a separate file in the zip
-                for (ThreadService.ThreadData thread : threads) {
-                    String fileName = thread.threadTs() + ".txt";
-                    log.debug("Adding thread to zip: {}", fileName);
+        // Create zip file in memory
+        try (var byteArrayOutputStream = new java.io.ByteArrayOutputStream();
+                var zip = new java.util.zip.ZipOutputStream(byteArrayOutputStream)) {
 
-                    zip.putNextEntry(new java.util.zip.ZipEntry(fileName));
+            // Add each thread as a separate file in the zip
+            for (ThreadService.ThreadData thread : threads) {
+                String fileName = thread.threadTs() + ".txt";
+                log.debug("Adding thread to zip: {}", fileName);
 
-                    // Write thread text to the zip entry
-                    try (var in = new ByteArrayInputStream(thread.text().getBytes(StandardCharsets.UTF_8))) {
-                        in.transferTo(zip);
-                    }
-
-                    zip.closeEntry();
-                    zip.flush();
-                }
-
-                zip.finish();
-                log.info("Successfully exported {} threads to zip file", threads.size());
+                zip.putNextEntry(new java.util.zip.ZipEntry(fileName));
+                zip.write(thread.text().getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
             }
-        };
 
-        return ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=\"content.zip\"")
-                .body(body);
+            zip.finish();
+            log.info("Successfully exported {} threads to zip file", threads.size());
+
+            byte[] zipBytes = byteArrayOutputStream.toByteArray();
+
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=\"content.zip\"")
+                    .body(zipBytes);
+
+        } catch (Exception e) {
+            log.error("Failed to create zip file", e);
+            throw new RuntimeException("Failed to create zip file", e);
+        }
     }
 
     /**
@@ -85,6 +84,7 @@ public class SummaryDataController {
      * @return Response with the number of records imported
      */
     @PostMapping("/import")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('LEADERSHIP', 'SUPPORT_ENGINEER')")
     public ResponseEntity<ImportResponse> importAnalysisData(@RequestParam("file") MultipartFile file) {
         log.info("Received import request for file: {}", file.getOriginalFilename());
 

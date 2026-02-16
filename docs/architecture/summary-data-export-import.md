@@ -13,12 +13,6 @@ To enable external AI-powered analysis of support patterns and knowledge gaps, w
 
 We implemented three new REST endpoints for summary data operations.
 
-**Access Control:**
-- Requires authenticated session
-- User must have `LEADERSHIP` or `SUPPORT_ENGINEER` role
-- Returns 401 Unauthorized if not authenticated
-- Returns 403 Forbidden if user lacks required roles
-
 ### 1. Service Export Endpoint: `GET /summary-data/export`
 
 **Purpose:** Export Slack thread texts as a ZIP file for external analysis.
@@ -74,7 +68,7 @@ CREATE TABLE analysis (
 - Performs upsert operation (INSERT ... ON CONFLICT UPDATE) by `ticket_id`
 - Allows updating existing analysis records with new insights
 
-### 3. React Prompt Endpoint: `GET /api/prompt`
+### 3. NextJS Prompt Endpoint: `GET /api/prompt`
 
 **Purpose:** Download the AI analysis prompt file.
 
@@ -132,7 +126,7 @@ CREATE TABLE analysis (
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 1. EXPORT                                                           │
 │    GET /api/summary-data/export?days=31                             │
-│    (requires LEADERSHIP or SUPPORT_ENGINEER role)                   │
+│    (requires SUPPORT_ENGINEER role)                                 │
 │    (requires CSRF token in X-CSRF-Token header)                     │
 │    → content.zip (thread text files)                                │
 └────────────────────────────┬────────────────────────────────────────┘
@@ -141,7 +135,7 @@ CREATE TABLE analysis (
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 2. GET PROMPT                                                       │
 │    GET /api/prompt                                                  │
-│    (requires LEADERSHIP or SUPPORT_ENGINEER role)                   │
+│    (requires SUPPORT_ENGINEER role)                                 │
 │    (requires CSRF token in X-CSRF-Token header)                     │
 │    → gap_analysis_taxonomy_summary-prompt.md                        │
 └────────────────────────────┬────────────────────────────────────────┘
@@ -165,7 +159,7 @@ CREATE TABLE analysis (
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 5. IMPORT                                                           │
 │    POST /api/summary-data/import (file=analysis.tsv)                │
-│    (requires LEADERSHIP or SUPPORT_ENGINEER role)                   │
+│    (requires SUPPORT_ENGINEER role)                                 │
 │    (requires CSRF token in X-CSRF-Token header)                     │
 │    → Upserts records into analysis table                            │
 └────────────────────────────┬────────────────────────────────────────┘
@@ -215,13 +209,11 @@ NOTE: the header row must be present
 
 ## Access Control
 
-All endpoints require OAuth token mapped to a user with `SUPPORT_ENGINEER` or `LEADERSHIP` role.
-
 | Endpoint               | Access Control | Roles Required                     |
 |------------------------|----------------|------------------------------------|
-| `/summary-data/export` | Restricted     | `LEADERSHIP` or `SUPPORT_ENGINEER` |
-| `/summary-data/import` | Restricted     | `LEADERSHIP` or `SUPPORT_ENGINEER` |
-| `/api/prompt`          | Restricted     | `LEADERSHIP` or `SUPPORT_ENGINEER` |
+| `/summary-data/export` | Restricted     | `SUPPORT_ENGINEER`                 |
+| `/summary-data/import` | Restricted     | `SUPPORT_ENGINEER`                 |
+| `/api/prompt`          | Restricted     | `SUPPORT_ENGINEER`                 |
 | `/analysis`            | Restricted     | `LEADERSHIP` or `SUPPORT_ENGINEER` |
 
 ## Implementation Details
@@ -299,18 +291,18 @@ All endpoints require OAuth token mapped to a user with `SUPPORT_ENGINEER` or `L
 
 ### Positive
 
-✅ **Enables AI-Powered Analysis:** External tools can process thread data without system integration
-✅ **Flexible Workflow:** Export → Analyze → Import cycle supports various AI tools
-✅ **Data Persistence:** Analysis results stored in database for historical tracking
-✅ **Upsert Support:** Can update analysis as understanding improves
-✅ **Privacy-Aware:** Removes PII (names, mentions) from exported data
-✅ **UI Integration:** Results displayed in Knowledge Gaps page
-✅ **Trend Analysis:** Compare exports over time to track improvement
-✅ **Role-Based Access Control:** Prompt file protected by API route, not accessible via direct URL
+- ✅ **Enables AI-Powered Analysis:** External tools can process thread data without system integration
+- ✅ **Flexible Workflow:** Export → Analyze → Import cycle supports various AI tools
+- ✅ **Data Persistence:** Analysis results stored in database for historical tracking
+- ✅ **Upsert Support:** Can update analysis as understanding improves
+- ✅ **Privacy-Aware:** Removes PII (names, mentions) from exported data
+- ✅ **UI Integration:** Results displayed in Knowledge Gaps page
+- ✅ **Trend Analysis:** Compare exports over time to track improvement
+- ✅ **Role-Based Access Control:** Prompt file protected by API route, not accessible via direct URL
 
 ### Negative
 
-⚠️ **Manual Process:** Requires external AI processing (not automated)
+- ⚠️ **Manual Process:** Requires external AI processing (not automated)
 
 ## References
 
