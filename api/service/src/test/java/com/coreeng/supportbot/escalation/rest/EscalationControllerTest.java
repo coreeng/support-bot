@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 import com.coreeng.supportbot.escalation.*;
+import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketQueryService;
@@ -35,6 +36,9 @@ class EscalationControllerTest {
 
     @Mock
     private EscalationUIMapper mapper;
+
+    @Mock
+    private SlackClient slackClient;
 
     @InjectMocks
     private EscalationController controller;
