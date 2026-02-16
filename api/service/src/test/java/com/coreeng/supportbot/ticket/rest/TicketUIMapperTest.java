@@ -6,11 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.rest.EscalationUIMapper;
 import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.teams.SupportTeamService;
@@ -79,7 +82,6 @@ public class TicketUIMapperTest {
                 .build();
 
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
-        when(slackClient.getPermalink(any())).thenReturn("https://slack.com/permalink");
 
         // when
         TicketUI result = ticketUIMapper.mapToUI(detailedTicket);
@@ -107,7 +109,6 @@ public class TicketUIMapperTest {
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
 
         // when
-        when(slackClient.getPermalink(any())).thenReturn("https://slack.com/permalink");
 
         // then
         TicketUI result = assertDoesNotThrow(() -> ticketUIMapper.mapToUI(detailedTicket));
@@ -136,7 +137,6 @@ public class TicketUIMapperTest {
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
 
         // when
-        when(slackClient.getPermalink(any())).thenReturn("https://slack.com/permalink");
         when(teamService.findTeamByCode("deleted-team")).thenReturn(null);
 
         // then
@@ -165,7 +165,6 @@ public class TicketUIMapperTest {
         Team team = new Team("wow", "wow", ImmutableList.of(TeamType.TENANT));
         TeamUI teamUI = new TeamUI("wow", "wow", ImmutableList.of(TeamType.TENANT));
 
-        when(slackClient.getPermalink(any())).thenReturn("https://slack.com/permalink");
         when(teamService.findTeamByCode("wow")).thenReturn(team);
         when(teamUIMapper.mapToUI(team)).thenReturn(teamUI);
 
@@ -194,7 +193,6 @@ public class TicketUIMapperTest {
                 .build();
 
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
-        when(slackClient.getPermalink(any())).thenReturn("https://slack.com/permalink");
 
         // when
         TicketUI result = ticketUIMapper.mapToUI(detailedTicket);
@@ -221,7 +219,6 @@ public class TicketUIMapperTest {
                 .build();
 
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
-        when(slackClient.getPermalink(any())).thenReturn("https://slack.com/permalink");
 
         // when
         TicketUI result = ticketUIMapper.mapToUI(detailedTicket);
@@ -248,7 +245,6 @@ public class TicketUIMapperTest {
                 .build();
 
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
-        when(slackClient.getPermalink(any())).thenReturn("https://slack.com/permalink");
         when(assignmentProps.enabled()).thenReturn(false);
 
         // when
@@ -276,7 +272,6 @@ public class TicketUIMapperTest {
                 .build();
 
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
-        when(slackClient.getPermalink(any())).thenReturn("https://slack.com/permalink");
         when(assignmentProps.enabled()).thenReturn(true);
         when(supportTeamService.members()).thenReturn(ImmutableList.of());
 
@@ -313,7 +308,6 @@ public class TicketUIMapperTest {
                 new TeamMemberFetcher.TeamMember("other@example.com", SlackId.user("U99999"));
         TeamMemberFetcher.TeamMember member2 = new TeamMemberFetcher.TeamMember(memberEmail, SlackId.user(slackUserId));
 
-        when(slackClient.getPermalink(any())).thenReturn("https://slack.com/permalink");
         when(assignmentProps.enabled()).thenReturn(true);
         when(supportTeamService.members()).thenReturn(ImmutableList.of(member1, member2));
 
@@ -322,5 +316,57 @@ public class TicketUIMapperTest {
 
         // then
         assertEquals(memberEmail, result.assignedTo());
+    }
+
+    @Test
+    void mapToUIListDoesNotFetchPermalink() {
+        // given
+        Ticket ticket = Ticket.builder()
+                .id(new TicketId(1))
+                .channelId("C123")
+                .queryTs(MessageTs.of("123.456"))
+                .createdMessageTs(MessageTs.of("123.457"))
+                .status(TicketStatus.opened)
+                .team(null)
+                .impact("production-blocking")
+                .tags(ImmutableList.of())
+                .lastInteractedAt(Instant.now())
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+                .build();
+
+        DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
+
+        // when
+        TicketUI result = ticketUIMapper.mapToUI(detailedTicket);
+
+        // then
+        assertNull(result.query().link());
+        verify(slackClient, never()).getPermalink(any());
+    }
+
+    @Test
+    void mapToUIDetailReturnsNullLinkWhenPermalinkFails() {
+        // given
+        Ticket ticket = Ticket.builder()
+                .id(new TicketId(1))
+                .channelId("C123")
+                .queryTs(MessageTs.of("123.456"))
+                .createdMessageTs(MessageTs.of("123.457"))
+                .status(TicketStatus.opened)
+                .team(null)
+                .impact("production-blocking")
+                .tags(ImmutableList.of())
+                .lastInteractedAt(Instant.now())
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+                .build();
+
+        DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
+        when(slackClient.getPermalink(any())).thenThrow(new SlackException(new RuntimeException("rate limited")));
+
+        // when
+        TicketUI result = ticketUIMapper.mapToUI(detailedTicket, "some query text");
+
+        // then
+        assertNull(result.query().link());
     }
 }

@@ -4,6 +4,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.rest.EscalationUIMapper;
+import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
@@ -18,11 +19,13 @@ import com.coreeng.supportbot.ticket.TicketTeam;
 import com.google.common.collect.ImmutableList;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class TicketUIMapper {
     private final EscalationUIMapper escalationUIMapper;
     private final SlackClient slackClient;
@@ -36,11 +39,11 @@ public class TicketUIMapper {
     }
 
     public TicketUI mapToUI(DetailedTicket ticket, @Nullable String queryText) {
+        String permalink = queryText != null ? resolveQueryPermalink(ticket) : null;
         return TicketUI.builder()
                 .id(Objects.requireNonNull(ticket.ticket().id()))
                 .query(new TicketUI.Query(
-                        slackClient.getPermalink(new SlackGetMessageByTsRequest(
-                                ticket.ticket().channelId(), ticket.ticket().queryTs())),
+                        permalink,
                         ticket.ticket().queryTs().getDate(),
                         ticket.ticket().queryTs(),
                         queryText))
@@ -83,6 +86,21 @@ public class TicketUIMapper {
     @Nullable private TeamUI mapKnownTeamToUI(String code) {
         Team team = teamService.findTeamByCode(code);
         return team != null ? teamUIMapper.mapToUI(team) : null;
+    }
+
+    @Nullable private String resolveQueryPermalink(DetailedTicket ticket) {
+        try {
+            return slackClient.getPermalink(new SlackGetMessageByTsRequest(
+                    ticket.ticket().channelId(), ticket.ticket().queryTs()));
+        } catch (SlackException ex) {
+            log.atError()
+                    .setCause(ex)
+                    .addKeyValue("ticketId", ticket.ticket().id())
+                    .addKeyValue("channelId", ticket.ticket().channelId())
+                    .addKeyValue("queryTs", ticket.ticket().queryTs())
+                    .log("Failed to resolve query permalink from Slack");
+            return null;
+        }
     }
 
     @Nullable private String getAssigneeEmail(SlackId.@Nullable User assignedToUserId) {
