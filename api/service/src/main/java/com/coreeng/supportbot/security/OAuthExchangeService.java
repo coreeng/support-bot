@@ -36,6 +36,7 @@ public class OAuthExchangeService {
     private final JwtService jwtService;
     private final TeamService teamService;
     private final SupportTeamService supportTeamService;
+    private final AllowListService allowListService;
 
     public String exchangeCodeForToken(String provider, String code, String redirectUri) {
         var registration = clientRegistrationRepository.findByRegistrationId(provider);
@@ -96,6 +97,10 @@ public class OAuthExchangeService {
 
             // Extract email and name
             var email = extractEmail(userInfo);
+            if (!allowListService.isAllowed(email)) {
+                log.warn("Allow-list rejected user during OAuth exchange");
+                throw new UserNotAllowedException();
+            }
             var name = extractName(userInfo);
 
             log.info("OAuth2 login successful for user");

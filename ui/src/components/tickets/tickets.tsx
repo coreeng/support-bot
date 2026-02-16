@@ -283,7 +283,6 @@ export default function TicketsPage() {
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Escalated</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Opened At</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Closed At</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Link</th>
                             </tr>
                             </thead>
                             <tbody className="divide-y">
@@ -308,25 +307,11 @@ export default function TicketsPage() {
                                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{(t.escalations?.length ?? 0) > 0 ? 'Yes' : 'No'}</td>
                                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{opened ? new Date(opened).toLocaleString() : '-'}</td>
                                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{closed ? new Date(closed).toLocaleString() : '-'}</td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm">
-                                            {t.query?.link ? (
-                                                <a
-                                                    href={t.query.link}
-                                                    className="text-blue-600 hover:underline"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                >
-                                                    View
-                                                </a>
-                                            ) : (
-                                                'N/A'
-                                            )}
-                                        </td>
                                     </tr>
                                 )
                             })}
                             {filteredTickets.length === 0 && <tr>
-                                <td colSpan={isAssignmentEnabled ? 8 : 7} className="text-center py-4 text-gray-500">No tickets found</td>
+                                <td colSpan={isAssignmentEnabled ? 7 : 6} className="text-center py-4 text-gray-500">No tickets found</td>
                             </tr>}
                             </tbody>
                         </table>

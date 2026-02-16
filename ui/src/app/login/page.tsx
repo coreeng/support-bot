@@ -165,6 +165,30 @@ function LoginContent() {
     );
   }
 
+  // Show not-onboarded message for allow-list rejections
+  if (error === "user_not_allowed") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-md w-full space-y-8 p-8 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Access Restricted</h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            You have successfully authenticated but your user has not been
+            onboarded to the Support UI.
+          </p>
+          <p className="text-gray-500 dark:text-gray-500 text-sm">
+            Please contact your administrator for access.
+          </p>
+          <button
+            onClick={() => router.replace("/login")}
+            className="text-blue-600 hover:underline"
+          >
+            Back to login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Show error if present
   if (error) {
     return (

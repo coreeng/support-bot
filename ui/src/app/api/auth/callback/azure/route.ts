@@ -23,21 +23,32 @@ export async function GET(request: NextRequest) {
     process.env.NEXTAUTH_URL
   ).toString();
 
-  const response = await publicFetch("/auth/oauth/exchange", {
-    method: "POST",
-    body: JSON.stringify({ provider: "azure", code, redirectUri: callbackUrl }),
-  });
+  try {
+    const response = await publicFetch("/auth/oauth/exchange", {
+      method: "POST",
+      body: JSON.stringify({ provider: "azure", code, redirectUri: callbackUrl }),
+    });
 
-  if (!response.ok) {
-    console.error("OAuth code exchange failed:", response.status);
+    if (!response.ok) {
+      console.error("OAuth code exchange failed:", response.status);
+      const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
+      if (response.status === 403) {
+        loginUrl.searchParams.set("error", "user_not_allowed");
+      } else {
+        loginUrl.searchParams.set("error", "Token exchange failed");
+      }
+      return NextResponse.redirect(loginUrl);
+    }
+
+    const result = await response.json();
+
+    const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
+    loginUrl.searchParams.set("token", result.token);
+    return NextResponse.redirect(loginUrl);
+  } catch (error) {
+    console.error("Azure OAuth callback error:", error);
     const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
     loginUrl.searchParams.set("error", "Token exchange failed");
     return NextResponse.redirect(loginUrl);
   }
-
-  const result = await response.json();
-
-  const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
-  loginUrl.searchParams.set("token", result.token);
-  return NextResponse.redirect(loginUrl);
 }
