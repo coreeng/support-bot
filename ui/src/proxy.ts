@@ -10,7 +10,7 @@ export const proxy = auth((req) => {
   const isLoggedIn = !!session?.user;
 
   // Public routes that don't require authentication
-  const publicPaths = ["/login", "/api/auth", "/api/health"];
+  const publicPaths = ["/login", "/api/auth", "/api/health", "/api/identity-providers"];
   const isPublicPath = publicPaths.some((path) =>
     nextUrl.pathname.startsWith(path)
   );

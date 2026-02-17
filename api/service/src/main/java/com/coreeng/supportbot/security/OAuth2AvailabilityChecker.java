@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.security;
 
+import java.util.ArrayList;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -11,18 +13,36 @@ import org.springframework.stereotype.Component;
 public class OAuth2AvailabilityChecker {
     private final boolean testBypassEnabled;
     private final boolean oauth2Available;
+    private final List<String> availableProviders;
 
     public OAuth2AvailabilityChecker(
             SecurityProperties securityProperties,
             @Value("${spring.security.oauth2.client.registration.google.client-id:}") String googleClientId,
-            @Value("${spring.security.oauth2.client.registration.azure.client-id:}") String azureClientId) {
+            @Value("${spring.security.oauth2.client.registration.google.client-secret:}") String googleClientSecret,
+            @Value("${spring.security.oauth2.client.registration.azure.client-id:}") String azureClientId,
+            @Value("${spring.security.oauth2.client.registration.azure.client-secret:}") String azureClientSecret,
+            @Value("${spring.security.oauth2.client.provider.azure.tenant-id:}") String azureTenantId) {
         this.testBypassEnabled = securityProperties.testBypass() != null
                 && securityProperties.testBypass().enabled();
-        this.oauth2Available = isNotBlank(googleClientId) || isNotBlank(azureClientId);
+
+        var providers = new ArrayList<String>();
+        if (isNotBlank(googleClientId) && isNotBlank(googleClientSecret)) {
+            providers.add("google");
+        }
+        if (isNotBlank(azureClientId) && isNotBlank(azureClientSecret) && isNotBlank(azureTenantId)) {
+            providers.add("azure");
+        }
+
+        this.availableProviders = List.copyOf(providers);
+        this.oauth2Available = !this.availableProviders.isEmpty();
     }
 
     public boolean isOAuth2Available() {
         return oauth2Available;
+    }
+
+    public List<String> getAvailableProviders() {
+        return availableProviders;
     }
 
     @EventListener(ApplicationReadyEvent.class)

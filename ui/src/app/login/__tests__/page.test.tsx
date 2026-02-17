@@ -29,6 +29,14 @@ describe('LoginPage', () => {
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: false } as any)
     mockUseSearchParams.mockReturnValue(new URLSearchParams() as any)
 
+    // Mock fetch for provider fetching
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ providers: ['google', 'azure'] }),
+      } as Response)
+    )
+
     // Default: no opener (not a popup)
     Object.defineProperty(window, 'opener', { value: null, writable: true, configurable: true })
     window.close = jest.fn()
@@ -43,12 +51,14 @@ describe('LoginPage', () => {
   // Basic rendering
   // -------------------------------------------------------------------
 
-  it('shows login form when not authenticated', () => {
+  it('shows login form when not authenticated', async () => {
     render(<LoginPage />)
 
-    expect(screen.getByText('Sign in')).toBeInTheDocument()
-    expect(screen.getByText('Continue with Google')).toBeInTheDocument()
-    expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Sign in')).toBeInTheDocument()
+      expect(screen.getByText('Continue with Google')).toBeInTheDocument()
+      expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
+    })
   })
 
   it('redirects to home if already authenticated', async () => {
@@ -71,23 +81,27 @@ describe('LoginPage', () => {
     )).toBeInTheDocument()
   })
 
-  it('shows error from search params', () => {
+  it('shows error from search params', async () => {
     mockUseSearchParams.mockReturnValue(new URLSearchParams('error=TokenExpired') as any)
 
     render(<LoginPage />)
 
-    expect(screen.getByText('Authentication Error')).toBeInTheDocument()
-    expect(screen.getByText('TokenExpired')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Authentication Error')).toBeInTheDocument()
+      expect(screen.getByText('TokenExpired')).toBeInTheDocument()
+    })
   })
 
-  it('shows not-onboarded message for user_not_allowed error', () => {
+  it('shows not-onboarded message for user_not_allowed error', async () => {
     mockUseSearchParams.mockReturnValue(new URLSearchParams('error=user_not_allowed') as any)
 
     render(<LoginPage />)
 
-    expect(screen.getByText('Access Restricted')).toBeInTheDocument()
-    expect(screen.getByText(/not been onboarded/)).toBeInTheDocument()
-    expect(screen.queryByText('Authentication Error')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Access Restricted')).toBeInTheDocument()
+      expect(screen.getByText(/not been onboarded/)).toBeInTheDocument()
+      expect(screen.queryByText('Authentication Error')).not.toBeInTheDocument()
+    })
   })
 
   // -------------------------------------------------------------------
@@ -360,7 +374,7 @@ describe('LoginPage', () => {
   // -------------------------------------------------------------------
 
   describe('iframe detection', () => {
-    it('opens popup when in an iframe', () => {
+    it('opens popup when in an iframe', async () => {
       const mockPopup = { focus: jest.fn() }
       window.open = jest.fn(() => mockPopup) as any
 
@@ -369,6 +383,8 @@ describe('LoginPage', () => {
       Object.defineProperty(window, 'self', { value: {}, writable: true, configurable: true })
 
       render(<LoginPage />)
+      
+      await waitFor(() => expect(screen.getByText('Continue with Google')).toBeInTheDocument())
       fireEvent.click(screen.getByText('Continue with Google'))
 
       expect(window.open).toHaveBeenCalledWith(

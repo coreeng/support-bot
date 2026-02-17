@@ -40,7 +40,7 @@ public class SecurityConfig {
                         // Public endpoints
                         .requestMatchers("/oauth2/**", "/login/**")
                         .permitAll()
-                        .requestMatchers("/auth/token", "/auth/oauth-url", "/auth/oauth/exchange")
+                        .requestMatchers("/auth/token", "/auth/oauth-url", "/auth/oauth/exchange", "/auth/providers")
                         .permitAll()
                         .requestMatchers("/health", "/prometheus")
                         .permitAll()
