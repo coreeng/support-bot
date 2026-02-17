@@ -28,7 +28,6 @@ describe('LoginPage', () => {
     mockUseRouter.mockReturnValue({ replace: mockReplace } as any)
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: false } as any)
     mockUseSearchParams.mockReturnValue(new URLSearchParams() as any)
-
     // Mock fetch for provider fetching
     global.fetch = jest.fn(() =>
       Promise.resolve({
@@ -366,6 +365,140 @@ describe('LoginPage', () => {
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/')
       })
+    })
+  })
+
+  // -------------------------------------------------------------------
+  // Provider fetching error scenarios
+  // -------------------------------------------------------------------
+
+  describe('provider fetching', () => {
+    it('shows "No authentication providers configured" when fetch returns empty array', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: [] }),
+        } as Response)
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('No authentication providers configured.')).toBeInTheDocument()
+      })
+    })
+
+    it('falls back to showing all providers when fetch fails with network error', async () => {
+      global.fetch = jest.fn(() => Promise.reject(new Error('Network error')))
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Continue with Google')).toBeInTheDocument()
+        expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
+        expect(screen.getByText('Unable to load authentication providers. Please refresh the page.')).toBeInTheDocument()
+      })
+    })
+
+    it('shows error message when fetch returns non-ok response', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 500,
+          json: () => Promise.resolve({}),
+        } as Response)
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Unable to load authentication providers. Please refresh the page.')).toBeInTheDocument()
+        expect(screen.getByText('No authentication providers configured.')).toBeInTheDocument()
+      })
+    })
+
+    it('shows only Google when only Google is configured', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ['google'] }),
+        } as Response)
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Continue with Google')).toBeInTheDocument()
+        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
+      })
+    })
+
+    it('shows only Azure when only Azure is configured', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ['azure'] }),
+        } as Response)
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
+        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
+      })
+    })
+
+    it('filters out unknown providers from API response', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ['google', 'unknown-provider', 'azure'] }),
+        } as Response)
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Continue with Google')).toBeInTheDocument()
+        expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
+        // No button for "unknown-provider" should be rendered
+      })
+    })
+
+    it('handles malformed API response gracefully', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ notProviders: 'malformed' }),
+        } as Response)
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('No authentication providers configured.')).toBeInTheDocument()
+      })
+    })
+
+    it('does not fetch providers when already authenticated', async () => {
+      mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true } as any)
+      const fetchSpy = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ['google', 'azure'] }),
+        } as Response)
+      )
+      global.fetch = fetchSpy
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/')
+      })
+
+      // Fetch should not be called when already authenticated
+      expect(fetchSpy).not.toHaveBeenCalled()
     })
   })
 

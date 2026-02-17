@@ -8,6 +8,12 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+/**
+ * Detects which OAuth2 providers are fully configured and available for authentication.
+ * A provider is only considered available if ALL required credentials are present:
+ * - Google: client-id AND client-secret
+ * - Azure: client-id AND client-secret AND tenant-id
+ */
 @Slf4j
 @Component
 public class OAuth2AvailabilityChecker {
@@ -25,6 +31,7 @@ public class OAuth2AvailabilityChecker {
         this.testBypassEnabled = securityProperties.testBypass() != null
                 && securityProperties.testBypass().enabled();
 
+        // Detect available providers - all credentials must be present for a provider to be available
         var providers = new ArrayList<String>();
         if (isNotBlank(googleClientId) && isNotBlank(googleClientSecret)) {
             providers.add("google");
@@ -33,6 +40,7 @@ public class OAuth2AvailabilityChecker {
             providers.add("azure");
         }
 
+        // Store immutable copy to prevent accidental modification
         this.availableProviders = List.copyOf(providers);
         this.oauth2Available = !this.availableProviders.isEmpty();
     }
@@ -41,6 +49,10 @@ public class OAuth2AvailabilityChecker {
         return oauth2Available;
     }
 
+    /**
+     * Returns the list of fully configured OAuth2 providers.
+     * @return Immutable list of provider names (e.g., "google", "azure")
+     */
     public List<String> getAvailableProviders() {
         return availableProviders;
     }
@@ -55,7 +67,8 @@ public class OAuth2AvailabilityChecker {
         } else {
             log.warn("OAuth2 credentials not configured and test-bypass is disabled. "
                     + "Users will not be able to authenticate. "
-                    + "Set GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET or AZURE_CLIENT_ID/AZURE_CLIENT_SECRET, "
+                    + "Set GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET or all three of "
+                    + "AZURE_CLIENT_ID/AZURE_CLIENT_SECRET/AZURE_TENANT_ID, "
                     + "or enable security.test-bypass.enabled for testing.");
         }
     }

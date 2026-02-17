@@ -24,6 +24,7 @@ function LoginContent() {
   const authAttemptedRef = useRef(false);
   const [providers, setProviders] = useState<("google" | "azure")[]>(["google", "azure"]);
   const [providersLoading, setProvidersLoading] = useState(true);
+  const [providersError, setProvidersError] = useState(false);
 
   // Handle callback from backend OAuth
   const code = searchParams.get("code");
@@ -31,7 +32,16 @@ function LoginContent() {
   const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const error = searchParams.get("error");
 
-  // Fetch available providers from backend (skip if already authenticated)
+  /**
+   * Fetch available providers from backend (skip if already authenticated).
+   * 
+   * Fallback strategy:
+   * - On network errors: Show all providers (google, azure) to prevent lockout
+   * - On non-ok responses: Show error message with empty providers list
+   * 
+   * This prevents users from being locked out due to temporary network issues
+   * while still showing appropriate feedback for backend configuration problems.
+   */
   useEffect(() => {
     if (isAuthenticated) {
       setProvidersLoading(false);
@@ -39,16 +49,30 @@ function LoginContent() {
     }
 
     fetch("/api/identity-providers", { cache: "no-store" })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) {
+          console.error(`[Login] Failed to fetch providers: HTTP ${res.status}`);
+          setProvidersError(true);
+          setProviders([]);
+          return null;
+        }
+        return res.json();
+      })
       .then((data) => {
+        if (!data) return;
         const availableProviders = (data.providers || []).filter(
           (p: string): p is "google" | "azure" => p === "google" || p === "azure"
         );
         setProviders(availableProviders);
-        setProvidersLoading(false);
+        setProvidersError(false);
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error("[Login] Exception fetching providers:", error);
+        setProvidersError(true);
+        // On network error, show all providers to prevent lockout
         setProviders(["google", "azure"]);
+      })
+      .finally(() => {
         setProvidersLoading(false);
       });
   }, [isAuthenticated]);
@@ -242,6 +266,12 @@ function LoginContent() {
         </div>
 
         <div className="space-y-4">
+          {providersError && (
+            <div className="text-sm text-red-600 text-center p-4 bg-red-50 rounded-lg dark:bg-red-900/20 dark:text-red-400">
+              Unable to load authentication providers. Please refresh the page.
+            </div>
+          )}
+
           {providers.includes("google") && (
             <button
               onClick={() => handleLogin("google")}
