@@ -385,35 +385,37 @@ describe('LoginPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('No authentication providers configured.')).toBeInTheDocument()
+        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
+        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
       })
     })
 
-    it('falls back to showing all providers when fetch fails with network error', async () => {
+    it('shows error with no login buttons when fetch fails with network error', async () => {
       global.fetch = jest.fn(() => Promise.reject(new Error('Network error')))
 
       render(<LoginPage />)
 
       await waitFor(() => {
-        expect(screen.getByText('Continue with Google')).toBeInTheDocument()
-        expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
-        expect(screen.getByText('Unable to load authentication providers. Please refresh the page.')).toBeInTheDocument()
+        expect(screen.getByText(/Unable to fetch identity provider configuration from backend/)).toBeInTheDocument()
+        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
+        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
       })
     })
 
-    it('shows error message when fetch returns non-ok response', async () => {
+    it('shows error with no login buttons when backend returns error', async () => {
       global.fetch = jest.fn(() =>
         Promise.resolve({
-          ok: false,
-          status: 500,
-          json: () => Promise.resolve({}),
+          ok: true,
+          json: () => Promise.resolve({ providers: [], error: true }),
         } as Response)
       )
 
       render(<LoginPage />)
 
       await waitFor(() => {
-        expect(screen.getByText('Unable to load authentication providers. Please refresh the page.')).toBeInTheDocument()
-        expect(screen.getByText('No authentication providers configured.')).toBeInTheDocument()
+        expect(screen.getByText(/Unable to fetch identity provider configuration from backend/)).toBeInTheDocument()
+        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
+        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
       })
     })
 
@@ -478,6 +480,8 @@ describe('LoginPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('No authentication providers configured.')).toBeInTheDocument()
+        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
+        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
       })
     })
 
