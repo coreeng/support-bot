@@ -30,7 +30,8 @@ class AuthControllerProvidersTest {
 
     @BeforeEach
     void setUp() {
-        controller = new AuthController(authCodeStore, oauthUrlService, oauthExchangeService, oauth2AvailabilityChecker);
+        controller =
+                new AuthController(authCodeStore, oauthUrlService, oauthExchangeService, oauth2AvailabilityChecker);
     }
 
     @Test
