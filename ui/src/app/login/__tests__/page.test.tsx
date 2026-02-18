@@ -28,6 +28,13 @@ describe('LoginPage', () => {
     mockUseRouter.mockReturnValue({ replace: mockReplace } as any)
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: false } as any)
     mockUseSearchParams.mockReturnValue(new URLSearchParams() as any)
+    // Mock fetch for provider fetching
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ providers: ['google', 'azure'] }),
+      } as Response)
+    )
 
     // Default: no opener (not a popup)
     Object.defineProperty(window, 'opener', { value: null, writable: true, configurable: true })
@@ -43,12 +50,14 @@ describe('LoginPage', () => {
   // Basic rendering
   // -------------------------------------------------------------------
 
-  it('shows login form when not authenticated', () => {
+  it('shows login form when not authenticated', async () => {
     render(<LoginPage />)
 
-    expect(screen.getByText('Sign in')).toBeInTheDocument()
-    expect(screen.getByText('Continue with Google')).toBeInTheDocument()
-    expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Sign in')).toBeInTheDocument()
+      expect(screen.getByText('Continue with Google')).toBeInTheDocument()
+      expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
+    })
   })
 
   it('redirects to home if already authenticated', async () => {
@@ -71,23 +80,27 @@ describe('LoginPage', () => {
     )).toBeInTheDocument()
   })
 
-  it('shows error from search params', () => {
+  it('shows error from search params', async () => {
     mockUseSearchParams.mockReturnValue(new URLSearchParams('error=TokenExpired') as any)
 
     render(<LoginPage />)
 
-    expect(screen.getByText('Authentication Error')).toBeInTheDocument()
-    expect(screen.getByText('TokenExpired')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Authentication Error')).toBeInTheDocument()
+      expect(screen.getByText('TokenExpired')).toBeInTheDocument()
+    })
   })
 
-  it('shows not-onboarded message for user_not_allowed error', () => {
+  it('shows not-onboarded message for user_not_allowed error', async () => {
     mockUseSearchParams.mockReturnValue(new URLSearchParams('error=user_not_allowed') as any)
 
     render(<LoginPage />)
 
-    expect(screen.getByText('Access Restricted')).toBeInTheDocument()
-    expect(screen.getByText(/not been onboarded/)).toBeInTheDocument()
-    expect(screen.queryByText('Authentication Error')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Access Restricted')).toBeInTheDocument()
+      expect(screen.getByText(/not been onboarded/)).toBeInTheDocument()
+      expect(screen.queryByText('Authentication Error')).not.toBeInTheDocument()
+    })
   })
 
   // -------------------------------------------------------------------
@@ -356,11 +369,149 @@ describe('LoginPage', () => {
   })
 
   // -------------------------------------------------------------------
+  // Provider fetching error scenarios
+  // -------------------------------------------------------------------
+
+  describe('provider fetching', () => {
+    it('shows "No authentication providers configured" when fetch returns empty array', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: [] }),
+        } as Response)
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('No authentication providers configured.')).toBeInTheDocument()
+        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
+        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
+      })
+    })
+
+    it('shows error with no login buttons when fetch fails with network error', async () => {
+      global.fetch = jest.fn(() => Promise.reject(new Error('Network error')))
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText(/Unable to fetch identity provider configuration from backend/)).toBeInTheDocument()
+        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
+        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
+      })
+    })
+
+    it('shows error with no login buttons when backend returns error', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: [], error: true }),
+        } as Response)
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText(/Unable to fetch identity provider configuration from backend/)).toBeInTheDocument()
+        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
+        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
+      })
+    })
+
+    it('shows only Google when only Google is configured', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ['google'] }),
+        } as Response)
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Continue with Google')).toBeInTheDocument()
+        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
+      })
+    })
+
+    it('shows only Azure when only Azure is configured', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ['azure'] }),
+        } as Response)
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
+        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
+      })
+    })
+
+    it('filters out unknown providers from API response', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ['google', 'unknown-provider', 'azure'] }),
+        } as Response)
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Continue with Google')).toBeInTheDocument()
+        expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
+        // No button for "unknown-provider" should be rendered
+      })
+    })
+
+    it('handles malformed API response gracefully', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ notProviders: 'malformed' }),
+        } as Response)
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('No authentication providers configured.')).toBeInTheDocument()
+        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
+        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
+      })
+    })
+
+    it('does not fetch providers when already authenticated', async () => {
+      mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true } as any)
+      const fetchSpy = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ['google', 'azure'] }),
+        } as Response)
+      )
+      global.fetch = fetchSpy
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/')
+      })
+
+      // Fetch should not be called when already authenticated
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  // -------------------------------------------------------------------
   // Iframe detection — handleLogin opens popup when in iframe
   // -------------------------------------------------------------------
 
   describe('iframe detection', () => {
-    it('opens popup when in an iframe', () => {
+    it('opens popup when in an iframe', async () => {
       const mockPopup = { focus: jest.fn() }
       window.open = jest.fn(() => mockPopup) as any
 
@@ -369,6 +520,8 @@ describe('LoginPage', () => {
       Object.defineProperty(window, 'self', { value: {}, writable: true, configurable: true })
 
       render(<LoginPage />)
+      
+      await waitFor(() => expect(screen.getByText('Continue with Google')).toBeInTheDocument())
       fireEvent.click(screen.getByText('Continue with Google'))
 
       expect(window.open).toHaveBeenCalledWith(

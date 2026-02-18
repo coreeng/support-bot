@@ -21,6 +21,7 @@ public class AuthController {
     private final AuthCodeStore authCodeStore;
     private final OAuthUrlService oauthUrlService;
     private final OAuthExchangeService oauthExchangeService;
+    private final OAuth2AvailabilityChecker oauth2AvailabilityChecker;
 
     @PostMapping("/token")
     public ResponseEntity<TokenResponse> exchangeToken(@RequestBody TokenRequest request) {
@@ -90,6 +91,11 @@ public class AuthController {
         }
     }
 
+    @GetMapping("/providers")
+    public ResponseEntity<ProvidersResponse> getAvailableProviders() {
+        return ResponseEntity.ok(new ProvidersResponse(oauth2AvailabilityChecker.getAvailableProviders()));
+    }
+
     public record TokenRequest(String code) {}
 
     public record TokenResponse(String token) {}
@@ -101,4 +107,6 @@ public class AuthController {
     public record OAuthUrlResponse(String url) {}
 
     public record OAuthExchangeRequest(String provider, String code, String redirectUri) {}
+
+    public record ProvidersResponse(List<String> providers) {}
 }
