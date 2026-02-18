@@ -55,6 +55,9 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: analysis-bundle
+              mountPath: /app/analysis.zip
+              subPath: analysis.zip
             {{- if .Values.configMap.enabled }}
             - name: config
               mountPath: /app/config
@@ -62,6 +65,10 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        - name: analysis-bundle
+          configMap:
+            name: analysis-bundle
+            optional: true
         {{- if .Values.configMap.enabled }}
         - name: config
           configMap:
