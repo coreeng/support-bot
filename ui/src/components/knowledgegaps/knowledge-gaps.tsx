@@ -3,11 +3,13 @@
 import React, { useState, useRef } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText } from 'lucide-react'
 import { getCsrfToken } from 'next-auth/react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAnalysis } from '@/lib/hooks'
 import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/hooks/useAuth'
 
 export default function KnowledgeGapsPage() {
+    const queryClient = useQueryClient()
     const { isSupportEngineer } = useAuth()
     const { data: analysisData, isLoading, error } = useAnalysis()
     const { showToast } = useToast()
@@ -68,7 +70,7 @@ export default function KnowledgeGapsPage() {
             // Get CSRF token for protection against cross-site request forgery
             const csrfToken = await getCsrfToken()
 
-            const response = await fetch('/api/prompt', {
+            const response = await fetch('/api/summary-data/analysis', {
                 headers: {
                     'X-CSRF-Token': csrfToken || '',
                 },
@@ -82,7 +84,7 @@ export default function KnowledgeGapsPage() {
             const url = window.URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
-            a.download = 'gap_analysis_taxonomy_summary-prompt.md'
+            a.download = 'analysis.zip'
             document.body.appendChild(a)
             a.click()
             window.URL.revokeObjectURL(url)
@@ -123,6 +125,9 @@ export default function KnowledgeGapsPage() {
 
             const result = await response.json()
             showToast(`Import successful! ${result.recordsImported} records imported.`, 'success')
+
+            // Invalidate and refetch the analysis data
+            await queryClient.invalidateQueries({ queryKey: ['analysis'] })
 
             // Reset the file input
             if (fileInputRef.current) {
@@ -269,7 +274,7 @@ export default function KnowledgeGapsPage() {
                                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                             >
                                 <FileText className="w-4 h-4" />
-                                Get Prompt
+                              Get Analysis Bundle
                             </button>
                             <button
                                 onClick={handleImportClick}

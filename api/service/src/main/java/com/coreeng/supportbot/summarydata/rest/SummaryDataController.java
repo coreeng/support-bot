@@ -7,12 +7,19 @@ import com.coreeng.supportbot.summarydata.ThreadService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -69,13 +76,36 @@ public class SummaryDataController {
             byte[] zipBytes = byteArrayOutputStream.toByteArray();
 
             return ResponseEntity.ok()
-                    .header("Content-Disposition", "attachment; filename=\"content.zip\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"content.zip\"")
                     .body(zipBytes);
 
         } catch (Exception e) {
             log.error("Failed to create zip file", e);
             throw new RuntimeException("Failed to create zip file", e);
         }
+    }
+
+    /**
+     * Export analysis bundle analysis.zip containing AI prompt and script to run analysis on thread texts.
+     * analysis.zip is expected to be in the current directory of the process.
+     *
+     * @return Analysis bundle zip file
+     */
+    @GetMapping(value = "/analysis", produces = "application/zip")
+    public ResponseEntity<Resource> download() throws IOException {
+        Path path = Paths.get("analysis.zip");
+        Resource res = new UrlResource(path.toUri());
+
+        if (!res.exists() || !res.isReadable()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        log.info("Downloading analysis bundle");
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"analysis.zip\"")
+                .contentLength(Files.size(path))
+                .body(res);
     }
 
     /**

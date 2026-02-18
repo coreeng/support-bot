@@ -14,6 +14,14 @@ jest.mock('next-auth/react', () => ({
     getCsrfToken: jest.fn(() => Promise.resolve('mock-csrf-token'))
 }))
 
+// Mock @tanstack/react-query
+jest.mock('@tanstack/react-query', () => ({
+    ...jest.requireActual('@tanstack/react-query'),
+    useQueryClient: jest.fn(() => ({
+        invalidateQueries: jest.fn()
+    }))
+}))
+
 // Helper to render with ToastProvider
 const renderWithToast = (component: React.ReactElement) => {
     return render(<ToastProvider>{component}</ToastProvider>)
@@ -174,7 +182,7 @@ describe('KnowledgeGapsPage', () => {
         // Check for import, export, and prompt buttons
         expect(screen.getByText('Import Data')).toBeInTheDocument()
         expect(screen.getByText('Export Data')).toBeInTheDocument()
-        expect(screen.getByText('Get Prompt')).toBeInTheDocument()
+        expect(screen.getByText('Get Analysis Bundle')).toBeInTheDocument()
 
         // Check for collapsible section headers
         expect(screen.getByText('Top 5 Support Areas')).toBeInTheDocument()
@@ -460,6 +468,12 @@ describe('KnowledgeGapsPage', () => {
     })
 
     it('handles import button click and file upload', async () => {
+        const { useQueryClient } = require('@tanstack/react-query')
+        const mockInvalidateQueries = jest.fn()
+        useQueryClient.mockReturnValue({
+            invalidateQueries: mockInvalidateQueries
+        })
+
         mockUseAnalysis.mockReturnValue({
             data: mockAnalysisData,
             isLoading: false,
@@ -505,6 +519,9 @@ describe('KnowledgeGapsPage', () => {
 
         // Verify success toast is shown
         expect(await screen.findByText('Import successful! 42 records imported.')).toBeInTheDocument()
+
+        // Verify that invalidateQueries was called to refresh the data
+        expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['analysis'] })
     })
 
     it('handles prompt button click to download analysis prompt', async () => {
@@ -518,7 +535,7 @@ describe('KnowledgeGapsPage', () => {
         const mockFetch = jest.fn(() =>
             Promise.resolve({
                 ok: true,
-                blob: () => Promise.resolve(new Blob(['test prompt'], { type: 'text/markdown' }))
+                blob: () => Promise.resolve(new Blob(['test prompt'], { type: 'application/zip' }))
             } as Response)
         )
         global.fetch = mockFetch
@@ -535,14 +552,14 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
-        const promptButton = screen.getByText('Get Prompt')
+        const promptButton = screen.getByText('Get Analysis Bundle')
         fireEvent.click(promptButton)
 
         // Wait for async operations
         await new Promise(resolve => setTimeout(resolve, 100))
 
         // Verify fetch was called
-        expect(mockFetch).toHaveBeenCalledWith('/api/prompt', {
+        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/analysis', {
             headers: {
                 'X-CSRF-Token': 'mock-csrf-token',
             },
@@ -578,7 +595,7 @@ describe('KnowledgeGapsPage', () => {
             renderWithToast(<KnowledgeGapsPage />)
 
             expect(screen.getByText('Export Data')).toBeInTheDocument()
-            expect(screen.getByText('Get Prompt')).toBeInTheDocument()
+            expect(screen.getByText('Get Analysis Bundle')).toBeInTheDocument()
             expect(screen.getByText('Import Data')).toBeInTheDocument()
         })
 
@@ -597,7 +614,7 @@ describe('KnowledgeGapsPage', () => {
             renderWithToast(<KnowledgeGapsPage />)
 
             expect(screen.queryByText('Export Data')).not.toBeInTheDocument()
-            expect(screen.queryByText('Get Prompt')).not.toBeInTheDocument()
+            expect(screen.queryByText('Get Analysis Bundle')).not.toBeInTheDocument()
             expect(screen.queryByText('Import Data')).not.toBeInTheDocument()
         })
 
@@ -616,7 +633,7 @@ describe('KnowledgeGapsPage', () => {
             renderWithToast(<KnowledgeGapsPage />)
 
             expect(screen.queryByText('Export Data')).not.toBeInTheDocument()
-            expect(screen.queryByText('Get Prompt')).not.toBeInTheDocument()
+            expect(screen.queryByText('Get Analysis Bundle')).not.toBeInTheDocument()
             expect(screen.queryByText('Import Data')).not.toBeInTheDocument()
         })
     })
