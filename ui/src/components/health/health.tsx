@@ -1530,7 +1530,6 @@ export default function HealthPage() {
                                             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
                                             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Opened At</th>
                                             <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Rated</th>
-                                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Link</th>
                                         </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-gray-200">
@@ -1573,22 +1572,12 @@ export default function HealthPage() {
                                                             <span className="text-gray-400">No</span>
                                                         )}
                                                     </td>
-                                                    <td className="px-4 py-3 text-sm">
-                                                        <a 
-                                                            href={t.query?.link} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer"
-                                                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                                                        >
-                                                            View
-                                                        </a>
-                                                    </td>
                                                 </tr>
                                             )
                                         })}
                                         {paginatedTickets.length === 0 && (
                                             <tr>
-                                                <td colSpan={isAssignmentEnabled ? 8 : 7} className="text-center py-8 text-gray-500">
+                                                <td colSpan={isAssignmentEnabled ? 7 : 6} className="text-center py-8 text-gray-500">
                                                     <div className="flex flex-col items-center gap-2">
                                                         <AlertTriangle className="w-8 h-8 text-gray-400" />
                                                         <p className="font-medium">No tickets found</p>
@@ -1600,17 +1589,56 @@ export default function HealthPage() {
                                         </tbody>
                                     </table>
 
-                                    <div className="flex justify-center space-x-2 p-2 bg-white">
-                                        {Array.from({length: Math.max(1, Math.ceil(filteredTickets.length / ticketsPerPage))}, (_, i) => (
-                                            <button
-                                                key={i}
-                                                onClick={() => setCurrentPage(i + 1)}
-                                                className={`px-3 py-1 rounded ${currentPage === i + 1 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}
-                                            >
-                                                {i + 1}
-                                            </button>
-                                        ))}
-                                    </div>
+                                    {(() => {
+                                        const totalPages = Math.max(1, Math.ceil(filteredTickets.length / ticketsPerPage))
+                                        if (totalPages <= 1) return null
+
+                                        const pages: (number | '...')[] = []
+                                        const maxVisible = 7
+                                        if (totalPages <= maxVisible) {
+                                            for (let i = 1; i <= totalPages; i++) pages.push(i)
+                                        } else {
+                                            pages.push(1)
+                                            const start = Math.max(2, currentPage - 1)
+                                            const end = Math.min(totalPages - 1, currentPage + 1)
+                                            if (start > 2) pages.push('...')
+                                            for (let i = start; i <= end; i++) pages.push(i)
+                                            if (end < totalPages - 1) pages.push('...')
+                                            pages.push(totalPages)
+                                        }
+
+                                        return (
+                                            <div className="flex justify-center items-center space-x-2 p-2 bg-white">
+                                                <button
+                                                    disabled={currentPage === 1}
+                                                    onClick={() => setCurrentPage(p => p - 1)}
+                                                    className="px-3 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    Previous
+                                                </button>
+                                                {pages.map((page, idx) =>
+                                                    page === '...' ? (
+                                                        <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">...</span>
+                                                    ) : (
+                                                        <button
+                                                            key={page}
+                                                            onClick={() => setCurrentPage(page)}
+                                                            className={`px-3 py-1 rounded ${currentPage === page ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}
+                                                        >
+                                                            {page}
+                                                        </button>
+                                                    )
+                                                )}
+                                                <button
+                                                    disabled={currentPage === totalPages}
+                                                    onClick={() => setCurrentPage(p => p + 1)}
+                                                    className="px-3 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    Next
+                                                </button>
+                                            </div>
+                                        )
+                                    })()}
                                 </div>
                             </>
                         )}
