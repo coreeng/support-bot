@@ -4,6 +4,7 @@ import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.summarydata.ThreadService;
+import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
@@ -15,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.ZipException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -42,11 +44,14 @@ public class SummaryDataController {
      * Export summary data as a zip file containing thread texts.
      * Each file in the zip is named with the thread timestamp.
      *
-     * @param days Number of days to look back (default: 31)
+     * @param days Number of days to look back (default: 7)
      * @return Zip file containing thread texts
      */
     @GetMapping(value = "/export", produces = "application/zip")
-    public ResponseEntity<byte[]> exportSummaryData(@RequestParam(defaultValue = "31") int days) {
+    public ResponseEntity<byte[]> exportSummaryData(@RequestParam(defaultValue = "7") int days) {
+
+        // Clamp days to 1-365
+        days = Math.min(Math.max(days, 1), 365);
 
         log.info("Exporting summary data for last {} days from channel {}", days, slackTicketsProps.channelId());
 
@@ -79,9 +84,20 @@ public class SummaryDataController {
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"content.zip\"")
                     .body(zipBytes);
 
+        } catch (ZipException e) {
+            log.error("Zip format error has occurred", e);
+            throw new RuntimeException("Zip format error has occurred", e);
+        } catch (IOException e) {
+            // byte array write error
+            log.error("An I/O error has occurred", e);
+            throw new RuntimeException("An I/O error has occurred", e);
+        } catch (NullPointerException e) {
+            // Charset unavailable
+            log.error("Configuration error has occurred", e);
+            throw new RuntimeException("Configuration error has occurred", e);
         } catch (Exception e) {
-            log.error("Failed to create zip file", e);
-            throw new RuntimeException("Failed to create zip file", e);
+            log.error("Zip stream cannot be closed", e);
+            throw new RuntimeException("Zip stream cannot be closed", e);
         }
     }
 
@@ -116,23 +132,47 @@ public class SummaryDataController {
      * @return Response with the number of records imported
      */
     @PostMapping("/import")
-    public ResponseEntity<ImportResponse> importAnalysisData(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<ImportResponse> importAnalysisData(
+            @RequestParam(value = "file", required = false) MultipartFile file) {
+
+        // Validate file is provided
+        if (file == null) {
+            log.warn("Import request received with no file");
+            return ResponseEntity.badRequest().body(new ImportResponse(0, "No file provided"));
+        } else if (file.isEmpty()) {
+            log.warn("Import request received with empty file");
+            return ResponseEntity.badRequest().body(new ImportResponse(0, "File is empty"));
+        }
+
         log.info("Received import request for file: {}", file.getOriginalFilename());
 
         try {
             // Parse JSONL file
-            List<AnalysisRepository.AnalysisRecord> records = parseJsonlFile(file);
-            log.info("Parsed {} records from JSONL file", records.size());
+            List<AnalysisRepository.AnalysisRecord> records = new ArrayList<>();
+            int totalLines = parseJsonlFile(file, records);
 
-            // Import data using AnalysisService
-            int importedCount = analysisService.importAnalysisData(records);
+            if (records.isEmpty()) {
+                log.warn("Import request received with no valid records");
+                return ResponseEntity.badRequest().body(new ImportResponse(0, "Not a valid JSONL file"));
+            }
 
-            log.info("Successfully imported {} analysis records", importedCount);
-            return ResponseEntity.ok(new ImportResponse(importedCount, "Import successful"));
+            log.info("Parsed {} records from JSONL file of {} lines", records.size(), totalLines);
+
+            if (totalLines == records.size()) {
+                // Import data using AnalysisService
+                int importedCount = analysisService.importAnalysisData(records);
+
+                log.info("Successfully imported {} analysis records", importedCount);
+
+                return ResponseEntity.ok(new ImportResponse(importedCount, "Import successful"));
+            }
+
+            return ResponseEntity.badRequest()
+                    .body(new ImportResponse(0, "Import skipped as some records were malformed or incomplete"));
 
         } catch (Exception e) {
             log.error("Failed to import analysis data", e);
-            return ResponseEntity.badRequest().body(new ImportResponse(0, "Import failed: " + e.getMessage()));
+            return ResponseEntity.internalServerError().body(new ImportResponse(0, "Import failed: " + e.getMessage()));
         }
     }
 
@@ -140,28 +180,37 @@ public class SummaryDataController {
      * Parse JSONL file into AnalysisRecord objects.
      *
      * @param file JSONL file to parse
-     * @return List of AnalysisRecord objects
-     * @throws Exception if parsing fails
+     * @param records List to add parsed records to
+     * @return boolean some records were dropped
      */
-    private List<AnalysisRepository.AnalysisRecord> parseJsonlFile(MultipartFile file) throws Exception {
-        List<AnalysisRepository.AnalysisRecord> records = new ArrayList<>();
-
+    private int parseJsonlFile(MultipartFile file, List<AnalysisRepository.AnalysisRecord> records) {
+        int totalLines = 0;
         try (BufferedReader reader =
                 new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
 
             String line;
             while ((line = reader.readLine()) != null) {
                 try {
+                    ++totalLines;
                     AnalysisRepository.AnalysisRecord record =
                             objectMapper.readValue(line, AnalysisRepository.AnalysisRecord.class);
+                    if (!record.isValid()) {
+                        log.warn("Skipping line - missing or empty fields: {}", line);
+                        continue;
+                    }
                     records.add(record);
+                } catch (JacksonException e) {
+                    log.warn("Skipping line  - invalid JSON: {}", line);
                 } catch (NumberFormatException e) {
-                    log.warn("Skipping line {} - invalid ticket_id", line);
+                    log.warn("Skipping line - invalid ticket_id: {}", line);
                 }
             }
+        } catch (IOException e) {
+            log.error("Unable to read input file");
+            throw new RuntimeException("Unable to read input file", e);
         }
 
-        return records;
+        return totalLines;
     }
 
     /**

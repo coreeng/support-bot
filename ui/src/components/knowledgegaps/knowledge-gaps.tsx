@@ -65,7 +65,7 @@ export default function KnowledgeGapsPage() {
         }
     }
 
-    const handlePromptDownload = async () => {
+    const handleAnalysisBundleDownload = async () => {
         try {
             // Get CSRF token for protection against cross-site request forgery
             const csrfToken = await getCsrfToken()
@@ -270,7 +270,7 @@ export default function KnowledgeGapsPage() {
                                 {isDownloading ? 'Downloading...' : 'Export Data'}
                             </button>
                             <button
-                                onClick={handlePromptDownload}
+                                onClick={handleAnalysisBundleDownload}
                                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                             >
                                 <FileText className="w-4 h-4" />

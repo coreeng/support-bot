@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.analysis;
 
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Repository for analysis data.
@@ -38,5 +39,19 @@ public interface AnalysisRepository {
     /**
      * DTO for analysis record to be inserted
      */
-    record AnalysisRecord(int ticketId, String driver, String category, String feature, String summary) {}
+    record AnalysisRecord(
+            int ticketId,
+            @Nullable String driver,
+            @Nullable String category,
+            @Nullable String feature,
+            @Nullable String summary) {
+
+        public boolean isValid() {
+            return ticketId > 0 && isValid(driver) && isValid(category) && isValid(feature) && isValid(summary);
+        }
+
+        private boolean isValid(@Nullable String s) {
+            return s != null && !s.isBlank();
+        }
+    }
 }

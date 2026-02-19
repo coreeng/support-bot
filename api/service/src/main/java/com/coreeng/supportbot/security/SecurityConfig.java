@@ -48,7 +48,7 @@ public class SecurityConfig {
                         .requestMatchers("/slack/events")
                         .permitAll()
                         // Dashboard restricted to leadership or support engineers
-                        .requestMatchers("/dashboard/**", "/analysis")
+                        .requestMatchers("/dashboard/**", "/summary-data/results")
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // Summary data export/import is restricted to support engineers
                         .requestMatchers("/summary-data/**")
