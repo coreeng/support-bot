@@ -241,3 +241,6 @@ metrics:
 
 knowledge-gaps:
   enabled: true
+
+summary-data:
+  analysis-bundle-path: classpath:placeholder-analysis-bundle.zip

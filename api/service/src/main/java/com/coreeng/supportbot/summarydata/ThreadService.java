@@ -45,13 +45,13 @@ public class ThreadService {
     private static final Pattern NAME_PATTERN = Pattern.compile("\\b([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)*)\\b");
 
     // Common words that are capitalized but not names (to avoid false positives)
-    // Loaded from common-words.txt resource file at startup
+    // Loaded from commonly-capitalised-words.txt resource file at startup
     private static final Set<String> COMMON_WORDS = loadCommonWords();
 
     private final SlackClient slackClient;
 
     /**
-     * Loads common words from the common-words.txt resource file.
+     * Loads common words from the commonly-capitalised-words.txt resource file.
      * This method is called once at class initialization time.
      *
      * @return Set of common capitalized words that should not be treated as names
@@ -72,10 +72,10 @@ public class ThreadService {
                 }
             }
 
-            log.info("Loaded {} common words from common-words.txt", words.size());
+            log.info("Loaded {} common words from commonly-capitalised-words.txt", words.size());
             return Set.copyOf(words); // Return immutable set
         } catch (IOException e) {
-            log.error("Failed to load common-words.txt, using empty set", e);
+            log.error("Failed to load commonly-capitalised-words.txt, using empty set", e);
             return Set.of(); // Return empty set on error
         }
     }
@@ -167,7 +167,7 @@ public class ThreadService {
     }
 
     /**
-     * Remove human names from text using NLP-based pattern matching.
+     * Remove human names from text using regex-based heuristics and a word exclusion list.
      * Processes each line independently to preserve conversation structure.
      * Identifies and removes:
      * - Capitalized words that appear to be names (e.g., "Oleg", "John Smith")

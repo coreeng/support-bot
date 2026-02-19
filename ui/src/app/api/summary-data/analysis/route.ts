@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     return unauthorizedResponse();
   }
 
-  // Validate CSRF token for GET requests that export sensitive data
+  // Validate CSRF token for GET request that downloads the analysis bundle
   const csrfTokenFromHeader = request.headers.get("X-CSRF-Token");
   const csrfCookieName = process.env.NODE_ENV === "production"
     ? "__Host-authjs.csrf-token"
@@ -29,31 +29,32 @@ export async function GET(request: NextRequest) {
     return errorResponse("Invalid CSRF token", 403);
   }
 
-  const searchParams = request.nextUrl.searchParams;
-
   const backendPath = `/summary-data/analysis`;
   const url = `${BACKEND_URL}${backendPath}`;
 
-  // Custom fetch for binary data (zip file)
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`,
-      Accept: "application/zip",
-    },
-  });
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${session.accessToken}`,
+        Accept: "application/zip",
+      },
+    });
 
-  if (!response.ok) {
-    return errorResponse(`Backend error: ${response.status}`, response.status);
+    if (!response.ok) {
+      return errorResponse(`Backend error: ${response.status}`, response.status);
+    }
+
+    const blob = await response.blob();
+
+    return new Response(blob, {
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Disposition": 'attachment; filename="analysis.zip"',
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching analysis bundle:", error);
+    return errorResponse("Failed to fetch analysis bundle from backend", 502);
   }
-
-  // Stream the zip file directly to the client
-  const blob = await response.blob();
-
-  return new Response(blob, {
-    headers: {
-      "Content-Type": "application/zip",
-      "Content-Disposition": 'attachment; filename="analysis.zip"',
-    },
-  });
 }
 

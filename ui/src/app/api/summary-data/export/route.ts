@@ -35,26 +35,29 @@ export async function GET(request: NextRequest) {
   const backendPath = `/summary-data/export?days=${days}`;
   const url = `${BACKEND_URL}${backendPath}`;
 
-  // Custom fetch for binary data (zip file)
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${session.accessToken}`,
-      Accept: "application/zip",
-    },
-  });
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${session.accessToken}`,
+        Accept: "application/zip",
+      },
+    });
 
-  if (!response.ok) {
-    return errorResponse(`Backend error: ${response.status}`, response.status);
+    if (!response.ok) {
+      return errorResponse(`Backend error: ${response.status}`, response.status);
+    }
+
+    const blob = await response.blob();
+
+    return new Response(blob, {
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Disposition": 'attachment; filename="content.zip"',
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching export data:", error);
+    return errorResponse("Failed to fetch export data from backend", 502);
   }
-
-  // Stream the zip file directly to the client
-  const blob = await response.blob();
-
-  return new Response(blob, {
-    headers: {
-      "Content-Type": "application/zip",
-      "Content-Disposition": 'attachment; filename="content.zip"',
-    },
-  });
 }
 

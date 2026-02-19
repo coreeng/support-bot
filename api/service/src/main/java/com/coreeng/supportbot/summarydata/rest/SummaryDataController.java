@@ -3,22 +3,22 @@ package com.coreeng.supportbot.summarydata.rest;
 import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.SummaryDataProps;
 import com.coreeng.supportbot.summarydata.ThreadService;
-import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.zip.ZipException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
@@ -37,6 +37,7 @@ public class SummaryDataController {
 
     private final ThreadService threadService;
     private final SlackTicketsProps slackTicketsProps;
+    private final SummaryDataProps summaryDataProps;
     private final AnalysisService analysisService;
     private final ObjectMapper objectMapper;
 
@@ -44,14 +45,14 @@ public class SummaryDataController {
      * Export summary data as a zip file containing thread texts.
      * Each file in the zip is named with the thread timestamp.
      *
-     * @param days Number of days to look back (default: 7)
+     * @param days Number of days to look back (default: 31)
      * @return Zip file containing thread texts
      */
     @GetMapping(value = "/export", produces = "application/zip")
-    public ResponseEntity<byte[]> exportSummaryData(@RequestParam(defaultValue = "7") int days) {
-
-        // Clamp days to 1-365
-        days = Math.min(Math.max(days, 1), 365);
+    public ResponseEntity<byte[]> exportSummaryData(@RequestParam(defaultValue = "31") int days) {
+        if (days < 1 || days > 365) {
+            return ResponseEntity.badRequest().build();
+        }
 
         log.info("Exporting summary data for last {} days from channel {}", days, slackTicketsProps.channelId());
 
@@ -84,44 +85,46 @@ public class SummaryDataController {
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"content.zip\"")
                     .body(zipBytes);
 
-        } catch (ZipException e) {
-            log.error("Zip format error has occurred", e);
-            throw new RuntimeException("Zip format error has occurred", e);
         } catch (IOException e) {
-            // byte array write error
-            log.error("An I/O error has occurred", e);
-            throw new RuntimeException("An I/O error has occurred", e);
-        } catch (NullPointerException e) {
-            // Charset unavailable
-            log.error("Configuration error has occurred", e);
-            throw new RuntimeException("Configuration error has occurred", e);
-        } catch (Exception e) {
-            log.error("Zip stream cannot be closed", e);
-            throw new RuntimeException("Zip stream cannot be closed", e);
+            log.error("Failed to create zip file for export of {} threads", threads.size(), e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 
     /**
      * Export analysis bundle analysis.zip containing AI prompt and script to run analysis on thread texts.
-     * analysis.zip is expected to be in the current directory of the process.
+     * The bundle path is configurable via {@code summary-data.analysis-bundle-path}.
+     * By default, serves a classpath placeholder bundle.
      *
      * @return Analysis bundle zip file
      */
     @GetMapping(value = "/analysis", produces = "application/zip")
-    public ResponseEntity<Resource> download() throws IOException {
-        Path path = Paths.get("analysis.zip");
-        Resource res = new UrlResource(path.toUri());
+    public ResponseEntity<Resource> download() {
+        String bundlePath = summaryDataProps.analysisBundlePath();
+        try {
+            Resource res;
+            if (bundlePath != null && bundlePath.startsWith("classpath:")) {
+                res = new ClassPathResource(bundlePath.substring("classpath:".length()));
+            } else {
+                Path path = Paths.get(bundlePath != null ? bundlePath : "analysis.zip");
+                res = new UrlResource(path.toUri());
+            }
 
-        if (!res.exists() || !res.isReadable()) {
-            return ResponseEntity.notFound().build();
+            if (!res.exists() || !res.isReadable()) {
+                log.warn("Analysis bundle not found at: {}", bundlePath);
+                return ResponseEntity.notFound().build();
+            }
+
+            log.info("Downloading analysis bundle from {}", bundlePath);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"analysis.zip\"")
+                    .contentLength(res.contentLength())
+                    .body(res);
+        } catch (IOException e) {
+            log.error("Failed to read analysis bundle from: {}", bundlePath, e);
+            return ResponseEntity.internalServerError().build();
         }
-
-        log.info("Downloading analysis bundle");
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"analysis.zip\"")
-                .contentLength(Files.size(path))
-                .body(res);
     }
 
     /**
@@ -146,6 +149,10 @@ public class SummaryDataController {
 
         log.info("Received import request for file: {}", file.getOriginalFilename());
 
+        if (file.getSize() > 10 * 1024 * 1024) {
+            return ResponseEntity.badRequest().body(new ImportResponse(0, "File too large (max 10MB)"));
+        }
+
         try {
             // Parse JSONL file
             List<AnalysisRepository.AnalysisRecord> records = new ArrayList<>();
@@ -156,23 +163,21 @@ public class SummaryDataController {
                 return ResponseEntity.badRequest().body(new ImportResponse(0, "Not a valid JSONL file"));
             }
 
-            log.info("Parsed {} records from JSONL file of {} lines", records.size(), totalLines);
+            log.info("Parsed {} valid records from {} total lines", records.size(), totalLines);
 
-            if (totalLines == records.size()) {
-                // Import data using AnalysisService
-                int importedCount = analysisService.importAnalysisData(records);
+            // Import data using AnalysisService
+            int importedCount = analysisService.importAnalysisData(records);
 
-                log.info("Successfully imported {} analysis records", importedCount);
+            log.info("Successfully imported {} analysis records", importedCount);
 
-                return ResponseEntity.ok(new ImportResponse(importedCount, "Import successful"));
-            }
+            return ResponseEntity.ok(new ImportResponse(importedCount, "Import successful"));
 
-            return ResponseEntity.badRequest()
-                    .body(new ImportResponse(0, "Import skipped as some records were malformed or incomplete"));
-
-        } catch (Exception e) {
-            log.error("Failed to import analysis data", e);
-            return ResponseEntity.internalServerError().body(new ImportResponse(0, "Import failed: " + e.getMessage()));
+        } catch (IOException e) {
+            log.error("Failed to read uploaded file: {}", file.getOriginalFilename(), e);
+            return ResponseEntity.badRequest().body(new ImportResponse(0, "Failed to read file: " + e.getMessage()));
+        } catch (org.springframework.dao.DataAccessException e) {
+            log.error("Database error during import of file: {}", file.getOriginalFilename(), e);
+            return ResponseEntity.internalServerError().body(new ImportResponse(0, "Database error during import"));
         }
     }
 
@@ -181,9 +186,10 @@ public class SummaryDataController {
      *
      * @param file JSONL file to parse
      * @param records List to add parsed records to
-     * @return boolean some records were dropped
+     * @return total number of lines parsed
+     * @throws IOException if reading the file fails
      */
-    private int parseJsonlFile(MultipartFile file, List<AnalysisRepository.AnalysisRecord> records) {
+    private int parseJsonlFile(MultipartFile file, List<AnalysisRepository.AnalysisRecord> records) throws IOException {
         int totalLines = 0;
         try (BufferedReader reader =
                 new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
@@ -199,15 +205,10 @@ public class SummaryDataController {
                         continue;
                     }
                     records.add(record);
-                } catch (JacksonException e) {
-                    log.warn("Skipping line  - invalid JSON: {}", line);
-                } catch (NumberFormatException e) {
-                    log.warn("Skipping line - invalid ticket_id: {}", line);
+                } catch (JsonProcessingException e) {
+                    log.warn("Skipping malformed JSONL line: {} - error: {}", line, e.getOriginalMessage());
                 }
             }
-        } catch (IOException e) {
-            log.error("Unable to read input file");
-            throw new RuntimeException("Unable to read input file", e);
         }
 
         return totalLines;
