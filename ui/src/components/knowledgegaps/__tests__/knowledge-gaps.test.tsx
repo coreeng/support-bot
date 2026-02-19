@@ -2,11 +2,33 @@ import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import KnowledgeGapsPage from '../knowledge-gaps'
 import * as hooks from '../../../lib/hooks'
+import { ToastProvider } from '@/components/ui/toast'
+import * as useAuthHook from '../../../hooks/useAuth'
 
 // Mock the hooks
 jest.mock('../../../lib/hooks')
+jest.mock('../../../hooks/useAuth')
+
+// Mock next-auth
+jest.mock('next-auth/react', () => ({
+    getCsrfToken: jest.fn(() => Promise.resolve('mock-csrf-token'))
+}))
+
+// Mock @tanstack/react-query
+jest.mock('@tanstack/react-query', () => ({
+    ...jest.requireActual('@tanstack/react-query'),
+    useQueryClient: jest.fn(() => ({
+        invalidateQueries: jest.fn()
+    }))
+}))
+
+// Helper to render with ToastProvider
+const renderWithToast = (component: React.ReactElement) => {
+    return render(<ToastProvider>{component}</ToastProvider>)
+}
 
 const mockUseAnalysis = hooks.useAnalysis as jest.MockedFunction<typeof hooks.useAnalysis>
+const mockUseAuth = useAuthHook.useAuth as jest.MockedFunction<typeof useAuthHook.useAuth>
 
 const mockAnalysisData = {
     knowledgeGaps: [
@@ -108,6 +130,17 @@ const mockAnalysisData = {
 describe('KnowledgeGapsPage', () => {
     beforeEach(() => {
         jest.clearAllMocks()
+        // Default mock for useAuth - SUPPORT_ENGINEER role
+        mockUseAuth.mockReturnValue({
+            user: { id: '1', email: 'test@example.com', name: 'Test User', teams: [], roles: ['SUPPORT_ENGINEER'] },
+            isLoading: false,
+            isAuthenticated: true,
+            isLeadership: false,
+            isEscalationTeam: false,
+            isSupportEngineer: true,
+            actualEscalationTeams: [],
+            logout: jest.fn()
+        })
     })
 
     it('shows loading state initially', () => {
@@ -117,7 +150,7 @@ describe('KnowledgeGapsPage', () => {
             error: null
         } as any)
 
-        render(<KnowledgeGapsPage />)
+        renderWithToast(<KnowledgeGapsPage />)
         expect(screen.getByText(/Loading support area summary/i)).toBeInTheDocument()
     })
 
@@ -128,7 +161,7 @@ describe('KnowledgeGapsPage', () => {
             error: new Error('API Error')
         } as any)
 
-        render(<KnowledgeGapsPage />)
+        renderWithToast(<KnowledgeGapsPage />)
         expect(screen.getByText('Error loading analysis data')).toBeInTheDocument()
         expect(screen.getByText('Please try again later')).toBeInTheDocument()
     })
@@ -140,11 +173,16 @@ describe('KnowledgeGapsPage', () => {
             error: null
         } as any)
 
-        render(<KnowledgeGapsPage />)
+        renderWithToast(<KnowledgeGapsPage />)
 
         // Check for main page header
         expect(screen.getByText('Support Area Summary')).toBeInTheDocument()
         expect(screen.getByText('Overview of support areas and knowledge gaps requiring attention')).toBeInTheDocument()
+
+        // Check for import, export, and prompt buttons
+        expect(screen.getByText('Import Data')).toBeInTheDocument()
+        expect(screen.getByText('Export Data')).toBeInTheDocument()
+        expect(screen.getByText('Get Analysis Bundle')).toBeInTheDocument()
 
         // Check for collapsible section headers
         expect(screen.getByText('Top 5 Support Areas')).toBeInTheDocument()
@@ -158,7 +196,7 @@ describe('KnowledgeGapsPage', () => {
             error: null
         } as any)
 
-        render(<KnowledgeGapsPage />)
+        renderWithToast(<KnowledgeGapsPage />)
 
         // Initially collapsed - items should not be visible
         expect(screen.queryByText('Knowledge Gap')).not.toBeInTheDocument()
@@ -185,7 +223,7 @@ describe('KnowledgeGapsPage', () => {
             error: null
         } as any)
 
-        render(<KnowledgeGapsPage />)
+        renderWithToast(<KnowledgeGapsPage />)
 
         // Initially collapsed - items should not be visible
         expect(screen.queryByText('CI')).not.toBeInTheDocument()
@@ -206,7 +244,7 @@ describe('KnowledgeGapsPage', () => {
             error: null
         } as any)
 
-        render(<KnowledgeGapsPage />)
+        renderWithToast(<KnowledgeGapsPage />)
 
         // Expand the Top 5 Support Areas section first
         const supportAreasButton = screen.getByRole('button', { name: /Top 5 Support Areas/i })
@@ -239,7 +277,7 @@ describe('KnowledgeGapsPage', () => {
             error: null
         } as any)
 
-        render(<KnowledgeGapsPage />)
+        renderWithToast(<KnowledgeGapsPage />)
 
         // Expand Top 5 Support Areas
         const supportAreasButton = screen.getByRole('button', { name: /Top 5 Support Areas/i })
@@ -262,5 +300,341 @@ describe('KnowledgeGapsPage', () => {
         expect(screen.getByText('CI')).toBeInTheDocument()
         expect(screen.getByText('Configuring Platform Features - Kafka and Dial')).toBeInTheDocument()
         expect(screen.getByText('Deploying & Configuring Tenant Applications')).toBeInTheDocument()
+    })
+
+    it('handles export button click', async () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        // Mock fetch
+        const mockFetch = jest.fn(() =>
+            Promise.resolve({
+                ok: true,
+                blob: () => Promise.resolve(new Blob(['test'], { type: 'application/zip' }))
+            } as Response)
+        )
+        global.fetch = mockFetch
+
+        // Mock URL.createObjectURL and revokeObjectURL
+        const mockCreateObjectURL = jest.fn(() => 'blob:test-url')
+        const mockRevokeObjectURL = jest.fn()
+        global.URL.createObjectURL = mockCreateObjectURL
+        global.URL.revokeObjectURL = mockRevokeObjectURL
+
+        // Mock HTMLAnchorElement click
+        const mockClick = jest.fn()
+        HTMLAnchorElement.prototype.click = mockClick
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        const exportButton = screen.getByText('Export Data')
+        fireEvent.click(exportButton)
+
+        // Wait for async operations
+        await screen.findByText('Downloading...')
+
+        // Verify fetch was called with default value of 7 days (Week)
+        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/export?days=7', {
+            headers: {
+                'X-CSRF-Token': 'mock-csrf-token',
+            },
+        })
+
+        // Wait for button to return to normal state
+        await screen.findByText('Export Data')
+
+        // Verify download was triggered
+        expect(mockClick).toHaveBeenCalled()
+        expect(mockCreateObjectURL).toHaveBeenCalled()
+        expect(mockRevokeObjectURL).toHaveBeenCalled()
+    })
+
+    it('renders time period dropdown with correct options', () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        // Find the select dropdown - default is Week (7 days)
+        const select = screen.getByDisplayValue('Week')
+        expect(select).toBeInTheDocument()
+
+        // Verify all options are present
+        const options = screen.getAllByRole('option')
+        expect(options).toHaveLength(3)
+        expect(screen.getByRole('option', { name: 'Week' })).toBeInTheDocument()
+        expect(screen.getByRole('option', { name: 'Month' })).toBeInTheDocument()
+        expect(screen.getByRole('option', { name: 'Quarter' })).toBeInTheDocument()
+    })
+
+    it('uses selected time period when exporting data', async () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        // Mock fetch
+        const mockFetch = jest.fn(() =>
+            Promise.resolve({
+                ok: true,
+                blob: () => Promise.resolve(new Blob(['test'], { type: 'application/zip' }))
+            } as Response)
+        )
+        global.fetch = mockFetch
+
+        // Mock URL.createObjectURL and revokeObjectURL
+        const mockCreateObjectURL = jest.fn(() => 'blob:test-url')
+        const mockRevokeObjectURL = jest.fn()
+        global.URL.createObjectURL = mockCreateObjectURL
+        global.URL.revokeObjectURL = mockRevokeObjectURL
+
+        // Mock HTMLAnchorElement click
+        const mockClick = jest.fn()
+        HTMLAnchorElement.prototype.click = mockClick
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        // Change the time period to Month (31 days)
+        const select = screen.getByDisplayValue('Week')
+        fireEvent.change(select, { target: { value: '31' } })
+
+        // Click export button
+        const exportButton = screen.getByText('Export Data')
+        fireEvent.click(exportButton)
+
+        // Wait for the fetch to be called
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // Verify fetch was called with days=31
+        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/export?days=31', {
+            headers: {
+                'X-CSRF-Token': 'mock-csrf-token',
+            },
+        })
+    })
+
+    it('uses quarter time period when exporting data', async () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        // Mock fetch
+        const mockFetch = jest.fn(() =>
+            Promise.resolve({
+                ok: true,
+                blob: () => Promise.resolve(new Blob(['test'], { type: 'application/zip' }))
+            } as Response)
+        )
+        global.fetch = mockFetch
+
+        // Mock URL.createObjectURL and revokeObjectURL
+        const mockCreateObjectURL = jest.fn(() => 'blob:test-url')
+        const mockRevokeObjectURL = jest.fn()
+        global.URL.createObjectURL = mockCreateObjectURL
+        global.URL.revokeObjectURL = mockRevokeObjectURL
+
+        // Mock HTMLAnchorElement click
+        const mockClick = jest.fn()
+        HTMLAnchorElement.prototype.click = mockClick
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        // Change the time period to Quarter (92 days)
+        const select = screen.getByDisplayValue('Week')
+        fireEvent.change(select, { target: { value: '92' } })
+
+        // Click export button
+        const exportButton = screen.getByText('Export Data')
+        fireEvent.click(exportButton)
+
+        // Wait for the fetch to be called
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // Verify fetch was called with days=92
+        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/export?days=92', {
+            headers: {
+                'X-CSRF-Token': 'mock-csrf-token',
+            },
+        })
+    })
+
+    it('handles import button click and file upload', async () => {
+        const { useQueryClient } = require('@tanstack/react-query')
+        const mockInvalidateQueries = jest.fn()
+        useQueryClient.mockReturnValue({
+            invalidateQueries: mockInvalidateQueries
+        })
+
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        // Mock fetch for upload
+        const mockFetch = jest.fn(() =>
+            Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve({ recordsImported: 42, message: 'Import successful' })
+            } as Response)
+        )
+        global.fetch = mockFetch
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        const importButton = screen.getByText('Import Data')
+        expect(importButton).toBeInTheDocument()
+
+        // Simulate file selection
+        const file = new File(['ticket_id\tDriver\tCategory\tFeature\tSummary'], 'analysis.tsv', { type: 'text/tab-separated-values' })
+        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+
+        // Trigger file change
+        Object.defineProperty(fileInput, 'files', {
+            value: [file],
+            writable: false,
+        })
+        fireEvent.change(fileInput)
+
+        // Wait for async operations
+        await screen.findByText('Uploading...')
+
+        // Verify fetch was called with FormData
+        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/import', expect.objectContaining({
+            method: 'POST',
+            body: expect.any(FormData)
+        }))
+
+        // Wait for button to return to normal state
+        await screen.findByText('Import Data')
+
+        // Verify success toast is shown
+        expect(await screen.findByText('Import successful! 42 records imported.')).toBeInTheDocument()
+
+        // Verify that invalidateQueries was called to refresh the data
+        expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['analysis'] })
+    })
+
+    it('handles prompt button click to download analysis prompt', async () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        // Mock fetch
+        const mockFetch = jest.fn(() =>
+            Promise.resolve({
+                ok: true,
+                blob: () => Promise.resolve(new Blob(['test prompt'], { type: 'application/zip' }))
+            } as Response)
+        )
+        global.fetch = mockFetch
+
+        // Mock URL.createObjectURL and revokeObjectURL
+        const mockCreateObjectURL = jest.fn(() => 'blob:test-url')
+        const mockRevokeObjectURL = jest.fn()
+        global.URL.createObjectURL = mockCreateObjectURL
+        global.URL.revokeObjectURL = mockRevokeObjectURL
+
+        // Mock HTMLAnchorElement click
+        const mockClick = jest.fn()
+        HTMLAnchorElement.prototype.click = mockClick
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        const promptButton = screen.getByText('Get Analysis Bundle')
+        fireEvent.click(promptButton)
+
+        // Wait for async operations
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // Verify fetch was called
+        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/analysis', {
+            headers: {
+                'X-CSRF-Token': 'mock-csrf-token',
+            },
+        })
+
+        // Verify download was triggered
+        expect(mockClick).toHaveBeenCalled()
+        expect(mockCreateObjectURL).toHaveBeenCalled()
+        expect(mockRevokeObjectURL).toHaveBeenCalled()
+    })
+
+    describe('role-based button visibility', () => {
+        beforeEach(() => {
+            mockUseAnalysis.mockReturnValue({
+                data: mockAnalysisData,
+                isLoading: false,
+                error: null
+            } as any)
+        })
+
+        it('shows buttons when user has SUPPORT_ENGINEER role', () => {
+            mockUseAuth.mockReturnValue({
+                user: { id: '1', email: 'test@example.com', name: 'Test User', teams: [], roles: ['SUPPORT_ENGINEER'] },
+                isLoading: false,
+                isAuthenticated: true,
+                isLeadership: false,
+                isEscalationTeam: false,
+                isSupportEngineer: true,
+                actualEscalationTeams: [],
+                logout: jest.fn()
+            })
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            expect(screen.getByText('Export Data')).toBeInTheDocument()
+            expect(screen.getByText('Get Analysis Bundle')).toBeInTheDocument()
+            expect(screen.getByText('Import Data')).toBeInTheDocument()
+        })
+
+        it('hides buttons when user does not have SUPPORT_ENGINEER role', () => {
+            mockUseAuth.mockReturnValue({
+                user: { id: '1', email: 'test@example.com', name: 'Test User', teams: [], roles: ['USER'] },
+                isLoading: false,
+                isAuthenticated: true,
+                isLeadership: false,
+                isEscalationTeam: false,
+                isSupportEngineer: false,
+                actualEscalationTeams: [],
+                logout: jest.fn()
+            })
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            expect(screen.queryByText('Export Data')).not.toBeInTheDocument()
+            expect(screen.queryByText('Get Analysis Bundle')).not.toBeInTheDocument()
+            expect(screen.queryByText('Import Data')).not.toBeInTheDocument()
+        })
+
+        it('hides buttons when user has LEADERSHIP role but not SUPPORT_ENGINEER', () => {
+            mockUseAuth.mockReturnValue({
+                user: { id: '1', email: 'test@example.com', name: 'Test User', teams: [], roles: ['LEADERSHIP'] },
+                isLoading: false,
+                isAuthenticated: true,
+                isLeadership: true,
+                isEscalationTeam: false,
+                isSupportEngineer: false,
+                actualEscalationTeams: [],
+                logout: jest.fn()
+            })
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            expect(screen.queryByText('Export Data')).not.toBeInTheDocument()
+            expect(screen.queryByText('Get Analysis Bundle')).not.toBeInTheDocument()
+            expect(screen.queryByText('Import Data')).not.toBeInTheDocument()
+        })
     })
 })

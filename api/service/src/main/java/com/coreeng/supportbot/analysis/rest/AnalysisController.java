@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
  * REST controller for analysis data.
  */
 @RestController
-@RequestMapping("/analysis")
+@RequestMapping("/summary-data/results")
 @RequiredArgsConstructor
 public class AnalysisController {
 

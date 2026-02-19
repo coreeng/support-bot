@@ -1,14 +1,25 @@
 'use client'
 
-import React, { useState } from 'react'
-import { ChevronDown, ChevronRight, ExternalLink, BarChart3 } from 'lucide-react'
+import React, { useState, useRef } from 'react'
+import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText } from 'lucide-react'
+import { getCsrfToken } from 'next-auth/react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAnalysis } from '@/lib/hooks'
+import { useToast } from '@/components/ui/toast'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function KnowledgeGapsPage() {
+    const queryClient = useQueryClient()
+    const { isSupportEngineer } = useAuth()
     const { data: analysisData, isLoading, error } = useAnalysis()
+    const { showToast } = useToast()
     const [supportAreasExpanded, setSupportAreasExpanded] = useState(false)
     const [knowledgeGapsExpanded, setKnowledgeGapsExpanded] = useState(false)
     const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+    const [isDownloading, setIsDownloading] = useState(false)
+    const [isUploading, setIsUploading] = useState(false)
+    const [selectedDays, setSelectedDays] = useState<number>(7)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     const toggleItemExpansion = (itemName: string) => {
         setExpandedItems(prev => {
@@ -20,6 +31,114 @@ export default function KnowledgeGapsPage() {
             }
             return next
         })
+    }
+
+    const handleExportDownload = async () => {
+        setIsDownloading(true)
+        try {
+            // Get CSRF token for protection against cross-site request forgery
+            const csrfToken = await getCsrfToken()
+
+            const response = await fetch(`/api/summary-data/export?days=${selectedDays}`, {
+                headers: {
+                    'X-CSRF-Token': csrfToken || '',
+                },
+            })
+            if (!response.ok) {
+                throw new Error('Failed to download export')
+            }
+
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = 'content.zip'
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+        } catch (error) {
+            console.error('Error downloading export:', error)
+            showToast('Failed to download export. Please try again.', 'error')
+        } finally {
+            setIsDownloading(false)
+        }
+    }
+
+    const handleAnalysisBundleDownload = async () => {
+        try {
+            // Get CSRF token for protection against cross-site request forgery
+            const csrfToken = await getCsrfToken()
+
+            const response = await fetch('/api/summary-data/analysis', {
+                headers: {
+                    'X-CSRF-Token': csrfToken || '',
+                },
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to download prompt')
+            }
+
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = 'analysis.zip'
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+        } catch (error) {
+            console.error('Error downloading prompt:', error)
+            showToast('Failed to download prompt. Please try again.', 'error')
+        }
+    }
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click()
+    }
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0]
+        if (!file) return
+
+        setIsUploading(true)
+        try {
+            // Get CSRF token for protection against cross-site request forgery
+            const csrfToken = await getCsrfToken()
+
+            const formData = new FormData()
+            formData.append('file', file)
+
+            const response = await fetch('/api/summary-data/import', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-Token': csrfToken || '',
+                },
+                body: formData,
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to upload file')
+            }
+
+            const result = await response.json()
+            showToast(`Import successful! ${result.recordsImported} records imported.`, 'success')
+
+            // Invalidate and refetch the analysis data
+            await queryClient.invalidateQueries({ queryKey: ['analysis'] })
+
+            // Reset the file input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ''
+            }
+        } catch (error) {
+            console.error('Error uploading file:', error)
+            showToast('Failed to upload file. Please try again.', 'error')
+        } finally {
+            setIsUploading(false)
+        }
     }
 
     const renderAreaItem = (item: { name: string; coveragePercentage: number; queryCount: number; queries: { text: string; link: string }[] }, index: number) => {
@@ -114,14 +233,59 @@ export default function KnowledgeGapsPage() {
         <div className="h-full overflow-auto bg-gray-50">
             <div className="max-w-7xl mx-auto p-8 space-y-6">
                 {/* Header */}
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                        <BarChart3 className="w-8 h-8 text-blue-600" />
-                        Support Area Summary
-                    </h1>
-                    <p className="text-gray-600 mt-2">
-                        Overview of support areas and knowledge gaps requiring attention
-                    </p>
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                            <BarChart3 className="w-8 h-8 text-blue-600" />
+                            Support Area Summary
+                        </h1>
+                        <p className="text-gray-600 mt-2">
+                            Overview of support areas and knowledge gaps requiring attention
+                        </p>
+                    </div>
+                    {isSupportEngineer && (
+                        <div className="flex items-center gap-3">
+                            <select
+                                value={selectedDays}
+                                onChange={(e) => setSelectedDays(Number(e.target.value))}
+                                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                                <option value={7}>Week</option>
+                                <option value={31}>Month</option>
+                                <option value={92}>Quarter</option>
+                            </select>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".jsonl"
+                                onChange={handleFileChange}
+                                className="hidden"
+                            />
+                            <button
+                                onClick={handleExportDownload}
+                                disabled={isDownloading}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <Download className="w-4 h-4" />
+                                {isDownloading ? 'Downloading...' : 'Export Data'}
+                            </button>
+                            <button
+                                onClick={handleAnalysisBundleDownload}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                <FileText className="w-4 h-4" />
+                              Get Analysis Bundle
+                            </button>
+                            <button
+                                onClick={handleImportClick}
+                                disabled={isUploading}
+                                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <Upload className="w-4 h-4" />
+                                {isUploading ? 'Uploading...' : 'Import Data'}
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Top 5 Support Areas */}

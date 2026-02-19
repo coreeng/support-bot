@@ -32,7 +32,7 @@ make db-run
 
 ## 4. Identity Provider Integrations
 Identity Provider integrations are disabled by default for local runs. What you can do instead, is look at the [app config](src/main/resources/application.yaml)
-and ensure the `platform-integration.static-user` is set to true, while `platform-integration.gcp.enabled` and `platform-integration.azure.enabled` are set to `false`. 
+and ensure the `platform-integration.static-user` is set to true, while `platform-integration.gcp.enabled` and `platform-integration.azure.enabled` are set to `false`.
 You can set your desired `platform-integration.static-user.users` entries.
 
 ## 5. Start the bot
@@ -52,3 +52,51 @@ make lint
 ```
 
 Ruleset can be found [here](pmd-ruleset.xml)
+
+# Support Bot API
+
+## Support Analysis API
+
+## Summary Data API
+
+### Process
+
+1. Export thread contents
+2. Analyze thread contents with Knowledge Gap Analysis scripts that produce a JSONL file with a record per thread
+3. Import analysis results JSONL file into the bot database
+
+If you ran the analysis before you will have some content in the directory.
+The export may overwrite some threads and create new ones.
+The analysis will only process new threads that have not been analysed before.
+If you want to process all threads again, remove the output directory created by the analysis
+
+When importing the analysis results, the bot will merge new analysis records with existing ones, overwriting existing records.
+
+### Export Thread Data
+
+```bash
+mkdir content || true
+curl -s http://localhost:8080/summary-data/export?days=10 | bsdtar -xf - -C content
+```
+
+This will create a file for each thread in the `content` directory.
+The file name is the thread timestamp.
+This is the format expected by Knowledge Gap analysis scripts.
+
+If the directory exists, existing files will be overwritten.
+This will allow you to provide fresh analysis based on the latest thread content
+
+### Import Analysis Data
+
+```bash
+curl -s -F "file=@../analysis-data/analysis.jsonl" http://localhost:8080/summary-data/import
+```
+
+This will merge analysis records with the records in the database by ticket ID
+
+### Read analysis data as UI JSON
+
+```bash
+curl http://localhost:8080/summary-data/results
+```
+

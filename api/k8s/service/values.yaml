@@ -119,6 +119,14 @@ env:
         name: support-bot
         key: SLACK_SIGNING_SECRET
 
+# Analysis bundle ConfigMap volume mount (disabled by default).
+# When enabled, mounts a ConfigMap as the analysis bundle zip file.
+analysisBundle:
+  enabled: false
+  configMapName: "analysis-bundle"
+  mountPath: "/app/analysis.zip"
+  subPath: "analysis.zip"
+
 # ConfigMap configuration
 configMap:
   enabled: true
