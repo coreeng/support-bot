@@ -525,7 +525,7 @@ describe('HealthPage', () => {
                 expect(screen.getByText('Tickets per Engineer Capacity:')).toBeInTheDocument();
             });
 
-            it('does not render when assignment is disabled', () => {
+            it('renders even when assignment is disabled', () => {
                 mockUseAssignmentEnabled.mockReturnValue({
                     data: false,
                     isLoading: false,
@@ -534,7 +534,7 @@ describe('HealthPage', () => {
 
                 render(<HealthPage />, { wrapper: Wrapper });
 
-                expect(screen.queryByText('Capacity vs Demand')).not.toBeInTheDocument();
+                expect(screen.getByText('Capacity vs Demand')).toBeInTheDocument();
             });
 
             it('allows changing engineers on rota', () => {
@@ -671,11 +671,11 @@ describe('HealthPage', () => {
                 if (header) {
                     fireEvent.click(header);
                     // After clicking, content should be visible
-                    expect(screen.getByText(/Average tickets per weekday/i)).toBeInTheDocument();
+                    expect(screen.getByText(/Total tickets per 2-hour block/i)).toBeInTheDocument();
                 }
             });
 
-            it('does not render when assignment is disabled', () => {
+            it('renders even when assignment is disabled', () => {
                 mockUseAssignmentEnabled.mockReturnValue({
                     data: false,
                     isLoading: false,
@@ -684,7 +684,7 @@ describe('HealthPage', () => {
 
                 render(<HealthPage />, { wrapper: Wrapper });
 
-                expect(screen.queryByText('Capacity Insights by Time Block')).not.toBeInTheDocument();
+                expect(screen.getByText('Capacity Insights by Time Block')).toBeInTheDocument();
             });
 
             it('groups hours into 2-hour blocks', () => {
@@ -705,7 +705,7 @@ describe('HealthPage', () => {
                 if (header) {
                     fireEvent.click(header);
                     // Should show time blocks like "9 AM - 11 AM", "11 AM - 1 PM", etc.
-                    expect(screen.getByText(/Average tickets per weekday/i)).toBeInTheDocument();
+                    expect(screen.getByText(/Total tickets per 2-hour block/i)).toBeInTheDocument();
                 }
             });
 
