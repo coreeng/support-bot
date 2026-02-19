@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const days = searchParams.get("days") || "31";
 
   const backendPath = `/summary-data/analysis`;
   const url = `${BACKEND_URL}${backendPath}`;
