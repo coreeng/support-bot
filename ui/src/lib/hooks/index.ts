@@ -469,7 +469,7 @@ export function useKnowledgeGapsEnabled() {
 export function useAnalysis() {
   return useQuery<AnalysisData>({
     queryKey: ["analysis"],
-    queryFn: () => apiGet("/analysis"),
+    queryFn: () => apiGet("/summary-data/results"),
     staleTime: 2 * 60 * 1000,
   });
 }

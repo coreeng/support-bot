@@ -42,6 +42,10 @@ spec:
             {{- end }}
           env:
             {{- toYaml .Values.env | nindent 12 }}
+            {{- if .Values.analysisBundle.enabled }}
+            - name: SUMMARY_DATA_ANALYSIS_BUNDLE_PATH
+              value: {{ .Values.analysisBundle.mountPath | default "/app/analysis.zip" }}
+            {{- end }}
           {{- with .Values.envFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
@@ -55,6 +59,11 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.analysisBundle.enabled }}
+            - name: analysis-bundle
+              mountPath: {{ .Values.analysisBundle.mountPath | default "/app/analysis.zip" }}
+              subPath: {{ .Values.analysisBundle.subPath | default "analysis.zip" }}
+            {{- end }}
             {{- if .Values.configMap.enabled }}
             - name: config
               mountPath: /app/config
@@ -62,6 +71,11 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if .Values.analysisBundle.enabled }}
+        - name: analysis-bundle
+          configMap:
+            name: {{ .Values.analysisBundle.configMapName | default "analysis-bundle" }}
+        {{- end }}
         {{- if .Values.configMap.enabled }}
         - name: config
           configMap:
