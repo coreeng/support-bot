@@ -10,6 +10,9 @@ RUN yarn --frozen-lockfile;
 COPY tsconfig.json cucumber.json ./
 COPY tests ./tests
 
+# Cucumber writes reports under /app; ensure runtime user can write there.
+RUN chown -R pwuser:pwuser /app
+
 USER pwuser
 
 CMD ["yarn", "test:cucumber:ci"]
