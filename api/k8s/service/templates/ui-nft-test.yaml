@@ -23,6 +23,7 @@ spec:
         - name: ui-nft-tests
           image: "{{ $repo }}:{{ $tag }}"
           imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
+          args: ["run", "load-testing/hello.js"]
           env:
             - name: SERVICE_ENDPOINT
               value: "{{ $serviceEndpoint }}"
