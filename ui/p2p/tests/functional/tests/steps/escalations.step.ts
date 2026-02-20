@@ -204,28 +204,6 @@ When('user logs in', async function (this: CustomWorld) {
         l2Teams: testContext.l2Teams || []
     });
 
-    // Mock user-info endpoint
-    await this.page.route('**/user*', async (route: Route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                email: testContext.userEmail,
-                teams: (testContext.userTeams || []).map((t: any) => {
-                    // ensure types present
-                    const l2TeamNames = (testContext.l2Teams || []).map((lt: any) => lt.label)
-                    const hasTypes = Array.isArray(t.types) && t.types.length > 0
-                    const inferredTypes = hasTypes
-                        ? t.types
-                        : l2TeamNames.includes(t.name)
-                            ? ['escalation']
-                            : ['tenant']
-                    return { ...t, types: inferredTypes }
-                })
-            })
-        });
-    });
-
     // Mock session
     const userEmail = testContext.userEmail || 'test@example.com';
     const isLeadership = testContext.isLeadership || false;
@@ -298,18 +276,6 @@ When('user logs in and selects {string} from dropdown', async function (this: Cu
         leadershipEmails: testContext.leadershipEmails || [],
         supportEmails: testContext.supportEmails || [],
         l2Teams: testContext.l2Teams || []
-    });
-
-    // Mock user-info endpoint
-    await this.page.route('**/user*', async (route: Route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                email: testContext.userEmail,
-                teams: testContext.userTeams || []
-            })
-        });
     });
 
     // Mock session

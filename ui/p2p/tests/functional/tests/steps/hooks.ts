@@ -119,22 +119,6 @@ Before(async function (this: CustomWorld) {
     });
   });
 
-  // Mock /user endpoint to align with frontend role/type expectations
-  await this.page.route('**/user', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        email: "functional-test@example.com",
-        teams: [
-          { label: "Test Support Leadership", code: "support-leadership", types: ["leadership"] },
-          { label: "Test Support Engineers", code: "support-engineers", types: ["support"] },
-          { label: "Team A", code: "team-a", types: ["tenant"] },
-        ]
-      })
-    });
-  });
-  
   await this.page.route('**/api/registry', async (route) => {
     await route.fulfill({
       status: 200,
@@ -146,8 +130,7 @@ Before(async function (this: CustomWorld) {
     });
   });
 
-  // Mock escalation endpoint - required for escalation widgets
-  await this.page.route('**/escalation**', async (route) => {
+  await this.page.route('**/api/escalations**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -160,8 +143,7 @@ Before(async function (this: CustomWorld) {
     });
   });
 
-  // Mock tickets endpoint - required for StatsPage to render
-  await this.page.route('**/ticket*', async (route) => {
+  await this.page.route('**/api/tickets**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -192,9 +174,6 @@ Before(async function (this: CustomWorld) {
       })
     });
   });
-
-  // NOTE: Authorization endpoint mocks (/team/leadership/members, /team/support/members, /team?type=escalation)
-  // and user-info mocks are test-specific and should be set up in individual test steps
 });
 
 After(async function (this: CustomWorld) {

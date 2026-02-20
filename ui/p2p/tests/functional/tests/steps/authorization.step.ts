@@ -107,30 +107,8 @@ When('user {string} logs in', async function (this: CustomWorld, email: string) 
         l2Teams: testContext.l2Teams || []
     });
 
-    // Mock the /user endpoint
-    await this.page.route('**/user*', async (route: Route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                email,
-                teams: (testContext.userTeams || [{ name: 'team-a', groupRefs: [], types: ['tenant'] }]).map((t: any) => {
-                    const hasTypes = Array.isArray(t.types) && t.types.length > 0
-                    // Compare codes with codes (user teams are now in code format)
-                    const l2TeamCodes = (testContext.l2Teams || []).map((lt: any) => lt.code)
-                    const inferredTypes = hasTypes
-                        ? t.types
-                        : l2TeamCodes.includes(t.name)
-                            ? ['escalation']
-                            : (isLeadership ? ['leadership'] : isSupportEngineer ? ['support'] : ['tenant'])
-                    return { ...t, types: inferredTypes }
-                })
-            })
-        });
-    });
-
     // Mock escalations endpoint (even if empty) so escalation widgets render
-    await this.page.route('**/escalation*', async (route: Route) => {
+    await this.page.route('**/api/escalations*', async (route: Route) => {
         await route.fulfill({
             status: 200,
             contentType: 'application/json',

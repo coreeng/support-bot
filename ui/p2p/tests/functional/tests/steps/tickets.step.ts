@@ -75,16 +75,6 @@ const mockTicketDetails = {
 
 // Setup mocks
 Given("Tickets API endpoints are mocked", async function (this: CustomWorld) {
-    // Mock ticket list and details with smart routing
-    await this.page.route("**/ticket**", (route) => {
-        const url = route.request().url();
-        if (url.includes('/ticket/1')) {
-            route.fulfill({ status: 200, body: JSON.stringify(mockTicketDetails) });
-        } else {
-            route.fulfill({ status: 200, body: JSON.stringify(mockTicketsData) });
-        }
-    });
-    // Also mock proxied API paths
     await this.page.route("**/api/tickets**", (route) => {
         const url = route.request().url();
         if (url.includes('/tickets/1')) {
@@ -93,10 +83,7 @@ Given("Tickets API endpoints are mocked", async function (this: CustomWorld) {
             route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketsData) });
         }
     });
-    
-    await this.page.route("**/team?type=tenant*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockTeamsData) })
-    );
+
     await this.page.route("**/api/teams?type=TENANT*", (route) =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
     );
@@ -111,58 +98,6 @@ Given("Tickets API endpoints are mocked", async function (this: CustomWorld) {
 });
 
 Given("Tickets API endpoints are mocked with sample data", async function (this: CustomWorld) {
-    // Mock ticket list and details with smart routing
-    await this.page.route("**/ticket**", (route) => {
-        const url = route.request().url();
-        const method = route.request().method();
-
-        // Handle PATCH requests for ticket updates
-        if (method === 'PATCH') {
-            const updatedTicket = {
-                ...mockTicketDetails,
-                status: 'closed',
-                tags: ['bug', 'urgent']
-            };
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify(updatedTicket)
-            });
-            return;
-        }
-
-        // Handle GET requests
-        if (url.includes('/ticket/1')) {
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify(mockTicketDetails)
-            });
-        } else {
-            route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify(mockTicketsData)
-            });
-        }
-    });
-
-    await this.page.route("**/team?type=tenant*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockTeamsData) })
-    );
-
-    await this.page.route("**/api/team?type=tenant*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
-    );
-
-    await this.page.route("**/registry/impact*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.impacts) })
-    );
-
-    await this.page.route("**/registry/tag*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.tags) })
-    );
-    // Also mock proxied API paths
     await this.page.route("**/api/tickets**", (route) => {
         const url = route.request().url();
         const method = route.request().method();
@@ -183,10 +118,7 @@ Given("Tickets API endpoints are mocked with sample data", async function (this:
             route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketsData) });
         }
     });
-    
-    await this.page.route("**/team?type=tenant*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockTeamsData) })
-    );
+
     await this.page.route("**/api/teams?type=TENANT*", (route) =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
     );
@@ -201,14 +133,6 @@ Given("Tickets API endpoints are mocked with sample data", async function (this:
 });
 
 Given("Tickets API endpoints are mocked with mixed statuses", async function (this: CustomWorld) {
-    await this.page.route("**/ticket?*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockTicketsMixedStatus) })
-    );
-    
-    await this.page.route("**/team?type=tenant*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockTeamsData) })
-    );
-
     await this.page.route("**/api/tickets?*", (route) =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketsMixedStatus) })
     );
@@ -222,28 +146,9 @@ Given("Tickets API endpoints are mocked with mixed statuses", async function (th
             body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
         })
     );
-    
-    await this.page.route("**/registry/impact*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.impacts) })
-    );
-    
-    await this.page.route("**/registry/tag*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.tags) })
-    );
 });
 
 Given("Tickets API returns empty list", async function (this: CustomWorld) {
-    await this.page.route("**/ticket?*", (route) =>
-        route.fulfill({ 
-            status: 200, 
-            body: JSON.stringify({ content: [], page: 0, totalPages: 0, totalElements: 0 })
-        })
-    );
-    
-    await this.page.route("**/team?type=tenant*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockTeamsData) })
-    );
-
     await this.page.route("**/api/tickets?*", (route) =>
         route.fulfill({
             status: 200,
@@ -260,14 +165,6 @@ Given("Tickets API returns empty list", async function (this: CustomWorld) {
             contentType: 'application/json',
             body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
         })
-    );
-    
-    await this.page.route("**/registry/impact*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.impacts) })
-    );
-    
-    await this.page.route("**/registry/tag*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.tags) })
     );
 });
 
