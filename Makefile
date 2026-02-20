@@ -260,7 +260,7 @@ run-api-functional:
 
 .PHONY: run-ui-functional
 run-ui-functional:
-	bash ui/p2p/scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" true
+	bash ui/p2p/scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" false
 
 .PHONY: run-functional
 run-functional: run-ui-functional run-api-functional
@@ -277,7 +277,7 @@ run-api-nft:
 
 .PHONY: run-ui-nft
 run-ui-nft:
-	bash ui/p2p/scripts/helm-test.sh nft "$(p2p_namespace)" "$(p2p_app_name)" true
+	bash ui/p2p/scripts/helm-test.sh nft "$(p2p_namespace)" "$(p2p_app_name)" false
 
 .PHONY: run-nft
 run-nft: run-ui-nft run-api-nft
