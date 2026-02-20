@@ -148,12 +148,12 @@ When('user {string} logs in', async function (this: CustomWorld, email: string) 
 
     await this.context.addCookies([
         {
-            name: 'next-auth.session-token',
-            value: 'mock-token',
-            domain: 'localhost',
-            path: '/',
-            httpOnly: true,
+            name: '__e2e_auth_bypass',
+            value: 'functional-test',
+            url: BASE_URL,
+            httpOnly: false,
             sameSite: 'Lax',
+            secure: false,
             expires: Math.floor(Date.now() / 1000) + 86400
         }
     ]);
@@ -164,22 +164,30 @@ When('user {string} logs in', async function (this: CustomWorld, email: string) 
             contentType: 'application/json',
             body: JSON.stringify({
                 user: {
+                    id: email,
                     email,
                     name: 'Test User',
-                    teams: (testContext.userTeams || [{ name: 'team-a', groupRefs: [], types: ['tenant'] }]).map((t: any) => {
+                    teams: (testContext.userTeams || [{ name: 'team-a', code: 'team-a', label: 'Team A', types: ['tenant'] }]).map((t: any) => {
                         const hasTypes = Array.isArray(t.types) && t.types.length > 0
-                        // Compare codes with codes (user teams are now in code format)
                         const l2TeamCodes = (testContext.l2Teams || []).map((lt: any) => lt.code)
                         const inferredTypes = hasTypes
                             ? t.types
-                            : l2TeamCodes.includes(t.name)
+                            : l2TeamCodes.includes(t.name || t.code)
                                 ? ['escalation']
                                 : (isLeadership ? ['leadership'] : isSupportEngineer ? ['support'] : ['tenant'])
-                        return { ...t, types: inferredTypes }
+                        return {
+                            name: t.name || t.code,
+                            code: t.code || t.name,
+                            label: t.label || t.name || t.code,
+                            types: inferredTypes
+                        }
                     }),
-                    isLeadership,
-                    isEscalation,
-                    isSupportEngineer
+                    roles: [
+                        'USER',
+                        ...(isLeadership ? ['LEADERSHIP'] : []),
+                        ...(isSupportEngineer ? ['SUPPORT_ENGINEER'] : []),
+                        ...(isEscalation ? ['ESCALATION'] : []),
+                    ]
                 },
                 expires: new Date(Date.now() + 86400000).toISOString()
             })

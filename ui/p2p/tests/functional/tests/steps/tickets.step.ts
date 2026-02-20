@@ -43,8 +43,8 @@ const mockTicketsMixedStatus = {
 };
 
 const mockTeamsData = [
-    { code: 'engineering', label: 'Engineering', types: ['tenant'] },
-    { code: 'support', label: 'Support', types: ['tenant'] }
+    { name: 'engineering', code: 'engineering', label: 'Engineering', types: ['tenant'] },
+    { name: 'support', code: 'support', label: 'Support', types: ['tenant'] }
 ];
 
 const mockRegistryData = {
@@ -85,9 +85,9 @@ Given("Tickets API endpoints are mocked", async function (this: CustomWorld) {
         }
     });
     // Also mock proxied API paths
-    await this.page.route("**/api/ticket**", (route) => {
+    await this.page.route("**/api/tickets**", (route) => {
         const url = route.request().url();
-        if (url.includes('/ticket/1')) {
+        if (url.includes('/tickets/1')) {
             route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketDetails) });
         } else {
             route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketsData) });
@@ -97,22 +97,16 @@ Given("Tickets API endpoints are mocked", async function (this: CustomWorld) {
     await this.page.route("**/team?type=tenant*", (route) =>
         route.fulfill({ status: 200, body: JSON.stringify(mockTeamsData) })
     );
-    await this.page.route("**/api/team?type=tenant*", (route) =>
+    await this.page.route("**/api/teams?type=TENANT*", (route) =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
     );
-    
-    await this.page.route("**/registry/impact*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.impacts) })
-    );
-    await this.page.route("**/api/registry/impact*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockRegistryData.impacts) })
-    );
-    
-    await this.page.route("**/registry/tag*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.tags) })
-    );
-    await this.page.route("**/api/registry/tag*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockRegistryData.tags) })
+
+    await this.page.route("**/api/registry*", (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
+        })
     );
 });
 
@@ -169,7 +163,7 @@ Given("Tickets API endpoints are mocked with sample data", async function (this:
         route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.tags) })
     );
     // Also mock proxied API paths
-    await this.page.route("**/api/ticket**", (route) => {
+    await this.page.route("**/api/tickets**", (route) => {
         const url = route.request().url();
         const method = route.request().method();
         
@@ -183,7 +177,7 @@ Given("Tickets API endpoints are mocked with sample data", async function (this:
             return;
         }
         
-        if (url.includes('/ticket/1')) {
+        if (url.includes('/tickets/1')) {
             route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketDetails) });
         } else {
             route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketsData) });
@@ -193,22 +187,16 @@ Given("Tickets API endpoints are mocked with sample data", async function (this:
     await this.page.route("**/team?type=tenant*", (route) =>
         route.fulfill({ status: 200, body: JSON.stringify(mockTeamsData) })
     );
-    await this.page.route("**/api/team?type=tenant*", (route) =>
+    await this.page.route("**/api/teams?type=TENANT*", (route) =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
     );
-    
-    await this.page.route("**/registry/impact*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.impacts) })
-    );
-    await this.page.route("**/api/registry/impact*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockRegistryData.impacts) })
-    );
-    
-    await this.page.route("**/registry/tag*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.tags) })
-    );
-    await this.page.route("**/api/registry/tag*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockRegistryData.tags) })
+
+    await this.page.route("**/api/registry*", (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
+        })
     );
 });
 
@@ -219,6 +207,20 @@ Given("Tickets API endpoints are mocked with mixed statuses", async function (th
     
     await this.page.route("**/team?type=tenant*", (route) =>
         route.fulfill({ status: 200, body: JSON.stringify(mockTeamsData) })
+    );
+
+    await this.page.route("**/api/tickets?*", (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketsMixedStatus) })
+    );
+    await this.page.route("**/api/teams?type=TENANT*", (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
+    );
+    await this.page.route("**/api/registry*", (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
+        })
     );
     
     await this.page.route("**/registry/impact*", (route) =>
@@ -240,6 +242,24 @@ Given("Tickets API returns empty list", async function (this: CustomWorld) {
     
     await this.page.route("**/team?type=tenant*", (route) =>
         route.fulfill({ status: 200, body: JSON.stringify(mockTeamsData) })
+    );
+
+    await this.page.route("**/api/tickets?*", (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ content: [], page: 0, totalPages: 0, totalElements: 0 })
+        })
+    );
+    await this.page.route("**/api/teams?type=TENANT*", (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
+    );
+    await this.page.route("**/api/registry*", (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
+        })
     );
     
     await this.page.route("**/registry/impact*", (route) =>
@@ -382,17 +402,15 @@ Given("User is a support engineer", async function (this: CustomWorld) {
     // Override the default session from hooks.ts to be support engineer only
     try { await this.page.unroute('**/api/auth/session'); } catch {}
     
-    // Ensure session cookie exists for middleware to allow the request
+    // Ensure middleware bypass cookie exists for functional tests
     const baseUrl = process.env.SERVICE_ENDPOINT || 'http://localhost:3000';
-    const cookieDomain = new URL(baseUrl).hostname || 'localhost';
     
     await this.context.addCookies([
         {
-            name: 'next-auth.session-token',
-            value: 'mock-session-token-support-engineer',
-            domain: cookieDomain,
-            path: '/',
-            httpOnly: true,
+            name: '__e2e_auth_bypass',
+            value: 'functional-test',
+            url: baseUrl,
+            httpOnly: false,
             secure: false,
             sameSite: 'Lax'
         }
@@ -404,16 +422,13 @@ Given("User is a support engineer", async function (this: CustomWorld) {
             contentType: 'application/json',
             body: JSON.stringify({
                 user: {
+                    id: "support@example.com",
                     email: "support@example.com",
                     name: "Support Engineer",
                     teams: [
-                        { name: "support-engineers", groupRefs: [], types: ["support"] }
+                        { name: "support-engineers", code: "support-engineers", label: "Support Engineers", types: ["support"] }
                     ],
-                    isLeadership: false,
-                    isEscalationTeam: false,
-                    isEscalation: false,
-                    isSupportEngineer: true,
-                    actualEscalationTeams: []
+                    roles: ["USER", "SUPPORT_ENGINEER"],
                 },
                 expires: new Date(Date.now() + 86400000).toISOString()
             })
@@ -429,17 +444,15 @@ Given("User is not a support engineer", async function (this: CustomWorld) {
     // Override the default session from hooks.ts to be non-support engineer
     try { await this.page.unroute('**/api/auth/session'); } catch {}
     
-    // Ensure session cookie exists for middleware to allow the request
+    // Ensure middleware bypass cookie exists for functional tests
     const baseUrl = process.env.SERVICE_ENDPOINT || 'http://localhost:3000';
-    const cookieDomain = new URL(baseUrl).hostname || 'localhost';
     
     await this.context.addCookies([
         {
-            name: 'next-auth.session-token',
-            value: 'mock-session-token-regular-user',
-            domain: cookieDomain,
-            path: '/',
-            httpOnly: true,
+            name: '__e2e_auth_bypass',
+            value: 'functional-test',
+            url: baseUrl,
+            httpOnly: false,
             secure: false,
             sameSite: 'Lax'
         }
@@ -451,16 +464,13 @@ Given("User is not a support engineer", async function (this: CustomWorld) {
             contentType: 'application/json',
             body: JSON.stringify({
                 user: {
+                    id: "user@example.com",
                     email: "user@example.com",
                     name: "Regular User",
                     teams: [
-                        { name: "engineering", groupRefs: [], types: ["tenant"] }
+                        { name: "engineering", code: "engineering", label: "Engineering", types: ["tenant"] }
                     ],
-                    isLeadership: false,
-                    isEscalationTeam: false,
-                    isEscalation: false,
-                    isSupportEngineer: false,
-                    actualEscalationTeams: []
+                    roles: ["USER"],
                 },
                 expires: new Date(Date.now() + 86400000).toISOString()
             })
@@ -600,13 +610,15 @@ Then("Ticket should be updated successfully", async function (this: CustomWorld)
     // Wait for the save operation to complete
     await this.page.waitForTimeout(2000);
 
-    // Close the modal manually since the save operation may not trigger automatic close
     const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
     const closeButton = modal.locator('button').filter({ hasText: 'Close' }).first();
-    await closeButton.click();
 
-    // Verify modal is closed
-    await expect(modal).not.toBeVisible({ timeout: 3000 });
+    // Some flows close the modal automatically after save; others keep it open.
+    // Accept either behavior, but ensure we end with the modal closed.
+    if (await closeButton.isVisible().catch(() => false)) {
+        await closeButton.click();
+    }
+    await expect(modal).not.toBeVisible({ timeout: 5000 });
 });
 
 Then("Modal should close", async function (this: CustomWorld) {

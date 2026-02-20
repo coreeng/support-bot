@@ -263,16 +263,7 @@ run-ui-functional:
 	bash ui/p2p/scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" true
 
 .PHONY: run-functional
-run-functional: run-api-functional run-ui-functional
-	NAMESPACE="$(p2p_namespace)" \
-	SERVICE_RELEASE="$(p2p_app_name)" \
-	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
-	SERVICE_IMAGE_TAG="$(p2p_version)" \
-	DB_RELEASE="$(p2p_app_name)-db" \
-	ACTION=delete \
-	DELETE_DB=true \
-	DEPLOY_DB=true \
-	./api/scripts/deploy-service.sh
+run-functional: run-ui-functional run-api-functional
 
 .PHONY: run-api-nft
 run-api-nft:
@@ -289,16 +280,7 @@ run-ui-nft:
 	bash ui/p2p/scripts/helm-test.sh nft "$(p2p_namespace)" "$(p2p_app_name)" true
 
 .PHONY: run-nft
-run-nft: run-api-nft run-ui-nft
-	NAMESPACE="$(p2p_namespace)" \
-	SERVICE_RELEASE="$(p2p_app_name)" \
-	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
-	SERVICE_IMAGE_TAG="$(p2p_version)" \
-	DB_RELEASE="$(p2p_app_name)-db" \
-	ACTION=delete \
-	DELETE_DB=true \
-	DEPLOY_DB=true \
-	./api/scripts/deploy-service.sh
+run-nft: run-ui-nft run-api-nft
 
 .PHONY: run-integration
 run-integration:

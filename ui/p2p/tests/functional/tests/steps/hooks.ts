@@ -16,41 +16,35 @@ Before(async function (this: CustomWorld) {
   // Allow Next.js internal routes to pass through
   await this.page.route('**/_next/**', route => route.continue());
   
-  // Mock authentication by setting NextAuth session cookie
-  // This bypasses the login requirement for functional tests
-  // User is both Leadership AND Support Engineer to ensure full access to all features
+  // Mock authentication for functional tests.
+  // Default persona: Leadership + Support Engineer = full access to all features.
   const mockSessionToken = {
     user: {
+      id: "functional-test@example.com",
       email: "functional-test@example.com",
       name: "Functional Test User",
       teams: [
-        { name: "test-support-leadership", groupRefs: [], types: ["leadership"] },
-        { name: "test-support-engineers", groupRefs: [], types: ["support"] },
-        { name: "team-a", groupRefs: [], types: ["tenant"] }
+        { name: "test-support-leadership", code: "test-support-leadership", label: "Test Support Leadership", types: ["leadership"] },
+        { name: "test-support-engineers", code: "test-support-engineers", label: "Test Support Engineers", types: ["support"] },
+        { name: "team-a", code: "team-a", label: "Team A", types: ["tenant"] }
       ],
-      isLeadership: true,
-      isEscalationTeam: false,
-      isSupportEngineer: true,
-      actualEscalationTeams: [],
-      escalationGroupName: null,
-      escalationGroupRef: null
+      roles: ["USER", "LEADERSHIP", "SUPPORT_ENGINEER"],
     },
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours from now
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   };
-  
-  // Set the session cookie that NextAuth uses
-  const baseUrl = process.env.SERVICE_ENDPOINT || 'http://localhost:3000';
-  const cookieDomain = new URL(baseUrl).hostname || 'localhost';
 
+  const baseUrl = process.env.SERVICE_ENDPOINT || 'http://localhost:3000';
+
+  // Bypass the server-side JWE validation in middleware so Playwright's
+  // browser-level /api/auth/session mock can take effect.
   await this.context.addCookies([
     {
-      name: 'next-auth.session-token',
-      value: 'mock-session-token-for-testing',
-      domain: cookieDomain,
-      path: '/',
-      httpOnly: true,
+      name: '__e2e_auth_bypass',
+      value: 'functional-test',
+      url: baseUrl,
+      httpOnly: false,
       secure: false,
-      sameSite: 'Lax'
+      sameSite: 'Lax' as const
     }
   ]);
   
@@ -65,9 +59,9 @@ Before(async function (this: CustomWorld) {
     });
   });
   
-  // Mock backend API endpoints that the app calls for user/team data
-  // The /api/team endpoint accepts ?type=escalation or ?type=tenant
-  await this.page.route('**/api/team**', async (route) => {
+  // Mock backend API endpoints that the app calls for user/team data.
+  // The /api/teams endpoint accepts ?type=escalation or ?type=tenant.
+  await this.page.route('**/api/teams**', async (route) => {
     const url = new URL(route.request().url());
     const typeParam = url.searchParams.get('type');
     
@@ -96,8 +90,8 @@ Before(async function (this: CustomWorld) {
     }
   });
 
-  // Mock /user/support endpoint to return support members list
-  await this.page.route('**/user/support', async (route) => {
+  // Mock /api/users/support endpoint to return support members list
+  await this.page.route('**/api/users/support', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -108,12 +102,20 @@ Before(async function (this: CustomWorld) {
     });
   });
 
-  // Mock /assignment/enabled endpoint
-  await this.page.route('**/assignment/enabled', async (route) => {
+  // Mock /api/assignment/enabled endpoint
+  await this.page.route('**/api/assignment/enabled', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ enabled: true })
+    });
+  });
+
+  await this.page.route('**/api/knowledge-gaps/enabled', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ enabled: false })
     });
   });
 
@@ -133,19 +135,14 @@ Before(async function (this: CustomWorld) {
     });
   });
   
-  await this.page.route('**/registry/impact*', async (route) => {
+  await this.page.route('**/api/registry', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([{ code: "high", label: "High" }, { code: "medium", label: "Medium" }, { code: "low", label: "Low" }])
-    });
-  });
-  
-  await this.page.route('**/registry/tag*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([{ code: "bug", label: "Bug" }])
+      body: JSON.stringify({
+        impacts: [{ code: "high", label: "High" }, { code: "medium", label: "Medium" }, { code: "low", label: "Low" }],
+        tags: [{ code: "bug", label: "Bug" }]
+      })
     });
   });
 
