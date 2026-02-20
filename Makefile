@@ -102,7 +102,7 @@ build-api-functional: ## Build API functional test docker image
 
 .PHONY: build-ui-functional
 build-ui-functional: ## Build UI functional test docker image
-	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui-functional) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui-functional)" ui/p2p/tests/functional/
+	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" ui/p2p/tests/functional/
 
 .PHONY: build-functional
 build-functional: build-api-functional build-ui-functional ## Build functional test docker images
@@ -113,7 +113,7 @@ build-api-nft: ## Build API nft test docker image
 
 .PHONY: build-ui-nft
 build-ui-nft: ## Build UI nft test docker image
-	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui-nft) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui-nft)" ui/p2p/tests/nft/
+	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" ui/p2p/tests/nft/
 
 .PHONY: build-nft
 build-nft: build-api-nft build-ui-nft ## Build nft test docker images
@@ -145,7 +145,7 @@ push-api-functional: ## Push API functional test docker image
 
 .PHONY: push-ui-functional
 push-ui-functional: ## Push UI functional test docker image
-	docker image push "$(call p2p_image_tag,$(p2p_app_name)-ui-functional)"
+	docker image push "$(call p2p_image_tag,$(p2p_app_name)-ui)"
 
 .PHONY: push-functional
 push-functional: push-api-functional push-ui-functional ## Push functional test docker images
@@ -156,7 +156,7 @@ push-api-nft: ## Push API nft test docker image
 
 .PHONY: push-ui-nft
 push-ui-nft: ## Push UI nft test docker image
-	docker image push "$(call p2p_image_tag,$(p2p_app_name)-ui-nft)"
+	docker image push "$(call p2p_image_tag,$(p2p_app_name)-ui)"
 
 .PHONY: push-nft
 push-nft: push-api-nft push-ui-nft ## Push nft test docker images
@@ -260,7 +260,7 @@ run-api-functional:
 
 .PHONY: run-ui-functional
 run-ui-functional:
-	bash ui/p2p/scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" false
+	bash ui/p2p/scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" false "30m" "$(p2p_app_name)-ui-functional-test"
 
 .PHONY: run-functional
 run-functional: run-ui-functional run-api-functional
@@ -277,7 +277,7 @@ run-api-nft:
 
 .PHONY: run-ui-nft
 run-ui-nft:
-	bash ui/p2p/scripts/helm-test.sh nft "$(p2p_namespace)" "$(p2p_app_name)" false
+	bash ui/p2p/scripts/helm-test.sh nft "$(p2p_namespace)" "$(p2p_app_name)" false "30m" "$(p2p_app_name)-ui-nft-test"
 
 .PHONY: run-nft
 run-nft: run-ui-nft run-api-nft

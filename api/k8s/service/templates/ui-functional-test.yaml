@@ -5,7 +5,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ printf "%s-functional-test" (include "support-bot.fullname" .) | trunc 63 | trimSuffix "-" }}
+  name: {{ printf "%s-ui-functional-test" (include "support-bot.fullname" .) | trunc 63 | trimSuffix "-" }}
   labels:
     {{- include "support-bot.labels" . | nindent 4 }}
   annotations:
