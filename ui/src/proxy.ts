@@ -38,8 +38,8 @@ export function proxy(request: NextRequest) {
 
   // Test bypass: lets Playwright functional tests skip server-side
   // JWE validation, which test tooling cannot satisfy without knowing AUTH_SECRET.
-  // Enabled in non-production only, and only with the explicit bypass cookie.
-  if (process.env.NODE_ENV !== "production") {
+  // Gated behind an explicit env var so it is never active in real deployments.
+  if (process.env.E2E_AUTH_BYPASS === "true") {
     const bypass = request.cookies.get("__e2e_auth_bypass");
     if (bypass?.value === "functional-test") {
       return NextResponse.next();
