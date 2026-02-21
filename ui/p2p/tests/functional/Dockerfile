@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright:v1.55.1-noble
+FROM mcr.microsoft.com/playwright:v1.58.0-noble
 
 WORKDIR /app
 
@@ -9,6 +9,9 @@ RUN yarn --frozen-lockfile;
 # Copy only the needed files and folders individually
 COPY tsconfig.json cucumber.json ./
 COPY tests ./tests
+
+# Cucumber writes reports under /app; ensure runtime user can write there.
+RUN chown -R pwuser:pwuser /app
 
 USER pwuser
 

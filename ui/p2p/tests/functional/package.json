@@ -19,6 +19,7 @@
     "glob": "^11.1.0"
   },
   "resolutions": {
-    "@isaacs/brace-expansion": "^5.0.1"
+    "@isaacs/brace-expansion": "^5.0.1",
+    "minimatch": "^10.2.1"
   }
 }

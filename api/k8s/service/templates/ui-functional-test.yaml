@@ -1,0 +1,29 @@
+{{- if .Values.ui.enabled -}}
+{{- $repo := printf "%s-functional" .Values.ui.image.repository -}}
+{{- $tag := .Values.ui.image.tag | default .Chart.AppVersion -}}
+{{- $serviceEndpoint := printf "http://%s:%v" (include "support-bot.ui.fullname" .) .Values.ui.service.port -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-ui-functional-test" (include "support-bot.fullname" .) | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "support-bot.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "support-bot.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: ui-functional-tests
+          image: "{{ $repo }}:{{ $tag }}"
+          imagePullPolicy: {{ .Values.ui.image.pullPolicy }}
+          env:
+            - name: SERVICE_ENDPOINT
+              value: "{{ $serviceEndpoint }}"
+{{- end }}
