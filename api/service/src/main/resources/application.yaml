@@ -1,3 +1,8 @@
+server:
+  port: 8080
+  shutdown: graceful
+  max-http-request-header-size: 65536  # 64KB
+
 management:
   server:
     port: 8081
@@ -53,7 +58,7 @@ spring:
             tenant-id: ${AZURE_TENANT_ID:}
             issuer-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID:common}/v2.0
   cloud:
-    # Uncomment in case you require Azure integration
+# Uncomment in case you require Azure integration
 #    azure:
 #      profile:
 #        tenant-id: ${AZURE_TENANT_ID}
@@ -62,7 +67,7 @@ spring:
 #        client-secret: ${AZURE_CLIENT_SECRET}
     gcp:
       core:
-        enabled: true
+        enabled: false
       credentials:
         scopes: [ "https://www.googleapis.com/auth/cloud-identity.groups.readonly" ]
   datasource:
@@ -101,16 +106,17 @@ ticket:
     encryption:
       enabled: true
       key: ${TICKET_ASSIGNMENT_ENCRYPTION_KEY:}
+
 enums:
   escalation-teams:
-    - label: Core Community
-      code: core-community
+    - label: wow
+      code: wow
       slack-group-id: S08948NBMED
-    - label: Escalation Team 1 Test
-      code: Escalation Team 1 Test
+    - label: infra-integration
+      code: infra-integration
       slack-group-id: S08948NBMED
-    - label: Escalation Team 2 Test
-      code: Escalation Team 2 Test
+    - label: connected-app
+      code: connected-app
       slack-group-id: S08948NBMED
   tags:
     - label: Ingresses
@@ -142,17 +148,17 @@ platform-integration:
   fetch:
     max-concurrency: 64
     timeout: 30s
-    ignore-unknown-teams: true # Whether to check for unknown escalation teams and fail if any are found
+    ignore-unknown-teams: false # Whether to check for unknown escalation teams and fail if any are found
   kubernetes:
     disable-http-proxy: false
     base-url: ""
   gcp:
-    enabled: true
+    enabled: false
     app-name: Support Bot
     client:
       base-url: ""
   static-user:
-    enabled: false
+    enabled: true
     users:
       wow-group:
         - wow1@test.com
@@ -171,23 +177,16 @@ platform-integration:
       log-level: ${AZURE_CLIENT_LOG_LEVEL:NONE}
   teams-scraping:
     static:
-      enabled: false
-      teams:
-        - name: CECG Support Tenants
-          group-ref: 833843f4-7430-410f-b141-bcf18f807232
-        - name: connected-app
-          group-ref: 55ca82ca-2877-4a8f-896d-f48d03ce35bb
-        - name: infra-integration
-          group-ref: 55ca82ca-2877-4a8f-896d-f48d03ce35bb
-        - name: wow
-          group-ref: 55ca82ca-2877-4a8f-896d-f48d03ce35bb
-        - name: Escalation Team 1 Test
-          group-ref: 10076c78-37d7-455d-a873-9edb0c2eacdc
-        - name: Escalation Team 2 Test
-          group-ref: 016e17a8-cdaa-4abb-872d-fe4326a13af2
-
-    core-platform:
       enabled: true
+      teams:
+        - name: wow
+          group-ref: wow-group
+        - name: infra-integration
+          group-ref: infra-group
+        - name: connected-app
+          group-ref: connected-app-group
+    core-platform:
+      enabled: false
     k8s-generic:
       enabled: false
       config:
@@ -199,9 +198,9 @@ platform-integration:
           name-regexp: null
           label-selector: "root.tree.hnc.x-k8s.io/depth"
         teamName:
-          jq-expression: .metadata.name
+          cel-expression: resource.metadata.name
         groupRef:
-          jq-expression: .metadata.uid
+          cel-expression: resource.metadata.uid
 
 team:
   support:
@@ -247,3 +246,6 @@ metrics:
 
 knowledge-gaps:
   enabled: true
+
+summary-data:
+  analysis-bundle-path: classpath:placeholder-analysis-bundle.zip
