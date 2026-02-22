@@ -281,7 +281,7 @@ describe('Tickets Component', () => {
             fireEvent.change(escalatedSelect!, { target: { value: 'Yes' } });
 
             expect(mockUseAllTickets).toHaveBeenCalled();
-            expect(screen.getByText('Wow Team')).toBeInTheDocument();
+            expect(screen.getAllByText('Wow Team').length).toBeGreaterThan(0);
         });
     });
 

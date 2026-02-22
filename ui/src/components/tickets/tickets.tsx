@@ -10,9 +10,12 @@ import {useQueryClient} from '@tanstack/react-query'
 
 
 export default function TicketsPage() {
-    const {hasFullAccess, effectiveTeams} = useTeamFilter()
+    const {effectiveTeams} = useTeamFilter()
     const queryClient = useQueryClient()
     const {data: isAssignmentEnabled} = useAssignmentEnabled()
+    const NO_TEAMS_SCOPE = '__no_teams__'
+    const hasNoTeamScope = effectiveTeams.includes(NO_TEAMS_SCOPE)
+    const isViewingAllTeams = effectiveTeams.length === 0 && !hasNoTeamScope
     type DateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
 
     // Selected ticket
@@ -23,6 +26,7 @@ export default function TicketsPage() {
     const [dateFilter, setDateFilter] = useState<DateFilter>('lastWeek')
     const [customDateRange, setCustomDateRange] = useState<{ start?: string; end?: string }>({})
     const [statusFilter, setStatusFilter] = useState('')
+    const ALL_TEAMS_FILTER = '__all__'
     const [teamFilter, setTeamFilter] = useState('')
     const [impactFilter, setImpactFilter] = useState('')
     const [tagFilter, setTagFilter] = useState('')
@@ -80,11 +84,11 @@ export default function TicketsPage() {
     )
 
     // Data hooks
-    // - When filters are applied: pull all pages client-side (both superusers and regular users) to avoid missing matches on later pages.
-    // - When no filters and superuser: use backend pagination (page/pageSize) for efficiency.
-    // - When no filters and non-superuser: keep existing large single fetch (page 0, size 1000) and client-side paginate.
-    const backendPageSize = hasFullAccess ? pageSize : 1000
-    const backendPage = hasFullAccess ? currentPage : 0
+    // - When filters are applied: pull all pages client-side to avoid missing matches on later pages.
+    // - When viewing all teams (no team filter): use backend pagination for efficiency.
+    // - When viewing a specific team: larger single fetch + client-side paginate.
+    const backendPageSize = isViewingAllTeams ? pageSize : 1000
+    const backendPage = isViewingAllTeams ? currentPage : 0
 
     const shouldUseAllTickets = hasClientFilters
     const allTicketsQuery = useAllTickets(200, dateRange.from, dateRange.to, shouldUseAllTickets)
@@ -100,6 +104,8 @@ export default function TicketsPage() {
         opened: 'bg-blue-100 text-blue-800',
         closed: 'bg-green-100 text-green-800',
     }
+    const normalizeTeamKey = (value?: string | null) =>
+        (value || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
 
     // --- Utility functions ---
     const getOpenedClosed = (ticket: TicketWithLogs) => {
@@ -134,22 +140,35 @@ export default function TicketsPage() {
         return Array.from(new Set([...fromData, ...fromRegistry])).sort()
     }, [ticketsContent, teamsData])
 
-    // --- Filter tickets based on superuser/team + UI filters ---
+    // --- Filter tickets based on team selector + UI filters ---
     // Date filtering is now done server-side
     const filteredTickets = useMemo(() => {
         if (!ticketsContent) return []
 
+        if (hasNoTeamScope) {
+            return []
+        }
+
         // Step 1: filter by effective teams (considers team selector)
-        const visibleTickets = hasFullAccess
-            ? ticketsContent // Full access -> show all
-            : effectiveTeams.length > 0
-                ? ticketsContent.filter((t: TicketWithLogs) => t.team?.name && effectiveTeams.includes(t.team.name)) // Filter by teams
-                : [] // No teams and no full access -> no tickets
+        // If the page-level Team filter is explicitly set, it should override sidebar scope.
+        const visibleTickets = teamFilter === ALL_TEAMS_FILTER
+            ? ticketsContent // explicit page-level override: show all teams
+            : teamFilter
+                ? ticketsContent // explicit page-level team selection
+                : effectiveTeams.length === 0
+                    ? ticketsContent // role-team view -> show all
+                    : ticketsContent.filter((t: TicketWithLogs) => {
+                        if (!t.team?.name) return false
+                        const ticketTeam = normalizeTeamKey(t.team.name)
+                        return effectiveTeams.some(team => normalizeTeamKey(team) === ticketTeam)
+                    })
 
         // Step 2: apply UI filters
         return visibleTickets.filter((t: TicketWithLogs) => {
             const matchesStatus = statusFilter ? t.status === statusFilter : true
-            const matchesTeam = teamFilter ? t.team?.name === teamFilter : true
+            const matchesTeam = (teamFilter && teamFilter !== ALL_TEAMS_FILTER)
+                ? normalizeTeamKey(t.team?.name) === normalizeTeamKey(teamFilter)
+                : true
             const matchesImpact = impactFilter ? t.impact === impactFilter : true
             const matchesTag = tagFilter ? t.tags?.includes(tagFilter) : true
             const matchesEscalated = escalatedFilter
@@ -160,7 +179,7 @@ export default function TicketsPage() {
 
             return matchesStatus && matchesTeam && matchesImpact && matchesTag && matchesEscalated
         })
-    }, [ticketsContent, hasFullAccess, effectiveTeams, statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter])
+    }, [ticketsContent, effectiveTeams, hasNoTeamScope, statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter])
 
     // Create a fingerprint of current filters to detect changes
     const filterFingerprint = JSON.stringify([statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter, dateFilter, customDateRange])
@@ -176,20 +195,18 @@ export default function TicketsPage() {
         }
     }
 
-    // Client-side pagination for non-superusers
+    // Client-side pagination when viewing a specific team; backend pagination for "all teams"
     const paginatedTickets = useMemo(() => {
-        if (hasFullAccess) {
-            // Superusers: already paginated by backend
+        if (isViewingAllTeams) {
             return filteredTickets
         } else {
-            // Non-superusers: paginate client-side after filtering
             const start = currentPage * pageSize
             return filteredTickets.slice(start, start + pageSize)
         }
-    }, [filteredTickets, currentPage, pageSize, hasFullAccess])
+    }, [filteredTickets, currentPage, pageSize, isViewingAllTeams])
 
     // Calculate pagination info
-    const totalPages = hasFullAccess 
+    const totalPages = isViewingAllTeams 
         ? (ticketsDataTyped?.totalPages || 0) 
         : Math.ceil(filteredTickets.length / pageSize)
 
@@ -197,15 +214,15 @@ export default function TicketsPage() {
     return (
         <div className="p-6 space-y-6">
             <h1 className="text-3xl font-bold text-gray-800">
-                {hasFullAccess
+                {hasNoTeamScope
+                    ? 'Tickets Dashboard'
+                    : effectiveTeams.length === 0
                     ? 'Tickets Dashboard - All Teams'
-                    : effectiveTeams.length > 0
-                        ? `Tickets Dashboard - ${effectiveTeams.join(', ')}`
-                        : 'Tickets Dashboard'}
+                    : `Tickets Dashboard - ${effectiveTeams.join(', ')}`}
             </h1>
 
             {/* Filters */}
-            <div className={`grid grid-cols-1 gap-2 mb-4 ${hasFullAccess ? 'sm:grid-cols-6' : 'sm:grid-cols-5'}`}>
+            <div className={`grid grid-cols-1 gap-2 mb-4 ${hasNoTeamScope ? 'sm:grid-cols-5' : 'sm:grid-cols-6'}`}>
                 {/* Date Filter - First */}
                 <select value={dateFilter} onChange={e => setDateFilter(e.target.value as DateFilter)} className="p-2 border rounded">
                     <option value="">Any Date</option>
@@ -223,9 +240,10 @@ export default function TicketsPage() {
                     <option value="stale">Stale</option>
                 </select>
 
-                {hasFullAccess && (
+                {!hasNoTeamScope && (
                     <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)} className="p-2 border rounded">
-                        <option value="">All Teams</option>
+                        <option value="">Current Team Scope</option>
+                        {!isViewingAllTeams && <option value={ALL_TEAMS_FILTER}>All Teams</option>}
                         {teamOptions.map((name: string, index: number) => (
                             <option key={`team-${index}-${name}`} value={name}>{name}</option>
                         ))}

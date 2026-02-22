@@ -3,7 +3,7 @@ import { createContext, useContext, ReactNode, useState, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 
 type TeamFilterContextType = {
-    selectedTeam: string | null  // null = "All Teams", string = specific team
+    selectedTeam: string | null  // null = not initialized yet, string = specific team
     setSelectedTeam: (team: string | null) => void
     effectiveTeams: string[]  // The teams to filter by (either all teams or selected team)
     hasFullAccess: boolean  // true if should see all features (Leadership viewing All Teams)
@@ -40,37 +40,32 @@ export const TeamFilterProvider = ({ children }: { children: ReactNode }) => {
         return types.some(t => /leadership/i.test(t) || /support/i.test(t))
     }
 
-    // Determine which teams to filter by
+    // Determine which teams to filter by.
+    // Empty array = "view all" (no team filter applied).
+    // In normal flow we keep a concrete team selected; empty is reserved for role-team views.
     const effectiveTeams = useMemo(() => {
         if (!user) return []
 
-        // Filter out pure role groups (leadership/support) by types; keep escalation & tenant teams
-        const dataTeams = user.teams
-            .filter(t => !(t.types || []).some(type => /leadership/i.test(type) || /support/i.test(type)))
-            .map(t => t.name)
+        // User with no teams at all → no data access
+        if (user.teams.length === 0) return ['__no_teams__']
 
-        // If selected team is a pure role group, return empty array to indicate "view all"
-        // This signals to consuming components that no team filtering should be applied
+        // Nothing selected yet (pre-initialization) → default to user's first data team
+        if (selectedTeam === null) {
+            const firstDataTeam = user.teams.find(t =>
+                !(t.types || []).some(type => /leadership/i.test(type) || /support/i.test(type))
+            )
+            return firstDataTeam ? [firstDataTeam.name] : []
+        }
+
+        // Role group selected (leadership/support) → no filter
         const selected = user.teams.find(t => t.name === selectedTeam)
         if (selected && isPureRoleGroup(selected)) {
-            // Return empty array - consumers should interpret as "no filter" when hasFullAccess is true
             return []
         }
 
-        // If Leadership/SupportEngineer with no selection or "All Teams"
-        if ((isLeadership || isSupportEngineer) && (selectedTeam === null || selectedTeam === 'all')) {
-            // Return empty array to indicate "view all"
-            return []
-        }
-
-        // Viewing a specific team (including escalation/tenant)
-        if (selectedTeam) {
-            return [selectedTeam]
-        }
-
-        // Default: all user's data teams (or empty if none)
-        return dataTeams
-    }, [user, isLeadership, isSupportEngineer, selectedTeam])
+        // Specific team selected → filter to that team
+        return [selectedTeam]
+    }, [user, selectedTeam])
 
     // Full access rules:
     // - True if selected team is a role team (leadership/support) OR no team selected (all) AND user is leadership/support
@@ -85,8 +80,8 @@ export const TeamFilterProvider = ({ children }: { children: ReactNode }) => {
         if (selectedIsEscalation) return false
         if (selectedIsRole) return true
 
-        // No team selected ("all") and user has leadership/support roles
-        if ((selectedTeam === null || selectedTeam === 'all' || selectedTeam === undefined) && (isLeadership || isSupportEngineer)) {
+        // No team selected and user has leadership/support roles
+        if ((selectedTeam === null || selectedTeam === undefined) && (isLeadership || isSupportEngineer)) {
             return true
         }
 

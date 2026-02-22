@@ -10,8 +10,13 @@ jest.mock('../../contexts/TeamFilterContext', () => ({
   useTeamFilter: jest.fn(),
 }))
 
+jest.mock('../../lib/hooks', () => ({
+  useTenantTeams: jest.fn(),
+}))
+
 const mockUseAuth = jest.requireMock('../../hooks/useAuth').useAuth as jest.Mock
 const mockUseTeamFilter = jest.requireMock('../../contexts/TeamFilterContext').useTeamFilter as jest.Mock
+const mockUseTenantTeams = jest.requireMock('../../lib/hooks').useTenantTeams as jest.Mock
 
 const baseTeamFilter = () => ({
   selectedTeam: null,
@@ -24,6 +29,7 @@ describe('TeamSelector', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockUseTeamFilter.mockReturnValue(baseTeamFilter())
+    mockUseTenantTeams.mockReturnValue({ data: [] })
   })
 
   it('does not render when there is no user', () => {
@@ -90,7 +96,7 @@ describe('TeamSelector', () => {
     expect(options).toEqual(
       expect.arrayContaining([
         '— Teams —',
-        'Tenant A · Tenant',
+        'Tenant A',
         '— Access Roles —',
         'Leadership Team · Leadership',
         'Support Engineers · Support',

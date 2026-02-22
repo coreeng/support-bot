@@ -17,6 +17,7 @@ jest.mock('../EscalatedToMyTeamTable', () => {
 
 const mockUseEscalations = hooks.useEscalations as jest.MockedFunction<typeof hooks.useEscalations>
 const mockUseEscalationTeams = hooks.useEscalationTeams as jest.MockedFunction<typeof hooks.useEscalationTeams>
+const mockUseTenantTeams = hooks.useTenantTeams as jest.MockedFunction<typeof hooks.useTenantTeams>
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>
 const mockUseTeamFilter = TeamFilterContext.useTeamFilter as jest.MockedFunction<typeof TeamFilterContext.useTeamFilter>
 const mockUseAuth = AuthHook.useAuth as jest.MockedFunction<typeof AuthHook.useAuth>
@@ -41,6 +42,12 @@ describe('EscalationsPage', () => {
             isLoading: false,
             error: null,
         } as unknown as ReturnType<typeof hooks.useEscalationTeams>)
+
+        mockUseTenantTeams.mockReturnValue({
+            data: [{ name: 'Tenant Alpha' }],
+            isLoading: false,
+            error: null,
+        } as unknown as ReturnType<typeof hooks.useTenantTeams>)
 
         mockUseTeamFilter.mockReturnValue({
             selectedTeam: 'Escalation Team 2 Test',
@@ -89,7 +96,7 @@ describe('EscalationsPage', () => {
 
         render(<EscalationsPage />, { wrapper: Wrapper })
 
-        expect(screen.getByText(/Escalated for My Team/i)).toBeInTheDocument()
+        expect(screen.getByText(/Escalated for Escalation Team 2 Test/i)).toBeInTheDocument()
         expect(screen.queryByText('T-1')).not.toBeInTheDocument()
         expect(screen.getByText(/No escalations found/i)).toBeInTheDocument()
     })
@@ -142,11 +149,11 @@ describe('EscalationsPage', () => {
 
         expect(screen.getByText('Escalating Team')).toBeInTheDocument()
         expect(screen.getByText('Escalated To')).toBeInTheDocument()
-        expect(screen.getByText('Tenant Alpha')).toBeInTheDocument()
+        expect(screen.getAllByText('Tenant Alpha').length).toBeGreaterThan(0)
         expect(screen.getByText('Escalation Team 1')).toBeInTheDocument()
     })
 
-    it('deduplicates escalations by ticketId in "Escalated for My Team" view', () => {
+    it('deduplicates escalations by ticketId in escalation team scoped view', () => {
         // Setup as escalation team viewing their own escalations
         mockUseTeamFilter.mockReturnValue({
             selectedTeam: 'Escalation Team 2 Test',

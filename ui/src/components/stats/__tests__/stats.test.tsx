@@ -193,7 +193,7 @@ describe('StatsPage (Home Dashboard)', () => {
                 selectedTeam: null,
                 setSelectedTeam: jest.fn(),
                 hasFullAccess: false,
-                effectiveTeams: [],
+                effectiveTeams: ['__no_teams__'],
             allTeams: ['Team A', 'Team B'],
             initialized: true,            });
             mockUseAuth.mockReturnValue({
