@@ -23,7 +23,13 @@ const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.us
 const mockUseAuth = AuthHook.useAuth as jest.MockedFunction<typeof AuthHook.useAuth>;
 const mockUseTeamFilter = TeamFilterContext.useTeamFilter as jest.MockedFunction<typeof TeamFilterContext.useTeamFilter>;
 
-// Test data
+const daysAgo = (n: number) => {
+    const d = new Date()
+    d.setDate(d.getDate() - n)
+    return d.toISOString()
+}
+
+// Test data — openedAt dates are kept within the default "Last 7 Days" filter
 const mockEscalations = [
     {
         id: 'esc-1',
@@ -33,17 +39,17 @@ const mockEscalations = [
         tags: ['bug', 'urgent'],
         ticketId: 'ticket-1',
         hasThread: true,
-        openedAt: '2024-01-01T10:00:00Z'
+        openedAt: daysAgo(1)
     },
     {
         id: 'esc-2',
         team: { name: 'Core-platform' },
-        resolvedAt: '2024-01-02T12:00:00Z',
+        resolvedAt: daysAgo(0),
         impact: 'medium',
         tags: ['feature'],
         ticketId: 'ticket-2',
         hasThread: true,
-        openedAt: '2024-01-01T11:00:00Z'
+        openedAt: daysAgo(2)
     },
     {
         id: 'esc-3',
@@ -53,7 +59,7 @@ const mockEscalations = [
         tags: ['bug', 'question'],
         ticketId: 'ticket-3',
         hasThread: true,
-        openedAt: '2024-01-01T12:00:00Z'
+        openedAt: daysAgo(3)
     },
     {
         id: 'esc-4',
@@ -63,7 +69,7 @@ const mockEscalations = [
         tags: ['bug'],
         ticketId: 'ticket-4',
         hasThread: true,
-        openedAt: '2024-01-01T13:00:00Z'
+        openedAt: daysAgo(1)
     }
 ];
 
@@ -174,9 +180,9 @@ describe('EscalatedToMyTeamTable', () => {
         it('should render filter dropdowns', () => {
             const { container } = render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
 
-            // Should have 2 select dropdowns (status and impact)
+            // Status, Impact, Tag, Date
             const selects = container.querySelectorAll('select');
-            expect(selects.length).toBe(2);
+            expect(selects.length).toBe(4);
         });
 
         it('should filter by status', () => {
@@ -217,8 +223,8 @@ describe('EscalatedToMyTeamTable', () => {
         it('should display top tags section', () => {
             render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
 
-            // Should show "Top 2 Tags" heading
-            expect(screen.getByText(/Top 2 Tags/i)).toBeInTheDocument();
+            // Should show "Top 5 Tags" heading
+            expect(screen.getByText(/Top 5 Tags/i)).toBeInTheDocument();
         });
 
         it('should update when filters change', () => {
@@ -228,8 +234,8 @@ describe('EscalatedToMyTeamTable', () => {
             const statusFilter = selects[0]; // First select is status
             fireEvent.change(statusFilter, { target: { value: 'resolved' } });
 
-            // Should still show Top 2 Tags heading
-            expect(screen.getByText(/Top 2 Tags/i)).toBeInTheDocument();
+            // Should still show Top 5 Tags heading
+            expect(screen.getByText(/Top 5 Tags/i)).toBeInTheDocument();
         });
     });
 

@@ -101,6 +101,11 @@ ticket:
     time-to-stale: 3d
     remind-about-stale-cron: 0 10 9 * * 1-5
     stale-reminder-interval: 1d
+  assignment:
+    enabled: true
+    encryption:
+      enabled: true
+      key: ${TICKET_ASSIGNMENT_ENCRYPTION_KEY:}
 
 enums:
   escalation-teams:
