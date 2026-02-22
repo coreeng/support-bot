@@ -10,7 +10,7 @@ import {useQueryClient} from '@tanstack/react-query'
 
 
 export default function TicketsPage() {
-    const {effectiveTeams} = useTeamFilter()
+    const {effectiveTeams, selectedTeam: teamFilterSelectedTeam} = useTeamFilter()
     const queryClient = useQueryClient()
     const {data: isAssignmentEnabled} = useAssignmentEnabled()
     const NO_TEAMS_SCOPE = '__no_teams__'
@@ -194,6 +194,12 @@ export default function TicketsPage() {
             setCurrentPage(0)
         }
     }
+
+    // Reset page-level team filter when sidebar "View as" scope changes.
+    useEffect(() => {
+        setTeamFilter('')
+        setCurrentPage(0)
+    }, [teamFilterSelectedTeam])
 
     // Client-side pagination when viewing a specific team; backend pagination for "all teams"
     const paginatedTickets = useMemo(() => {

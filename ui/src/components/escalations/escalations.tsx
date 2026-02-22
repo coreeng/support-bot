@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useEscalations, useRegistry, useTenantTeams } from '@/lib/hooks'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { useAuth } from '@/hooks/useAuth'
@@ -24,6 +24,13 @@ export default function EscalationsPage() {
     const hasNoTeamScope = effectiveTeams.includes(NO_TEAMS_SCOPE)
     const { actualEscalationTeams } = useAuth()
     const now = useNow()
+
+    // Reset page-level tenant team filter when sidebar "View as" scope changes.
+    // This keeps Escalations aligned to true current scope by default.
+    useEffect(() => {
+        setSelectedTeam('')
+        setPageIndex(0)
+    }, [teamFilterSelectedTeam])
 
     // Check if viewing as an escalation team (when "Escalated to My Team" section is visible)
     const isViewingAsEscalationTeam = useMemo(() => {
