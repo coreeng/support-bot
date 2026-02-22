@@ -79,12 +79,12 @@ Before(async function (this: CustomWorld) {
         body: JSON.stringify([])
       });
     } else if (typeParam === 'tenant') {
-      // Return tenant teams with code and label fields
+      // Return tenant teams — must include `name` to match the Team interface used by useTenantTeams()
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify([
-          { code: "team-a", label: "Team A", types: ["tenant"] }
+          { name: "team-a", code: "team-a", label: "Team A", types: ["tenant"] }
         ])
       });
     } else {

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { useEscalations, useEscalationTeams, useRegistry } from '@/lib/hooks'
+import { useState, useMemo, useEffect } from 'react'
+import { useEscalations, useRegistry, useTenantTeams } from '@/lib/hooks'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { useAuth } from '@/hooks/useAuth'
 import { useNow } from '@/hooks/useNow'
@@ -10,8 +10,10 @@ import LoadingSkeleton from '@/components/LoadingSkeleton'
 
 export default function EscalationsPage() {
     const { data: escalationsData, isLoading: isLoadingEscalations, error: errorEscalations } = useEscalations()
-    const { data: teamsData } = useEscalationTeams()
+    const { data: tenantTeamsData } = useTenantTeams()
     const { data: registryData } = useRegistry()
+    const ALL_TEAMS_FILTER = '__all__'
+    const NO_TEAMS_SCOPE = '__no_teams__'
     const [selectedTeam, setSelectedTeam] = useState<string>('')
     const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'resolved'>('all')
     const [impactFilter, setImpactFilter] = useState<string>('all')
@@ -19,8 +21,16 @@ export default function EscalationsPage() {
     const pageSize = 15
 
     const { hasFullAccess, effectiveTeams, selectedTeam: teamFilterSelectedTeam } = useTeamFilter()
+    const hasNoTeamScope = effectiveTeams.includes(NO_TEAMS_SCOPE)
     const { actualEscalationTeams } = useAuth()
     const now = useNow()
+
+    // Reset page-level tenant team filter when sidebar "View as" scope changes.
+    // This keeps Escalations aligned to true current scope by default.
+    useEffect(() => {
+        setSelectedTeam('')
+        setPageIndex(0)
+    }, [teamFilterSelectedTeam])
 
     // Check if viewing as an escalation team (when "Escalated to My Team" section is visible)
     const isViewingAsEscalationTeam = useMemo(() => {
@@ -30,6 +40,8 @@ export default function EscalationsPage() {
 
     // --- Formatting helpers ---
     const formatDate = (isoString?: string) => isoString ? new Date(isoString).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '-'
+    const normalizeTeamKey = (value?: string | null) =>
+        (value || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
     const formatDuration = (start?: string, end?: string) => {
         if (!start) return '-'
         const endTime = end ? new Date(end).getTime() : now
@@ -44,27 +56,27 @@ export default function EscalationsPage() {
     // --- Filtered Escalations ---
     const filteredEscalations = useMemo(() => {
         if (!escalationsData?.content) return []
+        if (hasNoTeamScope) return []
         let baseEscalations = escalationsData.content
 
-        // Full access -> show all, no access and no teams -> show nothing
-        if (!hasFullAccess) {
-            if (effectiveTeams.length === 0) {
-                return [] // No teams and no full access -> no escalations
-            }
-            // Filter by escalating team (ticket owner) - use case-insensitive matching for robustness
+        // Team filter modes:
+        // - ''                => Current Team Scope (use effectiveTeams)
+        // - '__all__'         => All Teams override
+        // - specific team     => explicit team override
+        if (selectedTeam !== ALL_TEAMS_FILTER && !selectedTeam && effectiveTeams.length > 0) {
             baseEscalations = baseEscalations.filter(esc => {
                 if (!esc.escalatingTeam) return false
-                const escalatingTeamTrimmed = esc.escalatingTeam.trim().toLowerCase()
-                return effectiveTeams.some(team => team.trim().toLowerCase() === escalatingTeamTrimmed)
+                const escalatingTeamKey = normalizeTeamKey(esc.escalatingTeam)
+                return effectiveTeams.some(team => normalizeTeamKey(team) === escalatingTeamKey)
             })
         }
 
-        // Apply team filter - filter by escalation team (team the escalation was escalated TO)
+        // Apply explicit page team filter by escalating team (ticket owner / tenant team)
         // Use case-insensitive matching for robustness
         baseEscalations = baseEscalations.filter(esc => {
-            if (!selectedTeam) return true
-            if (!esc.team?.name) return false
-            return esc.team.name.trim().toLowerCase() === selectedTeam.trim().toLowerCase()
+            if (!selectedTeam || selectedTeam === ALL_TEAMS_FILTER) return true
+            if (!esc.escalatingTeam) return false
+            return normalizeTeamKey(esc.escalatingTeam) === normalizeTeamKey(selectedTeam)
         })
 
         // Apply status filter
@@ -94,7 +106,7 @@ export default function EscalationsPage() {
         }
 
         return baseEscalations
-    }, [escalationsData, selectedTeam, statusFilter, impactFilter, hasFullAccess, effectiveTeams, isViewingAsEscalationTeam])
+    }, [escalationsData, selectedTeam, statusFilter, impactFilter, effectiveTeams, hasNoTeamScope, isViewingAsEscalationTeam, hasFullAccess])
 
     // --- Pagination ---
     const paginatedEscalations = useMemo(() => {
@@ -114,14 +126,33 @@ export default function EscalationsPage() {
             .map(([tag, count]) => ({ tag, count }))
     }, [filteredEscalations])
 
+    const secondTableTitle =
+        selectedTeam === ALL_TEAMS_FILTER
+            ? 'All Escalations'
+            : selectedTeam
+                ? `Escalated for ${selectedTeam}`
+                : (isViewingAsEscalationTeam && teamFilterSelectedTeam)
+                    ? `Escalated for ${teamFilterSelectedTeam}`
+                    : 'All Escalations'
+    const scopeLabel = effectiveTeams.length === 0 ? 'All Teams' : effectiveTeams.join(', ')
+    const teamFilterLabel =
+        selectedTeam === ALL_TEAMS_FILTER
+            ? 'All Teams'
+            : selectedTeam || 'Current Team Scope'
+    const topTagsTitleSuffix = selectedTeam
+        ? selectedTeam === ALL_TEAMS_FILTER
+            ? 'for All Teams'
+            : `for ${selectedTeam}`
+        : ''
+
     return (
         <div className="p-6 space-y-6">
             <h1 className="text-2xl font-bold mb-4">
-                {hasFullAccess 
-                    ? 'Escalations Dashboard - All Teams' 
-                    : effectiveTeams.length > 0
-                        ? `Escalations Dashboard - ${effectiveTeams.join(', ')}`
-                        : 'Escalations Dashboard'
+                {hasNoTeamScope
+                    ? 'Escalations Dashboard'
+                    : effectiveTeams.length === 0
+                    ? 'Escalations Dashboard - All Teams'
+                    : `Escalations Dashboard - ${effectiveTeams.join(', ')}`
                 }
             </h1>
 
@@ -143,10 +174,15 @@ export default function EscalationsPage() {
             <div className="space-y-6 bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-bold text-purple-900">
-                        {isViewingAsEscalationTeam ? 'Escalated for My Team' : 'All Escalations'}
+                        {secondTableTitle}
                     </h2>
                     <span className="text-sm text-gray-600">{filteredEscalations.length} total</span>
                 </div>
+                {!hasNoTeamScope && (
+                    <p className="text-sm text-gray-600">
+                        Scope: {scopeLabel} | Team Filter: {teamFilterLabel}
+                    </p>
+                )}
 
                 {/* Filters */}
                 <div className="flex gap-4 flex-wrap">
@@ -179,9 +215,9 @@ export default function EscalationsPage() {
                         ))}
                     </select>
                 </div>
-                {hasFullAccess && (
+                {!hasNoTeamScope && (
                     <div>
-                        <label className="text-sm font-medium text-gray-700 mr-2">Team:</label>
+                        <label className="text-sm font-medium text-gray-700 mr-2">Tenant Team:</label>
                         <select
                             data-testid="escalations-team-filter"
                             aria-label="Escalation team filter"
@@ -189,8 +225,9 @@ export default function EscalationsPage() {
                             onChange={e => { setSelectedTeam(e.target.value); setPageIndex(0) }}
                             className="p-2 border rounded"
                         >
-                            <option value="">All Teams</option>
-                            {teamsData?.map(team => <option key={team.name} value={team.name}>{team.name}</option>)}
+                            <option value="">Current Team Scope</option>
+                            {effectiveTeams.length > 0 && <option value={ALL_TEAMS_FILTER}>All Teams</option>}
+                            {tenantTeamsData?.map(team => <option key={team.name} value={team.name}>{team.name}</option>)}
                         </select>
                     </div>
                 )}
@@ -199,7 +236,7 @@ export default function EscalationsPage() {
             {/* Top 2 Tags */}
             <div className="mb-6">
                 <h2 className="text-xl font-bold mb-3">
-                    Top 2 Tags {selectedTeam && hasFullAccess && `for ${selectedTeam}`}
+                    Top 2 Tags {topTagsTitleSuffix}
                 </h2>
                 {topTags.length === 0 ? <p>No tags found.</p> : (
                     <div className="flex flex-col gap-4">
@@ -230,8 +267,8 @@ export default function EscalationsPage() {
                         <thead className="bg-gray-100">
                         <tr>
                             <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Ticket ID</th>
-                            {hasFullAccess && <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Escalating Team</th>}
-                            {hasFullAccess && <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Escalated To</th>}
+                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Escalating Team</th>
+                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Escalated To</th>
                             <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
                             <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Impact</th>
                             <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Opened</th>
@@ -248,8 +285,8 @@ export default function EscalationsPage() {
                         return (
                             <tr key={esc.id} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-4 py-2 text-sm">{esc.ticketId}</td>
-                                {hasFullAccess && <td className="px-4 py-2 text-sm">{esc.escalatingTeam || '-'}</td>}
-                                {hasFullAccess && <td className="px-4 py-2 text-sm">{esc.team?.name || '-'}</td>}
+                                <td className="px-4 py-2 text-sm">{esc.escalatingTeam || '-'}</td>
+                                <td className="px-4 py-2 text-sm">{esc.team?.name || '-'}</td>
                                 <td className="px-4 py-2">
                                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${esc.resolvedAt ? 'bg-green-200 text-green-800' : 'bg-yellow-200 text-yellow-800'}`}>
                                             {esc.resolvedAt ? 'Resolved' : 'Unresolved'}
