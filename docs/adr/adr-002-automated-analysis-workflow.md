@@ -141,8 +141,7 @@ SELECT q.ts
 
 ### 6. Resume on pod restart
 
-**Startup Hook:** On application startup, a `@PostConstruct` method in `AnalysisBatchService` checks for a running batch with id `knowledge-gap-analysis`. If found,
-resumes the batch (re-fetches threads and continue analysis, skipping already-analyzed threads via `prompt` column)
+**Startup Hook:** On application startup, a `@PostConstruct` method in `AnalysisBatchService` checks for a running batch with id `knowledge-gap-analysis`. If found, resumes the batch (re-fetches threads and continue analysis, skipping already-analyzed threads via `prompt` column)
 
 
 ### 7. New API Endpoints
