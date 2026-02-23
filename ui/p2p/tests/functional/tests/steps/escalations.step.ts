@@ -6,8 +6,8 @@ import { mockAuthorizationEndpoints } from '../helpers/auth-mocks';
 const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
 const setEscalations = async (page: Page, content: any[]) => {
-    try { await page.unroute('**/escalation*'); } catch {}
-    await page.route('**/escalation*', async (route: Route) => {
+    try { await page.unroute('**/api/escalations*'); } catch {}
+    await page.route('**/api/escalations*', async (route: Route) => {
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -204,28 +204,6 @@ When('user logs in', async function (this: CustomWorld) {
         l2Teams: testContext.l2Teams || []
     });
 
-    // Mock user-info endpoint
-    await this.page.route('**/user*', async (route: Route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                email: testContext.userEmail,
-                teams: (testContext.userTeams || []).map((t: any) => {
-                    // ensure types present
-                    const l2TeamNames = (testContext.l2Teams || []).map((lt: any) => lt.label)
-                    const hasTypes = Array.isArray(t.types) && t.types.length > 0
-                    const inferredTypes = hasTypes
-                        ? t.types
-                        : l2TeamNames.includes(t.name)
-                            ? ['escalation']
-                            : ['tenant']
-                    return { ...t, types: inferredTypes }
-                })
-            })
-        });
-    });
-
     // Mock session
     const userEmail = testContext.userEmail || 'test@example.com';
     const isLeadership = testContext.isLeadership || false;
@@ -234,12 +212,12 @@ When('user logs in', async function (this: CustomWorld) {
 
     await this.context.addCookies([
         {
-            name: 'next-auth.session-token',
-            value: 'mock-token',
-            domain: 'localhost',
-            path: '/',
-            httpOnly: true,
+            name: '__e2e_auth_bypass',
+            value: 'functional-test',
+            url: BASE_URL,
+            httpOnly: false,
             sameSite: 'Lax',
+            secure: false,
             expires: Math.floor(Date.now() / 1000) + 86400
         }
     ]);
@@ -250,6 +228,7 @@ When('user logs in', async function (this: CustomWorld) {
             contentType: 'application/json',
             body: JSON.stringify({
                 user: {
+                    id: userEmail,
                     email: userEmail,
                     name: 'Test User',
                     teams: (testContext.userTeams || []).map((t: any) => {
@@ -260,11 +239,19 @@ When('user logs in', async function (this: CustomWorld) {
                             : l2TeamNames.includes(t.name)
                                 ? ['escalation']
                                 : ['tenant']
-                        return { ...t, types: inferredTypes }
+                        return {
+                            name: t.name || t.code,
+                            code: t.code || t.name,
+                            label: t.label || t.name || t.code,
+                            types: inferredTypes
+                        }
                     }),
-                    isLeadership,
-                    isEscalation,
-                    isSupportEngineer
+                    roles: [
+                        'USER',
+                        ...(isLeadership ? ['LEADERSHIP'] : []),
+                        ...(isSupportEngineer ? ['SUPPORT_ENGINEER'] : []),
+                        ...(isEscalation ? ['ESCALATION'] : []),
+                    ]
                 },
                 expires: new Date(Date.now() + 86400000).toISOString()
             })
@@ -274,8 +261,7 @@ When('user logs in', async function (this: CustomWorld) {
     // Navigate and wait for minimal load; avoid long waits that can hang
     await this.page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 });
     
-    // Wait for the main app to render (banner should be visible)
-    await this.page.getByRole('img', { name: /Core Community/i }).waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.getByRole('button', { name: /Support/i }).first().waitFor({ state: 'visible', timeout: 5000 });
 });
 
 When('user logs in and selects {string} from dropdown', async function (this: CustomWorld, teamName: string) {
@@ -292,18 +278,6 @@ When('user logs in and selects {string} from dropdown', async function (this: Cu
         l2Teams: testContext.l2Teams || []
     });
 
-    // Mock user-info endpoint
-    await this.page.route('**/user*', async (route: Route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                email: testContext.userEmail,
-                teams: testContext.userTeams || []
-            })
-        });
-    });
-
     // Mock session
     const userEmail = testContext.userEmail || 'test@example.com';
     const isLeadership = testContext.isLeadership || false;
@@ -312,12 +286,12 @@ When('user logs in and selects {string} from dropdown', async function (this: Cu
 
     await this.context.addCookies([
         {
-            name: 'next-auth.session-token',
-            value: 'mock-token',
-            domain: 'localhost',
-            path: '/',
-            httpOnly: true,
+            name: '__e2e_auth_bypass',
+            value: 'functional-test',
+            url: BASE_URL,
+            httpOnly: false,
             sameSite: 'Lax',
+            secure: false,
             expires: Math.floor(Date.now() / 1000) + 86400
         }
     ]);
@@ -328,12 +302,21 @@ When('user logs in and selects {string} from dropdown', async function (this: Cu
             contentType: 'application/json',
             body: JSON.stringify({
                 user: {
+                    id: userEmail,
                     email: userEmail,
                     name: 'Test User',
-                    teams: testContext.userTeams || [],
-                    isLeadership,
-                    isEscalation,
-                    isSupportEngineer
+                    teams: (testContext.userTeams || []).map((t: any) => ({
+                        name: t.name || t.code,
+                        code: t.code || t.name,
+                        label: t.label || t.name || t.code,
+                        types: Array.isArray(t.types) ? t.types : ['tenant']
+                    })),
+                    roles: [
+                        'USER',
+                        ...(isLeadership ? ['LEADERSHIP'] : []),
+                        ...(isSupportEngineer ? ['SUPPORT_ENGINEER'] : []),
+                        ...(isEscalation ? ['ESCALATION'] : []),
+                    ]
                 },
                 expires: new Date(Date.now() + 86400000).toISOString()
             })
@@ -343,8 +326,7 @@ When('user logs in and selects {string} from dropdown', async function (this: Cu
     // Navigate and wait for load
     await this.page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 });
     
-    // Wait for the main app to render (banner should be visible)
-    await this.page.getByRole('img', { name: /Core Community/i }).waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.getByRole('button', { name: /Support/i }).first().waitFor({ state: 'visible', timeout: 10000 });
     
     // Select team from dropdown if needed (use data-testid to avoid matching date filter dropdown)
     const dropdown = this.page.locator('select[data-testid="team-selector"]');

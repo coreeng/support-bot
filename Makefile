@@ -2,7 +2,7 @@
 P2P_TENANT_NAME ?= support-bot
 P2P_APP_NAME ?= support-bot
 
-P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui
+P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui $(P2P_APP_NAME)-ui-functional $(P2P_APP_NAME)-ui-nft
 
 # Download and include p2p makefile
 $(shell curl -fsSL "https://raw.githubusercontent.com/coreeng/p2p/v1/p2p.mk" -o ".p2p.mk")
@@ -96,13 +96,27 @@ build-ui-app: lint-ui ## Build UI
 .PHONY: build-app
 build-app: build-api-app build-ui-app ## Build all apps
 
-.PHONY: build-functional
-build-functional: ## Build functional test docker image
+.PHONY: build-api-functional
+build-api-functional: ## Build API functional test docker image
 	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --file api/functional/Dockerfile api
 
-.PHONY: build-nft
-build-nft: ## Build nft test docker image
+.PHONY: build-ui-functional
+build-ui-functional: ## Build UI functional test docker image
+	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" ui/p2p/tests/functional/
+
+.PHONY: build-functional
+build-functional: build-api-functional build-ui-functional ## Build functional test docker images
+
+.PHONY: build-api-nft
+build-api-nft: ## Build API nft test docker image
 	docker buildx build $(p2p_image_cache) --tag "$(p2p_image_tag)" --file api/nft/Dockerfile api
+
+.PHONY: build-ui-nft
+build-ui-nft: ## Build UI nft test docker image
+	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" ui/p2p/tests/nft/
+
+.PHONY: build-nft
+build-nft: build-api-nft build-ui-nft ## Build nft test docker images
 
 .PHONY: build-integration
 build-integration:
@@ -125,13 +139,27 @@ push-ui-app: ## Push UI app
 .PHONY: push-app
 push-app: push-api-app push-ui-app ## Push all apps
 
-.PHONY: push-functional
-push-functional: ## Push functional test docker image
+.PHONY: push-api-functional
+push-api-functional: ## Push API functional test docker image
 	docker image push "$(p2p_image_tag)"
 
-.PHONY: push-nft
-push-nft: ## Push nft test docker image
+.PHONY: push-ui-functional
+push-ui-functional: ## Push UI functional test docker image
+	docker image push "$(call p2p_image_tag,$(p2p_app_name)-ui)"
+
+.PHONY: push-functional
+push-functional: push-api-functional push-ui-functional ## Push functional test docker images
+
+.PHONY: push-api-nft
+push-api-nft: ## Push API nft test docker image
 	docker image push "$(p2p_image_tag)"
+
+.PHONY: push-ui-nft
+push-ui-nft: ## Push UI nft test docker image
+	docker image push "$(call p2p_image_tag,$(p2p_app_name)-ui)"
+
+.PHONY: push-nft
+push-nft: push-api-nft push-ui-nft ## Push nft test docker images
 
 .PHONY: push-integration
 push-integration: ## Push integration test docker image
@@ -222,26 +250,23 @@ run-ui-app: ## Run UI app
 run-app: ## Run app
 	@echo "WARNING: use run-api-app or run-ui-app"
 
-.PHONY: run-functional
-run-functional:
+.PHONY: run-api-functional
+run-api-functional:
 	NAMESPACE="$(p2p_namespace)" \
 	JOB_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)-functional" \
 	IMAGE_TAG="$(p2p_version)" \
 	DEPLOY_SERVICE=false \
 	./api/scripts/run-functional-tests.sh
 
-	NAMESPACE="$(p2p_namespace)" \
-	SERVICE_RELEASE="$(p2p_app_name)" \
-	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
-	SERVICE_IMAGE_TAG="$(p2p_version)" \
-	DB_RELEASE="$(p2p_app_name)-db" \
-	ACTION=delete \
-	DELETE_DB=true \
-	DEPLOY_DB=true \
-	./api/scripts/deploy-service.sh
+.PHONY: run-ui-functional
+run-ui-functional:
+	bash ui/p2p/scripts/helm-test.sh functional "$(p2p_namespace)" "$(p2p_app_name)" false "30m" "$(p2p_app_name)-ui-functional-test"
 
-.PHONY: run-nft
-run-nft:
+.PHONY: run-functional
+run-functional: run-ui-functional run-api-functional
+
+.PHONY: run-api-nft
+run-api-nft:
 	NAMESPACE="$(p2p_namespace)" \
 	JOB_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)-nft" \
 	IMAGE_TAG="$(p2p_version)" \
@@ -250,15 +275,12 @@ run-nft:
 	DEPLOY_SERVICE=false \
 	./api/scripts/run-nft-tests.sh
 
-	NAMESPACE="$(p2p_namespace)" \
-	SERVICE_RELEASE="$(p2p_app_name)" \
-	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
-	SERVICE_IMAGE_TAG="$(p2p_version)" \
-	DB_RELEASE="$(p2p_app_name)-db" \
-	ACTION=delete \
-	DELETE_DB=true \
-	DEPLOY_DB=true \
-	./api/scripts/deploy-service.sh
+.PHONY: run-ui-nft
+run-ui-nft:
+	bash ui/p2p/scripts/helm-test.sh nft "$(p2p_namespace)" "$(p2p_app_name)" false "30m" "$(p2p_app_name)-ui-nft-test"
+
+.PHONY: run-nft
+run-nft: run-ui-nft run-api-nft
 
 .PHONY: run-integration
 run-integration:
