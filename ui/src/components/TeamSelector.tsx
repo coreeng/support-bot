@@ -29,7 +29,7 @@ export default function TeamSelector() {
         [apiTenantTeams]
     )
 
-    // Fallback tenant teams from session for resiliency (e.g. backend team endpoint returns empty)
+    // Fallback tenant teams from session for resiliency (e.g. transient empty API response)
     const tenantTeamNamesFromSession = useMemo(
         () =>
             teams
@@ -57,28 +57,28 @@ export default function TeamSelector() {
         [teams]
     )
 
-    const firstUserTeam = teams[0]?.name
+    const firstAvailableSelection =
+        tenantTeamNames[0] || userEscalationTeams[0]?.name || userRoleTeams[0]?.name || null
 
     // All valid selection values
     const validSelections = useMemo(() => {
         const set = new Set(tenantTeamNames)
         userEscalationTeams.forEach(t => set.add(t.name))
         userRoleTeams.forEach(t => set.add(t.name))
-        if (firstUserTeam) set.add(firstUserTeam)
         return set
-    }, [tenantTeamNames, userEscalationTeams, userRoleTeams, firstUserTeam])
+    }, [tenantTeamNames, userEscalationTeams, userRoleTeams])
 
     // Ensure selectedTeam is initialized and valid, otherwise reset.
     // Default stays aligned with user's first team in session ordering.
     useEffect(() => {
-        if (!selectedTeam && firstUserTeam) {
-            setSelectedTeam(firstUserTeam)
+        if (!selectedTeam && firstAvailableSelection) {
+            setSelectedTeam(firstAvailableSelection)
             return
         }
         if (selectedTeam && validSelections.size > 0 && !validSelections.has(selectedTeam)) {
-            setSelectedTeam(firstUserTeam || tenantTeamNames[0] || null)
+            setSelectedTeam(firstAvailableSelection)
         }
-    }, [selectedTeam, validSelections, tenantTeamNames, firstUserTeam, setSelectedTeam])
+    }, [selectedTeam, validSelections, firstAvailableSelection, setSelectedTeam])
 
     if (user && teams.length === 0) {
         return (
@@ -100,7 +100,7 @@ export default function TeamSelector() {
 
     const displayValue = selectedTeam && validSelections.has(selectedTeam)
         ? selectedTeam
-        : (firstUserTeam || tenantTeamNames[0] || '')
+        : (firstAvailableSelection || '')
 
     return (
         <div className="space-y-2">

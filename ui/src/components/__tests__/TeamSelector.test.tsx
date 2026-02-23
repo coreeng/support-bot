@@ -75,6 +75,7 @@ describe('TeamSelector', () => {
   })
 
   it('shows dropdown when a non-role team exists and includes role teams as options', () => {
+    mockUseTenantTeams.mockReturnValue({ data: [{ name: 'Tenant A' }] })
     mockUseAuth.mockReturnValue({
       user: {
         teams: [
@@ -105,6 +106,7 @@ describe('TeamSelector', () => {
   })
 
   it('deduplicates team names when building options', () => {
+    mockUseTenantTeams.mockReturnValue({ data: [{ name: 'Tenant A' }, { name: 'Tenant A' }] })
     mockUseAuth.mockReturnValue({
       user: {
         teams: [
@@ -118,12 +120,33 @@ describe('TeamSelector', () => {
 
     renderSelector()
 
-    // One group header plus one deduped team option
+    // One group header plus one deduped tenant option
     expect(screen.getAllByRole('option')).toHaveLength(2)
+  })
+
+  it('renders tenant options from session teams for the current logged-in user', () => {
+    mockUseTenantTeams.mockReturnValue({ data: [] })
+    mockUseAuth.mockReturnValue({
+      user: {
+        teams: [
+          { name: 'Tenant A', types: ['tenant'], groupRefs: [] },
+          { name: 'Tenant B', types: ['tenant'], groupRefs: [] },
+        ],
+      },
+      isLeadership: false,
+      isSupportEngineer: false,
+    })
+
+    renderSelector()
+
+    expect(screen.getByRole('combobox')).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Tenant A' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Tenant B' })).toBeInTheDocument()
   })
 
   it('resets selected team to first option if current selection is no longer valid', async () => {
     const setSelectedTeam = jest.fn()
+    mockUseTenantTeams.mockReturnValue({ data: [{ name: 'Tenant A' }] })
     mockUseTeamFilter.mockReturnValue({
       selectedTeam: 'Old Team',
       setSelectedTeam,
@@ -146,6 +169,7 @@ describe('TeamSelector', () => {
 
   it('selects a team when user changes the dropdown', async () => {
     const setSelectedTeam = jest.fn()
+    mockUseTenantTeams.mockReturnValue({ data: [{ name: 'Tenant A' }] })
     mockUseTeamFilter.mockReturnValue({
       selectedTeam: 'Tenant A',
       setSelectedTeam,
