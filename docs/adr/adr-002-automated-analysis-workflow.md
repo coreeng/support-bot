@@ -98,6 +98,8 @@ The `days` field records how many days of threads the batch was configured to an
 
 When the batch completes or fails, the row is deleted. In memory status is updated accordingly and exposed via status endpoint.
 
+This design does not prevent breaking thread batch into several sub-batches and running analysis in parallel. In this case, the batch record is deleted on completing all sub-batches. In-memory status aggregates number of completed threads by all sub-batches. A batch is considered successful if, and only if, all sub-batches are successful.
+
 
 ### 5. Avoid re-analysis with teh same prompt
 
