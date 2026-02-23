@@ -21,7 +21,8 @@ The application is a stateless Spring Boot 3 service running on Kubernetes, back
 - Avoid introducing a separate worker process or message queue — keep operational complexity low.
 - Leverage the existing GCP platform-identity integration so no new secrets need managing.
 - Configuration must be consistent with existing Spring `application.yaml` / env-var patterns.
-- The application is stateless and may run as multiple replicas; single-batch enforcement must be durable, not in-memory.
+- The application can be restarted by Kubernetes descheduler; analysis pipeline must resume on restart
+- LLM Analysis is time consuming and incurs cost; we want to eliminate re-analysis of the same thread with the same prompt
 
 ---
 
@@ -39,12 +40,7 @@ analysis:
     project-id: ${VERTEX_PROJECT_ID}
     location: ${VERTEX_LOCATION:us-central1}
     model-name: ${VERTEX_MODEL_NAME:gemini-1.5-pro}
-  batch:
-    days-to-export: ${ANALYSIS_DAYS_TO_EXPORT:31}
-    prompt: ${ANALYSIS_SUMMARY_PROMPT:Summarise this support thread as a JSON object ...}
 ```
-
-The `AnalysisBatchService` computes a SHA-256 hash of the `analysis.batch.prompt` configuration value at startup. This hash is stored with each analysis record and used to skip re-analyzing threads when the prompt hasn't changed.
 
 The `ChatLanguageModel` bean is annotated `@ConditionalOnProperty(name = "analysis.vertex.project-id")` so it is only created when Vertex is configured, keeping local/test environments unaffected.
 
@@ -72,7 +68,7 @@ platform-integration:
 
 A new `AnalysisBatchService` orchestrates the pipeline as a `@Async` Spring task:
 
-1. **Export** — reuse existing `SummaryDataService` to fetch open Slack threads from the configured channel for the last N days. Filter out threads that already have an analysis record with a matching `prompt_sha` to avoid re-analyzing with the same prompt. See the following section for more details.
+1. **Export** — reuse existing `SummaryDataService` to fetch open Slack threads from the configured channel for the last N days. Filter out threads that already have an analysis record with a matching `prompt` to avoid re-analyzing with the same prompt. See the following section for more details.
 2. **Summarise & Persist** — for each thread:
    - Build a prompt and call `ChatLanguageModel.generate()` via LangChain4j
    - Parse the model's response into an `AnalysisRecord` (one JSON record per thread matching the existing schema)
@@ -100,7 +96,7 @@ The `days` field records how many days of threads the batch was configured to an
 
 `POST /analysis/run` attempts to insert a row inside a transaction. If the unique index is violated, the endpoint returns `HTTP 409 Conflict`. On success the `@Async` task is started.
 
-When the batch completes or fails, the row is deleted.
+When the batch completes or fails, the row is deleted. In memory status is updated accordingly and exposed via status endpoint.
 
 
 ### 5. Avoid re-analysis with teh same prompt
@@ -129,8 +125,6 @@ String hash = Hashing.murmur3_32_fixed()
 
 ### Query to find threads that need to be analyzed
 
-The VALUES in the following query are the timestamps of the threads that we want to analyze.
-
 ```sql
 SELECT q.ts
     FROM query q
@@ -145,7 +139,7 @@ SELECT q.ts
 resumes the batch (re-fetches threads and continue analysis, skipping already-analyzed threads via `prompt` column)
 
 
-### 6. New API Endpoints
+### 7. New API Endpoints
 
 | Method | Path              | Description                                                           |
 |--------|-------------------|-----------------------------------------------------------------------|
@@ -154,7 +148,7 @@ resumes the batch (re-fetches threads and continue analysis, skipping already-an
 
 Both endpoints are protected by the existing JWT security filter and require an authenticated user with `SUPPORT_ENGINEER` role.
 
-### 7. Progress Panel — UI Polling
+### 8. Progress Panel — UI Polling
 
 The UI adds a small panel (new `AnalysisProgressPanel` client component) that:
 
