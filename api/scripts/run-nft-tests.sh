@@ -30,8 +30,10 @@ cleanup() {
     return
   fi
 
-  log "Cleaning up nft test job ${JOB_RELEASE} in namespace ${NAMESPACE}"
-  helm_uninstall_if_exists "${JOB_RELEASE}" "${NAMESPACE}" || true
+  log "Cleaning up Helm releases in namespace: ${NAMESPACE}"
+  helm uninstall "${JOB_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
+  helm uninstall "${SERVICE_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
+  helm uninstall "${DB_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
 }
 
 trap cleanup EXIT
