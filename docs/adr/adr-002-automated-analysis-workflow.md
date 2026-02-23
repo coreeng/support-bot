@@ -104,12 +104,10 @@ This design does not prevent breaking thread batch into several sub-batches and 
 ### 5. Avoid re-analysis with teh same prompt
 
 In order to avoid re-analyzing the same thread with the same prompt, we will add a new column to the `analysis` table called `prompt`.
-This column will store the hash of the prompt text. Before starting the analysis, we will compute the hash of the prompt text and check if there are any analysis records with a matching `prompt`. If there are, we will skip those threads.
+This column will store the hash of the prompt's text. Before starting the analysis, we will compute the hash of the prompt text and check if there are any analysis records with a matching `prompt`. If there are, we will skip those threads.
 Each analysis record with be updated with the hash of the prompt used to generate it.
 
 #### Analysis Table Schema Update
-
-The existing `analysis` table is extended with a `prompt` column to track which version of the prompt was used:
 
 ```sql
 ALTER TABLE analysis ADD COLUMN prompt TEXT;
@@ -127,12 +125,18 @@ String hash = Hashing.murmur3_32_fixed()
 
 ### Query to find threads that need to be analyzed
 
+Include a period of N days before today.
+If ran on a Monday, complete Monday to Sunday of last week are included.
+
 ```sql
 SELECT q.ts
     FROM query q
     JOIN ticket t on q.id = t.query_id
     JOIN analysis a on t.id = a.ticket_id
-    WHERE t.status = 'closed' and t.last_interacted_at >= '2026-01-01' and a.prompt = 'a1b2c3d4'
+    WHERE t.status = 'closed'
+      and t.last_interacted_at >= NOW()::date - INTERVAL '7 days'
+      and t.last_interacted_at < NOW()::date
+      and a.prompt != 'a1b2c3d4'
 ```
 
 ### 6. Resume on pod restart
