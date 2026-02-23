@@ -22,85 +22,85 @@ const mockDashboardData = {
 // Setup mocks using Playwright's native routing
 Given("Dashboard API endpoints are mocked", async function (this: CustomWorld) {
   // Mock all dashboard endpoints with sample data using Playwright
-  await this.page.route("**/api/db/dashboard/first-response-percentiles*", (route) =>
+  await this.page.route("**/api/dashboard/first-response-percentiles*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify(mockDashboardData.firstResponsePercentiles) })
   );
   
-  await this.page.route("**/api/db/dashboard/first-response-distribution*", (route) =>
+  await this.page.route("**/api/dashboard/first-response-distribution*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify(mockDashboardData.durationDistribution) })
   );
   
-  await this.page.route("**/api/db/dashboard/unattended-queries-count*", (route) =>
+  await this.page.route("**/api/dashboard/unattended-queries-count*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify(mockDashboardData.unattendedQueries) })
   );
   
-  await this.page.route("**/api/db/dashboard/resolution-percentiles*", (route) =>
+  await this.page.route("**/api/dashboard/resolution-percentiles*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify(mockDashboardData.resolutionPercentiles) })
   );
   
-  await this.page.route("**/api/db/dashboard/resolution-duration-distribution*", (route) =>
+  await this.page.route("**/api/dashboard/resolution-duration-distribution*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify(mockDashboardData.durationDistribution) })
   );
   
-  await this.page.route("**/api/db/dashboard/resolution-times-by-week*", (route) =>
+  await this.page.route("**/api/dashboard/resolution-times-by-week*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
   
-  await this.page.route("**/api/db/dashboard/unresolved-ticket-ages*", (route) =>
+  await this.page.route("**/api/dashboard/unresolved-ticket-ages*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify({ p50: "1 day", p90: "3 days" }) })
   );
   
-  await this.page.route("**/api/db/dashboard/resolution-time-by-tag*", (route) =>
+  await this.page.route("**/api/dashboard/resolution-time-by-tag*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
   
-  await this.page.route("**/api/db/dashboard/avg-escalation-duration-by-tag*", (route) =>
+  await this.page.route("**/api/dashboard/avg-escalation-duration-by-tag*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
   
-  await this.page.route("**/api/db/dashboard/escalation-percentage-by-tag*", (route) =>
+  await this.page.route("**/api/dashboard/escalation-percentage-by-tag*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
   
-  await this.page.route("**/api/db/dashboard/escalation-trends-by-date*", (route) =>
+  await this.page.route("**/api/dashboard/escalation-trends-by-date*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
   
-  await this.page.route("**/api/db/dashboard/escalations-by-team*", (route) =>
+  await this.page.route("**/api/dashboard/escalations-by-team*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
   
-  await this.page.route("**/api/db/dashboard/escalations-by-impact*", (route) =>
+  await this.page.route("**/api/dashboard/escalations-by-impact*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
   
-  await this.page.route("**/api/db/dashboard/weekly-ticket-counts*", (route) =>
+  await this.page.route("**/api/dashboard/weekly-ticket-counts*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
   
-  await this.page.route("**/api/db/dashboard/weekly-comparison*", (route) =>
+  await this.page.route("**/api/dashboard/weekly-comparison*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify({ opened: 10, closed: 8, stale: 2, escalated: 1 }) })
   );
   
-  await this.page.route("**/api/db/dashboard/top-escalated-tags-this-week*", (route) =>
+  await this.page.route("**/api/dashboard/top-escalated-tags-this-week*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
   
-  await this.page.route("**/api/db/dashboard/incoming-vs-resolved-rate*", (route) =>
+  await this.page.route("**/api/dashboard/incoming-vs-resolved-rate*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
 });
 
 Given("Dashboard API returns empty data", async function (this: CustomWorld) {
   // Mock all dashboard endpoints to return empty arrays
-  await this.page.route("**/api/db/dashboard/**", (route) =>
+  await this.page.route("**/api/dashboard/**", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
 });
 
 Given("Dashboard API has delayed responses", async function (this: CustomWorld) {
   // Add delay to simulate slow API
-  await this.page.route("**/api/db/dashboard/**", async (route) => {
+  await this.page.route("**/api/dashboard/**", async (route) => {
     const url = route.request().url();
     await new Promise(resolve => setTimeout(resolve, 2000));
     
@@ -125,51 +125,20 @@ Given("Dashboard API has delayed responses", async function (this: CustomWorld) 
 
 // Navigation
 Given("User navigates to the dashboards page", async function (this: CustomWorld) {
-  try {
-    await this.page.goto(`${BASE_URL}/`, { 
-      waitUntil: 'domcontentloaded', 
-      timeout: 30000 
-    });
-  } catch (error) {
-    console.error('❌ Failed to navigate:', error);
-    throw error;
-  }
-  
-  // Click on "Support" button in the sidebar to expand it if not already expanded
-  const supportButton = this.page.getByRole('button', { name: /Support/ }).first();
-  await supportButton.waitFor({ state: 'visible', timeout: 8000 });
-  
-  // Wait a bit for the page to fully load and user context to initialize
-  await this.page.waitForTimeout(500);
-  
-  // Debug: Check all visible buttons in sidebar
-  const allButtons = await this.page.getByRole('button').allTextContents();
-  
-  // Check if SLA Dashboard is already visible (Support might be expanded by default)
-  const slaDashboardButton = this.page.getByRole('button', { name: /SLA Dashboard/i });
-  let isSubMenuVisible = await slaDashboardButton.isVisible().catch(() => false);
-  
-  if (!isSubMenuVisible) {
-    await supportButton.click();
-    await this.page.waitForTimeout(500); // Wait for expand animation and content to render
-    
-    // Check again after expanding
-    isSubMenuVisible = await slaDashboardButton.isVisible().catch(() => false);
-    if (!isSubMenuVisible) {
-      // Wait a bit more in case of slow rendering
-      await this.page.waitForTimeout(2000);
-    } 
-  }
-  // Click on "SLA Dashboard" sub-tab (it's a button)
-  await slaDashboardButton.waitFor({ state: 'visible', timeout: 10000 });
+  await this.page.goto(`${BASE_URL}/`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 10000
+  });
+
+  const supportButton = this.page.getByRole('button', { name: /Support/i }).first();
+  await expect(supportButton).toBeVisible({ timeout: 5000 });
+
+  const slaDashboardButton = this.page.getByRole('button', { name: /SLA Dashboard/i }).first();
+  await expect(slaDashboardButton).toBeVisible({ timeout: 5000 });
   await slaDashboardButton.click();
-  
-  // Wait for dashboard content to load (give it more time)
-  await this.page.waitForTimeout(3000); // Increased from 1500ms to 3000ms
-  
-  // Look for the Response SLAs tab with longer timeout to handle flakiness
-  const responseSLATab = this.page.getByRole('button', { name: /Response SLAs/i });
-  await responseSLATab.waitFor({ state: 'visible', timeout: 30000 }); // Increased from 15s to 30s
+
+  const responseSLATab = this.page.getByRole('button', { name: /Response SLAs/i }).first();
+  await expect(responseSLATab).toBeVisible({ timeout: 8000 });
 });
 
 // Page header assertions

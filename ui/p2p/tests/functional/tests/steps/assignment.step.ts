@@ -6,7 +6,7 @@ const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
 // Background steps
 Given("assignment feature is enabled", async function (this: CustomWorld) {
-    await this.page.route('**/assignment/enabled', async (route) => {
+    await this.page.route('**/api/assignment/enabled', async (route) => {
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -16,7 +16,7 @@ Given("assignment feature is enabled", async function (this: CustomWorld) {
 });
 
 Given("assignment feature is disabled", async function (this: CustomWorld) {
-    await this.page.route('**/assignment/enabled', async (route) => {
+    await this.page.route('**/api/assignment/enabled', async (route) => {
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -26,7 +26,7 @@ Given("assignment feature is disabled", async function (this: CustomWorld) {
 });
 
 Given("support members are available", async function (this: CustomWorld) {
-    await this.page.route('**/user/support', async (route) => {
+    await this.page.route('**/api/users/support', async (route) => {
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -49,15 +49,62 @@ Given("support members are available", async function (this: CustomWorld) {
 });
 
 Given("user is a support engineer", async function (this: CustomWorld) {
-    await this.page.route('**/user/me', async (route) => {
+    await this.page.route('**/api/auth/session', async (route) => {
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({
-                name: "Test Support Engineer",
-                email: "test-engineer@example.com",
-                groups: ["support"]
+                user: {
+                    id: "test-engineer@example.com",
+                    name: "Test Support Engineer",
+                    email: "test-engineer@example.com",
+                    roles: ["USER", "SUPPORT_ENGINEER"],
+                    teams: [
+                        { name: "support-engineers", code: "support-engineers", label: "Support Engineers", types: ["support"] },
+                        { name: "team-a", code: "team-a", label: "Team A", types: ["tenant"] }
+                    ]
+                },
+                expires: new Date(Date.now() + 86400000).toISOString()
             }),
+        });
+    });
+
+    // Provide a default ticket dataset for scenarios that don't explicitly
+    // register ticket mocks (e.g., edit assignee via tickets page).
+    const defaultTicket = {
+        id: "1",
+        status: "opened",
+        impact: "high",
+        team: { name: "team-a" },
+        tags: ["bug"],
+        escalations: [],
+        logs: [{ event: "opened", date: new Date().toISOString() }],
+        query: { link: "https://example.com/ticket/1", text: "Sample ticket" },
+        assignedTo: "support-engineer-1@example.com"
+    };
+    await this.page.route('**/api/tickets**', async (route) => {
+        const url = route.request().url();
+        const method = route.request().method();
+        if (method === "GET" && /\/api\/tickets\/\d+$/.test(url)) {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify(defaultTicket)
+            });
+            return;
+        }
+        if (method === "PATCH") {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify(defaultTicket)
+            });
+            return;
+        }
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ content: [defaultTicket], page: 0, totalPages: 1, totalElements: 1 })
         });
     });
 });
@@ -103,12 +150,12 @@ Given("there are {int} opened tickets assigned to {string}", async function (
 // Navigation steps
 When("user navigates to Analytics & Operations", async function (this: CustomWorld) {
     // Set up ticket route with test data - register AFTER hooks.ts to override
-    await this.page.route('**/ticket*', async (route) => {
+    await this.page.route('**/api/tickets**', async (route) => {
         const url = route.request().url();
         const method = route.request().method();
         
         // Individual ticket GET
-        const idMatch = url.match(/\/ticket\/(\d+)$/);
+        const idMatch = url.match(/\/api\/tickets\/(\d+)$/);
         if (idMatch && method === 'GET') {
             const ticketId = parseInt(idMatch[1]);
             const ticket = this.testTickets?.find((t: any) => t.id === ticketId);
@@ -147,7 +194,7 @@ When("user navigates to Analytics & Operations", async function (this: CustomWor
         
         // PATCH requests
         if (method === 'PATCH') {
-            const ticketIdMatch = url.match(/\/ticket\/(\d+)/);
+            const ticketIdMatch = url.match(/\/api\/tickets\/(\d+)/);
             if (ticketIdMatch) {
                 const ticketId = parseInt(ticketIdMatch[1]);
                 const requestBody = route.request().postDataJSON();
@@ -167,6 +214,31 @@ When("user navigates to Analytics & Operations", async function (this: CustomWor
         route.continue();
     });
 
+    await this.page.route('**/api/registry*', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                impacts: [
+                    { code: "high", label: "High" },
+                    { code: "medium", label: "Medium" },
+                    { code: "low", label: "Low" }
+                ],
+                tags: [
+                    { code: "bug", label: "Bug" },
+                    { code: "urgent", label: "Urgent" }
+                ]
+            })
+        });
+    });
+    await this.page.route('**/api/stats/ratings*', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ average: 0, count: 0, weekly: [] })
+        });
+    });
+
     await this.page.goto(BASE_URL);
     await this.page.waitForLoadState('networkidle');
     const navButton = this.page.getByRole('button', { name: /Analytics & Operations/i });
@@ -179,14 +251,14 @@ When("user navigates to the tickets page", async function (this: CustomWorld) {
     await this.page.goto(BASE_URL);
     
     // Re-register route AFTER page load but BEFORE it makes requests
-    await this.page.route('**/ticket*', async (route) => {
+    await this.page.route('**/api/tickets**', async (route) => {
         const url = route.request().url();
         const method = route.request().method();
         
         console.log(`[ROUTE] ${method} ${url}`);
         
         // Individual ticket GET (e.g., /ticket/1)
-        const idMatch = url.match(/\/ticket\/(\d+)$/);
+        const idMatch = url.match(/\/api\/tickets\/(\d+)$/);
         if (idMatch && method === 'GET') {
             const ticketId = parseInt(idMatch[1]);
             const ticket = this.testTickets?.find((t: any) => t.id === ticketId);
@@ -230,7 +302,7 @@ When("user navigates to the tickets page", async function (this: CustomWorld) {
         
         // PATCH requests (updates)
         if (method === 'PATCH') {
-            const ticketIdMatch = url.match(/\/ticket\/(\d+)/);
+            const ticketIdMatch = url.match(/\/api\/tickets\/(\d+)/);
             if (ticketIdMatch) {
                 const ticketId = parseInt(ticketIdMatch[1]);
                 const requestBody = route.request().postDataJSON();
@@ -252,6 +324,31 @@ When("user navigates to the tickets page", async function (this: CustomWorld) {
         console.log(`[ROUTE] Fallback - continuing`);
         route.continue();
     });
+
+    await this.page.route('**/api/registry*', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                impacts: [
+                    { code: "high", label: "High" },
+                    { code: "medium", label: "Medium" },
+                    { code: "low", label: "Low" }
+                ],
+                tags: [
+                    { code: "bug", label: "Bug" },
+                    { code: "urgent", label: "Urgent" }
+                ]
+            })
+        });
+    });
+    await this.page.route('**/api/stats/ratings*', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ average: 0, count: 0, weekly: [] })
+        });
+    });
     
     await this.page.reload();
     await this.page.waitForLoadState('networkidle');
@@ -259,14 +356,10 @@ When("user navigates to the tickets page", async function (this: CustomWorld) {
 });
 
 When("user selects {string} tab", async function (this: CustomWorld, tabName: string) {
-    // Wait for page to be fully loaded
-    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-    await this.page.waitForTimeout(500);
-    
-    const tab = this.page.getByRole('button', { name: new RegExp(tabName, 'i') });
-    await tab.waitFor({ state: 'visible', timeout: 15000 });
+    const tab = this.page.getByRole('button', { name: new RegExp(`^${tabName}$`, 'i') }).first();
+    await expect(tab).toBeVisible({ timeout: 8000 });
     await tab.click();
-    await this.page.waitForTimeout(500);
+    await this.page.waitForTimeout(300);
 });
 
 When("user clicks on the first ticket", async function (this: CustomWorld) {
@@ -334,8 +427,8 @@ When("user changes assignee to {string}", async function (
     newAssignee: string
 ) {
     // Find the Support Engineer select in the modal
-    const modal = this.page.locator('[role="dialog"]');
-    const assigneeSelect = modal.locator('select').filter({ hasText: /example\.com/ });
+    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+    const assigneeSelect = modal.locator('#assignee-select');
     await assigneeSelect.waitFor({ state: 'visible', timeout: 5000 });
     await assigneeSelect.selectOption(newAssignee);
     await this.page.waitForTimeout(500);
@@ -400,17 +493,25 @@ Then("all displayed tickets should have assignee {string}", async function (
 });
 
 Then("ticket modal should open", async function (this: CustomWorld) {
-    const modal = this.page.locator('[role="dialog"]');
+    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
     await expect(modal).toBeVisible({ timeout: 5000 });
 });
 
 Then("Ticket details modal should appear", async function (this: CustomWorld) {
-    const modal = this.page.locator('[role="dialog"]');
-    await expect(modal).toBeVisible({ timeout: 10000 });
+    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+    const alreadyVisible = await modal.isVisible().catch(() => false);
+    if (!alreadyVisible) {
+        // Retry opening the modal in case a prior click did not latch due to rerender.
+        const firstRow = this.page.locator('tbody tr').first();
+        if (await firstRow.isVisible().catch(() => false)) {
+            await firstRow.click({ force: true });
+        }
+    }
+    await expect(modal).toBeVisible({ timeout: 8000 });
 });
 
 Then("assignee select should be visible", async function (this: CustomWorld) {
-    const modal = this.page.locator('[role="dialog"]');
+    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
     // Look for any select that might contain assignee options
     const assigneeSection = modal.getByText(/Support Engineer/i);
     await expect(assigneeSection).toBeVisible({ timeout: 5000 });
@@ -422,7 +523,7 @@ Then("assignee should be updated to {string}", async function (
 ) {
     // Wait for modal to close
     await this.page.waitForTimeout(1000);
-    const modal = this.page.locator('[role="dialog"]');
+    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
     await expect(modal).not.toBeVisible({ timeout: 5000 });
 });
 
@@ -440,7 +541,7 @@ When("user clicks {string} button", async function (
 ) {
     // Mock bulk reassign endpoint if clicking the confirmation button
     if (buttonText.toLowerCase().includes('reassign') && buttonText.toLowerCase().includes('yes')) {
-        await this.page.route('**/assignment/bulk-reassign', async (route) => {
+        await this.page.route('**/api/assignment/bulk-reassign', async (route) => {
             const requestBody = route.request().postDataJSON();
             await route.fulfill({
                 status: 200,

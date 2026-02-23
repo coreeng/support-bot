@@ -3,8 +3,10 @@ ui:
   env:
     - name: NODE_ENV
       value: "test"
+    - name: E2E_AUTH_BYPASS
+      value: "true"
     - name: BACKEND_URL
-      value: "http://mock-backend:8080"
+      value: "http://backend-not-used:8080"
     - name: AUTH_SECRET
       value: "functional-test-secret-not-for-production-use"
     - name: NEXTAUTH_URL
