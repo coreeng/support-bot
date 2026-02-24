@@ -91,10 +91,10 @@ public class ThreadService {
             try {
                 response = slackClient.getThreadPage(requestBuilder.build());
             } catch (SlackException e) {
-                if ("rate_limited".equals(e.getError())) {
-                    log.warn("Rate limited on page {}, waiting 60 seconds before retry", pageCount);
+                if ("ratelimited".equals(e.getError())) {
+                    log.warn("Rate limited on page {}, waiting 10 seconds before retry", pageCount);
                     try {
-                        Thread.sleep(60000); // Wait 60 seconds
+                        Thread.sleep(10000); // Wait 10 seconds
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         throw new RuntimeException("Interrupted while waiting for rate limit", ie);
@@ -127,6 +127,13 @@ public class ThreadService {
                 pageCount,
                 channelId,
                 threadTs);
+
+        try {
+            Thread.sleep(500); // Wait 0.5 seconds
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted while waiting for rate limit", ie);
+        }
 
         // Extract text from all messages, filtering out null/empty texts
         ImmutableList<String> messageTexts = allMessages.stream()
