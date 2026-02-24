@@ -78,7 +78,7 @@ export default function HealthPage() {
                 // Calculate the current range based on week (default)
                 const toDate = new Date()
                 const fromDate = new Date(toDate)
-                fromDate.setDate(toDate.getDate() - 7)
+                fromDate.setDate(toDate.getDate() - 6)
                 const from = fromDate.toISOString().split('T')[0]
                 const to = toDate.toISOString().split('T')[0]
                 return { from, to }
@@ -90,7 +90,7 @@ export default function HealthPage() {
         const fromDate = new Date(toDate)
 
         if (dateFilterMode === 'week') {
-            fromDate.setDate(toDate.getDate() - 7)
+            fromDate.setDate(toDate.getDate() - 6)
         } else if (dateFilterMode === 'month') {
             fromDate.setMonth(toDate.getMonth() - 1)
         } else if (dateFilterMode === 'year') {
@@ -103,6 +103,24 @@ export default function HealthPage() {
     }, [dateFilterMode, startDate, endDate, isDateRangeValid])
     
     const {data: tickets, isLoading: ticketsLoading} = useTickets(0, 1000, dateRange.from, dateRange.to)
+
+    // Count actual weekdays (Mon-Fri) in the selected date range. Used as the denominator
+    // for avgTickets in capacity insights — the busiestPeriods heatmap accumulates totals
+    // across all weeks in the range, so dividing by 5 (DOW count) would over-inflate
+    // averages for any range longer than one week.
+    const weekdaysInRange = useMemo(() => {
+        if (!dateRange.from || !dateRange.to) return 5
+        const start = new Date(dateRange.from + 'T12:00:00')
+        const end = new Date(dateRange.to + 'T12:00:00')
+        let count = 0
+        const curr = new Date(start)
+        while (curr <= end) {
+            const day = curr.getDay()
+            if (day >= 1 && day <= 5) count++
+            curr.setDate(curr.getDate() + 1)
+        }
+        return Math.max(1, count)
+    }, [dateRange])
     const {data: ratingStats, isLoading: ratingsLoading} = useRatings(dateRange.from, dateRange.to)
     const [currentPage, setCurrentPage] = useState(1)
     const ticketsPerPage = 10
@@ -385,7 +403,10 @@ export default function HealthPage() {
             .sort((a, b) => a.hour - b.hour)
     }, [filteredTickets])
 
-    // --- Busiest periods heatmap (day of week × hour) - Weekdays only, 7AM-7PM, using ticket time ---
+    // --- Busiest periods heatmap (day of week × hour) - Weekdays only, 7AM-6PM, using ticket time ---
+    // Hours 7-18 (7:00 AM to 6:59 PM). "7 AM - 7 PM" means the boundary is 19:00, so
+    // the last tracked hour slot is 18 (6 PM). This aligns with the 2-hour capacity blocks
+    // which cover [start, end) — the last block "5 PM - 7 PM" covers hours 17 and 18.
     const busiestPeriods = useMemo(() => {
         const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
         const dayIndexMap: Record<number, string> = {
@@ -399,8 +420,7 @@ export default function HealthPage() {
         
         days.forEach(day => {
             heatmap[day] = {}
-            // Only track hours 7-19 (7AM to 7PM)
-            for (let hour = 7; hour <= 19; hour++) {
+            for (let hour = 7; hour <= 18; hour++) {
                 heatmap[day][hour] = 0
             }
         })
@@ -408,22 +428,20 @@ export default function HealthPage() {
         filteredTickets.forEach(t => {
             const {opened} = getOpenedClosed(t)
             if (opened) {
-                const dayOfWeek = opened.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+                const dayOfWeek = opened.getDay()
                 const dayName = dayIndexMap[dayOfWeek]
-                if (dayName) { // Only include weekdays
-                    const hour = opened.getHours() // Uses ticket's opened time
-                    // Only count hours between 7AM and 7PM
-                    if (hour >= 7 && hour <= 19) {
+                if (dayName) {
+                    const hour = opened.getHours()
+                    if (hour >= 7 && hour <= 18) {
                         heatmap[dayName][hour] = (heatmap[dayName][hour] || 0) + 1
                     }
                 }
             }
         })
         
-        // Convert to array format for visualization
         return days.map(day => {
             const row: { day: string; [key: number]: number } = { day }
-            for (let hour = 7; hour <= 19; hour++) {
+            for (let hour = 7; hour <= 18; hour++) {
                 row[hour] = heatmap[day][hour]
             }
             return row
@@ -432,7 +450,7 @@ export default function HealthPage() {
 
     // --- Capacity Insights by 2-Hour Blocks ---
     const capacityInsights = useMemo(() => {
-        if (!isAssignmentEnabled || !busiestPeriods.length) {
+        if (!busiestPeriods.length) {
             return []
         }
 
@@ -440,31 +458,16 @@ export default function HealthPage() {
         const capacityPerEngineer = Math.max(1, ticketsPerEngineerCapacity)
         const currentCapacity = rotaCount * capacityPerEngineer
 
-        // Count actual weekdays that have tickets by checking busiestPeriods data
-        // This avoids iterating through filteredTickets again (important for scalability)
-        // A weekday has tickets if any hour in that day has tickets > 0
-        const weekdaysWithTickets = new Set<string>()
-        busiestPeriods.forEach(row => {
-            const dayName = row.day
-            // Check if this day has any tickets in any hour (7-19)
-            for (let hour = 7; hour <= 19; hour++) {
-                if ((row[hour] as number) > 0) {
-                    weekdaysWithTickets.add(dayName)
-                    break // Found tickets for this day, no need to check other hours
-                }
-            }
-        })
-        const actualWeekdaysCount = Math.max(1, weekdaysWithTickets.size) // At least 1 to avoid division by zero
+        const formatHour = (h: number) => {
+            if (h < 12) return `${h} AM`
+            if (h === 12) return '12 PM'
+            return `${h - 12} PM`
+        }
 
         // Group hours into 2-hour blocks: 7-9, 9-11, 11-13, 13-15, 15-17, 17-19
         const timeBlocks: Array<{ start: number; end: number; label: string }> = []
         for (let start = 7; start < 19; start += 2) {
             const end = start + 2
-            const formatHour = (h: number) => {
-                if (h < 12) return `${h} AM`
-                if (h === 12) return '12 PM'
-                return `${h - 12} PM`
-            }
             timeBlocks.push({
                 start,
                 end,
@@ -474,7 +477,8 @@ export default function HealthPage() {
 
         const insights: Array<{
             timeBlock: string
-            avgTickets: number
+            totalTickets: number
+            avgPerWeekday: number
             currentCapacity: number
             utilization: number
             recommendedRange: string
@@ -490,10 +494,9 @@ export default function HealthPage() {
                 }
             })
 
-            // Average per weekday (across 2 hours) - only count weekdays that actually have tickets
-            const avgTickets = actualWeekdaysCount > 0 
-                ? parseFloat((totalTicketsInBlock / actualWeekdaysCount).toFixed(2))
-                : 0
+            // Average tickets per weekday in the selected date range.
+            // weekdaysInRange is the actual number of Mon-Fri days in the range (not just 1-5).
+            const avgTickets = parseFloat((totalTicketsInBlock / weekdaysInRange).toFixed(2))
             
             // Capacity for 2-hour block (same as single hour since it's concurrent capacity)
             const utilization = currentCapacity > 0 
@@ -517,7 +520,8 @@ export default function HealthPage() {
 
             insights.push({
                 timeBlock: block.label,
-                avgTickets,
+                totalTickets: totalTicketsInBlock,
+                avgPerWeekday: avgTickets,
                 currentCapacity,
                 utilization,
                 recommendedRange,
@@ -526,13 +530,10 @@ export default function HealthPage() {
         })
 
         return insights
-    }, [busiestPeriods, isAssignmentEnabled, engineersOnRota, ticketsPerEngineerCapacity])
+    }, [busiestPeriods, weekdaysInRange, engineersOnRota, ticketsPerEngineerCapacity])
 
     // --- Capacity vs Demand ---
     const capacityVsDemand = useMemo(() => {
-        if (!isAssignmentEnabled) {
-            return null
-        }
         
         const openTickets = filteredTickets.filter(t => t.status?.toLowerCase() === 'opened')
         const ticketsCount = openTickets.length
@@ -556,7 +557,7 @@ export default function HealthPage() {
                 ? Math.round((ticketsCount / totalCapacity) * 100) // Can exceed 100% when over capacity
                 : 0
         }
-    }, [filteredTickets, isAssignmentEnabled, engineersOnRota, ticketsPerEngineerCapacity, supportMembers])
+    }, [filteredTickets, engineersOnRota, ticketsPerEngineerCapacity, supportMembers])
 
     const avgRatingsByWeek = useMemo(() => {
         return (weeklyRatings || [])
@@ -927,8 +928,8 @@ export default function HealthPage() {
                                                     <thead>
                                                         <tr>
                                                             <th className="text-left p-2 sticky left-0 bg-white z-10">Day</th>
-                                                            {Array.from({ length: 13 }, (_, idx) => {
-                                                                const hour = idx + 7 // Hours 7-19
+                                                            {Array.from({ length: 12 }, (_, idx) => {
+                                                                const hour = idx + 7 // Hours 7-18
                                                                 return (
                                                                     <th key={hour} className="p-1 text-center min-w-[30px]">
                                                                         {String(hour).padStart(2, '0')}
@@ -939,13 +940,13 @@ export default function HealthPage() {
                                                     </thead>
                                                     <tbody>
                                                         {busiestPeriods.map((row, idx) => {
-                                                            const hourValues = Array.from({ length: 13 }, (_, idx) => row[idx + 7] as number)
+                                                            const hourValues = Array.from({ length: 12 }, (_, idx) => row[idx + 7] as number)
                                                             const maxValue = Math.max(...hourValues, 0)
                                                             return (
                                                                 <tr key={idx} className="border-t">
                                                                     <td className="p-2 sticky left-0 bg-white font-medium">{row.day}</td>
-                                                                    {Array.from({ length: 13 }, (_, idx) => {
-                                                                        const hour = idx + 7 // Hours 7-19
+                                                                    {Array.from({ length: 12 }, (_, idx) => {
+                                                                        const hour = idx + 7 // Hours 7-18
                                                                         const value = row[hour] as number
                                                                         const intensity = maxValue > 0 ? (value / maxValue) * 100 : 0
                                                                         const bgColor = intensity > 70 
@@ -976,7 +977,7 @@ export default function HealthPage() {
                                 </div>
 
                                 {/* Capacity Planning - Combined Section */}
-                                {isAssignmentEnabled && capacityVsDemand && (
+                                {capacityVsDemand && (
                                     <div className="bg-white shadow-sm rounded-lg border mt-4 border-purple-200">
                                         {/* Capacity vs Demand - Always Visible */}
                                         <div className="p-4 border-b border-purple-200">
@@ -1089,7 +1090,7 @@ export default function HealthPage() {
                                                 {capacityInsightsExpanded && (
                                                     <div className="px-3 pb-3 border-t border-purple-200 pt-3">
                                                         <p className="text-xs text-gray-500 text-center mb-3">
-                                                            Average tickets per weekday (2-hour blocks) | Capacity: {engineersOnRota} engineers × {ticketsPerEngineerCapacity} = {engineersOnRota * ticketsPerEngineerCapacity}
+                                                            Total tickets per 2-hour block (local time) | Capacity: {engineersOnRota} engineers × {ticketsPerEngineerCapacity} = {engineersOnRota * ticketsPerEngineerCapacity}
                                                         </p>
                                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                                             {capacityInsights.map((insight, idx) => {
@@ -1111,8 +1112,12 @@ export default function HealthPage() {
                                                                         </div>
                                                                         <div className="space-y-1 text-xs">
                                                                             <div className="flex justify-between">
-                                                                                <span className="text-gray-600">Avg Tickets:</span>
-                                                                                <span className="font-medium">{insight.avgTickets.toFixed(1)}</span>
+                                                                                <span className="text-gray-600">Total Tickets:</span>
+                                                                                <span className="font-medium">{insight.totalTickets}</span>
+                                                                            </div>
+                                                                            <div className="flex justify-between">
+                                                                                <span className="text-gray-600">Avg per weekday:</span>
+                                                                                <span className="font-medium">{insight.avgPerWeekday.toFixed(1)}</span>
                                                                             </div>
                                                                             <div className="flex justify-between">
                                                                                 <span className="text-gray-600">Capacity:</span>
