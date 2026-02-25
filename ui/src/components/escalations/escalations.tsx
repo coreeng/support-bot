@@ -15,6 +15,13 @@ export default function EscalationsPage() {
     const [selectedTeam, setSelectedTeam] = useState<string>('')
     const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'resolved'>('all')
     const [impactFilter, setImpactFilter] = useState<string>('all')
+    const [tagFilter, setTagFilter] = useState<string>('')
+    type DateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
+    const [dateFilter, setDateFilter] = useState<DateFilter>('lastWeek')
+    const [customDateRange, setCustomDateRange] = useState<{ start?: string; end?: string }>({})
+    type SortColumn = 'ticketId' | 'openedAt' | 'resolvedAt' | 'duration'
+    const [sortColumn, setSortColumn] = useState<SortColumn>('openedAt')
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
     const [pageIndex, setPageIndex] = useState<number>(0)
     const pageSize = 15
 
@@ -40,6 +47,22 @@ export default function EscalationsPage() {
         return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
     }
     const getDurationColor = (minutes: number) => minutes < 30 ? 'text-green-700' : minutes < 120 ? 'text-yellow-700' : 'text-indigo-700 font-semibold'
+
+    // --- Date range for date filter ---
+    const dateRange = useMemo(() => {
+        if (!dateFilter) return { from: undefined, to: undefined }
+        if (dateFilter === 'custom') {
+            if (!customDateRange.start || !customDateRange.end) return { from: undefined, to: undefined }
+            return { from: customDateRange.start, to: customDateRange.end }
+        }
+        const now = new Date()
+        const to = now.toISOString().split('T')[0]
+        const fromDate = new Date(now)
+        if (dateFilter === 'lastWeek') fromDate.setDate(now.getDate() - 6)
+        else if (dateFilter === 'last2Weeks') fromDate.setDate(now.getDate() - 13)
+        else if (dateFilter === 'lastMonth') fromDate.setMonth(now.getMonth() - 1)
+        return { from: fromDate.toISOString().split('T')[0], to }
+    }, [dateFilter, customDateRange])
 
     // --- Filtered Escalations ---
     const filteredEscalations = useMemo(() => {
@@ -79,6 +102,21 @@ export default function EscalationsPage() {
             baseEscalations = baseEscalations.filter(esc => esc.impact === impactFilter)
         }
 
+        // Apply tag filter
+        if (tagFilter) {
+            baseEscalations = baseEscalations.filter(esc => esc.tags?.includes(tagFilter))
+        }
+
+        // Apply date filter
+        if (dateRange.from) {
+            const from = new Date(dateRange.from + 'T00:00:00')
+            baseEscalations = baseEscalations.filter(esc => esc.openedAt && new Date(esc.openedAt) >= from)
+        }
+        if (dateRange.to) {
+            const to = new Date(dateRange.to + 'T23:59:59')
+            baseEscalations = baseEscalations.filter(esc => esc.openedAt && new Date(esc.openedAt) <= to)
+        }
+
         // When viewing as escalation team ("Escalated for My Team"), deduplicate by ticketId
         // to match the home dashboard "Tickets We Own - Escalated" count
         // Keep the most recent escalation per ticket
@@ -94,13 +132,46 @@ export default function EscalationsPage() {
         }
 
         return baseEscalations
-    }, [escalationsData, selectedTeam, statusFilter, impactFilter, hasFullAccess, effectiveTeams, isViewingAsEscalationTeam])
+    }, [escalationsData, selectedTeam, statusFilter, impactFilter, tagFilter, dateRange, hasFullAccess, effectiveTeams, isViewingAsEscalationTeam])
+
+    // --- Sorting ---
+    const handleSort = (column: SortColumn) => {
+        if (sortColumn === column) {
+            setSortDirection(d => d === 'asc' ? 'desc' : 'asc')
+        } else {
+            setSortColumn(column)
+            setSortDirection(column === 'openedAt' || column === 'resolvedAt' ? 'desc' : 'asc')
+        }
+        setPageIndex(0)
+    }
+
+    const sortedEscalations = useMemo(() => {
+        return [...filteredEscalations].sort((a, b) => {
+            let cmp = 0
+            if (sortColumn === 'ticketId') {
+                cmp = (a.ticketId || '').localeCompare(b.ticketId || '')
+            } else if (sortColumn === 'openedAt') {
+                cmp = (a.openedAt || '').localeCompare(b.openedAt || '')
+            } else if (sortColumn === 'resolvedAt') {
+                // Unresolved (null) sorts last regardless of direction
+                if (!a.resolvedAt && !b.resolvedAt) cmp = 0
+                else if (!a.resolvedAt) cmp = 1
+                else if (!b.resolvedAt) cmp = -1
+                else cmp = a.resolvedAt.localeCompare(b.resolvedAt)
+            } else if (sortColumn === 'duration') {
+                const aDur = a.openedAt ? (a.resolvedAt ? new Date(a.resolvedAt).getTime() : now) - new Date(a.openedAt).getTime() : 0
+                const bDur = b.openedAt ? (b.resolvedAt ? new Date(b.resolvedAt).getTime() : now) - new Date(b.openedAt).getTime() : 0
+                cmp = aDur - bDur
+            }
+            return sortDirection === 'asc' ? cmp : -cmp
+        })
+    }, [filteredEscalations, sortColumn, sortDirection, now])
 
     // --- Pagination ---
     const paginatedEscalations = useMemo(() => {
         const start = pageIndex * pageSize
-        return filteredEscalations.slice(start, start + pageSize)
-    }, [filteredEscalations, pageIndex])
+        return sortedEscalations.slice(start, start + pageSize)
+    }, [sortedEscalations, pageIndex])
 
     const totalPages = Math.ceil(filteredEscalations.length / pageSize)
 
@@ -110,7 +181,7 @@ export default function EscalationsPage() {
         filteredEscalations.forEach(esc => esc.tags?.forEach(tag => freqMap[tag] = (freqMap[tag] || 0) + 1))
         return Object.entries(freqMap)
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 2)
+            .slice(0, 5)
             .map(([tag, count]) => ({ tag, count }))
     }, [filteredEscalations])
 
@@ -150,6 +221,41 @@ export default function EscalationsPage() {
 
                 {/* Filters */}
                 <div className="flex gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Date:</label>
+                    <select
+                        data-testid="escalations-date-filter"
+                        aria-label="Escalation date filter"
+                        value={dateFilter}
+                        onChange={e => { setDateFilter(e.target.value as DateFilter); setPageIndex(0) }}
+                        className="p-2 border rounded"
+                    >
+                        <option value="">Any Date</option>
+                        <option value="lastWeek">Last Week</option>
+                        <option value="last2Weeks">Last 2 Weeks</option>
+                        <option value="lastMonth">Last Month</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                    {dateFilter === 'custom' && (
+                        <>
+                            <input
+                                type="date"
+                                aria-label="Date filter start"
+                                value={customDateRange.start || ''}
+                                onChange={e => { setCustomDateRange(r => ({ ...r, start: e.target.value })); setPageIndex(0) }}
+                                className="p-2 border rounded text-sm"
+                            />
+                            <span className="text-gray-500 text-sm">to</span>
+                            <input
+                                type="date"
+                                aria-label="Date filter end"
+                                value={customDateRange.end || ''}
+                                onChange={e => { setCustomDateRange(r => ({ ...r, end: e.target.value })); setPageIndex(0) }}
+                                className="p-2 border rounded text-sm"
+                            />
+                        </>
+                    )}
+                </div>
                 <div>
                     <label className="text-sm font-medium text-gray-700 mr-2">Status:</label>
                     <select
@@ -194,24 +300,40 @@ export default function EscalationsPage() {
                         </select>
                     </div>
                 )}
+                <div>
+                    <label className="text-sm font-medium text-gray-700 mr-2">Tag:</label>
+                    <select
+                        data-testid="escalations-tag-filter"
+                        aria-label="Escalation tag filter"
+                        value={tagFilter}
+                        onChange={e => { setTagFilter(e.target.value); setPageIndex(0) }}
+                        className="p-2 border rounded"
+                    >
+                        <option value="">All Tags</option>
+                        {registryData?.tags?.map((tag: { code: string; label: string }) => (
+                            <option key={tag.code} value={tag.code}>{tag.label}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
-            {/* Top 2 Tags */}
-            <div className="mb-6">
-                <h2 className="text-xl font-bold mb-3">
-                    Top 2 Tags {selectedTeam && hasFullAccess && `for ${selectedTeam}`}
-                </h2>
-                {topTags.length === 0 ? <p>No tags found.</p> : (
-                    <div className="flex flex-col gap-4">
+            {/* Top 5 Tags */}
+            <div className="mb-4">
+                <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">
+                    Top 5 Tags {selectedTeam && hasFullAccess && `— ${selectedTeam}`}
+                </h3>
+                {topTags.length === 0 ? <p className="text-sm text-gray-500">No tags found.</p> : (
+                    <div className="flex flex-col gap-1.5">
                         {topTags.map(({ tag, count }, idx) => {
                             const maxCount = topTags[0].count
                             const widthPercent = Math.min(100, (count / maxCount) * 100)
-                            const bgColor = idx === 0 ? 'from-indigo-500 to-indigo-400' : 'from-blue-400 to-cyan-300'
+                            const palette = ['from-indigo-500 to-indigo-400', 'from-blue-400 to-cyan-300', 'from-violet-500 to-purple-400', 'from-sky-500 to-blue-400', 'from-teal-500 to-emerald-400']
+                            const bgColor = palette[idx % palette.length]
                             return (
-                                <div key={tag} className="flex items-center space-x-4">
-                                    <span className="w-32 font-semibold text-gray-700">{tag}</span>
-                                    <div className="flex-1 h-10 rounded-full overflow-hidden bg-gray-200 shadow-inner">
-                                        <div className={`h-10 rounded-full bg-gradient-to-r ${bgColor} flex items-center justify-end pr-4 text-white font-bold text-sm transition-all duration-700`} style={{ width: `${widthPercent}%` }}>
+                                <div key={tag} className="flex items-center gap-3">
+                                    <span className="shrink-0 bg-indigo-100 text-indigo-800 text-xs font-semibold px-2 py-0.5 rounded">{tag}</span>
+                                    <div className="flex-1 h-4 rounded-full overflow-hidden bg-gray-200">
+                                        <div className={`h-4 rounded-full bg-gradient-to-r ${bgColor} flex items-center justify-end pr-2 text-white font-semibold text-xs transition-all duration-500`} style={{ width: `${widthPercent}%` }}>
                                             {count}
                                         </div>
                                     </div>
@@ -229,16 +351,35 @@ export default function EscalationsPage() {
                     <table className="min-w-full divide-y">
                         <thead className="bg-gray-100">
                         <tr>
-                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Ticket ID</th>
-                            {hasFullAccess && <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Escalating Team</th>}
-                            {hasFullAccess && <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Escalated To</th>}
-                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
-                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Impact</th>
-                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Opened</th>
-                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Resolved</th>
-                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Duration</th>
-                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Tags</th>
-                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Thread</th>
+                            {(() => {
+                                const SortableHeader = ({ col, label }: { col: SortColumn; label: string }) => (
+                                    <th
+                                        className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase cursor-pointer select-none hover:bg-gray-200 transition-colors"
+                                        onClick={() => handleSort(col)}
+                                    >
+                                        <span className="flex items-center gap-1">
+                                            {label}
+                                            <span className="text-gray-400">
+                                                {sortColumn === col ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
+                                            </span>
+                                        </span>
+                                    </th>
+                                )
+                                return (
+                                    <>
+                                        <SortableHeader col="ticketId" label="Ticket ID" />
+                                        {hasFullAccess && <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Escalating Team</th>}
+                                        {hasFullAccess && <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Escalated To</th>}
+                                        <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
+                                        <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Impact</th>
+                                        <SortableHeader col="openedAt" label="Opened" />
+                                        <SortableHeader col="resolvedAt" label="Resolved" />
+                                        <SortableHeader col="duration" label="Duration" />
+                                        <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Tags</th>
+                                        <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Thread</th>
+                                    </>
+                                )
+                            })()}
                         </tr>
                         </thead>
                     <tbody className="divide-y">
