@@ -10,10 +10,12 @@ Sanitisation rules are currently hardcoded. Different deployments have different
 
 ## Decision
 
-Sanitisation will become config-driven. Deployments will define two things:
+Sanitisation will become fully config-driven. Deployments will define two things:
 
 1. **What to remove** — a list of regex patterns
-2. **What to keep** — a file of exception words (used by name detection)
+2. **What to keep** — a list of words to preserve even if matched by a pattern
+
+By default, no sanitisation is applied. Each deployment configures the rules appropriate to their needs.
 
 ### Example
 
@@ -21,11 +23,14 @@ Sanitisation will become config-driven. Deployments will define two things:
 summary-data:
   sanitisation:
     patterns:
-      - "<?@?[UW][A-Z0-9]{8,}>?"                             # slack mentions
-      - "<mailto:[^|>]+\\|[^>]+>"                            # slack mailto links
-      - "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"    # email addresses
-    remove-capitalised-words: true
-    exceptions-file: commonly-capitalised-words.txt
+      - "<?@?[UW][A-Z0-9]{8,}>?"                            # slack mentions
+      - "<mailto:[^|>]+\\|[^>]+>"                           # slack mailto links
+      - "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"   # email addresses
+    exceptions:
+      - Monday
+      - Tuesday
+      - Kubernetes
+      - Azure
 ```
 
 ### How it works
@@ -33,12 +38,11 @@ summary-data:
 | Field | What it does |
 |-------|-------------|
 | `patterns` | List of regexes. Each one removes all matches from every message. Applied in order. |
-| `remove-capitalised-words` | When `true`, detects and removes capitalised words that look like names (e.g. "John Smith"). |
-| `exceptions-file` | Words to keep even when `remove-capitalised-words` is on. One word per line. Deployments point this to their own file if needed. |
+| `exceptions` | List of words to keep. If a pattern matches one of these words, it is not removed. |
 
 ### Defaults
 
-Out of the box, the bot removes Slack mentions and capitalised names using the bundled `commonly-capitalised-words.txt` exceptions file. To add email removal or any other pattern, deployments add a regex to `patterns` in their values file. No code change needed.
+No sanitisation is applied out of the box. Deployments configure their own `patterns` and `exceptions` in their values files. No code change needed to add or update rules.
 
 ## Consequences
 
@@ -46,9 +50,8 @@ Out of the box, the bot removes Slack mentions and capitalised names using the b
 
 - Updating sanitisation rules is a config change, not a release
 - Each deployment controls its own privacy rules
-- Backwards compatible. Defaults match current behaviour
+- No opinions baked into the product — deployments opt in to what they need
 
 ### Negative
 
 - Patterns can only remove, not mask or redact
-- Name detection is not perfect — it may remove words that aren't names or miss names that don't follow typical capitalisation
