@@ -54,32 +54,38 @@ Tracked repositories are defined in Spring config:
 pr-identification:
   repositories:
     - name: my-org/onboarding-repo
-      owning-team: platform-engineering
-      owning-team-slack-handle: "<slack-handle>"
-      sla: PT48H
+      owning-team: wow
+      sla: 48h
     - name: my-org/another-repo
-      owning-team: cloud-ops
-      owning-team-slack-handle: "<slack-handle>"
-      sla: PT72H
+      owning-team: infra-integration
+      sla: 72h
 ```
 
 - `name` — matched against the `org/repo` component of GitHub PR URLs.
-- `owning-team` — logical name, displayed in bot messages.
-- `owning-team-slack-handle` — Slack user group mention used for escalation tagging after SLA expiry.
-- `sla` — ISO-8601 duration, parsed to `java.time.Duration`.
+- `owning-team` — escalation team **code** (from `enums.escalation-teams[*].code`).
+- Team `label` (for bot messages) and `slack-group-id` (for tagging) are resolved from `enums.escalation-teams` using `owning-team`.
+- `sla` — Spring duration format used elsewhere in this service (e.g. `48h`, `72h`).
 
 ### 3. GitHub Credentials
 
-Read access to tracked repos via a PAT or GitHub App token, injected as a Kubernetes secret:
+The bot supports two auth modes for GitHub API access:
+
+- `token` — use a configured bearer token directly (typically PAT).
+- `app` — mint GitHub App installation tokens in-process in the API (JWT + installation token exchange), with refresh before expiry.
 
 ```yaml
 pr-identification:
   github:
-    token: ${GITHUB_TOKEN}
     api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
+    auth-mode: ${GITHUB_AUTH_MODE:token} # token | app
+    token: ${GITHUB_TOKEN:} # Used only when auth-mode=token (typically PAT)
+    app-id: ${GITHUB_APP_ID:}
+    installation-id: ${GITHUB_APP_INSTALLATION_ID:}
+    private-key-pem: ${GITHUB_APP_PRIVATE_KEY_PEM:}
 ```
 
 API calls use a thin `GitHubClient` wrapper over Spring `RestClient`. The `api-base-url` override supports GitHub Enterprise.
+Startup validation enforces required fields per mode (`token` requires `token`; `app` requires `app-id`, `installation-id`, `private-key-pem`).
 
 ### 4. PR Link Detection
 
@@ -93,10 +99,9 @@ When an in-scope PR link is found:
 
 1. Fetch PR metadata via GitHub API (`created_at`, current state).
 2. Add a `pr` tag to the parent support issue.
-3. Post a thread reply: _"PRs to `<repo>` have an SLA of `<SLA>`. I'll automatically escalate to the owning team (`<owning-team>`) if the PR isn't responded to before `<pr_created_at + SLA>`."_ The owning team is named but **not tagged** in this message.
-4. React to the message with an emoji (e.g. `:hourglass_flowing_sand:`) indicating an open PR under SLA.
-5. React to the top-level thread with an emoji (e.g. `:github:`) indicating it contains a PR review.
-6. Persist a `pr_tracking` record for lifecycle polling.
+3. Post the regular ticket form update plus a thread reply: _"PRs to `<repo>` have an SLA of `<SLA>`. I'll automatically escalate to the owning team (`<team-label>`) if the PR isn't responded to before `<pr_created_at + SLA>`."_ The team is named but **not tagged** in this message.
+4. React to the **top-level thread message** with an emoji (e.g. `:github:`) indicating the ticket contains a PR review request, regardless of which reply introduced the PR link.
+5. Persist a `pr_tracking` record for lifecycle polling.
 
 ### 6. PR Tracking State
 
@@ -111,24 +116,25 @@ create table if not exists pr_tracking
     sla_deadline  timestamptz not null,
     owning_team   text        not null,
     status        text        not null default 'OPEN',
-    escalated_at  timestamptz,
+    escalation_id bigint,
     closed_at     timestamptz,
     created_at    timestamptz not null default now(),
 
     constraint pr_tracking_ticket_id_fk foreign key (ticket_id) references ticket (id),
+    constraint pr_tracking_escalation_id_fk foreign key (escalation_id) references escalation (id),
     constraint pr_tracking_repo_pr_unique unique (ticket_id, github_repo, pr_number)
 );
 create index pr_tracking_status_idx on pr_tracking (status) where status != 'CLOSED';
 ```
 
-Slack thread coordinates are resolved via `ticket_id → query` (same pattern as `escalation`). The unique constraint prevents duplicate tracking per PR per ticket. `sla_deadline` and `owning_team` are snapshot at detection time so config changes don't retroactively alter in-flight tracking.
+Slack thread coordinates are resolved via `ticket_id → query` (same pattern as `escalation`). The unique constraint prevents duplicate tracking per PR per ticket. `sla_deadline` and `owning_team` are snapshot at detection time so config changes don't retroactively alter in-flight tracking. `escalation_id` links directly to the escalation record when auto-escalation is triggered.
 
 ### 7. Periodic Lifecycle Polling
 
-A `@Scheduled` task (default: every 60 minutes, configurable via `pr-identification.poll-interval`) processes all records where `status != 'CLOSED'`:
+A `@Scheduled` task runs on a business-hours cron (default: `0 0 9-18 * * 1-5`, configurable via `pr-identification.poll-cron`) and processes all records where `status != 'CLOSED'`:
 
 - **PR merged or closed** — set `status = CLOSED`, `closed_at`. Post a closure message in the thread, react with `:white_check_mark:`, and close the support thread.
-- **PR open, SLA expired, not yet escalated** — set `status = ESCALATED`, `escalated_at`. Post an escalation message **tagging the owning team via their Slack handle**.
+- **PR open, SLA expired, not yet escalated** — create escalation, set `status = ESCALATED`, persist `escalation_id`, and post an escalation message tagging the owning team (resolved from escalation-team config).
 - **PR open, within SLA** — no action.
 
 **Note on "responded to" vs "closed":** In v1, escalation triggers purely on SLA expiry + PR still open. This means a PR
