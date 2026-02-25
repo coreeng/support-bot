@@ -124,11 +124,6 @@ create table if not exists pr_tracking
 );
 ```
 
-The persistence model guarantees:
-
-- Snapshot semantics for deadline and owning-team at detection time (config changes do not retroactively alter in-flight records).
-- Efficient lookup of non-closed records for periodic polling.
-
 ### 7. Periodic Lifecycle Polling
 
 A `@Scheduled` task runs on a business-hours cron (default: `0 0 9-18 * * 1-5`, configurable via `pr-identification.poll-cron`) and processes all records where `status != 'CLOSED'`:
