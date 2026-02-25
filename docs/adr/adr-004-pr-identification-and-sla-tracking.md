@@ -1,7 +1,7 @@
 # ADR: PR Identification and SLA Tracking in Support Threads
 
 **Date:** 2026-02-25
-**Status:** Proposed
+**Status:** Accepted
 
 ---
 
@@ -40,7 +40,7 @@ A single property gates the entire pipeline, defaulting to `false`. All related 
 use `@ConditionalOnProperty` so nothing is instantiated when off.
 
 ```yaml
-pr-identification:
+pr-review-tracking:
   enabled: ${PR_IDENTIFICATION_ENABLED:false}
 ```
 
@@ -51,7 +51,7 @@ pr-identification:
 Tracked repositories are defined in Spring config:
 
 ```yaml
-pr-identification:
+pr-review-tracking:
   repositories:
     - name: my-org/onboarding-repo
       owning-team: wow
@@ -74,7 +74,7 @@ The bot supports two auth modes for GitHub API access:
 - `app` — mint GitHub App installation tokens in-process in the API (JWT + installation token exchange), with refresh before expiry.
 
 ```yaml
-pr-identification:
+pr-review-tracking:
   github:
     api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
     auth-mode: ${GITHUB_AUTH_MODE:token} # token | app
@@ -126,7 +126,7 @@ create table if not exists pr_tracking
 
 ### 7. Periodic Lifecycle Polling
 
-A `@Scheduled` task runs on a business-hours cron (default: `0 0 9-18 * * 1-5`, configurable via `pr-identification.poll-cron`) and processes all records where `status != 'CLOSED'`:
+A `@Scheduled` task runs on a business-hours cron (default: `0 0 9-18 * * 1-5`, configurable via `pr-review-tracking.poll-cron`) and processes all records where `status != 'CLOSED'`:
 
 - **PR merged or closed** — set `status = CLOSED`, `closed_at`. Post a closure message in the thread, react with `:white_check_mark:`, and close the support thread.
 - **PR open, SLA expired, not yet escalated** — create escalation, set `status = ESCALATED`, persist `escalation_id`, and post an escalation message tagging the owning team (resolved from escalation-team config).
