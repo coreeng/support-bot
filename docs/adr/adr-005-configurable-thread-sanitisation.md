@@ -22,7 +22,7 @@ summary-data:
   sanitisation:
     patterns:
       - "<?@?[UW][A-Z0-9]{8,}>?"                             # slack mentions
-      - "<mailto:[^|>]+\\|[^>]+>"                             # slack mailto links
+      - "<mailto:[^|>]+\\|[^>]+>"                            # slack mailto links
       - "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"    # email addresses
     remove-capitalised-words: true
     exceptions-file: commonly-capitalised-words.txt
