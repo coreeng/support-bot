@@ -7,6 +7,7 @@ import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.SummaryDataProps;
+import com.coreeng.supportbot.config.SummaryDataProps.SanitisationProperties;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
@@ -45,7 +46,8 @@ class SummaryDataControllerTest {
     @BeforeEach
     void setUp() {
         slackTicketsProps = new SlackTicketsProps("C123", "eyes", "eyes", "white_check_mark", "sos");
-        summaryDataProps = new SummaryDataProps("classpath:placeholder-analysis-bundle.zip");
+        summaryDataProps = new SummaryDataProps(
+                "classpath:placeholder-analysis-bundle.zip", new SanitisationProperties(List.of(), List.of()));
         objectMapper = new ObjectMapper();
         controller = new SummaryDataController(
                 threadService, slackTicketsProps, summaryDataProps, analysisService, objectMapper);
