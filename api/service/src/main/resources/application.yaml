@@ -102,6 +102,18 @@ ticket:
     remind-about-stale-cron: 0 10 9 * * 1-5
     stale-reminder-interval: 1d
 
+pr-review-tracking:
+  enabled: false
+  poll-cron: 0 0 9-18 * * 1-5
+  repositories: [ ]
+  github:
+    api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
+    auth-mode: ${GITHUB_AUTH_MODE:token} # token | app
+    token: ${GITHUB_TOKEN:} # Used only when auth-mode=token (typically PAT)
+    app-id: ${GITHUB_APP_ID:}
+    installation-id: ${GITHUB_APP_INSTALLATION_ID:}
+    private-key-pem: ${GITHUB_APP_PRIVATE_KEY_PEM:}
+
 enums:
   escalation-teams:
     - label: wow
