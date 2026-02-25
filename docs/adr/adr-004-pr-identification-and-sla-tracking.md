@@ -55,16 +55,16 @@ pr-identification:
   repositories:
     - name: my-org/onboarding-repo
       owning-team: wow
-      sla: 48h
+      sla: PT48H
     - name: my-org/another-repo
       owning-team: infra-integration
-      sla: 72h
+      sla: PT72H
 ```
 
 - `name` — matched against the `org/repo` component of GitHub PR URLs.
 - `owning-team` — escalation team **code** (from `enums.escalation-teams[*].code`).
 - Team `label` (for bot messages) and `slack-group-id` (for tagging) are resolved from `enums.escalation-teams` using `owning-team`.
-- `sla` — Spring duration format used elsewhere in this service (e.g. `48h`, `72h`).
+- `sla` — ISO-8601 duration (e.g. `PT48H`, `PT72H`), parsed to `java.time.Duration`.
 
 ### 3. GitHub Credentials
 
@@ -105,29 +105,30 @@ When an in-scope PR link is found:
 
 ### 6. PR Tracking State
 
+The API persists PR tracking records linked to the existing ticket model:
+
 ```sql
 create table if not exists pr_tracking
 (
-    id            bigserial   primary key,
-    ticket_id     bigint      not null,
-    github_repo   text        not null,
-    pr_number     integer     not null,
-    pr_created_at timestamptz not null,
-    sla_deadline  timestamptz not null,
-    owning_team   text        not null,
-    status        text        not null default 'OPEN',
-    escalation_id bigint,
+    id            bigserial,
+    ticket_id     bigint,
+    github_repo   text,
+    pr_number     integer,
+    pr_created_at timestamptz,
+    sla_deadline  timestamptz,
+    owning_team   text,
+    status        text,          -- OPEN | ESCALATED | CLOSED
+    escalation_id bigint,        -- set when auto-escalation is created
     closed_at     timestamptz,
-    created_at    timestamptz not null default now(),
-
-    constraint pr_tracking_ticket_id_fk foreign key (ticket_id) references ticket (id),
-    constraint pr_tracking_escalation_id_fk foreign key (escalation_id) references escalation (id),
-    constraint pr_tracking_repo_pr_unique unique (ticket_id, github_repo, pr_number)
+    created_at    timestamptz not null default now()
 );
-create index pr_tracking_status_idx on pr_tracking (status) where status != 'CLOSED';
 ```
 
-Slack thread coordinates are resolved via `ticket_id → query` (same pattern as `escalation`). The unique constraint prevents duplicate tracking per PR per ticket. `sla_deadline` and `owning_team` are snapshot at detection time so config changes don't retroactively alter in-flight tracking. `escalation_id` links directly to the escalation record when auto-escalation is triggered.
+The persistence model guarantees:
+
+- One tracking record per PR per ticket (idempotent when the same link is posted repeatedly).
+- Snapshot semantics for deadline and owning-team at detection time (config changes do not retroactively alter in-flight records).
+- Efficient lookup of non-closed records for periodic polling.
 
 ### 7. Periodic Lifecycle Polling
 
