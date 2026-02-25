@@ -1,82 +1,55 @@
 package com.coreeng.supportbot.summarydata;
 
+import com.coreeng.supportbot.config.SummaryDataProps;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.client.SlackClient;
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.request.conversations.ConversationsHistoryRequest;
 import com.slack.api.methods.request.conversations.ConversationsRepliesRequest;
 import com.slack.api.methods.response.conversations.ConversationsHistoryResponse;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
 import com.slack.api.model.Message;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
-/**
- * Service for fetching all messages from a Slack thread using the conversations.replies API.
- */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class ThreadService {
 
     private static final int PAGE_LIMIT = 200; // Recommended page size for Slack API
     private static final String WHITE_CHECK_MARK_EMOJI = "white_check_mark";
 
-    // Pattern to match Slack user/workspace mentions like <@U12345678> or @W12345678 or U12345678
-    private static final Pattern SLACK_MENTION_PATTERN = Pattern.compile("<?@?[UW][A-Z0-9]{8,}>?");
-
-    // Pattern to match capitalized words that might be names
-    private static final Pattern NAME_PATTERN = Pattern.compile("\\b([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)*)\\b");
-
-    // Common words that are capitalized but not names (to avoid false positives)
-    // Loaded from commonly-capitalised-words.txt resource file at startup
-    private static final Set<String> COMMON_WORDS = loadCommonWords();
-
     private final SlackClient slackClient;
+    private final ImmutableList<Pattern> compiledPatterns;
+    private final Set<String> exceptions;
 
-    /**
-     * Loads common words from the commonly-capitalised-words.txt resource file.
-     * This method is called once at class initialization time.
-     *
-     * @return Set of common capitalized words that should not be treated as names
-     */
-    private static Set<String> loadCommonWords() {
+    public ThreadService(SlackClient slackClient, SummaryDataProps props) {
+        this.slackClient = slackClient;
+        var sanitisation = props.sanitisation();
+        this.compiledPatterns = sanitisation.patterns().stream()
+                .map(ThreadService::compilePattern)
+                .collect(ImmutableList.toImmutableList());
+        this.exceptions = sanitisation.exceptions().stream()
+                .map(s -> s.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toUnmodifiableSet());
+        log.info("Loaded {} sanitisation patterns and {} exceptions", compiledPatterns.size(), exceptions.size());
+    }
+
+    private static Pattern compilePattern(String regex) {
         try {
-            ClassPathResource resource = new ClassPathResource("commonly-capitalised-words.txt");
-            Set<String> words = new HashSet<>();
-
-            try (BufferedReader reader =
-                    new BufferedReader(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    line = line.trim();
-                    if (!line.isEmpty() && !line.startsWith("#")) {
-                        words.add(line);
-                    }
-                }
-            }
-
-            log.info("Loaded {} common words from commonly-capitalised-words.txt", words.size());
-            return Set.copyOf(words); // Return immutable set
-        } catch (IOException e) {
-            log.error("Failed to load commonly-capitalised-words.txt, using empty set", e);
-            return Set.of(); // Return empty set on error
+            return Pattern.compile(regex);
+        } catch (PatternSyntaxException e) {
+            throw new IllegalArgumentException(
+                    "Invalid sanitisation pattern: \"" + regex + "\" — " + e.getDescription(), e);
         }
     }
 
@@ -166,107 +139,24 @@ public class ThreadService {
         return messageTexts;
     }
 
-    /**
-     * Remove human names from text using regex-based heuristics and a word exclusion list.
-     * Processes each line independently to preserve conversation structure.
-     * Identifies and removes:
-     * - Capitalized words that appear to be names (e.g., "Oleg", "John Smith")
-     * - Common name patterns in sentences
-     *
-     * @param text Text containing potential human names
-     * @return Text with names removed, preserving line delimiters
-     */
-    private String removeHumanNames(String text) {
-        if (text == null || text.isEmpty()) {
-            return text;
+    private String applySanitisation(String text) {
+        for (Pattern pattern : compiledPatterns) {
+            text = pattern.matcher(text).replaceAll(match -> {
+                if (exceptions.contains(match.group().toLowerCase(Locale.ROOT))) {
+                    return match.group();
+                }
+                return "";
+            });
         }
-
-        // Process each line independently to preserve conversation structure
-        Iterable<String> lines = Splitter.on('\n').split(text);
-        List<String> processedLines = new ArrayList<>();
-
-        for (String line : lines) {
-            // Skip empty lines
-            if (line.trim().isEmpty()) {
-                processedLines.add(line);
-                continue;
-            }
-
-            // Find capitalized words that might be names
-            Matcher matcher = NAME_PATTERN.matcher(line);
-            StringBuffer processedLine = new StringBuffer();
-
-            while (matcher.find()) {
-                String match = matcher.group(1);
-
-                // Split multi-word names
-                List<String> words = Splitter.onPattern("\\s+").splitToList(match);
-
-                // Filter out common words
-                List<String> filteredWords = words.stream()
-                        .filter(word -> !COMMON_WORDS.contains(word))
-                        .collect(Collectors.toList());
-
-                // If all words were common words, keep the original
-                if (filteredWords.isEmpty()) {
-                    matcher.appendReplacement(processedLine, Matcher.quoteReplacement(match));
-                    continue;
-                }
-
-                // Check if it's at start of line
-                boolean isStartOfLine = line.trim().startsWith(match);
-
-                // If it's a multi-word capitalized phrase (likely a name), remove it
-                if (words.size() > 1) {
-                    matcher.appendReplacement(processedLine, "");
-                    continue;
-                }
-
-                // Single word: remove if not at start of line or if it's clearly a name
-                if (!isStartOfLine || !filteredWords.isEmpty()) {
-                    // Additional heuristic: if the word is short (2-15 chars) and capitalized, likely a name
-                    if (match.length() >= 2 && match.length() <= 15 && match.matches("^[A-Z][a-z]+$")) {
-                        matcher.appendReplacement(processedLine, "");
-                        continue;
-                    }
-                }
-
-                matcher.appendReplacement(processedLine, Matcher.quoteReplacement(match));
-            }
-            matcher.appendTail(processedLine);
-
-            // Clean up extra whitespace within the line
-            String cleanedLine = processedLine
-                    .toString()
-                    .replaceAll("\\s+", " ") // Collapse multiple spaces
-                    .replaceAll("\\s+([.,!?;:])", "$1") // Remove space before punctuation
-                    .trim();
-
-            processedLines.add(cleanedLine);
-        }
-
-        // Join lines back with original line delimiters
-        return String.join("\n", processedLines);
+        return text.replaceAll("\\s+", " ").trim();
     }
 
-    /**
-     * Fetches all messages from a Slack thread, removes Slack user/workspace mentions,
-     * and joins them into a single string with double newline separators.
-     *
-     * @param channelId The Slack channel ID
-     * @param threadTs The thread timestamp (ts of the parent message)
-     * @return A single string with all message texts joined by "\n\n", with mentions removed
-     */
     public String getThreadAsText(String channelId, String threadTs) {
         log.debug("Fetching thread as text: channel={}, threadTs={}", channelId, threadTs);
 
         ImmutableList<String> messageTexts = getAllThreadMessageTexts(channelId, threadTs);
 
-        // Remove Slack mentions and human names from each message, then join with double newlines
-        String result = messageTexts.stream()
-                .map(text -> SLACK_MENTION_PATTERN.matcher(text).replaceAll(""))
-                .map(this::removeHumanNames)
-                .collect(Collectors.joining("\n\n"));
+        String result = messageTexts.stream().map(this::applySanitisation).collect(Collectors.joining("\n\n"));
 
         log.debug("Processed thread text, final length: {} characters", result.length());
 
