@@ -42,6 +42,40 @@ const mockTicketsMixedStatus = {
     totalElements: 4
 };
 
+const mockTicketsEscalationsAndDates = {
+    content: [
+        {
+            ...mockTicket('1', 'closed', 'engineering', 'high'),
+            tags: ['bug'],
+            escalations: [{ id: 'esc-1', team: { name: 'Support Team' } }],
+            logs: [
+                { event: 'opened', date: '2025-01-01T10:00:00Z' },
+                { event: 'closed', date: '2025-01-03T10:00:00Z' }
+            ]
+        },
+        {
+            ...mockTicket('2', 'closed', 'support', 'medium'),
+            tags: ['urgent'],
+            escalations: [{ id: 'esc-2', team: { name: 'Platform Team' } }],
+            logs: [
+                { event: 'opened', date: '2025-01-02T10:00:00Z' },
+                { event: 'closed', date: '2025-01-04T10:00:00Z' }
+            ]
+        },
+        {
+            ...mockTicket('3', 'opened', 'qa', 'low'),
+            tags: ['doc'],
+            escalations: [{ id: 'esc-3', team: { name: 'Support Team' } }],
+            logs: [
+                { event: 'opened', date: '2025-01-03T10:00:00Z' }
+            ]
+        }
+    ],
+    page: 0,
+    totalPages: 1,
+    totalElements: 3
+};
+
 const mockTeamsData = [
     { name: 'engineering', code: 'engineering', label: 'Engineering', types: ['tenant'] },
     { name: 'support', code: 'support', label: 'Support', types: ['tenant'] }
@@ -168,6 +202,44 @@ Given("Tickets API returns empty list", async function (this: CustomWorld) {
     );
 });
 
+Given("Tickets API endpoints are mocked with escalations and varied dates", async function (this: CustomWorld) {
+    await this.page.route("**/ticket**", (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(mockTicketsEscalationsAndDates)
+        })
+    );
+    await this.page.route("**/api/ticket**", (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(mockTicketsEscalationsAndDates)
+        })
+    );
+
+    await this.page.route("**/team?type=tenant*", (route) =>
+        route.fulfill({ status: 200, body: JSON.stringify(mockTeamsData) })
+    );
+    await this.page.route("**/api/team?type=tenant*", (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
+    );
+
+    await this.page.route("**/registry/impact*", (route) =>
+        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.impacts) })
+    );
+    await this.page.route("**/api/registry/impact*", (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockRegistryData.impacts) })
+    );
+
+    await this.page.route("**/registry/tag*", (route) =>
+        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.tags) })
+    );
+    await this.page.route("**/api/registry/tag*", (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockRegistryData.tags) })
+    );
+});
+
 // Navigation
 When("User navigates to the tickets page", async function (this: CustomWorld) {
     await this.page.goto(`${BASE_URL}/`, {
@@ -224,6 +296,38 @@ When("User clicks on the first ticket", async function (this: CustomWorld) {
     await this.page.waitForTimeout(300);
 });
 
+When("User selects {string} from escalated to filter", async function (this: CustomWorld, teamName: string) {
+    await this.page.locator('table').waitFor({ state: 'visible', timeout: 5000 });
+    const escalatedToFilter = this.page.locator('select').filter({ hasText: 'Escalated To' }).first();
+    await escalatedToFilter.waitFor({ state: 'visible', timeout: 5000 });
+    await escalatedToFilter.selectOption(teamName);
+    await this.page.waitForTimeout(800);
+});
+
+When("User sorts tickets by opened at", async function (this: CustomWorld) {
+    await this.page.locator('table').waitFor({ state: 'visible', timeout: 5000 });
+    const openedHeader = this.page.locator('thead th', { hasText: 'Opened At' });
+    const openedHeaderText = (await openedHeader.textContent()) || '';
+    if (!openedHeaderText.includes('↓')) {
+        await openedHeader.click();
+    }
+    await this.page.waitForTimeout(500);
+});
+
+When("User toggles opened at sort", async function (this: CustomWorld) {
+    await this.page.locator('thead th', { hasText: 'Opened At' }).click();
+    await this.page.waitForTimeout(500);
+});
+
+When("User sorts tickets by closed at", async function (this: CustomWorld) {
+    const closedHeader = this.page.locator('thead th', { hasText: 'Closed At' });
+    const closedHeaderText = (await closedHeader.textContent()) || '';
+    if (!closedHeaderText.includes('↓')) {
+        await closedHeader.click();
+    }
+    await this.page.waitForTimeout(500);
+});
+
 // Assertions
 Then("Tickets table should be visible", async function (this: CustomWorld) {
     const table = this.page.locator('table');
@@ -234,6 +338,8 @@ Then("Tickets table should have required headers", async function (this: CustomW
     await expect(this.page.locator('thead th', { hasText: 'Status' })).toBeVisible();
     await expect(this.page.locator('thead th', { hasText: 'Team' })).toBeVisible();
     await expect(this.page.locator('thead th', { hasText: 'Impact' })).toBeVisible();
+    await expect(this.page.locator('thead th', { hasText: 'Tags' })).toBeVisible();
+    await expect(this.page.locator('thead th', { hasText: 'Escalated To' })).toBeVisible();
 });
 
 Then("Tickets should display status information", async function (this: CustomWorld) {
@@ -258,6 +364,20 @@ Then("Tickets should display impact information", async function (this: CustomWo
     expect(count).toBeGreaterThan(0);
 });
 
+Then("Tickets should display tags information", async function (this: CustomWorld) {
+    const bodyText = await this.page.locator('tbody').textContent();
+    expect(bodyText).toBeTruthy();
+    expect(bodyText).toMatch(/bug|urgent|doc/i);
+});
+
+Then("Tickets should display escalated to information", async function (this: CustomWorld) {
+    await expect(this.page.locator('thead th', { hasText: 'Escalated To' })).toBeVisible();
+    const firstEscalatedToCell = this.page.locator('tbody tr td').nth(6);
+    await expect(firstEscalatedToCell).toBeVisible();
+    const cellText = (await firstEscalatedToCell.textContent()) || '';
+    expect(cellText.trim().length).toBeGreaterThan(0);
+});
+
 Then("Only opened tickets should be displayed", async function (this: CustomWorld) {
     // Wait for pagination to settle
     await this.page.waitForTimeout(500);
@@ -270,6 +390,29 @@ Then("Only opened tickets should be displayed", async function (this: CustomWorl
     const rows = this.page.locator('tbody tr');
     const count = await rows.count();
     expect(count).toBeGreaterThan(0);
+});
+
+Then("Only tickets escalated to {string} should be displayed", async function (this: CustomWorld, teamName: string) {
+    const bodyText = await this.page.locator('tbody').textContent();
+    expect(bodyText).toContain(teamName);
+
+    const nonMatching = teamName === 'Support Team' ? 'Platform Team' : 'Support Team';
+    expect(bodyText).not.toContain(nonMatching);
+});
+
+Then("Tickets should be sorted by opened at descending", async function (this: CustomWorld) {
+    const firstTeamCellText = await this.page.locator('tbody tr').first().locator('td').nth(1).textContent();
+    expect((firstTeamCellText || '').trim().toLowerCase()).toBe('qa');
+});
+
+Then("Tickets should be sorted by opened at ascending", async function (this: CustomWorld) {
+    const firstTeamCellText = await this.page.locator('tbody tr').first().locator('td').nth(1).textContent();
+    expect((firstTeamCellText || '').trim().toLowerCase()).toBe('engineering');
+});
+
+Then("Tickets should be sorted by closed at descending", async function (this: CustomWorld) {
+    const firstTeamCellText = await this.page.locator('tbody tr').first().locator('td').nth(1).textContent();
+    expect((firstTeamCellText || '').trim().toLowerCase()).toBe('support');
 });
 
 Then("Ticket details panel should appear", async function (this: CustomWorld) {
