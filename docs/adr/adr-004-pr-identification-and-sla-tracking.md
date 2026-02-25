@@ -126,7 +126,6 @@ create table if not exists pr_tracking
 
 The persistence model guarantees:
 
-- One tracking record per PR per ticket (idempotent when the same link is posted repeatedly).
 - Snapshot semantics for deadline and owning-team at detection time (config changes do not retroactively alter in-flight records).
 - Efficient lookup of non-closed records for periodic polling.
 
