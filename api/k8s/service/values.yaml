@@ -88,6 +88,13 @@ tolerations: []
 
 affinity: {}
 
+# Sanitisation configuration for data export (optional).
+# When both lists are empty, no sanitisation is applied.
+# Rendered into the ConfigMap application.yaml under summary-data.sanitisation.
+sanitisation:
+  patterns: []
+  exceptions: []
+
 # Auth allow-list configuration (optional).
 # When both lists are empty, all SSO-authenticated users are allowed.
 # Rendered into the ConfigMap application.yaml under security.allow-list.
