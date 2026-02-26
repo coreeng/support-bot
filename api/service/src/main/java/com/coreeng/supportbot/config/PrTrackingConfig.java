@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@ConditionalOnProperty(name = "pr-identification.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
 public class PrTrackingConfig {
 
     @Bean

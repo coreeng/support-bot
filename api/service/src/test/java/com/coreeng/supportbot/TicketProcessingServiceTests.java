@@ -1,6 +1,8 @@
 package com.coreeng.supportbot;
 
 import static java.util.Objects.requireNonNull;
+
+import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -63,7 +65,7 @@ public class TicketProcessingServiceTests {
         slackTicketsProps = new SlackTicketsProps("some-channel-id", "eyes", "ticket", "white_check_mark", "rocket");
         assignmentProps = new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(false, null));
         ticketProcessingService = new TicketProcessingService(
-                ticketRepository, slackService, escalationQueryService, slackTicketsProps, assignmentProps, publisher);
+                ticketRepository, slackService, escalationQueryService, slackTicketsProps, assignmentProps, publisher, Optional.empty());
     }
 
     @Test
@@ -165,7 +167,7 @@ public class TicketProcessingServiceTests {
                 new EscalationQueryService(new EscalationInMemoryRepository(timezone));
         ticketRepository = new TicketInMemoryRepository(escalationQueryService, timezone);
         ticketProcessingService = new TicketProcessingService(
-                ticketRepository, slackService, escalationQueryService, slackTicketsProps, assignmentProps, publisher);
+                ticketRepository, slackService, escalationQueryService, slackTicketsProps, assignmentProps, publisher, Optional.empty());
         MessageRef threadRef = new MessageRef(MESSAGE_TS, null, slackTicketsProps.channelId());
         when(slackService.postTicketForm(eq(threadRef), any()))
                 .thenReturn(new MessageRef(MessageTs.of("form"), MESSAGE_TS, slackTicketsProps.channelId()));
