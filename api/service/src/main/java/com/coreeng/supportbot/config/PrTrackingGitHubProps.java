@@ -21,6 +21,16 @@ public record PrTrackingGitHubProps(
         return new PrTrackingGitHubProps(PrTrackingAuthMode.TOKEN, "", "", "", "", "");
     }
 
+    @Override
+    public String toString() {
+        return "PrTrackingGitHubProps[authMode=" + authMode
+                + ", apiBaseUrl=" + apiBaseUrl
+                + ", token=REDACTED"
+                + ", appId=" + appId
+                + ", installationId=" + installationId
+                + ", privateKeyPem=REDACTED]";
+    }
+
     private static String nonNullString(String value) {
         return value == null ? "" : value;
     }

@@ -59,6 +59,46 @@ class GitHubAuthTokenProviderFactoryTest {
         assertThat(fetchCount.get()).isEqualTo(2);
     }
 
+    @Test
+    void returnsEmptyStringWhenFirstFetchFailsAndNoCachedToken() {
+        PrTrackingGitHubProps githubConfig = new PrTrackingGitHubProps(
+                PrTrackingAuthMode.APP, "https://api.github.com", "", "app-id", "installation-id", "private-key");
+        MutableClock clock = new MutableClock(Instant.parse("2026-02-26T10:00:00Z"));
+
+        GitHubAppInstallationTokenClient failingClient = (baseUrl, appId, installationId, privateKeyPem) -> {
+            throw new RuntimeException("GitHub unreachable");
+        };
+
+        GitHubAuthTokenProvider provider = GitHubAuthTokenProviderFactory.create(githubConfig, failingClient, clock);
+
+        assertThat(provider.getToken()).isEmpty();
+    }
+
+    @Test
+    void fallsBackToCachedTokenWhenRefreshFailsButTokenStillValid() {
+        PrTrackingGitHubProps githubConfig = new PrTrackingGitHubProps(
+                PrTrackingAuthMode.APP, "https://api.github.com", "", "app-id", "installation-id", "private-key");
+        MutableClock clock = new MutableClock(Instant.parse("2026-02-26T10:00:00Z"));
+        AtomicInteger fetchCount = new AtomicInteger(0);
+
+        GitHubAppInstallationTokenClient tokenClient = (baseUrl, appId, installationId, privateKeyPem) -> {
+            int call = fetchCount.incrementAndGet();
+            if (call > 1) {
+                throw new RuntimeException("GitHub unreachable");
+            }
+            return new GitHubInstallationToken("app-token-1", clock.instant().plusSeconds(3600));
+        };
+
+        GitHubAuthTokenProvider provider = GitHubAuthTokenProviderFactory.create(githubConfig, tokenClient, clock);
+
+        assertThat(provider.getToken()).isEqualTo("app-token-1");
+
+        // Advance into the refresh window (token expires at T+3600, refresh at T+3300)
+        clock.advanceBySeconds(3301);
+        assertThat(provider.getToken()).isEqualTo("app-token-1");
+        assertThat(fetchCount.get()).isEqualTo(2);
+    }
+
     private static final class MutableClock extends Clock {
         private Instant now;
 
