@@ -8,6 +8,11 @@ public class GitHubApiException extends RuntimeException {
         this.statusCode = statusCode;
     }
 
+    public GitHubApiException(int statusCode, String message, Throwable cause) {
+        super(message, cause);
+        this.statusCode = statusCode;
+    }
+
     public int statusCode() {
         return statusCode;
     }
