@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.github;
 
 import java.io.IOException;
+import java.util.Date;
 import java.util.Locale;
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHIssueState;
