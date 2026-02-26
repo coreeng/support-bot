@@ -1,8 +1,12 @@
 package com.coreeng.supportbot.config;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -11,19 +15,29 @@ public record PrTrackingProps(
         boolean enabled,
         String pollCron,
         List<PrTrackingRepositoryProps> repositories,
-        PrTrackingGitHubProps githubConfig) {
+        PrTrackingGitHubProps github) {
 
-    public PrTrackingProps {
-        repositories = repositories == null ? List.of() : List.copyOf(repositories);
-        githubConfig = githubConfig == null ? PrTrackingGitHubProps.defaultTokenModeConfig() : githubConfig;
+    public PrTrackingProps(
+            boolean enabled,
+            String pollCron,
+            @Nullable List<PrTrackingRepositoryProps> repositories,
+            @Nullable PrTrackingGitHubProps github) {
+        this.enabled = enabled;
+        this.pollCron = pollCron;
+        this.repositories = repositories == null ? List.of() : List.copyOf(repositories);
+        this.github = github == null ? PrTrackingGitHubProps.defaultTokenModeConfig() : github;
 
         if (enabled) {
-            validateRepositories(repositories);
-            validateConfig(githubConfig);
+            validateRepositories(this.repositories);
+            validateConfig(this.github);
         }
     }
 
     private static void validateRepositories(List<PrTrackingRepositoryProps> repositories) {
+        if (repositories.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "pr-review-tracking.repositories must not be empty when enabled");
+        }
         Set<String> names = new HashSet<>();
         for (PrTrackingRepositoryProps repository : repositories) {
             if (isBlank(repository.name())) {
