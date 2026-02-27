@@ -174,6 +174,26 @@ mock-data: # Generate mock data in case DB is empty. Purely for testing/demo pur
 metrics: # Prometheus metrics populated from database
   enabled: true # Set to false to disable
   refresh-interval: 60s # How often to refresh ticket metrics e.g. 60s
+
+pr-review-tracking: # Detects PR links in support threads and manages their lifecycle (SLA tracking, escalation, auto-close)
+  enabled: false # Feature flag — off by default
+  poll-cron: 0 0 9-18 * * 1-5 # Cron schedule for the lifecycle poller (default: business hours Mon–Fri)
+  pr-emoji: pr # Slack emoji added to the message when a PR is detected — must exist in your Slack workspace
+  tags: # Required when enabled: tag codes from enums.tags applied to the ticket when the bot auto-closes it
+    - <tag-code>
+  impact: <impact-code> # Required when enabled: impact code from enums.impacts applied when the bot auto-closes a ticket
+  repositories: # Repositories to watch. At least one entry is required when enabled.
+    - name: my-org/my-repo # Repository in org/repo format
+      owning-team: <team-code> # Team code from enums.escalation-teams — escalated when the SLA is breached
+      sla: PT48H # SLA duration for PRs in this repository (ISO 8601 duration, e.g. PT48H = 48 hours)
+  github:
+    api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
+    auth-mode: ${GITHUB_AUTH_MODE:token} # token | app
+    token: ${GITHUB_TOKEN:} # Personal Access Token — used only when auth-mode=token
+    app-id: ${GITHUB_APP_ID:} # GitHub App ID — used only when auth-mode=app
+    installation-id: ${GITHUB_APP_INSTALLATION_ID:} # GitHub App installation ID — used only when auth-mode=app
+    private-key-pem: ${GITHUB_APP_PRIVATE_KEY_PEM:} # PEM-encoded private key — used only when auth-mode=app
+                                                     # Supply as a YAML block scalar or base64-decode from an env var
 ```
 
 # Integrations

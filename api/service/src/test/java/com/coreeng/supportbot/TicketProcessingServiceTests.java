@@ -10,6 +10,7 @@ import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.EscalationInMemoryRepository;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
+import com.coreeng.supportbot.prtracking.PrDetectionService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackId;
@@ -46,6 +47,9 @@ public class TicketProcessingServiceTests {
 
     @Mock
     private TicketSlackService slackService;
+
+    @Mock
+    private PrDetectionService prDetectionService;
 
     private SlackTicketsProps slackTicketsProps;
     private TicketAssignmentProps assignmentProps;
@@ -178,5 +182,138 @@ public class TicketProcessingServiceTests {
         Ticket ticket = ticketRepository.findTicketByQuery(threadRef);
         assertNotNull(ticket);
         assertNull(ticket.assignedTo(), "Assignment is skipped when feature disabled");
+    }
+
+    @Test
+    public void shouldAutoCreateTicketAndNotifyPrDetectionWhenPrLinkDetected() {
+        // given
+        TicketProcessingService service = serviceWithPrDetection();
+        MessageRef queryRef = new MessageRef(MESSAGE_TS, null, slackTicketsProps.channelId());
+        MessageRef formRef = new MessageRef(MessageTs.of("form-ts"), MESSAGE_TS, slackTicketsProps.channelId());
+
+        when(prDetectionService.containsPrLinks(any())).thenReturn(true);
+        when(slackService.postTicketForm(eq(new MessageRef(MESSAGE_TS, slackTicketsProps.channelId())), any()))
+                .thenReturn(formRef);
+
+        // when
+        service.handleMessagePosted(
+                new MessagePosted("https://github.com/org/repo/pull/1", USER_ID, queryRef));
+
+        // then
+        assertTrue(ticketRepository.queryExists(queryRef), "query is created");
+        Ticket ticket = ticketRepository.findTicketByQuery(queryRef);
+        assertNotNull(ticket, "ticket is auto-created for PR link");
+        assertEquals(TicketStatus.opened, ticket.status());
+
+        verify(slackService).markPostTracked(new MessageRef(MESSAGE_TS, slackTicketsProps.channelId()));
+        verify(slackService).postTicketForm(eq(new MessageRef(MESSAGE_TS, slackTicketsProps.channelId())), any());
+
+        ArgumentCaptor<Ticket> ticketCaptor = ArgumentCaptor.forClass(Ticket.class);
+        verify(prDetectionService).handleMessagePosted(any(MessagePosted.class), ticketCaptor.capture());
+        assertEquals(ticket.id(), ticketCaptor.getValue().id());
+    }
+
+    @Test
+    public void shouldNotAutoCreateTicketWhenNoPrLinksInMessage() {
+        // given
+        TicketProcessingService service = serviceWithPrDetection();
+        MessageRef queryRef = new MessageRef(MESSAGE_TS, null, slackTicketsProps.channelId());
+
+        when(prDetectionService.containsPrLinks(any())).thenReturn(false);
+
+        // when
+        service.handleMessagePosted(new MessagePosted("just a question", USER_ID, queryRef));
+
+        // then
+        assertTrue(ticketRepository.queryExists(queryRef), "query is still created");
+        assertNull(ticketRepository.findTicketByQuery(queryRef), "no ticket created without PR link");
+        verify(prDetectionService, never()).handleMessagePosted(any(), any());
+    }
+
+    @Test
+    public void shouldCallPrDetectionOnThreadReplyForExistingTicket() {
+        // given — create a ticket first via reaction
+        TicketProcessingService service = serviceWithPrDetection();
+        MessageRef queryRef = new MessageRef(MESSAGE_TS, null, slackTicketsProps.channelId());
+        MessageRef formRef = new MessageRef(MessageTs.of("form-ts"), MESSAGE_TS, slackTicketsProps.channelId());
+
+        when(slackService.postTicketForm(any(), any())).thenReturn(formRef);
+        service.handleReactionAdded(
+                new ReactionAdded(slackTicketsProps.expectedInitialReaction(), USER_ID, queryRef));
+        Ticket ticket = ticketRepository.findTicketByQuery(queryRef);
+        assertNotNull(ticket);
+        TicketId ticketId = requireNonNull(ticket.id());
+
+        // when — a thread reply arrives
+        MessageRef replyRef = new MessageRef(
+                MessageTs.of("reply-ts"), MESSAGE_TS, slackTicketsProps.channelId());
+        service.handleMessagePosted(new MessagePosted("a PR follow-up", USER_ID, replyRef));
+
+        // then
+        ArgumentCaptor<Ticket> ticketCaptor = ArgumentCaptor.forClass(Ticket.class);
+        verify(prDetectionService).handleMessagePosted(any(MessagePosted.class), ticketCaptor.capture());
+        assertEquals(ticketId, ticketCaptor.getValue().id());
+    }
+
+    @Test
+    public void shouldCloseTicketWithGivenTagsAndImpact() {
+        // given
+        Ticket ticket = createTrackedTicket();
+        TicketId ticketId = requireNonNull(ticket.id());
+
+        // when
+        ticketProcessingService.closeForPrResolution(
+                ticketId, ImmutableList.of("pr-review", "infra"), "medium");
+
+        // then
+        Ticket closed = ticketRepository.findTicketById(ticketId);
+        assertNotNull(closed);
+        assertEquals(TicketStatus.closed, closed.status());
+        assertEquals(ImmutableList.of("pr-review", "infra"), closed.tags());
+        assertEquals("medium", closed.impact());
+        verify(slackService).markTicketClosed(any());
+    }
+
+    @Test
+    public void shouldSkipCloseForPrResolutionGracefullyWhenTicketNotFound() {
+        // when / then
+        assertDoesNotThrow(() ->
+                ticketProcessingService.closeForPrResolution(
+                        new TicketId(999L), ImmutableList.of("tag"), "low"));
+    }
+
+    @Test
+    public void shouldNotChangeStatusWhenTicketAlreadyClosed() {
+        // given — create and close the ticket once
+        Ticket ticket = createTrackedTicket();
+        TicketId ticketId = requireNonNull(ticket.id());
+        ticketProcessingService.closeForPrResolution(ticketId, ImmutableList.of("original-tag"), "low");
+
+        // when — attempt to close again with different values
+        ticketProcessingService.closeForPrResolution(
+                ticketId, ImmutableList.of("different-tag"), "high");
+
+        // then — tags from the first close are preserved
+        Ticket afterSecondClose = ticketRepository.findTicketById(ticketId);
+        assertNotNull(afterSecondClose);
+        assertEquals(TicketStatus.closed, afterSecondClose.status());
+        assertEquals(ImmutableList.of("original-tag"), afterSecondClose.tags());
+        assertEquals("low", afterSecondClose.impact());
+    }
+
+    private TicketProcessingService serviceWithPrDetection() {
+        return new TicketProcessingService(
+                ticketRepository, slackService,
+                new EscalationQueryService(new EscalationInMemoryRepository(ZoneId.of("UTC"))),
+                slackTicketsProps, assignmentProps, publisher, Optional.of(prDetectionService));
+    }
+
+    private Ticket createTrackedTicket() {
+        MessageRef queryRef = new MessageRef(MESSAGE_TS, null, slackTicketsProps.channelId());
+        MessageRef formRef = new MessageRef(MessageTs.of("form-ts"), MESSAGE_TS, slackTicketsProps.channelId());
+        when(slackService.postTicketForm(any(), any())).thenReturn(formRef);
+        ticketProcessingService.handleReactionAdded(
+                new ReactionAdded(slackTicketsProps.expectedInitialReaction(), USER_ID, queryRef));
+        return requireNonNull(ticketRepository.findTicketByQuery(queryRef));
     }
 }
