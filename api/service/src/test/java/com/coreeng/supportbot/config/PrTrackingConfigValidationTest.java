@@ -11,127 +11,123 @@ class PrTrackingConfigValidationTest {
 
     @Test
     void acceptsValidTokenModeWhenEnabled() {
-        PrTrackingRepositoryProps repository =
-                new PrTrackingRepositoryProps("my-org/onboarding-repo", "wow", Duration.ofDays(2));
-        PrTrackingGitHubProps githubConfig = new PrTrackingGitHubProps(
-                PrTrackingAuthMode.TOKEN,
-                "https://api.github.com",
-                "pat-123",
-                "",
-                "",
-                "");
-
-        assertThatCode(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", List.of(repository), githubConfig))
+        // when / then
+        assertThatCode(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(validRepo()), validTokenGithub()))
                 .doesNotThrowAnyException();
     }
 
     @Test
     void rejectsDuplicateRepositoryNamesIgnoringCase() {
-        PrTrackingRepositoryProps repoA =
-                new PrTrackingRepositoryProps("my-org/onboarding-repo", "wow", Duration.ofDays(2));
-        PrTrackingRepositoryProps repoB =
-                new PrTrackingRepositoryProps("MY-ORG/ONBOARDING-REPO", "infra", Duration.ofDays(1));
+        // given
+        PrTrackingRepositoryProps repoA = validRepoWithName("my-org/onboarding-repo");
+        PrTrackingRepositoryProps repoB = validRepoWithName("MY-ORG/ONBOARDING-REPO");
 
+        // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
-                        true,
-                        "0 0 9-18 * * 1-5",
-                        List.of(repoA, repoB),
-                        new PrTrackingGitHubProps(
-                                PrTrackingAuthMode.TOKEN,
-                                "https://api.github.com",
-                                "pat-123",
-                                "",
-                                "",
-                                "")))
+                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(repoA, repoB), validTokenGithub()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("contains duplicates");
     }
 
     @Test
     void rejectsMissingTokenWhenTokenModeEnabled() {
-        PrTrackingRepositoryProps repository =
-                new PrTrackingRepositoryProps("my-org/onboarding-repo", "wow", Duration.ofDays(2));
-        PrTrackingGitHubProps githubConfig = new PrTrackingGitHubProps(
-                PrTrackingAuthMode.TOKEN,
-                "https://api.github.com",
-                "",
-                "",
-                "",
-                "");
+        // given
+        PrTrackingGitHubProps noToken = new PrTrackingGitHubProps(
+                PrTrackingAuthMode.TOKEN, "https://api.github.com", "", "", "", "");
 
-        assertThatThrownBy(
-                        () -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", List.of(repository), githubConfig))
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(validRepo()), noToken))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("github.token");
     }
 
     @Test
     void rejectsMissingGitHubAppFieldsWhenAppModeEnabled() {
-        PrTrackingRepositoryProps repository =
-                new PrTrackingRepositoryProps("my-org/onboarding-repo", "wow", Duration.ofDays(2));
-        PrTrackingGitHubProps githubConfig = new PrTrackingGitHubProps(
-                PrTrackingAuthMode.APP,
-                "https://api.github.com",
-                "",
-                "12345",
-                "",
-                "");
+        // given
+        PrTrackingGitHubProps appNoInstallation = new PrTrackingGitHubProps(
+                PrTrackingAuthMode.APP, "https://api.github.com", "", "12345", "", "");
 
-        assertThatThrownBy(
-                        () -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", List.of(repository), githubConfig))
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(validRepo()), appNoInstallation))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("installation-id");
     }
 
     @Test
     void acceptsValidAppModeWhenEnabled() {
-        PrTrackingRepositoryProps repository =
-                new PrTrackingRepositoryProps("my-org/onboarding-repo", "wow", Duration.ofDays(2));
-        PrTrackingGitHubProps githubConfig = new PrTrackingGitHubProps(
-                PrTrackingAuthMode.APP,
-                "https://api.github.com",
-                "",
-                "12345",
-                "67890",
-                "-----BEGIN RSA PRIVATE KEY-----");
+        // given
+        PrTrackingGitHubProps appConfig = new PrTrackingGitHubProps(
+                PrTrackingAuthMode.APP, "https://api.github.com", "", "12345", "67890", "-----BEGIN RSA PRIVATE KEY-----");
 
-        assertThatCode(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", List.of(repository), githubConfig))
+        // when / then
+        assertThatCode(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(validRepo()), appConfig))
                 .doesNotThrowAnyException();
     }
 
     @Test
     void rejectsRepoNameWithExtraSlashes() {
-        PrTrackingRepositoryProps repository =
-                new PrTrackingRepositoryProps("my-org/sub/repo", "wow", Duration.ofDays(2));
+        // given
+        PrTrackingRepositoryProps badName = new PrTrackingRepositoryProps(
+                "my-org/sub/repo", "wow", Duration.ofDays(2));
 
-        assertThatThrownBy(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", List.of(repository), validTokenGithub()))
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(badName), validTokenGithub()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("org/repo format");
     }
 
     @Test
     void rejectsZeroSlaWhenEnabled() {
-        PrTrackingRepositoryProps repository = new PrTrackingRepositoryProps("my-org/repo", "wow", Duration.ZERO);
+        // given
+        PrTrackingRepositoryProps zeroSla = new PrTrackingRepositoryProps(
+                "my-org/repo", "wow", Duration.ZERO);
 
-        assertThatThrownBy(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", List.of(repository), validTokenGithub()))
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(zeroSla), validTokenGithub()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("positive duration");
     }
 
     @Test
+    void rejectsEmptyTagsWhenEnabled() {
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", "pr", List.of(), "low", List.of(validRepo()), validTokenGithub()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("tags must not be empty");
+    }
+
+    @Test
+    void rejectsBlankImpactWhenEnabled() {
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "", List.of(validRepo()), validTokenGithub()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("impact must not be blank");
+    }
+
+    @Test
     void rejectsEmptyRepositoryListWhenEnabled() {
-        assertThatThrownBy(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", List.of(), validTokenGithub()))
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(), validTokenGithub()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must not be empty");
     }
 
     @Test
     void skipsAllValidationWhenDisabled() {
+        // given
         PrTrackingRepositoryProps badRepo = new PrTrackingRepositoryProps("", "", Duration.ZERO);
 
-        assertThatCode(() ->
-                        new PrTrackingProps(false, "", List.of(badRepo), PrTrackingGitHubProps.defaultTokenModeConfig()))
+        // when / then
+        assertThatCode(() -> new PrTrackingProps(false, "", null, null, null, List.of(badRepo), PrTrackingGitHubProps.defaultTokenModeConfig()))
                 .doesNotThrowAnyException();
+    }
+
+    private static PrTrackingRepositoryProps validRepo() {
+        return validRepoWithName("my-org/onboarding-repo");
+    }
+
+    private static PrTrackingRepositoryProps validRepoWithName(String name) {
+        return new PrTrackingRepositoryProps(name, "wow", Duration.ofDays(2));
     }
 
     private static PrTrackingGitHubProps validTokenGithub() {

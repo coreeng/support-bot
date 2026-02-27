@@ -14,20 +14,36 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 public record PrTrackingProps(
         boolean enabled,
         String pollCron,
+        String prEmoji,
+        List<String> tags,
+        String impact,
         List<PrTrackingRepositoryProps> repositories,
         PrTrackingGitHubProps github) {
 
     public PrTrackingProps(
             boolean enabled,
             String pollCron,
+            @Nullable String prEmoji,
+            @Nullable List<String> tags,
+            @Nullable String impact,
             @Nullable List<PrTrackingRepositoryProps> repositories,
             @Nullable PrTrackingGitHubProps github) {
         this.enabled = enabled;
         this.pollCron = pollCron;
+        this.prEmoji = prEmoji == null ? "pr" : prEmoji;
+        this.tags = tags == null ? List.of() : List.copyOf(tags);
+        this.impact = impact == null ? "" : impact;
         this.repositories = repositories == null ? List.of() : List.copyOf(repositories);
         this.github = github == null ? PrTrackingGitHubProps.defaultTokenModeConfig() : github;
 
         if (enabled) {
+            requireNotBlank(this.prEmoji, "pr-review-tracking.pr-emoji must not be blank");
+            if (this.tags.isEmpty()) {
+                throw new IllegalArgumentException("pr-review-tracking.tags must not be empty when enabled");
+            }
+            if (isBlank(this.impact)) {
+                throw new IllegalArgumentException("pr-review-tracking.impact must not be blank when enabled");
+            }
             validateRepositories(this.repositories);
             validateConfig(this.github);
         }

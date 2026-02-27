@@ -4,9 +4,11 @@ import static com.coreeng.supportbot.dbschema.Tables.PR_TRACKING;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
+import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +41,38 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 .where(PR_TRACKING.STATUS.eq(status))
                 .fetch()
                 .map(JdbcPrTrackingRepository::toRecord);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<PrTrackingRecord> findAllActive() {
+        return dsl.selectFrom(PR_TRACKING)
+                .where(PR_TRACKING.STATUS.in(PrTrackingStatus.OPEN, PrTrackingStatus.ESCALATED))
+                .fetch()
+                .map(JdbcPrTrackingRepository::toRecord);
+    }
+
+    @Override
+    public PrTrackingRecord updateStatus(
+            long id, PrTrackingStatus newStatus, @Nullable Instant closedAt, @Nullable Long escalationId) {
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row =
+                dsl.update(PR_TRACKING)
+                        .set(PR_TRACKING.STATUS, newStatus)
+                        .set(PR_TRACKING.CLOSED_AT, closedAt)
+                        .set(PR_TRACKING.ESCALATION_ID, escalationId)
+                        .where(PR_TRACKING.ID.eq(id))
+                        .returning()
+                        .fetchSingle();
+        return toRecord(row);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public boolean hasAnyActiveForTicket(long ticketId) {
+        return dsl.fetchExists(
+                PR_TRACKING,
+                PR_TRACKING.TICKET_ID.eq(ticketId)
+                        .and(PR_TRACKING.STATUS.in(PrTrackingStatus.OPEN, PrTrackingStatus.ESCALATED)));
     }
 
     @Transactional(readOnly = true)

@@ -4,6 +4,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
+import com.google.common.collect.ImmutableList;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.prtracking.PrDetectionService;
 import com.coreeng.supportbot.slack.MessageRef;
@@ -239,6 +240,26 @@ public class TicketProcessingService {
         publisher.publishEvent(new TicketEscalated(ticket, request.team(), request.threadPermalink(), request.tags()));
         log.atInfo().addKeyValue("ticketId", checkNotNull(ticket.id()).id()).log("Ticket escalated");
         slackService.markTicketEscalated(ticket.queryRef());
+    }
+
+    public void closeForPrResolution(TicketId ticketId, ImmutableList<String> tags, String impact) {
+        Ticket ticket = repository.findTicketById(ticketId);
+        if (ticket == null) {
+            log.atWarn().addArgument(ticketId).log("Ticket {} not found for bot close, skipping");
+            return;
+        }
+        if (ticket.status() == TicketStatus.closed) {
+            log.atDebug().addArgument(ticketId).log("Ticket {} already closed, skipping");
+            return;
+        }
+        Ticket updated = repository.updateTicket(ticket.toBuilder()
+                .status(TicketStatus.closed)
+                .tags(tags)
+                .impact(impact)
+                .lastInteractedAt(Instant.now())
+                .build());
+        onStatusUpdate(updated);
+        log.atInfo().addKeyValue("ticketId", ticketId.id()).log("Ticket closed automatically — all tracked PRs resolved");
     }
 
     public void markAsStale(TicketId ticketId) {

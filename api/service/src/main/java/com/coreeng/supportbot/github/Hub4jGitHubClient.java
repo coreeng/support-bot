@@ -35,6 +35,9 @@ public final class Hub4jGitHubClient implements GitHubClient {
                     pullNumber,
                     createdAt.toInstant(),
                     state.name().toLowerCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new GitHubApiException(
+                    0, "Invalid repository name '%s': %s".formatted(repositoryName, e.getMessage()), e);
         } catch (GHFileNotFoundException e) {
             throw new GitHubApiException(
                     404, "PR not found: %s#%d".formatted(repositoryName, pullNumber), e);
