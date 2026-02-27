@@ -3,8 +3,36 @@ import { auth } from "@/auth";
 const BACKEND_URL = process.env.BACKEND_URL!;
 
 /**
+ * Fetch with logging and error handling.
+ * Non-ok responses and network failures are always logged.
+ * Set PROXY_LOGGING=true to also log successful requests.
+ * Returns a 502 on network failure instead of throwing.
+ */
+export async function proxyFetch(
+  tag: string,
+  path: string,
+  url: string,
+  options: RequestInit
+): Promise<Response> {
+  const method = options.method?.toUpperCase() || "GET";
+  const start = Date.now();
+
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      console.error(`[${tag}] ${method} ${path} ${response.status} (${Date.now() - start}ms)`);
+    } else if (process.env.PROXY_LOGGING === "true") {
+      console.log(`[${tag}] ${method} ${path} ${response.status} (${Date.now() - start}ms)`);
+    }
+    return response;
+  } catch (error) {
+    console.error(`[${tag}] ${method} ${path} FAILED (${Date.now() - start}ms)`, error);
+    return Response.json({ error: "Backend service unreachable" }, { status: 502 });
+  }
+}
+
+/**
  * Authenticated fetch to backend API.
- * Automatically injects the user's access token from the session.
  * Returns null if user is not authenticated (caller should handle 401).
  */
 export async function backendFetch(
@@ -23,8 +51,7 @@ export async function backendFetch(
   headers.set("Authorization", `Bearer ${session.accessToken}`);
 
   const url = path.startsWith("http") ? path : `${BACKEND_URL}${path}`;
-
-  return fetch(url, { ...options, headers });
+  return proxyFetch("proxy", path, url, { ...options, headers });
 }
 
 /**
