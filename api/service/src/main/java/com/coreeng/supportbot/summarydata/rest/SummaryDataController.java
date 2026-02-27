@@ -1,7 +1,7 @@
 package com.coreeng.supportbot.summarydata.rest;
 
 import com.coreeng.supportbot.analysis.AnalysisRepository;
-import com.coreeng.supportbot.analysis.AnalysisService;
+import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.SummaryDataProps;
 import com.coreeng.supportbot.summarydata.ThreadService;
@@ -38,7 +38,7 @@ public class SummaryDataController {
     private final ThreadService threadService;
     private final SlackTicketsProps slackTicketsProps;
     private final SummaryDataProps summaryDataProps;
-    private final AnalysisService analysisService;
+    private final AnalysisResultsService analysisResultsService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -166,7 +166,7 @@ public class SummaryDataController {
             log.info("Parsed {} valid records from {} total lines", records.size(), totalLines);
 
             // Import data using AnalysisService
-            int importedCount = analysisService.importAnalysisData(records);
+            int importedCount = analysisResultsService.importAnalysisData(records);
 
             log.info("Successfully imported {} analysis records", importedCount);
 

@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 import com.coreeng.supportbot.analysis.AnalysisRepository;
-import com.coreeng.supportbot.analysis.AnalysisService;
+import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.SummaryDataProps;
 import com.coreeng.supportbot.config.SummaryDataProps.SanitisationProperties;
@@ -36,7 +36,7 @@ class SummaryDataControllerTest {
     private ThreadService threadService;
 
     @Mock
-    private AnalysisService analysisService;
+    private AnalysisResultsService analysisResultsService;
 
     private SlackTicketsProps slackTicketsProps;
     private SummaryDataProps summaryDataProps;
@@ -50,7 +50,7 @@ class SummaryDataControllerTest {
                 "classpath:placeholder-analysis-bundle.zip", new SanitisationProperties(List.of(), List.of()));
         objectMapper = new ObjectMapper();
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, summaryDataProps, analysisService, objectMapper);
+                threadService, slackTicketsProps, summaryDataProps, analysisResultsService, objectMapper);
     }
 
     // --- Export tests ---
@@ -146,7 +146,7 @@ class SummaryDataControllerTest {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "data.jsonl", "application/jsonl", jsonl.getBytes(StandardCharsets.UTF_8));
 
-        when(analysisService.importAnalysisData(anyList())).thenReturn(2);
+        when(analysisResultsService.importAnalysisData(anyList())).thenReturn(2);
 
         // when
         ResponseEntity<SummaryDataController.ImportResponse> response = controller.importAnalysisData(file);
@@ -159,7 +159,7 @@ class SummaryDataControllerTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<AnalysisRepository.AnalysisRecord>> captor = ArgumentCaptor.forClass(List.class);
-        verify(analysisService).importAnalysisData(captor.capture());
+        verify(analysisResultsService).importAnalysisData(captor.capture());
 
         List<AnalysisRepository.AnalysisRecord> records = captor.getValue();
         assertThat(records).hasSize(2);
@@ -179,7 +179,7 @@ class SummaryDataControllerTest {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "data.jsonl", "application/jsonl", jsonl.getBytes(StandardCharsets.UTF_8));
 
-        when(analysisService.importAnalysisData(anyList())).thenReturn(2);
+        when(analysisResultsService.importAnalysisData(anyList())).thenReturn(2);
 
         // when
         ResponseEntity<SummaryDataController.ImportResponse> response = controller.importAnalysisData(file);
@@ -189,7 +189,7 @@ class SummaryDataControllerTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<AnalysisRepository.AnalysisRecord>> captor = ArgumentCaptor.forClass(List.class);
-        verify(analysisService).importAnalysisData(captor.capture());
+        verify(analysisResultsService).importAnalysisData(captor.capture());
 
         List<AnalysisRepository.AnalysisRecord> records = captor.getValue();
         assertThat(records).hasSize(2);
@@ -209,7 +209,7 @@ class SummaryDataControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().message()).containsIgnoringCase("empty");
-        verifyNoInteractions(analysisService);
+        verifyNoInteractions(analysisResultsService);
     }
 
     @Test
@@ -220,7 +220,7 @@ class SummaryDataControllerTest {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "data.jsonl", "application/jsonl", jsonl.getBytes(StandardCharsets.UTF_8));
 
-        when(analysisService.importAnalysisData(anyList()))
+        when(analysisResultsService.importAnalysisData(anyList()))
                 .thenThrow(new DataAccessResourceFailureException("Connection refused"));
 
         // when

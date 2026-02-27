@@ -1,0 +1,196 @@
+package com.coreeng.supportbot.analysis;
+
+import static com.coreeng.supportbot.dbschema.Tables.ANALYSIS;
+import static org.jooq.impl.DSL.excluded;
+import static org.jooq.impl.DSL.row;
+
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.jooq.DSLContext;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * JOOQ-based implementation of {@link AnalysisRepository}.
+ *
+ * <p>This repository uses:
+ * <ul>
+ *   <li>Raw SQL with CTEs for complex aggregation queries</li>
+ *   <li>JOOQ's type-safe DSL for upsert operations</li>
+ *   <li>PostgreSQL's {@code ON CONFLICT} clause for upserts</li>
+ * </ul>
+ */
+@Repository
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class JdbcAnalysisResultsRepository implements AnalysisRepository {
+
+    private final DSLContext dsl;
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Uses a CTE to find the top 5 categories, then ranks summaries by creation date
+     * and returns up to 5 examples per category.
+     */
+    @Override
+    public List<DimensionSummary> getKnowledgeGapCategoriesWithSummaries() {
+        String sql = """
+                WITH top_categories AS (
+                    SELECT category, COUNT(*) as query_count
+                    FROM analysis
+                    WHERE driver = 'Knowledge Gap'
+                    GROUP BY category
+                    ORDER BY COUNT(*) DESC
+                    LIMIT 5
+                ),
+                ranked_summaries AS (
+                    SELECT
+                        a.category,
+                        tc.query_count,
+                        a.summary,
+                        q.channel_id,
+                        q.ts as query_ts,
+                        ROW_NUMBER() OVER (PARTITION BY a.category ORDER BY a.created_at DESC) as rn
+                    FROM analysis a
+                    INNER JOIN top_categories tc ON a.category = tc.category
+                    INNER JOIN ticket t ON a.ticket_id = t.id
+                    INNER JOIN query q ON t.query_id = q.id
+                    WHERE a.driver = 'Knowledge Gap'
+                )
+                SELECT
+                    category as dimension,
+                    query_count,
+                    summary,
+                    channel_id,
+                    query_ts
+                FROM ranked_summaries
+                WHERE rn <= 5
+                ORDER BY query_count DESC, dimension, rn
+                """;
+
+        return dsl.resultQuery(sql)
+                .fetch(r -> new DimensionSummary(
+                        r.get("dimension", String.class),
+                        r.get("query_count", Long.class),
+                        r.get("summary", String.class),
+                        r.get("channel_id", String.class),
+                        r.get("query_ts", String.class)));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Uses a CTE to find the top 5 drivers, then ranks summaries by creation date
+     * and returns up to 5 examples per driver.
+     */
+    @Override
+    public List<DimensionSummary> getDriversWithSummaries() {
+        String sql = """
+                WITH top_drivers AS (
+                    SELECT driver, COUNT(*) as query_count
+                    FROM analysis
+                    GROUP BY driver
+                    ORDER BY COUNT(*) DESC
+                    LIMIT 5
+                ),
+                ranked_summaries AS (
+                    SELECT
+                        a.driver,
+                        td.query_count,
+                        a.summary,
+                        q.channel_id,
+                        q.ts as query_ts,
+                        ROW_NUMBER() OVER (PARTITION BY a.driver ORDER BY a.created_at DESC) as rn
+                    FROM analysis a
+                    INNER JOIN top_drivers td ON a.driver = td.driver
+                    INNER JOIN ticket t ON a.ticket_id = t.id
+                    INNER JOIN query q ON t.query_id = q.id
+                )
+                SELECT
+                    driver as dimension,
+                    query_count,
+                    summary,
+                    channel_id,
+                    query_ts
+                FROM ranked_summaries
+                WHERE rn <= 5
+                ORDER BY query_count DESC, dimension, rn
+                """;
+
+        return dsl.resultQuery(sql)
+                .fetch(r -> new DimensionSummary(
+                        r.get("dimension", String.class),
+                        r.get("query_count", Long.class),
+                        r.get("summary", String.class),
+                        r.get("channel_id", String.class),
+                        r.get("query_ts", String.class)));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Uses JOOQ's {@code valuesOfRows} for efficient batch insertion with
+     * {@code ON CONFLICT (ticket_id) DO UPDATE} to handle duplicates.
+     */
+    @Override
+    @Transactional
+    public int upsert(List<AnalysisRecord> records) {
+        if (records.isEmpty()) {
+            return 0;
+        }
+
+        return dsl.insertInto(
+                        ANALYSIS,
+                        ANALYSIS.TICKET_ID,
+                        ANALYSIS.DRIVER,
+                        ANALYSIS.CATEGORY,
+                        ANALYSIS.FEATURE,
+                        ANALYSIS.SUMMARY,
+                        ANALYSIS.PROMPT_ID)
+                .valuesOfRows(records.stream()
+                        .map(r -> row(r.ticketId(), r.driver(), r.category(), r.feature(), r.summary(), r.promptId()))
+                        .toList())
+                .onConflict(ANALYSIS.TICKET_ID)
+                .doUpdate()
+                .set(ANALYSIS.DRIVER, excluded(ANALYSIS.DRIVER))
+                .set(ANALYSIS.CATEGORY, excluded(ANALYSIS.CATEGORY))
+                .set(ANALYSIS.FEATURE, excluded(ANALYSIS.FEATURE))
+                .set(ANALYSIS.SUMMARY, excluded(ANALYSIS.SUMMARY))
+                .set(ANALYSIS.PROMPT_ID, excluded(ANALYSIS.PROMPT_ID))
+                .execute();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Uses {@code ON CONFLICT (ticket_id) DO UPDATE} to insert or update based on ticket ID.
+     */
+    @Override
+    @Transactional
+    public void upsert(AnalysisRecord record) {
+        dsl.insertInto(
+                        ANALYSIS,
+                        ANALYSIS.TICKET_ID,
+                        ANALYSIS.DRIVER,
+                        ANALYSIS.CATEGORY,
+                        ANALYSIS.FEATURE,
+                        ANALYSIS.SUMMARY,
+                        ANALYSIS.PROMPT_ID)
+                .values(
+                        record.ticketId(),
+                        record.driver(),
+                        record.category(),
+                        record.feature(),
+                        record.summary(),
+                        record.promptId())
+                .onConflict(ANALYSIS.TICKET_ID)
+                .doUpdate()
+                .set(ANALYSIS.DRIVER, excluded(ANALYSIS.DRIVER))
+                .set(ANALYSIS.CATEGORY, excluded(ANALYSIS.CATEGORY))
+                .set(ANALYSIS.FEATURE, excluded(ANALYSIS.FEATURE))
+                .set(ANALYSIS.SUMMARY, excluded(ANALYSIS.SUMMARY))
+                .set(ANALYSIS.PROMPT_ID, excluded(ANALYSIS.PROMPT_ID))
+                .execute();
+    }
+}
