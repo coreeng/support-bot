@@ -10,6 +10,7 @@ import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.EscalationInMemoryRepository;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
+import com.coreeng.supportbot.prtracking.PrDetectionOutcome;
 import com.coreeng.supportbot.prtracking.PrDetectionService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
@@ -192,6 +193,7 @@ public class TicketProcessingServiceTests {
         MessageRef formRef = new MessageRef(MessageTs.of("form-ts"), MESSAGE_TS, slackTicketsProps.channelId());
 
         when(prDetectionService.containsPrLinks(any())).thenReturn(true);
+        when(prDetectionService.handleMessagePosted(any(), any())).thenReturn(PrDetectionOutcome.tracked());
         when(slackService.postTicketForm(eq(new MessageRef(MESSAGE_TS, slackTicketsProps.channelId())), any()))
                 .thenReturn(formRef);
 
@@ -238,6 +240,7 @@ public class TicketProcessingServiceTests {
         MessageRef formRef = new MessageRef(MessageTs.of("form-ts"), MESSAGE_TS, slackTicketsProps.channelId());
 
         when(slackService.postTicketForm(any(), any())).thenReturn(formRef);
+        when(prDetectionService.handleMessagePosted(any(), any())).thenReturn(PrDetectionOutcome.tracked());
         service.handleReactionAdded(
                 new ReactionAdded(slackTicketsProps.expectedInitialReaction(), USER_ID, queryRef));
         Ticket ticket = ticketRepository.findTicketByQuery(queryRef);
@@ -253,6 +256,60 @@ public class TicketProcessingServiceTests {
         ArgumentCaptor<Ticket> ticketCaptor = ArgumentCaptor.forClass(Ticket.class);
         verify(prDetectionService).handleMessagePosted(any(MessagePosted.class), ticketCaptor.capture());
         assertEquals(ticketId, ticketCaptor.getValue().id());
+    }
+
+    @Test
+    public void shouldCloseTicketWhenPrDetectionSignalsAlreadyMerged() {
+        // given — PR link in the opening message, GitHub says the PR is already merged
+        TicketProcessingService service = serviceWithPrDetection();
+        MessageRef queryRef = new MessageRef(MESSAGE_TS, null, slackTicketsProps.channelId());
+        MessageRef formRef = new MessageRef(MessageTs.of("form-ts"), MESSAGE_TS, slackTicketsProps.channelId());
+
+        when(prDetectionService.containsPrLinks(any())).thenReturn(true);
+        when(prDetectionService.handleMessagePosted(any(), any()))
+                .thenReturn(PrDetectionOutcome.notOpen(ImmutableList.of("pr-review"), "low"));
+        when(slackService.postTicketForm(eq(new MessageRef(MESSAGE_TS, slackTicketsProps.channelId())), any()))
+                .thenReturn(formRef);
+
+        // when
+        service.handleMessagePosted(
+                new MessagePosted("https://github.com/org/repo/pull/1", USER_ID, queryRef));
+
+        // then — ticket is auto-created and immediately closed with the tags/impact from the outcome
+        Ticket ticket = ticketRepository.findTicketByQuery(queryRef);
+        assertNotNull(ticket, "ticket is created");
+        assertEquals(TicketStatus.closed, ticket.status());
+        assertEquals(ImmutableList.of("pr-review"), ticket.tags());
+        assertEquals("low", ticket.impact());
+    }
+
+    @Test
+    public void shouldCloseTicketWhenPrDetectionSignalsAlreadyMergedOnThreadReply() {
+        // given — ticket already exists, a thread reply arrives with a merged-PR link
+        TicketProcessingService service = serviceWithPrDetection();
+        MessageRef queryRef = new MessageRef(MESSAGE_TS, null, slackTicketsProps.channelId());
+        MessageRef formRef = new MessageRef(MessageTs.of("form-ts"), MESSAGE_TS, slackTicketsProps.channelId());
+
+        when(slackService.postTicketForm(any(), any())).thenReturn(formRef);
+        when(prDetectionService.handleMessagePosted(any(), any()))
+                .thenReturn(PrDetectionOutcome.notOpen(ImmutableList.of("pr-review"), "medium"));
+
+        service.handleReactionAdded(
+                new ReactionAdded(slackTicketsProps.expectedInitialReaction(), USER_ID, queryRef));
+        Ticket ticket = ticketRepository.findTicketByQuery(queryRef);
+        assertNotNull(ticket);
+
+        // when — a thread reply is posted with a merged PR link
+        MessageRef replyRef = new MessageRef(
+                MessageTs.of("reply-ts"), MESSAGE_TS, slackTicketsProps.channelId());
+        service.handleMessagePosted(new MessagePosted("merged PR link", USER_ID, replyRef));
+
+        // then — ticket is closed with tags/impact from the outcome
+        Ticket updated = ticketRepository.findTicketByQuery(queryRef);
+        assertNotNull(updated);
+        assertEquals(TicketStatus.closed, updated.status());
+        assertEquals(ImmutableList.of("pr-review"), updated.tags());
+        assertEquals("medium", updated.impact());
     }
 
     @Test

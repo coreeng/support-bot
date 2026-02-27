@@ -6,6 +6,7 @@ import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.google.common.collect.ImmutableList;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
+import com.coreeng.supportbot.prtracking.PrDetectionOutcome;
 import com.coreeng.supportbot.prtracking.PrDetectionService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.SlackId;
@@ -59,7 +60,10 @@ public class TicketProcessingService {
 
             if (prDetectionService.isPresent() && prDetectionService.get().containsPrLinks(e.message())) {
                 Ticket ticket = createTicket(e.messageRef());
-                prDetectionService.get().handleMessagePosted(e, ticket);
+                PrDetectionOutcome outcome = prDetectionService.get().handleMessagePosted(e, ticket);
+                if (outcome.shouldCloseTicket()) {
+                    closeForPrResolution(checkNotNull(ticket.id()), outcome.closingTags(), outcome.closingImpact());
+                }
             }
             return;
         }
@@ -82,7 +86,12 @@ public class TicketProcessingService {
             repository.touchTicketById(ticketId, Instant.now());
         }
 
-        prDetectionService.ifPresent(svc -> svc.handleMessagePosted(e, ticket));
+        prDetectionService.ifPresent(svc -> {
+            PrDetectionOutcome outcome = svc.handleMessagePosted(e, ticket);
+            if (outcome.shouldCloseTicket()) {
+                closeForPrResolution(checkNotNull(ticket.id()), outcome.closingTags(), outcome.closingImpact());
+            }
+        });
     }
 
     private Ticket createTicket(MessageRef queryRef) {

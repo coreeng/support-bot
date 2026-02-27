@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -33,7 +34,7 @@ import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
-import com.coreeng.supportbot.ticket.TicketProcessingService;
+import com.coreeng.supportbot.prtracking.PrDetectionOutcome;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
@@ -69,7 +70,6 @@ class PrDetectionServiceTest {
     @Mock private EscalationProcessingService escalationProcessingService;
     @Mock private TicketSlackService ticketSlackService;
     @Mock private SlackClient slackClient;
-    @Mock private TicketProcessingService ticketProcessingService;
 
     @Captor private ArgumentCaptor<SlackPostMessageRequest> postMessageCaptor;
     @Captor private ArgumentCaptor<NewPrTracking> newTrackingCaptor;
@@ -81,7 +81,7 @@ class PrDetectionServiceTest {
         service = new PrDetectionService(
                 prUrlParser, gitHubClient, prTrackingRepository, prTrackingProps,
                 escalationTeamsRegistry, escalationProcessingService, ticketSlackService,
-                slackClient, ticketProcessingService);
+                slackClient);
     }
 
     // -------------------------------------------------------------------------
@@ -319,17 +319,16 @@ class PrDetectionServiceTest {
                     .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, prCreatedAt, "closed"));
 
             // when
-            service.handleMessagePosted(messagePostedWith("msg"), ticket);
+            PrDetectionOutcome outcome = service.handleMessagePosted(messagePostedWith("msg"), ticket);
 
-            // then — no tracking record, but a notice message is posted and the ticket is closed
+            // then — no tracking record, a notice message is posted, and the outcome signals closure
             verify(prTrackingRepository, never()).insert(any());
             verify(slackClient).postMessage(postMessageCaptor.capture());
             String text = postMessageCaptor.getValue().message().getText();
             assertThat(text).contains("#" + PR_NUMBER).contains(REPO).contains("closed");
-            verify(ticketProcessingService).closeForPrResolution(
-                    eq(new TicketId(1L)),
-                    eq(ImmutableList.of("networking")),
-                    eq("low"));
+            assertThat(outcome.shouldCloseTicket()).isTrue();
+            assertThat(outcome.closingTags()).containsExactly("networking");
+            assertThat(outcome.closingImpact()).isEqualTo("low");
             verifyNoInteractions(escalationProcessingService, ticketSlackService);
         }
 
@@ -498,6 +497,41 @@ class PrDetectionServiceTest {
             // then — only the new PR is inserted and replied to
             verify(prTrackingRepository, org.mockito.Mockito.times(1)).insert(any());
             verify(slackClient, org.mockito.Mockito.times(1)).postMessage(any());
+        }
+
+        @Test
+        void doesNotCloseWhenOnePrClosedAndOneOpen() {
+            // given — two PRs: first closed, second open (ticket closes only when all are closed)
+            String repoB = "my-org/other-repo";
+            int prB = 99;
+            Instant createdAt = Instant.now().minus(Duration.ofHours(1));
+
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories()).thenReturn(List.of(
+                    new PrTrackingRepositoryProps(REPO, TEAM_CODE, SLA_24H),
+                    new PrTrackingRepositoryProps(repoB, TEAM_CODE, SLA_24H)));
+            when(prTrackingProps.tags()).thenReturn(List.of("networking"));
+            when(prTrackingProps.impact()).thenReturn("low");
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
+                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
+            when(prUrlParser.parse(any())).thenReturn(List.of(
+                    new DetectedPr(REPO, PR_NUMBER), new DetectedPr(repoB, prB)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt())).thenReturn(false);
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, createdAt, "closed"));
+            when(gitHubClient.getPullRequest(repoB, prB))
+                    .thenReturn(new GitHubPullRequest(repoB, prB, createdAt, "open"));
+            when(prTrackingRepository.insert(any()))
+                    .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
+
+            // when
+            PrDetectionOutcome outcome = service.handleMessagePosted(messagePostedWith("two PRs"), ticketWithId(10L));
+
+            // then — we post notice for the closed PR and track the open one; outcome is tracked (do not close)
+            verify(slackClient, atLeast(1)).postMessage(argThat((SlackPostMessageRequest req) ->
+                    req.message().getText().contains("closed") && req.message().getText().contains(REPO)));
+            verify(prTrackingRepository).insert(argThat(r -> repoB.equals(r.githubRepo()) && r.prNumber() == prB));
+            assertThat(outcome.shouldCloseTicket()).isFalse();
         }
     }
 

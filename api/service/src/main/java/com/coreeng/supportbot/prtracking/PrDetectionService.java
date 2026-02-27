@@ -18,14 +18,12 @@ import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
-import com.coreeng.supportbot.ticket.TicketProcessingService;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -38,6 +36,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 @Service
 @ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
+@RequiredArgsConstructor
 @Slf4j
 public class PrDetectionService {
 
@@ -52,43 +51,21 @@ public class PrDetectionService {
     private final EscalationProcessingService escalationProcessingService;
     private final TicketSlackService ticketSlackService;
     private final SlackClient slackClient;
-    private final TicketProcessingService ticketProcessingService;
-
-    // @Lazy breaks the circular dependency: TicketProcessingService optionally injects PrDetectionService,
-    // so Spring would deadlock without a proxy on one side.
-    @Autowired
-    public PrDetectionService(
-            GitHubPrUrlParser prUrlParser,
-            GitHubClient gitHubClient,
-            PrTrackingRepository prTrackingRepository,
-            PrTrackingProps prTrackingProps,
-            EscalationTeamsRegistry escalationTeamsRegistry,
-            EscalationProcessingService escalationProcessingService,
-            TicketSlackService ticketSlackService,
-            SlackClient slackClient,
-            @Lazy TicketProcessingService ticketProcessingService) {
-        this.prUrlParser = prUrlParser;
-        this.gitHubClient = gitHubClient;
-        this.prTrackingRepository = prTrackingRepository;
-        this.prTrackingProps = prTrackingProps;
-        this.escalationTeamsRegistry = escalationTeamsRegistry;
-        this.escalationProcessingService = escalationProcessingService;
-        this.ticketSlackService = ticketSlackService;
-        this.slackClient = slackClient;
-        this.ticketProcessingService = ticketProcessingService;
-    }
 
     public boolean containsPrLinks(String message) {
         return !prUrlParser.parse(message).isEmpty();
     }
 
-    public void handleMessagePosted(MessagePosted event, Ticket ticket) {
+    public PrDetectionOutcome handleMessagePosted(MessagePosted event, Ticket ticket) {
         List<DetectedPr> detectedPrs = prUrlParser.parse(event.message());
         if (detectedPrs.isEmpty()) {
-            return;
+            return PrDetectionOutcome.skipped();
         }
 
         TicketId ticketId = checkNotNull(ticket.id());
+        boolean anyOpenTracked = false;
+        boolean anyNotOpen = false;
+
         for (DetectedPr pr : detectedPrs) {
             if (prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(
                     ticketId.id(), pr.repositoryName(), pr.pullNumber())) {
@@ -99,11 +76,27 @@ public class PrDetectionService {
                         .log("PR {}#{} already tracked for ticket {}, skipping");
                 continue;
             }
-            processPr(pr, ticket);
+            PerPrResult result = processPr(pr, ticket);
+            switch (result) {
+                case TRACKED -> anyOpenTracked = true;
+                case NOT_OPEN -> anyNotOpen = true;
+                case SKIPPED -> { }
+            }
         }
+
+        // Close only when every linked PR was not open (none were open to track).
+        if (anyOpenTracked) {
+            return PrDetectionOutcome.tracked();
+        }
+        if (anyNotOpen) {
+            return PrDetectionOutcome.notOpen(prTrackingProps.tags(), prTrackingProps.impact());
+        }
+        return PrDetectionOutcome.tracked();
     }
 
-    private void processPr(DetectedPr detectedPr, Ticket ticket) {
+    private enum PerPrResult { TRACKED, NOT_OPEN, SKIPPED }
+
+    private PerPrResult processPr(DetectedPr detectedPr, Ticket ticket) {
         PrTrackingRepositoryProps repoConfig = prTrackingProps.repositories().stream()
                 .filter(r -> r.name().equals(detectedPr.repositoryName()))
                 .findFirst()
@@ -119,7 +112,7 @@ public class PrDetectionService {
                     .addArgument(detectedPr::pullNumber)
                     .addArgument(e::getMessage)
                     .log("Could not fetch PR metadata for {}#{}, skipping: {}");
-            return;
+            return PerPrResult.SKIPPED;
         }
 
         if (!prMetadata.isOpen()) {
@@ -127,13 +120,9 @@ public class PrDetectionService {
                     .addArgument(detectedPr::repositoryName)
                     .addArgument(detectedPr::pullNumber)
                     .addArgument(prMetadata::state)
-                    .log("PR {}#{} is {} — posting notice and closing ticket");
+                    .log("PR {}#{} is {} — posting notice (ticket will close only when all linked PRs are closed)");
             postPrNotOpenMessage(detectedPr, prMetadata.state(), ticket.queryTs(), ticket.channelId());
-            ticketProcessingService.closeForPrResolution(
-                    checkNotNull(ticket.id()),
-                    ImmutableList.copyOf(prTrackingProps.tags()),
-                    prTrackingProps.impact());
-            return;
+            return PerPrResult.NOT_OPEN;
         }
 
         Instant slaDeadline = prMetadata.createdAt().plus(repoConfig.sla());
@@ -165,6 +154,7 @@ public class PrDetectionService {
         } else {
             postSlaReply(detectedPr, repoConfig.sla(), teamLabel, slaDeadline, queryTs, channelId);
         }
+        return PerPrResult.TRACKED;
     }
 
     private void escalateImmediately(PrTrackingRecord tracking, Ticket ticket, String owningTeam) {
@@ -186,7 +176,7 @@ public class PrDetectionService {
     }
 
     private void postPrNotOpenMessage(DetectedPr pr, String state, MessageTs queryTs, String channelId) {
-        String text = "PR #%d in `%s` seems to be `%s`. Closing this support ticket."
+        String text = "PR #%d in `%s` seems to already  be `%s`."
                 .formatted(pr.pullNumber(), pr.repositoryName(), state);
 
         slackClient.postMessage(new SlackPostMessageRequest(
@@ -213,7 +203,7 @@ public class PrDetectionService {
             Instant slaDeadline,
             MessageTs queryTs,
             String channelId) {
-        String text = "Pull requests submitted to `%s` are expected to be reviewed within %s. If PR #%d hasn't been reviewed by %s, I'll automatically escalate it to the owning team (%s)."
+        String text = "Pull requests submitted to `%s` are expected to be reviewed within %s. You don't have to ping us for reviews, but I'll keep an eye on this one. If PR #%d hasn't been reviewed by %s, I'll automatically escalate it to the owning team (%s)."
                 .formatted(pr.repositoryName(), formatDuration(sla), pr.pullNumber(), DEADLINE_FMT.format(slaDeadline), teamLabel);
 
         slackClient.postMessage(new SlackPostMessageRequest(
