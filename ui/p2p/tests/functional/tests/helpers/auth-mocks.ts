@@ -52,22 +52,34 @@ export async function mockAuthorizationEndpoints(
         });
     });
 
-    // Mock /team?type=escalation endpoint
-    // Note: Using URL check to handle query params reliably
-    await page.route(url => url.pathname.includes('/team') && url.search.includes('type=escalation'), async (route: Route) => {
+    const escalationTeamsResponse = l2Teams.map(team => ({
+        ...team,
+        name: (team.code || team.label)
+    }));
+
+    // Mock escalation teams endpoints used by UI (/teams?type=ESCALATION)
+    await page.route(url =>
+        (url.pathname.includes('/team') || url.pathname.includes('/teams')) &&
+        /type=escalation/i.test(url.search),
+    async (route: Route) => {
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify(l2Teams)
+            body: JSON.stringify(escalationTeamsResponse)
         });
     });
 
     // Fallback catch-all for any escalation type query (e.g., proxied paths)
-    await page.route('**/*type=escalation*', async (route: Route) => {
+    await page.route('**/*type=*', async (route: Route) => {
+        const url = route.request().url().toLowerCase();
+        if (!url.includes('type=escalation')) {
+            await route.fallback();
+            return;
+        }
         await route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify(l2Teams)
+            body: JSON.stringify(escalationTeamsResponse)
         });
     });
 }

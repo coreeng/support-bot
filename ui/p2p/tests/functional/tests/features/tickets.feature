@@ -15,12 +15,30 @@ Feature: Tickets Dashboard
     Then Tickets should display status information
     And Tickets should display team information
     And Tickets should display impact information
+    And Tickets should display tags information
+    And Tickets should display escalated to information
 
   Scenario: User can filter tickets by status
     Given Tickets API endpoints are mocked with mixed statuses
     When User navigates to the tickets page
     And User selects "opened" from status filter
     Then Only opened tickets should be displayed
+
+  Scenario: User can filter tickets by escalated to team
+    Given Tickets API endpoints are mocked with escalations and varied dates
+    When User navigates to the tickets page
+    And User selects "Support Team" from escalated to filter
+    Then Only tickets escalated to "Support Team" should be displayed
+
+  Scenario: User can sort tickets by Opened At and Closed At
+    Given Tickets API endpoints are mocked with escalations and varied dates
+    When User navigates to the tickets page
+    And User sorts tickets by opened at
+    Then Tickets should be sorted by opened at descending
+    When User toggles opened at sort
+    Then Tickets should be sorted by opened at ascending
+    When User sorts tickets by closed at
+    Then Tickets should be sorted by closed at descending
 
   Scenario: User can view ticket details
     Given Tickets API endpoints are mocked with sample data

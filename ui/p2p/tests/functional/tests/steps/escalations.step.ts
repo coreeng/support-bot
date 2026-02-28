@@ -21,6 +21,15 @@ const setEscalations = async (page: Page, content: any[]) => {
     })
 };
 
+const getMainEscalationsSection = (page: Page) => page.locator('.bg-purple-50');
+const clearEscalationsDateFilter = async (page: Page) => {
+    const dateFilter = page.locator('[data-testid="escalations-date-filter"]');
+    if (await dateFilter.isVisible().catch(() => false)) {
+        await dateFilter.selectOption('');
+        await page.waitForTimeout(300);
+    }
+};
+
 // Setup: Mock escalation data (default)
 Given('the backend has escalation data', async function (this: CustomWorld) {
     await setEscalations(this.page, [
@@ -94,7 +103,7 @@ Given('there are ongoing and resolved escalations for {string}', async function 
             id: 'esc-1',
             ticketId: 'ticket-1',
             team: { name: teamName },
-            escalatingTeam: 'Team X',
+            escalatingTeam: teamName,
             resolvedAt: null,
             impact: 'high',
             tags: ['bug'],
@@ -105,7 +114,7 @@ Given('there are ongoing and resolved escalations for {string}', async function 
             id: 'esc-2',
             ticketId: 'ticket-2',
             team: { name: teamName },
-            escalatingTeam: 'Team Y',
+            escalatingTeam: teamName,
             resolvedAt: '2024-01-02T12:00:00Z',
             impact: 'medium',
             tags: ['feature'],
@@ -121,7 +130,7 @@ Given('there are high and medium impact escalations for {string}', async functio
             id: 'esc-1',
             ticketId: 'ticket-1',
             team: { name: teamName },
-            escalatingTeam: 'Team X',
+            escalatingTeam: teamName,
             resolvedAt: null,
             impact: 'high',
             tags: ['bug'],
@@ -132,10 +141,37 @@ Given('there are high and medium impact escalations for {string}', async functio
             id: 'esc-2',
             ticketId: 'ticket-2',
             team: { name: teamName },
-            escalatingTeam: 'Team Y',
+            escalatingTeam: teamName,
             resolvedAt: null,
             impact: 'medium',
             tags: ['feature'],
+            hasThread: true,
+            openedAt: '2024-01-02T10:00:00Z'
+        }
+    ]);
+});
+
+Given('there are escalations with tags {string} and {string} for {string}', async function (this: CustomWorld, tagA: string, tagB: string, teamName: string) {
+    await setEscalations(this.page, [
+        {
+            id: 'esc-tag-1',
+            ticketId: 'ticket-tag-1',
+            team: { name: teamName },
+            escalatingTeam: teamName,
+            resolvedAt: null,
+            impact: 'high',
+            tags: [tagA],
+            hasThread: true,
+            openedAt: '2024-01-01T10:00:00Z'
+        },
+        {
+            id: 'esc-tag-2',
+            ticketId: 'ticket-tag-2',
+            team: { name: teamName },
+            escalatingTeam: teamName,
+            resolvedAt: null,
+            impact: 'medium',
+            tags: [tagB],
             hasThread: true,
             openedAt: '2024-01-02T10:00:00Z'
         }
@@ -375,6 +411,51 @@ When('user filters escalations by impact {string}', async function (this: Custom
     await this.page.waitForTimeout(500);
 });
 
+When('user filters escalations by team {string}', async function (this: CustomWorld, teamName: string) {
+    const teamFilter = this.page.locator('[data-testid="escalations-team-filter"]');
+    await teamFilter.waitFor({ state: 'visible', timeout: 10000 });
+    const target = teamName.trim().toLowerCase();
+    const options = await teamFilter.locator('option').evaluateAll((els) =>
+        els.map((el) => ({
+            label: (el.textContent || '').trim(),
+            value: (el as HTMLOptionElement).value
+        }))
+    );
+    const match = options.find(option =>
+        option.label.toLowerCase() === target || option.value.toLowerCase() === target
+    );
+    if (match) {
+        await teamFilter.selectOption(match.value);
+    } else {
+        throw new Error(`Escalation team option "${teamName}" not found. Available: ${options.map(o => `${o.label}(${o.value})`).join(', ')}`);
+    }
+    await this.page.waitForTimeout(500);
+});
+
+When('user filters escalations by tag {string}', async function (this: CustomWorld, tag: string) {
+    const tagFilter = this.page.locator('[data-testid="escalations-tag-filter"]');
+    await tagFilter.waitFor({ state: 'visible', timeout: 10000 });
+    await tagFilter.selectOption(tag);
+    await this.page.waitForTimeout(500);
+});
+
+When('user sorts escalations by {string}', async function (this: CustomWorld, columnName: string) {
+    const header = getMainEscalationsSection(this.page).locator('thead th').filter({ hasText: new RegExp(`^${columnName}\\b`, 'i') }).first();
+    await header.waitFor({ state: 'visible', timeout: 5000 });
+    const text = (await header.textContent()) || '';
+    if (!text.includes('↓')) {
+        await header.click();
+        await this.page.waitForTimeout(400);
+    }
+});
+
+When('user toggles escalations sort by {string}', async function (this: CustomWorld, columnName: string) {
+    const header = getMainEscalationsSection(this.page).locator('thead th').filter({ hasText: new RegExp(`^${columnName}\\b`, 'i') }).first();
+    await header.waitFor({ state: 'visible', timeout: 5000 });
+    await header.click();
+    await this.page.waitForTimeout(400);
+});
+
 // Assertions: Visibility
 // Note: "user should see X section" and "user should NOT see X section" steps are defined in authorization.step.ts
 
@@ -428,17 +509,41 @@ Then('user should only see ongoing escalations', async function (this: CustomWor
 });
 
 Then('user should only see resolved escalations', async function (this: CustomWorld) {
-    // Verify filter is applied (filtering logic tested in unit tests)
-    await this.page.waitForTimeout(500);
-    const dashboard = this.page.getByText(/Escalated to My Team/i);
-    await expect(dashboard).toBeVisible();
+    await clearEscalationsDateFilter(this.page);
+    const bodyText = (await getMainEscalationsSection(this.page).locator('tbody').textContent()) || '';
+    expect(bodyText).toContain('Resolved');
+    expect(bodyText).not.toContain('Unresolved');
 });
 
 Then('user should only see high impact escalations', async function (this: CustomWorld) {
-    // Verify filter is applied (filtering logic tested in unit tests)
-    await this.page.waitForTimeout(500);
-    const dashboard = this.page.getByText(/Escalated to My Team/i);
-    await expect(dashboard).toBeVisible();
+    await clearEscalationsDateFilter(this.page);
+    const bodyText = (await getMainEscalationsSection(this.page).locator('tbody').textContent()) || '';
+    expect(bodyText).toContain('high');
+    expect(bodyText).not.toContain('medium');
+});
+
+Then('user should only see escalations for selected team {string}', async function (this: CustomWorld, teamName: string) {
+    await clearEscalationsDateFilter(this.page);
+    const bodyText = (await getMainEscalationsSection(this.page).locator('tbody').textContent()) || '';
+    expect(bodyText).toContain(teamName);
+    const nonMatching = teamName.toLowerCase().includes('core') ? 'Other-team' : 'Core-platform';
+    expect(bodyText).not.toContain(nonMatching);
+});
+
+Then('user should only see escalations with tag {string}', async function (this: CustomWorld, tag: string) {
+    await clearEscalationsDateFilter(this.page);
+    const bodyText = (await getMainEscalationsSection(this.page).locator('tbody').textContent()) || '';
+    expect(bodyText.toLowerCase()).toContain(tag.toLowerCase());
+    const nonMatching = tag.toLowerCase() === 'bug' ? 'feature' : 'bug';
+    expect(bodyText.toLowerCase()).not.toContain(nonMatching);
+});
+
+Then('escalations should be sorted by {string} in {string} order', async function (this: CustomWorld, columnName: string, direction: string) {
+    const header = getMainEscalationsSection(this.page).locator('thead th').filter({ hasText: new RegExp(`^${columnName}\\b`, 'i') }).first();
+    await header.waitFor({ state: 'visible', timeout: 5000 });
+    const text = (await header.textContent()) || '';
+    const expectedArrow = direction.toLowerCase() === 'asc' ? '↑' : '↓';
+    expect(text).toContain(expectedArrow);
 });
 
 Then('user should have full access to all teams', async function (this: CustomWorld) {

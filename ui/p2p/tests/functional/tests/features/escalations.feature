@@ -66,6 +66,24 @@ Feature: Escalation Team Workflows
     When user filters escalations by impact "high"
     Then user should only see high impact escalations
 
+  Scenario: Escalation filtering by tag works
+    Given user is an escalation team member for "core-platform"
+    And there are escalations with tags "bug" and "feature" for "core-platform"
+    When user logs in and selects "core-platform" from dropdown
+    And user navigates to the "Escalations" tab
+    And user filters escalations by tag "bug"
+    Then user should only see escalations with tag "bug"
+
+  Scenario: Escalations table supports sorting by opened and resolved
+    Given user is an escalation team member for "core-platform"
+    And there are ongoing and resolved escalations for "core-platform"
+    When user logs in and selects "core-platform" from dropdown
+    And user navigates to the "Escalations" tab
+    And user sorts escalations by "Opened"
+    Then escalations should be sorted by "Opened" in "desc" order
+    When user toggles escalations sort by "Opened"
+    Then escalations should be sorted by "Opened" in "asc" order
+
   Scenario: Leadership member does NOT see escalation features when viewing as Leadership
     Given user is both Leadership and escalation team member for "core-platform"
     When user logs in and selects "leadership" from dropdown
