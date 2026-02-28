@@ -1,7 +1,6 @@
 package com.coreeng.supportbot.github;
 
 import java.io.IOException;
-import java.util.Date;
 import java.util.Locale;
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHIssueState;
@@ -39,8 +38,7 @@ public final class Hub4jGitHubClient implements GitHubClient {
             throw new GitHubApiException(
                     0, "Invalid repository name '%s': %s".formatted(repositoryName, e.getMessage()), e);
         } catch (GHFileNotFoundException e) {
-            throw new GitHubApiException(
-                    404, "PR not found: %s#%d".formatted(repositoryName, pullNumber), e);
+            throw new GitHubApiException(404, "PR not found: %s#%d".formatted(repositoryName, pullNumber), e);
         } catch (HttpException e) {
             throw new GitHubApiException(
                     e.getResponseCode(),

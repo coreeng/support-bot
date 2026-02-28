@@ -10,10 +10,7 @@ import java.util.List;
  * {@link #closingImpact()} to close the associated ticket. Keeping this logic in the caller avoids
  * a circular dependency between {@code PrDetectionService} and {@code TicketProcessingService}.
  */
-public record PrDetectionOutcome(
-        boolean shouldCloseTicket,
-        ImmutableList<String> closingTags,
-        String closingImpact) {
+public record PrDetectionOutcome(boolean shouldCloseTicket, ImmutableList<String> closingTags, String closingImpact) {
 
     /** A PR was successfully detected and SLA tracking started — no ticket closure needed. */
     public static PrDetectionOutcome tracked() {

@@ -46,5 +46,10 @@ public class PrTrackingTestController {
     }
 
     public record PrTrackingToCreate(
-            long ticketId, String githubRepo, int prNumber, Instant prCreatedAt, Instant slaDeadline, String owningTeam) {}
+            long ticketId,
+            String githubRepo,
+            int prNumber,
+            Instant prCreatedAt,
+            Instant slaDeadline,
+            String owningTeam) {}
 }

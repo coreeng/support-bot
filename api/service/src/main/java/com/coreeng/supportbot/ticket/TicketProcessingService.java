@@ -4,7 +4,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
-import com.google.common.collect.ImmutableList;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.prtracking.PrDetectionOutcome;
 import com.coreeng.supportbot.prtracking.PrDetectionService;
@@ -15,6 +14,7 @@ import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
+import com.google.common.collect.ImmutableList;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -116,9 +116,7 @@ public class TicketProcessingService {
                     .lastInteractedAt(Instant.now())
                     .build());
         } else {
-            log.atInfo()
-                    .addArgument(queryRef::actualThreadTs)
-                    .log("Ticket form already posted to message({})");
+            log.atInfo().addArgument(queryRef::actualThreadTs).log("Ticket form already posted to message({})");
         }
         return newTicket;
     }
@@ -268,7 +266,9 @@ public class TicketProcessingService {
                 .lastInteractedAt(Instant.now())
                 .build());
         onStatusUpdate(updated);
-        log.atInfo().addKeyValue("ticketId", ticketId.id()).log("Ticket closed automatically — all tracked PRs resolved");
+        log.atInfo()
+                .addKeyValue("ticketId", ticketId.id())
+                .log("Ticket closed automatically — all tracked PRs resolved");
     }
 
     public void markAsStale(TicketId ticketId) {

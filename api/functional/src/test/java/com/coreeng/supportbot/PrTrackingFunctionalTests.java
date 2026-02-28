@@ -6,21 +6,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import com.coreeng.supportbot.testkit.MessageTs;
-import com.coreeng.supportbot.testkit.MessageToGet;
-import com.coreeng.supportbot.testkit.MessageUpdatedExpectation;
-import com.coreeng.supportbot.testkit.EphemeralMessageExpectation;
 import com.coreeng.supportbot.testkit.ReactionAddedExpectation;
-import com.coreeng.supportbot.testkit.RatingRequestMessage;
 import com.coreeng.supportbot.testkit.SlackMessage;
 import com.coreeng.supportbot.testkit.SlackTestKit;
-import com.coreeng.supportbot.testkit.StubWithResult;
 import com.coreeng.supportbot.testkit.SupportBotClient;
 import com.coreeng.supportbot.testkit.TestKit;
 import com.coreeng.supportbot.testkit.TestKitExtension;
 import com.coreeng.supportbot.testkit.TicketByIdQuery;
 import com.coreeng.supportbot.testkit.TicketMessage;
-import com.github.tomakehurst.wiremock.client.MappingBuilder;
-import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import java.time.Duration;
 import java.time.Instant;
 
@@ -302,7 +295,7 @@ public class PrTrackingFunctionalTests {
     }
 
     @Test
-    public void whenPrIsClosed_postsNoticeAndClosesTicket() {
+    public void whenPrIsClosed_detectionSkipsTrackingAndKeepsTicketOpened() {
         TestKit.RoledTestKit asTenant = testKit.as(tenant);
         SlackTestKit asTenantSlack = asTenant.slack();
         String channelId = testKit.config().mocks().slack().supportChannelId();
@@ -311,24 +304,11 @@ public class PrTrackingFunctionalTests {
         String messageWithPr = "Could you review " + PR_LINK_1 + "?";
         MessageTs ticketMessageTs = MessageTs.now();
 
-        // Stub GitHub (PR is closed)
+        // Stub GitHub (PR is closed => detection should skip tracking entirely)
         var githubStub = testKit.slack().wiremock().stubGitHubGetPullRequest(
                 "GitHub PR closed", PR_REPO, 1, "closed", recentCreatedAt());
 
-        // Closing a ticket fetches the original query before posting the rating prompt.
-        var getQueryMessageStub = testKit.slack().wiremock().stubGetMessage(MessageToGet.builder()
-                .description("Get query message for close flow")
-                .channelId(channelId)
-                .ts(queryTs)
-                .threadTs(queryTs)
-                .text(messageWithPr)
-                .blocksJson("[]")
-                .userId(asTenant.userId())
-                .botId(null)
-                .build());
-
-        // Stub ticket creation (ticket form message) AFTER generic chat.postMessage stubs.
-        // Wiremock uses LIFO matching, so the more specific ticket-form stub must be newest.
+        // Ticket creation still happens for query messages with PR links.
         SlackMessage messageForStubs = SlackMessage.builder()
                 .slackWiremock(testKit.slack().wiremock())
                 .ts(queryTs)
@@ -336,62 +316,34 @@ public class PrTrackingFunctionalTests {
                 .build();
         var creationStubs = messageForStubs.stubTicketCreationFlow("ticket created", ticketMessageTs);
 
-        // Stub Slack: update ticket form to closed
-        var updateStub = testKit.slack().wiremock().stubMessageUpdated(
-                MessageUpdatedExpectation.<TicketMessage>builder()
-                        .description("Ticket form updated to closed")
-                        .channelId(channelId)
-                        .ts(ticketMessageTs)
-                        .threadTs(queryTs)
-                        .receiver(new TicketMessage.Receiver())
-                        .build());
-
-        // Stub Slack: resolved reaction (defaults to white_check_mark)
-        var resolvedReactionStub = testKit.slack().wiremock().stubReactionAdd(
+        // PR-specific side effects should not happen for closed PR links.
+        var prReactionStub = testKit.slack().wiremock().stubReactionAdd(
                 ReactionAddedExpectation.builder()
-                        .description("Resolved reaction")
-                        .reaction("white_check_mark")
+                        .description("No PR reaction expected")
+                        .reaction("pr")
                         .channelId(channelId)
                         .ts(queryTs)
                         .build());
-
-        // Stub rating request sent after ticket closure.
-        var ratingRequestStub = testKit.slack().wiremock().stubEphemeralMessagePosted(
-                EphemeralMessageExpectation.<RatingRequestMessage>builder()
-                        .description("Rating request prompt")
-                        .channelId(channelId)
-                        .threadTs(queryTs)
-                        .userId(asTenant.userId())
-                        .receiver(new StubWithResult.Receiver<>() {
-                            @Override
-                            public MappingBuilder configureStub(MappingBuilder stubBuilder) {
-                                return stubBuilder;
-                            }
-
-                            @Override
-                            public RatingRequestMessage assertAndExtractResult(ServeEvent servedStub) {
-                                return RatingRequestMessage.builder().ticketId(0L).build();
-                            }
-                        })
-                        .build());
-
         // when — post original message with one PR link
-        SlackMessage tenantsMessage = asTenantSlack.postMessage(queryTs, messageWithPr);
+        asTenantSlack.postMessage(queryTs, messageWithPr);
 
-        // then — app creates ticket and detects closed PR
+        // then — ticket exists and remains opened; no PR tracking side effects.
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
-            updateStub.assertIsCalled();
-            resolvedReactionStub.assertIsCalled();
-            getQueryMessageStub.assertIsCalled();
-            ratingRequestStub.assertIsCalled();
+            githubStub.assertIsCalled();
+            creationStubs.reactionAdded().assertIsCalled();
+            creationStubs.ticketMessagePosted().assertIsCalled();
+            creationStubs.conversationsReplies().assertIsNotCalled();
+            prReactionStub.assertIsNotCalled();
         });
 
         var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
         assertThat(ticketResponse).isNotNull();
-        assertThat(ticketResponse.status()).isEqualTo("closed");
+        assertThat(ticketResponse.status()).isEqualTo("opened");
+        assertThat(ticketResponse.escalated()).isFalse();
 
         githubStub.cleanUp();
         creationStubs.cleanUp();
+        prReactionStub.cleanUp();
     }
 
     @Test

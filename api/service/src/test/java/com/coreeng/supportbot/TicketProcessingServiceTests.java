@@ -1,8 +1,6 @@
 package com.coreeng.supportbot;
 
 import static java.util.Objects.requireNonNull;
-
-import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -29,6 +27,7 @@ import com.coreeng.supportbot.ticket.TicketTeam;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
 import java.time.ZoneId;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -70,7 +69,13 @@ public class TicketProcessingServiceTests {
         slackTicketsProps = new SlackTicketsProps("some-channel-id", "eyes", "ticket", "white_check_mark", "rocket");
         assignmentProps = new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(false, null));
         ticketProcessingService = new TicketProcessingService(
-                ticketRepository, slackService, escalationQueryService, slackTicketsProps, assignmentProps, publisher, Optional.empty());
+                ticketRepository,
+                slackService,
+                escalationQueryService,
+                slackTicketsProps,
+                assignmentProps,
+                publisher,
+                Optional.empty());
     }
 
     @Test
@@ -172,7 +177,13 @@ public class TicketProcessingServiceTests {
                 new EscalationQueryService(new EscalationInMemoryRepository(timezone));
         ticketRepository = new TicketInMemoryRepository(escalationQueryService, timezone);
         ticketProcessingService = new TicketProcessingService(
-                ticketRepository, slackService, escalationQueryService, slackTicketsProps, assignmentProps, publisher, Optional.empty());
+                ticketRepository,
+                slackService,
+                escalationQueryService,
+                slackTicketsProps,
+                assignmentProps,
+                publisher,
+                Optional.empty());
         MessageRef threadRef = new MessageRef(MESSAGE_TS, null, slackTicketsProps.channelId());
         when(slackService.postTicketForm(eq(threadRef), any()))
                 .thenReturn(new MessageRef(MessageTs.of("form"), MESSAGE_TS, slackTicketsProps.channelId()));
@@ -198,8 +209,7 @@ public class TicketProcessingServiceTests {
                 .thenReturn(formRef);
 
         // when
-        service.handleMessagePosted(
-                new MessagePosted("https://github.com/org/repo/pull/1", USER_ID, queryRef));
+        service.handleMessagePosted(new MessagePosted("https://github.com/org/repo/pull/1", USER_ID, queryRef));
 
         // then
         assertTrue(ticketRepository.queryExists(queryRef), "query is created");
@@ -241,15 +251,13 @@ public class TicketProcessingServiceTests {
 
         when(slackService.postTicketForm(any(), any())).thenReturn(formRef);
         when(prDetectionService.handleMessagePosted(any(), any())).thenReturn(PrDetectionOutcome.tracked());
-        service.handleReactionAdded(
-                new ReactionAdded(slackTicketsProps.expectedInitialReaction(), USER_ID, queryRef));
+        service.handleReactionAdded(new ReactionAdded(slackTicketsProps.expectedInitialReaction(), USER_ID, queryRef));
         Ticket ticket = ticketRepository.findTicketByQuery(queryRef);
         assertNotNull(ticket);
         TicketId ticketId = requireNonNull(ticket.id());
 
         // when — a thread reply arrives
-        MessageRef replyRef = new MessageRef(
-                MessageTs.of("reply-ts"), MESSAGE_TS, slackTicketsProps.channelId());
+        MessageRef replyRef = new MessageRef(MessageTs.of("reply-ts"), MESSAGE_TS, slackTicketsProps.channelId());
         service.handleMessagePosted(new MessagePosted("a PR follow-up", USER_ID, replyRef));
 
         // then
@@ -272,8 +280,7 @@ public class TicketProcessingServiceTests {
                 .thenReturn(formRef);
 
         // when
-        service.handleMessagePosted(
-                new MessagePosted("https://github.com/org/repo/pull/1", USER_ID, queryRef));
+        service.handleMessagePosted(new MessagePosted("https://github.com/org/repo/pull/1", USER_ID, queryRef));
 
         // then — ticket is auto-created and immediately closed with the tags/impact from the outcome
         Ticket ticket = ticketRepository.findTicketByQuery(queryRef);
@@ -294,14 +301,12 @@ public class TicketProcessingServiceTests {
         when(prDetectionService.handleMessagePosted(any(), any()))
                 .thenReturn(PrDetectionOutcome.notOpen(ImmutableList.of("pr-review"), "medium"));
 
-        service.handleReactionAdded(
-                new ReactionAdded(slackTicketsProps.expectedInitialReaction(), USER_ID, queryRef));
+        service.handleReactionAdded(new ReactionAdded(slackTicketsProps.expectedInitialReaction(), USER_ID, queryRef));
         Ticket ticket = ticketRepository.findTicketByQuery(queryRef);
         assertNotNull(ticket);
 
         // when — a thread reply is posted with a merged PR link
-        MessageRef replyRef = new MessageRef(
-                MessageTs.of("reply-ts"), MESSAGE_TS, slackTicketsProps.channelId());
+        MessageRef replyRef = new MessageRef(MessageTs.of("reply-ts"), MESSAGE_TS, slackTicketsProps.channelId());
         service.handleMessagePosted(new MessagePosted("merged PR link", USER_ID, replyRef));
 
         // then — ticket is closed with tags/impact from the outcome
@@ -319,8 +324,7 @@ public class TicketProcessingServiceTests {
         TicketId ticketId = requireNonNull(ticket.id());
 
         // when
-        ticketProcessingService.closeForPrResolution(
-                ticketId, ImmutableList.of("pr-review", "infra"), "medium");
+        ticketProcessingService.closeForPrResolution(ticketId, ImmutableList.of("pr-review", "infra"), "medium");
 
         // then
         Ticket closed = ticketRepository.findTicketById(ticketId);
@@ -334,9 +338,8 @@ public class TicketProcessingServiceTests {
     @Test
     public void shouldSkipCloseForPrResolutionGracefullyWhenTicketNotFound() {
         // when / then
-        assertDoesNotThrow(() ->
-                ticketProcessingService.closeForPrResolution(
-                        new TicketId(999L), ImmutableList.of("tag"), "low"));
+        assertDoesNotThrow(
+                () -> ticketProcessingService.closeForPrResolution(new TicketId(999L), ImmutableList.of("tag"), "low"));
     }
 
     @Test
@@ -347,8 +350,7 @@ public class TicketProcessingServiceTests {
         ticketProcessingService.closeForPrResolution(ticketId, ImmutableList.of("original-tag"), "low");
 
         // when — attempt to close again with different values
-        ticketProcessingService.closeForPrResolution(
-                ticketId, ImmutableList.of("different-tag"), "high");
+        ticketProcessingService.closeForPrResolution(ticketId, ImmutableList.of("different-tag"), "high");
 
         // then — tags from the first close are preserved
         Ticket afterSecondClose = ticketRepository.findTicketById(ticketId);
@@ -360,9 +362,13 @@ public class TicketProcessingServiceTests {
 
     private TicketProcessingService serviceWithPrDetection() {
         return new TicketProcessingService(
-                ticketRepository, slackService,
+                ticketRepository,
+                slackService,
                 new EscalationQueryService(new EscalationInMemoryRepository(ZoneId.of("UTC"))),
-                slackTicketsProps, assignmentProps, publisher, Optional.of(prDetectionService));
+                slackTicketsProps,
+                assignmentProps,
+                publisher,
+                Optional.of(prDetectionService));
     }
 
     private Ticket createTrackedTicket() {

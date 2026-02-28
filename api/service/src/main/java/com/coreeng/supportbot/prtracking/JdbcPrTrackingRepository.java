@@ -21,16 +21,15 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
 
     @Override
     public PrTrackingRecord insert(NewPrTracking newRecord) {
-        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row =
-                dsl.insertInto(PR_TRACKING)
-                        .set(PR_TRACKING.TICKET_ID, newRecord.ticketId())
-                        .set(PR_TRACKING.GITHUB_REPO, newRecord.githubRepo())
-                        .set(PR_TRACKING.PR_NUMBER, newRecord.prNumber())
-                        .set(PR_TRACKING.PR_CREATED_AT, newRecord.prCreatedAt())
-                        .set(PR_TRACKING.SLA_DEADLINE, newRecord.slaDeadline())
-                        .set(PR_TRACKING.OWNING_TEAM, newRecord.owningTeam())
-                        .returning()
-                        .fetchSingle();
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.insertInto(PR_TRACKING)
+                .set(PR_TRACKING.TICKET_ID, newRecord.ticketId())
+                .set(PR_TRACKING.GITHUB_REPO, newRecord.githubRepo())
+                .set(PR_TRACKING.PR_NUMBER, newRecord.prNumber())
+                .set(PR_TRACKING.PR_CREATED_AT, newRecord.prCreatedAt())
+                .set(PR_TRACKING.SLA_DEADLINE, newRecord.slaDeadline())
+                .set(PR_TRACKING.OWNING_TEAM, newRecord.owningTeam())
+                .returning()
+                .fetchSingle();
         return toRecord(row);
     }
 
@@ -55,14 +54,13 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     @Override
     public PrTrackingRecord updateStatus(
             long id, PrTrackingStatus newStatus, @Nullable Instant closedAt, @Nullable Long escalationId) {
-        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row =
-                dsl.update(PR_TRACKING)
-                        .set(PR_TRACKING.STATUS, newStatus)
-                        .set(PR_TRACKING.CLOSED_AT, closedAt)
-                        .set(PR_TRACKING.ESCALATION_ID, escalationId)
-                        .where(PR_TRACKING.ID.eq(id))
-                        .returning()
-                        .fetchSingle();
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.update(PR_TRACKING)
+                .set(PR_TRACKING.STATUS, newStatus)
+                .set(PR_TRACKING.CLOSED_AT, closedAt)
+                .set(PR_TRACKING.ESCALATION_ID, escalationId)
+                .where(PR_TRACKING.ID.eq(id))
+                .returning()
+                .fetchSingle();
         return toRecord(row);
     }
 
@@ -71,7 +69,9 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     public boolean hasAnyActiveForTicket(long ticketId) {
         return dsl.fetchExists(
                 PR_TRACKING,
-                PR_TRACKING.TICKET_ID.eq(ticketId)
+                PR_TRACKING
+                        .TICKET_ID
+                        .eq(ticketId)
                         .and(PR_TRACKING.STATUS.in(PrTrackingStatus.OPEN, PrTrackingStatus.ESCALATED)));
     }
 
@@ -80,13 +80,14 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     public boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, String githubRepo, int prNumber) {
         return dsl.fetchExists(
                 PR_TRACKING,
-                PR_TRACKING.TICKET_ID.eq(ticketId)
+                PR_TRACKING
+                        .TICKET_ID
+                        .eq(ticketId)
                         .and(PR_TRACKING.GITHUB_REPO.eq(githubRepo))
                         .and(PR_TRACKING.PR_NUMBER.eq(prNumber)));
     }
 
-    private static PrTrackingRecord toRecord(
-            com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row) {
+    private static PrTrackingRecord toRecord(com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row) {
         return new PrTrackingRecord(
                 checkNotNull(row.getId()),
                 checkNotNull(row.getTicketId()),

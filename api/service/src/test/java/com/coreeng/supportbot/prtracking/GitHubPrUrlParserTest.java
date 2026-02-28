@@ -14,8 +14,7 @@ class GitHubPrUrlParserTest {
     @Test
     void detectsPlainUrl() {
         // when
-        List<DetectedPr> result =
-                parser.parse("Please review https://github.com/my-org/onboarding-repo/pull/42");
+        List<DetectedPr> result = parser.parse("Please review https://github.com/my-org/onboarding-repo/pull/42");
 
         // then
         assertThat(result).containsExactly(new DetectedPr("my-org/onboarding-repo", 42));
@@ -24,8 +23,7 @@ class GitHubPrUrlParserTest {
     @Test
     void detectsSlackFormattedUrl() {
         // when
-        List<DetectedPr> result =
-                parser.parse("Please review <https://github.com/my-org/onboarding-repo/pull/42>");
+        List<DetectedPr> result = parser.parse("Please review <https://github.com/my-org/onboarding-repo/pull/42>");
 
         // then
         assertThat(result).containsExactly(new DetectedPr("my-org/onboarding-repo", 42));
@@ -34,8 +32,8 @@ class GitHubPrUrlParserTest {
     @Test
     void detectsSlackFormattedUrlWithDisplayText() {
         // when
-        List<DetectedPr> result = parser.parse(
-                "Please review <https://github.com/my-org/onboarding-repo/pull/42|my PR title>");
+        List<DetectedPr> result =
+                parser.parse("Please review <https://github.com/my-org/onboarding-repo/pull/42|my PR title>");
 
         // then
         assertThat(result).containsExactly(new DetectedPr("my-org/onboarding-repo", 42));
@@ -44,23 +42,20 @@ class GitHubPrUrlParserTest {
     @Test
     void detectsMultiplePrsInOneMessage() {
         // when
-        List<DetectedPr> result = parser.parse(
-                "Two PRs: https://github.com/my-org/onboarding-repo/pull/1 "
-                        + "and https://github.com/my-org/another-repo/pull/99");
+        List<DetectedPr> result = parser.parse("Two PRs: https://github.com/my-org/onboarding-repo/pull/1 "
+                + "and https://github.com/my-org/another-repo/pull/99");
 
         // then
         assertThat(result)
                 .containsExactlyInAnyOrder(
-                        new DetectedPr("my-org/onboarding-repo", 1),
-                        new DetectedPr("my-org/another-repo", 99));
+                        new DetectedPr("my-org/onboarding-repo", 1), new DetectedPr("my-org/another-repo", 99));
     }
 
     @Test
     void deduplicatesSamePrLinkPostedTwice() {
         // when
-        List<DetectedPr> result = parser.parse(
-                "https://github.com/my-org/onboarding-repo/pull/7 "
-                        + "https://github.com/my-org/onboarding-repo/pull/7");
+        List<DetectedPr> result = parser.parse("https://github.com/my-org/onboarding-repo/pull/7 "
+                + "https://github.com/my-org/onboarding-repo/pull/7");
 
         // then
         assertThat(result).containsExactly(new DetectedPr("my-org/onboarding-repo", 7));
@@ -69,8 +64,7 @@ class GitHubPrUrlParserTest {
     @Test
     void ignoresUnknownRepository() {
         // when
-        List<DetectedPr> result =
-                parser.parse("https://github.com/some-other-org/untracked-repo/pull/5");
+        List<DetectedPr> result = parser.parse("https://github.com/some-other-org/untracked-repo/pull/5");
 
         // then
         assertThat(result).isEmpty();
@@ -85,8 +79,7 @@ class GitHubPrUrlParserTest {
     @Test
     void detectsHttpUrl() {
         // when
-        List<DetectedPr> result =
-                parser.parse("http://github.com/my-org/onboarding-repo/pull/10");
+        List<DetectedPr> result = parser.parse("http://github.com/my-org/onboarding-repo/pull/10");
 
         // then
         assertThat(result).containsExactly(new DetectedPr("my-org/onboarding-repo", 10));
@@ -95,7 +88,8 @@ class GitHubPrUrlParserTest {
     @Test
     void ignoresNonPrGitHubUrls() {
         // when / then
-        assertThat(parser.parse("https://github.com/my-org/onboarding-repo/issues/42")).isEmpty();
+        assertThat(parser.parse("https://github.com/my-org/onboarding-repo/issues/42"))
+                .isEmpty();
         assertThat(parser.parse("https://github.com/my-org/onboarding-repo")).isEmpty();
     }
 }

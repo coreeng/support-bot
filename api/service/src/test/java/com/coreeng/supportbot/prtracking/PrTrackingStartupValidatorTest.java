@@ -29,9 +29,14 @@ import org.springframework.boot.ApplicationArguments;
 @ExtendWith(MockitoExtension.class)
 class PrTrackingStartupValidatorTest {
 
-    @Mock private PrTrackingProps props;
-    @Mock private TagsRegistry tagsRegistry;
-    @Mock private ImpactsRegistry impactsRegistry;
+    @Mock
+    private PrTrackingProps props;
+
+    @Mock
+    private TagsRegistry tagsRegistry;
+
+    @Mock
+    private ImpactsRegistry impactsRegistry;
 
     private PrTrackingStartupValidator validator;
 
@@ -52,16 +57,14 @@ class PrTrackingStartupValidatorTest {
         when(impactsRegistry.findImpactByCode("low")).thenReturn(new TicketImpact("Low", "low"));
 
         // when / then
-        assertThatCode(() -> validator.run(mock(ApplicationArguments.class)))
-                .doesNotThrowAnyException();
+        assertThatCode(() -> validator.run(mock(ApplicationArguments.class))).doesNotThrowAnyException();
     }
 
     @Test
     void throwsForUnknownTagCode() {
         // given
         when(props.tags()).thenReturn(List.of("unknown-tag"));
-        when(tagsRegistry.listTagsByCodes(ImmutableList.of("unknown-tag")))
-                .thenReturn(ImmutableList.of());
+        when(tagsRegistry.listTagsByCodes(ImmutableList.of("unknown-tag"))).thenReturn(ImmutableList.of());
 
         // when / then
         assertThatThrownBy(() -> validator.run(mock(ApplicationArguments.class)))
@@ -76,8 +79,7 @@ class PrTrackingStartupValidatorTest {
         when(props.tags()).thenReturn(List.of("valid-tag", "unknown-tag"));
         when(tagsRegistry.listTagsByCodes(ImmutableList.of("valid-tag")))
                 .thenReturn(ImmutableList.of(new Tag("Valid Tag", "valid-tag")));
-        when(tagsRegistry.listTagsByCodes(ImmutableList.of("unknown-tag")))
-                .thenReturn(ImmutableList.of());
+        when(tagsRegistry.listTagsByCodes(ImmutableList.of("unknown-tag"))).thenReturn(ImmutableList.of());
 
         // when / then
         assertThatThrownBy(() -> validator.run(mock(ApplicationArguments.class)))

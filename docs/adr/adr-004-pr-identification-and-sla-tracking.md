@@ -66,7 +66,22 @@ pr-review-tracking:
 - Team `label` (for bot messages) and `slack-group-id` (for tagging) are resolved from `enums.escalation-teams` using `owning-team`.
 - `sla` — ISO-8601 duration (e.g. `PT48H`, `PT72H`), parsed to `java.time.Duration`.
 
-### 3. GitHub Credentials
+### 3. Behaviour Configuration
+
+Additional PR-tracking behaviour is configured via:
+
+```yaml
+pr-review-tracking:
+  pr-emoji: pr
+  tags: [networking]
+  impact: productionBlocking
+```
+
+- `pr-emoji` — Slack emoji name added to the query message when an **open** PR is tracked.
+- `tags` — required tag codes applied only when the bot auto-closes a ticket for PR resolution.
+- `impact` — required impact code applied only when the bot auto-closes a ticket for PR resolution.
+
+### 4. GitHub Credentials
 
 The bot supports two auth modes for GitHub API access:
 
@@ -84,26 +99,27 @@ pr-review-tracking:
     private-key-pem: ${GITHUB_APP_PRIVATE_KEY_PEM:}
 ```
 
-API calls use a thin `GitHubClient` wrapper over Spring `RestClient`. The `api-base-url` override supports GitHub Enterprise.
+The `api-base-url` override supports GitHub Enterprise.
+
 Startup validation enforces required fields per mode (`token` requires `token`; `app` requires `app-id`, `installation-id`, `private-key-pem`).
 
-### 4. PR Link Detection
+### 5. PR Link Detection
 
 The existing Slack event listener is extended to match GitHub PR URLs (`github.com/<org>/<repo>/pull/<number>`) via compiled regex.
 If `<org>/<repo>` matches a configured repository, the PR is in-scope. Multiple links per message are each tracked independently.
 Unrecognised repos are silently ignored.
 
-### 5. On PR Detection
+### 6. On PR Detection
 
 When an in-scope PR link is found:
 
 1. Fetch PR metadata via GitHub API (`created_at`, current state).
-2. Add a `pr` tag to the parent support issue.
-3. Post the regular ticket form update plus a thread reply: _"PRs to `<repo>` have an SLA of `<SLA>`. I'll automatically escalate to the owning team (`<team-label>`) if the PR isn't responded to before `<pr_created_at + SLA>`."_ The team is named but **not tagged** in this message.
-4. React to the **top-level thread message** with an emoji (e.g. `:github:`) indicating the ticket contains a PR review request, regardless of which reply introduced the PR link.
+2. If the PR is already non-open (`closed`, `merged`, etc.), the bot does nothing for PR-tracking (no record, no reply, no reaction, no auto-close).
+3. If the PR is open, post a thread reply: _"PRs to `<repo>` have an SLA of `<SLA>`. I'll automatically escalate to the owning team (`<team-label>`) if the PR isn't responded to before `<pr_created_at + SLA>`."_ The team is named but **not tagged** in this message.
+4. React to the **top-level thread message** with configured `pr-emoji`.
 5. Persist a `pr_tracking` record for lifecycle polling.
 
-### 6. PR Tracking State
+### 7. PR Tracking State
 
 The API persists PR tracking records linked to the existing ticket model:
 
@@ -124,7 +140,7 @@ create table if not exists pr_tracking
 );
 ```
 
-### 7. Periodic Lifecycle Polling
+### 8. Periodic Lifecycle Polling
 
 A `@Scheduled` task runs on a business-hours cron (default: `0 0 9-18 * * 1-5`, configurable via `pr-review-tracking.poll-cron`) and processes all records where `status != 'CLOSED'`:
 
@@ -139,6 +155,7 @@ activity (`APPROVED`, `CHANGES_REQUESTED`, `COMMENTED`) which could be checked b
 This is deferred to the PR Lifecycle Tracking follow-up to keep v1 scope contained, but should be prioritised if false escalations prove disruptive.
 
 When a thread contains multiple tracked PRs, the thread is only auto-closed once all of them are closed.
+PRs that were already non-open at detection-time are not tracked and therefore are excluded from this poller-driven close logic.
 
 ---
 

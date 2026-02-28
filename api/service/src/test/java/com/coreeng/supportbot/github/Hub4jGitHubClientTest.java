@@ -1,14 +1,13 @@
 package com.coreeng.supportbot.github;
 
-import org.junit.jupiter.api.Test;
-import org.kohsuke.github.*;
-
-import java.io.IOException;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import org.junit.jupiter.api.Test;
+import org.kohsuke.github.*;
 
 class Hub4jGitHubClientTest {
 
@@ -26,20 +25,21 @@ class Hub4jGitHubClientTest {
         // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
                 .isInstanceOf(GitHubApiException.class)
-                .satisfies(ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(0))
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(0))
                 .hasMessageContaining("null created_at");
     }
 
     @Test
     void wrapsNotFoundAsGitHubApiException() throws IOException {
         // given
-        when(gitHub.getRepository("my-org/my-repo"))
-                .thenThrow(new GHFileNotFoundException("Not Found"));
+        when(gitHub.getRepository("my-org/my-repo")).thenThrow(new GHFileNotFoundException("Not Found"));
 
         // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 999))
                 .isInstanceOf(GitHubApiException.class)
-                .satisfies(ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(404))
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(404))
                 .hasMessageContaining("my-org/my-repo#999");
     }
 
@@ -52,7 +52,8 @@ class Hub4jGitHubClientTest {
         // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 1))
                 .isInstanceOf(GitHubApiException.class)
-                .satisfies(ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(401))
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(401))
                 .hasMessageContaining("401");
     }
 
@@ -64,7 +65,8 @@ class Hub4jGitHubClientTest {
         // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 1))
                 .isInstanceOf(GitHubApiException.class)
-                .satisfies(ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(0))
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(0))
                 .hasMessageContaining("my-org/my-repo#1");
     }
 }
