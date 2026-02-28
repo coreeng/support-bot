@@ -152,7 +152,8 @@ class ServiceLifecycle(
         springProfile: String,
         healthUrl: String,
         logFile: File,
-        timeoutSeconds: Long = 60
+        timeoutSeconds: Long = 60,
+        javaExecutable: String? = null
     ): Boolean {
         // Clean up any stale process first
         killStaleProcess()
@@ -170,8 +171,9 @@ class ServiceLifecycle(
         logFile.parentFile.mkdirs()
         logFile.createNewFile()
 
+        val javaBin = javaExecutable ?: "${System.getProperty("java.home")}/bin/java"
         val process = ProcessBuilder(
-            "${System.getProperty("java.home")}/bin/java",
+            javaBin,
             "-jar", jarFile.absolutePath,
             "--spring.profiles.active=$springProfile"
         )

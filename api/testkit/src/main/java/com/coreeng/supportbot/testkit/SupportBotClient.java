@@ -206,6 +206,40 @@ public class SupportBotClient {
                     .ifValidationFails(LogDetail.ALL, true)
                     .statusCode(200);
         }
+
+        public void triggerPrTrackingPoll() {
+            given().config(REST_ASSURED_CONFIG)
+                    .when()
+                    .post(baseUrl + "/test/prtracking/poll")
+                    .then()
+                    .log()
+                    .ifValidationFails(LogDetail.ALL, true)
+                    .statusCode(200);
+        }
+
+        public void cleanupPrTrackingRecords() {
+            given().config(REST_ASSURED_CONFIG)
+                    .when()
+                    .post(baseUrl + "/test/prtracking/cleanup")
+                    .then()
+                    .log()
+                    .ifValidationFails(LogDetail.ALL, true)
+                    .statusCode(200);
+        }
+
+        public PrTrackingRecordResponse createPrTrackingRecord(PrTrackingToCreate request) {
+            return given().config(REST_ASSURED_CONFIG)
+                    .when()
+                    .contentType(JSON)
+                    .body(request)
+                    .post(baseUrl + "/test/prtracking/record")
+                    .then()
+                    .log()
+                    .ifValidationFails(LogDetail.ALL, true)
+                    .statusCode(200)
+                    .extract()
+                    .as(PrTrackingRecordResponse.class);
+        }
     }
 
     @Builder
@@ -261,6 +295,34 @@ public class SupportBotClient {
         private String team;
         private MessageTs createdMessageTs;
         private ImmutableList<@NonNull String> tags;
+    }
+
+    @Builder
+    @Getter
+    @Jacksonized
+    public static class PrTrackingToCreate {
+        private long ticketId;
+        private String githubRepo;
+        private int prNumber;
+        private Instant prCreatedAt;
+        private Instant slaDeadline;
+        private String owningTeam;
+    }
+
+    @Builder
+    @Getter
+    @Jacksonized
+    public static class PrTrackingRecordResponse {
+        private long id;
+        private long ticketId;
+        private String githubRepo;
+        private int prNumber;
+        private Instant prCreatedAt;
+        private Instant slaDeadline;
+        private String owningTeam;
+        private String status;
+        private Instant closedAt;
+        private Long escalationId;
     }
 
     @Builder
