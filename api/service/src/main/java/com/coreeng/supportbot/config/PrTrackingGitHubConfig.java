@@ -52,8 +52,8 @@ public class PrTrackingGitHubConfig {
 
         AuthorizationProvider jwtProvider = () -> "Bearer " + createJwt(appId, privateKey);
 
-        AppInstallationAuthorizationProvider authProvider = new AppInstallationAuthorizationProvider(
-                app -> app.getInstallationById(installationId), jwtProvider);
+        AppInstallationAuthorizationProvider authProvider =
+                new AppInstallationAuthorizationProvider(app -> app.getInstallationById(installationId), jwtProvider);
 
         return new GitHubBuilder()
                 .withEndpoint(config.apiBaseUrl())
@@ -82,14 +82,17 @@ public class PrTrackingGitHubConfig {
         try (PEMParser parser = new PEMParser(new StringReader(pem))) {
             Object obj = parser.readObject();
             if (obj instanceof PEMKeyPair keyPair) {
-                return  new JcaPEMKeyConverter().getPrivateKey(keyPair.getPrivateKeyInfo());
+                return new JcaPEMKeyConverter().getPrivateKey(keyPair.getPrivateKeyInfo());
             }
             if (obj instanceof org.bouncycastle.asn1.pkcs.PrivateKeyInfo keyInfo) {
                 return new JcaPEMKeyConverter().getPrivateKey(keyInfo);
             }
             throw new IllegalArgumentException(
                     "Unrecognised PEM object — check that private-key-pem is supplied as a YAML block scalar (| indicator). "
-                            + "Got: " + (obj == null ? "null (no PEM header found)" : obj.getClass().getName()));
+                            + "Got: "
+                            + (obj == null
+                                    ? "null (no PEM header found)"
+                                    : obj.getClass().getName()));
         } catch (IOException e) {
             throw new IllegalArgumentException("Failed to parse GitHub App private key from PEM", e);
         }

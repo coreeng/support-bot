@@ -14,7 +14,8 @@ public interface PrTrackingRepository {
     /** Returns all records with status OPEN or ESCALATED. */
     List<PrTrackingRecord> findAllActive();
 
-    PrTrackingRecord updateStatus(long id, PrTrackingStatus newStatus, @Nullable Instant closedAt, @Nullable Long escalationId);
+    PrTrackingRecord updateStatus(
+            long id, PrTrackingStatus newStatus, @Nullable Instant closedAt, @Nullable Long escalationId);
 
     /** Returns true if any OPEN or ESCALATED record still exists for this ticket. */
     boolean hasAnyActiveForTicket(long ticketId);

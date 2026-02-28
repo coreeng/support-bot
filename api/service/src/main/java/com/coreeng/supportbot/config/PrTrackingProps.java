@@ -1,14 +1,13 @@
 package com.coreeng.supportbot.config;
 
-import org.jspecify.annotations.Nullable;
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-
-import static org.apache.commons.lang3.StringUtils.isBlank;
+import org.jspecify.annotations.Nullable;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "pr-review-tracking")
 public record PrTrackingProps(
@@ -51,8 +50,7 @@ public record PrTrackingProps(
 
     private static void validateRepositories(List<PrTrackingRepositoryProps> repositories) {
         if (repositories.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "pr-review-tracking.repositories must not be empty when enabled");
+            throw new IllegalArgumentException("pr-review-tracking.repositories must not be empty when enabled");
         }
         Set<String> names = new HashSet<>();
         for (PrTrackingRepositoryProps repository : repositories) {
@@ -62,14 +60,15 @@ public record PrTrackingProps(
 
             String[] repositoryParts = repository.name().split("/", -1);
             if (repositoryParts.length != 2 || repositoryParts[0].isBlank() || repositoryParts[1].isBlank()) {
-                throw new IllegalArgumentException(
-                        "pr-review-tracking.repositories[].name must be in org/repo format");
+                throw new IllegalArgumentException("pr-review-tracking.repositories[].name must be in org/repo format");
             }
 
             if (isBlank(repository.owningTeam())) {
                 throw new IllegalArgumentException("pr-review-tracking.repositories[].owning-team must not be blank");
             }
-            if (repository.sla() == null || repository.sla().isZero() || repository.sla().isNegative()) {
+            if (repository.sla() == null
+                    || repository.sla().isZero()
+                    || repository.sla().isNegative()) {
                 throw new IllegalArgumentException("pr-review-tracking.repositories[].sla must be a positive duration");
             }
 
@@ -88,8 +87,7 @@ public record PrTrackingProps(
         }
         if (githubConfig.authMode() == PrTrackingAuthMode.APP) {
             requireNotBlank(
-                    githubConfig.appId(),
-                    "pr-review-tracking.github.app-id must not be blank when auth-mode=app");
+                    githubConfig.appId(), "pr-review-tracking.github.app-id must not be blank when auth-mode=app");
             requireNotBlank(
                     githubConfig.installationId(),
                     "pr-review-tracking.github.installation-id must not be blank when auth-mode=app");
@@ -98,8 +96,7 @@ public record PrTrackingProps(
                     "pr-review-tracking.github.private-key-pem must not be blank when auth-mode=app");
             return;
         }
-        requireNotBlank(
-                githubConfig.token(), "pr-review-tracking.github.token must not be blank when auth-mode=token");
+        requireNotBlank(githubConfig.token(), "pr-review-tracking.github.token must not be blank when auth-mode=token");
     }
 
     private static void requireNotBlank(String value, String errorMessage) {

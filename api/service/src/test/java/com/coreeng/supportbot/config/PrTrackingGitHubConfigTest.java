@@ -11,8 +11,8 @@ import org.springframework.context.annotation.Configuration;
 
 class PrTrackingGitHubConfigTest {
 
-    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-            .withUserConfiguration(TestConfig.class, PrTrackingGitHubConfig.class);
+    private final ApplicationContextRunner contextRunner =
+            new ApplicationContextRunner().withUserConfiguration(TestConfig.class, PrTrackingGitHubConfig.class);
 
     @Test
     void doesNotCreateGitHubBeansWhenFeatureDisabled() {

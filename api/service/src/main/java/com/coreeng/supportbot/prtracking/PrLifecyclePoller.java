@@ -2,11 +2,11 @@ package com.coreeng.supportbot.prtracking;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import com.coreeng.supportbot.escalation.CreateEscalationRequest;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
-import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.github.GitHubApiException;
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.github.GitHubPullRequest;
@@ -42,6 +42,7 @@ public class PrLifecyclePoller {
     private final TicketSlackService ticketSlackService;
     private final SlackClient slackClient;
     private final PrTrackingProps prTrackingProps;
+
     @Scheduled(cron = "${pr-review-tracking.poll-cron:0 0 9-18 * * 1-5}")
     public void poll() {
         List<PrTrackingRecord> active = prTrackingRepository.findAllActive();
@@ -89,7 +90,9 @@ public class PrLifecyclePoller {
 
         Ticket ticket = ticketRepository.findTicketById(new TicketId(record.ticketId()));
         if (ticket == null) {
-            log.atWarn().addArgument(record::ticketId).log("Ticket {} not found after PR closed, skipping Slack message");
+            log.atWarn()
+                    .addArgument(record::ticketId)
+                    .log("Ticket {} not found after PR closed, skipping Slack message");
             return;
         }
 
@@ -101,9 +104,7 @@ public class PrLifecyclePoller {
         if (!prTrackingRepository.hasAnyActiveForTicket(record.ticketId())) {
             log.atInfo().addArgument(record::ticketId).log("All PRs resolved for ticket {}, closing ticket");
             ticketProcessingService.closeForPrResolution(
-                    checkNotNull(ticket.id()),
-                    ImmutableList.copyOf(prTrackingProps.tags()),
-                    prTrackingProps.impact());
+                    checkNotNull(ticket.id()), ImmutableList.copyOf(prTrackingProps.tags()), prTrackingProps.impact());
         }
     }
 
@@ -114,14 +115,14 @@ public class PrLifecyclePoller {
             return;
         }
 
-        Escalation escalation = escalationProcessingService.createEscalation(
-                CreateEscalationRequest.builder()
-                        .ticket(ticket)
-                        .team(record.owningTeam())
-                        .tags(ImmutableList.of())
-                        .build());
+        Escalation escalation = escalationProcessingService.createEscalation(CreateEscalationRequest.builder()
+                .ticket(ticket)
+                .team(record.owningTeam())
+                .tags(ImmutableList.of())
+                .build());
 
-        Long escalationId = escalation != null && escalation.id() != null ? escalation.id().id() : null;
+        Long escalationId =
+                escalation != null && escalation.id() != null ? escalation.id().id() : null;
         prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.ESCALATED, null, escalationId);
         ticketSlackService.markTicketEscalated(ticket.queryRef());
 

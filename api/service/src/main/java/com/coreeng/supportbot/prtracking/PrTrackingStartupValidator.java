@@ -31,15 +31,16 @@ public class PrTrackingStartupValidator implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         log.atInfo().log("Validating PR tracking config against registry");
         for (String tagCode : props.tags()) {
-            if (tagsRegistry.listTagsByCodes(com.google.common.collect.ImmutableList.of(tagCode)).isEmpty()) {
+            if (tagsRegistry
+                    .listTagsByCodes(com.google.common.collect.ImmutableList.of(tagCode))
+                    .isEmpty()) {
                 throw new IllegalStateException(
                         "pr-review-tracking: unknown tag code '%s'. Check enums.tags config.".formatted(tagCode));
             }
         }
         if (impactsRegistry.findImpactByCode(props.impact()) == null) {
-            throw new IllegalStateException(
-                    "pr-review-tracking: unknown impact code '%s'. Check enums.impacts config."
-                            .formatted(props.impact()));
+            throw new IllegalStateException("pr-review-tracking: unknown impact code '%s'. Check enums.impacts config."
+                    .formatted(props.impact()));
         }
         log.atInfo().log("PR tracking config validation passed");
     }

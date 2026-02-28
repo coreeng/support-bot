@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.prtracking;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.config.PrTrackingRepositoryProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
@@ -21,18 +23,15 @@ import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Service;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
 
 @Service
 @ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
@@ -64,7 +63,6 @@ public class PrDetectionService {
 
         TicketId ticketId = checkNotNull(ticket.id());
         boolean anyOpenTracked = false;
-        boolean anyNotOpen = false;
 
         for (DetectedPr pr : detectedPrs) {
             if (prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(
@@ -79,29 +77,27 @@ public class PrDetectionService {
             PerPrResult result = processPr(pr, ticket);
             switch (result) {
                 case TRACKED -> anyOpenTracked = true;
-                case NOT_OPEN -> anyNotOpen = true;
-                case SKIPPED -> { }
+                case SKIPPED -> {}
             }
         }
 
-        // Close only when every linked PR was not open (none were open to track).
         if (anyOpenTracked) {
             return PrDetectionOutcome.tracked();
         }
-        if (anyNotOpen) {
-            return PrDetectionOutcome.notOpen(prTrackingProps.tags(), prTrackingProps.impact());
-        }
-        return PrDetectionOutcome.tracked();
+        return PrDetectionOutcome.skipped();
     }
 
-    private enum PerPrResult { TRACKED, NOT_OPEN, SKIPPED }
+    private enum PerPrResult {
+        TRACKED,
+        SKIPPED
+    }
 
     private PerPrResult processPr(DetectedPr detectedPr, Ticket ticket) {
         PrTrackingRepositoryProps repoConfig = prTrackingProps.repositories().stream()
                 .filter(r -> r.name().equals(detectedPr.repositoryName()))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "Repo config not found for " + detectedPr.repositoryName()));
+                .orElseThrow(
+                        () -> new IllegalStateException("Repo config not found for " + detectedPr.repositoryName()));
 
         GitHubPullRequest prMetadata;
         try {
@@ -120,9 +116,8 @@ public class PrDetectionService {
                     .addArgument(detectedPr::repositoryName)
                     .addArgument(detectedPr::pullNumber)
                     .addArgument(prMetadata::state)
-                    .log("PR {}#{} is {} — posting notice (ticket will close only when all linked PRs are closed)");
-            postPrNotOpenMessage(detectedPr, prMetadata.state(), ticket.queryTs(), ticket.channelId());
-            return PerPrResult.NOT_OPEN;
+                    .log("PR {}#{} is {} — skipping tracking");
+            return PerPrResult.SKIPPED;
         }
 
         Instant slaDeadline = prMetadata.createdAt().plus(repoConfig.sla());
@@ -163,29 +158,23 @@ public class PrDetectionService {
                 .addArgument(tracking::prNumber)
                 .log("PR {}#{} SLA already breached at detection time — escalating immediately");
 
-        Escalation escalation = escalationProcessingService.createEscalation(
-                CreateEscalationRequest.builder()
-                        .ticket(ticket)
-                        .team(owningTeam)
-                        .tags(ImmutableList.of())
-                        .build());
+        Escalation escalation = escalationProcessingService.createEscalation(CreateEscalationRequest.builder()
+                .ticket(ticket)
+                .team(owningTeam)
+                .tags(ImmutableList.of())
+                .build());
 
-        Long escalationId = escalation != null && escalation.id() != null ? escalation.id().id() : null;
-        prTrackingRepository.updateStatus(tracking.id(), com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.ESCALATED, null, escalationId);
+        Long escalationId =
+                escalation != null && escalation.id() != null ? escalation.id().id() : null;
+        prTrackingRepository.updateStatus(
+                tracking.id(), com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.ESCALATED, null, escalationId);
         ticketSlackService.markTicketEscalated(ticket.queryRef());
     }
 
-    private void postPrNotOpenMessage(DetectedPr pr, String state, MessageTs queryTs, String channelId) {
-        String text = "PR #%d in `%s` seems to already  be `%s`."
-                .formatted(pr.pullNumber(), pr.repositoryName(), state);
-
-        slackClient.postMessage(new SlackPostMessageRequest(
-                SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
-    }
-
     private void postSlaBreachReply(DetectedPr pr, Duration sla, MessageTs queryTs, String channelId) {
-        String text = "Pull requests submitted to `%s` are expected to be reviewed within %s. It looks like PR #%d has exceeded that timeframe."
-                .formatted(pr.repositoryName(), formatDuration(sla), pr.pullNumber());
+        String text =
+                "Pull requests submitted to `%s` are expected to be reviewed within %s. It looks like PR #%d has exceeded that timeframe."
+                        .formatted(pr.repositoryName(), formatDuration(sla), pr.pullNumber());
 
         slackClient.postMessage(new SlackPostMessageRequest(
                 SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
@@ -197,22 +186,20 @@ public class PrDetectionService {
     }
 
     private void postSlaReply(
-            DetectedPr pr,
-            Duration sla,
-            String teamLabel,
-            Instant slaDeadline,
-            MessageTs queryTs,
-            String channelId) {
-        String text = "Pull requests submitted to `%s` are expected to be reviewed within %s. You don't have to ping us for reviews, but I'll keep an eye on this one. If PR #%d hasn't been reviewed by %s, I'll automatically escalate it to the owning team (%s)."
-                .formatted(pr.repositoryName(), formatDuration(sla), pr.pullNumber(), DEADLINE_FMT.format(slaDeadline), teamLabel);
+            DetectedPr pr, Duration sla, String teamLabel, Instant slaDeadline, MessageTs queryTs, String channelId) {
+        String text =
+                "Pull requests submitted to `%s` are expected to be reviewed within %s. You don't have to ping us for reviews, but I'll keep an eye on this one. If PR #%d hasn't been reviewed by %s, I'll automatically escalate it to the owning team (%s)."
+                        .formatted(
+                                pr.repositoryName(),
+                                formatDuration(sla),
+                                pr.pullNumber(),
+                                DEADLINE_FMT.format(slaDeadline),
+                                teamLabel);
 
         slackClient.postMessage(new SlackPostMessageRequest(
                 SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
 
-        log.atInfo()
-                .addArgument(pr::repositoryName)
-                .addArgument(pr::pullNumber)
-                .log("SLA reply posted for PR {}#{}");
+        log.atInfo().addArgument(pr::repositoryName).addArgument(pr::pullNumber).log("SLA reply posted for PR {}#{}");
     }
 
     private void addReaction(String emoji, MessageTs queryTs, String channelId) {
