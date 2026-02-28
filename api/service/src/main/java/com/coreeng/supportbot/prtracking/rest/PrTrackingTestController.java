@@ -8,6 +8,7 @@ import com.coreeng.supportbot.prtracking.PrTrackingRecord;
 import com.coreeng.supportbot.prtracking.PrTrackingRepository;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.jooq.DSLContext;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @Profile({"functionaltests", "nft"})
+@ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
 @RequestMapping("/test/prtracking")
 @RequiredArgsConstructor
 public class PrTrackingTestController {
