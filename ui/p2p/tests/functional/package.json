@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "@cucumber/cucumber": "^12.2.0",
-    "glob": "^11.1.0"
+    "glob": "^11.1.0",
+    "minimatch": "^10.2.4"
   },
   "resolutions": {
     "@isaacs/brace-expansion": "^5.0.1",
