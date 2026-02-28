@@ -12,6 +12,12 @@ plugins {
     checkstyle
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
 val serviceLifecycle = ServiceLifecycle(project, "functional", logger)
 
 repositories {
@@ -111,12 +117,17 @@ tasks.register("testIntegrated") {
         val bootJarTask = project(":service").tasks.named("bootJar").get() as Jar
         val jarFile = bootJarTask.archiveFile.get().asFile
         val logFile = File("${project(":service").projectDir.path}/logs/support-bot.log")
+        
+        val javaToolchains = project.extensions.getByType(JavaToolchainService::class.java)
+        val javaCompiler = project.extensions.getByType(JavaPluginExtension::class.java).toolchain
+        val javaLauncher = javaToolchains.launcherFor(javaCompiler).get()
 
         val started = serviceLifecycle.startService(
             jarFile = jarFile,
             springProfile = "functionaltests",
             healthUrl = "http://localhost:8081/health",
-            logFile = logFile
+            logFile = logFile,
+            javaExecutable = javaLauncher.executablePath.asFile.absolutePath
         )
 
         if (!started) {

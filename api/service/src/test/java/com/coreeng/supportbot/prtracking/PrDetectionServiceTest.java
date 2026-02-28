@@ -510,8 +510,7 @@ class PrDetectionServiceTest {
             when(prTrackingProps.repositories()).thenReturn(List.of(
                     new PrTrackingRepositoryProps(REPO, TEAM_CODE, SLA_24H),
                     new PrTrackingRepositoryProps(repoB, TEAM_CODE, SLA_24H)));
-            when(prTrackingProps.tags()).thenReturn(List.of("networking"));
-            when(prTrackingProps.impact()).thenReturn("low");
+
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
             when(prUrlParser.parse(any())).thenReturn(List.of(
