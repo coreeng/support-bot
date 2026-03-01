@@ -4,6 +4,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.config.PrTrackingRepositoryProps;
+import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.escalation.CreateEscalationRequest;
@@ -13,6 +14,7 @@ import com.coreeng.supportbot.github.GitHubApiException;
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.github.GitHubPullRequest;
 import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
 import com.coreeng.supportbot.slack.client.SlackClient;
@@ -20,6 +22,10 @@ import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
+import com.coreeng.supportbot.ticket.TicketRepository;
+import com.coreeng.supportbot.ticket.TicketTeam;
+import com.coreeng.supportbot.ticket.TicketTeamSuggestionsService;
+import com.coreeng.supportbot.ticket.TicketTeamsSuggestion;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
@@ -28,8 +34,10 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -49,7 +57,10 @@ public class PrDetectionService {
     private final EscalationTeamsRegistry escalationTeamsRegistry;
     private final EscalationProcessingService escalationProcessingService;
     private final TicketSlackService ticketSlackService;
+    private final TicketRepository ticketRepository;
+    private final TicketTeamSuggestionsService ticketTeamSuggestionsService;
     private final SlackClient slackClient;
+    private final SlackTicketsProps slackTicketsProps;
 
     public boolean containsPrLinks(String message) {
         return !prUrlParser.parse(message).isEmpty();
@@ -63,6 +74,8 @@ public class PrDetectionService {
 
         TicketId ticketId = checkNotNull(ticket.id());
         boolean anyOpenTracked = false;
+        boolean metadataInitialized = false;
+        boolean baseReactionsAdded = false;
 
         for (DetectedPr pr : detectedPrs) {
             if (prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(
@@ -74,9 +87,20 @@ public class PrDetectionService {
                         .log("PR {}#{} already tracked for ticket {}, skipping");
                 continue;
             }
+            if (!baseReactionsAdded) {
+                addReaction(slackTicketsProps.expectedInitialReaction(), ticket.queryTs(), ticket.channelId());
+                ticketSlackService.markPostTracked(ticket.queryRef());
+                baseReactionsAdded = true;
+            }
             PerPrResult result = processPr(pr, ticket);
             switch (result) {
-                case TRACKED -> anyOpenTracked = true;
+                case TRACKED -> {
+                    anyOpenTracked = true;
+                    if (!metadataInitialized) {
+                        ticket = initializePrMetadataIfNeeded(ticket, event);
+                        metadataInitialized = true;
+                    }
+                }
                 case SKIPPED -> {}
             }
         }
@@ -140,7 +164,6 @@ public class PrDetectionService {
 
         MessageTs queryTs = ticket.queryTs();
         String channelId = ticket.channelId();
-
         addReaction(prTrackingProps.prEmoji(), queryTs, channelId);
 
         if (Instant.now().isAfter(slaDeadline)) {
@@ -150,6 +173,44 @@ public class PrDetectionService {
             postSlaReply(detectedPr, repoConfig.sla(), teamLabel, slaDeadline, queryTs, channelId);
         }
         return PerPrResult.TRACKED;
+    }
+
+    private Ticket initializePrMetadataIfNeeded(Ticket ticket, MessagePosted event) {
+        TicketTeam resolvedTeam = ticket.team() != null ? ticket.team() : resolveFirstSuggestedTeam(event.userId());
+        ImmutableList<String> resolvedTags =
+                ticket.tags().isEmpty() ? ImmutableList.copyOf(prTrackingProps.tags()) : ticket.tags();
+        String resolvedImpact =
+                (ticket.impact() == null || ticket.impact().isBlank()) ? prTrackingProps.impact() : ticket.impact();
+
+        boolean changed = !Objects.equals(ticket.team(), resolvedTeam)
+                || !ticket.tags().equals(resolvedTags)
+                || !Objects.equals(ticket.impact(), resolvedImpact);
+        if (!changed) {
+            return ticket;
+        }
+
+        return ticketRepository.updateTicket(ticket.toBuilder()
+                .team(resolvedTeam)
+                .tags(resolvedTags)
+                .impact(resolvedImpact)
+                .build());
+    }
+
+    private @Nullable TicketTeam resolveFirstSuggestedTeam(String authorId) {
+        try {
+            TicketTeamsSuggestion suggestion =
+                    ticketTeamSuggestionsService.getTeamSuggestions("", SlackId.user(authorId));
+            String code = !suggestion.userTeams().isEmpty()
+                    ? suggestion.userTeams().get(0)
+                    : (!suggestion.otherTeams().isEmpty() ? suggestion.otherTeams().get(0) : null);
+            return TicketTeam.fromCode(code);
+        } catch (Exception e) {
+            log.atWarn()
+                    .setCause(e)
+                    .addArgument(() -> authorId)
+                    .log("Failed to resolve authors team suggestion for Slack user {}, leaving team unchanged");
+            return null;
+        }
     }
 
     private void escalateImmediately(PrTrackingRecord tracking, Ticket ticket, String owningTeam) {

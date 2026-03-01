@@ -1,20 +1,8 @@
 package com.coreeng.supportbot.prtracking;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
-
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.config.PrTrackingRepositoryProps;
+import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
@@ -31,14 +19,9 @@ import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.slack.events.MessagePosted;
-import com.coreeng.supportbot.ticket.Ticket;
-import com.coreeng.supportbot.ticket.TicketId;
-import com.coreeng.supportbot.ticket.TicketStatus;
+import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -47,6 +30,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PrDetectionServiceTest {
@@ -82,7 +73,16 @@ class PrDetectionServiceTest {
     private TicketSlackService ticketSlackService;
 
     @Mock
+    private TicketRepository ticketRepository;
+
+    @Mock
+    private TicketTeamSuggestionsService ticketTeamSuggestionsService;
+
+    @Mock
     private SlackClient slackClient;
+
+    @Mock
+    private SlackTicketsProps slackTicketsProps;
 
     @Captor
     private ArgumentCaptor<SlackPostMessageRequest> postMessageCaptor;
@@ -102,7 +102,17 @@ class PrDetectionServiceTest {
                 escalationTeamsRegistry,
                 escalationProcessingService,
                 ticketSlackService,
-                slackClient);
+                ticketRepository,
+                ticketTeamSuggestionsService,
+                slackClient,
+                slackTicketsProps);
+        lenient().when(slackTicketsProps.expectedInitialReaction()).thenReturn("eyes");
+        lenient().when(prTrackingProps.tags()).thenReturn(List.of("pr-review"));
+        lenient().when(prTrackingProps.impact()).thenReturn("medium");
+        lenient().when(ticketRepository.updateTicket(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient()
+                .when(ticketTeamSuggestionsService.getTeamSuggestions(any(), any()))
+                .thenReturn(new TicketTeamsSuggestion(ImmutableList.of(), ImmutableList.of()));
     }
 
     // -------------------------------------------------------------------------
@@ -267,7 +277,42 @@ class PrDetectionServiceTest {
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
             // then
-            verifyNoInteractions(escalationProcessingService, ticketSlackService);
+            verifyNoInteractions(escalationProcessingService);
+            verify(ticketSlackService).markPostTracked(any(MessageRef.class));
+        }
+
+        @Test
+        void initializesTeamTagsAndImpactForTrackedPrWhenMissing() {
+            // given
+            setupDetectedPr(Instant.now().minus(Duration.ofHours(1)));
+            when(ticketTeamSuggestionsService.getTeamSuggestions(any(), any()))
+                    .thenReturn(new TicketTeamsSuggestion(ImmutableList.of("wow"), ImmutableList.of("core")));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then
+            verify(ticketRepository).updateTicket(argThat(ticket -> ticket.team() != null
+                    && "wow".equals(ticket.team().toCode())
+                    && ticket.tags().equals(ImmutableList.of("pr-review"))
+                    && "medium".equals(ticket.impact())));
+        }
+
+        @Test
+        void doesNotOverrideExistingTeamTagsAndImpact() {
+            // given
+            setupDetectedPr(Instant.now().minus(Duration.ofHours(1)));
+            Ticket ticket = ticketWithId(1L).toBuilder()
+                    .team(TicketTeam.fromCode("existing-team"))
+                    .tags(ImmutableList.of("manual-tag"))
+                    .impact("high")
+                    .build();
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticket);
+
+            // then
+            verify(ticketRepository, never()).updateTicket(any());
         }
 
         private void setupDetectedPr(Instant prCreatedAt) {
@@ -327,7 +372,9 @@ class PrDetectionServiceTest {
 
             // then
             verify(prTrackingRepository, never()).insert(any());
-            verifyNoInteractions(slackClient);
+            verify(slackClient, times(1)).addReaction(any());
+            verify(slackClient, never()).postMessage(any());
+            verify(ticketSlackService).markPostTracked(any(MessageRef.class));
         }
 
         @Test
@@ -349,8 +396,10 @@ class PrDetectionServiceTest {
             // then — closed PR is ignored at detection-time
             verify(prTrackingRepository, never()).insert(any());
             assertThat(outcome.shouldCloseTicket()).isFalse();
-            verifyNoInteractions(slackClient);
-            verifyNoInteractions(escalationProcessingService, ticketSlackService);
+            verify(slackClient, times(1)).addReaction(any());
+            verify(slackClient, never()).postMessage(any());
+            verifyNoInteractions(escalationProcessingService);
+            verify(ticketSlackService).markPostTracked(any(MessageRef.class));
         }
 
         @Test
@@ -369,7 +418,9 @@ class PrDetectionServiceTest {
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(2L));
 
             // then — merged PR is ignored
-            verifyNoInteractions(slackClient);
+            verify(slackClient, times(1)).addReaction(any());
+            verify(slackClient, never()).postMessage(any());
+            verify(ticketSlackService).markPostTracked(any(MessageRef.class));
             verify(prTrackingRepository, never()).insert(any());
         }
     }
@@ -493,7 +544,7 @@ class PrDetectionServiceTest {
             verify(prTrackingRepository).insert(argThat(r -> REPO.equals(r.githubRepo()) && r.prNumber() == PR_NUMBER));
             verify(prTrackingRepository).insert(argThat(r -> repoB.equals(r.githubRepo()) && r.prNumber() == prB));
             verify(slackClient, org.mockito.Mockito.times(2)).postMessage(any());
-            verify(slackClient, org.mockito.Mockito.times(2)).addReaction(any());
+            verify(slackClient, org.mockito.Mockito.times(3)).addReaction(any());
         }
 
         @Test

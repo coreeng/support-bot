@@ -60,6 +60,7 @@ public class SlackWiremock extends WireMockServer {
     private void setupAppInitMocks() {
         LOGGER.info("Setting up initial Slack API stubs");
         stubAuthTest("initial mock");
+        stubUsersInfoDefault("initial users.info mock");
     }
 
     private void capturePermanentStubs() {
@@ -541,6 +542,27 @@ public class SlackWiremock extends WireMockServer {
                 .wireMockServer(this)
                 .description(userProfile.description())
                 .build();
+    }
+
+    /**
+     * Permanent fallback for users.info calls used by team suggestions.
+     * Tests can still override with a more specific users.info stub as needed.
+     */
+    public void stubUsersInfoDefault(String description) {
+        givenThat(post("/api/users.info")
+                .withName(description)
+                .willReturn(okJson("""
+                        {
+                          "ok": true,
+                          "user": {
+                            "id": "UNSET_BY_TESTS",
+                            "is_bot": false,
+                            "profile": {
+                              "email": "functional-user@example.com"
+                            }
+                          }
+                        }
+                        """)));
     }
 
     public <T> StubWithResult<T> stubEphemeralMessagePosted(EphemeralMessageExpectation<T> expectation) {
