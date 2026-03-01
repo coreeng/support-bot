@@ -66,6 +66,20 @@ public class PrTrackingFunctionalTests {
                         .channelId(tenantsQuery.channelId())
                         .ts(queryTs)
                         .build());
+        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
+                ReactionAddedExpectation.builder()
+                        .description("Eyes reaction on query")
+                        .reaction("eyes")
+                        .channelId(tenantsQuery.channelId())
+                        .ts(queryTs)
+                        .build());
+        var ticketReactionStub = testKit.slack().wiremock().stubReactionAdd(
+                ReactionAddedExpectation.builder()
+                        .description("Ticket reaction on query")
+                        .reaction("ticket")
+                        .channelId(tenantsQuery.channelId())
+                        .ts(queryTs)
+                        .build());
         var slaReplyStub = testKit.slack().wiremock().stubChatPostMessage(
                 "PR SLA reply in thread", tenantsQuery.channelId());
 
@@ -74,6 +88,8 @@ public class PrTrackingFunctionalTests {
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
             githubStub.assertIsCalled();
             prReactionStub.assertIsCalled();
+            eyesReactionStub.assertIsCalled();
+            ticketReactionStub.assertIsCalled();
             slaReplyStub.assertIsCalled();
         });
 
@@ -125,6 +141,13 @@ public class PrTrackingFunctionalTests {
                         .channelId(channelId)
                         .ts(queryTs)
                         .build());
+        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
+                ReactionAddedExpectation.builder()
+                        .description("Eyes reaction on query")
+                        .reaction("eyes")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
 
         // Must be registered after generic chat.postMessage stubs (Wiremock LIFO matching).
         SlackMessage messageForStubs = SlackMessage.builder()
@@ -140,6 +163,7 @@ public class PrTrackingFunctionalTests {
             githubClosedStub.assertIsCalled();
             githubOpenStub.assertIsCalled();
             prReactionStub.assertIsCalled();
+            eyesReactionStub.assertIsCalled();
         });
 
         var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
@@ -171,6 +195,13 @@ public class PrTrackingFunctionalTests {
                         .channelId(channelId)
                         .ts(queryTs)
                         .build());
+        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
+                ReactionAddedExpectation.builder()
+                        .description("Eyes reaction on query")
+                        .reaction("eyes")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
 
         // Must be registered after generic chat.postMessage stubs (Wiremock LIFO matching).
         SlackMessage messageForStubs = SlackMessage.builder()
@@ -186,6 +217,7 @@ public class PrTrackingFunctionalTests {
             githubErrorStub.assertIsCalled();
             githubOpenStub.assertIsCalled();
             prReactionStub.assertIsCalled();
+            eyesReactionStub.assertIsCalled();
         });
 
         var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
@@ -226,6 +258,20 @@ public class PrTrackingFunctionalTests {
                         .channelId(tenantsQuery.channelId())
                         .ts(queryTs)
                         .build());
+        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
+                ReactionAddedExpectation.builder()
+                        .description("Eyes reaction on query")
+                        .reaction("eyes")
+                        .channelId(tenantsQuery.channelId())
+                        .ts(queryTs)
+                        .build());
+        var ticketReactionStub = testKit.slack().wiremock().stubReactionAdd(
+                ReactionAddedExpectation.builder()
+                        .description("Ticket reaction on query")
+                        .reaction("ticket")
+                        .channelId(tenantsQuery.channelId())
+                        .ts(queryTs)
+                        .build());
         var slaReplyStub = testKit.slack().wiremock().stubChatPostMessage(
                 "PR SLA reply in thread", tenantsQuery.channelId());
 
@@ -236,6 +282,8 @@ public class PrTrackingFunctionalTests {
         // then — app detects PR, calls GitHub, adds reaction and posts SLA reply
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
             prReactionStub.assertIsCalled();
+            eyesReactionStub.assertIsCalled();
+            ticketReactionStub.assertIsCalled();
             slaReplyStub.assertIsCalled();
         });
         githubStub.cleanUp();
@@ -267,6 +315,13 @@ public class PrTrackingFunctionalTests {
                         .channelId(channelId)
                         .ts(queryTs)
                         .build());
+        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
+                ReactionAddedExpectation.builder()
+                        .description("Eyes reaction")
+                        .reaction("eyes")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
 
         // Stub ticket creation for the initial query message.
         SlackMessage messageForStubs = SlackMessage.builder()
@@ -286,6 +341,7 @@ public class PrTrackingFunctionalTests {
             githubStub1.assertIsCalled();
             githubStub2.assertIsCalled();
             prReactionStub.assertIsCalled(2);
+            eyesReactionStub.assertIsCalled();
         });
 
         var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
@@ -324,6 +380,13 @@ public class PrTrackingFunctionalTests {
                         .channelId(channelId)
                         .ts(queryTs)
                         .build());
+        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
+                ReactionAddedExpectation.builder()
+                        .description("Eyes reaction expected")
+                        .reaction("eyes")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
         // when — post original message with one PR link
         asTenantSlack.postMessage(queryTs, messageWithPr);
 
@@ -334,6 +397,7 @@ public class PrTrackingFunctionalTests {
             creationStubs.ticketMessagePosted().assertIsCalled();
             creationStubs.conversationsReplies().assertIsNotCalled();
             prReactionStub.assertIsNotCalled();
+            eyesReactionStub.assertIsCalled();
         });
 
         var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
@@ -344,6 +408,7 @@ public class PrTrackingFunctionalTests {
         githubStub.cleanUp();
         creationStubs.cleanUp();
         prReactionStub.cleanUp();
+        eyesReactionStub.cleanUp();
     }
 
     @Test
@@ -366,6 +431,13 @@ public class PrTrackingFunctionalTests {
                 ReactionAddedExpectation.builder()
                         .description("PR reaction")
                         .reaction("pr")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
+                ReactionAddedExpectation.builder()
+                        .description("Eyes reaction")
+                        .reaction("eyes")
                         .channelId(channelId)
                         .ts(queryTs)
                         .build());
@@ -392,6 +464,7 @@ public class PrTrackingFunctionalTests {
         // then
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
             prReactionStub.assertIsCalled();
+            eyesReactionStub.assertIsCalled();
             escalatedReactionStub.assertIsCalled();
         });
 

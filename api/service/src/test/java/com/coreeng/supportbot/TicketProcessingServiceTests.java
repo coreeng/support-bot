@@ -217,7 +217,6 @@ public class TicketProcessingServiceTests {
         assertNotNull(ticket, "ticket is auto-created for PR link");
         assertEquals(TicketStatus.opened, ticket.status());
 
-        verify(slackService).markPostTracked(new MessageRef(MESSAGE_TS, slackTicketsProps.channelId()));
         verify(slackService).postTicketForm(eq(new MessageRef(MESSAGE_TS, slackTicketsProps.channelId())), any());
 
         ArgumentCaptor<Ticket> ticketCaptor = ArgumentCaptor.forClass(Ticket.class);

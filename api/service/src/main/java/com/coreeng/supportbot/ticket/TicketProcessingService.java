@@ -102,8 +102,6 @@ public class TicketProcessingService {
                 .addKeyValue("ticketId", newTicketId.id())
                 .log("Ticket auto-created for PR-link message({})", queryRef.actualThreadTs());
 
-        slackService.markPostTracked(new MessageRef(queryRef.actualThreadTs(), queryRef.channelId()));
-
         if (newTicket.createdMessageTs() == null) {
             MessageRef postedMessageRef = slackService.postTicketForm(
                     new MessageRef(queryRef.actualThreadTs(), queryRef.channelId()),
