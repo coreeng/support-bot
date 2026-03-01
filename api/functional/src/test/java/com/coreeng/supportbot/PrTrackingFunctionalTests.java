@@ -16,7 +16,6 @@ import com.coreeng.supportbot.testkit.TicketByIdQuery;
 import com.coreeng.supportbot.testkit.TicketMessage;
 import java.time.Duration;
 import java.time.Instant;
-
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -57,31 +56,35 @@ public class PrTrackingFunctionalTests {
         asSupportSlack.addReactionTo(tenantsQuery, "eyes");
         creationStubs.awaitAllCalled(Duration.ofSeconds(5));
 
-        var githubStub = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "GitHub PR #1", PR_REPO, 1, "open", recentCreatedAt());
-        var prReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var githubStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("GitHub PR #1", PR_REPO, 1, "open", recentCreatedAt());
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("PR reaction on query")
                         .reaction("pr")
                         .channelId(tenantsQuery.channelId())
                         .ts(queryTs)
                         .build());
-        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("Eyes reaction on query")
                         .reaction("eyes")
                         .channelId(tenantsQuery.channelId())
                         .ts(queryTs)
                         .build());
-        var ticketReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var ticketReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("Ticket reaction on query")
                         .reaction("ticket")
                         .channelId(tenantsQuery.channelId())
                         .ts(queryTs)
                         .build());
-        var slaReplyStub = testKit.slack().wiremock().stubChatPostMessage(
-                "PR SLA reply in thread", tenantsQuery.channelId());
+        var slaReplyStub =
+                testKit.slack().wiremock().stubChatPostMessage("PR SLA reply in thread", tenantsQuery.channelId());
 
         // First PR link should be tracked.
         asTenantSlack.postThreadReply(MessageTs.now(), queryTs, "Here is the fix: " + PR_LINK_1);
@@ -94,24 +97,29 @@ public class PrTrackingFunctionalTests {
         });
 
         // Posting the same PR link again for the same ticket should be ignored.
-        var duplicateGithubStub = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "GitHub PR #1 duplicate should not be fetched", PR_REPO, 1, "open", recentCreatedAt());
-        var duplicatePrReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var duplicateGithubStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest(
+                        "GitHub PR #1 duplicate should not be fetched", PR_REPO, 1, "open", recentCreatedAt());
+        var duplicatePrReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("PR reaction should not be added for duplicate")
                         .reaction("pr")
                         .channelId(tenantsQuery.channelId())
                         .ts(queryTs)
                         .build());
-        var duplicateSlaReplyStub = testKit.slack().wiremock().stubChatPostMessage(
-                "PR SLA reply should not be posted for duplicate", tenantsQuery.channelId());
+        var duplicateSlaReplyStub = testKit.slack()
+                .wiremock()
+                .stubChatPostMessage("PR SLA reply should not be posted for duplicate", tenantsQuery.channelId());
 
         asTenantSlack.postThreadReply(MessageTs.now(), queryTs, "Re-posting same PR: " + PR_LINK_1);
         await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3)).untilAsserted(() -> {
             duplicateGithubStub.assertIsNotCalled();
             duplicatePrReactionStub.assertIsNotCalled();
             duplicateSlaReplyStub.assertIsNotCalled();
-            assertThat(supportBotClient.findTicketByQueryTs(tenantsQuery.channelId(), queryTs)).isNotNull();
+            assertThat(supportBotClient.findTicketByQueryTs(tenantsQuery.channelId(), queryTs))
+                    .isNotNull();
         });
 
         duplicateGithubStub.cleanUp();
@@ -129,20 +137,24 @@ public class PrTrackingFunctionalTests {
         String messageWithTwoPrs = "Please review " + PR_LINK_1 + " and " + PR_LINK_2;
         MessageTs ticketMessageTs = MessageTs.now();
 
-        var githubClosedStub = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "GitHub PR #1 closed", PR_REPO, 1, "closed", recentCreatedAt());
-        var githubOpenStub = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "GitHub PR #2 open", PR_REPO, 2, "open", recentCreatedAt());
+        var githubClosedStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("GitHub PR #1 closed", PR_REPO, 1, "closed", recentCreatedAt());
+        var githubOpenStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("GitHub PR #2 open", PR_REPO, 2, "open", recentCreatedAt());
 
-        var prReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("PR reaction on query")
                         .reaction("pr")
                         .channelId(channelId)
                         .ts(queryTs)
                         .build());
-        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("Eyes reaction on query")
                         .reaction("eyes")
                         .channelId(channelId)
@@ -183,20 +195,24 @@ public class PrTrackingFunctionalTests {
         String messageWithTwoPrs = "Please review " + PR_LINK_1 + " and " + PR_LINK_2;
         MessageTs ticketMessageTs = MessageTs.now();
 
-        var githubErrorStub = testKit.slack().wiremock().stubGitHubGetPullRequestError(
-                "GitHub PR #1 error", PR_REPO, 1, 404, "PR not found");
-        var githubOpenStub = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "GitHub PR #2 open", PR_REPO, 2, "open", recentCreatedAt());
+        var githubErrorStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequestError("GitHub PR #1 error", PR_REPO, 1, 404, "PR not found");
+        var githubOpenStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("GitHub PR #2 open", PR_REPO, 2, "open", recentCreatedAt());
 
-        var prReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("PR reaction on query")
                         .reaction("pr")
                         .channelId(channelId)
                         .ts(queryTs)
                         .build());
-        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("Eyes reaction on query")
                         .reaction("eyes")
                         .channelId(channelId)
@@ -248,32 +264,36 @@ public class PrTrackingFunctionalTests {
         supportBotClient.assertTicketExists(TicketByIdQuery.fromTicketMessage(ticketMessage, queryText));
 
         // stub GitHub: PR is open
-        var githubStub = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "GitHub PR #1", PR_REPO, 1, "open", recentCreatedAt());
+        var githubStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("GitHub PR #1", PR_REPO, 1, "open", recentCreatedAt());
         // stub Slack: PR emoji on query message, then SLA reply in thread
-        var prReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("PR reaction on query")
                         .reaction("pr")
                         .channelId(tenantsQuery.channelId())
                         .ts(queryTs)
                         .build());
-        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("Eyes reaction on query")
                         .reaction("eyes")
                         .channelId(tenantsQuery.channelId())
                         .ts(queryTs)
                         .build());
-        var ticketReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var ticketReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("Ticket reaction on query")
                         .reaction("ticket")
                         .channelId(tenantsQuery.channelId())
                         .ts(queryTs)
                         .build());
-        var slaReplyStub = testKit.slack().wiremock().stubChatPostMessage(
-                "PR SLA reply in thread", tenantsQuery.channelId());
+        var slaReplyStub =
+                testKit.slack().wiremock().stubChatPostMessage("PR SLA reply in thread", tenantsQuery.channelId());
 
         // when — tenant posts a thread reply with a PR link
         MessageTs replyTs = MessageTs.now();
@@ -300,23 +320,26 @@ public class PrTrackingFunctionalTests {
         String messageWithTwoPrs = "Could you review " + PR_LINK_1 + " and " + PR_LINK_2 + "?";
         MessageTs ticketMessageTs = MessageTs.now();
 
-
         // Stub GitHub for both PRs (open)
-        var githubStub1 = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "GitHub PR #1", PR_REPO, 1, "open", recentCreatedAt());
-        var githubStub2 = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "GitHub PR #2", PR_REPO, 2, "open", recentCreatedAt());
+        var githubStub1 = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("GitHub PR #1", PR_REPO, 1, "open", recentCreatedAt());
+        var githubStub2 = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("GitHub PR #2", PR_REPO, 2, "open", recentCreatedAt());
 
         // Stub Slack: PR reactions on the query message.
-        var prReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("PR reaction")
                         .reaction("pr")
                         .channelId(channelId)
                         .ts(queryTs)
                         .build());
-        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("Eyes reaction")
                         .reaction("eyes")
                         .channelId(channelId)
@@ -361,8 +384,9 @@ public class PrTrackingFunctionalTests {
         MessageTs ticketMessageTs = MessageTs.now();
 
         // Stub GitHub (PR is closed => detection should skip tracking entirely)
-        var githubStub = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "GitHub PR closed", PR_REPO, 1, "closed", recentCreatedAt());
+        var githubStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("GitHub PR closed", PR_REPO, 1, "closed", recentCreatedAt());
 
         // Ticket creation still happens for query messages with PR links.
         SlackMessage messageForStubs = SlackMessage.builder()
@@ -373,15 +397,17 @@ public class PrTrackingFunctionalTests {
         var creationStubs = messageForStubs.stubTicketCreationFlow("ticket created", ticketMessageTs);
 
         // PR-specific side effects should not happen for closed PR links.
-        var prReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("No PR reaction expected")
                         .reaction("pr")
                         .channelId(channelId)
                         .ts(queryTs)
                         .build());
-        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("Eyes reaction expected")
                         .reaction("eyes")
                         .channelId(channelId)
@@ -423,27 +449,31 @@ public class PrTrackingFunctionalTests {
 
         // Stub GitHub (PR created 2 days ago, breaking the 24h SLA)
         Instant oldCreatedAt = Instant.now().minus(Duration.ofDays(2));
-        var githubStub = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "GitHub PR open", PR_REPO, 1, "open", oldCreatedAt.toString());
+        var githubStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("GitHub PR open", PR_REPO, 1, "open", oldCreatedAt.toString());
 
         // Stub reactions
-        var prReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("PR reaction")
                         .reaction("pr")
                         .channelId(channelId)
                         .ts(queryTs)
                         .build());
-        var eyesReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("Eyes reaction")
                         .reaction("eyes")
                         .channelId(channelId)
                         .ts(queryTs)
                         .build());
 
-        var escalatedReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var escalatedReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("Escalated reaction")
                         .reaction("rocket")
                         .channelId(channelId)
@@ -501,8 +531,9 @@ public class PrTrackingFunctionalTests {
         SlackMessage tenantsMessage = asTenantSlack.postMessage(queryTs, messageWithPr);
 
         // then — ensure it remains ignored for a stable window
-        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3)).untilAsserted(() ->
-                creationStubs.ticketMessagePosted().assertIsNotCalled());
+        await().during(Duration.ofSeconds(2))
+                .atMost(Duration.ofSeconds(3))
+                .untilAsserted(() -> creationStubs.ticketMessagePosted().assertIsNotCalled());
 
         creationStubs.cleanUp();
     }

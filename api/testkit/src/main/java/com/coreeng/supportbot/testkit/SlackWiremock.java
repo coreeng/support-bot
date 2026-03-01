@@ -209,8 +209,7 @@ public class SlackWiremock extends WireMockServer {
         String[] parts = repositoryName.split("/", 2);
         String repoBody = """
                 {"id":1,"name":"%s","full_name":"%s","owner":{"login":"%s"},"private":false}
-                """
-                .formatted(parts[1], repositoryName, parts[0]);
+                """.formatted(parts[1], repositoryName, parts[0]);
         StubMapping repoStub = givenThat(get("/repos/" + repositoryName)
                 .withName(description + " (repo metadata)")
                 .willReturn(aResponse()
@@ -221,8 +220,7 @@ public class SlackWiremock extends WireMockServer {
         String prPath = "/repos/" + repositoryName + "/pulls/" + pullNumber;
         String prBody = """
                 {"state":"%s","created_at":"%s","title":"PR title","user":{"login":"test"},"number":%d}
-                """
-                .formatted(state, createdAtIso, pullNumber);
+                """.formatted(state, createdAtIso, pullNumber);
         StubMapping prStub = givenThat(get(prPath)
                 .withName(description)
                 .willReturn(aResponse()
@@ -246,8 +244,7 @@ public class SlackWiremock extends WireMockServer {
         String[] parts = repositoryName.split("/", 2);
         String repoBody = """
                 {"id":1,"name":"%s","full_name":"%s","owner":{"login":"%s"},"private":false}
-                """
-                .formatted(parts[1], repositoryName, parts[0]);
+                """.formatted(parts[1], repositoryName, parts[0]);
         StubMapping repoStub = givenThat(get("/repos/" + repositoryName)
                 .withName(description + " (repo metadata)")
                 .willReturn(aResponse()
@@ -549,9 +546,7 @@ public class SlackWiremock extends WireMockServer {
      * Tests can still override with a more specific users.info stub as needed.
      */
     public void stubUsersInfoDefault(String description) {
-        givenThat(post("/api/users.info")
-                .withName(description)
-                .willReturn(okJson("""
+        givenThat(post("/api/users.info").withName(description).willReturn(okJson("""
                         {
                           "ok": true,
                           "user": {

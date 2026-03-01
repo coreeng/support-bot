@@ -37,45 +37,53 @@ public class PrLifecyclePollerFunctionalTests {
         SeededTicket ticket = createOpenedTicket(queryText);
 
         Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
-        supportBotClient.test().createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
-                .ticketId(ticket.ticketId())
-                .githubRepo(PR_REPO)
-                .prNumber(1)
-                .prCreatedAt(prCreatedAt)
-                .slaDeadline(prCreatedAt.plus(Duration.ofHours(24)))
-                .owningTeam("wow")
-                .build());
+        supportBotClient
+                .test()
+                .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                        .ticketId(ticket.ticketId())
+                        .githubRepo(PR_REPO)
+                        .prNumber(1)
+                        .prCreatedAt(prCreatedAt)
+                        .slaDeadline(prCreatedAt.plus(Duration.ofHours(24)))
+                        .owningTeam("wow")
+                        .build());
 
-        var githubClosedStub = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "Poll GitHub PR closed", PR_REPO, 1, "closed", prCreatedAt.toString());
+        var githubClosedStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("Poll GitHub PR closed", PR_REPO, 1, "closed", prCreatedAt.toString());
         var closeNoticeStub = testKit.slack().wiremock().stubChatPostMessage("Poll close notice", ticket.channelId());
-        var updateStub = testKit.slack().wiremock().stubMessageUpdated(
-                MessageUpdatedExpectation.<TicketMessage>builder()
+        var updateStub = testKit.slack()
+                .wiremock()
+                .stubMessageUpdated(MessageUpdatedExpectation.<TicketMessage>builder()
                         .description("Ticket form updated to closed")
                         .channelId(ticket.channelId())
                         .ts(ticket.formMessageTs())
                         .threadTs(ticket.queryTs())
                         .receiver(new TicketMessage.Receiver())
                         .build());
-        var resolvedReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var resolvedReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("Resolved reaction")
                         .reaction("white_check_mark")
                         .channelId(ticket.channelId())
                         .ts(ticket.queryTs())
                         .build());
-        var getQueryMessageStub = testKit.slack().wiremock().stubGetMessage(MessageToGet.builder()
-                .description("Get query message for close flow")
-                .channelId(ticket.channelId())
-                .ts(ticket.queryTs())
-                .threadTs(ticket.queryTs())
-                .text(queryText)
-                .blocksJson("[]")
-                .userId(testKit.as(tenant).userId())
-                .botId(null)
-                .build());
-        var ratingRequestStub = testKit.slack().wiremock().stubEphemeralMessagePosted(
-                EphemeralMessageExpectation.<RatingRequestMessage>builder()
+        var getQueryMessageStub = testKit.slack()
+                .wiremock()
+                .stubGetMessage(MessageToGet.builder()
+                        .description("Get query message for close flow")
+                        .channelId(ticket.channelId())
+                        .ts(ticket.queryTs())
+                        .threadTs(ticket.queryTs())
+                        .text(queryText)
+                        .blocksJson("[]")
+                        .userId(testKit.as(tenant).userId())
+                        .botId(null)
+                        .build());
+        var ratingRequestStub = testKit.slack()
+                .wiremock()
+                .stubEphemeralMessagePosted(EphemeralMessageExpectation.<RatingRequestMessage>builder()
                         .description("Rating request prompt")
                         .channelId(ticket.channelId())
                         .threadTs(ticket.queryTs())
@@ -106,27 +114,33 @@ public class PrLifecyclePollerFunctionalTests {
         SeededTicket ticket = createOpenedTicket("Please review two PRs");
 
         Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
-        supportBotClient.test().createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
-                .ticketId(ticket.ticketId())
-                .githubRepo(PR_REPO)
-                .prNumber(1)
-                .prCreatedAt(prCreatedAt)
-                .slaDeadline(prCreatedAt.plus(Duration.ofHours(24)))
-                .owningTeam("wow")
-                .build());
-        supportBotClient.test().createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
-                .ticketId(ticket.ticketId())
-                .githubRepo(PR_REPO)
-                .prNumber(2)
-                .prCreatedAt(prCreatedAt)
-                .slaDeadline(prCreatedAt.plus(Duration.ofHours(24)))
-                .owningTeam("wow")
-                .build());
+        supportBotClient
+                .test()
+                .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                        .ticketId(ticket.ticketId())
+                        .githubRepo(PR_REPO)
+                        .prNumber(1)
+                        .prCreatedAt(prCreatedAt)
+                        .slaDeadline(prCreatedAt.plus(Duration.ofHours(24)))
+                        .owningTeam("wow")
+                        .build());
+        supportBotClient
+                .test()
+                .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                        .ticketId(ticket.ticketId())
+                        .githubRepo(PR_REPO)
+                        .prNumber(2)
+                        .prCreatedAt(prCreatedAt)
+                        .slaDeadline(prCreatedAt.plus(Duration.ofHours(24)))
+                        .owningTeam("wow")
+                        .build());
 
-        var githubClosedStub = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "Poll GitHub PR #1 closed", PR_REPO, 1, "closed", prCreatedAt.toString());
-        var githubOpenStub = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "Poll GitHub PR #2 open", PR_REPO, 2, "open", prCreatedAt.toString());
+        var githubClosedStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("Poll GitHub PR #1 closed", PR_REPO, 1, "closed", prCreatedAt.toString());
+        var githubOpenStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("Poll GitHub PR #2 open", PR_REPO, 2, "open", prCreatedAt.toString());
         var closeNoticeStub = testKit.slack().wiremock().stubChatPostMessage("Poll close notice", ticket.channelId());
 
         supportBotClient.test().triggerPrTrackingPoll();
@@ -150,25 +164,30 @@ public class PrLifecyclePollerFunctionalTests {
         SeededTicket ticket = createOpenedTicket("Please review my stale PR");
 
         Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
-        supportBotClient.test().createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
-                .ticketId(ticket.ticketId())
-                .githubRepo(PR_REPO)
-                .prNumber(1)
-                .prCreatedAt(prCreatedAt)
-                .slaDeadline(Instant.now().minus(Duration.ofHours(1)))
-                .owningTeam("wow")
-                .build());
+        supportBotClient
+                .test()
+                .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                        .ticketId(ticket.ticketId())
+                        .githubRepo(PR_REPO)
+                        .prNumber(1)
+                        .prCreatedAt(prCreatedAt)
+                        .slaDeadline(Instant.now().minus(Duration.ofHours(1)))
+                        .owningTeam("wow")
+                        .build());
 
-        var githubOpenStub = testKit.slack().wiremock().stubGitHubGetPullRequest(
-                "Poll GitHub PR open", PR_REPO, 1, "open", prCreatedAt.toString());
-        var escalatedReactionStub = testKit.slack().wiremock().stubReactionAdd(
-                ReactionAddedExpectation.builder()
+        var githubOpenStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("Poll GitHub PR open", PR_REPO, 1, "open", prCreatedAt.toString());
+        var escalatedReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
                         .description("Escalated reaction")
                         .reaction("rocket")
                         .channelId(ticket.channelId())
                         .ts(ticket.queryTs())
                         .build());
-        var escalationMessageStub = testKit.slack().wiremock().stubChatPostMessage("Escalation message", ticket.channelId());
+        var escalationMessageStub =
+                testKit.slack().wiremock().stubChatPostMessage("Escalation message", ticket.channelId());
 
         supportBotClient.test().triggerPrTrackingPoll();
 

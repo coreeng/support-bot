@@ -14,8 +14,8 @@ import com.coreeng.supportbot.github.GitHubApiException;
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.github.GitHubPullRequest;
 import com.coreeng.supportbot.slack.MessageTs;
-import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.SlackException;
+import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
@@ -202,7 +202,9 @@ public class PrDetectionService {
                     ticketTeamSuggestionsService.getTeamSuggestions("", SlackId.user(authorId));
             String code = !suggestion.userTeams().isEmpty()
                     ? suggestion.userTeams().get(0)
-                    : (!suggestion.otherTeams().isEmpty() ? suggestion.otherTeams().get(0) : null);
+                    : (!suggestion.otherTeams().isEmpty()
+                            ? suggestion.otherTeams().get(0)
+                            : null);
             return TicketTeam.fromCode(code);
         } catch (Exception e) {
             log.atWarn()
