@@ -1,5 +1,9 @@
 package com.coreeng.supportbot.prtracking;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.config.PrTrackingRepositoryProps;
 import com.coreeng.supportbot.config.SlackTicketsProps;
@@ -22,6 +26,9 @@ import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -30,14 +37,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PrDetectionServiceTest {
@@ -292,10 +291,11 @@ class PrDetectionServiceTest {
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
             // then
-            verify(ticketRepository).updateTicket(argThat(ticket -> ticket.team() != null
-                    && "wow".equals(ticket.team().toCode())
-                    && ticket.tags().equals(ImmutableList.of("pr-review"))
-                    && "medium".equals(ticket.impact())));
+            verify(ticketRepository)
+                    .updateTicket(argThat(ticket -> ticket.team() != null
+                            && "wow".equals(ticket.team().toCode())
+                            && ticket.tags().equals(ImmutableList.of("pr-review"))
+                            && "medium".equals(ticket.impact())));
         }
 
         @Test
