@@ -11,14 +11,14 @@ public interface AnalysisRepository {
     /**
      * Get top 5 categories for "Knowledge Gap" driver with 5 example summaries for each category.
      *
-     * @return List of DimensionSummary records with dimension (category), count, and summary
+     * @return List of DimensionSummary records with dimension (category), count, summary, channelId, and queryTs
      */
     List<DimensionSummary> getKnowledgeGapCategoriesWithSummaries();
 
     /**
      * Get top 5 drivers with 5 example summaries for each driver.
      *
-     * @return List of DimensionSummary records with dimension (driver), count, and summary
+     * @return List of DimensionSummary records with dimension (driver), count, summary, channelId, and queryTs
      */
     List<DimensionSummary> getDriversWithSummaries();
 
@@ -34,7 +34,7 @@ public interface AnalysisRepository {
     /**
      * DTO for dimension with summary (used for both categories and drivers)
      */
-    record DimensionSummary(String dimension, long queryCount, String summary) {}
+    record DimensionSummary(String dimension, long queryCount, String summary, String channelId, String queryTs) {}
 
     /**
      * DTO for analysis record to be inserted
