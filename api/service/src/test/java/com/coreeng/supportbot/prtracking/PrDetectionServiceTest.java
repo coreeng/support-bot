@@ -315,6 +315,18 @@ class PrDetectionServiceTest {
             verify(ticketRepository, never()).updateTicket(any());
         }
 
+        @Test
+        void doesNotInitializeMetadataForThreadReplyPrLinks() {
+            // given
+            setupDetectedPr(Instant.now().minus(Duration.ofHours(1)));
+
+            // when
+            service.handleMessagePosted(messagePostedReplyWith("msg"), ticketWithId(1L));
+
+            // then
+            verify(ticketRepository, never()).updateTicket(any());
+        }
+
         private void setupDetectedPr(Instant prCreatedAt) {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
@@ -791,6 +803,11 @@ class PrDetectionServiceTest {
 
     private static MessagePosted messagePostedWith(String text) {
         MessageRef ref = new MessageRef(QUERY_TS, null, CHANNEL_ID);
+        return new MessagePosted(text, "U_USER", ref);
+    }
+
+    private static MessagePosted messagePostedReplyWith(String text) {
+        MessageRef ref = new MessageRef(MessageTs.of("1700000001.000001"), QUERY_TS, CHANNEL_ID);
         return new MessagePosted(text, "U_USER", ref);
     }
 

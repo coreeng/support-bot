@@ -96,7 +96,7 @@ public class PrDetectionService {
             switch (result) {
                 case TRACKED -> {
                     anyOpenTracked = true;
-                    if (!metadataInitialized) {
+                    if (!metadataInitialized && !event.messageRef().isReply()) {
                         ticket = initializePrMetadataIfNeeded(ticket, event);
                         metadataInitialized = true;
                     }
