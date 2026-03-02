@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class JdbcAnalysisResultsRepository implements AnalysisRepository {
+public class JdbcAnalysisRepository implements AnalysisRepository {
 
     private final DSLContext dsl;
 
