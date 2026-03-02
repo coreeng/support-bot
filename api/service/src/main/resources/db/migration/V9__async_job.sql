@@ -4,5 +4,3 @@ CREATE TABLE async_job (
     started_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX async_job_id_idx ON async_job (id);
-

@@ -53,12 +53,14 @@ public class SecurityConfig {
                         // Summary data export/import is restricted to support engineers
                         .requestMatchers("/summary-data/**")
                         .hasAnyRole("SUPPORT_ENGINEER")
+                        .requestMatchers("/summary-data/results")
+                        .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // Analysis endpoints restricted to support engineers
-                        //                        .requestMatchers("/analysis/**")
-                        //                        .hasAnyRole("SUPPORT_ENGINEER")
+                        .requestMatchers("/analysis/**")
+                        .hasAnyRole("SUPPORT_ENGINEER")
                         // All other endpoints require authentication
                         .anyRequest()
-                        .anonymous())
+                        .authenticated())
                 .oauth2Login(oauth2 -> {
                     if (oauth2AvailabilityChecker.isOAuth2Available()) {
                         oauth2.successHandler(oauth2SuccessHandler());
