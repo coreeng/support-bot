@@ -659,5 +659,267 @@ describe('KnowledgeGapsPage', () => {
             expect(screen.queryByText('Analysis Bundle')).not.toBeInTheDocument()
             expect(screen.queryByText('Import')).not.toBeInTheDocument()
         })
+
+        it('shows Start Analysis button when user has SUPPORT_ENGINEER role', () => {
+            mockUseAuth.mockReturnValue({
+                user: { id: '1', email: 'test@example.com', name: 'Test User', teams: [], roles: ['SUPPORT_ENGINEER'] },
+                isLoading: false,
+                isAuthenticated: true,
+                isLeadership: false,
+                isEscalationTeam: false,
+                isSupportEngineer: true,
+                actualEscalationTeams: [],
+                logout: jest.fn()
+            })
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            expect(screen.getByText('Start Analysis')).toBeInTheDocument()
+        })
+    })
+
+    describe('Start Analysis functionality', () => {
+        beforeEach(() => {
+            mockUseAnalysis.mockReturnValue({
+                data: mockAnalysisData,
+                isLoading: false,
+                error: null
+            } as any)
+
+            mockUseAuth.mockReturnValue({
+                user: { id: '1', email: 'test@example.com', name: 'Test User', teams: [], roles: ['SUPPORT_ENGINEER'] },
+                isLoading: false,
+                isAuthenticated: true,
+                isLeadership: false,
+                isEscalationTeam: false,
+                isSupportEngineer: true,
+                actualEscalationTeams: [],
+                logout: jest.fn()
+            })
+
+            // Clear all timers before each test
+            jest.clearAllTimers()
+            jest.useFakeTimers()
+        })
+
+        afterEach(() => {
+            jest.runOnlyPendingTimers()
+            jest.useRealTimers()
+        })
+
+        it('fetches analysis status on mount', async () => {
+            const mockFetch = jest.fn(() =>
+                Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        jobId: null,
+                        exportedCount: null,
+                        analyzedCount: null,
+                        running: false,
+                        error: null
+                    })
+                } as Response)
+            )
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for the initial status fetch
+            await screen.findByText('Start Analysis')
+
+            expect(mockFetch).toHaveBeenCalledWith('/api/analysis/status')
+        })
+
+        it('starts analysis when Start Analysis button is clicked and shows progress immediately', async () => {
+            const mockFetch = jest.fn()
+                .mockImplementationOnce(() =>
+                    Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: null,
+                            exportedCount: null,
+                            analyzedCount: null,
+                            running: false,
+                            error: null
+                        })
+                    } as Response)
+                )
+                .mockImplementationOnce(() =>
+                    Promise.resolve({
+                        status: 202,
+                        ok: true
+                    } as Response)
+                )
+                .mockImplementationOnce(() =>
+                    Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: 'test-job-id',
+                            exportedCount: 0,
+                            analyzedCount: 0,
+                            running: true,
+                            error: null
+                        })
+                    } as Response)
+                )
+
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            const startButton = await screen.findByText('Start Analysis')
+            fireEvent.click(startButton)
+
+            // Progress panel should appear immediately
+            await screen.findByText(/Analysis in progress/)
+
+            // Verify the analysis run endpoint was called
+            expect(mockFetch).toHaveBeenCalledWith('/api/analysis/run?days=7', expect.objectContaining({
+                method: 'POST'
+            }))
+        })
+
+        it('shows error toast when analysis start returns 409 Conflict', async () => {
+            const mockFetch = jest.fn()
+                .mockImplementationOnce(() =>
+                    Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: null,
+                            exportedCount: null,
+                            analyzedCount: null,
+                            running: false,
+                            error: null
+                        })
+                    } as Response)
+                )
+                .mockImplementationOnce(() =>
+                    Promise.resolve({
+                        status: 409,
+                        ok: false
+                    } as Response)
+                )
+
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            const startButton = await screen.findByText('Start Analysis')
+            fireEvent.click(startButton)
+
+            // Wait for error toast
+            await screen.findByText('Analysis was just started by someone else')
+        })
+
+        it('disables Start Analysis button when analysis is running', async () => {
+            const mockFetch = jest.fn(() =>
+                Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        jobId: 'test-job-id',
+                        exportedCount: 10,
+                        analyzedCount: 5,
+                        running: true,
+                        error: null
+                    })
+                } as Response)
+            )
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for progress display to appear, which indicates status has been fetched
+            await screen.findByText(/Analysis in progress/)
+
+            const startButton = screen.getByText('Start Analysis')
+
+            // Button should be disabled when analysis is running
+            expect(startButton).toBeDisabled()
+        })
+
+        it('shows progress when analysis is running', async () => {
+            const mockFetch = jest.fn(() =>
+                Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        jobId: 'test-job-id',
+                        exportedCount: 10,
+                        analyzedCount: 5,
+                        running: true,
+                        error: null
+                    })
+                } as Response)
+            )
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for progress display
+            await screen.findByText(/Analysis in progress/)
+            expect(screen.getByText(/Exported: 10, Analyzed: 5/)).toBeInTheDocument()
+        })
+
+        it('shows completion status in progress panel before hiding it', async () => {
+            const { useQueryClient } = require('@tanstack/react-query')
+            const mockInvalidateQueries = jest.fn()
+            useQueryClient.mockReturnValue({
+                invalidateQueries: mockInvalidateQueries
+            })
+
+            let callCount = 0
+            const mockFetch = jest.fn(() => {
+                callCount++
+                if (callCount === 1) {
+                    // Initial status check - running
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: 'test-job-id',
+                            exportedCount: 5,
+                            analyzedCount: 3,
+                            running: true,
+                            error: null
+                        })
+                    } as Response)
+                } else {
+                    // Subsequent check - completed
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: 'test-job-id',
+                            exportedCount: 10,
+                            analyzedCount: 8,
+                            running: false,
+                            error: null
+                        })
+                    } as Response)
+                }
+            })
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for initial progress display
+            await screen.findByText(/Analysis in progress/)
+
+            // Fast-forward time to trigger polling
+            jest.advanceTimersByTime(3000)
+
+            // Wait for completion message
+            const completionMessage = await screen.findByText(/Analysis complete! Exported: 10, Analyzed: 8/)
+
+            // Verify the panel shows completion status (green background)
+            // The parent div with the bg-green-50 class is 3 levels up from the text
+            const completionPanel = completionMessage.parentElement?.parentElement
+            expect(completionPanel).toHaveClass('bg-green-50')
+
+            // Fast-forward another 5 seconds to hide the panel and refresh data
+            jest.advanceTimersByTime(5000)
+
+            // Verify data was refreshed
+            await (() => {
+                expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['analysis'] })
+            })
+        })
     })
 })

@@ -1,12 +1,20 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
-import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText } from 'lucide-react'
+import React, { useState, useRef, useEffect } from 'react'
+import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText, Play } from 'lucide-react'
 import { getCsrfToken } from 'next-auth/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAnalysis } from '@/lib/hooks'
 import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/hooks/useAuth'
+
+interface AnalysisStatus {
+    jobId: string | null
+    exportedCount: number | null
+    analyzedCount: number | null
+    running: boolean
+    error: string | null
+}
 
 export default function KnowledgeGapsPage() {
     const queryClient = useQueryClient()
@@ -22,6 +30,162 @@ export default function KnowledgeGapsPage() {
     const [isUploading, setIsUploading] = useState(false)
     const [selectedDays, setSelectedDays] = useState<number>(7)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus | null>(null)
+    const [isStartingAnalysis, setIsStartingAnalysis] = useState(false)
+    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const [showCompletedStatus, setShowCompletedStatus] = useState(false)
+    const [completedMessage, setCompletedMessage] = useState<string>('')
+    const isCompletedRef = useRef(false)
+
+    // Fetch analysis status
+    const fetchAnalysisStatus = async () => {
+        try {
+            const response = await fetch('/api/analysis/status')
+            if (response.ok) {
+                const status: AnalysisStatus = await response.json()
+                setAnalysisStatus(status)
+                return status
+            }
+        } catch (error) {
+            console.error('Error fetching analysis status:', error)
+        }
+        return null
+    }
+
+    // Start polling for analysis status
+    const startPolling = () => {
+        if (pollingIntervalRef.current) return
+
+        pollingIntervalRef.current = setInterval(async () => {
+            // Don't fetch status if we're already showing completion
+            if (isCompletedRef.current) return
+
+            const status = await fetchAnalysisStatus()
+            if (status && !status.running) {
+                stopPolling()
+                isCompletedRef.current = true
+
+                // Show completion message in the progress panel
+                if (status.error) {
+                    setCompletedMessage(`Analysis failed: ${status.error}`)
+                    setShowCompletedStatus(true)
+
+                    // Show error toast and hide panel after 5 seconds
+                    setTimeout(() => {
+                        setShowCompletedStatus(false)
+                        setAnalysisStatus(null)
+                        isCompletedRef.current = false
+                        showToast(`Analysis failed: ${status.error}`, 'error')
+                    }, 5000)
+                } else {
+                    setCompletedMessage(`Analysis complete! Exported: ${status.exportedCount || 0}, Analyzed: ${status.analyzedCount || 0}`)
+                    setShowCompletedStatus(true)
+
+                    // Wait 5 seconds, then hide panel and refresh data
+                    setTimeout(async () => {
+                        setShowCompletedStatus(false)
+                        setAnalysisStatus(null)
+                        isCompletedRef.current = false
+                        await queryClient.invalidateQueries({ queryKey: ['analysis'] })
+                    }, 5000)
+                }
+            }
+        }, 3000)
+    }
+
+    // Stop polling
+    const stopPolling = () => {
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current)
+            pollingIntervalRef.current = null
+        }
+    }
+
+    // Check status on mount and when page becomes visible
+    useEffect(() => {
+        fetchAnalysisStatus()
+
+        return () => {
+            stopPolling()
+        }
+    }, [])
+
+    // Start polling if analysis is running
+    useEffect(() => {
+        if (analysisStatus?.running) {
+            startPolling()
+        } else {
+            stopPolling()
+        }
+    }, [analysisStatus?.running])
+
+    const handleStartAnalysis = async () => {
+        setIsStartingAnalysis(true)
+        try {
+            const csrfToken = await getCsrfToken()
+
+            const response = await fetch(`/api/analysis/run?days=${selectedDays}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-Token': csrfToken || '',
+                },
+            })
+
+            if (response.status === 202) {
+                // Analysis started successfully - show progress panel immediately
+                setAnalysisStatus({
+                    jobId: null,
+                    exportedCount: 0,
+                    analyzedCount: 0,
+                    running: true,
+                    error: null
+                })
+
+                // Fetch actual status
+                const status = await fetchAnalysisStatus()
+
+                // Check if analysis completed immediately (nothing to analyze)
+                if (status && !status.running) {
+                    isCompletedRef.current = true
+
+                    // Show completion message
+                    if (status.error) {
+                        setCompletedMessage(`Analysis failed: ${status.error}`)
+                        setShowCompletedStatus(true)
+
+                        setTimeout(() => {
+                            setShowCompletedStatus(false)
+                            setAnalysisStatus(null)
+                            isCompletedRef.current = false
+                            showToast(`Analysis failed: ${status.error}`, 'error')
+                        }, 5000)
+                    } else {
+                        setCompletedMessage(`Analysis complete! Exported: ${status.exportedCount || 0}, Analyzed: ${status.analyzedCount || 0}`)
+                        setShowCompletedStatus(true)
+
+                        setTimeout(async () => {
+                            setShowCompletedStatus(false)
+                            setAnalysisStatus(null)
+                            isCompletedRef.current = false
+                            await queryClient.invalidateQueries({ queryKey: ['analysis'] })
+                        }, 5000)
+                    }
+                } else {
+                    // Analysis is still running, start polling
+                    startPolling()
+                }
+            } else if (response.status === 409) {
+                showToast('Analysis was just started by someone else', 'error')
+            } else {
+                showToast('Failed to start analysis. Please try again.', 'error')
+            }
+        } catch (error) {
+            console.error('Error starting analysis:', error)
+            showToast('Failed to start analysis. Please try again.', 'error')
+        } finally {
+            setIsStartingAnalysis(false)
+        }
+    }
 
     const toggleItemExpansion = (itemName: string) => {
         setExpandedItems(prev => {
@@ -278,46 +442,75 @@ export default function KnowledgeGapsPage() {
                         </p>
                     </div>
                     {isSupportEngineer && (
-                        <div className="flex items-center gap-2">
-                            <select
-                                value={selectedDays}
-                                onChange={(e) => setSelectedDays(Number(e.target.value))}
-                                className="h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            >
-                                <option value={7}>Week</option>
-                                <option value={31}>Month</option>
-                                <option value={92}>Quarter</option>
-                            </select>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".jsonl"
-                                onChange={handleFileChange}
-                                className="hidden"
-                            />
-                            <button
-                                onClick={handleExportDownload}
-                                disabled={isDownloading}
-                                className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                            >
-                                <Download className="w-4 h-4" />
-                                {isDownloading ? 'Downloading...' : 'Export'}
-                            </button>
-                            <button
-                                onClick={handleAnalysisBundleDownload}
-                                className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
-                            >
-                                <FileText className="w-4 h-4" />
-                                Analysis Bundle
-                            </button>
-                            <button
-                                onClick={handleImportClick}
-                                disabled={isUploading}
-                                className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                            >
-                                <Upload className="w-4 h-4" />
-                                {isUploading ? 'Uploading...' : 'Import'}
-                            </button>
+                        <div className="flex flex-col items-end gap-3">
+                            <div className="flex items-center gap-2">
+                                <select
+                                    value={selectedDays}
+                                    onChange={(e) => setSelectedDays(Number(e.target.value))}
+                                    className="h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                    <option value={7}>Week</option>
+                                    <option value={31}>Month</option>
+                                    <option value={92}>Quarter</option>
+                                </select>
+                                <button
+                                    onClick={handleStartAnalysis}
+                                    disabled={analysisStatus?.running || isStartingAnalysis}
+                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                >
+                                    <Play className="w-4 h-4" />
+                                    {isStartingAnalysis ? 'Starting...' : 'Start Analysis'}
+                                </button>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".jsonl"
+                                    onChange={handleFileChange}
+                                    className="hidden"
+                                />
+                                <button
+                                    onClick={handleExportDownload}
+                                    disabled={isDownloading}
+                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                >
+                                    <Download className="w-4 h-4" />
+                                    {isDownloading ? 'Downloading...' : 'Export'}
+                                </button>
+                                <button
+                                    onClick={handleAnalysisBundleDownload}
+                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                                >
+                                    <FileText className="w-4 h-4" />
+                                    Analysis Bundle
+                                </button>
+                                <button
+                                    onClick={handleImportClick}
+                                    disabled={isUploading}
+                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                >
+                                    <Upload className="w-4 h-4" />
+                                    {isUploading ? 'Uploading...' : 'Import'}
+                                </button>
+                            </div>
+                            {(analysisStatus?.running || showCompletedStatus) && (
+                                <div className={`border rounded-xl px-4 py-2 text-sm ${
+                                    showCompletedStatus
+                                        ? 'bg-green-50 border-green-200 text-green-800'
+                                        : 'bg-blue-50 border-blue-200 text-blue-800'
+                                }`}>
+                                    <div className="flex items-center gap-2">
+                                        {!showCompletedStatus && (
+                                            <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                        )}
+                                        <span>
+                                            {showCompletedStatus
+                                                ? completedMessage
+                                                : `Analysis in progress... Exported: ${analysisStatus?.exportedCount || 0}, Analyzed: ${analysisStatus?.analyzedCount || 0}`
+                                            }
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
