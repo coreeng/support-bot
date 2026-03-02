@@ -91,10 +91,10 @@ export default function TicketsPage() {
     // - When filters are applied: pull all pages client-side to avoid missing matches on later pages.
     // - When viewing all teams (no team filter): use backend pagination for efficiency.
     // - When viewing a specific team: larger single fetch + client-side paginate.
-    const backendPageSize = isViewingAllTeams ? pageSize : 1000
-    const backendPage = isViewingAllTeams ? currentPage : 0
-
     const shouldUseAllTickets = hasClientFilters
+    const useServerPagination = isViewingAllTeams && !shouldUseAllTickets
+    const backendPageSize = useServerPagination ? pageSize : 1000
+    const backendPage = useServerPagination ? currentPage : 0
     const allTicketsQuery = useAllTickets(200, dateRange.from, dateRange.to, shouldUseAllTickets)
     const pagedTicketsQuery = useTickets(backendPage, backendPageSize, dateRange.from, dateRange.to)
 
@@ -244,20 +244,22 @@ export default function TicketsPage() {
         setCurrentPage(0)
     }, [teamFilterSelectedTeam])
 
-    // Client-side pagination when viewing a specific team; backend pagination for "all teams"
+    // Server pagination for all-teams without client filters; otherwise client-side pagination.
     const paginatedTickets = useMemo(() => {
-        if (isViewingAllTeams) {
+        if (useServerPagination) {
             return sortedTickets
-        } else {
-            const start = currentPage * pageSize
-            return sortedTickets.slice(start, start + pageSize)
         }
-    }, [sortedTickets, currentPage, pageSize, isViewingAllTeams])
+        const start = currentPage * pageSize
+        return sortedTickets.slice(start, start + pageSize)
+    }, [sortedTickets, currentPage, pageSize, useServerPagination])
 
     // Calculate pagination info
-    const totalPages = isViewingAllTeams
+    const totalPages = useServerPagination
         ? (ticketsDataTyped?.totalPages || 0)
         : Math.ceil(sortedTickets.length / pageSize)
+    const totalTickets = useServerPagination
+        ? (ticketsDataTyped?.totalElements || 0)
+        : sortedTickets.length
 
     // --- Render ---
     return (
@@ -454,7 +456,7 @@ export default function TicketsPage() {
                         <span className="ml-2 text-gray-500">
                             ({paginatedTickets.length}
                             {statusFilter || teamFilter || impactFilter || tagFilter || escalatedFilter || escalatedToFilter || dateFilter ? ' matching' : ''}
-                            {' '}on this page)
+                            {' '}on this page, {totalTickets} total)
                         </span>
                     </div>
                     <button
