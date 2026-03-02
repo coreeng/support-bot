@@ -110,9 +110,7 @@ I have a Slack thread with the following content:
 
             Iterable<String> lines = Splitter.onPattern("\\r?\\n").split(response);
             for (String line : lines) {
-                if (line.startsWith("Ticket:")) {
-                    // Ignore - we use the ticketId parameter
-                } else if (line.startsWith("Primary Driver:")) {
+                if (line.startsWith("Primary Driver:")) {
                     driver = line.replace("Primary Driver:", "").trim();
                 } else if (line.startsWith("Category:")) {
                     category = line.replace("Category:", "").trim();
