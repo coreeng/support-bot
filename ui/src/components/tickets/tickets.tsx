@@ -31,6 +31,10 @@ export default function TicketsPage() {
     const [impactFilter, setImpactFilter] = useState('')
     const [tagFilter, setTagFilter] = useState('')
     const [escalatedFilter, setEscalatedFilter] = useState('')
+    const [escalatedToFilter, setEscalatedToFilter] = useState('')
+    type SortColumn = 'openedAt' | 'closedAt'
+    const [sortColumn, setSortColumn] = useState<SortColumn>('openedAt')
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(0)
@@ -40,7 +44,7 @@ export default function TicketsPage() {
     // When switching to "custom", preserve the current range until custom dates are set
     const dateRange = useMemo(() => {
         if (!dateFilter) return { from: undefined, to: undefined }
-        
+
         if (dateFilter === 'custom') {
             // If custom dates are not set yet, preserve the previous filter's range
             if (!customDateRange.start || !customDateRange.end) {
@@ -57,11 +61,11 @@ export default function TicketsPage() {
                 to: customDateRange.end
             }
         }
-        
+
         const now = new Date()
         const to = now.toISOString().split('T')[0]
         const fromDate = new Date(now)
-        
+
         switch (dateFilter) {
             case 'lastWeek':
                 fromDate.setDate(now.getDate() - 7)
@@ -73,14 +77,14 @@ export default function TicketsPage() {
                 fromDate.setDate(now.getDate() - 30)
                 break
         }
-        
+
         const from = fromDate.toISOString().split('T')[0]
         return { from, to }
     }, [dateFilter, customDateRange])
 
     const hasClientFilters = useMemo(
-        () => !!(statusFilter || teamFilter || impactFilter || tagFilter || escalatedFilter),
-        [statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter]
+        () => !!(statusFilter || teamFilter || impactFilter || tagFilter || escalatedFilter || escalatedToFilter),
+        [statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter, escalatedToFilter]
     )
 
     // Data hooks
@@ -124,6 +128,15 @@ export default function TicketsPage() {
         return {opened, closed}
     }
 
+    const getTagLabel = (tag: unknown): string => {
+        if (typeof tag === 'string') return tag
+        if (tag && typeof tag === 'object') {
+            const obj = tag as { label?: string; code?: string }
+            return obj.label || obj.code || ''
+        }
+        return ''
+    }
+
     // Build team options from both registry list and the data we actually received.
     // This prevents missing teams (e.g., escalation/legacy teams) from showing 0 results when filtered.
     const ticketsDataTyped = ticketsData as PaginatedTickets | undefined
@@ -140,7 +153,16 @@ export default function TicketsPage() {
         return Array.from(new Set([...fromData, ...fromRegistry])).sort()
     }, [ticketsContent, teamsData])
 
-    // --- Filter tickets based on team selector + UI filters ---
+    const escalatedToOptions = useMemo(() => {
+        const escalationTeams = ticketsContent.flatMap((t: TicketWithLogs) =>
+            (t.escalations ?? [])
+                .map(e => e.team?.name)
+                .filter((name): name is string => !!name)
+        )
+        return Array.from(new Set(escalationTeams)).sort()
+    }, [ticketsContent])
+
+    // --- Filter tickets based on superuser/team + UI filters ---
     // Date filtering is now done server-side
     const filteredTickets = useMemo(() => {
         if (!ticketsContent) return []
@@ -176,13 +198,34 @@ export default function TicketsPage() {
                     ? (t.escalations?.length ?? 0) > 0
                     : (t.escalations?.length ?? 0) === 0
                 : true
+            const matchesEscalatedTo = escalatedToFilter
+                ? (t.escalations ?? []).some(e => e.team?.name === escalatedToFilter)
+                : true
 
-            return matchesStatus && matchesTeam && matchesImpact && matchesTag && matchesEscalated
+            return matchesStatus && matchesTeam && matchesImpact && matchesTag && matchesEscalated && matchesEscalatedTo
         })
-    }, [ticketsContent, effectiveTeams, hasNoTeamScope, statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter])
+    }, [ticketsContent, hasNoTeamScope, effectiveTeams, statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter, escalatedToFilter])
+
+    const sortedTickets = useMemo(() => {
+        const toTs = (value: string | null) => (value ? new Date(value).getTime() : null)
+        return [...filteredTickets].sort((a, b) => {
+            const aDates = getOpenedClosed(a)
+            const bDates = getOpenedClosed(b)
+            const aValue = sortColumn === 'openedAt' ? toTs(aDates.opened) : toTs(aDates.closed)
+            const bValue = sortColumn === 'openedAt' ? toTs(bDates.opened) : toTs(bDates.closed)
+
+            // Keep missing dates last regardless of sort direction
+            if (aValue === null && bValue === null) return 0
+            if (aValue === null) return 1
+            if (bValue === null) return -1
+
+            const cmp = aValue - bValue
+            return sortDirection === 'asc' ? cmp : -cmp
+        })
+    }, [filteredTickets, sortColumn, sortDirection])
 
     // Create a fingerprint of current filters to detect changes
-    const filterFingerprint = JSON.stringify([statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter, dateFilter, customDateRange])
+    const filterFingerprint = JSON.stringify([statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter, escalatedToFilter, dateFilter, customDateRange])
 
     // Track previous fingerprint to detect changes
     const [prevFilterFingerprint, setPrevFilterFingerprint] = useState(filterFingerprint)
@@ -204,17 +247,17 @@ export default function TicketsPage() {
     // Client-side pagination when viewing a specific team; backend pagination for "all teams"
     const paginatedTickets = useMemo(() => {
         if (isViewingAllTeams) {
-            return filteredTickets
+            return sortedTickets
         } else {
             const start = currentPage * pageSize
-            return filteredTickets.slice(start, start + pageSize)
+            return sortedTickets.slice(start, start + pageSize)
         }
-    }, [filteredTickets, currentPage, pageSize, isViewingAllTeams])
+    }, [sortedTickets, currentPage, pageSize, isViewingAllTeams])
 
     // Calculate pagination info
-    const totalPages = isViewingAllTeams 
-        ? (ticketsDataTyped?.totalPages || 0) 
-        : Math.ceil(filteredTickets.length / pageSize)
+    const totalPages = isViewingAllTeams
+        ? (ticketsDataTyped?.totalPages || 0)
+        : Math.ceil(sortedTickets.length / pageSize)
 
     // --- Render ---
     return (
@@ -274,6 +317,14 @@ export default function TicketsPage() {
                     <option value="No">No</option>
                 </select>
 
+                <select value={escalatedToFilter} onChange={e => setEscalatedToFilter(e.target.value)}
+                        className="p-2 border rounded">
+                    <option value="">Escalated To</option>
+                    {escalatedToOptions.map((name: string, index: number) => (
+                        <option key={`escalated-to-${index}-${name}`} value={name}>{name}</option>
+                    ))}
+                </select>
+
                 {dateFilter === 'custom' && (
                     <>
                         <input type="date" value={customDateRange.start || ''}
@@ -301,17 +352,50 @@ export default function TicketsPage() {
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Team</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Impact</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Tags</th>
                                 {isAssignmentEnabled && (
                                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Support Engineer</th>
                                 )}
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Escalated</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Opened At</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Closed At</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Escalated To</th>
+                                <th
+                                    className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer select-none"
+                                    onClick={() => {
+                                        if (sortColumn === 'openedAt') {
+                                            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+                                        } else {
+                                            setSortColumn('openedAt')
+                                            setSortDirection('desc')
+                                        }
+                                    }}
+                                >
+                                    Opened At {sortColumn === 'openedAt' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
+                                </th>
+                                <th
+                                    className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer select-none"
+                                    onClick={() => {
+                                        if (sortColumn === 'closedAt') {
+                                            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+                                        } else {
+                                            setSortColumn('closedAt')
+                                            setSortDirection('desc')
+                                        }
+                                    }}
+                                >
+                                    Closed At {sortColumn === 'closedAt' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
+                                </th>
                             </tr>
                             </thead>
                             <tbody className="divide-y">
                             {paginatedTickets.map((t: TicketWithLogs) => {
                                 const {opened, closed} = getOpenedClosed(t)
+                                const escalatedTo = Array.from(
+                                    new Set(
+                                        (t.escalations ?? [])
+                                            .map(e => e.team?.name)
+                                            .filter((name): name is string => !!name)
+                                    )
+                                )
                                 return (
                                     <tr key={t.id}
                                         onClick={() => {
@@ -325,17 +409,30 @@ export default function TicketsPage() {
                                         </td>
                                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{t.team?.name || '-'}</td>
                                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{registryData?.impacts.find((i: TicketImpact) => i.code === t.impact)?.label || t.impact || '-'}</td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                            {(t.tags?.length ?? 0) > 0
+                                                ? t.tags
+                                                    ?.map(getTagLabel)
+                                                    .filter(Boolean)
+                                                    .map((tag, idx) => (
+                                                        <span key={`${t.id}-tag-${idx}`} className="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2 py-0.5 rounded mr-1">
+                                                            {tag}
+                                                        </span>
+                                                    ))
+                                                : '-'}
+                                        </td>
                                         {isAssignmentEnabled && (
                                             <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{t.assignedTo || '-'}</td>
                                         )}
                                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{(t.escalations?.length ?? 0) > 0 ? 'Yes' : 'No'}</td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{escalatedTo.length ? escalatedTo.join(', ') : '-'}</td>
                                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{opened ? new Date(opened).toLocaleString() : '-'}</td>
                                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{closed ? new Date(closed).toLocaleString() : '-'}</td>
                                     </tr>
                                 )
                             })}
                             {filteredTickets.length === 0 && <tr>
-                                <td colSpan={isAssignmentEnabled ? 7 : 6} className="text-center py-4 text-gray-500">No tickets found</td>
+                                <td colSpan={isAssignmentEnabled ? 9 : 8} className="text-center py-4 text-gray-500">No tickets found</td>
                             </tr>}
                             </tbody>
                         </table>
@@ -345,23 +442,23 @@ export default function TicketsPage() {
             {/* Pagination Controls */}
             {totalPages > 1 && (
                 <div className="flex justify-center items-center space-x-4 mt-4">
-                    <button 
-                        disabled={currentPage === 0} 
+                    <button
+                        disabled={currentPage === 0}
                         onClick={() => setCurrentPage(p => p - 1)}
                         className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
                     >
                         Previous
                     </button>
                     <div className="text-sm text-gray-600">
-                        Page {currentPage + 1} of {totalPages} 
+                        Page {currentPage + 1} of {totalPages}
                         <span className="ml-2 text-gray-500">
-                            ({paginatedTickets.length} 
-                            {statusFilter || teamFilter || impactFilter || tagFilter || escalatedFilter || dateFilter ? ' matching' : ''} 
+                            ({paginatedTickets.length}
+                            {statusFilter || teamFilter || impactFilter || tagFilter || escalatedFilter || escalatedToFilter || dateFilter ? ' matching' : ''}
                             {' '}on this page)
                         </span>
                     </div>
-                    <button 
-                        disabled={currentPage >= totalPages - 1} 
+                    <button
+                        disabled={currentPage >= totalPages - 1}
                         onClick={() => setCurrentPage(p => p + 1)}
                         className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
                     >

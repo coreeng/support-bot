@@ -182,7 +182,9 @@ describe('Tickets Component', () => {
             expect(screen.getByText('Status')).toBeInTheDocument();
             expect(screen.getByText('Team')).toBeInTheDocument();
             expect(screen.getByText('Impact')).toBeInTheDocument();
+            expect(screen.getByText('Tags')).toBeInTheDocument();
             expect(screen.getByText('Escalated')).toBeInTheDocument();
+            expect(screen.getAllByText('Escalated To').length).toBeGreaterThan(0);
         });
 
         it('displays ticket data in table', () => {
@@ -407,6 +409,50 @@ describe('Tickets Component', () => {
             expect(mockUseAllTickets).toHaveBeenCalled();
             expect(screen.getAllByText('Wow Team').length).toBeGreaterThan(0);
         });
+
+        it('filters tickets by escalation target team via "Escalated To" dropdown', () => {
+            const ticketEscalatedToInfra = {
+                ...createMockTicket('1', 'opened', 'Team A', 'high'),
+                escalations: [{ id: 'esc-1', team: { name: 'Infra Team' } }]
+            };
+            const ticketEscalatedToPlatform = {
+                ...createMockTicket('2', 'opened', 'Team B', 'medium'),
+                escalations: [{ id: 'esc-2', team: { name: 'Platform Team' } }]
+            };
+
+            const mockTickets = getMockPaginatedTickets([
+                ticketEscalatedToInfra,
+                ticketEscalatedToPlatform
+            ]);
+
+            mockUseTickets.mockReturnValue({
+                data: mockTickets,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            mockUseAllTickets.mockReturnValue({
+                data: mockTickets,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useAllTickets>);
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            const escalatedToSelect = screen.getAllByRole('combobox').find(sel =>
+                Array.from((sel as HTMLSelectElement).options).some(o => o.textContent === 'Escalated To')
+            ) as HTMLSelectElement;
+
+            expect(escalatedToSelect).toBeDefined();
+            const options = Array.from(escalatedToSelect.options).map(o => o.textContent);
+            expect(options).toEqual(expect.arrayContaining(['Infra Team', 'Platform Team']));
+
+            fireEvent.change(escalatedToSelect, { target: { value: 'Infra Team' } });
+
+            const tableBodyText = screen.getByRole('table').querySelector('tbody')?.textContent || '';
+            expect(tableBodyText).toContain('Team A');
+            expect(tableBodyText).not.toContain('Team B');
+        });
     });
 
     describe('Escalation Display', () => {
@@ -445,6 +491,26 @@ describe('Tickets Component', () => {
             
             const noElements = screen.getAllByText('No');
             expect(noElements.length).toBeGreaterThan(0);
+        });
+
+        it('shows escalation target team names in the Escalated To column', () => {
+            const ticketWithEscalations = {
+                ...createMockTicket('1', 'opened', 'Team A', 'high'),
+                escalations: [
+                    { id: 'esc-1', team: { name: 'Support Team' } },
+                    { id: 'esc-2', team: { name: 'Infra Team' } }
+                ]
+            };
+
+            mockUseTickets.mockReturnValue({
+                data: getMockPaginatedTickets([ticketWithEscalations]),
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            expect(screen.getByText('Support Team, Infra Team')).toBeInTheDocument();
         });
     });
 
@@ -570,6 +636,75 @@ describe('Tickets Component', () => {
             // Should show dashes for missing dates
             const table = screen.getByRole('table');
             expect(table).toBeInTheDocument();
+        });
+
+        it('sorts by Opened At when header is clicked', () => {
+            const older = {
+                ...createMockTicket('1', 'opened', 'Team A', 'high'),
+                logs: [{ event: 'opened', date: '2024-01-01T10:00:00Z' }]
+            };
+            const newer = {
+                ...createMockTicket('2', 'opened', 'Team B', 'high'),
+                logs: [{ event: 'opened', date: '2024-01-02T10:00:00Z' }]
+            };
+
+            mockUseTickets.mockReturnValue({
+                data: getMockPaginatedTickets([older, newer]),
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            const getFirstDataRowText = () => {
+                const rows = screen.getAllByRole('row');
+                return rows[1]?.textContent || '';
+            };
+
+            // Default opened sort is desc => newer first
+            expect(getFirstDataRowText()).toContain('Team B');
+
+            // Toggle to asc => older first
+            fireEvent.click(screen.getByText(/Opened At/i));
+            expect(getFirstDataRowText()).toContain('Team A');
+        });
+
+        it('sorts by Closed At when header is clicked', () => {
+            const closesEarlier = {
+                ...createMockTicket('1', 'closed', 'Team A', 'high'),
+                logs: [
+                    { event: 'opened', date: '2024-01-01T10:00:00Z' },
+                    { event: 'closed', date: '2024-01-03T10:00:00Z' }
+                ]
+            };
+            const closesLater = {
+                ...createMockTicket('2', 'closed', 'Team B', 'high'),
+                logs: [
+                    { event: 'opened', date: '2024-01-01T10:00:00Z' },
+                    { event: 'closed', date: '2024-01-04T10:00:00Z' }
+                ]
+            };
+
+            mockUseTickets.mockReturnValue({
+                data: getMockPaginatedTickets([closesEarlier, closesLater]),
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            const getFirstDataRowText = () => {
+                const rows = screen.getAllByRole('row');
+                return rows[1]?.textContent || '';
+            };
+
+            // Closed sort defaults to desc on first click => later close first
+            fireEvent.click(screen.getByText(/Closed At/i));
+            expect(getFirstDataRowText()).toContain('Team B');
+
+            // Toggle to asc => earlier close first
+            fireEvent.click(screen.getByText(/Closed At/i));
+            expect(getFirstDataRowText()).toContain('Team A');
         });
     });
 
