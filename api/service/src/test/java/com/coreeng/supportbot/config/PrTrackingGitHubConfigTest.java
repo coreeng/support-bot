@@ -3,6 +3,7 @@ package com.coreeng.supportbot.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.github.GitHubClient;
+import com.coreeng.supportbot.prtracking.PrTrackingGitHubConfig;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GitHub;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

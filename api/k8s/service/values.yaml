@@ -110,14 +110,14 @@ prReviewTracking:
 # Example:
 # prReviewTracking:
 #   enabled: true
-#   pollCron: "0 0 9-18 * * 1-5"
-#   prEmoji: "pr"
-#   tags:
-#     - "pull-request"
-#   impact: "prReview"
+#   pollCron: "0 0 9-18 * * 1-5" # Cron schedule for the lifecycle poller (example: 09:00 to 18:00 Mon–Fri)
+#   prEmoji: "pr" # Slack emoji name added to the message when a PR is detected
+#   tags: # Required when enabled: tag codes from enums.tags, applied when the bot auto-closes a ticket
+#     - "pull-request" # Required when enabled: tag codes from enums.tags, applied when the bot auto-closes a ticket
+#   impact: "prReview" # Required when enabled: impact code from enums.impacts, applied when the bot auto-closes a ticket
 #   repositories:
-#     - name: "coreeng/core-platform-environment"
-#       owningTeam: "infra-integration"
+#     - name: "coreeng/core-platform-environment" # Repository in org/repo format
+#       owningTeam: "infra-integration" # Team code from enums.escalation-teams — escalated when the SLA is breached
 #       sla: "PT48H"
 
 # Environment variables

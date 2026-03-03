@@ -1,5 +1,6 @@
-package com.coreeng.supportbot.config;
+package com.coreeng.supportbot.prtracking;
 
+import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.github.Hub4jGitHubClient;
 import io.jsonwebtoken.Jwts;
@@ -26,9 +27,9 @@ public class PrTrackingGitHubConfig {
 
     @Bean
     public GitHub gitHub(PrTrackingProps props) {
-        PrTrackingGitHubProps config = props.github();
+        PrTrackingProps.GitHub config = props.github();
         try {
-            if (config.authMode() == PrTrackingAuthMode.APP) {
+            if (config.authMode() == PrTrackingProps.AuthMode.APP) {
                 return buildAppModeClient(config);
             }
             return new GitHubBuilder()
@@ -45,7 +46,7 @@ public class PrTrackingGitHubConfig {
         return new Hub4jGitHubClient(gitHub);
     }
 
-    private static GitHub buildAppModeClient(PrTrackingGitHubProps config) throws IOException {
+    private static GitHub buildAppModeClient(PrTrackingProps.GitHub config) throws IOException {
         PrivateKey privateKey = parsePrivateKey(config.privateKeyPem());
         long installationId = Long.parseLong(config.installationId());
         String appId = config.appId();

@@ -3,7 +3,6 @@ package com.coreeng.supportbot.prtracking;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
-import com.coreeng.supportbot.config.PrTrackingRepositoryProps;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
@@ -117,7 +116,7 @@ public class PrDetectionService {
     }
 
     private PerPrResult processPr(DetectedPr detectedPr, Ticket ticket) {
-        PrTrackingRepositoryProps repoConfig = prTrackingProps.repositories().stream()
+        PrTrackingProps.Repository repoConfig = prTrackingProps.repositories().stream()
                 .filter(r -> r.name().equals(detectedPr.repositoryName()))
                 .findFirst()
                 .orElseThrow(

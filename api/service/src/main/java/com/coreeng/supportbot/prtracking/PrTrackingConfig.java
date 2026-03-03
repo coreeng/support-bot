@@ -1,6 +1,6 @@
-package com.coreeng.supportbot.config;
+package com.coreeng.supportbot.prtracking;
 
-import com.coreeng.supportbot.prtracking.GitHubPrUrlParser;
+import com.coreeng.supportbot.config.PrTrackingProps;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -14,7 +14,7 @@ public class PrTrackingConfig {
     @Bean
     public GitHubPrUrlParser gitHubPrUrlParser(PrTrackingProps props) {
         Set<String> repoNames = props.repositories().stream()
-                .map(PrTrackingRepositoryProps::name)
+                .map(PrTrackingProps.Repository::name)
                 .collect(Collectors.toUnmodifiableSet());
         return new GitHubPrUrlParser(repoNames);
     }

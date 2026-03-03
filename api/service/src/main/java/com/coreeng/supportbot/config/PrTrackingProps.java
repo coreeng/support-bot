@@ -16,8 +16,8 @@ public record PrTrackingProps(
         String prEmoji,
         List<String> tags,
         String impact,
-        List<PrTrackingRepositoryProps> repositories,
-        PrTrackingGitHubProps github) {
+        List<Repository> repositories,
+        GitHub github) {
 
     public PrTrackingProps(
             boolean enabled,
@@ -25,15 +25,15 @@ public record PrTrackingProps(
             @Nullable String prEmoji,
             @Nullable List<String> tags,
             @Nullable String impact,
-            @Nullable List<PrTrackingRepositoryProps> repositories,
-            @Nullable PrTrackingGitHubProps github) {
+            @Nullable List<Repository> repositories,
+            @Nullable GitHub github) {
         this.enabled = enabled;
         this.pollCron = pollCron;
         this.prEmoji = prEmoji == null ? "pr" : prEmoji;
         this.tags = tags == null ? List.of() : List.copyOf(tags);
         this.impact = impact == null ? "" : impact;
         this.repositories = repositories == null ? List.of() : List.copyOf(repositories);
-        this.github = github == null ? PrTrackingGitHubProps.defaultTokenModeConfig() : github;
+        this.github = github == null ? GitHub.defaultTokenModeConfig() : github;
 
         if (enabled) {
             requireNotBlank(this.prEmoji, "pr-review-tracking.pr-emoji must not be blank");
@@ -43,17 +43,20 @@ public record PrTrackingProps(
             if (isBlank(this.impact)) {
                 throw new IllegalArgumentException("pr-review-tracking.impact must not be blank when enabled");
             }
+            if (github == null) {
+                throw new IllegalArgumentException("pr-review-tracking.github must be configured when enabled");
+            }
             validateRepositories(this.repositories);
             validateConfig(this.github);
         }
     }
 
-    private static void validateRepositories(List<PrTrackingRepositoryProps> repositories) {
+    private static void validateRepositories(List<Repository> repositories) {
         if (repositories.isEmpty()) {
             throw new IllegalArgumentException("pr-review-tracking.repositories must not be empty when enabled");
         }
         Set<String> names = new HashSet<>();
-        for (PrTrackingRepositoryProps repository : repositories) {
+        for (Repository repository : repositories) {
             if (isBlank(repository.name())) {
                 throw new IllegalArgumentException("pr-review-tracking.repositories[].name must not be blank");
             }
@@ -81,11 +84,14 @@ public record PrTrackingProps(
         }
     }
 
-    private static void validateConfig(PrTrackingGitHubProps githubConfig) {
+    private static void validateConfig(GitHub githubConfig) {
+        if (githubConfig.authMode() == null) {
+            throw new IllegalArgumentException("pr-review-tracking.github.auth-mode must not be blank when enabled");
+        }
         if (isBlank(githubConfig.apiBaseUrl())) {
             throw new IllegalArgumentException("pr-review-tracking.github.api-base-url must not be blank");
         }
-        if (githubConfig.authMode() == PrTrackingAuthMode.APP) {
+        if (githubConfig.authMode() == AuthMode.APP) {
             requireNotBlank(
                     githubConfig.appId(), "pr-review-tracking.github.app-id must not be blank when auth-mode=app");
             requireNotBlank(
@@ -102,6 +108,48 @@ public record PrTrackingProps(
     private static void requireNotBlank(String value, String errorMessage) {
         if (isBlank(value)) {
             throw new IllegalArgumentException(errorMessage);
+        }
+    }
+
+    public enum AuthMode {
+        TOKEN,
+        APP
+    }
+
+    public record Repository(String name, String owningTeam, java.time.Duration sla) {}
+
+    public record GitHub(
+            @Nullable AuthMode authMode,
+            String apiBaseUrl,
+            String token,
+            String appId,
+            String installationId,
+            String privateKeyPem) {
+
+        public GitHub {
+            apiBaseUrl = nonNullString(apiBaseUrl);
+            token = nonNullString(token);
+            appId = nonNullString(appId);
+            installationId = nonNullString(installationId);
+            privateKeyPem = nonNullString(privateKeyPem);
+        }
+
+        public static GitHub defaultTokenModeConfig() {
+            return new GitHub(AuthMode.TOKEN, "", "", "", "", "");
+        }
+
+        @Override
+        public String toString() {
+            return "GitHub[authMode=" + authMode
+                    + ", apiBaseUrl=" + apiBaseUrl
+                    + ", token=REDACTED"
+                    + ", appId=" + appId
+                    + ", installationId=" + installationId
+                    + ", privateKeyPem=REDACTED]";
+        }
+
+        private static String nonNullString(@Nullable String value) {
+            return value == null ? "" : value;
         }
     }
 }

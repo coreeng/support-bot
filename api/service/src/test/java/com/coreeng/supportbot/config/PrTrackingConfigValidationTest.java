@@ -26,8 +26,8 @@ class PrTrackingConfigValidationTest {
     @Test
     void rejectsDuplicateRepositoryNamesIgnoringCase() {
         // given
-        PrTrackingRepositoryProps repoA = validRepoWithName("my-org/onboarding-repo");
-        PrTrackingRepositoryProps repoB = validRepoWithName("MY-ORG/ONBOARDING-REPO");
+        PrTrackingProps.Repository repoA = validRepoWithName("my-org/onboarding-repo");
+        PrTrackingProps.Repository repoB = validRepoWithName("MY-ORG/ONBOARDING-REPO");
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
@@ -45,8 +45,8 @@ class PrTrackingConfigValidationTest {
     @Test
     void rejectsMissingTokenWhenTokenModeEnabled() {
         // given
-        PrTrackingGitHubProps noToken =
-                new PrTrackingGitHubProps(PrTrackingAuthMode.TOKEN, "https://api.github.com", "", "", "", "");
+        PrTrackingProps.GitHub noToken =
+                new PrTrackingProps.GitHub(PrTrackingProps.AuthMode.TOKEN, "https://api.github.com", "", "", "", "");
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
@@ -58,8 +58,8 @@ class PrTrackingConfigValidationTest {
     @Test
     void rejectsMissingGitHubAppFieldsWhenAppModeEnabled() {
         // given
-        PrTrackingGitHubProps appNoInstallation =
-                new PrTrackingGitHubProps(PrTrackingAuthMode.APP, "https://api.github.com", "", "12345", "", "");
+        PrTrackingProps.GitHub appNoInstallation =
+                new PrTrackingProps.GitHub(PrTrackingProps.AuthMode.APP, "https://api.github.com", "", "12345", "", "");
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
@@ -69,10 +69,32 @@ class PrTrackingConfigValidationTest {
     }
 
     @Test
+    void rejectsMissingGitHubConfigWhenEnabled() {
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(validRepo()), null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("pr-review-tracking.github must be configured when enabled");
+    }
+
+    @Test
+    void rejectsMissingAuthModeWhenEnabled() {
+        // given
+        PrTrackingProps.GitHub noAuthMode =
+                new PrTrackingProps.GitHub(null, "https://api.github.com", "pat-123", "", "", "");
+
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(validRepo()), noAuthMode))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("github.auth-mode");
+    }
+
+    @Test
     void acceptsValidAppModeWhenEnabled() {
         // given
-        PrTrackingGitHubProps appConfig = new PrTrackingGitHubProps(
-                PrTrackingAuthMode.APP,
+        PrTrackingProps.GitHub appConfig = new PrTrackingProps.GitHub(
+                PrTrackingProps.AuthMode.APP,
                 "https://api.github.com",
                 "",
                 "12345",
@@ -88,7 +110,8 @@ class PrTrackingConfigValidationTest {
     @Test
     void rejectsRepoNameWithExtraSlashes() {
         // given
-        PrTrackingRepositoryProps badName = new PrTrackingRepositoryProps("my-org/sub/repo", "wow", Duration.ofDays(2));
+        PrTrackingProps.Repository badName =
+                new PrTrackingProps.Repository("my-org/sub/repo", "wow", Duration.ofDays(2));
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
@@ -100,7 +123,7 @@ class PrTrackingConfigValidationTest {
     @Test
     void rejectsZeroSlaWhenEnabled() {
         // given
-        PrTrackingRepositoryProps zeroSla = new PrTrackingRepositoryProps("my-org/repo", "wow", Duration.ZERO);
+        PrTrackingProps.Repository zeroSla = new PrTrackingProps.Repository("my-org/repo", "wow", Duration.ZERO);
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
@@ -139,23 +162,24 @@ class PrTrackingConfigValidationTest {
     @Test
     void skipsAllValidationWhenDisabled() {
         // given
-        PrTrackingRepositoryProps badRepo = new PrTrackingRepositoryProps("", "", Duration.ZERO);
+        PrTrackingProps.Repository badRepo = new PrTrackingProps.Repository("", "", Duration.ZERO);
 
         // when / then
         assertThatCode(() -> new PrTrackingProps(
-                        false, "", null, null, null, List.of(badRepo), PrTrackingGitHubProps.defaultTokenModeConfig()))
+                        false, "", null, null, null, List.of(badRepo), PrTrackingProps.GitHub.defaultTokenModeConfig()))
                 .doesNotThrowAnyException();
     }
 
-    private static PrTrackingRepositoryProps validRepo() {
+    private static PrTrackingProps.Repository validRepo() {
         return validRepoWithName("my-org/onboarding-repo");
     }
 
-    private static PrTrackingRepositoryProps validRepoWithName(String name) {
-        return new PrTrackingRepositoryProps(name, "wow", Duration.ofDays(2));
+    private static PrTrackingProps.Repository validRepoWithName(String name) {
+        return new PrTrackingProps.Repository(name, "wow", Duration.ofDays(2));
     }
 
-    private static PrTrackingGitHubProps validTokenGithub() {
-        return new PrTrackingGitHubProps(PrTrackingAuthMode.TOKEN, "https://api.github.com", "pat-123", "", "", "");
+    private static PrTrackingProps.GitHub validTokenGithub() {
+        return new PrTrackingProps.GitHub(
+                PrTrackingProps.AuthMode.TOKEN, "https://api.github.com", "pat-123", "", "", "");
     }
 }
