@@ -5,8 +5,8 @@ import static org.mockito.Mockito.*;
 
 import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
-import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;

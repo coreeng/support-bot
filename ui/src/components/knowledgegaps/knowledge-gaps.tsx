@@ -462,57 +462,59 @@ export default function KnowledgeGapsPage() {
                     {isSupportEngineer && (
                         <div className="flex flex-col items-end gap-3">
                             <div className="flex items-center gap-2">
+                                <select
+                                    value={selectedDays}
+                                    onChange={(e) => setSelectedDays(Number(e.target.value))}
+                                    className="h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                    <option value={7}>Week</option>
+                                    <option value={31}>Month</option>
+                                    <option value={92}>Quarter</option>
+                                </select>
                                 {isAnalysisEnabled && (
+                                    <button
+                                        onClick={handleStartAnalysis}
+                                        disabled={analysisStatus?.running || isStartingAnalysis}
+                                        className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        <Play className="w-4 h-4" />
+                                        {isStartingAnalysis ? 'Starting...' : 'Start Analysis'}
+                                    </button>
+                                )}
+                                {!isAnalysisEnabled && (
                                     <>
-                                        <select
-                                            value={selectedDays}
-                                            onChange={(e) => setSelectedDays(Number(e.target.value))}
-                                            className="h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        >
-                                            <option value={7}>Week</option>
-                                            <option value={31}>Month</option>
-                                            <option value={92}>Quarter</option>
-                                        </select>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept=".jsonl"
+                                            onChange={handleFileChange}
+                                            className="hidden"
+                                        />
                                         <button
-                                            onClick={handleStartAnalysis}
-                                            disabled={analysisStatus?.running || isStartingAnalysis}
-                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                            onClick={handleExportDownload}
+                                            disabled={isDownloading}
+                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                         >
-                                            <Play className="w-4 h-4" />
-                                            {isStartingAnalysis ? 'Starting...' : 'Start Analysis'}
+                                            <Download className="w-4 h-4" />
+                                            {isDownloading ? 'Downloading...' : 'Export'}
+                                        </button>
+                                        <button
+                                            onClick={handleAnalysisBundleDownload}
+                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                                        >
+                                            <FileText className="w-4 h-4" />
+                                            Analysis Bundle
+                                        </button>
+                                        <button
+                                            onClick={handleImportClick}
+                                            disabled={isUploading}
+                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                        >
+                                            <Upload className="w-4 h-4" />
+                                            {isUploading ? 'Uploading...' : 'Import'}
                                         </button>
                                     </>
                                 )}
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept=".jsonl"
-                                    onChange={handleFileChange}
-                                    className="hidden"
-                                />
-                                <button
-                                    onClick={handleExportDownload}
-                                    disabled={isDownloading}
-                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                >
-                                    <Download className="w-4 h-4" />
-                                    {isDownloading ? 'Downloading...' : 'Export'}
-                                </button>
-                                <button
-                                    onClick={handleAnalysisBundleDownload}
-                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
-                                >
-                                    <FileText className="w-4 h-4" />
-                                    Analysis Bundle
-                                </button>
-                                <button
-                                    onClick={handleImportClick}
-                                    disabled={isUploading}
-                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                >
-                                    <Upload className="w-4 h-4" />
-                                    {isUploading ? 'Uploading...' : 'Import'}
-                                </button>
                             </div>
                             {isAnalysisEnabled && (analysisStatus?.running || showCompletedStatus) && (
                                 <div className={`border rounded-xl px-4 py-2 text-sm ${

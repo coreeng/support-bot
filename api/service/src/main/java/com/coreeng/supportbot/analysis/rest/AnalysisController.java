@@ -22,7 +22,8 @@ public class AnalysisController {
 
     @GetMapping("/enabled")
     public ResponseEntity<KnowledgeGapsStatusUI> getKnowledgeGapsStatus() {
-        return ResponseEntity.ok(new KnowledgeGapsStatusUI(analysisProps.prompt().enabled()));
+        return ResponseEntity.ok(
+                new KnowledgeGapsStatusUI(analysisProps.prompt().enabled()));
     }
 
     @PostMapping("/run")

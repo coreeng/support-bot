@@ -422,7 +422,7 @@ describe('KnowledgeGapsPage', () => {
             if (url === '/api/analysis/enabled') {
                 return Promise.resolve({
                     ok: true,
-                    json: () => Promise.resolve({ enabled: true })
+                    json: () => Promise.resolve({ enabled: false })
                 } as Response)
             }
             return Promise.resolve({
@@ -475,7 +475,7 @@ describe('KnowledgeGapsPage', () => {
             if (url === '/api/analysis/enabled') {
                 return Promise.resolve({
                     ok: true,
-                    json: () => Promise.resolve({ enabled: true })
+                    json: () => Promise.resolve({ enabled: false })
                 } as Response)
             }
             return Promise.resolve({
@@ -1062,8 +1062,8 @@ describe('KnowledgeGapsPage', () => {
 
             // Verify the button is not present
             expect(screen.queryByText('Start Analysis')).not.toBeInTheDocument()
-            // Also verify the days selector is not present
-            expect(screen.queryByDisplayValue('Week')).not.toBeInTheDocument()
+            // The days selector should still be present (used for Export Data)
+            expect(screen.getByDisplayValue('Week')).toBeInTheDocument()
         })
 
         it('hides progress panel when feature is disabled', async () => {
@@ -1104,6 +1104,97 @@ describe('KnowledgeGapsPage', () => {
 
             // Verify the progress panel is not shown even though analysis is running
             expect(screen.queryByText(/Analysis in progress/)).not.toBeInTheDocument()
+        })
+
+        it('hides Export Data, Get Analysis Bundle, and Import Data buttons when feature is enabled', async () => {
+            mockUseAnalysis.mockReturnValue({
+                data: mockAnalysisData,
+                isLoading: false,
+                error: null
+            } as any)
+
+            const mockFetch = jest.fn((url) => {
+                if (url === '/api/analysis/enabled') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ enabled: true })
+                    } as Response)
+                }
+                if (url === '/api/analysis/status') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: null,
+                            exportedCount: null,
+                            analyzedCount: null,
+                            running: false,
+                            error: null
+                        })
+                    } as Response)
+                }
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
+            })
+
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for the page to render
+            await screen.findByText('Support Area Summary')
+
+            // Verify all three buttons are not present
+            expect(screen.queryByText('Export Data')).not.toBeInTheDocument()
+            expect(screen.queryByText('Get Analysis Bundle')).not.toBeInTheDocument()
+            expect(screen.queryByText('Import Data')).not.toBeInTheDocument()
+        })
+
+        it('shows Export Data, Get Analysis Bundle, and Import Data buttons when feature is disabled', async () => {
+            mockUseAnalysis.mockReturnValue({
+                data: mockAnalysisData,
+                isLoading: false,
+                error: null
+            } as any)
+
+            const mockFetch = jest.fn((url) => {
+                if (url === '/api/analysis/enabled') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ enabled: false })
+                    } as Response)
+                }
+                if (url === '/api/analysis/status') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: null,
+                            exportedCount: null,
+                            analyzedCount: null,
+                            running: false,
+                            error: null
+                        })
+                    } as Response)
+                }
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
+            })
+
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for the page to render
+            await screen.findByText('Support Area Summary')
+
+            // Verify all three buttons are present and enabled
+            const exportButton = screen.getByText('Export Data')
+            const bundleButton = screen.getByText('Get Analysis Bundle')
+            const importButton = screen.getByText('Import Data')
+
+            expect(exportButton).toBeInTheDocument()
+            expect(exportButton).not.toBeDisabled()
+            expect(bundleButton).toBeInTheDocument()
+            expect(bundleButton).not.toBeDisabled()
+            expect(importButton).toBeInTheDocument()
+            expect(importButton).not.toBeDisabled()
         })
     })
 })
