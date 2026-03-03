@@ -603,3 +603,4 @@ bin
 .project
 
 .vscode
+.worktrees/
