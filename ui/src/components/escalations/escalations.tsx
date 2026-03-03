@@ -57,9 +57,17 @@ export default function EscalationsPage() {
     const [pageIndex, setPageIndex] = useState<number>(0)
     const pageSize = 15
 
-    const { hasFullAccess, effectiveTeams, selectedTeam: teamFilterSelectedTeam } = useTeamFilter()
-    const hasNoTeamScope = effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
+    const {
+        hasFullAccess,
+        effectiveTeams,
+        hasNoTeamScope: contextHasNoTeamScope,
+        isViewingAsEscalationTeam: contextIsViewingAsEscalationTeam,
+        selectedTeam: teamFilterSelectedTeam
+    } = useTeamFilter()
     const { actualEscalationTeams } = useAuth()
+    const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
+    const isViewingAsEscalationTeam = contextIsViewingAsEscalationTeam ??
+        (!!teamFilterSelectedTeam && actualEscalationTeams.includes(teamFilterSelectedTeam))
     const now = useNow()
 
     // Reset page-level tenant team filter synchronously when sidebar "View as" scope changes.
@@ -69,12 +77,6 @@ export default function EscalationsPage() {
         if (selectedTeam !== '') setSelectedTeam('')
         if (pageIndex !== 0) setPageIndex(0)
     }
-
-    // Check if viewing as an escalation team (when "Escalated to My Team" section is visible)
-    const isViewingAsEscalationTeam = useMemo(() => {
-        if (!teamFilterSelectedTeam || actualEscalationTeams.length === 0) return false
-        return actualEscalationTeams.includes(teamFilterSelectedTeam)
-    }, [teamFilterSelectedTeam, actualEscalationTeams])
 
     // --- Formatting helpers ---
     const formatDate = (isoString?: string) => isoString ? new Date(isoString).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '-'
@@ -221,7 +223,7 @@ export default function EscalationsPage() {
 
     const totalPages = Math.ceil(filteredEscalations.length / pageSize)
 
-    // --- Top 2 tags ---
+    // --- Top 5 tags ---
     const topTags = useMemo(() => {
         const freqMap: Record<string, number> = {}
         filteredEscalations.forEach(esc => esc.tags?.forEach(tag => freqMap[tag] = (freqMap[tag] || 0) + 1))

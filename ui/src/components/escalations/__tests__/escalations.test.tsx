@@ -16,7 +16,6 @@ jest.mock('../EscalatedToMyTeamTable', () => {
 })
 
 const mockUseEscalations = hooks.useEscalations as jest.MockedFunction<typeof hooks.useEscalations>
-const mockUseEscalationTeams = hooks.useEscalationTeams as jest.MockedFunction<typeof hooks.useEscalationTeams>
 const mockUseTenantTeams = hooks.useTenantTeams as jest.MockedFunction<typeof hooks.useTenantTeams>
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>
 const mockUseTeamFilter = TeamFilterContext.useTeamFilter as jest.MockedFunction<typeof TeamFilterContext.useTeamFilter>
@@ -43,12 +42,6 @@ describe('EscalationsPage', () => {
             isLoading: false,
             error: null,
         } as unknown as ReturnType<typeof hooks.useRegistry>)
-
-        mockUseEscalationTeams.mockReturnValue({
-            data: [{ name: 'Escalation Team 2 Test' }],
-            isLoading: false,
-            error: null,
-        } as unknown as ReturnType<typeof hooks.useEscalationTeams>)
 
         mockUseTenantTeams.mockReturnValue({
             data: [{ name: 'Tenant Alpha' }],

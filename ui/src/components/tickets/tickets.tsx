@@ -13,11 +13,16 @@ import { getDateRangeFromFilter } from '@/lib/dateRange'
 
 
 export default function TicketsPage() {
-    const {effectiveTeams, selectedTeam: teamFilterSelectedTeam} = useTeamFilter()
+    const {
+        effectiveTeams,
+        hasNoTeamScope: contextHasNoTeamScope,
+        isViewingAllTeams: contextIsViewingAllTeams,
+        selectedTeam: teamFilterSelectedTeam
+    } = useTeamFilter()
     const queryClient = useQueryClient()
     const {data: isAssignmentEnabled} = useAssignmentEnabled()
-    const hasNoTeamScope = effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
-    const isViewingAllTeams = effectiveTeams.length === 0 && !hasNoTeamScope
+    const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
+    const isViewingAllTeams = contextIsViewingAllTeams ?? (effectiveTeams.length === 0 && !hasNoTeamScope)
     type DateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
 
     // Selected ticket

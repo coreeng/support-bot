@@ -68,15 +68,16 @@ export default function StatsPage() {
     // This ensures we get complete data for accurate statistics
     const { data: ticketsData, isLoading: isTicketsLoading, error: ticketsError } = useAllTickets(200, dateRange.from, dateRange.to)
     const { data: registryData } = useRegistry()
-    const { effectiveTeams, selectedTeam } = useTeamFilter()
+    const {
+        effectiveTeams,
+        hasNoTeamScope: contextHasNoTeamScope,
+        selectedTeam,
+        isViewingAsEscalationTeam: contextIsViewingAsEscalationTeam
+    } = useTeamFilter()
     const { actualEscalationTeams } = useAuth()
-    const hasNoTeamScope = effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
-
-    // Check if viewing as escalation team
-    const isViewingAsEscalationTeam = useMemo(() => {
-        if (!selectedTeam || actualEscalationTeams.length === 0) return false
-        return actualEscalationTeams.includes(selectedTeam)
-    }, [selectedTeam, actualEscalationTeams])
+    const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
+    const isViewingAsEscalationTeam = contextIsViewingAsEscalationTeam ??
+        (!!selectedTeam && actualEscalationTeams.includes(selectedTeam))
 
     // Filter tickets by selected team
     const teamTickets = useMemo(() => {

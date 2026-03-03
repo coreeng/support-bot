@@ -9,11 +9,26 @@ jest.mock('../../hooks/useAuth')
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>
 
 const Probe = () => {
-    const { selectedTeam, setSelectedTeam, effectiveTeams, hasFullAccess, allTeams, initialized } = useTeamFilter()
+    const {
+        selectedTeam,
+        setSelectedTeam,
+        teamScope,
+        effectiveTeams,
+        hasNoTeamScope,
+        isViewingAllTeams,
+        isViewingAsEscalationTeam,
+        hasFullAccess,
+        allTeams,
+        initialized
+    } = useTeamFilter()
     return (
         <div>
             <div data-testid="selected-team">{selectedTeam ?? 'null'}</div>
+            <div data-testid="team-scope">{teamScope.mode}</div>
             <div data-testid="effective-teams">{effectiveTeams.join('|')}</div>
+            <div data-testid="has-no-team-scope">{String(hasNoTeamScope)}</div>
+            <div data-testid="is-viewing-all-teams">{String(isViewingAllTeams)}</div>
+            <div data-testid="is-viewing-as-escalation-team">{String(isViewingAsEscalationTeam)}</div>
             <div data-testid="has-full-access">{String(hasFullAccess)}</div>
             <div data-testid="all-teams">{allTeams.join('|')}</div>
             <div data-testid="initialized">{String(initialized)}</div>
@@ -50,6 +65,7 @@ describe('TeamFilterContext', () => {
         renderProvider()
 
         expect(screen.getByTestId('initialized')).toHaveTextContent('false')
+        expect(screen.getByTestId('team-scope')).toHaveTextContent('uninitialized')
         expect(screen.getByTestId('effective-teams')).toHaveTextContent('')
     })
 
@@ -76,6 +92,8 @@ describe('TeamFilterContext', () => {
         await waitFor(() =>
             expect(screen.getByTestId('effective-teams')).toHaveTextContent(TEAM_SCOPE.NO_TEAMS)
         )
+        expect(screen.getByTestId('team-scope')).toHaveTextContent('no_teams')
+        expect(screen.getByTestId('has-no-team-scope')).toHaveTextContent('true')
         expect(screen.getByTestId('initialized')).toHaveTextContent('true')
     })
 
@@ -105,6 +123,8 @@ describe('TeamFilterContext', () => {
 
         await waitFor(() => expect(screen.getByTestId('selected-team')).toHaveTextContent('Support'))
         expect(screen.getByTestId('has-full-access')).toHaveTextContent('true')
+        expect(screen.getByTestId('team-scope')).toHaveTextContent('all_teams')
+        expect(screen.getByTestId('is-viewing-all-teams')).toHaveTextContent('true')
         expect(screen.getByTestId('effective-teams')).toHaveTextContent('')
         expect(screen.getByTestId('all-teams')).toHaveTextContent('Tenant A|Tenant B')
     })
@@ -137,7 +157,35 @@ describe('TeamFilterContext', () => {
         fireEvent.click(screen.getByText('select-tenant-b'))
 
         await waitFor(() => expect(screen.getByTestId('selected-team')).toHaveTextContent('Tenant B'))
+        expect(screen.getByTestId('team-scope')).toHaveTextContent('selected_teams')
         expect(screen.getByTestId('effective-teams')).toHaveTextContent('Tenant B')
         expect(screen.getByTestId('has-full-access')).toHaveTextContent('false')
+    })
+
+    it('flags escalation-team viewing when selected team is in escalation set', async () => {
+        mockUseAuth.mockReturnValue({
+            user: {
+                id: 'u-4',
+                email: 'esc@example.com',
+                name: 'Esc User',
+                teams: [
+                    { name: 'Esc Team', code: 'esc-team', label: 'Esc Team', types: ['escalation'] },
+                    { name: 'Tenant C', code: 'tenant-c', label: 'Tenant C', types: [] },
+                ],
+                roles: ['ESCALATION'],
+            },
+            isLoading: false,
+            isAuthenticated: true,
+            isLeadership: false,
+            isEscalationTeam: true,
+            isSupportEngineer: false,
+            actualEscalationTeams: ['Esc Team'],
+            logout: jest.fn(),
+        })
+
+        renderProvider()
+
+        await waitFor(() => expect(screen.getByTestId('selected-team')).toHaveTextContent('Esc Team'))
+        expect(screen.getByTestId('is-viewing-as-escalation-team')).toHaveTextContent('true')
     })
 })
