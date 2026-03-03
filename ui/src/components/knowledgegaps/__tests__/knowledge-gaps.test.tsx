@@ -37,8 +37,8 @@ const mockAnalysisData = {
             coveragePercentage: 90,
             queryCount: 28,
             queries: [
-                { text: 'Firewall rules for output traffic', link: 'https://slack.com/1' },
-                { text: 'DNS resolution issues', link: 'https://slack.com/2' }
+                { text: 'Firewall rules for output traffic', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'DNS resolution issues', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -46,8 +46,8 @@ const mockAnalysisData = {
             coveragePercentage: 88,
             queryCount: 50,
             queries: [
-                { text: 'How to view application logs?', link: 'https://slack.com/3' },
-                { text: 'Setting up custom metrics', link: 'https://slack.com/4' }
+                { text: 'How to view application logs?', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'Setting up custom metrics', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -55,8 +55,8 @@ const mockAnalysisData = {
             coveragePercentage: 75,
             queryCount: 42,
             queries: [
-                { text: 'How do I fix the CI pipeline failure?', link: 'https://slack.com/5' },
-                { text: 'What is the correct configuration for the build step?', link: 'https://slack.com/6' }
+                { text: 'How do I fix the CI pipeline failure?', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'What is the correct configuration for the build step?', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -64,8 +64,8 @@ const mockAnalysisData = {
             coveragePercentage: 60,
             queryCount: 35,
             queries: [
-                { text: 'How to setup Kafka consumers?', link: 'https://slack.com/7' },
-                { text: 'Dial configuration for new tenant', link: 'https://slack.com/8' }
+                { text: 'How to setup Kafka consumers?', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'Dial configuration for new tenant', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -73,8 +73,8 @@ const mockAnalysisData = {
             coveragePercentage: 45,
             queryCount: 15,
             queries: [
-                { text: 'Deployment failed with timeout', link: 'https://slack.com/9' },
-                { text: 'Configuring environment variables', link: 'https://slack.com/10' }
+                { text: 'Deployment failed with timeout', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'Configuring environment variables', link: 'https://slack.com/archives/CTEST/p' }
             ]
         }
     ],
@@ -84,8 +84,8 @@ const mockAnalysisData = {
             coveragePercentage: 56,
             queryCount: 2127,
             queries: [
-                { text: 'Documentation missing for new API', link: 'https://slack.com/11' },
-                { text: 'How to configure advanced settings?', link: 'https://slack.com/12' }
+                { text: 'Documentation missing for new API', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'How to configure advanced settings?', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -93,8 +93,8 @@ const mockAnalysisData = {
             coveragePercentage: 22,
             queryCount: 825,
             queries: [
-                { text: 'Service temporarily unavailable', link: 'https://slack.com/13' },
-                { text: '503 errors on login', link: 'https://slack.com/14' }
+                { text: 'Service temporarily unavailable', link: 'https://slack.com/archives/CTEST/p' },
+                { text: '503 errors on login', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -102,8 +102,8 @@ const mockAnalysisData = {
             coveragePercentage: 13,
             queryCount: 493,
             queries: [
-                { text: 'Please reset my API key', link: 'https://slack.com/15' },
-                { text: 'Update billing address', link: 'https://slack.com/16' }
+                { text: 'Please reset my API key', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'Update billing address', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -111,8 +111,8 @@ const mockAnalysisData = {
             coveragePercentage: 5,
             queryCount: 196,
             queries: [
-                { text: 'Cannot find the logout button', link: 'https://slack.com/17' },
-                { text: 'Dashboard is confusing', link: 'https://slack.com/18' }
+                { text: 'Cannot find the logout button', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'Dashboard is confusing', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -120,8 +120,8 @@ const mockAnalysisData = {
             coveragePercentage: 4,
             queryCount: 163,
             queries: [
-                { text: 'Add dark mode support', link: 'https://slack.com/19' },
-                { text: 'Export report to PDF', link: 'https://slack.com/20' }
+                { text: 'Add dark mode support', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'Export report to PDF', link: 'https://slack.com/archives/CTEST/p' }
             ]
         }
     ]
@@ -180,16 +180,16 @@ describe('KnowledgeGapsPage', () => {
         expect(screen.getByText('Overview of support areas and knowledge gaps requiring attention')).toBeInTheDocument()
 
         // Check for import, export, and prompt buttons
-        expect(screen.getByText('Import Data')).toBeInTheDocument()
-        expect(screen.getByText('Export Data')).toBeInTheDocument()
-        expect(screen.getByText('Get Analysis Bundle')).toBeInTheDocument()
+        expect(screen.getByText('Import')).toBeInTheDocument()
+        expect(screen.getByText('Export')).toBeInTheDocument()
+        expect(screen.getByText('Analysis Bundle')).toBeInTheDocument()
 
         // Check for collapsible section headers
-        expect(screen.getByText('Top 5 Support Areas')).toBeInTheDocument()
-        expect(screen.getByText('Top 5 Knowledge Gaps')).toBeInTheDocument()
+        expect(screen.getByText('Top Support Areas')).toBeInTheDocument()
+        expect(screen.getByText('Top Knowledge Gaps')).toBeInTheDocument()
     })
 
-    it('expands and collapses support areas section', () => {
+    it('sections are expanded by default and can be collapsed', () => {
         mockUseAnalysis.mockReturnValue({
             data: mockAnalysisData,
             isLoading: false,
@@ -198,46 +198,27 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
-        // Initially collapsed - items should not be visible
-        expect(screen.queryByText('Knowledge Gap')).not.toBeInTheDocument()
-
-        // Click to expand Top 5 Support Areas
-        const supportAreasButton = screen.getByRole('button', { name: /Top 5 Support Areas/i })
-        fireEvent.click(supportAreasButton)
-
-        // Now items should be visible
+        // Sections expanded by default - items should be visible
         expect(screen.getByText('Knowledge Gap')).toBeInTheDocument()
         expect(screen.getByText('2,127 queries')).toBeInTheDocument()
-
-        // Click again to collapse
-        fireEvent.click(supportAreasButton)
-
-        // Items should be hidden again
-        expect(screen.queryByText('Knowledge Gap')).not.toBeInTheDocument()
-    })
-
-    it('expands and collapses knowledge gaps section', () => {
-        mockUseAnalysis.mockReturnValue({
-            data: mockAnalysisData,
-            isLoading: false,
-            error: null
-        } as any)
-
-        renderWithToast(<KnowledgeGapsPage />)
-
-        // Initially collapsed - items should not be visible
-        expect(screen.queryByText('CI')).not.toBeInTheDocument()
-
-        // Click to expand Top 5 Knowledge Gaps
-        const knowledgeGapsButton = screen.getByRole('button', { name: /Top 5 Knowledge Gaps/i })
-        fireEvent.click(knowledgeGapsButton)
-
-        // Now items should be visible
         expect(screen.getByText('CI')).toBeInTheDocument()
         expect(screen.getByText('42 queries')).toBeInTheDocument()
+
+        // Collapse support areas
+        const supportAreasButton = screen.getByRole('button', { name: /Top Support Areas/i })
+        fireEvent.click(supportAreasButton)
+
+        // List item hidden
+        expect(screen.queryByText('Knowledge Gap')).not.toBeInTheDocument()
+
+        // Collapse knowledge gaps
+        const knowledgeGapsButton = screen.getByRole('button', { name: /Top Knowledge Gaps/i })
+        fireEvent.click(knowledgeGapsButton)
+
+        expect(screen.queryByText('CI')).not.toBeInTheDocument()
     })
 
-    it('expands individual area to show relevant queries', () => {
+    it('expands individual area to show relevant queries on click', () => {
         mockUseAnalysis.mockReturnValue({
             data: mockAnalysisData,
             isLoading: false,
@@ -246,31 +227,24 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
-        // Expand the Top 5 Support Areas section first
-        const supportAreasButton = screen.getByRole('button', { name: /Top 5 Support Areas/i })
-        fireEvent.click(supportAreasButton)
-
-        // Queries should not be visible yet
+        // Individual items should NOT be auto-expanded
         expect(screen.queryByText('Documentation missing for new API')).not.toBeInTheDocument()
 
-        // Find and click the expand button for "Knowledge Gap" area (first item)
-        const expandButtons = screen.getAllByLabelText('Expand')
-        fireEvent.click(expandButtons[0])
+        // Click on "Knowledge Gap" area card to expand it
+        fireEvent.click(screen.getByText('Knowledge Gap'))
 
         // Now queries should be visible
-        expect(screen.getByText('Relevant Support Queries')).toBeInTheDocument()
         expect(screen.getByText('Documentation missing for new API')).toBeInTheDocument()
         expect(screen.getByText('How to configure advanced settings?')).toBeInTheDocument()
 
-        // Click to collapse
-        const collapseButton = screen.getByLabelText('Collapse')
-        fireEvent.click(collapseButton)
+        // Click again to collapse
+        fireEvent.click(screen.getByText('Knowledge Gap'))
 
-        // Queries should be hidden again
+        // Queries should be hidden
         expect(screen.queryByText('Documentation missing for new API')).not.toBeInTheDocument()
     })
 
-    it('displays all 5 items when sections are expanded', () => {
+    it('query links point to Slack permalinks', () => {
         mockUseAnalysis.mockReturnValue({
             data: mockAnalysisData,
             isLoading: false,
@@ -279,22 +253,71 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
-        // Expand Top 5 Support Areas
-        const supportAreasButton = screen.getByRole('button', { name: /Top 5 Support Areas/i })
-        fireEvent.click(supportAreasButton)
+        // Expand the "Knowledge Gap" support area to reveal queries
+        fireEvent.click(screen.getByText('Knowledge Gap'))
 
-        // Should show 5 numbered items
+        // Query links should point to Slack permalinks and open in a new tab
+        const links = screen.getAllByRole('link', { name: /view/i })
+        expect(links[0]).toHaveAttribute('href', 'https://slack.com/archives/CTEST/p')
+        expect(links[1]).toHaveAttribute('href', 'https://slack.com/archives/CTEST/p')
+        expect(links[0]).toHaveAttribute('target', '_blank')
+        expect(links[0]).toHaveAttribute('rel', 'noopener noreferrer')
+    })
+
+    it('renders queries with null links as plain text without anchor tags', () => {
+        const dataWithNullLinks = {
+            ...mockAnalysisData,
+            supportAreas: [
+                {
+                    name: 'Mixed Links',
+                    coveragePercentage: 50,
+                    queryCount: 10,
+                    queries: [
+                        { text: 'Query with link', link: 'https://slack.com/archives/CTEST/p123' },
+                        { text: 'Query without link', link: null }
+                    ]
+                }
+            ]
+        }
+
+        mockUseAnalysis.mockReturnValue({
+            data: dataWithNullLinks,
+            isLoading: false,
+            error: null
+        } as any)
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        // Expand the item to reveal queries
+        fireEvent.click(screen.getByText('Mixed Links'))
+
+        // Both query texts should be visible
+        expect(screen.getByText('Query with link')).toBeInTheDocument()
+        expect(screen.getByText('Query without link')).toBeInTheDocument()
+
+        // Only the non-null query has a clickable link
+        const links = screen.getAllByRole('link', { name: /view/i })
+        expect(links).toHaveLength(1)
+        expect(links[0]).toHaveAttribute('href', 'https://slack.com/archives/CTEST/p123')
+    })
+
+    it('displays all 5 items in each section', () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        // Support areas - all 5 visible by default
         expect(screen.getByText('Knowledge Gap')).toBeInTheDocument()
         expect(screen.getByText('Product Temporary Issue')).toBeInTheDocument()
         expect(screen.getByText('Task Request')).toBeInTheDocument()
         expect(screen.getByText('Product Usability Problem')).toBeInTheDocument()
         expect(screen.getByText('Feature Request')).toBeInTheDocument()
 
-        // Expand Top 5 Knowledge Gaps
-        const knowledgeGapsButton = screen.getByRole('button', { name: /Top 5 Knowledge Gaps/i })
-        fireEvent.click(knowledgeGapsButton)
-
-        // Should show 5 numbered items
+        // Knowledge gaps - all 5 visible by default
         expect(screen.getByText('Connectivity and Networking')).toBeInTheDocument()
         expect(screen.getByText('Monitoring & Troubleshooting Tenant Applications')).toBeInTheDocument()
         expect(screen.getByText('CI')).toBeInTheDocument()
@@ -330,7 +353,7 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
-        const exportButton = screen.getByText('Export Data')
+        const exportButton = screen.getByText('Export')
         fireEvent.click(exportButton)
 
         // Wait for async operations
@@ -344,7 +367,7 @@ describe('KnowledgeGapsPage', () => {
         })
 
         // Wait for button to return to normal state
-        await screen.findByText('Export Data')
+        await screen.findByText('Export')
 
         // Verify download was triggered
         expect(mockClick).toHaveBeenCalled()
@@ -406,7 +429,7 @@ describe('KnowledgeGapsPage', () => {
         fireEvent.change(select, { target: { value: '31' } })
 
         // Click export button
-        const exportButton = screen.getByText('Export Data')
+        const exportButton = screen.getByText('Export')
         fireEvent.click(exportButton)
 
         // Wait for the fetch to be called
@@ -453,7 +476,7 @@ describe('KnowledgeGapsPage', () => {
         fireEvent.change(select, { target: { value: '92' } })
 
         // Click export button
-        const exportButton = screen.getByText('Export Data')
+        const exportButton = screen.getByText('Export')
         fireEvent.click(exportButton)
 
         // Wait for the fetch to be called
@@ -491,7 +514,7 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
-        const importButton = screen.getByText('Import Data')
+        const importButton = screen.getByText('Import')
         expect(importButton).toBeInTheDocument()
 
         // Simulate file selection
@@ -515,7 +538,7 @@ describe('KnowledgeGapsPage', () => {
         }))
 
         // Wait for button to return to normal state
-        await screen.findByText('Import Data')
+        await screen.findByText('Import')
 
         // Verify success toast is shown
         expect(await screen.findByText('Import successful! 42 records imported.')).toBeInTheDocument()
@@ -552,7 +575,7 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
-        const promptButton = screen.getByText('Get Analysis Bundle')
+        const promptButton = screen.getByText('Analysis Bundle')
         fireEvent.click(promptButton)
 
         // Wait for async operations
@@ -594,9 +617,9 @@ describe('KnowledgeGapsPage', () => {
 
             renderWithToast(<KnowledgeGapsPage />)
 
-            expect(screen.getByText('Export Data')).toBeInTheDocument()
-            expect(screen.getByText('Get Analysis Bundle')).toBeInTheDocument()
-            expect(screen.getByText('Import Data')).toBeInTheDocument()
+            expect(screen.getByText('Export')).toBeInTheDocument()
+            expect(screen.getByText('Analysis Bundle')).toBeInTheDocument()
+            expect(screen.getByText('Import')).toBeInTheDocument()
         })
 
         it('hides buttons when user does not have SUPPORT_ENGINEER role', () => {
@@ -613,9 +636,9 @@ describe('KnowledgeGapsPage', () => {
 
             renderWithToast(<KnowledgeGapsPage />)
 
-            expect(screen.queryByText('Export Data')).not.toBeInTheDocument()
-            expect(screen.queryByText('Get Analysis Bundle')).not.toBeInTheDocument()
-            expect(screen.queryByText('Import Data')).not.toBeInTheDocument()
+            expect(screen.queryByText('Export')).not.toBeInTheDocument()
+            expect(screen.queryByText('Analysis Bundle')).not.toBeInTheDocument()
+            expect(screen.queryByText('Import')).not.toBeInTheDocument()
         })
 
         it('hides buttons when user has LEADERSHIP role but not SUPPORT_ENGINEER', () => {
@@ -632,9 +655,9 @@ describe('KnowledgeGapsPage', () => {
 
             renderWithToast(<KnowledgeGapsPage />)
 
-            expect(screen.queryByText('Export Data')).not.toBeInTheDocument()
-            expect(screen.queryByText('Get Analysis Bundle')).not.toBeInTheDocument()
-            expect(screen.queryByText('Import Data')).not.toBeInTheDocument()
+            expect(screen.queryByText('Export')).not.toBeInTheDocument()
+            expect(screen.queryByText('Analysis Bundle')).not.toBeInTheDocument()
+            expect(screen.queryByText('Import')).not.toBeInTheDocument()
         })
     })
 })

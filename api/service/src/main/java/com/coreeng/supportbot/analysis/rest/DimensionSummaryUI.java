@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.analysis.rest;
 
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Response model for dimension summaries (categories, drivers, etc.) with example queries.
@@ -15,7 +16,7 @@ public record DimensionSummaryUI(String name, int coveragePercentage, long query
      * Individual query summary.
      *
      * @param text The summary text
-     * @param link Link to the Slack thread
+     * @param link Slack permalink for the related query
      */
-    public record QuerySummary(String text, String link) {}
+    public record QuerySummary(String text, @Nullable String link) {}
 }
