@@ -119,6 +119,13 @@ prReviewTracking:
 #     - name: "coreeng/core-platform-environment" # Repository in org/repo format
 #       owningTeam: "infra-integration" # Team code from enums.escalation-teams — escalated when the SLA is breached
 #       sla: "PT48H"
+#   github:
+#     apiBaseUrl: "${GITHUB_API_BASE_URL:https://api.github.com}" # Supports GitHub Enterprise overrides
+#     authMode: "${GITHUB_AUTH_MODE:token}" # token | app
+#     token: "${GITHUB_TOKEN:}" # Used when authMode=token
+#     appId: "${GITHUB_APP_ID:}" # Used when authMode=app
+#     installationId: "${GITHUB_APP_INSTALLATION_ID:}" # Used when authMode=app
+#     privateKeyPem: "${GITHUB_APP_PRIVATE_KEY_PEM:}" # Used when authMode=app
 
 # Environment variables
 env:

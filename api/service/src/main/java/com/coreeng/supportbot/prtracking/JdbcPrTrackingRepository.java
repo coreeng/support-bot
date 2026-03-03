@@ -20,7 +20,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     private final DSLContext dsl;
 
     @Override
-    public PrTrackingRecord insert(NewPrTracking newRecord) {
+    public @Nullable PrTrackingRecord insertIfAbsent(NewPrTracking newRecord) {
         com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.insertInto(PR_TRACKING)
                 .set(PR_TRACKING.TICKET_ID, newRecord.ticketId())
                 .set(PR_TRACKING.GITHUB_REPO, newRecord.githubRepo())
@@ -28,9 +28,12 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 .set(PR_TRACKING.PR_CREATED_AT, newRecord.prCreatedAt())
                 .set(PR_TRACKING.SLA_DEADLINE, newRecord.slaDeadline())
                 .set(PR_TRACKING.OWNING_TEAM, newRecord.owningTeam())
+                .set(PR_TRACKING.CLOSE_TICKET_ON_RESOLVE, newRecord.closeTicketOnResolve())
+                .onConflict(PR_TRACKING.TICKET_ID, PR_TRACKING.GITHUB_REPO, PR_TRACKING.PR_NUMBER)
+                .doNothing()
                 .returning()
-                .fetchSingle();
-        return toRecord(row);
+                .fetchOne();
+        return row == null ? null : toRecord(row);
     }
 
     @Transactional(readOnly = true)
@@ -60,7 +63,8 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 .set(PR_TRACKING.ESCALATION_ID, escalationId)
                 .where(PR_TRACKING.ID.eq(id))
                 .returning()
-                .fetchSingle();
+                .fetchOptional()
+                .orElseThrow(() -> new IllegalStateException("PR tracking record not found for id " + id));
         return toRecord(row);
     }
 
@@ -72,6 +76,18 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 PR_TRACKING
                         .TICKET_ID
                         .eq(ticketId)
+                        .and(PR_TRACKING.STATUS.in(PrTrackingStatus.OPEN, PrTrackingStatus.ESCALATED)));
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public boolean hasAnyActiveClosableForTicket(long ticketId) {
+        return dsl.fetchExists(
+                PR_TRACKING,
+                PR_TRACKING
+                        .TICKET_ID
+                        .eq(ticketId)
+                        .and(PR_TRACKING.CLOSE_TICKET_ON_RESOLVE.isTrue())
                         .and(PR_TRACKING.STATUS.in(PrTrackingStatus.OPEN, PrTrackingStatus.ESCALATED)));
     }
 
@@ -96,6 +112,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 checkNotNull(row.getPrCreatedAt()),
                 checkNotNull(row.getSlaDeadline()),
                 checkNotNull(row.getOwningTeam()),
+                checkNotNull(row.getCloseTicketOnResolve()),
                 checkNotNull(row.getStatus()),
                 row.getEscalationId(),
                 row.getClosedAt());

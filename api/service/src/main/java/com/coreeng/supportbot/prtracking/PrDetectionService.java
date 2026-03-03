@@ -91,7 +91,8 @@ public class PrDetectionService {
                 ticketSlackService.markPostTracked(ticket.queryRef());
                 baseReactionsAdded = true;
             }
-            PerPrResult result = processPr(pr, ticket);
+            boolean closeTicketOnResolve = !event.messageRef().isReply();
+            PerPrResult result = processPr(pr, ticket, closeTicketOnResolve);
             switch (result) {
                 case TRACKED -> {
                     anyOpenTracked = true;
@@ -115,7 +116,7 @@ public class PrDetectionService {
         SKIPPED
     }
 
-    private PerPrResult processPr(DetectedPr detectedPr, Ticket ticket) {
+    private PerPrResult processPr(DetectedPr detectedPr, Ticket ticket, boolean closeTicketOnResolve) {
         PrTrackingProps.Repository repoConfig = prTrackingProps.repositories().stream()
                 .filter(r -> r.name().equals(detectedPr.repositoryName()))
                 .findFirst()
@@ -147,13 +148,22 @@ public class PrDetectionService {
         String teamLabel = resolveTeamLabel(repoConfig.owningTeam());
         TicketId ticketId = checkNotNull(ticket.id());
 
-        PrTrackingRecord tracking = prTrackingRepository.insert(new NewPrTracking(
+        PrTrackingRecord tracking = prTrackingRepository.insertIfAbsent(new NewPrTracking(
                 ticketId.id(),
                 detectedPr.repositoryName(),
                 detectedPr.pullNumber(),
                 prMetadata.createdAt(),
                 slaDeadline,
-                repoConfig.owningTeam()));
+                repoConfig.owningTeam(),
+                closeTicketOnResolve));
+        if (tracking == null) {
+            log.atInfo()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .addArgument(ticketId::id)
+                    .log("PR {}#{} became tracked concurrently for ticket {}, skipping");
+            return PerPrResult.SKIPPED;
+        }
 
         log.atInfo()
                 .addArgument(detectedPr::repositoryName)
@@ -205,8 +215,8 @@ public class PrDetectionService {
                             ? suggestion.otherTeams().get(0)
                             : null);
             return TicketTeam.fromCode(code);
-        } catch (Exception e) {
-            log.atWarn()
+        } catch (RuntimeException e) {
+            log.atError()
                     .setCause(e)
                     .addArgument(() -> authorId)
                     .log("Failed to resolve authors team suggestion for Slack user {}, leaving team unchanged");
@@ -226,8 +236,15 @@ public class PrDetectionService {
                 .tags(ImmutableList.of())
                 .build());
 
-        Long escalationId =
-                escalation != null && escalation.id() != null ? escalation.id().id() : null;
+        if (escalation == null || escalation.id() == null) {
+            log.atWarn()
+                    .addArgument(tracking::githubRepo)
+                    .addArgument(tracking::prNumber)
+                    .addArgument(() -> checkNotNull(ticket.id()).id())
+                    .log("Escalation creation returned null for PR {}#{} on ticket {}, keeping tracking OPEN");
+            return;
+        }
+        Long escalationId = escalation.id().id();
         prTrackingRepository.updateStatus(
                 tracking.id(), com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.ESCALATED, null, escalationId);
         ticketSlackService.markTicketEscalated(ticket.queryRef());
@@ -237,14 +254,21 @@ public class PrDetectionService {
         String text =
                 "Pull requests submitted to `%s` are expected to be reviewed within %s. It looks like PR #%d has exceeded that timeframe."
                         .formatted(pr.repositoryName(), formatDuration(sla), pr.pullNumber());
-
-        slackClient.postMessage(new SlackPostMessageRequest(
-                SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
-
-        log.atInfo()
-                .addArgument(pr::repositoryName)
-                .addArgument(pr::pullNumber)
-                .log("SLA breach message posted for PR {}#{}");
+        try {
+            slackClient.postMessage(new SlackPostMessageRequest(
+                    SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
+            log.atInfo()
+                    .addArgument(pr::repositoryName)
+                    .addArgument(pr::pullNumber)
+                    .log("SLA breach message posted for PR {}#{}");
+        } catch (Exception e) {
+            log.atWarn()
+                    .setCause(e)
+                    .addArgument(pr::repositoryName)
+                    .addArgument(pr::pullNumber)
+                    .addArgument(queryTs::ts)
+                    .log("Failed to post SLA breach message for PR {}#{} in thread {}");
+        }
     }
 
     private void postSlaReply(
@@ -257,11 +281,21 @@ public class PrDetectionService {
                                 pr.pullNumber(),
                                 DEADLINE_FMT.format(slaDeadline),
                                 teamLabel);
-
-        slackClient.postMessage(new SlackPostMessageRequest(
-                SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
-
-        log.atInfo().addArgument(pr::repositoryName).addArgument(pr::pullNumber).log("SLA reply posted for PR {}#{}");
+        try {
+            slackClient.postMessage(new SlackPostMessageRequest(
+                    SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
+            log.atInfo()
+                    .addArgument(pr::repositoryName)
+                    .addArgument(pr::pullNumber)
+                    .log("SLA reply posted for PR {}#{}");
+        } catch (Exception e) {
+            log.atWarn()
+                    .setCause(e)
+                    .addArgument(pr::repositoryName)
+                    .addArgument(pr::pullNumber)
+                    .addArgument(queryTs::ts)
+                    .log("Failed to post SLA reply for PR {}#{} in thread {}");
+        }
     }
 
     private void addReaction(String emoji, MessageTs queryTs, String channelId) {
@@ -279,9 +313,10 @@ public class PrDetectionService {
                         .log(":{}:  reaction already present on message {}");
             } else {
                 log.atWarn()
+                        .setCause(e)
                         .addArgument(emoji)
                         .addArgument(queryTs)
-                        .addArgument(e::getMessage)
+                        .addArgument(e::getError)
                         .log("Failed to add :{}: reaction to message {}: {}");
             }
         }
@@ -293,15 +328,33 @@ public class PrDetectionService {
     }
 
     static String formatDuration(Duration duration) {
-        long totalSeconds = duration.toSeconds();
-        if (totalSeconds % 3600 == 0) {
-            long hours = totalSeconds / 3600;
-            return hours + " hour" + (hours == 1 ? "" : "s");
+        long totalSeconds = Math.abs(duration.toSeconds());
+        if (totalSeconds == 0) {
+            return "0 seconds";
         }
-        if (totalSeconds % 60 == 0) {
-            long minutes = totalSeconds / 60;
-            return minutes + " minute" + (minutes == 1 ? "" : "s");
+
+        long hours = totalSeconds / 3600;
+        long remainder = totalSeconds % 3600;
+        long minutes = remainder / 60;
+        long seconds = remainder % 60;
+
+        StringBuilder formatted = new StringBuilder();
+        appendUnit(formatted, hours, "hour");
+        appendUnit(formatted, minutes, "minute");
+        appendUnit(formatted, seconds, "second");
+        return formatted.toString();
+    }
+
+    private static void appendUnit(StringBuilder target, long value, String unit) {
+        if (value == 0) {
+            return;
         }
-        return totalSeconds + " second" + (totalSeconds == 1 ? "" : "s");
+        if (!target.isEmpty()) {
+            target.append(' ');
+        }
+        target.append(value).append(' ').append(unit);
+        if (value != 1) {
+            target.append('s');
+        }
     }
 }

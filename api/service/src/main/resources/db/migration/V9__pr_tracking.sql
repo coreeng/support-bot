@@ -9,11 +9,13 @@ create table if not exists pr_tracking
     pr_created_at timestamptz        not null,
     sla_deadline  timestamptz        not null,
     owning_team   text               not null,
+    close_ticket_on_resolve boolean  not null default true,
     status        pr_tracking_status not null default 'OPEN',
     escalation_id bigint,
     closed_at     timestamptz,
     created_at    timestamptz        not null default now(),
 
+    constraint pr_tracking_ticket_repo_pr_unique unique (ticket_id, github_repo, pr_number),
     constraint pr_tracking_ticket_id_fk foreign key (ticket_id) references ticket (id),
     constraint pr_tracking_escalation_id_fk foreign key (escalation_id) references escalation (id)
 );

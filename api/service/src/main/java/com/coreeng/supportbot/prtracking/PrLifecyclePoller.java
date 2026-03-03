@@ -51,12 +51,12 @@ public class PrLifecyclePoller {
         for (PrTrackingRecord record : active) {
             try {
                 processRecord(record);
-            } catch (GitHubApiException e) {
+            } catch (Exception e) {
                 log.atError()
                         .addArgument(record::githubRepo)
                         .addArgument(record::prNumber)
                         .setCause(e)
-                        .log("Error processing PR tracking record for {}#{}");
+                        .log("Error processing PR tracking record for {}#{}, continuing with next record");
             }
         }
     }
@@ -99,9 +99,17 @@ public class PrLifecyclePoller {
         postMessage(
                 "PR `%s#%d` has been closed. :white_check_mark:".formatted(record.githubRepo(), record.prNumber()),
                 ticket.channelId(),
-                ticket.queryTs());
+                ticket.queryTs(),
+                record);
 
-        if (!prTrackingRepository.hasAnyActiveForTicket(record.ticketId())) {
+        if (!record.closeTicketOnResolve()) {
+            log.atInfo()
+                    .addArgument(record::ticketId)
+                    .log("PR for ticket {} resolved from thread reply context; skipping auto-close");
+            return;
+        }
+
+        if (!prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId())) {
             log.atInfo().addArgument(record::ticketId).log("All PRs resolved for ticket {}, closing ticket");
             ticketProcessingService.closeForPrResolution(
                     checkNotNull(ticket.id()), ImmutableList.copyOf(prTrackingProps.tags()), prTrackingProps.impact());
@@ -121,8 +129,15 @@ public class PrLifecyclePoller {
                 .tags(ImmutableList.of())
                 .build());
 
-        Long escalationId =
-                escalation != null && escalation.id() != null ? escalation.id().id() : null;
+        if (escalation == null || escalation.id() == null) {
+            log.atWarn()
+                    .addArgument(record::githubRepo)
+                    .addArgument(record::prNumber)
+                    .addArgument(record::ticketId)
+                    .log("Escalation creation returned null for PR {}#{} on ticket {}, keeping tracking OPEN");
+            return;
+        }
+        Long escalationId = escalation.id().id();
         prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.ESCALATED, null, escalationId);
         ticketSlackService.markTicketEscalated(ticket.queryRef());
 
@@ -133,8 +148,17 @@ public class PrLifecyclePoller {
                 .log("PR {}#{} SLA breached — escalated on ticket {}");
     }
 
-    private void postMessage(String text, String channelId, MessageTs queryTs) {
-        slackClient.postMessage(new SlackPostMessageRequest(
-                SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
+    private void postMessage(String text, String channelId, MessageTs queryTs, PrTrackingRecord record) {
+        try {
+            slackClient.postMessage(new SlackPostMessageRequest(
+                    SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
+        } catch (Exception e) {
+            log.atWarn()
+                    .setCause(e)
+                    .addArgument(record::githubRepo)
+                    .addArgument(record::prNumber)
+                    .addArgument(record::ticketId)
+                    .log("Failed to post closure message for PR {}#{} on ticket {}, continuing");
+        }
     }
 }

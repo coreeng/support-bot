@@ -1,9 +1,15 @@
 package com.coreeng.supportbot.config;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.prtracking.PrTrackingGitHubConfig;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.time.Duration;
+import java.util.Base64;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GitHub;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -43,6 +49,45 @@ class PrTrackingGitHubConfigTest {
             assertThat(context).hasSingleBean(GitHub.class);
             assertThat(context).hasSingleBean(GitHubClient.class);
         });
+    }
+
+    @Test
+    void createsGitHubBeanInAppModeWithValidPrivateKeyPem() throws Exception {
+        // given
+        PrTrackingGitHubConfig config = new PrTrackingGitHubConfig();
+        PrTrackingProps.GitHub appGithub = new PrTrackingProps.GitHub(
+                PrTrackingProps.AuthMode.APP,
+                "https://api.github.com",
+                "",
+                "12345",
+                "67890",
+                toPem(generatePrivateKey()));
+        PrTrackingProps props = new PrTrackingProps(
+                true,
+                "0 0 9-18 * * 1-5",
+                "pr",
+                List.of("pr-review"),
+                "low",
+                List.of(new PrTrackingProps.Repository("my-org/my-repo", "wow", Duration.ofDays(2))),
+                appGithub);
+
+        // when
+        GitHub gitHub = config.gitHub(props);
+
+        // then
+        assertThat(gitHub).isNotNull();
+        assertThat(config.gitHubClient(gitHub)).isNotNull().isInstanceOf(GitHubClient.class);
+    }
+
+    private static PrivateKey generatePrivateKey() throws Exception {
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+        generator.initialize(2048);
+        return generator.generateKeyPair().getPrivate();
+    }
+
+    private static String toPem(PrivateKey privateKey) {
+        String base64 = Base64.getMimeEncoder(64, "\n".getBytes(UTF_8)).encodeToString(privateKey.getEncoded());
+        return "-----BEGIN PRIVATE KEY-----\n" + base64 + "\n-----END PRIVATE KEY-----";
     }
 
     @Configuration

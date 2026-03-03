@@ -204,6 +204,97 @@ public class PrLifecyclePollerFunctionalTests {
         supportBotClient.test().cleanupPrTrackingRecords();
     }
 
+    @Test
+    public void whenThreadReplyOriginTrackedPrCloses_pollerDoesNotCloseTicket() {
+        supportBotClient.test().cleanupPrTrackingRecords();
+
+        TestKit.RoledTestKit asTenant = testKit.as(tenant);
+        SlackTestKit asTenantSlack = asTenant.slack();
+        SlackTestKit asSupportSlack = testKit.as(support).slack();
+
+        MessageTs queryTs = MessageTs.now();
+        String queryText = "Please help with this issue";
+        SlackMessage tenantsQuery = asTenantSlack.postMessage(queryTs, queryText);
+
+        MessageTs ticketMessageTs = MessageTs.now();
+        var creationStubs = tenantsQuery.stubTicketCreationFlow("ticket created", ticketMessageTs);
+        asSupportSlack.addReactionTo(tenantsQuery, "eyes");
+        creationStubs.awaitAllCalled(Duration.ofSeconds(5));
+
+        // Track PR from a thread reply (reply-origin records should not auto-close ticket on resolve).
+        Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+        var githubOpenStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("Track PR #1 open", PR_REPO, 1, "open", prCreatedAt.toString());
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("PR reaction on query")
+                        .reaction("pr")
+                        .channelId(tenantsQuery.channelId())
+                        .ts(queryTs)
+                        .build());
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Eyes reaction on query")
+                        .reaction("eyes")
+                        .channelId(tenantsQuery.channelId())
+                        .ts(queryTs)
+                        .build());
+        var ticketReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Ticket reaction on query")
+                        .reaction("ticket")
+                        .channelId(tenantsQuery.channelId())
+                        .ts(queryTs)
+                        .build());
+        var slaReplyStub =
+                testKit.slack().wiremock().stubChatPostMessage("PR SLA reply in thread", tenantsQuery.channelId());
+
+        asTenantSlack.postThreadReply(MessageTs.now(), queryTs, "Fix in PR: https://github.com/" + PR_REPO + "/pull/1");
+
+        await().atMost(Duration.ofSeconds(8)).untilAsserted(() -> {
+            githubOpenStub.assertIsCalled();
+            prReactionStub.assertIsCalled();
+            eyesReactionStub.assertIsCalled();
+            ticketReactionStub.assertIsCalled();
+            slaReplyStub.assertIsCalled();
+        });
+
+        // Now PR is closed; poller should close tracking record but must keep ticket OPEN for reply-origin PRs.
+        var githubClosedStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("Poll PR #1 closed", PR_REPO, 1, "closed", prCreatedAt.toString());
+        var closeNoticeStub =
+                testKit.slack().wiremock().stubChatPostMessage("Poll close notice", tenantsQuery.channelId());
+        var resolvedReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Resolved reaction should not be added")
+                        .reaction("white_check_mark")
+                        .channelId(tenantsQuery.channelId())
+                        .ts(queryTs)
+                        .build());
+
+        supportBotClient.test().triggerPrTrackingPoll();
+
+        await().atMost(Duration.ofSeconds(8)).untilAsserted(() -> {
+            githubClosedStub.assertIsCalled();
+            closeNoticeStub.assertIsCalled();
+            resolvedReactionStub.assertIsNotCalled();
+        });
+
+        var updatedTicket = supportBotClient.findTicketByQueryTs(tenantsQuery.channelId(), queryTs);
+        assertThat(updatedTicket).isNotNull();
+        assertThat(updatedTicket.status()).isEqualTo("opened");
+        assertThat(updatedTicket.escalated()).isFalse();
+
+        resolvedReactionStub.cleanUp();
+        supportBotClient.test().cleanupPrTrackingRecords();
+    }
+
     private SeededTicket createOpenedTicket(String queryText) {
         TestKit.RoledTestKit asTenant = testKit.as(tenant);
         SlackTestKit asTenantSlack = asTenant.slack();

@@ -11,10 +11,12 @@ import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @Profile({"functionaltests", "nft"})
@@ -33,13 +35,17 @@ public class PrTrackingTestController {
 
     @PostMapping("/record")
     public PrTrackingRecord createRecord(@RequestBody PrTrackingToCreate request) {
-        return prTrackingRepository.insert(new NewPrTracking(
+        PrTrackingRecord created = prTrackingRepository.insertIfAbsent(new NewPrTracking(
                 request.ticketId(),
                 request.githubRepo(),
                 request.prNumber(),
                 request.prCreatedAt(),
                 request.slaDeadline(),
                 request.owningTeam()));
+        if (created == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "PR tracking record already exists");
+        }
+        return created;
     }
 
     @PostMapping("/cleanup")

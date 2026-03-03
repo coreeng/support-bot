@@ -60,7 +60,7 @@ public class TicketProcessingService {
 
             if (prDetectionService.isPresent() && prDetectionService.get().containsPrLinks(e.message())) {
                 Ticket ticket = createTicket(e.messageRef());
-                PrDetectionOutcome outcome = prDetectionService.get().handleMessagePosted(e, ticket);
+                PrDetectionOutcome outcome = handlePrDetectionSafely(prDetectionService.get(), e, ticket);
                 if (outcome.shouldCloseTicket()) {
                     closeForPrResolution(checkNotNull(ticket.id()), outcome.closingTags(), outcome.closingImpact());
                 }
@@ -87,11 +87,26 @@ public class TicketProcessingService {
         }
 
         prDetectionService.ifPresent(svc -> {
-            PrDetectionOutcome outcome = svc.handleMessagePosted(e, ticket);
+            PrDetectionOutcome outcome = handlePrDetectionSafely(svc, e, ticket);
             if (outcome.shouldCloseTicket()) {
                 closeForPrResolution(checkNotNull(ticket.id()), outcome.closingTags(), outcome.closingImpact());
             }
         });
+    }
+
+    private PrDetectionOutcome handlePrDetectionSafely(PrDetectionService svc, MessagePosted event, Ticket ticket) {
+        try {
+            return svc.handleMessagePosted(event, ticket);
+        } catch (Exception ex) {
+            log.atError()
+                    .setCause(ex)
+                    .addKeyValue("ticketId", ticket.id() != null ? ticket.id().id() : null)
+                    .addKeyValue("channelId", ticket.channelId())
+                    .addKeyValue("queryTs", ticket.queryTs().ts())
+                    .addArgument(event::messageRef)
+                    .log("PR detection failed for message({}); continuing ticket processing");
+            return PrDetectionOutcome.skipped();
+        }
     }
 
     private Ticket createTicket(MessageRef queryRef) {

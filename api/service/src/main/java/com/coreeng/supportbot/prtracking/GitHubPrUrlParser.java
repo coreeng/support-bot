@@ -2,11 +2,15 @@ package com.coreeng.supportbot.prtracking;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GitHubPrUrlParser {
+    private static final Logger log = LoggerFactory.getLogger(GitHubPrUrlParser.class);
 
     // Matches plain and Slack-formatted URLs: https://github.com/org/repo/pull/123
     // Slack wraps links as <https://...> or <https://...|display text>, but the regex
@@ -29,8 +33,18 @@ public class GitHubPrUrlParser {
         List<DetectedPr> results = new ArrayList<>();
         Matcher matcher = PR_URL_PATTERN.matcher(messageText);
         while (matcher.find()) {
-            String repoName = matcher.group(1);
-            int pullNumber = Integer.parseInt(matcher.group(2));
+            String repoName = matcher.group(1).toLowerCase(Locale.ROOT);
+            int pullNumber;
+            try {
+                pullNumber = Integer.parseInt(matcher.group(2));
+            } catch (NumberFormatException e) {
+                // Skip malformed / overflow PR numbers and continue parsing others.
+                log.atWarn()
+                        .addArgument(() -> matcher.group(0))
+                        .addArgument(() -> matcher.group(2))
+                        .log("Skipping PR URL due to invalid PR number: url={}, pullNumber={}");
+                continue;
+            }
             DetectedPr candidate = new DetectedPr(repoName, pullNumber);
             if (trackedRepositories.contains(repoName) && !results.contains(candidate)) {
                 results.add(candidate);

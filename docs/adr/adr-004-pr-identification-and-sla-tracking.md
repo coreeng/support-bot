@@ -114,9 +114,9 @@ Unrecognised repos are silently ignored.
 When an in-scope PR link is found:
 
 1. Fetch PR metadata via GitHub API (`created_at`, current state).
-2. Add a `pr` tag to the parent support issue.
-3. Post the regular ticket form update plus a thread reply: _"PRs to `<repo>` have an SLA of `<SLA>`. I'll automatically escalate to the owning team (`<team-label>`) if the PR isn't responded to before `<pr_created_at + SLA>`."_ The team is named but **not tagged** in this message.
-4. React to the **top-level thread message** with an emoji (e.g. `:github:`) indicating the ticket contains a PR review request, regardless of which reply introduced the PR link.
+2. If the ticket is missing metadata, initialise it with configured defaults (`tags`, `impact`) and suggested author team when available. Existing team/tags/impact are preserved.
+3. Post a thread reply with SLA tracking messaging. If the SLA is still within bounds, the message states the deadline and owning team label (named, not tagged). If already breached at detection time, the message states that the timeframe has been exceeded.
+4. React to the **top-level thread message** with the configured PR emoji (`pr-emoji`, default `pr`) to indicate the ticket contains a tracked PR request, regardless of which reply introduced the PR link.
 5. Persist a `pr_tracking` record for lifecycle polling.
 
 ### 6. PR Tracking State
@@ -126,25 +126,26 @@ The API persists PR tracking records linked to the existing ticket model:
 ```sql
 create table if not exists pr_tracking
 (
-    id            bigserial,
-    ticket_id     bigint,
-    github_repo   text,
-    pr_number     integer,
-    pr_created_at timestamptz,
-    sla_deadline  timestamptz,
-    owning_team   text,
-    status        text,          -- OPEN | ESCALATED | CLOSED
-    escalation_id bigint,        -- set when auto-escalation is created
-    closed_at     timestamptz,
-    created_at    timestamptz not null default now()
+    id                      bigserial,
+    ticket_id               bigint,
+    github_repo             text,
+    pr_number               integer,
+    pr_created_at           timestamptz,
+    sla_deadline            timestamptz,
+    owning_team             text,
+    status                  text,          -- OPEN | ESCALATED | CLOSED
+    escalation_id           bigint,        -- set when auto-escalation is created
+    close_ticket_on_resolve boolean not null default true,
+    closed_at               timestamptz,
+    created_at              timestamptz not null default now()
 );
 ```
 
 ### 7. Periodic Lifecycle Polling
 
-A `@Scheduled` task runs on a business-hours cron (default: `0 0 9-18 * * 1-5`, configurable via `pr-review-tracking.poll-cron`) and processes all records where `status != 'CLOSED'`:
+A `@Scheduled` task runs on a business-hours cron (default: `0 0 9-18 * * 1-5`, configurable via `pr-review-tracking.poll-cron`) and processes records where `status IN ('OPEN', 'ESCALATED')`:
 
-- **PR merged or closed** — set `status = CLOSED`, `closed_at`. Post a closure message in the thread, react with `:white_check_mark:`, and close the support thread.
+- **PR merged or closed** — set `status = CLOSED`, `closed_at`. Post a closure message in the thread and close the support thread once no active tracked PRs remain.
 - **PR open, SLA expired, not yet escalated** — create escalation, set `status = ESCALATED`, persist `escalation_id`, and post an escalation message tagging the owning team (resolved from escalation-team config).
 - **PR open, within SLA** — no action.
 

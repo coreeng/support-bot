@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.config;
 
+import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.HashSet;
@@ -32,7 +33,12 @@ public record PrTrackingProps(
         this.prEmoji = prEmoji == null ? "pr" : prEmoji;
         this.tags = tags == null ? List.of() : List.copyOf(tags);
         this.impact = impact == null ? "" : impact;
-        this.repositories = repositories == null ? List.of() : List.copyOf(repositories);
+        this.repositories = repositories == null
+                ? List.of()
+                : repositories.stream()
+                        .map(repository -> new Repository(
+                                normalizeRepositoryName(repository.name()), repository.owningTeam(), repository.sla()))
+                        .toList();
         this.github = github == null ? GitHub.defaultTokenModeConfig() : github;
 
         if (enabled) {
@@ -111,12 +117,22 @@ public record PrTrackingProps(
         }
     }
 
+    private static String normalizeRepositoryName(String repositoryName) {
+        return repositoryName == null ? "" : repositoryName.toLowerCase(Locale.ROOT);
+    }
+
     public enum AuthMode {
         TOKEN,
         APP
     }
 
-    public record Repository(String name, String owningTeam, java.time.Duration sla) {}
+    public record Repository(String name, String owningTeam, java.time.Duration sla) {
+        public Repository {
+            requireNonNull(name, "name must not be null");
+            requireNonNull(owningTeam, "owningTeam must not be null");
+            requireNonNull(sla, "sla must not be null");
+        }
+    }
 
     public record GitHub(
             @Nullable AuthMode authMode,

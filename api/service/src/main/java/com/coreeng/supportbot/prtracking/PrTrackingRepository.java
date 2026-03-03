@@ -7,7 +7,7 @@ import org.jspecify.annotations.Nullable;
 
 public interface PrTrackingRepository {
 
-    PrTrackingRecord insert(NewPrTracking newRecord);
+    @Nullable PrTrackingRecord insertIfAbsent(NewPrTracking newRecord);
 
     List<PrTrackingRecord> findAllByStatus(PrTrackingStatus status);
 
@@ -19,6 +19,9 @@ public interface PrTrackingRepository {
 
     /** Returns true if any OPEN or ESCALATED record still exists for this ticket. */
     boolean hasAnyActiveForTicket(long ticketId);
+
+    /** Returns true if any OPEN or ESCALATED record that can auto-close ticket still exists for this ticket. */
+    boolean hasAnyActiveClosableForTicket(long ticketId);
 
     boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, String githubRepo, int prNumber);
 }

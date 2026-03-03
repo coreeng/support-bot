@@ -1,7 +1,6 @@
 package com.coreeng.supportbot.github;
 
 import java.io.IOException;
-import java.util.Locale;
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHIssueState;
 import org.kohsuke.github.GHPullRequest;
@@ -24,7 +23,13 @@ public final class Hub4jGitHubClient implements GitHubClient {
                 throw new GitHubApiException(
                         0, "GitHub API returned null created_at for %s#%d".formatted(repositoryName, pullNumber));
             }
-            GHIssueState state = pr.getState();
+            GHIssueState state;
+            try {
+                state = pr.getState();
+            } catch (RuntimeException e) {
+                throw new GitHubApiException(
+                        0, "GitHub API returned null state for %s#%d".formatted(repositoryName, pullNumber), e);
+            }
             if (state == null) {
                 throw new GitHubApiException(
                         0, "GitHub API returned null state for %s#%d".formatted(repositoryName, pullNumber));
@@ -33,7 +38,7 @@ public final class Hub4jGitHubClient implements GitHubClient {
                     repositoryName,
                     pullNumber,
                     createdAt.toInstant(),
-                    state.name().toLowerCase(Locale.ROOT));
+                    state == GHIssueState.OPEN ? GitHubPullRequest.PrState.OPEN : GitHubPullRequest.PrState.CLOSED);
         } catch (IllegalArgumentException e) {
             throw new GitHubApiException(
                     0, "Invalid repository name '%s': %s".formatted(repositoryName, e.getMessage()), e);

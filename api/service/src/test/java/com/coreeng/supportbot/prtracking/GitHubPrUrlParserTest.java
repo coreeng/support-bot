@@ -92,4 +92,23 @@ class GitHubPrUrlParserTest {
                 .isEmpty();
         assertThat(parser.parse("https://github.com/my-org/onboarding-repo")).isEmpty();
     }
+
+    @Test
+    void normalizesMixedCaseRepoFromUrl() {
+        // when
+        List<DetectedPr> result = parser.parse("https://github.com/My-Org/Onboarding-Repo/pull/42");
+
+        // then
+        assertThat(result).containsExactly(new DetectedPr("my-org/onboarding-repo", 42));
+    }
+
+    @Test
+    void ignoresOverflowPrNumberAndContinuesParsing() {
+        // when
+        List<DetectedPr> result = parser.parse("https://github.com/my-org/onboarding-repo/pull/99999999999999999999 "
+                + "https://github.com/my-org/another-repo/pull/9");
+
+        // then
+        assertThat(result).containsExactly(new DetectedPr("my-org/another-repo", 9));
+    }
 }

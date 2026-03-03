@@ -72,8 +72,17 @@ public class JdbcEscalationRepository implements EscalationRepository {
                 .returning(ESCALATION.ID)
                 .fetchOne(ESCALATION.ID);
         if (id == null) {
-            log.atWarn().addArgument(escalation::threadTs).log("Couldn't insert escalation with threadTs({})");
-            return escalation;
+            return dsl.select(getSelectFields())
+                    .from(ESCALATION)
+                    .where(ESCALATION
+                            .TICKET_ID
+                            .eq(escalation.ticketId().id())
+                            .and(ESCALATION.TEAM.eq(escalation.team()))
+                            .and(ESCALATION.STATUS.eq(com.coreeng.supportbot.dbschema.enums.EscalationStatus.opened)))
+                    .limit(1)
+                    .fetchOptional(this::buildEscalationFromRow)
+                    .map(this::populateEscalation)
+                    .orElse(null);
         }
 
         dsl.insertInto(ESCALATION_TO_TAG, ESCALATION_TO_TAG.ESCALATION_ID, ESCALATION_TO_TAG.TAG_CODE)

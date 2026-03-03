@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -168,6 +169,23 @@ class PrTrackingConfigValidationTest {
         assertThatCode(() -> new PrTrackingProps(
                         false, "", null, null, null, List.of(badRepo), PrTrackingProps.GitHub.defaultTokenModeConfig()))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void normalizesRepositoryNamesToLowerCase() {
+        // given
+        PrTrackingProps.Repository mixedCase =
+                new PrTrackingProps.Repository("My-Org/My-Repo", "wow", Duration.ofDays(2));
+
+        // when
+        PrTrackingProps props = new PrTrackingProps(
+                true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(mixedCase), validTokenGithub());
+
+        // then
+        assertThat(props.repositories())
+                .singleElement()
+                .extracting(PrTrackingProps.Repository::name)
+                .isEqualTo("my-org/my-repo");
     }
 
     private static PrTrackingProps.Repository validRepo() {
