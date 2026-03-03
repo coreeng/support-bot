@@ -261,9 +261,7 @@ class AnalysisServiceTest {
     void runAsyncAnalysis_analyzesThreadsAndPersists() {
         // given
         when(threadsAwaitingAnalysisService.find(7, "test-prompt-v1"))
-                .thenReturn(ImmutableList.of(
-                        new ThreadToAnalyze(1L, "ts1"),
-                        new ThreadToAnalyze(2L, "ts2")));
+                .thenReturn(ImmutableList.of(new ThreadToAnalyze(1L, "ts1"), new ThreadToAnalyze(2L, "ts2")));
         when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts1"), eq(1L), anyString()))
                 .thenReturn(new AnalysisRecord(1, "Bug", "Config", "networking", "Issue 1", null));
         when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts2"), eq(2L), anyString()))
@@ -275,7 +273,8 @@ class AnalysisServiceTest {
         // then — both records upserted with promptId stamped
         ArgumentCaptor<AnalysisRecord> captor = ArgumentCaptor.forClass(AnalysisRecord.class);
         verify(analysisRepository, times(2)).upsert(captor.capture());
-        assertThat(captor.getAllValues()).allSatisfy(r -> assertThat(r.promptId()).isEqualTo("test-prompt-v1"));
+        assertThat(captor.getAllValues())
+                .allSatisfy(r -> assertThat(r.promptId()).isEqualTo("test-prompt-v1"));
         assertThat(captor.getAllValues().get(0).ticketId()).isEqualTo(1);
         assertThat(captor.getAllValues().get(1).ticketId()).isEqualTo(2);
 
@@ -294,9 +293,7 @@ class AnalysisServiceTest {
     void runAsyncAnalysis_skipsInvalidRecords() {
         // given — first thread returns null (LLM failure), second returns valid record
         when(threadsAwaitingAnalysisService.find(7, "test-prompt-v1"))
-                .thenReturn(ImmutableList.of(
-                        new ThreadToAnalyze(1L, "ts1"),
-                        new ThreadToAnalyze(2L, "ts2")));
+                .thenReturn(ImmutableList.of(new ThreadToAnalyze(1L, "ts1"), new ThreadToAnalyze(2L, "ts2")));
         when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts1"), eq(1L), anyString()))
                 .thenReturn(null);
         when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts2"), eq(2L), anyString()))

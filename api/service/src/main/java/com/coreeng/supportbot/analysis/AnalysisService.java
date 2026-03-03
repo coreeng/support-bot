@@ -168,6 +168,10 @@ public class AnalysisService {
                     AnalysisRecord record = llmAnalysisService.analyzeThread(
                             slackTicketsProps.channelId(), thread.threadTs(), thread.ticketId(), prompt);
 
+                    if (record == null || !record.isValid()) {
+                        log.warn("Skipping invalid analysis result for ticket {}", thread.ticketId());
+                    }
+
                     if (record != null && record.isValid()) {
                         // Add prompt ID to record
                         AnalysisRecord recordWithPromptId = new AnalysisRecord(
@@ -190,6 +194,10 @@ public class AnalysisService {
                     // Rate limiting delay to avoid hitting LLM API limits
                     Thread.sleep(analysisProps.vertex().requestDelay().toMillis());
 
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.warn("Analysis interrupted at ticket {}", thread.ticketId());
+                    break;
                 } catch (Exception e) {
                     log.error("Failed to analyze thread for ticket {}: {}", thread.ticketId(), e.getMessage());
                     // Continue with next thread
