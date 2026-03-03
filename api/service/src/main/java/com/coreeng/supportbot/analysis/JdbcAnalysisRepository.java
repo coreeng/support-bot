@@ -36,15 +36,21 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                     a.category,
                     tc.query_count,
                     a.summary,
+                    q.channel_id,
+                    q.ts as query_ts,
                     ROW_NUMBER() OVER (PARTITION BY a.category ORDER BY a.created_at DESC) as rn
                 FROM analysis a
                 INNER JOIN top_categories tc ON a.category = tc.category
+                INNER JOIN ticket t ON a.ticket_id = t.id
+                INNER JOIN query q ON t.query_id = q.id
                 WHERE a.driver = 'Knowledge Gap'
             )
             SELECT
                 category as dimension,
                 query_count,
-                summary
+                summary,
+                channel_id,
+                query_ts
             FROM ranked_summaries
             WHERE rn <= 5
             ORDER BY query_count DESC, dimension, rn
@@ -54,7 +60,9 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                 .fetch(r -> new DimensionSummary(
                         r.get("dimension", String.class),
                         r.get("query_count", Long.class),
-                        r.get("summary", String.class)));
+                        r.get("summary", String.class),
+                        r.get("channel_id", String.class),
+                        r.get("query_ts", String.class)));
     }
 
     @Override
@@ -72,14 +80,20 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                     a.driver,
                     td.query_count,
                     a.summary,
+                    q.channel_id,
+                    q.ts as query_ts,
                     ROW_NUMBER() OVER (PARTITION BY a.driver ORDER BY a.created_at DESC) as rn
                 FROM analysis a
                 INNER JOIN top_drivers td ON a.driver = td.driver
+                INNER JOIN ticket t ON a.ticket_id = t.id
+                INNER JOIN query q ON t.query_id = q.id
             )
             SELECT
                 driver as dimension,
                 query_count,
-                summary
+                summary,
+                channel_id,
+                query_ts
             FROM ranked_summaries
             WHERE rn <= 5
             ORDER BY query_count DESC, dimension, rn
@@ -89,7 +103,9 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                 .fetch(r -> new DimensionSummary(
                         r.get("dimension", String.class),
                         r.get("query_count", Long.class),
-                        r.get("summary", String.class)));
+                        r.get("summary", String.class),
+                        r.get("channel_id", String.class),
+                        r.get("query_ts", String.class)));
     }
 
     @Override
