@@ -4,6 +4,7 @@ import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.AnalysisProps;
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.SummaryDataProps;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
