@@ -50,10 +50,11 @@ class SummaryDataControllerTest {
     @BeforeEach
     void setUp() {
         slackTicketsProps = new SlackTicketsProps("C123", "eyes", "eyes", "white_check_mark", "sos");
-        analysisProps = new AnalysisProps(
-                new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
-                new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip"),
-                new AnalysisProps.Prompt(true, "", ""));
+        AnalysisProps.Vertex vertex =
+                new AnalysisProps.Vertex("test-project", "europe-west2", "gemini-2.5-flash", Duration.ofMillis(100));
+        AnalysisProps.Bundle bundle = new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip");
+        AnalysisProps.Prompt prompt = new AnalysisProps.Prompt(true, "", "");
+        analysisProps = new AnalysisProps(vertex, bundle, prompt);
         objectMapper = new ObjectMapper();
         controller = new SummaryDataController(
                 threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
