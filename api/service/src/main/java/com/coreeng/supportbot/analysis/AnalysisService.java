@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.event.EventListener;
@@ -44,6 +45,7 @@ import org.springframework.stereotype.Service;
  * {@link AnalysisProps}.
  */
 @Service
+@ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
 @Slf4j
 public class AnalysisService {
 

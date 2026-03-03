@@ -7,11 +7,13 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/analysis")
+@ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class AnalysisController {

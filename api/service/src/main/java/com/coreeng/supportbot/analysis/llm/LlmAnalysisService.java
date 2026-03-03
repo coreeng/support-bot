@@ -7,6 +7,7 @@ import dev.langchain4j.model.chat.ChatLanguageModel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Service;
  * </pre>
  */
 @Service
+@ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class LlmAnalysisService {
