@@ -150,9 +150,9 @@ public class AnalysisService {
      */
     @Async("analysisTaskExecutor")
     public void runAsyncAnalysis(int days) {
-        String promptId = loadPromptId();
 
         try {
+            String promptId = loadPromptId();
             // Find threads that need analysis (no analysis record with this prompt ID)
             ImmutableList<ThreadToAnalyze> threads = threadsAwaitingAnalysisService.find(days, promptId);
 

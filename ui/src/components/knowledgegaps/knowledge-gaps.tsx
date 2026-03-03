@@ -519,7 +519,9 @@ export default function KnowledgeGapsPage() {
                             {isAnalysisEnabled && (analysisStatus?.running || showCompletedStatus) && (
                                 <div className={`border rounded-xl px-4 py-2 text-sm ${
                                     showCompletedStatus
-                                        ? 'bg-green-50 border-green-200 text-green-800'
+                                        ? (analysisStatus?.error
+                                            ? 'bg-red-50 border-red-200 text-red-800'
+                                            : 'bg-green-50 border-green-200 text-green-800')
                                         : 'bg-blue-50 border-blue-200 text-blue-800'
                                 }`}>
                                     <div className="flex items-center gap-2">
