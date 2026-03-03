@@ -118,6 +118,9 @@ pr-review-tracking:
   #   - name: my-org/my-repo
   #     owning-team: <team-code from enums.escalation-teams>
   #     sla: PT48H
+  #     tenant-path-globs:
+  #       - tenants/**/*
+  #       - onboarding/**/*
   github:
     api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
     auth-mode: ${GITHUB_AUTH_MODE:token} # token | app
