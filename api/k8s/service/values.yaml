@@ -102,6 +102,24 @@ auth:
   allowedDomains: []
   allowedEmails: []
 
+# Optional typed Helm config for pr-review-tracking.
+# This block is rendered into application.yaml only when enabled=true.
+# Defaults to disabled so existing raw configMap.config behavior remains unchanged.
+prReviewTracking:
+  enabled: false
+# Example:
+# prReviewTracking:
+#   enabled: true
+#   pollCron: "0 0 9-18 * * 1-5"
+#   prEmoji: "pr"
+#   tags:
+#     - "pull-request"
+#   impact: "prReview"
+#   repositories:
+#     - name: "coreeng/core-platform-environment"
+#       owningTeam: "infra-integration"
+#       sla: "PT48H"
+
 # Environment variables
 env:
   - name: DB_URL

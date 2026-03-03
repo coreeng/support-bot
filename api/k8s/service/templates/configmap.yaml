@@ -12,7 +12,7 @@ metadata:
 data:
 #trivy:ignore:AVD-KSV-0109 ConfigMap contains placeholder refs; real secrets are provided via K8s Secrets
   application.yaml: |
-    {{- toYaml .Values.configMap.config | nindent 4 }}
+    {{- toYaml (.Values.configMap.config | default dict) | nindent 4 }}
     {{- with .Values.sanitisation.patterns }}
     summary-data.sanitisation.patterns:
     {{- range . }}
@@ -36,5 +36,30 @@ data:
     {{- range . }}
       - {{ . | quote }}
     {{- end }}
+    {{- end }}
+    {{- if .Values.prReviewTracking.enabled }}
+    pr-review-tracking:
+      enabled: true
+      poll-cron: {{ .Values.prReviewTracking.pollCron | default "0 0 9-18 * * 1-5" | quote }}
+      pr-emoji: {{ .Values.prReviewTracking.prEmoji | default "pr" | quote }}
+      {{- if .Values.prReviewTracking.tags }}
+      tags:
+      {{- range .Values.prReviewTracking.tags }}
+        - {{ . | quote }}
+      {{- end }}
+      {{- else }}
+      tags: [ ]
+      {{- end }}
+      impact: {{ .Values.prReviewTracking.impact | default "" | quote }}
+      {{- if .Values.prReviewTracking.repositories }}
+      repositories:
+      {{- range .Values.prReviewTracking.repositories }}
+        - name: {{ .name | quote }}
+          owning-team: {{ .owningTeam | quote }}
+          sla: {{ .sla | quote }}
+      {{- end }}
+      {{- else }}
+      repositories: [ ]
+      {{- end }}
     {{- end }}
 {{- end }}
