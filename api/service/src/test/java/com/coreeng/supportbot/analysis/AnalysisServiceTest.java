@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.coreeng.supportbot.analysis.AnalysisRepository.AnalysisRecord;
 import com.coreeng.supportbot.analysis.AnalysisService.AnalysisStatus;
+import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadToAnalyze;
 import com.coreeng.supportbot.analysis.llm.LlmAnalysisService;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository.AsyncJob;
@@ -13,6 +15,7 @@ import com.coreeng.supportbot.config.AnalysisProps.Bundle;
 import com.coreeng.supportbot.config.AnalysisProps.Prompt;
 import com.coreeng.supportbot.config.AnalysisProps.Vertex;
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +25,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
@@ -249,5 +253,93 @@ class AnalysisServiceTest {
         verifyNoInteractions(threadsAwaitingAnalysisService);
         verifyNoInteractions(llmAnalysisService);
         verifyNoInteractions(analysisRepository);
+    }
+
+    // --- runAsyncAnalysis tests ---
+
+    @Test
+    void runAsyncAnalysis_analyzesThreadsAndPersists() {
+        // given
+        when(threadsAwaitingAnalysisService.find(7, "test-prompt-v1"))
+                .thenReturn(ImmutableList.of(
+                        new ThreadToAnalyze(1L, "ts1"),
+                        new ThreadToAnalyze(2L, "ts2")));
+        when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts1"), eq(1L), anyString()))
+                .thenReturn(new AnalysisRecord(1, "Bug", "Config", "networking", "Issue 1", null));
+        when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts2"), eq(2L), anyString()))
+                .thenReturn(new AnalysisRecord(2, "Knowledge Gap", "Monitoring", "compute", "Issue 2", null));
+
+        // when
+        service.runAsyncAnalysis(7);
+
+        // then — both records upserted with promptId stamped
+        ArgumentCaptor<AnalysisRecord> captor = ArgumentCaptor.forClass(AnalysisRecord.class);
+        verify(analysisRepository, times(2)).upsert(captor.capture());
+        assertThat(captor.getAllValues()).allSatisfy(r -> assertThat(r.promptId()).isEqualTo("test-prompt-v1"));
+        assertThat(captor.getAllValues().get(0).ticketId()).isEqualTo(1);
+        assertThat(captor.getAllValues().get(1).ticketId()).isEqualTo(2);
+
+        // job cleaned up
+        verify(asyncJobRepository).deleteJob("analysis");
+
+        // final status
+        AnalysisStatus status = service.getStatus();
+        assertThat(status.running()).isFalse();
+        assertThat(status.analyzedCount()).isEqualTo(2);
+        assertThat(status.exportedCount()).isEqualTo(2);
+        assertThat(status.error()).isNull();
+    }
+
+    @Test
+    void runAsyncAnalysis_skipsInvalidRecords() {
+        // given — first thread returns null (LLM failure), second returns valid record
+        when(threadsAwaitingAnalysisService.find(7, "test-prompt-v1"))
+                .thenReturn(ImmutableList.of(
+                        new ThreadToAnalyze(1L, "ts1"),
+                        new ThreadToAnalyze(2L, "ts2")));
+        when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts1"), eq(1L), anyString()))
+                .thenReturn(null);
+        when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts2"), eq(2L), anyString()))
+                .thenReturn(new AnalysisRecord(2, "Bug", "Config", "networking", "Issue", null));
+
+        // when
+        service.runAsyncAnalysis(7);
+
+        // then — only 1 upsert (the valid record)
+        verify(analysisRepository, times(1)).upsert(any(AnalysisRecord.class));
+        verify(asyncJobRepository).deleteJob("analysis");
+
+        AnalysisStatus status = service.getStatus();
+        assertThat(status.analyzedCount()).isEqualTo(1);
+        assertThat(status.exportedCount()).isEqualTo(2);
+    }
+
+    @Test
+    void runAsyncAnalysis_setsErrorOnPromptLoadFailure() throws IOException {
+        // given — recreate service with nonexistent prompt ID file
+        Files.deleteIfExists(tempPromptIdFile);
+        Path badPath = Path.of("/nonexistent/prompt-id.yaml");
+        AnalysisProps badProps = new AnalysisProps(
+                analysisProps.vertex(),
+                analysisProps.bundle(),
+                new Prompt(true, tempPromptFile.toString(), badPath.toString()));
+        AnalysisService badService = new AnalysisService(
+                asyncJobRepository,
+                threadsAwaitingAnalysisService,
+                llmAnalysisService,
+                analysisRepository,
+                badProps,
+                slackTicketsProps,
+                applicationContext);
+
+        // when
+        badService.runAsyncAnalysis(7);
+
+        // then — error status set, job still cleaned up
+        AnalysisStatus status = badService.getStatus();
+        assertThat(status.running()).isFalse();
+        assertThat(status.error()).isNotNull();
+        verify(asyncJobRepository).deleteJob("analysis");
+        verifyNoInteractions(llmAnalysisService);
     }
 }

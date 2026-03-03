@@ -110,3 +110,12 @@ platform-integration:
           groupRef: group-ref-infra-integration
         - name: connected-app
           groupRef: group-ref-connected-app
+
+analysis:
+  vertex:
+    project-id: "false"
+    request-delay: 10ms
+  prompt:
+    enabled: true
+    file: ${ANALYSIS_PROMPT_FILE:service/analysis/prompt.md}
+    id-file: ${ANALYSIS_PROMPT_ID_FILE:service/analysis/prompt-id.yaml}

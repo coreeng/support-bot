@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
 public class LlmConfig {
 
     @Bean
-    @ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
+    @ConditionalOnProperty(name = "analysis.vertex.project-id")
     public ChatLanguageModel chatLanguageModel(AnalysisProps analysisProps) {
         log.info(
                 "Configuring Vertex AI Gemini model: project={}, location={}, model={}",
