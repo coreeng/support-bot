@@ -29,8 +29,9 @@ class AnalysisResultsServiceTest {
     void getKnowledgeGapCategoriesWithSummaries_shouldReturnRepositoryResults() {
         // given
         List<DimensionSummary> expectedSummaries = List.of(
-                new DimensionSummary("Monitoring & Troubleshooting", 25L, "Example summary 1"),
-                new DimensionSummary("Configuration", 15L, "Example summary 2"));
+                new DimensionSummary(
+                        "Monitoring & Troubleshooting", 25L, "Example summary 1", "C001", "1740988800.000001"),
+                new DimensionSummary("Configuration", 15L, "Example summary 2", "C002", "1740988800.000002"));
 
         when(analysisRepository.getKnowledgeGapCategoriesWithSummaries()).thenReturn(expectedSummaries);
 
@@ -46,9 +47,9 @@ class AnalysisResultsServiceTest {
     void getDriversWithSummaries_shouldReturnRepositoryResults() {
         // given
         List<DimensionSummary> expectedSummaries = List.of(
-                new DimensionSummary("Knowledge Gap", 50L, "Example summary 1"),
-                new DimensionSummary("Bug", 30L, "Example summary 2"),
-                new DimensionSummary("Feature Request", 20L, "Example summary 3"));
+                new DimensionSummary("Knowledge Gap", 50L, "Example summary 1", "C003", "1740988800.000003"),
+                new DimensionSummary("Bug", 30L, "Example summary 2", "C004", "1740988800.000004"),
+                new DimensionSummary("Feature Request", 20L, "Example summary 3", "C005", "1740988800.000005"));
 
         when(analysisRepository.getDriversWithSummaries()).thenReturn(expectedSummaries);
 

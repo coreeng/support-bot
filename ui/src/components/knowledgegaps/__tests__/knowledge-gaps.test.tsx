@@ -1062,7 +1062,7 @@ describe('KnowledgeGapsPage', () => {
 
             // Verify the button is not present
             expect(screen.queryByText('Start Analysis')).not.toBeInTheDocument()
-            // The days selector should still be present (used for Export Data)
+            // The days selector should still be present (used for Export)
             expect(screen.getByDisplayValue('Week')).toBeInTheDocument()
         })
 
@@ -1106,7 +1106,7 @@ describe('KnowledgeGapsPage', () => {
             expect(screen.queryByText(/Analysis in progress/)).not.toBeInTheDocument()
         })
 
-        it('hides Export Data, Get Analysis Bundle, and Import Data buttons when feature is enabled', async () => {
+        it('hides Export, Analysis Bundle, and Import buttons when feature is enabled', async () => {
             mockUseAnalysis.mockReturnValue({
                 data: mockAnalysisData,
                 isLoading: false,
@@ -1143,12 +1143,12 @@ describe('KnowledgeGapsPage', () => {
             await screen.findByText('Support Area Summary')
 
             // Verify all three buttons are not present
-            expect(screen.queryByText('Export Data')).not.toBeInTheDocument()
-            expect(screen.queryByText('Get Analysis Bundle')).not.toBeInTheDocument()
-            expect(screen.queryByText('Import Data')).not.toBeInTheDocument()
+            expect(screen.queryByText('Export')).not.toBeInTheDocument()
+            expect(screen.queryByText('Analysis Bundle')).not.toBeInTheDocument()
+            expect(screen.queryByText('Import')).not.toBeInTheDocument()
         })
 
-        it('shows Export Data, Get Analysis Bundle, and Import Data buttons when feature is disabled', async () => {
+        it('shows Export, Analysis Bundle, and Import buttons when feature is disabled', async () => {
             mockUseAnalysis.mockReturnValue({
                 data: mockAnalysisData,
                 isLoading: false,
@@ -1185,9 +1185,9 @@ describe('KnowledgeGapsPage', () => {
             await screen.findByText('Support Area Summary')
 
             // Verify all three buttons are present and enabled
-            const exportButton = screen.getByText('Export Data')
-            const bundleButton = screen.getByText('Get Analysis Bundle')
-            const importButton = screen.getByText('Import Data')
+            const exportButton = screen.getByText('Export')
+            const bundleButton = screen.getByText('Analysis Bundle')
+            const importButton = screen.getByText('Import')
 
             expect(exportButton).toBeInTheDocument()
             expect(exportButton).not.toBeDisabled()
