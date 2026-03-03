@@ -1,6 +1,8 @@
 package com.coreeng.supportbot.analysis.rest;
 
 import com.coreeng.supportbot.analysis.AnalysisService;
+import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.knowledgegaps.rest.KnowledgeGapsStatusUI;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +17,13 @@ import org.springframework.web.bind.annotation.*;
 public class AnalysisController {
 
     private final AnalysisService analysisService;
+
+    private final AnalysisProps analysisProps;
+
+    @GetMapping("/enabled")
+    public ResponseEntity<KnowledgeGapsStatusUI> getKnowledgeGapsStatus() {
+        return ResponseEntity.ok(new KnowledgeGapsStatusUI(analysisProps.prompt().enabled()));
+    }
 
     @PostMapping("/run")
     public ResponseEntity<Void> runAnalysis(@RequestParam(defaultValue = "7") int days) {

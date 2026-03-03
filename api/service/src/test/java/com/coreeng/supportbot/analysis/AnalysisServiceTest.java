@@ -9,6 +9,7 @@ import com.coreeng.supportbot.analysis.llm.LlmAnalysisService;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository.AsyncJob;
 import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.AnalysisProps.Bundle;
 import com.coreeng.supportbot.config.AnalysisProps.Prompt;
 import com.coreeng.supportbot.config.AnalysisProps.Vertex;
 import com.coreeng.supportbot.config.SlackTicketsProps;
@@ -59,9 +60,10 @@ class AnalysisServiceTest {
         Files.writeString(tempPromptIdFile, "id: test-prompt-v1");
 
         Vertex vertex = new Vertex("test-project", "europe-west2", "gemini-2.5-flash", Duration.ofMillis(100));
+        Bundle bundle = new Bundle("classpath:placeholder-analysis-bundle.zip");
         Prompt prompt =
-                new Prompt(tempPromptFile.toString(), tempPromptIdFile.toString(), ""); // prompt is loaded from file
-        analysisProps = new AnalysisProps(vertex, prompt);
+                new Prompt(true, tempPromptFile.toString(), tempPromptIdFile.toString()); // prompt is loaded from file
+        analysisProps = new AnalysisProps(vertex, bundle, prompt);
         slackTicketsProps = new SlackTicketsProps("C123456", "eyes", "ticket", "white_check_mark", "rocket");
 
         service = new AnalysisService(

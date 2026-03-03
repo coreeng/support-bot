@@ -36,6 +36,7 @@ export default function KnowledgeGapsPage() {
     const [showCompletedStatus, setShowCompletedStatus] = useState(false)
     const [completedMessage, setCompletedMessage] = useState<string>('')
     const isCompletedRef = useRef(false)
+    const [isAnalysisEnabled, setIsAnalysisEnabled] = useState(false)
 
     // Fetch analysis status
     const fetchAnalysisStatus = async () => {
@@ -100,6 +101,23 @@ export default function KnowledgeGapsPage() {
             pollingIntervalRef.current = null
         }
     }
+
+    // Fetch analysis enabled status
+    useEffect(() => {
+        const fetchAnalysisEnabled = async () => {
+            try {
+                const response = await fetch('/api/analysis/enabled')
+                if (response.ok) {
+                    const data = await response.json()
+                    setIsAnalysisEnabled(data.enabled)
+                }
+            } catch (error) {
+                console.error('Error fetching analysis enabled status:', error)
+            }
+        }
+
+        fetchAnalysisEnabled()
+    }, [])
 
     // Check status on mount and when page becomes visible
     useEffect(() => {
@@ -444,23 +462,27 @@ export default function KnowledgeGapsPage() {
                     {isSupportEngineer && (
                         <div className="flex flex-col items-end gap-3">
                             <div className="flex items-center gap-2">
-                                <select
-                                    value={selectedDays}
-                                    onChange={(e) => setSelectedDays(Number(e.target.value))}
-                                    className="h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                >
-                                    <option value={7}>Week</option>
-                                    <option value={31}>Month</option>
-                                    <option value={92}>Quarter</option>
-                                </select>
-                                <button
-                                    onClick={handleStartAnalysis}
-                                    disabled={analysisStatus?.running || isStartingAnalysis}
-                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                >
-                                    <Play className="w-4 h-4" />
-                                    {isStartingAnalysis ? 'Starting...' : 'Start Analysis'}
-                                </button>
+                                {isAnalysisEnabled && (
+                                    <>
+                                        <select
+                                            value={selectedDays}
+                                            onChange={(e) => setSelectedDays(Number(e.target.value))}
+                                            className="h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        >
+                                            <option value={7}>Week</option>
+                                            <option value={31}>Month</option>
+                                            <option value={92}>Quarter</option>
+                                        </select>
+                                        <button
+                                            onClick={handleStartAnalysis}
+                                            disabled={analysisStatus?.running || isStartingAnalysis}
+                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                        >
+                                            <Play className="w-4 h-4" />
+                                            {isStartingAnalysis ? 'Starting...' : 'Start Analysis'}
+                                        </button>
+                                    </>
+                                )}
                                 <input
                                     ref={fileInputRef}
                                     type="file"
@@ -492,7 +514,7 @@ export default function KnowledgeGapsPage() {
                                     {isUploading ? 'Uploading...' : 'Import'}
                                 </button>
                             </div>
-                            {(analysisStatus?.running || showCompletedStatus) && (
+                            {isAnalysisEnabled && (analysisStatus?.running || showCompletedStatus) && (
                                 <div className={`border rounded-xl px-4 py-2 text-sm ${
                                     showCompletedStatus
                                         ? 'bg-green-50 border-green-200 text-green-800'

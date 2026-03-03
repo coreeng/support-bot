@@ -56,7 +56,7 @@ public class SecurityConfig {
                         .requestMatchers("/summary-data/results")
                         .hasAnyRole("LEADERSHIP", "SUPPORT_ENGINEER")
                         // Analysis endpoints restricted to support engineers
-                        .requestMatchers("/analysis/**")
+                        .requestMatchers("/analysis/status", "/analysis/run")
                         .hasAnyRole("SUPPORT_ENGINEER")
                         // All other endpoints require authentication
                         .anyRequest()

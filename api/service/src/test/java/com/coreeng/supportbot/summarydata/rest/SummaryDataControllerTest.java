@@ -6,14 +6,16 @@ import static org.mockito.Mockito.*;
 import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.SlackTicketsProps;
-import com.coreeng.supportbot.config.SummaryDataProps;
-import com.coreeng.supportbot.config.SummaryDataProps.SanitisationProperties;
+import com.coreeng.supportbot.config.AnalysisProps;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
@@ -21,9 +23,11 @@ import java.util.zip.ZipInputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.Resource;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -39,18 +43,20 @@ class SummaryDataControllerTest {
     private AnalysisResultsService analysisResultsService;
 
     private SlackTicketsProps slackTicketsProps;
-    private SummaryDataProps summaryDataProps;
+    private AnalysisProps analysisProps;
     private ObjectMapper objectMapper;
     private SummaryDataController controller;
 
     @BeforeEach
     void setUp() {
         slackTicketsProps = new SlackTicketsProps("C123", "eyes", "eyes", "white_check_mark", "sos");
-        summaryDataProps = new SummaryDataProps(
-                "classpath:placeholder-analysis-bundle.zip", new SanitisationProperties(List.of(), List.of()));
+        analysisProps = new AnalysisProps(
+                new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
+                new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip"),
+                new AnalysisProps.Prompt(true, "", ""));
         objectMapper = new ObjectMapper();
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, summaryDataProps, analysisResultsService, objectMapper);
+                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
     }
 
     // --- Export tests ---
@@ -230,5 +236,155 @@ class SummaryDataControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().message()).contains("Database error");
+    }
+
+    // --- Download tests ---
+
+    @Test
+    void download_shouldReturnClasspathResource() {
+        // given - using default classpath resource from setUp
+
+        // when
+        ResponseEntity<?> response = controller.download();
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getHeaders().getFirst("Content-Disposition"))
+                .isEqualTo("attachment; filename=\"analysis.zip\"");
+        assertThat(response.getBody()).isInstanceOf(Resource.class);
+    }
+
+    @Test
+    void download_shouldReturnNotFound_whenClasspathResourceDoesNotExist() {
+        // given
+        analysisProps = new AnalysisProps(
+                new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
+                new AnalysisProps.Bundle("classpath:nonexistent.zip"),
+                new AnalysisProps.Prompt(true, "", ""));
+        controller = new SummaryDataController(
+                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+
+        // when
+        ResponseEntity<?> response = controller.download();
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void download_shouldReturnZipFromDirectory(@TempDir Path tempDir) throws IOException {
+        // given - create a directory with test files
+        Files.writeString(tempDir.resolve("file1.txt"), "Content of file 1");
+        Files.writeString(tempDir.resolve("file2.txt"), "Content of file 2");
+        Files.writeString(tempDir.resolve("script.sh"), "#!/bin/bash\necho 'test'");
+
+        analysisProps = new AnalysisProps(
+                new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
+                new AnalysisProps.Bundle(tempDir.toString()),
+                new AnalysisProps.Prompt(true, "", ""));
+        controller = new SummaryDataController(
+                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+
+        // when
+        ResponseEntity<?> response = controller.download();
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getHeaders().getFirst("Content-Disposition"))
+                .isEqualTo("attachment; filename=\"analysis.zip\"");
+        assertThat(response.getBody()).isInstanceOf(byte[].class);
+
+        // Verify zip contents
+        byte[] zipBytes = (byte[]) response.getBody();
+        List<String> fileNames = new ArrayList<>();
+        List<String> fileContents = new ArrayList<>();
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                fileNames.add(entry.getName());
+                fileContents.add(new String(zis.readAllBytes(), StandardCharsets.UTF_8));
+                zis.closeEntry();
+            }
+        }
+
+        assertThat(fileNames).containsExactlyInAnyOrder("file1.txt", "file2.txt", "script.sh");
+        assertThat(fileContents)
+                .containsExactlyInAnyOrder("Content of file 1", "Content of file 2", "#!/bin/bash\necho 'test'");
+    }
+
+    @Test
+    void download_shouldReturnEmptyZip_whenDirectoryIsEmpty(@TempDir Path tempDir) throws IOException {
+        // given - empty directory
+        analysisProps = new AnalysisProps(
+                new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
+                new AnalysisProps.Bundle(tempDir.toString()),
+                new AnalysisProps.Prompt(true, "", ""));
+        controller = new SummaryDataController(
+                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+
+        // when
+        ResponseEntity<?> response = controller.download();
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isInstanceOf(byte[].class);
+
+        // Verify zip is empty
+        byte[] zipBytes = (byte[]) response.getBody();
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+            assertThat(zis.getNextEntry()).isNull();
+        }
+    }
+
+    @Test
+    void download_shouldSkipSubdirectories(@TempDir Path tempDir) throws IOException {
+        // given - directory with files and subdirectories
+        Files.writeString(tempDir.resolve("file1.txt"), "Content 1");
+        Path subDir = tempDir.resolve("subdir");
+        Files.createDirectory(subDir);
+        Files.writeString(subDir.resolve("file2.txt"), "Content 2");
+
+        analysisProps = new AnalysisProps(
+                new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
+                new AnalysisProps.Bundle(tempDir.toString()),
+                new AnalysisProps.Prompt(true, "", ""));
+        controller = new SummaryDataController(
+                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+
+        // when
+        ResponseEntity<?> response = controller.download();
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // Verify only top-level files are included
+        byte[] zipBytes = (byte[]) response.getBody();
+        List<String> fileNames = new ArrayList<>();
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                fileNames.add(entry.getName());
+                zis.closeEntry();
+            }
+        }
+
+        assertThat(fileNames).containsExactly("file1.txt");
+    }
+
+    @Test
+    void download_shouldReturnNotFound_whenDirectoryDoesNotExist() {
+        // given
+        analysisProps = new AnalysisProps(
+                new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
+                new AnalysisProps.Bundle("/nonexistent/directory"),
+                new AnalysisProps.Prompt(true, "", ""));
+        controller = new SummaryDataController(
+                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+
+        // when
+        ResponseEntity<?> response = controller.download();
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 }
