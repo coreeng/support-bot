@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -107,6 +108,46 @@ class PrTrackingConfigValidationTest {
                         true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(zeroSla), validTokenGithub()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("positive duration");
+    }
+
+    @Test
+    void rejectsBlankTenantPathGlobWhenEnabled() {
+        // given
+        PrTrackingRepositoryProps repoWithBlankTenantPathGlob =
+                new PrTrackingRepositoryProps("my-org/repo", "wow", Duration.ofDays(2), List.of(" "));
+
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(repoWithBlankTenantPathGlob),
+                        validTokenGithub()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("tenant-path-globs[] must not be blank");
+    }
+
+    @Test
+    void deduplicatesDuplicateTenantPathGlobsIgnoringCaseWhenEnabled() {
+        // given
+        PrTrackingRepositoryProps repoWithDuplicateTenantPathGlobs = new PrTrackingRepositoryProps(
+                "my-org/repo", "wow", Duration.ofDays(2), List.of("tenants/**/*", "TENANTS/**/*"));
+
+        // when
+        PrTrackingProps props = new PrTrackingProps(
+                true,
+                "0 0 9-18 * * 1-5",
+                "pr",
+                List.of("tag"),
+                "low",
+                List.of(repoWithDuplicateTenantPathGlobs),
+                validTokenGithub());
+
+        // then
+        assertThat(props.repositories()).hasSize(1);
+        assertThat(props.repositories().get(0).tenantPathGlobs()).containsExactly("tenants/**/*");
     }
 
     @Test

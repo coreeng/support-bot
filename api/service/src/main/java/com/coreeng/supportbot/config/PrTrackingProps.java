@@ -71,12 +71,22 @@ public record PrTrackingProps(
                     || repository.sla().isNegative()) {
                 throw new IllegalArgumentException("pr-review-tracking.repositories[].sla must be a positive duration");
             }
+            validateTenantPathGlobs(repository);
 
             String normalizedName = repository.name().toLowerCase(Locale.ROOT);
 
             if (!names.add(normalizedName)) {
                 throw new IllegalArgumentException(
                         "pr-review-tracking.repositories[].name contains duplicates: " + repository.name());
+            }
+        }
+    }
+
+    private static void validateTenantPathGlobs(PrTrackingRepositoryProps repository) {
+        for (String tenantPathGlob : repository.tenantPathGlobs()) {
+            if (isBlank(tenantPathGlob)) {
+                throw new IllegalArgumentException(
+                        "pr-review-tracking.repositories[].tenant-path-globs[] must not be blank");
             }
         }
     }
