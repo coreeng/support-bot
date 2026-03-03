@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import StatsPage from '../stats';
 import * as hooks from '../../../lib/hooks';
@@ -188,7 +188,7 @@ describe('StatsPage (Home Dashboard)', () => {
             expect(screen.getByText(/Open Tickets/i)).toBeInTheDocument();
         });
 
-        it('should not expose ticket data when user has no effective teams', () => {
+        it('shows explicit no-team-access banner when user has no effective teams', () => {
             mockUseTeamFilter.mockReturnValue({
                 selectedTeam: null,
                 setSelectedTeam: jest.fn(),
@@ -215,17 +215,8 @@ describe('StatsPage (Home Dashboard)', () => {
 
             render(<StatsPage />, { wrapper: Wrapper });
 
-            const totalCard = screen.getByText(/Total Tickets/i).parentElement;
-            expect(totalCard).toBeTruthy();
-            if (totalCard) {
-                expect(within(totalCard).getByText('0')).toBeInTheDocument();
-            }
-
-            const openCard = screen.getByText(/Open Tickets/i).parentElement;
-            expect(openCard).toBeTruthy();
-            if (openCard) {
-                expect(within(openCard).getByText('0')).toBeInTheDocument();
-            }
+            expect(screen.getByText(/No Team Access/i)).toBeInTheDocument();
+            expect(screen.getByText(/dashboard data cannot be displayed/i)).toBeInTheDocument();
         });
 
         it('should show split view for escalation teams', () => {

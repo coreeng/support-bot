@@ -8,6 +8,8 @@ import {TicketImpact} from "@/lib/types";
 import EscalatedToMyTeamWidget from '@/components/escalations/EscalatedToMyTeamWidget'
 import { useAuth } from '@/hooks/useAuth'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
+import { TEAM_SCOPE } from '@/lib/constants'
+import { normalizeTeamKey } from '@/lib/teamUtils'
 
 export default function StatsPage() {
     // Date filter state - default to last week to match other views
@@ -68,10 +70,7 @@ export default function StatsPage() {
     const { data: registryData } = useRegistry()
     const { effectiveTeams, selectedTeam } = useTeamFilter()
     const { actualEscalationTeams } = useAuth()
-    const NO_TEAMS_SCOPE = '__no_teams__'
-    const hasNoTeamScope = effectiveTeams.includes(NO_TEAMS_SCOPE)
-    const normalizeTeamKey = (value?: string | null) =>
-        (value || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
+    const hasNoTeamScope = effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
 
     // Check if viewing as escalation team
     const isViewingAsEscalationTeam = useMemo(() => {
@@ -170,7 +169,6 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }:
             </div>
         </div>
     )
-
     // Render split view for escalation teams
     if (isViewingAsEscalationTeam) {
         return (
@@ -348,6 +346,13 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }:
                     )}
                 </div>
             </div>
+
+            {hasNoTeamScope && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900">
+                    <p className="font-semibold">No Team Access</p>
+                    <p className="text-sm mt-1">You are not assigned to any teams, so dashboard data cannot be displayed.</p>
+                </div>
+            )}
 
             {/* Summary cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

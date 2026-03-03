@@ -1,19 +1,50 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useEscalations, useRegistry, useTenantTeams } from '@/lib/hooks'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { useAuth } from '@/hooks/useAuth'
 import { useNow } from '@/hooks/useNow'
 import EscalatedToMyTeamTable from './EscalatedToMyTeamTable'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
+import { TEAM_SCOPE } from '@/lib/constants'
+import { normalizeTeamKey } from '@/lib/teamUtils'
+
+type SortColumn = 'ticketId' | 'escalatingTeam' | 'escalatedTo' | 'openedAt' | 'resolvedAt' | 'duration'
+
+function SortableHeader({
+    col,
+    label,
+    sortColumn,
+    sortDirection,
+    onSort
+}: {
+    col: SortColumn
+    label: string
+    sortColumn: SortColumn
+    sortDirection: 'asc' | 'desc'
+    onSort: (column: SortColumn) => void
+}) {
+    return (
+        <th
+            className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase cursor-pointer select-none hover:bg-gray-200 transition-colors"
+            onClick={() => onSort(col)}
+        >
+            <span className="flex items-center gap-1">
+                {label}
+                <span className="text-gray-400">
+                    {sortColumn === col ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
+                </span>
+            </span>
+        </th>
+    )
+}
 
 export default function EscalationsPage() {
     const { data: escalationsData, isLoading: isLoadingEscalations, error: errorEscalations } = useEscalations()
     const { data: tenantTeamsData } = useTenantTeams()
     const { data: registryData } = useRegistry()
-    const ALL_TEAMS_FILTER = '__all__'
-    const NO_TEAMS_SCOPE = '__no_teams__'
+    const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS
     const [selectedTeam, setSelectedTeam] = useState<string>('')
     const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'resolved'>('all')
     const [impactFilter, setImpactFilter] = useState<string>('all')
@@ -21,23 +52,23 @@ export default function EscalationsPage() {
     type DateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
     const [dateFilter, setDateFilter] = useState<DateFilter>('lastWeek')
     const [customDateRange, setCustomDateRange] = useState<{ start?: string; end?: string }>({})
-    type SortColumn = 'ticketId' | 'openedAt' | 'resolvedAt' | 'duration'
     const [sortColumn, setSortColumn] = useState<SortColumn>('openedAt')
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
     const [pageIndex, setPageIndex] = useState<number>(0)
     const pageSize = 15
 
     const { hasFullAccess, effectiveTeams, selectedTeam: teamFilterSelectedTeam } = useTeamFilter()
-    const hasNoTeamScope = effectiveTeams.includes(NO_TEAMS_SCOPE)
+    const hasNoTeamScope = effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
     const { actualEscalationTeams } = useAuth()
     const now = useNow()
 
-    // Reset page-level tenant team filter when sidebar "View as" scope changes.
-    // This keeps Escalations aligned to true current scope by default.
-    useEffect(() => {
-        setSelectedTeam('')
-        setPageIndex(0)
-    }, [teamFilterSelectedTeam])
+    // Reset page-level tenant team filter synchronously when sidebar "View as" scope changes.
+    const [prevTeamFilterSelectedTeam, setPrevTeamFilterSelectedTeam] = useState(teamFilterSelectedTeam)
+    if (prevTeamFilterSelectedTeam !== teamFilterSelectedTeam) {
+        setPrevTeamFilterSelectedTeam(teamFilterSelectedTeam)
+        if (selectedTeam !== '') setSelectedTeam('')
+        if (pageIndex !== 0) setPageIndex(0)
+    }
 
     // Check if viewing as an escalation team (when "Escalated to My Team" section is visible)
     const isViewingAsEscalationTeam = useMemo(() => {
@@ -47,8 +78,6 @@ export default function EscalationsPage() {
 
     // --- Formatting helpers ---
     const formatDate = (isoString?: string) => isoString ? new Date(isoString).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '-'
-    const normalizeTeamKey = (value?: string | null) =>
-        (value || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
     const formatDuration = (start?: string, end?: string) => {
         if (!start) return '-'
         const endTime = end ? new Date(end).getTime() : now
@@ -70,7 +99,7 @@ export default function EscalationsPage() {
         const now = new Date()
         const to = now.toISOString().split('T')[0]
         const fromDate = new Date(now)
-        if (dateFilter === 'lastWeek') fromDate.setDate(now.getDate() - 6)
+        if (dateFilter === 'lastWeek') fromDate.setDate(now.getDate() - 7)
         else if (dateFilter === 'last2Weeks') fromDate.setDate(now.getDate() - 13)
         else if (dateFilter === 'lastMonth') fromDate.setMonth(now.getMonth() - 1)
         return { from: fromDate.toISOString().split('T')[0], to }
@@ -129,10 +158,11 @@ export default function EscalationsPage() {
             baseEscalations = baseEscalations.filter(esc => esc.openedAt && new Date(esc.openedAt) <= to)
         }
 
-        // When viewing as escalation team ("Escalated for My Team"), deduplicate by ticketId
-        // to match the home dashboard "Tickets We Own - Escalated" count
-        // Keep the most recent escalation per ticket
-        if (isViewingAsEscalationTeam && !hasFullAccess) {
+        // When viewing as escalation team in default "Current Team Scope", deduplicate by ticketId
+        // to match the home dashboard "Tickets We Own - Escalated" count.
+        // Do not dedupe explicit tenant/all-team overrides: those should show raw escalation rows.
+        const isCurrentScopeView = !selectedTeam
+        if (isViewingAsEscalationTeam && !hasFullAccess && isCurrentScopeView) {
             const ticketMap = new Map<string, typeof baseEscalations[0]>()
             baseEscalations.forEach(esc => {
                 const existing = ticketMap.get(esc.ticketId)
@@ -144,7 +174,7 @@ export default function EscalationsPage() {
         }
 
         return baseEscalations
-    }, [escalationsData, selectedTeam, statusFilter, impactFilter, tagFilter, dateRange, effectiveTeams, hasNoTeamScope, isViewingAsEscalationTeam, hasFullAccess])
+    }, [escalationsData, selectedTeam, statusFilter, impactFilter, tagFilter, dateRange, effectiveTeams, hasNoTeamScope, isViewingAsEscalationTeam, hasFullAccess, ALL_TEAMS_FILTER])
 
     // --- Sorting ---
     const handleSort = (column: SortColumn) => {
@@ -162,6 +192,10 @@ export default function EscalationsPage() {
             let cmp = 0
             if (sortColumn === 'ticketId') {
                 cmp = (a.ticketId || '').localeCompare(b.ticketId || '')
+            } else if (sortColumn === 'escalatingTeam') {
+                cmp = (a.escalatingTeam || '').localeCompare(b.escalatingTeam || '')
+            } else if (sortColumn === 'escalatedTo') {
+                cmp = (a.team?.name || '').localeCompare(b.team?.name || '')
             } else if (sortColumn === 'openedAt') {
                 cmp = (a.openedAt || '').localeCompare(b.openedAt || '')
             } else if (sortColumn === 'resolvedAt') {
@@ -215,6 +249,7 @@ export default function EscalationsPage() {
             ? 'for All Teams'
             : `for ${selectedTeam}`
         : ''
+    const showEscalatedForColumn = hasFullAccess || selectedTeam === ALL_TEAMS_FILTER
 
     return (
         <div className="p-6 space-y-6">
@@ -226,6 +261,13 @@ export default function EscalationsPage() {
                     : `Escalations Dashboard - ${effectiveTeams.join(', ')}`
                 }
             </h1>
+
+            {hasNoTeamScope && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900">
+                    <p className="font-semibold">No Team Access</p>
+                    <p className="text-sm mt-1">You are not assigned to any teams, so escalations cannot be displayed.</p>
+                </div>
+            )}
 
             {isLoadingEscalations && <LoadingSkeleton />}
             {errorEscalations && (
@@ -388,35 +430,54 @@ export default function EscalationsPage() {
                     <table className="min-w-full divide-y">
                         <thead className="bg-gray-100">
                         <tr>
-                            {(() => {
-                                const SortableHeader = ({ col, label }: { col: SortColumn; label: string }) => (
-                                    <th
-                                        className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase cursor-pointer select-none hover:bg-gray-200 transition-colors"
-                                        onClick={() => handleSort(col)}
-                                    >
-                                        <span className="flex items-center gap-1">
-                                            {label}
-                                            <span className="text-gray-400">
-                                                {sortColumn === col ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
-                                            </span>
-                                        </span>
-                                    </th>
-                                )
-                                return (
-                                    <>
-                                        <SortableHeader col="ticketId" label="Ticket ID" />
-                                        {hasFullAccess && <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Escalating Team</th>}
-                                        {hasFullAccess && <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Escalated To</th>}
-                                        <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
-                                        <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Impact</th>
-                                        <SortableHeader col="openedAt" label="Opened" />
-                                        <SortableHeader col="resolvedAt" label="Resolved" />
-                                        <SortableHeader col="duration" label="Duration" />
-                                        <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Tags</th>
-                                        <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Thread</th>
-                                    </>
-                                )
-                            })()}
+                            <SortableHeader
+                                col="ticketId"
+                                label="Ticket ID"
+                                sortColumn={sortColumn}
+                                sortDirection={sortDirection}
+                                onSort={handleSort}
+                            />
+                            {showEscalatedForColumn && (
+                                <SortableHeader
+                                    col="escalatingTeam"
+                                    label="Escalated For"
+                                    sortColumn={sortColumn}
+                                    sortDirection={sortDirection}
+                                    onSort={handleSort}
+                                />
+                            )}
+                            <SortableHeader
+                                col="escalatedTo"
+                                label="Escalated To"
+                                sortColumn={sortColumn}
+                                sortDirection={sortDirection}
+                                onSort={handleSort}
+                            />
+                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
+                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Impact</th>
+                            <SortableHeader
+                                col="openedAt"
+                                label="Opened"
+                                sortColumn={sortColumn}
+                                sortDirection={sortDirection}
+                                onSort={handleSort}
+                            />
+                            <SortableHeader
+                                col="resolvedAt"
+                                label="Resolved"
+                                sortColumn={sortColumn}
+                                sortDirection={sortDirection}
+                                onSort={handleSort}
+                            />
+                            <SortableHeader
+                                col="duration"
+                                label="Duration"
+                                sortColumn={sortColumn}
+                                sortDirection={sortDirection}
+                                onSort={handleSort}
+                            />
+                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Tags</th>
+                            <th className="px-4 py-2 text-left text-xs font-bold text-gray-700 uppercase">Thread</th>
                         </tr>
                         </thead>
                     <tbody className="divide-y">
@@ -426,8 +487,8 @@ export default function EscalationsPage() {
                         return (
                             <tr key={esc.id} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-4 py-2 text-sm">{esc.ticketId}</td>
-                                {hasFullAccess && <td className="px-4 py-2 text-sm">{esc.escalatingTeam || '-'}</td>}
-                                {hasFullAccess && <td className="px-4 py-2 text-sm">{esc.team?.name || '-'}</td>}
+                                {showEscalatedForColumn && <td className="px-4 py-2 text-sm">{esc.escalatingTeam || '-'}</td>}
+                                <td className="px-4 py-2 text-sm">{esc.team?.name || '-'}</td>
                                 <td className="px-4 py-2">
                                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${esc.resolvedAt ? 'bg-green-200 text-green-800' : 'bg-yellow-200 text-yellow-800'}`}>
                                             {esc.resolvedAt ? 'Resolved' : 'Unresolved'}

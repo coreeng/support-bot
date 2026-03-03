@@ -1,6 +1,7 @@
 'use client'
 import { createContext, useContext, ReactNode, useState, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { TEAM_SCOPE } from '@/lib/constants'
 
 type TeamFilterContextType = {
     selectedTeam: string | null  // null = not initialized yet, string = specific team
@@ -47,7 +48,7 @@ export const TeamFilterProvider = ({ children }: { children: ReactNode }) => {
         if (!user) return []
 
         // User with no teams at all → no data access
-        if (user.teams.length === 0) return ['__no_teams__']
+        if (user.teams.length === 0) return [TEAM_SCOPE.NO_TEAMS]
 
         // Nothing selected yet (pre-initialization) → default to user's first data team
         if (selectedTeam === null) {

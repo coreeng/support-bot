@@ -108,13 +108,13 @@ describe('EscalationsPage', () => {
         expect(screen.getByText(/No escalations found/i)).toBeInTheDocument()
     })
 
-    it('shows both escalating team and target team columns in leadership view', () => {
+    it('always shows "Escalated To" column even without full access', () => {
         mockUseTeamFilter.mockReturnValue({
-            selectedTeam: null,
+            selectedTeam: 'Escalation Team 2 Test',
             setSelectedTeam: jest.fn(),
-            hasFullAccess: true,
-            effectiveTeams: [],
-            allTeams: [],
+            hasFullAccess: false,
+            effectiveTeams: ['Escalation Team 2 Test'],
+            allTeams: ['Escalation Team 2 Test'],
             initialized: true
         })
 
@@ -122,10 +122,10 @@ describe('EscalationsPage', () => {
             user: null,
             isLoading: false,
             isAuthenticated: true,
-            isLeadership: true,
-            isEscalationTeam: false,
+            isLeadership: false,
+            isEscalationTeam: true,
             isSupportEngineer: false,
-            actualEscalationTeams: [],
+            actualEscalationTeams: ['Escalation Team 2 Test'],
             logout: jest.fn()
         })
 
@@ -154,10 +154,134 @@ describe('EscalationsPage', () => {
 
         render(<EscalationsPage />, { wrapper: Wrapper })
 
-        expect(screen.getByText('Escalating Team')).toBeInTheDocument()
+        expect(screen.getByText('Escalated To')).toBeInTheDocument()
+        expect(screen.queryByText('Escalated For')).not.toBeInTheDocument()
+    })
+
+    it('shows "Escalated For" in leadership/support full-access view', () => {
+        mockUseTeamFilter.mockReturnValue({
+            selectedTeam: null,
+            setSelectedTeam: jest.fn(),
+            hasFullAccess: true,
+            effectiveTeams: [],
+            allTeams: [],
+            initialized: true
+        })
+
+        mockUseAuth.mockReturnValue({
+            user: null,
+            isLoading: false,
+            isAuthenticated: true,
+            isLeadership: true,
+            isEscalationTeam: false,
+            isSupportEngineer: false,
+            actualEscalationTeams: [],
+            logout: jest.fn()
+        })
+
+        mockUseEscalations.mockReturnValue({
+            data: {
+                page: 0,
+                totalPages: 1,
+                totalElements: 1,
+                content: [
+                    {
+                        id: 'esc-1',
+                        ticketId: 'T-501',
+                        escalatingTeam: 'Tenant Alpha',
+                        team: { name: 'Escalation Team 1' },
+                        impact: 'high',
+                        tags: [],
+                        openedAt: daysAgo(1),
+                        resolvedAt: null,
+                        hasThread: false,
+                    },
+                ],
+            },
+            isLoading: false,
+            error: null,
+        } as unknown as ReturnType<typeof hooks.useEscalations>)
+
+        render(<EscalationsPage />, { wrapper: Wrapper })
+
+        expect(screen.getByText('Escalated For')).toBeInTheDocument()
         expect(screen.getByText('Escalated To')).toBeInTheDocument()
         expect(screen.getAllByText('Tenant Alpha').length).toBeGreaterThan(0)
         expect(screen.getByText('Escalation Team 1')).toBeInTheDocument()
+    })
+
+    it('shows "Escalated For" only when explicit All Teams is selected', () => {
+        mockUseTeamFilter.mockReturnValue({
+            selectedTeam: 'Escalation Team 2 Test',
+            setSelectedTeam: jest.fn(),
+            hasFullAccess: false,
+            effectiveTeams: ['Escalation Team 2 Test'],
+            allTeams: ['Escalation Team 2 Test'],
+            initialized: true
+        })
+
+        mockUseAuth.mockReturnValue({
+            user: null,
+            isLoading: false,
+            isAuthenticated: true,
+            isLeadership: false,
+            isEscalationTeam: true,
+            isSupportEngineer: false,
+            actualEscalationTeams: ['Escalation Team 2 Test'],
+            logout: jest.fn()
+        })
+
+        mockUseTenantTeams.mockReturnValue({
+            data: [{ name: 'Tenant Alpha' }, { name: 'Tenant Beta' }],
+            isLoading: false,
+            error: null,
+        } as unknown as ReturnType<typeof hooks.useTenantTeams>)
+
+        mockUseEscalations.mockReturnValue({
+            data: {
+                page: 0,
+                totalPages: 1,
+                totalElements: 2,
+                content: [
+                    {
+                        id: 'esc-1',
+                        ticketId: 'T-401',
+                        escalatingTeam: 'Tenant Alpha',
+                        team: { name: 'Escalation Team 2 Test' },
+                        impact: 'high',
+                        tags: [],
+                        openedAt: daysAgo(1),
+                        resolvedAt: null,
+                        hasThread: false,
+                    },
+                    {
+                        id: 'esc-2',
+                        ticketId: 'T-402',
+                        escalatingTeam: 'Tenant Beta',
+                        team: { name: 'Escalation Team 3 Test' },
+                        impact: 'medium',
+                        tags: [],
+                        openedAt: daysAgo(2),
+                        resolvedAt: null,
+                        hasThread: false,
+                    },
+                ],
+            },
+            isLoading: false,
+            error: null,
+        } as unknown as ReturnType<typeof hooks.useEscalations>)
+
+        render(<EscalationsPage />, { wrapper: Wrapper })
+
+        // Not All Teams yet
+        expect(screen.queryByText('Escalated For')).not.toBeInTheDocument()
+        expect(screen.getByText('Escalated To')).toBeInTheDocument()
+
+        fireEvent.change(screen.getByTestId('escalations-team-filter'), { target: { value: '__all__' } })
+
+        expect(screen.getByText('Escalated For')).toBeInTheDocument()
+        expect(screen.getByText('Escalated To')).toBeInTheDocument()
+        expect(screen.getAllByText('Tenant Alpha').length).toBeGreaterThan(0)
     })
 
     describe('Tag filter', () => {
@@ -376,6 +500,87 @@ describe('EscalationsPage', () => {
 
         // Should show T-200 once
         expect(screen.getByText('T-200')).toBeInTheDocument()
+    })
+
+    it('does not deduplicate when escalation-team user selects "All Teams" override', () => {
+        mockUseTeamFilter.mockReturnValue({
+            selectedTeam: 'Escalation Team 2 Test',
+            setSelectedTeam: jest.fn(),
+            hasFullAccess: false,
+            effectiveTeams: ['Escalation Team 2 Test'],
+            allTeams: ['Escalation Team 2 Test'],
+            initialized: true
+        })
+
+        mockUseAuth.mockReturnValue({
+            user: null,
+            isLoading: false,
+            isAuthenticated: true,
+            isLeadership: false,
+            isEscalationTeam: true,
+            isSupportEngineer: false,
+            actualEscalationTeams: ['Escalation Team 2 Test'],
+            logout: jest.fn()
+        })
+
+        mockUseTenantTeams.mockReturnValue({
+            data: [{ name: 'Tenant Alpha' }, { name: 'Tenant Beta' }],
+            isLoading: false,
+            error: null,
+        } as unknown as ReturnType<typeof hooks.useTenantTeams>)
+
+        mockUseEscalations.mockReturnValue({
+            data: {
+                page: 0,
+                totalPages: 1,
+                totalElements: 3,
+                content: [
+                    {
+                        id: 'esc-1',
+                        ticketId: 'T-100',
+                        escalatingTeam: 'Tenant Alpha',
+                        team: { name: 'Infra Team' },
+                        impact: 'high',
+                        tags: ['networking'],
+                        openedAt: daysAgo(2),
+                        resolvedAt: null,
+                        hasThread: false,
+                    },
+                    {
+                        id: 'esc-2',
+                        ticketId: 'T-100',
+                        escalatingTeam: 'Tenant Alpha',
+                        team: { name: 'Security Team' },
+                        impact: 'high',
+                        tags: ['networking'],
+                        openedAt: daysAgo(1),
+                        resolvedAt: null,
+                        hasThread: false,
+                    },
+                    {
+                        id: 'esc-3',
+                        ticketId: 'T-200',
+                        escalatingTeam: 'Tenant Beta',
+                        team: { name: 'Infra Team' },
+                        impact: 'medium',
+                        tags: ['ingresses'],
+                        openedAt: daysAgo(3),
+                        resolvedAt: null,
+                        hasThread: false,
+                    },
+                ],
+            },
+            isLoading: false,
+            error: null,
+        } as unknown as ReturnType<typeof hooks.useEscalations>)
+
+        render(<EscalationsPage />, { wrapper: Wrapper })
+
+        fireEvent.change(screen.getByTestId('escalations-team-filter'), { target: { value: '__all__' } })
+
+        // Explicit all-teams override should show raw escalation rows (no ticket-level dedupe)
+        expect(screen.getByText('3 total')).toBeInTheDocument()
+        expect(screen.getAllByText('T-100')).toHaveLength(2)
     })
 
     it('resets page-level team filter to current scope when sidebar team changes', () => {

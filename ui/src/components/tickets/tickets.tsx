@@ -1,20 +1,22 @@
 'use client'
 
-import {useEffect, useMemo, useState} from 'react'
+import {useMemo, useState} from 'react'
 import {useAllTickets, useRegistry, useTenantTeams, useTickets, useAssignmentEnabled} from '@/lib/hooks'
 import {useTeamFilter} from '@/contexts/TeamFilterContext'
 import {TicketWithLogs, PaginatedTickets, TicketImpact, TicketTag} from "@/lib/types"
 import LoadingSkeleton from '@/components/LoadingSkeleton'
 import EditTicketModal from './EditTicketModal'
 import {useQueryClient} from '@tanstack/react-query'
+import { TEAM_SCOPE } from '@/lib/constants'
+import { normalizeTeamKey } from '@/lib/teamUtils'
+import { getDateRangeFromFilter } from '@/lib/dateRange'
 
 
 export default function TicketsPage() {
     const {effectiveTeams, selectedTeam: teamFilterSelectedTeam} = useTeamFilter()
     const queryClient = useQueryClient()
     const {data: isAssignmentEnabled} = useAssignmentEnabled()
-    const NO_TEAMS_SCOPE = '__no_teams__'
-    const hasNoTeamScope = effectiveTeams.includes(NO_TEAMS_SCOPE)
+    const hasNoTeamScope = effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
     const isViewingAllTeams = effectiveTeams.length === 0 && !hasNoTeamScope
     type DateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
 
@@ -26,7 +28,7 @@ export default function TicketsPage() {
     const [dateFilter, setDateFilter] = useState<DateFilter>('lastWeek')
     const [customDateRange, setCustomDateRange] = useState<{ start?: string; end?: string }>({})
     const [statusFilter, setStatusFilter] = useState('')
-    const ALL_TEAMS_FILTER = '__all__'
+    const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS
     const [teamFilter, setTeamFilter] = useState('')
     const [impactFilter, setImpactFilter] = useState('')
     const [tagFilter, setTagFilter] = useState('')
@@ -40,47 +42,21 @@ export default function TicketsPage() {
     const [currentPage, setCurrentPage] = useState(0)
     const pageSize = 15
 
-    // Calculate date range based on filter
-    // When switching to "custom", preserve the current range until custom dates are set
-    const dateRange = useMemo(() => {
-        if (!dateFilter) return { from: undefined, to: undefined }
-
-        if (dateFilter === 'custom') {
-            // If custom dates are not set yet, preserve the previous filter's range
-            if (!customDateRange.start || !customDateRange.end) {
-                // Calculate the current range based on last week (default)
-                const now = new Date()
-                const to = now.toISOString().split('T')[0]
-                const fromDate = new Date(now)
-                fromDate.setDate(now.getDate() - 7)
-                const from = fromDate.toISOString().split('T')[0]
-                return { from, to }
-            }
-            return {
-                from: customDateRange.start,
-                to: customDateRange.end
-            }
-        }
-
-        const now = new Date()
-        const to = now.toISOString().split('T')[0]
-        const fromDate = new Date(now)
-
-        switch (dateFilter) {
-            case 'lastWeek':
-                fromDate.setDate(now.getDate() - 7)
-                break
-            case 'last2Weeks':
-                fromDate.setDate(now.getDate() - 14)
-                break
-            case 'lastMonth':
-                fromDate.setDate(now.getDate() - 30)
-                break
-        }
-
-        const from = fromDate.toISOString().split('T')[0]
-        return { from, to }
-    }, [dateFilter, customDateRange])
+    const dateRange = useMemo(
+        () =>
+            getDateRangeFromFilter({
+                dateFilter,
+                customDateRange,
+                customValue: 'custom',
+                fallbackValue: 'lastWeek',
+                presetDays: {
+                    lastWeek: 7,
+                    last2Weeks: 14,
+                    lastMonth: 30,
+                },
+            }),
+        [dateFilter, customDateRange]
+    )
 
     const hasClientFilters = useMemo(
         () => !!(statusFilter || teamFilter || impactFilter || tagFilter || escalatedFilter || escalatedToFilter),
@@ -108,9 +84,6 @@ export default function TicketsPage() {
         opened: 'bg-blue-100 text-blue-800',
         closed: 'bg-green-100 text-green-800',
     }
-    const normalizeTeamKey = (value?: string | null) =>
-        (value || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
-
     // --- Utility functions ---
     const getOpenedClosed = (ticket: TicketWithLogs) => {
         if (!ticket.logs?.length) return {opened: null, closed: null}
@@ -204,7 +177,7 @@ export default function TicketsPage() {
 
             return matchesStatus && matchesTeam && matchesImpact && matchesTag && matchesEscalated && matchesEscalatedTo
         })
-    }, [ticketsContent, hasNoTeamScope, effectiveTeams, statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter, escalatedToFilter])
+    }, [ticketsContent, hasNoTeamScope, effectiveTeams, statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter, escalatedToFilter, ALL_TEAMS_FILTER])
 
     const sortedTickets = useMemo(() => {
         const toTs = (value: string | null) => (value ? new Date(value).getTime() : null)
@@ -229,6 +202,7 @@ export default function TicketsPage() {
 
     // Track previous fingerprint to detect changes
     const [prevFilterFingerprint, setPrevFilterFingerprint] = useState(filterFingerprint)
+    const [prevTeamFilterSelectedTeam, setPrevTeamFilterSelectedTeam] = useState(teamFilterSelectedTeam)
 
     // Reset page when filters change (during render, not in effect)
     if (prevFilterFingerprint !== filterFingerprint) {
@@ -238,11 +212,12 @@ export default function TicketsPage() {
         }
     }
 
-    // Reset page-level team filter when sidebar "View as" scope changes.
-    useEffect(() => {
-        setTeamFilter('')
-        setCurrentPage(0)
-    }, [teamFilterSelectedTeam])
+    // Reset page-level team filter synchronously when sidebar "View as" scope changes.
+    if (prevTeamFilterSelectedTeam !== teamFilterSelectedTeam) {
+        setPrevTeamFilterSelectedTeam(teamFilterSelectedTeam)
+        if (teamFilter !== '') setTeamFilter('')
+        if (currentPage !== 0) setCurrentPage(0)
+    }
 
     // Server pagination for all-teams without client filters; otherwise client-side pagination.
     const paginatedTickets = useMemo(() => {
@@ -271,6 +246,13 @@ export default function TicketsPage() {
                     ? 'Tickets Dashboard - All Teams'
                     : `Tickets Dashboard - ${effectiveTeams.join(', ')}`}
             </h1>
+
+            {hasNoTeamScope && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900">
+                    <p className="font-semibold">No Team Access</p>
+                    <p className="text-sm mt-1">You are not assigned to any teams, so tickets cannot be displayed.</p>
+                </div>
+            )}
 
             {/* Filters */}
             <div className={`grid grid-cols-1 gap-2 mb-4 ${hasNoTeamScope ? 'sm:grid-cols-5' : 'sm:grid-cols-6'}`}>

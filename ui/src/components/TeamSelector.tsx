@@ -11,7 +11,7 @@ export default function TeamSelector() {
     const { selectedTeam, setSelectedTeam } = useTeamFilter()
     const { data: apiTenantTeams } = useTenantTeams()
 
-    const teams = user?.teams || []
+    const teams = useMemo(() => user?.teams ?? [], [user])
     const isRoleTeam = (t: { types?: string[] }) => (t.types || []).some(type => /leadership/i.test(type) || /support/i.test(type))
     const isEscalationTeam = (t: { types?: string[] }) => (t.types || []).some(type => /escalation/i.test(type))
 
