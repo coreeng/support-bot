@@ -28,6 +28,20 @@ usage() {
   echo "  [DELETE_DB=true|false] [DEPLOY_DB=true|false]"
 }
 
+reset_db_schema() {
+  local ns="$1" release="$2"
+  log "Resetting database schema for release [${release}] in namespace ${ns}..."
+  local db_pod
+  db_pod=$(kubectl get pod -n "$ns" \
+    -l "app.kubernetes.io/instance=${release},app.kubernetes.io/name=postgresql" \
+    -o jsonpath='{.items[0].metadata.name}')
+  kubectl exec -n "$ns" "$db_pod" -- \
+    env PGPASSWORD=supportbotpassword \
+    psql -U supportbot -d supportbot -c \
+    "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+  log_success "Database schema reset complete"
+}
+
 deploy_db() {
   local ns="$1" release="$2"
   log "Installing PostgreSQL [${release}] in namespace ${ns}..."
@@ -44,6 +58,7 @@ deploy_db() {
     --set serviceAccount.create=false \
     --wait --atomic --timeout=3m
   log_success "PostgreSQL deployed"
+  reset_db_schema "$ns" "$release"
 }
 
 deploy_service() {
