@@ -970,10 +970,9 @@ describe('KnowledgeGapsPage', () => {
             // Wait for completion message
             const completionMessage = await screen.findByText(/Analysis complete! 8 of 10 threads analysed/)
 
-            // Verify the panel shows completion status (green background)
-            // The parent div with the bg-green-50 class is 3 levels up from the text
-            const completionPanel = completionMessage.parentElement?.parentElement
-            expect(completionPanel).toHaveClass('bg-green-50')
+            // Verify the panel shows completion status (green background gradient)
+            const completionPanel = completionMessage.parentElement?.parentElement?.parentElement
+            expect(completionPanel).toHaveClass('from-green-50')
 
             // Fast-forward another 5 seconds to hide the panel and refresh data
             jest.advanceTimersByTime(5000)
@@ -1066,7 +1065,7 @@ describe('KnowledgeGapsPage', () => {
             expect(screen.getByDisplayValue('Week')).toBeInTheDocument()
         })
 
-        it('hides progress panel when feature is disabled', async () => {
+        it('shows progress panel to all users even when feature is disabled', async () => {
             mockUseAnalysis.mockReturnValue({
                 data: mockAnalysisData,
                 isLoading: false,
@@ -1102,8 +1101,9 @@ describe('KnowledgeGapsPage', () => {
             // Wait for the page to render
             await screen.findByText('Support Area Summary')
 
-            // Verify the progress panel is not shown even though analysis is running
-            expect(screen.queryByText(/Checking for new threads|Analysing threads/)).not.toBeInTheDocument()
+            // Progress panel is visible to all users even when analysis feature is disabled
+            // (anyone visiting the page should see if analysis is in progress)
+            await screen.findByText(/Analysing threads... 3 of 5 complete/)
         })
 
         it('hides Export, Analysis Bundle, and Import buttons when feature is enabled', async () => {
@@ -1139,10 +1139,10 @@ describe('KnowledgeGapsPage', () => {
 
             renderWithToast(<KnowledgeGapsPage />)
 
-            // Wait for the page to render
-            await screen.findByText('Support Area Summary')
+            // Wait for the page to render and Run Analysis button to appear (proves enabled=true took effect)
+            await screen.findByText('Run Analysis')
 
-            // Verify all three buttons are not present
+            // Verify all three buttons are not present when feature is enabled
             expect(screen.queryByText('Export')).not.toBeInTheDocument()
             expect(screen.queryByText('Analysis Bundle')).not.toBeInTheDocument()
             expect(screen.queryByText('Import')).not.toBeInTheDocument()

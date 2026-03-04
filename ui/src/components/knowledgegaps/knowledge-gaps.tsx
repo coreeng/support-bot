@@ -96,12 +96,12 @@ export default function KnowledgeGapsPage() {
                     setCompletedMessage(message)
                     setShowCompletedStatus(true)
 
-                    // Wait 5 seconds, then hide panel and refresh data
-                    completionTimeoutRef.current = setTimeout(async () => {
+                    // Refresh data immediately, then hide panel after 5 seconds
+                    queryClient.invalidateQueries({ queryKey: ['analysis'] })
+                    completionTimeoutRef.current = setTimeout(() => {
                         setShowCompletedStatus(false)
                         setAnalysisStatus(null)
                         isCompletedRef.current = false
-                        await queryClient.invalidateQueries({ queryKey: ['analysis'] })
                     }, 5000)
                 }
             }
@@ -206,11 +206,12 @@ export default function KnowledgeGapsPage() {
                         setCompletedMessage(message)
                         setShowCompletedStatus(true)
 
-                        completionTimeoutRef.current = setTimeout(async () => {
+                        // Refresh data immediately, then hide panel after 5 seconds
+                        queryClient.invalidateQueries({ queryKey: ['analysis'] })
+                        completionTimeoutRef.current = setTimeout(() => {
                             setShowCompletedStatus(false)
                             setAnalysisStatus(null)
                             isCompletedRef.current = false
-                            await queryClient.invalidateQueries({ queryKey: ['analysis'] })
                         }, 5000)
                     }
                 } else {
@@ -485,8 +486,7 @@ export default function KnowledgeGapsPage() {
                         </p>
                     </div>
                     {isSupportEngineer && (
-                        <div className="flex flex-col items-end gap-3">
-                            <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2">
                                 <select
                                     value={selectedDays}
                                     onChange={(e) => setSelectedDays(Number(e.target.value))}
@@ -540,45 +540,68 @@ export default function KnowledgeGapsPage() {
                                         </button>
                                     </>
                                 )}
-                            </div>
-                            {isAnalysisEnabled && (analysisStatus?.running || showCompletedStatus) && (() => {
-                                const isUpToDate = showCompletedStatus && !isCompletionError && !analysisStatus?.exportedCount
-                                const isSuccess = showCompletedStatus && !isCompletionError && (analysisStatus?.exportedCount ?? 0) > 0
-                                const isError = showCompletedStatus && isCompletionError
-                                const isRunning = !showCompletedStatus
-
-                                const panelClass = isError
-                                    ? 'bg-red-50 border-red-200 text-red-800'
-                                    : isUpToDate
-                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                                        : isSuccess
-                                            ? 'bg-green-50 border-green-200 text-green-800'
-                                            : 'bg-blue-50 border-blue-200 text-blue-800'
-
-                                return (
-                                    <div className={`border rounded-xl text-sm font-medium px-4 py-2.5 ${panelClass}`}>
-                                        <div className="flex items-center gap-2">
-                                            {isRunning && (
-                                                <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 shrink-0"></div>
-                                            )}
-                                            {isUpToDate && <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />}
-                                            {isSuccess && <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />}
-                                            {isError && <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />}
-                                            <span>
-                                                {showCompletedStatus
-                                                    ? completedMessage
-                                                    : (analysisStatus?.exportedCount ?? 0) > 0
-                                                        ? `Analysing threads... ${analysisStatus?.analyzedCount || 0} of ${analysisStatus?.exportedCount ?? 0} complete`
-                                                        : 'Checking for new threads to analyse...'
-                                                }
-                                            </span>
-                                        </div>
-                                    </div>
-                                )
-                            })()}
                         </div>
                     )}
                 </div>
+
+                {/* Analysis Progress Card — visible to all users */}
+                {(analysisStatus?.running || showCompletedStatus) && (() => {
+                    const isUpToDate = showCompletedStatus && !isCompletionError && !analysisStatus?.exportedCount
+                    const isSuccess = showCompletedStatus && !isCompletionError && (analysisStatus?.exportedCount ?? 0) > 0
+                    const isError = showCompletedStatus && isCompletionError
+                    const isRunning = !showCompletedStatus
+
+                    const exported = analysisStatus?.exportedCount ?? 0
+                    const analyzed = analysisStatus?.analyzedCount ?? 0
+                    const progressPercent = exported > 0 ? Math.round((analyzed / exported) * 100) : 0
+
+                    const borderColor = isError ? 'border-red-200' : isUpToDate ? 'border-emerald-200' : isSuccess ? 'border-green-200' : 'border-blue-200'
+                    const bgGradient = isError
+                        ? 'from-red-50 to-white'
+                        : isUpToDate
+                            ? 'from-emerald-50 to-white'
+                            : isSuccess
+                                ? 'from-green-50 to-white'
+                                : 'from-purple-50 to-white'
+                    const barColor = isError ? 'bg-red-500' : isSuccess ? 'bg-green-500' : isUpToDate ? 'bg-emerald-500' : 'bg-purple-500'
+                    const barTrack = isError ? 'bg-red-100' : isSuccess ? 'bg-green-100' : isUpToDate ? 'bg-emerald-100' : 'bg-purple-100'
+
+                    return (
+                        <div className={`bg-white rounded-xl border ${borderColor} shadow-sm overflow-hidden`}>
+                            <div className={`px-6 py-5 bg-gradient-to-r ${bgGradient}`}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        {isRunning && (
+                                            <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600 shrink-0"></div>
+                                        )}
+                                        {isUpToDate && <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />}
+                                        {isSuccess && <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />}
+                                        {isError && <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />}
+                                        <span className="font-semibold text-gray-900">
+                                            {showCompletedStatus
+                                                ? completedMessage
+                                                : exported > 0
+                                                    ? `Analysing threads... ${analyzed} of ${exported} complete`
+                                                    : 'Checking for new threads to analyse...'
+                                            }
+                                        </span>
+                                    </div>
+                                    {isRunning && exported > 0 && (
+                                        <span className="text-sm font-medium text-purple-700">{progressPercent}%</span>
+                                    )}
+                                </div>
+                                {(isRunning || isSuccess) && exported > 0 && (
+                                    <div className={`mt-3 h-2.5 rounded-full ${barTrack} overflow-hidden`}>
+                                        <div
+                                            className={`h-full rounded-full ${barColor} transition-all duration-500 ease-out`}
+                                            style={{ width: `${isSuccess ? 100 : progressPercent}%` }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )
+                })()}
 
                 {/* Top Support Areas */}
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
