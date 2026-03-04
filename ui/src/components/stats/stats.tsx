@@ -8,6 +8,8 @@ import {TicketImpact} from "@/lib/types";
 import EscalatedToMyTeamWidget from '@/components/escalations/EscalatedToMyTeamWidget'
 import { useAuth } from '@/hooks/useAuth'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
+import { TEAM_SCOPE } from '@/lib/constants'
+import { normalizeTeamKey } from '@/lib/teamUtils'
 
 export default function StatsPage() {
     // Date filter state - default to last week to match other views
@@ -66,28 +68,32 @@ export default function StatsPage() {
     // This ensures we get complete data for accurate statistics
     const { data: ticketsData, isLoading: isTicketsLoading, error: ticketsError } = useAllTickets(200, dateRange.from, dateRange.to)
     const { data: registryData } = useRegistry()
-    const { hasFullAccess, effectiveTeams, selectedTeam } = useTeamFilter()
+    const {
+        effectiveTeams,
+        hasNoTeamScope: contextHasNoTeamScope,
+        selectedTeam,
+        isViewingAsEscalationTeam: contextIsViewingAsEscalationTeam
+    } = useTeamFilter()
     const { actualEscalationTeams } = useAuth()
+    const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
+    const isViewingAsEscalationTeam = contextIsViewingAsEscalationTeam ??
+        (!!selectedTeam && actualEscalationTeams.includes(selectedTeam))
 
-    // Check if viewing as escalation team
-    const isViewingAsEscalationTeam = useMemo(() => {
-        if (!selectedTeam || actualEscalationTeams.length === 0) return false
-        return actualEscalationTeams.includes(selectedTeam)
-    }, [selectedTeam, actualEscalationTeams])
-
-    // Filter tickets by team unless superuser
+    // Filter tickets by selected team
     const teamTickets = useMemo(() => {
         if (!ticketsData?.content) return []
+        if (hasNoTeamScope) return []
         
-        // Full access (leadership/support viewing all) -> show all tickets
-        if (hasFullAccess) return ticketsData.content
-        
-        // No teams and no full access -> no tickets
-        if (effectiveTeams.length === 0) return []
+        // "All Teams" or no team filter -> show all tickets
+        if (effectiveTeams.length === 0) return ticketsData.content
         
         // Filter by specific teams
-        return ticketsData.content.filter(t => t.team?.name && effectiveTeams.includes(t.team.name))
-    }, [ticketsData, hasFullAccess, effectiveTeams])
+        return ticketsData.content.filter(t => {
+            if (!t.team?.name) return false
+            const ticketTeam = normalizeTeamKey(t.team.name)
+            return effectiveTeams.some(team => normalizeTeamKey(team) === ticketTeam)
+        })
+    }, [ticketsData, effectiveTeams, hasNoTeamScope])
 
     // Compute stats
     const totalTickets = teamTickets.length
@@ -164,7 +170,6 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }:
             </div>
         </div>
     )
-
     // Render split view for escalation teams
     if (isViewingAsEscalationTeam) {
         return (
@@ -303,11 +308,11 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }:
         <div className="p-6 space-y-6 relative">
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold text-gray-800">
-                    {hasFullAccess
+                    {hasNoTeamScope
+                        ? 'Home Dashboard'
+                        : effectiveTeams.length === 0
                         ? 'Home Dashboard - All Teams'
-                        : effectiveTeams.length > 0
-                            ? `Home Dashboard - ${effectiveTeams.join(', ')}`
-                            : 'Home Dashboard'}
+                        : `Home Dashboard - ${effectiveTeams.join(', ')}`}
                 </h1>
                 {/* Date Filter */}
                 <div className="flex items-center gap-2">
@@ -342,6 +347,13 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }:
                     )}
                 </div>
             </div>
+
+            {hasNoTeamScope && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900">
+                    <p className="font-semibold">No Team Access</p>
+                    <p className="text-sm mt-1">You are not assigned to any teams, so dashboard data cannot be displayed.</p>
+                </div>
+            )}
 
             {/* Summary cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

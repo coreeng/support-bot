@@ -97,7 +97,12 @@ export default function EscalatedToMyTeamWidget() {
     }
 
     if (escalationsError) {
-        return null
+        return (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
+                <p className="font-semibold">Error loading escalations</p>
+                <p className="text-sm mt-1">Unable to load escalation data. Please try refreshing the page.</p>
+            </div>
+        )
     }
 
     return (
