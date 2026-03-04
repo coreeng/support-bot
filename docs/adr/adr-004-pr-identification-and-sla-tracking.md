@@ -41,10 +41,10 @@ use `@ConditionalOnProperty` so nothing is instantiated when off.
 
 ```yaml
 pr-review-tracking:
-  enabled: ${PR_IDENTIFICATION_ENABLED:false}
+  enabled: ${PR_REVIEW_TRACKING_ENABLED:false}
 ```
 
-`PR_IDENTIFICATION_ENABLED` is set per environment in the Helm chart — the only place that needs to change to toggle the feature.
+`PR_REVIEW_TRACKING_ENABLED` can be set per environment via deployment configuration (for example Helm/env vars) to toggle the feature.
 
 ### 2. Repository Configuration
 
@@ -66,6 +66,21 @@ pr-review-tracking:
 - Team `label` (for bot messages) and `slack-group-id` (for tagging) are resolved from `enums.escalation-teams` using `owning-team`.
 - `sla` — ISO-8601 duration (e.g. `PT48H`, `PT72H`), parsed to `java.time.Duration`.
 
+### Behaviour Configuration
+
+Additional PR-tracking behaviour is configured via:
+
+```yaml
+pr-review-tracking:
+  pr-emoji: pr
+  tags: [networking]
+  impact: productionBlocking
+```
+
+- `pr-emoji` — Slack emoji name added to the query message when an **open** PR is tracked.
+- `tags` — tag codes used as defaults during top-level metadata initialisation when ticket tags are empty, and passed to the PR-resolution close flow.
+- `impact` — impact code used as a default during top-level metadata initialisation when ticket impact is unset, and passed to the PR-resolution close flow.
+
 ### 3. GitHub Credentials
 
 The bot supports two auth modes for GitHub API access:
@@ -84,7 +99,8 @@ pr-review-tracking:
     private-key-pem: ${GITHUB_APP_PRIVATE_KEY_PEM:}
 ```
 
-API calls use a thin `GitHubClient` wrapper over Spring `RestClient`. The `api-base-url` override supports GitHub Enterprise.
+The `api-base-url` override supports GitHub Enterprise.
+
 Startup validation enforces required fields per mode (`token` requires `token`; `app` requires `app-id`, `installation-id`, `private-key-pem`).
 
 ### 4. PR Link Detection
@@ -98,10 +114,10 @@ Unrecognised repos are silently ignored.
 When an in-scope PR link is found:
 
 1. Fetch PR metadata via GitHub API (`created_at`, current state).
-2. Add a `pr` tag to the parent support issue.
-3. Post the regular ticket form update plus a thread reply: _"PRs to `<repo>` have an SLA of `<SLA>`. I'll automatically escalate to the owning team (`<team-label>`) if the PR isn't responded to before `<pr_created_at + SLA>`."_ The team is named but **not tagged** in this message.
-4. React to the **top-level thread message** with an emoji (e.g. `:github:`) indicating the ticket contains a PR review request, regardless of which reply introduced the PR link.
-5. Persist a `pr_tracking` record for lifecycle polling.
+2. For PR links detected on the top-level query message (not thread replies), if the ticket is missing metadata, initialise it with configured defaults (`tags`, `impact`) and suggested author team when available. Existing team/tags/impact are preserved.
+3. Post a thread reply with SLA tracking messaging. If the SLA is still within bounds, the message states the deadline and owning team label (named, not tagged). If already breached at detection time, the message states that the timeframe has been exceeded and the ticket is escalated immediately to the configured owning team.
+4. React to the **top-level thread message** with the configured PR emoji (`pr-emoji`, default `pr`) to indicate the ticket contains a tracked PR request, regardless of which reply introduced the PR link.
+5. Persist a `pr_tracking` record for lifecycle polling, including whether ticket auto-close is allowed for this PR (`can_auto_close_ticket`: true for top-level detections, false for thread-reply detections).
 
 ### 6. PR Tracking State
 
@@ -110,25 +126,26 @@ The API persists PR tracking records linked to the existing ticket model:
 ```sql
 create table if not exists pr_tracking
 (
-    id            bigserial,
-    ticket_id     bigint,
-    github_repo   text,
-    pr_number     integer,
-    pr_created_at timestamptz,
-    sla_deadline  timestamptz,
-    owning_team   text,
-    status        text,          -- OPEN | ESCALATED | CLOSED
-    escalation_id bigint,        -- set when auto-escalation is created
-    closed_at     timestamptz,
-    created_at    timestamptz not null default now()
+    id                      bigserial,
+    ticket_id               bigint,
+    github_repo             text,
+    pr_number               integer,
+    pr_created_at           timestamptz,
+    sla_deadline            timestamptz,
+    owning_team             text,
+    status                  pr_tracking_status, -- OPEN | ESCALATED | CLOSED
+    escalation_id           bigint,        -- set when auto-escalation is created
+    can_auto_close_ticket boolean not null default true,
+    closed_at               timestamptz,
+    created_at              timestamptz not null default now()
 );
 ```
 
 ### 7. Periodic Lifecycle Polling
 
-A `@Scheduled` task runs on a business-hours cron (default: `0 0 9-18 * * 1-5`, configurable via `pr-review-tracking.poll-cron`) and processes all records where `status != 'CLOSED'`:
+A `@Scheduled` task runs on a business-hours cron (default: `0 0 9-18 * * 1-5`, configurable via `pr-review-tracking.poll-cron`) and processes records where `status IN ('OPEN', 'ESCALATED')`:
 
-- **PR merged or closed** — set `status = CLOSED`, `closed_at`. Post a closure message in the thread, react with `:white_check_mark:`, and close the support thread.
+- **PR merged or closed** — set `status = CLOSED`, `closed_at`. Post a closure message in the thread and close the support thread only when no active **closable** tracked PRs remain (thread reply-origin PR tracking does not trigger auto-close).
 - **PR open, SLA expired, not yet escalated** — create escalation, set `status = ESCALATED`, persist `escalation_id`, and post an escalation message tagging the owning team (resolved from escalation-team config).
 - **PR open, within SLA** — no action.
 
@@ -138,7 +155,7 @@ escalated — a false positive. GitHub's Reviews API (`GET /repos/{owner}/{repo}
 activity (`APPROVED`, `CHANGES_REQUESTED`, `COMMENTED`) which could be checked before escalating to suppress these cases.
 This is deferred to the PR Lifecycle Tracking follow-up to keep v1 scope contained, but should be prioritised if false escalations prove disruptive.
 
-When a thread contains multiple tracked PRs, the thread is only auto-closed once all of them are closed.
+When a thread contains multiple tracked PRs, the thread is only auto-closed once all active PRs that allow auto-close are resolved.
 
 ---
 
@@ -154,7 +171,7 @@ When a thread contains multiple tracked PRs, the thread is only auto-closed once
 
 ### Negative / Trade-offs
 
-- **GitHub API rate limits** — one call per open PR per poll cycle. Configurable interval and batch sleep as initial mitigation; adaptive backoff is a follow-up.
+- **GitHub API rate limits** — one call per open PR per poll cycle. Poll cadence is configurable via `pr-review-tracking.poll-cron`; adaptive backoff is a follow-up.
 - **No real-time close detection** — closure detected at next poll interval (minutes, not seconds). Acceptable for hour/day-scale SLAs; GitHub webhooks could address this later.
 - **Thread auto-close on PR close** — if a thread has non-PR topics, auto-closing may be premature. Making this opt-in per repo config is a follow-up.
 - **No review-awareness in v1** — escalation is based solely on SLA expiry + PR still open. If the owning team has already reviewed (e.g., requested changes) but the PR author hasn't acted, the bot will still escalate — a false positive. Incorporating GitHub review state is deferred.
