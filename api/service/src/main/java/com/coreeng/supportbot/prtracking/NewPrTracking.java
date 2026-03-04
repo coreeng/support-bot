@@ -11,7 +11,7 @@ public record NewPrTracking(
         Instant prCreatedAt,
         Instant slaDeadline,
         String owningTeam,
-        boolean closeTicketOnResolve) {
+        boolean canAutoCloseTicket) {
     public NewPrTracking {
         requireNonNull(githubRepo, "githubRepo must not be null");
         requireNonNull(prCreatedAt, "prCreatedAt must not be null");

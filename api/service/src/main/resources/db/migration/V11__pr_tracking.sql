@@ -9,7 +9,7 @@ create table if not exists pr_tracking
     pr_created_at timestamptz        not null,
     sla_deadline  timestamptz        not null,
     owning_team   text               not null,
-    close_ticket_on_resolve boolean  not null default true,
+    can_auto_close_ticket boolean  not null default true,
     status        pr_tracking_status not null default 'OPEN',
     escalation_id bigint,
     closed_at     timestamptz,

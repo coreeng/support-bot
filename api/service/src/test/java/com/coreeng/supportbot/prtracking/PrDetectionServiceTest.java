@@ -203,7 +203,7 @@ class PrDetectionServiceTest {
             assertThat(inserted.prCreatedAt()).isEqualTo(prCreatedAt);
             assertThat(inserted.slaDeadline()).isEqualTo(prCreatedAt.plus(SLA_24H));
             assertThat(inserted.owningTeam()).isEqualTo(TEAM_CODE);
-            assertThat(inserted.closeTicketOnResolve()).isTrue();
+            assertThat(inserted.canAutoCloseTicket()).isTrue();
         }
 
         @Test
@@ -356,7 +356,7 @@ class PrDetectionServiceTest {
 
             // then
             verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
-            assertThat(newTrackingCaptor.getValue().closeTicketOnResolve()).isFalse();
+            assertThat(newTrackingCaptor.getValue().canAutoCloseTicket()).isFalse();
         }
 
         private void setupDetectedPr(Instant prCreatedAt) {

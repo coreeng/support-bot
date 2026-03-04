@@ -91,8 +91,8 @@ public class PrDetectionService {
                 ticketSlackService.markPostTracked(ticket.queryRef());
                 baseReactionsAdded = true;
             }
-            boolean closeTicketOnResolve = !event.messageRef().isReply();
-            PerPrResult result = processPr(pr, ticket, closeTicketOnResolve);
+            boolean canAutoCloseTicket = !event.messageRef().isReply();
+            PerPrResult result = processPr(pr, ticket, canAutoCloseTicket);
             switch (result) {
                 case TRACKED -> {
                     anyOpenTracked = true;
@@ -116,7 +116,7 @@ public class PrDetectionService {
         SKIPPED
     }
 
-    private PerPrResult processPr(DetectedPr detectedPr, Ticket ticket, boolean closeTicketOnResolve) {
+    private PerPrResult processPr(DetectedPr detectedPr, Ticket ticket, boolean canAutoCloseTicket) {
         PrTrackingProps.Repository repoConfig = prTrackingProps.repositories().stream()
                 .filter(r -> r.name().equals(detectedPr.repositoryName()))
                 .findFirst()
@@ -155,7 +155,7 @@ public class PrDetectionService {
                 prMetadata.createdAt(),
                 slaDeadline,
                 repoConfig.owningTeam(),
-                closeTicketOnResolve));
+                canAutoCloseTicket));
         if (tracking == null) {
             log.atInfo()
                     .addArgument(detectedPr::repositoryName)

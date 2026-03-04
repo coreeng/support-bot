@@ -14,7 +14,7 @@ public record PrTrackingRecord(
         Instant prCreatedAt,
         Instant slaDeadline,
         String owningTeam,
-        boolean closeTicketOnResolve,
+        boolean canAutoCloseTicket,
         PrTrackingStatus status,
         @Nullable Long escalationId,
         @Nullable Instant closedAt) {

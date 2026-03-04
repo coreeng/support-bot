@@ -28,7 +28,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 .set(PR_TRACKING.PR_CREATED_AT, newRecord.prCreatedAt())
                 .set(PR_TRACKING.SLA_DEADLINE, newRecord.slaDeadline())
                 .set(PR_TRACKING.OWNING_TEAM, newRecord.owningTeam())
-                .set(PR_TRACKING.CLOSE_TICKET_ON_RESOLVE, newRecord.closeTicketOnResolve())
+                .set(PR_TRACKING.CAN_AUTO_CLOSE_TICKET, newRecord.canAutoCloseTicket())
                 .onConflict(PR_TRACKING.TICKET_ID, PR_TRACKING.GITHUB_REPO, PR_TRACKING.PR_NUMBER)
                 .doNothing()
                 .returning()
@@ -87,7 +87,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 PR_TRACKING
                         .TICKET_ID
                         .eq(ticketId)
-                        .and(PR_TRACKING.CLOSE_TICKET_ON_RESOLVE.isTrue())
+                        .and(PR_TRACKING.CAN_AUTO_CLOSE_TICKET.isTrue())
                         .and(PR_TRACKING.STATUS.in(PrTrackingStatus.OPEN, PrTrackingStatus.ESCALATED)));
     }
 
@@ -112,7 +112,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 checkNotNull(row.getPrCreatedAt()),
                 checkNotNull(row.getSlaDeadline()),
                 checkNotNull(row.getOwningTeam()),
-                checkNotNull(row.getCloseTicketOnResolve()),
+                checkNotNull(row.getCanAutoCloseTicket()),
                 checkNotNull(row.getStatus()),
                 row.getEscalationId(),
                 row.getClosedAt());

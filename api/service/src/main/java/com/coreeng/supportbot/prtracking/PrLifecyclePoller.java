@@ -102,7 +102,7 @@ public class PrLifecyclePoller {
                 ticket.queryTs(),
                 record);
 
-        if (!record.closeTicketOnResolve()) {
+        if (!record.canAutoCloseTicket()) {
             log.atInfo()
                     .addArgument(record::ticketId)
                     .log("PR for ticket {} resolved from thread reply context; skipping auto-close");
