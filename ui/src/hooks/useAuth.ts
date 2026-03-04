@@ -30,7 +30,7 @@ export function useAuth(): UseAuthReturn {
     if (!user || !isEscalationTeam) return [];
     return user.teams
       .filter((t: AuthTeam) => t.types.some((type: string) => /escalation/i.test(type)))
-      .map((t: AuthTeam) => t.code || t.label);
+      .map((t: AuthTeam) => t.name);
   }, [user, isEscalationTeam]);
 
   const logout = async () => {

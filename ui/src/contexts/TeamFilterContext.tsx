@@ -1,20 +1,31 @@
 'use client'
 import { createContext, useContext, ReactNode, useState, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { TEAM_SCOPE } from '@/lib/constants'
+
+type TeamScopeState =
+    | { mode: 'uninitialized' }
+    | { mode: 'no_teams' }
+    | { mode: 'all_teams' }
+    | { mode: 'selected_teams'; teams: string[] }
 
 type TeamFilterContextType = {
-    selectedTeam: string | null  // null = "All Teams", string = specific team
+    selectedTeam: string | null  // null = not initialized yet, string = specific team
     setSelectedTeam: (team: string | null) => void
-    effectiveTeams: string[]  // The teams to filter by (either all teams or selected team)
+    teamScope: TeamScopeState  // Explicit scope state to avoid inferring semantics from effectiveTeams shape
+    effectiveTeams: string[]  // Backward-compatible derived scope list
+    hasNoTeamScope: boolean  // True when the user has no data teams and no role-wide access scope
+    isViewingAllTeams: boolean  // True when effective scope is all teams (unfiltered)
+    isViewingAsEscalationTeam: boolean  // True when sidebar scope is one of user's escalation teams
     hasFullAccess: boolean  // true if should see all features (Leadership viewing All Teams)
-    allTeams: string[]  // All available teams for the user
+    allTeams: string[]  // Data teams available for selection (excludes role teams)
     initialized: boolean  // Whether the context has finished initializing
 }
 
 const TeamFilterContext = createContext<TeamFilterContextType | undefined>(undefined)
 
 export const TeamFilterProvider = ({ children }: { children: ReactNode }) => {
-    const { user, isLeadership, isSupportEngineer } = useAuth()
+    const { user, isLeadership, isSupportEngineer, actualEscalationTeams } = useAuth()
 
     // Track if we've done one-time initialization
     const [hasInitialized, setHasInitialized] = useState(false)
@@ -40,37 +51,35 @@ export const TeamFilterProvider = ({ children }: { children: ReactNode }) => {
         return types.some(t => /leadership/i.test(t) || /support/i.test(t))
     }
 
-    // Determine which teams to filter by
-    const effectiveTeams = useMemo(() => {
-        if (!user) return []
+    const teamScope = useMemo<TeamScopeState>(() => {
+        if (!user) return { mode: 'uninitialized' }
+        if (user.teams.length === 0) return { mode: 'no_teams' }
 
-        // Filter out pure role groups (leadership/support) by types; keep escalation & tenant teams
-        const dataTeams = user.teams
-            .filter(t => !(t.types || []).some(type => /leadership/i.test(type) || /support/i.test(type)))
-            .map(t => t.name)
+        // Nothing selected yet (pre-initialization) → default to user's first data team
+        if (selectedTeam === null) {
+            const firstDataTeam = user.teams.find(t =>
+                !(t.types || []).some(type => /leadership/i.test(type) || /support/i.test(type))
+            )
+            return firstDataTeam
+                ? { mode: 'selected_teams', teams: [firstDataTeam.name] }
+                : { mode: 'all_teams' }
+        }
 
-        // If selected team is a pure role group, return empty array to indicate "view all"
-        // This signals to consuming components that no team filtering should be applied
+        // Role group selected (leadership/support) → no filter
         const selected = user.teams.find(t => t.name === selectedTeam)
         if (selected && isPureRoleGroup(selected)) {
-            // Return empty array - consumers should interpret as "no filter" when hasFullAccess is true
-            return []
+            return { mode: 'all_teams' }
         }
 
-        // If Leadership/SupportEngineer with no selection or "All Teams"
-        if ((isLeadership || isSupportEngineer) && (selectedTeam === null || selectedTeam === 'all')) {
-            // Return empty array to indicate "view all"
-            return []
-        }
+        // Specific team selected → filter to that team
+        return { mode: 'selected_teams', teams: [selectedTeam] }
+    }, [user, selectedTeam])
 
-        // Viewing a specific team (including escalation/tenant)
-        if (selectedTeam) {
-            return [selectedTeam]
-        }
-
-        // Default: all user's data teams (or empty if none)
-        return dataTeams
-    }, [user, isLeadership, isSupportEngineer, selectedTeam])
+    const effectiveTeams = useMemo(() => {
+        if (teamScope.mode === 'selected_teams') return teamScope.teams
+        if (teamScope.mode === 'no_teams') return [TEAM_SCOPE.NO_TEAMS]
+        return []
+    }, [teamScope])
 
     // Full access rules:
     // - True if selected team is a role team (leadership/support) OR no team selected (all) AND user is leadership/support
@@ -85,13 +94,20 @@ export const TeamFilterProvider = ({ children }: { children: ReactNode }) => {
         if (selectedIsEscalation) return false
         if (selectedIsRole) return true
 
-        // No team selected ("all") and user has leadership/support roles
-        if ((selectedTeam === null || selectedTeam === 'all' || selectedTeam === undefined) && (isLeadership || isSupportEngineer)) {
+        // No team selected and user has leadership/support roles
+        if ((selectedTeam === null || selectedTeam === undefined) && (isLeadership || isSupportEngineer)) {
             return true
         }
 
         return false
     }, [isLeadership, isSupportEngineer, selectedTeam, user])
+
+    const hasNoTeamScope = teamScope.mode === 'no_teams'
+    const isViewingAllTeams = teamScope.mode === 'all_teams'
+    const isViewingAsEscalationTeam = useMemo(() => {
+        if (!selectedTeam || actualEscalationTeams.length === 0) return false
+        return actualEscalationTeams.includes(selectedTeam)
+    }, [selectedTeam, actualEscalationTeams])
 
     // Get all available teams for the user
     const allTeams = useMemo(() => {
@@ -105,7 +121,11 @@ export const TeamFilterProvider = ({ children }: { children: ReactNode }) => {
         <TeamFilterContext.Provider value={{
             selectedTeam,
             setSelectedTeam,
+            teamScope,
             effectiveTeams,
+            hasNoTeamScope,
+            isViewingAllTeams,
+            isViewingAsEscalationTeam,
             hasFullAccess,
             allTeams,
             initialized,

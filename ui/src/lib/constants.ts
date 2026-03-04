@@ -75,3 +75,11 @@ export const SLA_THRESHOLDS = {
     ESCALATION_RESPONSE: 3600,       // 1 hour
 } as const
 
+/**
+ * Team-scope sentinel values used by dashboard filters/context.
+ */
+export const TEAM_SCOPE = {
+    NO_TEAMS: '__no_teams__',
+    ALL_TEAMS: '__all__',
+} as const
+

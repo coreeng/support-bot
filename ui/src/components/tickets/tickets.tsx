@@ -1,18 +1,28 @@
 'use client'
 
-import {useEffect, useMemo, useState} from 'react'
+import {useMemo, useState} from 'react'
 import {useAllTickets, useRegistry, useTenantTeams, useTickets, useAssignmentEnabled} from '@/lib/hooks'
 import {useTeamFilter} from '@/contexts/TeamFilterContext'
 import {TicketWithLogs, PaginatedTickets, TicketImpact, TicketTag} from "@/lib/types"
 import LoadingSkeleton from '@/components/LoadingSkeleton'
 import EditTicketModal from './EditTicketModal'
 import {useQueryClient} from '@tanstack/react-query'
+import { TEAM_SCOPE } from '@/lib/constants'
+import { normalizeTeamKey } from '@/lib/teamUtils'
+import { getDateRangeFromFilter } from '@/lib/dateRange'
 
 
 export default function TicketsPage() {
-    const {hasFullAccess, effectiveTeams} = useTeamFilter()
+    const {
+        effectiveTeams,
+        hasNoTeamScope: contextHasNoTeamScope,
+        isViewingAllTeams: contextIsViewingAllTeams,
+        selectedTeam: teamFilterSelectedTeam
+    } = useTeamFilter()
     const queryClient = useQueryClient()
     const {data: isAssignmentEnabled} = useAssignmentEnabled()
+    const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
+    const isViewingAllTeams = contextIsViewingAllTeams ?? (effectiveTeams.length === 0 && !hasNoTeamScope)
     type DateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
 
     // Selected ticket
@@ -23,6 +33,7 @@ export default function TicketsPage() {
     const [dateFilter, setDateFilter] = useState<DateFilter>('lastWeek')
     const [customDateRange, setCustomDateRange] = useState<{ start?: string; end?: string }>({})
     const [statusFilter, setStatusFilter] = useState('')
+    const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS
     const [teamFilter, setTeamFilter] = useState('')
     const [impactFilter, setImpactFilter] = useState('')
     const [tagFilter, setTagFilter] = useState('')
@@ -36,47 +47,21 @@ export default function TicketsPage() {
     const [currentPage, setCurrentPage] = useState(0)
     const pageSize = 15
 
-    // Calculate date range based on filter
-    // When switching to "custom", preserve the current range until custom dates are set
-    const dateRange = useMemo(() => {
-        if (!dateFilter) return { from: undefined, to: undefined }
-        
-        if (dateFilter === 'custom') {
-            // If custom dates are not set yet, preserve the previous filter's range
-            if (!customDateRange.start || !customDateRange.end) {
-                // Calculate the current range based on last week (default)
-                const now = new Date()
-                const to = now.toISOString().split('T')[0]
-                const fromDate = new Date(now)
-                fromDate.setDate(now.getDate() - 7)
-                const from = fromDate.toISOString().split('T')[0]
-                return { from, to }
-            }
-            return {
-                from: customDateRange.start,
-                to: customDateRange.end
-            }
-        }
-        
-        const now = new Date()
-        const to = now.toISOString().split('T')[0]
-        const fromDate = new Date(now)
-        
-        switch (dateFilter) {
-            case 'lastWeek':
-                fromDate.setDate(now.getDate() - 7)
-                break
-            case 'last2Weeks':
-                fromDate.setDate(now.getDate() - 14)
-                break
-            case 'lastMonth':
-                fromDate.setDate(now.getDate() - 30)
-                break
-        }
-        
-        const from = fromDate.toISOString().split('T')[0]
-        return { from, to }
-    }, [dateFilter, customDateRange])
+    const dateRange = useMemo(
+        () =>
+            getDateRangeFromFilter({
+                dateFilter,
+                customDateRange,
+                customValue: 'custom',
+                fallbackValue: 'lastWeek',
+                presetDays: {
+                    lastWeek: 7,
+                    last2Weeks: 14,
+                    lastMonth: 30,
+                },
+            }),
+        [dateFilter, customDateRange]
+    )
 
     const hasClientFilters = useMemo(
         () => !!(statusFilter || teamFilter || impactFilter || tagFilter || escalatedFilter || escalatedToFilter),
@@ -84,13 +69,13 @@ export default function TicketsPage() {
     )
 
     // Data hooks
-    // - When filters are applied: pull all pages client-side (both superusers and regular users) to avoid missing matches on later pages.
-    // - When no filters and superuser: use backend pagination (page/pageSize) for efficiency.
-    // - When no filters and non-superuser: keep existing large single fetch (page 0, size 1000) and client-side paginate.
-    const backendPageSize = hasFullAccess ? pageSize : 1000
-    const backendPage = hasFullAccess ? currentPage : 0
-
+    // - When filters are applied: pull all pages client-side to avoid missing matches on later pages.
+    // - When viewing all teams (no team filter): use backend pagination for efficiency.
+    // - When viewing a specific team: larger single fetch + client-side paginate.
     const shouldUseAllTickets = hasClientFilters
+    const useServerPagination = isViewingAllTeams && !shouldUseAllTickets
+    const backendPageSize = useServerPagination ? pageSize : 1000
+    const backendPage = useServerPagination ? currentPage : 0
     const allTicketsQuery = useAllTickets(200, dateRange.from, dateRange.to, shouldUseAllTickets)
     const pagedTicketsQuery = useTickets(backendPage, backendPageSize, dateRange.from, dateRange.to)
 
@@ -104,7 +89,6 @@ export default function TicketsPage() {
         opened: 'bg-blue-100 text-blue-800',
         closed: 'bg-green-100 text-green-800',
     }
-
     // --- Utility functions ---
     const getOpenedClosed = (ticket: TicketWithLogs) => {
         if (!ticket.logs?.length) return {opened: null, closed: null}
@@ -161,17 +145,30 @@ export default function TicketsPage() {
     const filteredTickets = useMemo(() => {
         if (!ticketsContent) return []
 
+        if (hasNoTeamScope) {
+            return []
+        }
+
         // Step 1: filter by effective teams (considers team selector)
-        const visibleTickets = hasFullAccess
-            ? ticketsContent // Full access -> show all
-            : effectiveTeams.length > 0
-                ? ticketsContent.filter((t: TicketWithLogs) => t.team?.name && effectiveTeams.includes(t.team.name)) // Filter by teams
-                : [] // No teams and no full access -> no tickets
+        // If the page-level Team filter is explicitly set, it should override sidebar scope.
+        const visibleTickets = teamFilter === ALL_TEAMS_FILTER
+            ? ticketsContent // explicit page-level override: show all teams
+            : teamFilter
+                ? ticketsContent // explicit page-level team selection
+                : effectiveTeams.length === 0
+                    ? ticketsContent // role-team view -> show all
+                    : ticketsContent.filter((t: TicketWithLogs) => {
+                        if (!t.team?.name) return false
+                        const ticketTeam = normalizeTeamKey(t.team.name)
+                        return effectiveTeams.some(team => normalizeTeamKey(team) === ticketTeam)
+                    })
 
         // Step 2: apply UI filters
         return visibleTickets.filter((t: TicketWithLogs) => {
             const matchesStatus = statusFilter ? t.status === statusFilter : true
-            const matchesTeam = teamFilter ? t.team?.name === teamFilter : true
+            const matchesTeam = (teamFilter && teamFilter !== ALL_TEAMS_FILTER)
+                ? normalizeTeamKey(t.team?.name) === normalizeTeamKey(teamFilter)
+                : true
             const matchesImpact = impactFilter ? t.impact === impactFilter : true
             const matchesTag = tagFilter ? t.tags?.includes(tagFilter) : true
             const matchesEscalated = escalatedFilter
@@ -185,7 +182,7 @@ export default function TicketsPage() {
 
             return matchesStatus && matchesTeam && matchesImpact && matchesTag && matchesEscalated && matchesEscalatedTo
         })
-    }, [ticketsContent, hasFullAccess, effectiveTeams, statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter, escalatedToFilter])
+    }, [ticketsContent, hasNoTeamScope, effectiveTeams, statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter, escalatedToFilter, ALL_TEAMS_FILTER])
 
     const sortedTickets = useMemo(() => {
         const toTs = (value: string | null) => (value ? new Date(value).getTime() : null)
@@ -210,6 +207,7 @@ export default function TicketsPage() {
 
     // Track previous fingerprint to detect changes
     const [prevFilterFingerprint, setPrevFilterFingerprint] = useState(filterFingerprint)
+    const [prevTeamFilterSelectedTeam, setPrevTeamFilterSelectedTeam] = useState(teamFilterSelectedTeam)
 
     // Reset page when filters change (during render, not in effect)
     if (prevFilterFingerprint !== filterFingerprint) {
@@ -219,36 +217,50 @@ export default function TicketsPage() {
         }
     }
 
-    // Client-side pagination for non-superusers
+    // Reset page-level team filter synchronously when sidebar "View as" scope changes.
+    if (prevTeamFilterSelectedTeam !== teamFilterSelectedTeam) {
+        setPrevTeamFilterSelectedTeam(teamFilterSelectedTeam)
+        if (teamFilter !== '') setTeamFilter('')
+        if (currentPage !== 0) setCurrentPage(0)
+    }
+
+    // Server pagination for all-teams without client filters; otherwise client-side pagination.
     const paginatedTickets = useMemo(() => {
-        if (hasFullAccess) {
-            // Superusers: already paginated by backend
+        if (useServerPagination) {
             return sortedTickets
-        } else {
-            // Non-superusers: paginate client-side after filtering
-            const start = currentPage * pageSize
-            return sortedTickets.slice(start, start + pageSize)
         }
-    }, [sortedTickets, currentPage, pageSize, hasFullAccess])
+        const start = currentPage * pageSize
+        return sortedTickets.slice(start, start + pageSize)
+    }, [sortedTickets, currentPage, pageSize, useServerPagination])
 
     // Calculate pagination info
-    const totalPages = hasFullAccess 
-        ? (ticketsDataTyped?.totalPages || 0) 
+    const totalPages = useServerPagination
+        ? (ticketsDataTyped?.totalPages || 0)
         : Math.ceil(sortedTickets.length / pageSize)
+    const totalTickets = useServerPagination
+        ? (ticketsDataTyped?.totalElements || 0)
+        : sortedTickets.length
 
     // --- Render ---
     return (
         <div className="p-6 space-y-6">
             <h1 className="text-3xl font-bold text-gray-800">
-                {hasFullAccess
+                {hasNoTeamScope
+                    ? 'Tickets Dashboard'
+                    : effectiveTeams.length === 0
                     ? 'Tickets Dashboard - All Teams'
-                    : effectiveTeams.length > 0
-                        ? `Tickets Dashboard - ${effectiveTeams.join(', ')}`
-                        : 'Tickets Dashboard'}
+                    : `Tickets Dashboard - ${effectiveTeams.join(', ')}`}
             </h1>
 
+            {hasNoTeamScope && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900">
+                    <p className="font-semibold">No Team Access</p>
+                    <p className="text-sm mt-1">You are not assigned to any teams, so tickets cannot be displayed.</p>
+                </div>
+            )}
+
             {/* Filters */}
-            <div className={`grid grid-cols-1 gap-2 mb-4 ${hasFullAccess ? 'sm:grid-cols-7' : 'sm:grid-cols-6'}`}>
+            <div className={`grid grid-cols-1 gap-2 mb-4 ${hasNoTeamScope ? 'sm:grid-cols-5' : 'sm:grid-cols-6'}`}>
                 {/* Date Filter - First */}
                 <select value={dateFilter} onChange={e => setDateFilter(e.target.value as DateFilter)} className="p-2 border rounded">
                     <option value="">Any Date</option>
@@ -266,9 +278,10 @@ export default function TicketsPage() {
                     <option value="stale">Stale</option>
                 </select>
 
-                {hasFullAccess && (
+                {!hasNoTeamScope && (
                     <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)} className="p-2 border rounded">
-                        <option value="">All Teams</option>
+                        <option value="">Current Team Scope</option>
+                        {!isViewingAllTeams && <option value={ALL_TEAMS_FILTER}>All Teams</option>}
                         {teamOptions.map((name: string, index: number) => (
                             <option key={`team-${index}-${name}`} value={name}>{name}</option>
                         ))}
@@ -418,23 +431,23 @@ export default function TicketsPage() {
             {/* Pagination Controls */}
             {totalPages > 1 && (
                 <div className="flex justify-center items-center space-x-4 mt-4">
-                    <button 
-                        disabled={currentPage === 0} 
+                    <button
+                        disabled={currentPage === 0}
                         onClick={() => setCurrentPage(p => p - 1)}
                         className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
                     >
                         Previous
                     </button>
                     <div className="text-sm text-gray-600">
-                        Page {currentPage + 1} of {totalPages} 
+                        Page {currentPage + 1} of {totalPages}
                         <span className="ml-2 text-gray-500">
-                            ({paginatedTickets.length} 
-                            {statusFilter || teamFilter || impactFilter || tagFilter || escalatedFilter || escalatedToFilter || dateFilter ? ' matching' : ''} 
-                            {' '}on this page)
+                            ({paginatedTickets.length}
+                            {statusFilter || teamFilter || impactFilter || tagFilter || escalatedFilter || escalatedToFilter || dateFilter ? ' matching' : ''}
+                            {' '}on this page, {totalTickets} total)
                         </span>
                     </div>
-                    <button 
-                        disabled={currentPage >= totalPages - 1} 
+                    <button
+                        disabled={currentPage >= totalPages - 1}
                         onClick={() => setCurrentPage(p => p + 1)}
                         className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
                     >

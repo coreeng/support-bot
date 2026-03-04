@@ -1,7 +1,7 @@
 # ADR: Rework View Permissions for Tickets and Escalations
 
 **Date:** 2026-02-24
-**Status:** Proposed
+**Status:** Accepted
 
 ---
 

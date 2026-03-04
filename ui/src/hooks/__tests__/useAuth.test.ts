@@ -155,12 +155,12 @@ describe("useAuth", () => {
       expect(result.current.actualEscalationTeams).toEqual([]);
     });
 
-    it("returns team codes for escalation-type teams", () => {
+    it("returns team names for escalation-type teams", () => {
       const user = createTestUser({
         roles: ["ESCALATION"],
         teams: [
-          createEscalationTeam({ code: "platform-team", label: "Platform Team" }),
-          createEscalationTeam({ code: "infra-team", label: "Infrastructure Team" }),
+          createEscalationTeam({ name: "platform-team", code: "platform-team", label: "Platform Team" }),
+          createEscalationTeam({ name: "infra-team", code: "infra-team", label: "Infrastructure Team" }),
         ],
       });
       mockUseSession.mockReturnValue(mockAuthenticatedSession(user));
@@ -188,24 +188,24 @@ describe("useAuth", () => {
       expect(result.current.actualEscalationTeams).toEqual(["escalation-team"]);
     });
 
-    it("falls back to label when code is empty", () => {
+    it("uses team name even when code differs", () => {
       const user = createTestUser({
         roles: ["ESCALATION"],
-        teams: [createEscalationTeam({ code: "", label: "Fallback Label" })],
+        teams: [createEscalationTeam({ name: "team-name", code: "different-code", label: "Display Label" })],
       });
       mockUseSession.mockReturnValue(mockAuthenticatedSession(user));
 
       const { result } = renderHook(() => useAuth());
 
-      expect(result.current.actualEscalationTeams).toEqual(["Fallback Label"]);
+      expect(result.current.actualEscalationTeams).toEqual(["team-name"]);
     });
 
     it("matches escalation type case-insensitively", () => {
       const user = createTestUser({
         roles: ["ESCALATION"],
         teams: [
-          createTestTeam({ code: "team-a", types: ["ESCALATION"] }),
-          createTestTeam({ code: "team-b", types: ["Escalation"] }),
+          createTestTeam({ code: "team-a", name: "team-a", types: ["ESCALATION"] }),
+          createTestTeam({ code: "team-b", name: "team-b", types: ["Escalation"] }),
         ],
       });
       mockUseSession.mockReturnValue(mockAuthenticatedSession(user));

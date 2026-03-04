@@ -48,8 +48,10 @@ export function proxy(request: NextRequest) {
 
   // NextAuth's `auth` wrapper has overloaded signatures; in proxy context
   // we only pass the request object.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (protectedProxy as any)(request);
+  const proxyHandler = protectedProxy as (
+    req: NextRequest
+  ) => ReturnType<typeof NextResponse.next>;
+  return proxyHandler(request);
 }
 
 export const config = {

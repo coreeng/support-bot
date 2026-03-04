@@ -343,17 +343,15 @@ describe('EscalatedToMyTeamWidget', () => {
             expect(screen.getByText(/Loading/i)).toBeInTheDocument();
         });
 
-        it('should return null when escalations fail to load', () => {
+        it('should show error banner when escalations fail to load', () => {
             mockUseEscalations.mockReturnValue({
                 data: undefined,
                 isLoading: false,
                 error: new Error('Failed to load escalations')
             } as unknown as ReturnType<typeof hooks.useEscalations>);
 
-            const { container } = render(<EscalatedToMyTeamWidget />, { wrapper: Wrapper });
-
-            // Component returns null on error
-            expect(container.firstChild).toBeNull();
+            render(<EscalatedToMyTeamWidget />, { wrapper: Wrapper });
+            expect(screen.getByText(/Error loading escalations/i)).toBeInTheDocument();
         });
 
         it('should handle empty escalations data gracefully', () => {

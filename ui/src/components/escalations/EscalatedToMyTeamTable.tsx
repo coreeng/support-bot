@@ -135,7 +135,7 @@ export default function EscalatedToMyTeamTable() {
 
     const totalPages = Math.ceil(sortedEscalations.length / pageSize)
 
-    // Top 2 tags
+    // Top 5 tags
     const topTags = useMemo(() => {
         const freqMap: Record<string, number> = {}
         filteredEscalations.forEach(esc => esc.tags?.forEach(tag => freqMap[tag] = (freqMap[tag] || 0) + 1))

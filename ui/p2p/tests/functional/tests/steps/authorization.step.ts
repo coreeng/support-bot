@@ -234,11 +234,19 @@ Then('total tickets count should be {string}', async function (this: CustomWorld
     // Wait briefly for cards to render
     await this.page.waitForTimeout(1500);
     const card = this.page.getByText(/Total Tickets/i).first();
-    await card.waitFor({ state: 'visible', timeout: 5000 });
-    const cardText = (await card.textContent()) || '';
-    const match = cardText.match(/(\d+)/);
-    const value = match ? parseInt(match[1], 10) : 0;
-    expect(value).toBe(parseInt(expected, 10));
+    const cardVisible = await card.isVisible().catch(() => false);
+    if (cardVisible) {
+        const cardText = (await card.textContent()) || '';
+        const match = cardText.match(/(\d+)/);
+        const value = match ? parseInt(match[1], 10) : 0;
+        expect(value).toBe(parseInt(expected, 10));
+        return;
+    }
+
+    // No-team dashboard view does not render summary cards; this still represents zero accessible tickets.
+    const noTeamBanner = this.page.getByText(/No Team Access/i).first();
+    await expect(noTeamBanner).toBeVisible({ timeout: 5000 });
+    expect(parseInt(expected, 10)).toBe(0);
 });
 
 Then('user should NOT see {string} section', async function (this: CustomWorld, sectionText: string) {

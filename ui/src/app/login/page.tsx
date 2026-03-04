@@ -37,10 +37,7 @@ function LoginContent() {
    * Shows error message with no login options if backend is unreachable.
    */
   useEffect(() => {
-    if (isAuthenticated) {
-      setProvidersLoading(false);
-      return;
-    }
+    if (isAuthenticated) return;
 
     fetch("/api/identity-providers", { cache: "no-store" })
       .then((res) => res.json())
@@ -66,6 +63,8 @@ function LoginContent() {
         setProvidersLoading(false);
       });
   }, [isAuthenticated]);
+
+  const showProvidersLoading = !isAuthenticated && providersLoading;
 
   // Iframe: listen for auth completion from popup
   useEffect(() => {
@@ -190,7 +189,7 @@ function LoginContent() {
   };
 
   // Show loading state (but not if auth already failed - let error screen show)
-  if (isLoading || providersLoading || ((code || token) && !error)) {
+  if (isLoading || showProvidersLoading || ((code || token) && !error)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
