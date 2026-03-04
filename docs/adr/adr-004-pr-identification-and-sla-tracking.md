@@ -117,7 +117,7 @@ When an in-scope PR link is found:
 2. For PR links detected on the top-level query message (not thread replies), if the ticket is missing metadata, initialise it with configured defaults (`tags`, `impact`) and suggested author team when available. Existing team/tags/impact are preserved.
 3. Post a thread reply with SLA tracking messaging. If the SLA is still within bounds, the message states the deadline and owning team label (named, not tagged). If already breached at detection time, the message states that the timeframe has been exceeded and the ticket is escalated immediately to the configured owning team.
 4. React to the **top-level thread message** with the configured PR emoji (`pr-emoji`, default `pr`) to indicate the ticket contains a tracked PR request, regardless of which reply introduced the PR link.
-5. Persist a `pr_tracking` record for lifecycle polling, including whether ticket auto-close is allowed for this PR (`close_ticket_on_resolve`: true for top-level detections, false for thread-reply detections).
+5. Persist a `pr_tracking` record for lifecycle polling, including whether ticket auto-close is allowed for this PR (`can_auto_close_ticket`: true for top-level detections, false for thread-reply detections).
 
 ### 6. PR Tracking State
 
@@ -135,7 +135,7 @@ create table if not exists pr_tracking
     owning_team             text,
     status                  pr_tracking_status, -- OPEN | ESCALATED | CLOSED
     escalation_id           bigint,        -- set when auto-escalation is created
-    close_ticket_on_resolve boolean not null default true,
+    can_auto_close_ticket boolean not null default true,
     closed_at               timestamptz,
     created_at              timestamptz not null default now()
 );
