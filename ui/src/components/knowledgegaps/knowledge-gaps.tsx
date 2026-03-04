@@ -54,6 +54,7 @@ export default function KnowledgeGapsPage() {
                 setAnalysisStatus(status)
                 return status
             }
+            console.error('Analysis status request failed:', response.status)
         } catch (error) {
             console.error('Error fetching analysis status:', error)
         }
@@ -123,6 +124,8 @@ export default function KnowledgeGapsPage() {
                 if (response.ok) {
                     const data = await response.json()
                     setIsAnalysisEnabled(data.enabled)
+                } else {
+                    console.error('Failed to check analysis enabled status:', response.status)
                 }
             } catch (error) {
                 console.error('Error fetching analysis enabled status:', error)

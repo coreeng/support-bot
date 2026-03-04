@@ -125,7 +125,7 @@ dependencies {
     implementation("com.microsoft.graph:microsoft-graph:6.36.0")
     implementation("com.azure.spring:spring-cloud-azure-starter:5.22.0")
 
-    implementation("dev.langchain4j:langchain4j-vertex-ai-gemini:0.36.0")
+    implementation("dev.langchain4j:langchain4j-vertex-ai-gemini:0.36.2")
     implementation("dev.langchain4j:langchain4j:0.36.2")
 
     implementation("net.logstash.logback:logstash-logback-encoder:8.0")

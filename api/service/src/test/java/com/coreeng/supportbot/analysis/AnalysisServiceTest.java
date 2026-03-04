@@ -29,6 +29,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.task.TaskRejectedException;
 
 @ExtendWith(MockitoExtension.class)
 class AnalysisServiceTest {
@@ -309,6 +310,78 @@ class AnalysisServiceTest {
         AnalysisStatus status = service.getStatus();
         assertThat(status.analyzedCount()).isEqualTo(1);
         assertThat(status.exportedCount()).isEqualTo(2);
+    }
+
+    @Test
+    void start_shouldDeleteJobAndReturnFalse_whenExecutorRejectsTask() {
+        // given
+        when(asyncJobRepository.tryStartJob("analysis", "7")).thenReturn(true);
+        when(applicationContext.getBean(AnalysisService.class))
+                .thenThrow(new TaskRejectedException("Executor queue full"));
+
+        // when
+        boolean result = service.start(7);
+
+        // then
+        assertThat(result).isFalse();
+        verify(asyncJobRepository).deleteJob("analysis");
+    }
+
+    @Test
+    void resumeAnalysisOnStartup_shouldDeleteJobWhenDataIsCorrupt() {
+        // given
+        AsyncJob corruptJob = new AsyncJob("analysis", "not-a-number", Instant.now());
+        when(asyncJobRepository.findJob("analysis")).thenReturn(corruptJob);
+
+        // when
+        service.resumeAnalysisOnStartup();
+
+        // then
+        verify(asyncJobRepository).deleteJob("analysis");
+        verifyNoInteractions(applicationContext);
+    }
+
+    @Test
+    void resumeAnalysisOnStartup_shouldDeleteJobWhenExecutorRejects() {
+        // given
+        AsyncJob existingJob = new AsyncJob("analysis", "7", Instant.now());
+        when(asyncJobRepository.findJob("analysis")).thenReturn(existingJob);
+        when(applicationContext.getBean(AnalysisService.class))
+                .thenThrow(new TaskRejectedException("Executor queue full"));
+
+        // when
+        service.resumeAnalysisOnStartup();
+
+        // then
+        verify(asyncJobRepository).deleteJob("analysis");
+    }
+
+    @Test
+    void runAsyncAnalysis_continuesAfterPerThreadException() {
+        // given — first thread throws, second and third return valid records
+        when(threadsAwaitingAnalysisService.find(7, "test-prompt-v1"))
+                .thenReturn(ImmutableList.of(
+                        new ThreadToAnalyze(1L, "ts1"),
+                        new ThreadToAnalyze(2L, "ts2"),
+                        new ThreadToAnalyze(3L, "ts3")));
+        when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts1"), eq(1L), anyString()))
+                .thenThrow(new RuntimeException("Slack timeout for thread ts1"));
+        when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts2"), eq(2L), anyString()))
+                .thenReturn(new AnalysisRecord(2, "Bug", "Config", "networking", "Issue 2", null));
+        when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts3"), eq(3L), anyString()))
+                .thenReturn(new AnalysisRecord(3, "Knowledge Gap", "Monitoring", "compute", "Issue 3", null));
+
+        // when
+        service.runAsyncAnalysis(7);
+
+        // then — 2 records persisted (skipping the failed one)
+        verify(analysisRepository, times(2)).upsert(any(AnalysisRecord.class));
+        verify(asyncJobRepository).deleteJob("analysis");
+
+        AnalysisStatus status = service.getStatus();
+        assertThat(status.analyzedCount()).isEqualTo(2);
+        assertThat(status.exportedCount()).isEqualTo(3);
+        assertThat(status.error()).isNull();
     }
 
     @Test

@@ -95,17 +95,26 @@ public class AnalysisService {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void resumeAnalysisOnStartup() {
-        AsyncJobRepository.AsyncJob existingJob = asyncJobRepository.findJob(ASYNC_ID);
+        try {
+            AsyncJobRepository.AsyncJob existingJob = asyncJobRepository.findJob(ASYNC_ID);
+            if (existingJob == null) return;
 
-        if (existingJob != null) {
+            int days;
             try {
-                int days = Integer.parseInt(existingJob.data());
-                log.info("Found pending async job on startup: {}, resuming...", ASYNC_ID);
-                applicationContext.getBean(AnalysisService.class).runAsyncAnalysis(days);
+                days = Integer.parseInt(existingJob.data());
             } catch (NumberFormatException e) {
                 log.error("Corrupt async job data '{}', deleting job", existingJob.data());
                 asyncJobRepository.deleteJob(ASYNC_ID);
+                return;
             }
+
+            log.info("Found pending async job on startup: {}, resuming...", ASYNC_ID);
+            applicationContext.getBean(AnalysisService.class).runAsyncAnalysis(days);
+        } catch (TaskRejectedException e) {
+            log.error("Executor rejected resume of analysis job, cleaning up DB record", e);
+            asyncJobRepository.deleteJob(ASYNC_ID);
+        } catch (Exception e) {
+            log.error("Failed to resume analysis job on startup", e);
         }
     }
 
@@ -200,14 +209,18 @@ public class AnalysisService {
                     interrupted = true;
                     break;
                 } catch (Exception e) {
-                    log.error("Failed to analyze thread for ticket {}: {}", thread.ticketId(), e.getMessage());
+                    log.error("Failed to analyze thread for ticket {}: {}", thread.ticketId(), e.getMessage(), e);
                     // Continue with next thread
                 }
             }
 
             if (interrupted) {
                 log.warn("Async job {} interrupted: analyzed {}/{} threads", ASYNC_ID, analyzedCount, threads.size());
-                currentStatus.set(new AnalysisStatus(ASYNC_ID, threads.size(), analyzedCount, false,
+                currentStatus.set(new AnalysisStatus(
+                        ASYNC_ID,
+                        threads.size(),
+                        analyzedCount,
+                        false,
                         "Analysis interrupted after " + analyzedCount + "/" + threads.size() + " threads"));
             } else {
                 log.info("Async job {} completed: analyzed {}/{} threads", ASYNC_ID, analyzedCount, threads.size());

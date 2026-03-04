@@ -185,7 +185,7 @@ public class SummaryDataController {
 
     /**
      * Import analysis data from a JSONL file.
-     * The file should have the structure: ticket_id, Driver, Category, Feature, Summary
+     * The file should contain JSON objects with fields: ticketId, driver, category, feature, summary
      *
      * @param file JSONL file to import
      * @return Response with the number of records imported
