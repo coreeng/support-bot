@@ -124,7 +124,7 @@ I have a Slack thread with the following content:
             // promptId is set to null here; it's added by the caller (AnalysisService)
             return new AnalysisRecord(Math.toIntExact(ticketId), driver, category, feature, summary, null);
         } catch (Exception e) {
-            log.error("Failed to parse LLM response: {}. Response content: {}", e.getMessage(), response);
+            log.error("Failed to parse LLM response: {}. Response content: {}", e.getMessage(), response, e);
             return null;
         }
     }
