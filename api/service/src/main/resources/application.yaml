@@ -258,4 +258,3 @@ analysis:
   prompt:
     enabled: ${ANALYSIS_PROMPT_ENABLED:false}
     file: ${ANALYSIS_PROMPT_FILE:/app/analysis/prompt.md}
-    id-file: ${ANALYSIS_PROMPT_ID_FILE:/app/analysis/prompt-id.yaml}

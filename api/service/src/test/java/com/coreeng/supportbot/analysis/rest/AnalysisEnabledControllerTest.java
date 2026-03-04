@@ -37,7 +37,7 @@ class AnalysisEnabledControllerTest {
         AnalysisProps.Vertex vertex =
                 new AnalysisProps.Vertex("test-project", "europe-west2", "gemini-2.5-flash", Duration.ofMillis(100));
         AnalysisProps.Bundle bundle = new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip");
-        AnalysisProps.Prompt prompt = new AnalysisProps.Prompt(enabled, "", "");
+        AnalysisProps.Prompt prompt = new AnalysisProps.Prompt(enabled, "");
         AnalysisProps analysisProps = new AnalysisProps(vertex, bundle, prompt);
         return new AnalysisEnabledController(analysisProps);
     }

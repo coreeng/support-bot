@@ -17,8 +17,6 @@ env:
     value: "functional-test-jwt-secret-minimum-256-bits"
   - name: ANALYSIS_PROMPT_FILE
     value: "analysis/prompt.md"
-  - name: ANALYSIS_PROMPT_ID_FILE
-    value: "analysis/prompt-id.yaml"
 
 monitoring:
   enabled: true

@@ -53,7 +53,7 @@ class SummaryDataControllerTest {
         AnalysisProps.Vertex vertex =
                 new AnalysisProps.Vertex("test-project", "europe-west2", "gemini-2.5-flash", Duration.ofMillis(100));
         AnalysisProps.Bundle bundle = new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip");
-        AnalysisProps.Prompt prompt = new AnalysisProps.Prompt(true, "", "");
+        AnalysisProps.Prompt prompt = new AnalysisProps.Prompt(true, "");
         analysisProps = new AnalysisProps(vertex, bundle, prompt);
         objectMapper = new ObjectMapper();
         controller = new SummaryDataController(
@@ -261,7 +261,7 @@ class SummaryDataControllerTest {
         analysisProps = new AnalysisProps(
                 new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
                 new AnalysisProps.Bundle("classpath:nonexistent.zip"),
-                new AnalysisProps.Prompt(true, "", ""));
+                new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
                 threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
 
@@ -282,7 +282,7 @@ class SummaryDataControllerTest {
         analysisProps = new AnalysisProps(
                 new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
                 new AnalysisProps.Bundle(tempDir.toString()),
-                new AnalysisProps.Prompt(true, "", ""));
+                new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
                 threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
 
@@ -319,7 +319,7 @@ class SummaryDataControllerTest {
         analysisProps = new AnalysisProps(
                 new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
                 new AnalysisProps.Bundle(tempDir.toString()),
-                new AnalysisProps.Prompt(true, "", ""));
+                new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
                 threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
 
@@ -348,7 +348,7 @@ class SummaryDataControllerTest {
         analysisProps = new AnalysisProps(
                 new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
                 new AnalysisProps.Bundle(tempDir.toString()),
-                new AnalysisProps.Prompt(true, "", ""));
+                new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
                 threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
 
@@ -378,7 +378,7 @@ class SummaryDataControllerTest {
         analysisProps = new AnalysisProps(
                 new AnalysisProps.Vertex("", "", "", Duration.ofSeconds(1)),
                 new AnalysisProps.Bundle("/nonexistent/directory"),
-                new AnalysisProps.Prompt(true, "", ""));
+                new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
                 threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
 

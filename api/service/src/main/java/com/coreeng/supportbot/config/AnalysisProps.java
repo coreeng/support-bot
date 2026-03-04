@@ -9,5 +9,5 @@ public record AnalysisProps(Vertex vertex, Bundle bundle, Prompt prompt) {
 
     public record Bundle(String path) {}
 
-    public record Prompt(boolean enabled, String file, String idFile) {}
+    public record Prompt(boolean enabled, String file) {}
 }

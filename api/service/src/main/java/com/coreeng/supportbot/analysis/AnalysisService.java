@@ -6,12 +6,13 @@ import com.coreeng.supportbot.analysis.llm.LlmAnalysisService;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.AnalysisProps;
 import com.coreeng.supportbot.config.SlackTicketsProps;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.collect.ImmutableList;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,8 +44,8 @@ import org.springframework.stereotype.Service;
  * ({@code analysisTaskExecutor}) to avoid LLM rate limits and prevent double processing.
  *
  * <p>The service uses prompt versioning via {@code prompt_id} to avoid re-analyzing threads
- * when the prompt hasn't changed. The prompt ID is loaded from a YAML file specified in
- * {@link AnalysisProps}.
+ * when the prompt hasn't changed. The prompt ID is computed as a SHA-256 hash of the prompt
+ * file content, so it auto-updates whenever the prompt changes.
  */
 @Service
 @ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
@@ -53,7 +54,6 @@ import org.springframework.stereotype.Service;
 public class AnalysisService {
 
     private static final String ASYNC_ID = "analysis";
-    private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
 
     /**
      * Repository for managing async job state in the database.
@@ -146,9 +146,9 @@ public class AnalysisService {
      *
      * <p>This method:
      * <ol>
-     *   <li>Loads the current prompt ID from the YAML file</li>
-     *   <li>Finds all threads that need analysis (closed tickets without analysis for this prompt ID)</li>
      *   <li>Loads the prompt text from the configured file</li>
+     *   <li>Computes the prompt ID as a SHA-256 hash of the prompt content</li>
+     *   <li>Finds all threads that need analysis (closed tickets without analysis for this prompt ID)</li>
      *   <li>Analyzes each thread using the LLM</li>
      *   <li>Persists valid analysis results immediately</li>
      *   <li>Updates the in-memory status after each thread</li>
@@ -162,13 +162,14 @@ public class AnalysisService {
     public void runAsyncAnalysis(int days) {
 
         try {
-            String promptId = loadPromptId();
+            String prompt = loadPrompt();
+            String promptId = computePromptId(prompt);
+            log.info("Computed prompt ID (SHA-256): {}", promptId);
+
             // Find threads that need analysis (no analysis record with this prompt ID)
             ImmutableList<ThreadToAnalyze> threads = threadsAwaitingAnalysisService.find(days, promptId);
 
             currentStatus.set(new AnalysisStatus(ASYNC_ID, threads.size(), 0, true, null));
-
-            String prompt = loadPrompt();
 
             int analyzedCount = 0;
             boolean interrupted = false;
@@ -252,31 +253,21 @@ public class AnalysisService {
     }
 
     /**
-     * Loads the prompt ID from the YAML file specified in {@link AnalysisProps#prompt()}.
+     * Computes a prompt ID by hashing the prompt content with SHA-256.
      *
-     * <p>The YAML file must contain an {@code id} field. This ID is used to version prompts
-     * and avoid re-analyzing threads when the prompt hasn't changed.
+     * <p>This ensures the prompt ID automatically changes whenever the prompt content changes,
+     * triggering re-analysis of threads with the updated prompt.
      *
-     * @return The prompt ID string
-     * @throws RuntimeException if the file cannot be read or doesn't contain an 'id' field
+     * @param promptContent The prompt text to hash
+     * @return A 64-character lowercase hex string (SHA-256 digest)
      */
-    private String loadPromptId() {
+    static String computePromptId(String promptContent) {
         try {
-            String idFile = analysisProps.prompt().idFile();
-            String yamlContent = Files.readString(Path.of(idFile));
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> yamlData = YAML_MAPPER.readValue(yamlContent, Map.class);
-
-            Object id = yamlData.get("id");
-            if (id == null) {
-                throw new IllegalArgumentException("Prompt ID file does not contain 'id' field: " + idFile);
-            }
-
-            return id.toString();
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    "Failed to load prompt ID file: " + analysisProps.prompt().idFile(), e);
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(promptContent.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new AssertionError("SHA-256 must be available in every JVM", e);
         }
     }
 

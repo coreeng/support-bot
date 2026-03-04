@@ -53,21 +53,16 @@ class AnalysisServiceTest {
     private SlackTicketsProps slackTicketsProps;
     private AnalysisService service;
     private Path tempPromptFile;
-    private Path tempPromptIdFile;
 
     @BeforeEach
     void setUp() throws IOException {
-        // Create temporary files for testing
+        // Create temporary prompt file for testing
         tempPromptFile = Files.createTempFile("test-prompt", ".md");
-        tempPromptIdFile = Files.createTempFile("test-prompt-id", ".yaml");
-
         Files.writeString(tempPromptFile, "Test prompt content");
-        Files.writeString(tempPromptIdFile, "id: test-prompt-v1");
 
         Vertex vertex = new Vertex("test-project", "europe-west2", "gemini-2.5-flash", Duration.ofMillis(100));
         Bundle bundle = new Bundle("classpath:placeholder-analysis-bundle.zip");
-        Prompt prompt =
-                new Prompt(true, tempPromptFile.toString(), tempPromptIdFile.toString()); // prompt is loaded from file
+        Prompt prompt = new Prompt(true, tempPromptFile.toString());
         analysisProps = new AnalysisProps(vertex, bundle, prompt);
         slackTicketsProps = new SlackTicketsProps("C123456", "eyes", "ticket", "white_check_mark", "rocket");
 
@@ -83,12 +78,8 @@ class AnalysisServiceTest {
 
     @AfterEach
     void tearDown() throws IOException {
-        // Clean up temporary files
         if (tempPromptFile != null) {
             Files.deleteIfExists(tempPromptFile);
-        }
-        if (tempPromptIdFile != null) {
-            Files.deleteIfExists(tempPromptIdFile);
         }
     }
 
@@ -256,12 +247,34 @@ class AnalysisServiceTest {
         verifyNoInteractions(analysisRepository);
     }
 
+    @Test
+    void computePromptId_returnsSameHashForSameContent() {
+        // given
+        String prompt = "Analyse the support thread and classify the issue.";
+
+        // when
+        String hash1 = AnalysisService.computePromptId(prompt);
+        String hash2 = AnalysisService.computePromptId(prompt);
+
+        // then
+        assertThat(hash1).isEqualTo(hash2);
+        assertThat(hash1).matches("[0-9a-f]{64}");
+    }
+
+    @Test
+    void computePromptId_returnsDifferentHashForDifferentContent() {
+        String hash1 = AnalysisService.computePromptId("Version 1 of the prompt");
+        String hash2 = AnalysisService.computePromptId("Version 2 of the prompt");
+
+        assertThat(hash1).isNotEqualTo(hash2);
+    }
+
     // --- runAsyncAnalysis tests ---
 
     @Test
     void runAsyncAnalysis_analyzesThreadsAndPersists() {
         // given
-        when(threadsAwaitingAnalysisService.find(7, "test-prompt-v1"))
+        when(threadsAwaitingAnalysisService.find(eq(7), anyString()))
                 .thenReturn(ImmutableList.of(new ThreadToAnalyze(1L, "ts1"), new ThreadToAnalyze(2L, "ts2")));
         when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts1"), eq(1L), anyString()))
                 .thenReturn(new AnalysisRecord(1, "Bug", "Config", "networking", "Issue 1", null));
@@ -271,11 +284,11 @@ class AnalysisServiceTest {
         // when
         service.runAsyncAnalysis(7);
 
-        // then — both records upserted with promptId stamped
+        // then — both records upserted with promptId stamped (SHA-256 = 64-char hex)
         ArgumentCaptor<AnalysisRecord> captor = ArgumentCaptor.forClass(AnalysisRecord.class);
         verify(analysisRepository, times(2)).upsert(captor.capture());
         assertThat(captor.getAllValues())
-                .allSatisfy(r -> assertThat(r.promptId()).isEqualTo("test-prompt-v1"));
+                .allSatisfy(r -> assertThat(r.promptId()).matches("[0-9a-f]{64}"));
         assertThat(captor.getAllValues().get(0).ticketId()).isEqualTo(1);
         assertThat(captor.getAllValues().get(1).ticketId()).isEqualTo(2);
 
@@ -293,7 +306,7 @@ class AnalysisServiceTest {
     @Test
     void runAsyncAnalysis_skipsInvalidRecords() {
         // given — first thread returns null (LLM failure), second returns valid record
-        when(threadsAwaitingAnalysisService.find(7, "test-prompt-v1"))
+        when(threadsAwaitingAnalysisService.find(eq(7), anyString()))
                 .thenReturn(ImmutableList.of(new ThreadToAnalyze(1L, "ts1"), new ThreadToAnalyze(2L, "ts2")));
         when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts1"), eq(1L), anyString()))
                 .thenReturn(null);
@@ -359,7 +372,7 @@ class AnalysisServiceTest {
     @Test
     void runAsyncAnalysis_continuesAfterPerThreadException() {
         // given — first thread throws, second and third return valid records
-        when(threadsAwaitingAnalysisService.find(7, "test-prompt-v1"))
+        when(threadsAwaitingAnalysisService.find(eq(7), anyString()))
                 .thenReturn(ImmutableList.of(
                         new ThreadToAnalyze(1L, "ts1"),
                         new ThreadToAnalyze(2L, "ts2"),
@@ -385,14 +398,10 @@ class AnalysisServiceTest {
     }
 
     @Test
-    void runAsyncAnalysis_setsErrorOnPromptLoadFailure() throws IOException {
-        // given — recreate service with nonexistent prompt ID file
-        Files.deleteIfExists(tempPromptIdFile);
-        Path badPath = Path.of("/nonexistent/prompt-id.yaml");
+    void runAsyncAnalysis_setsErrorOnPromptLoadFailure() {
+        // given — recreate service with nonexistent prompt file
         AnalysisProps badProps = new AnalysisProps(
-                analysisProps.vertex(),
-                analysisProps.bundle(),
-                new Prompt(true, tempPromptFile.toString(), badPath.toString()));
+                analysisProps.vertex(), analysisProps.bundle(), new Prompt(true, "/nonexistent/prompt.md"));
         AnalysisService badService = new AnalysisService(
                 asyncJobRepository,
                 threadsAwaitingAnalysisService,
