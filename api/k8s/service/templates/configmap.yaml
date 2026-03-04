@@ -64,9 +64,9 @@ data:
       github:
         api-base-url: {{ .Values.prReviewTracking.github.apiBaseUrl | default "${GITHUB_API_BASE_URL:https://api.github.com}" | quote }}
         auth-mode: {{ .Values.prReviewTracking.github.authMode | default "${GITHUB_AUTH_MODE:token}" | quote }}
-        token: {{ .Values.prReviewTracking.github.token | default "${GITHUB_TOKEN:}" | quote }}
+        token: "${GITHUB_TOKEN:}"
         app-id: {{ .Values.prReviewTracking.github.appId | default "${GITHUB_APP_ID:}" | quote }}
         installation-id: {{ .Values.prReviewTracking.github.installationId | default "${GITHUB_APP_INSTALLATION_ID:}" | quote }}
-        private-key-pem: {{ .Values.prReviewTracking.github.privateKeyPem | default "${GITHUB_APP_PRIVATE_KEY_PEM:}" | quote }}
+        private-key-pem: "${GITHUB_APP_PRIVATE_KEY_PEM:}"
     {{- end }}
 {{- end }}
