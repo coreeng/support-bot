@@ -52,17 +52,17 @@ main() {
   helm_uninstall_if_exists "$JOB_RELEASE" "$NAMESPACE"
 
   if [[ "$DEPLOY_SERVICE" == "true" ]]; then
-    "${SCRIPT_DIR}/deploy-service.sh" \
-      ACTION=deploy \
-      NAMESPACE="$NAMESPACE" \
-      SERVICE_RELEASE="$SERVICE_RELEASE" \
-      SERVICE_CHART_PATH="$SERVICE_CHART_PATH" \
-      VALUES_FILE="$SERVICE_CHART_PATH/values-functional.yaml" \
-      DEPLOY_DB="$CLEAN_DEPLOY_DB" \
-      DB_RELEASE="$DB_RELEASE" \
-      SERVICE_IMAGE_REPOSITORY="$SERVICE_IMAGE_REPOSITORY" \
-      SERVICE_IMAGE_TAG="$SERVICE_IMAGE_TAG" \
-      WAIT_TIMEOUT=180
+    ACTION=deploy \
+    NAMESPACE="$NAMESPACE" \
+    SERVICE_RELEASE="$SERVICE_RELEASE" \
+    SERVICE_CHART_PATH="$SERVICE_CHART_PATH" \
+    VALUES_FILE="$SERVICE_CHART_PATH/values-functional.yaml" \
+    DEPLOY_DB="$CLEAN_DEPLOY_DB" \
+    DB_RELEASE="$DB_RELEASE" \
+    SERVICE_IMAGE_REPOSITORY="$SERVICE_IMAGE_REPOSITORY" \
+    SERVICE_IMAGE_TAG="$SERVICE_IMAGE_TAG" \
+    WAIT_TIMEOUT=180 \
+    "${SCRIPT_DIR}/deploy-service.sh"
   else
     log_warning "Skipping service deployment per DEPLOY_SERVICE=false"
   fi
