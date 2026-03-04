@@ -26,6 +26,8 @@ import org.springframework.stereotype.Service;
 public class ThreadService {
 
     private static final int PAGE_LIMIT = 200; // Recommended page size for Slack API
+    private static final int DEFAULT_RATE_LIMIT_WAIT_SECONDS = 10;
+    private static final String RATE_LIMITED_ERROR = "ratelimited";
     private static final String WHITE_CHECK_MARK_EMOJI = "white_check_mark";
 
     private final SlackClient slackClient;
@@ -91,18 +93,19 @@ public class ThreadService {
             try {
                 response = slackClient.getThreadPage(requestBuilder.build());
             } catch (SlackException e) {
-                if ("ratelimited".equals(e.getError())) {
-                    log.warn("Rate limited on page {}, waiting 10 seconds before retry", pageCount);
-                    try {
-                        Thread.sleep(10000); // Wait 10 seconds
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        throw new RuntimeException("Interrupted while waiting for rate limit", ie);
-                    }
-                    response = slackClient.getThreadPage(requestBuilder.build()); // Retry once
-                } else {
+                if (!RATE_LIMITED_ERROR.equals(e.getError())) {
                     throw e;
                 }
+                Integer retryAfter = e.retryAfterSeconds();
+                int waitSeconds = retryAfter != null ? retryAfter : DEFAULT_RATE_LIMIT_WAIT_SECONDS;
+                log.warn("Rate limited on thread replies page {}, Retry-After: {} seconds", pageCount, waitSeconds);
+                try {
+                    Thread.sleep(waitSeconds * 1000L);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while waiting for rate limit", ie);
+                }
+                response = slackClient.getThreadPage(requestBuilder.build()); // Retry once
             }
 
             if (response.getMessages() != null) {
@@ -129,7 +132,7 @@ public class ThreadService {
                 threadTs);
 
         try {
-            Thread.sleep(500); // Wait 0.5 seconds
+            Thread.sleep(500); // Wait 0.5 seconds between thread fetches to avoid rate limiting
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted while waiting for rate limit", ie);
@@ -210,18 +213,19 @@ public class ThreadService {
             try {
                 response = slackClient.getHistoryPage(requestBuilder.build());
             } catch (SlackException e) {
-                if ("rate_limited".equals(e.getError())) {
-                    log.warn("Rate limited on page {}, waiting 2 seconds before retry", pageCount);
-                    try {
-                        Thread.sleep(2000);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        throw new RuntimeException("Interrupted while waiting for rate limit", ie);
-                    }
-                    response = slackClient.getHistoryPage(requestBuilder.build()); // Retry once
-                } else {
+                if (!RATE_LIMITED_ERROR.equals(e.getError())) {
                     throw e;
                 }
+                Integer retryAfter = e.retryAfterSeconds();
+                int waitSeconds = retryAfter != null ? retryAfter : DEFAULT_RATE_LIMIT_WAIT_SECONDS;
+                log.warn("Rate limited on history page {}, Retry-After: {} seconds", pageCount, waitSeconds);
+                try {
+                    Thread.sleep(waitSeconds * 1000L);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while waiting for rate limit", ie);
+                }
+                response = slackClient.getHistoryPage(requestBuilder.build()); // Retry once
             }
 
             if (response.getMessages() != null) {
@@ -251,7 +255,7 @@ public class ThreadService {
                     Thread.sleep(1100);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    break;
+                    throw new RuntimeException("Interrupted while waiting for rate limit", e);
                 }
             } else {
                 hasMore = false;

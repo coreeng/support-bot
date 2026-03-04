@@ -1,16 +1,24 @@
 package com.coreeng.supportbot.summarydata;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.config.SummaryDataProps;
 import com.coreeng.supportbot.config.SummaryDataProps.SanitisationProperties;
+import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.client.SlackClient;
+import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
 import com.slack.api.model.Message;
 import com.slack.api.model.ResponseMetadata;
 import java.util.List;
+import okhttp3.Protocol;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -243,6 +251,46 @@ class ThreadServiceTest {
         assertThat(result).contains("contact:");
     }
 
+    @Test
+    void getAllThreadMessageTexts_shouldRetryOnceOnRateLimit() {
+        // Given
+        var service = serviceWithSanitisation(List.of(), List.of());
+        when(slackClient.getThreadPage(any()))
+                .thenThrow(rateLimitedSlackException("1"))
+                .thenReturn(singlePageResponse(List.of(messageWithText("recovered"))));
+
+        // When
+        var result = service.getAllThreadMessageTexts(CHANNEL_ID, THREAD_TS);
+
+        // Then
+        assertThat(result).containsExactly("recovered");
+        verify(slackClient, times(2)).getThreadPage(any());
+    }
+
+    @Test
+    void getAllThreadMessageTexts_shouldRethrowNonRateLimitSlackException() {
+        // Given
+        var service = serviceWithSanitisation(List.of(), List.of());
+        var exception = new SlackException(new RuntimeException("channel_not_found"));
+        when(slackClient.getThreadPage(any())).thenThrow(exception);
+
+        // When / Then
+        assertThatThrownBy(() -> service.getAllThreadMessageTexts(CHANNEL_ID, THREAD_TS))
+                .isSameAs(exception);
+    }
+
+    @Test
+    void getAllThreadMessageTexts_shouldPropagateWhenRetryAlsoFails() {
+        // Given
+        var service = serviceWithSanitisation(List.of(), List.of());
+        when(slackClient.getThreadPage(any())).thenThrow(rateLimitedSlackException("1"));
+
+        // When / Then
+        assertThatThrownBy(() -> service.getAllThreadMessageTexts(CHANNEL_ID, THREAD_TS))
+                .isInstanceOf(SlackException.class);
+        verify(slackClient, times(2)).getThreadPage(any());
+    }
+
     private ThreadService serviceWithSanitisation(List<String> patterns, List<String> exceptions) {
         var sanitisation = new SanitisationProperties(patterns, exceptions);
         var props = new SummaryDataProps("classpath:placeholder-analysis-bundle.zip", sanitisation);
@@ -261,5 +309,17 @@ class ThreadServiceTest {
         var msg = new Message();
         msg.setText(text);
         return msg;
+    }
+
+    private static SlackException rateLimitedSlackException(String retryAfterSeconds) {
+        Response okHttpResponse = new Response.Builder()
+                .request(new Request.Builder().url("https://slack.com/api/test").build())
+                .protocol(Protocol.HTTP_1_1)
+                .code(429)
+                .message("Too Many Requests")
+                .header("Retry-After", retryAfterSeconds)
+                .build();
+        SlackApiException cause = new SlackApiException(okHttpResponse, "{\"ok\":false,\"error\":\"ratelimited\"}");
+        return new SlackException(cause);
     }
 }
