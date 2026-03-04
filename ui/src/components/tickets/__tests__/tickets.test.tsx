@@ -232,6 +232,130 @@ describe('Tickets Component', () => {
             const options = screen.getAllByRole('option').map(o => o.textContent);
             expect(options).toEqual(expect.arrayContaining(['Wow Team']));
         });
+
+        it('resets page-level team filter to current scope when sidebar team changes', () => {
+            const mockTickets = getMockPaginatedTickets([
+                createMockTicket('1', 'opened', 'Team A', 'high'),
+                createMockTicket('2', 'opened', 'Team B', 'medium'),
+            ]);
+
+            mockUseTickets.mockReturnValue({
+                data: mockTickets,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            mockUseTeamFilter.mockReturnValue({
+                selectedTeam: 'Team A',
+                setSelectedTeam: jest.fn(),
+                hasFullAccess: false,
+                effectiveTeams: ['Team A'],
+                allTeams: ['Team A', 'Team B'],
+                initialized: true
+            });
+
+            const { rerender } = render(<Tickets />, { wrapper: Wrapper });
+
+            const teamSelect = screen.getAllByRole('combobox').find(sel =>
+                Array.from((sel as HTMLSelectElement).options).some(o => o.textContent === 'Current Team Scope')
+            ) as HTMLSelectElement;
+
+            fireEvent.change(teamSelect, { target: { value: '__all__' } });
+            expect(teamSelect.value).toBe('__all__');
+
+            mockUseTeamFilter.mockReturnValue({
+                selectedTeam: 'Team B',
+                setSelectedTeam: jest.fn(),
+                hasFullAccess: false,
+                effectiveTeams: ['Team B'],
+                allTeams: ['Team A', 'Team B'],
+                initialized: true
+            });
+
+            rerender(<Tickets />);
+
+            const resetTeamSelect = screen.getAllByRole('combobox').find(sel =>
+                Array.from((sel as HTMLSelectElement).options).some(o => o.textContent === 'Current Team Scope')
+            ) as HTMLSelectElement;
+
+            expect(resetTeamSelect.value).toBe('');
+            expect(screen.getByText('Tickets Dashboard - Team B')).toBeInTheDocument();
+        });
+
+        it('applies 3-state team filtering: current scope, all teams, explicit team', () => {
+            const mockTickets = getMockPaginatedTickets([
+                createMockTicket('1', 'opened', 'Team A', 'high'),
+                createMockTicket('2', 'opened', 'Team B', 'medium'),
+            ]);
+
+            mockUseTickets.mockReturnValue({
+                data: mockTickets,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+            mockUseAllTickets.mockReturnValue({
+                data: mockTickets,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useAllTickets>);
+
+            mockUseTeamFilter.mockReturnValue({
+                selectedTeam: 'Team A',
+                setSelectedTeam: jest.fn(),
+                hasFullAccess: false,
+                effectiveTeams: ['Team A'],
+                allTeams: ['Team A', 'Team B'],
+                initialized: true
+            });
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            const getTableBodyText = () => screen.getByRole('table').querySelector('tbody')?.textContent || '';
+            const teamSelect = screen.getAllByRole('combobox').find(sel =>
+                Array.from((sel as HTMLSelectElement).options).some(o => o.textContent === 'Current Team Scope')
+            ) as HTMLSelectElement;
+
+            // '' => current team scope (Team A only)
+            expect(getTableBodyText()).toContain('Team A');
+            expect(getTableBodyText()).not.toContain('Team B');
+
+            // __all__ => all teams
+            fireEvent.change(teamSelect, { target: { value: '__all__' } });
+            expect(getTableBodyText()).toContain('Team A');
+            expect(getTableBodyText()).toContain('Team B');
+
+            // specific team => explicit team override
+            fireEvent.change(teamSelect, { target: { value: 'Team B' } });
+            expect(getTableBodyText()).not.toContain('Team A');
+            expect(getTableBodyText()).toContain('Team B');
+        });
+
+        it('hides team scope controls when user has no backend team scope', () => {
+            const mockTickets = getMockPaginatedTickets([
+                createMockTicket('1', 'opened', 'Team A', 'high'),
+            ]);
+
+            mockUseTickets.mockReturnValue({
+                data: mockTickets,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            mockUseTeamFilter.mockReturnValue({
+                selectedTeam: null,
+                setSelectedTeam: jest.fn(),
+                hasFullAccess: false,
+                effectiveTeams: ['__no_teams__'],
+                allTeams: ['Team A'],
+                initialized: true
+            });
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            expect(screen.queryByText('Current Team Scope')).not.toBeInTheDocument();
+            expect(screen.getByText('Tickets Dashboard')).toBeInTheDocument();
+            expect(screen.getByText('No tickets found')).toBeInTheDocument();
+        });
     });
 
     describe('Filtering across pages', () => {
@@ -283,7 +407,7 @@ describe('Tickets Component', () => {
             fireEvent.change(escalatedSelect!, { target: { value: 'Yes' } });
 
             expect(mockUseAllTickets).toHaveBeenCalled();
-            expect(screen.getByText('Wow Team')).toBeInTheDocument();
+            expect(screen.getAllByText('Wow Team').length).toBeGreaterThan(0);
         });
 
         it('filters tickets by escalation target team via "Escalated To" dropdown', () => {
