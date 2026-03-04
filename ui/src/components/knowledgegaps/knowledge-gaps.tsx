@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText, Play } from 'lucide-react'
+import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText, Play, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react'
 import { getCsrfToken } from 'next-auth/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAnalysis } from '@/lib/hooks'
@@ -33,8 +33,10 @@ export default function KnowledgeGapsPage() {
     const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus | null>(null)
     const [isStartingAnalysis, setIsStartingAnalysis] = useState(false)
     const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const [showCompletedStatus, setShowCompletedStatus] = useState(false)
     const [completedMessage, setCompletedMessage] = useState<string>('')
+    const [isCompletionError, setIsCompletionError] = useState(false)
     const isCompletedRef = useRef(false)
     const [isAnalysisEnabled, setIsAnalysisEnabled] = useState(false)
 
@@ -42,6 +44,11 @@ export default function KnowledgeGapsPage() {
     const fetchAnalysisStatus = async () => {
         try {
             const response = await fetch('/api/analysis/status')
+            if (response.status === 401) {
+                stopPolling()
+                showToast('Session expired. Please refresh the page.', 'error')
+                return null
+            }
             if (response.ok) {
                 const status: AnalysisStatus = await response.json()
                 setAnalysisStatus(status)
@@ -68,22 +75,28 @@ export default function KnowledgeGapsPage() {
 
                 // Show completion message in the progress panel
                 if (status.error) {
+                    setIsCompletionError(true)
                     setCompletedMessage(`Analysis failed: ${status.error}`)
                     setShowCompletedStatus(true)
 
                     // Show error toast and hide panel after 5 seconds
-                    setTimeout(() => {
+                    completionTimeoutRef.current = setTimeout(() => {
                         setShowCompletedStatus(false)
                         setAnalysisStatus(null)
                         isCompletedRef.current = false
                         showToast(`Analysis failed: ${status.error}`, 'error')
                     }, 5000)
                 } else {
-                    setCompletedMessage(`Analysis complete! Exported: ${status.exportedCount || 0}, Analyzed: ${status.analyzedCount || 0}`)
+                    setIsCompletionError(false)
+                    const exported = status.exportedCount ?? 0
+                        const message = exported === 0
+                            ? 'All threads are up to date'
+                            : `Analysis complete! ${status.analyzedCount || 0} of ${exported} threads analysed`
+                    setCompletedMessage(message)
                     setShowCompletedStatus(true)
 
                     // Wait 5 seconds, then hide panel and refresh data
-                    setTimeout(async () => {
+                    completionTimeoutRef.current = setTimeout(async () => {
                         setShowCompletedStatus(false)
                         setAnalysisStatus(null)
                         isCompletedRef.current = false
@@ -125,6 +138,9 @@ export default function KnowledgeGapsPage() {
 
         return () => {
             stopPolling()
+            if (completionTimeoutRef.current) {
+                clearTimeout(completionTimeoutRef.current)
+            }
         }
     }, [])
 
@@ -168,20 +184,26 @@ export default function KnowledgeGapsPage() {
 
                     // Show completion message
                     if (status.error) {
+                        setIsCompletionError(true)
                         setCompletedMessage(`Analysis failed: ${status.error}`)
                         setShowCompletedStatus(true)
 
-                        setTimeout(() => {
+                        completionTimeoutRef.current = setTimeout(() => {
                             setShowCompletedStatus(false)
                             setAnalysisStatus(null)
                             isCompletedRef.current = false
                             showToast(`Analysis failed: ${status.error}`, 'error')
                         }, 5000)
                     } else {
-                        setCompletedMessage(`Analysis complete! Exported: ${status.exportedCount || 0}, Analyzed: ${status.analyzedCount || 0}`)
+                        setIsCompletionError(false)
+                        const exported = status.exportedCount ?? 0
+                        const message = exported === 0
+                            ? 'All threads are up to date'
+                            : `Analysis complete! ${status.analyzedCount || 0} of ${exported} threads analysed`
+                        setCompletedMessage(message)
                         setShowCompletedStatus(true)
 
-                        setTimeout(async () => {
+                        completionTimeoutRef.current = setTimeout(async () => {
                             setShowCompletedStatus(false)
                             setAnalysisStatus(null)
                             isCompletedRef.current = false
@@ -195,11 +217,11 @@ export default function KnowledgeGapsPage() {
             } else if (response.status === 409) {
                 showToast('Analysis was just started by someone else', 'error')
             } else {
-                showToast('Failed to start analysis. Please try again.', 'error')
+                showToast('Failed to start analysis.. Please try again.', 'error')
             }
         } catch (error) {
             console.error('Error starting analysis:', error)
-            showToast('Failed to start analysis. Please try again.', 'error')
+            showToast('Failed to start analysis.. Please try again.', 'error')
         } finally {
             setIsStartingAnalysis(false)
         }
@@ -474,11 +496,11 @@ export default function KnowledgeGapsPage() {
                                 {isAnalysisEnabled && (
                                     <button
                                         onClick={handleStartAnalysis}
-                                        disabled={analysisStatus?.running || isStartingAnalysis}
+                                        disabled={analysisStatus?.running || isStartingAnalysis || showCompletedStatus}
                                         className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                     >
                                         <Play className="w-4 h-4" />
-                                        {isStartingAnalysis ? 'Starting...' : 'Start Analysis'}
+                                        {isStartingAnalysis ? 'Checking...' : 'Run Analysis'}
                                     </button>
                                 )}
                                 {!isAnalysisEnabled && (
@@ -516,27 +538,41 @@ export default function KnowledgeGapsPage() {
                                     </>
                                 )}
                             </div>
-                            {isAnalysisEnabled && (analysisStatus?.running || showCompletedStatus) && (
-                                <div className={`border rounded-xl px-4 py-2 text-sm ${
-                                    showCompletedStatus
-                                        ? (analysisStatus?.error
-                                            ? 'bg-red-50 border-red-200 text-red-800'
-                                            : 'bg-green-50 border-green-200 text-green-800')
-                                        : 'bg-blue-50 border-blue-200 text-blue-800'
-                                }`}>
-                                    <div className="flex items-center gap-2">
-                                        {!showCompletedStatus && (
-                                            <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                                        )}
-                                        <span>
-                                            {showCompletedStatus
-                                                ? completedMessage
-                                                : `Analysis in progress... Exported: ${analysisStatus?.exportedCount || 0}, Analyzed: ${analysisStatus?.analyzedCount || 0}`
-                                            }
-                                        </span>
+                            {isAnalysisEnabled && (analysisStatus?.running || showCompletedStatus) && (() => {
+                                const isUpToDate = showCompletedStatus && !isCompletionError && !analysisStatus?.exportedCount
+                                const isSuccess = showCompletedStatus && !isCompletionError && (analysisStatus?.exportedCount ?? 0) > 0
+                                const isError = showCompletedStatus && isCompletionError
+                                const isRunning = !showCompletedStatus
+
+                                const panelClass = isError
+                                    ? 'bg-red-50 border-red-200 text-red-800'
+                                    : isUpToDate
+                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                        : isSuccess
+                                            ? 'bg-green-50 border-green-200 text-green-800'
+                                            : 'bg-blue-50 border-blue-200 text-blue-800'
+
+                                return (
+                                    <div className={`border rounded-xl text-sm font-medium px-4 py-2.5 ${panelClass}`}>
+                                        <div className="flex items-center gap-2">
+                                            {isRunning && (
+                                                <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 shrink-0"></div>
+                                            )}
+                                            {isUpToDate && <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />}
+                                            {isSuccess && <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />}
+                                            {isError && <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />}
+                                            <span>
+                                                {showCompletedStatus
+                                                    ? completedMessage
+                                                    : (analysisStatus?.exportedCount ?? 0) > 0
+                                                        ? `Analysing threads... ${analysisStatus?.analyzedCount || 0} of ${analysisStatus?.exportedCount ?? 0} complete`
+                                                        : 'Checking for new threads to analyse...'
+                                                }
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )
+                            })()}
                         </div>
                     )}
                 </div>

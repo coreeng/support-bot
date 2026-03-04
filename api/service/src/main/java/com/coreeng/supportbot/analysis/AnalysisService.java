@@ -13,12 +13,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -46,10 +48,12 @@ import org.springframework.stereotype.Service;
  */
 @Service
 @ConditionalOnProperty(name = "analysis.prompt.enabled", havingValue = "true")
+@RequiredArgsConstructor
 @Slf4j
 public class AnalysisService {
 
     private static final String ASYNC_ID = "analysis";
+    private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
 
     /**
      * Repository for managing async job state in the database.
@@ -59,27 +63,10 @@ public class AnalysisService {
 
     private final ThreadsAwaitingAnalysisService threadsAwaitingAnalysisService;
     private final LlmAnalysisService llmAnalysisService;
-    private final com.coreeng.supportbot.analysis.AnalysisRepository analysisRepository;
+    private final AnalysisRepository analysisRepository;
     private final AnalysisProps analysisProps;
     private final SlackTicketsProps slackTicketsProps;
     private final ApplicationContext applicationContext;
-
-    public AnalysisService(
-            AsyncJobRepository asyncJobRepository,
-            ThreadsAwaitingAnalysisService threadsAwaitingAnalysisService,
-            LlmAnalysisService llmAnalysisService,
-            com.coreeng.supportbot.analysis.AnalysisRepository analysisRepository,
-            AnalysisProps analysisProps,
-            SlackTicketsProps slackTicketsProps,
-            ApplicationContext applicationContext) {
-        this.asyncJobRepository = asyncJobRepository;
-        this.threadsAwaitingAnalysisService = threadsAwaitingAnalysisService;
-        this.llmAnalysisService = llmAnalysisService;
-        this.analysisRepository = analysisRepository;
-        this.analysisProps = analysisProps;
-        this.slackTicketsProps = slackTicketsProps;
-        this.applicationContext = applicationContext;
-    }
 
     private static final AnalysisStatus IDLE_STATUS = new AnalysisStatus(null, null, null, false, null);
     private final AtomicReference<AnalysisStatus> currentStatus = new AtomicReference<>(IDLE_STATUS);
@@ -93,6 +80,8 @@ public class AnalysisService {
      * @param running Whether the analysis job is currently running
      * @param error Error message if the job failed, null otherwise
      */
+    // TODO: add failedCount field to make skipped/failed threads visible in progress panel.
+    //  This changes the /analysis/status API contract so needs an ADR update first.
     public record AnalysisStatus(
             @Nullable String jobId,
             @Nullable Integer exportedCount,
@@ -109,8 +98,14 @@ public class AnalysisService {
         AsyncJobRepository.AsyncJob existingJob = asyncJobRepository.findJob(ASYNC_ID);
 
         if (existingJob != null) {
-            log.info("Found pending async job on startup: {}, resuming...", ASYNC_ID);
-            applicationContext.getBean(AnalysisService.class).runAsyncAnalysis(Integer.parseInt(existingJob.data()));
+            try {
+                int days = Integer.parseInt(existingJob.data());
+                log.info("Found pending async job on startup: {}, resuming...", ASYNC_ID);
+                applicationContext.getBean(AnalysisService.class).runAsyncAnalysis(days);
+            } catch (NumberFormatException e) {
+                log.error("Corrupt async job data '{}', deleting job", existingJob.data());
+                asyncJobRepository.deleteJob(ASYNC_ID);
+            }
         }
     }
 
@@ -122,9 +117,15 @@ public class AnalysisService {
      */
     public boolean start(int days) {
         if (asyncJobRepository.tryStartJob(ASYNC_ID, Integer.toString(days))) {
-            log.info("Started new async job: id={}, days={}", ASYNC_ID, days);
-            applicationContext.getBean(AnalysisService.class).runAsyncAnalysis(days);
-            return true;
+            try {
+                log.info("Started new async job: id={}, days={}", ASYNC_ID, days);
+                applicationContext.getBean(AnalysisService.class).runAsyncAnalysis(days);
+                return true;
+            } catch (TaskRejectedException e) {
+                log.error("Executor rejected analysis job, cleaning up DB record", e);
+                asyncJobRepository.deleteJob(ASYNC_ID);
+                return false;
+            }
         } else {
             log.warn("Cannot start async job {}: already running", ASYNC_ID);
             return false;
@@ -161,6 +162,7 @@ public class AnalysisService {
             String prompt = loadPrompt();
 
             int analyzedCount = 0;
+            boolean interrupted = false;
 
             // Analyze each thread
             for (ThreadToAnalyze thread : threads) {
@@ -170,9 +172,7 @@ public class AnalysisService {
 
                     if (record == null || !record.isValid()) {
                         log.warn("Skipping invalid analysis result for ticket {}", thread.ticketId());
-                    }
-
-                    if (record != null && record.isValid()) {
+                    } else {
                         // Add prompt ID to record
                         AnalysisRecord recordWithPromptId = new AnalysisRecord(
                                 record.ticketId(),
@@ -197,6 +197,7 @@ public class AnalysisService {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     log.warn("Analysis interrupted at ticket {}", thread.ticketId());
+                    interrupted = true;
                     break;
                 } catch (Exception e) {
                     log.error("Failed to analyze thread for ticket {}: {}", thread.ticketId(), e.getMessage());
@@ -204,13 +205,18 @@ public class AnalysisService {
                 }
             }
 
-            // Success
-            log.info("Async job {} completed: analyzed {}/{} threads", ASYNC_ID, analyzedCount, threads.size());
-            currentStatus.set(new AnalysisStatus(ASYNC_ID, threads.size(), analyzedCount, false, null));
+            if (interrupted) {
+                log.warn("Async job {} interrupted: analyzed {}/{} threads", ASYNC_ID, analyzedCount, threads.size());
+                currentStatus.set(new AnalysisStatus(ASYNC_ID, threads.size(), analyzedCount, false,
+                        "Analysis interrupted after " + analyzedCount + "/" + threads.size() + " threads"));
+            } else {
+                log.info("Async job {} completed: analyzed {}/{} threads", ASYNC_ID, analyzedCount, threads.size());
+                currentStatus.set(new AnalysisStatus(ASYNC_ID, threads.size(), analyzedCount, false, null));
+            }
 
         } catch (Exception e) {
             log.error("Analysis job {} failed: {}", ASYNC_ID, e.getMessage(), e);
-            currentStatus.set(new AnalysisStatus(ASYNC_ID, 0, 0, false, e.getMessage()));
+            currentStatus.set(new AnalysisStatus(ASYNC_ID, 0, 0, false, e.toString()));
         } finally {
             asyncJobRepository.deleteJob(ASYNC_ID);
         }
@@ -246,9 +252,8 @@ public class AnalysisService {
             String idFile = analysisProps.prompt().idFile();
             String yamlContent = Files.readString(Path.of(idFile));
 
-            ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
             @SuppressWarnings("unchecked")
-            Map<String, Object> yamlData = yamlMapper.readValue(yamlContent, Map.class);
+            Map<String, Object> yamlData = YAML_MAPPER.readValue(yamlContent, Map.class);
 
             Object id = yamlData.get("id");
             if (id == null) {

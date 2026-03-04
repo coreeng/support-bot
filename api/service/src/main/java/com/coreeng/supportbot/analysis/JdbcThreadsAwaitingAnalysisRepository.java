@@ -27,7 +27,7 @@ public class JdbcThreadsAwaitingAnalysisRepository implements ThreadsAwaitingAna
     /**
      * {@inheritDoc}
      *
-     * <p>Implementation uses a SQL query with a NOT IN subquery to exclude tickets
+     * <p>Implementation uses a SQL query with a NOT EXISTS subquery to exclude tickets
      * that already have analysis records for the given prompt ID.
      */
     @Override
@@ -44,7 +44,7 @@ public class JdbcThreadsAwaitingAnalysisRepository implements ThreadsAwaitingAna
             WHERE t.status = 'closed'
               AND q.channel_id = ?
               AND t.last_interacted_at > NOW()::date - (? * INTERVAL '1 days')
-              AND t.id NOT IN (SELECT ticket_id from analysis where prompt_id = ?)
+              AND NOT EXISTS (SELECT 1 FROM analysis WHERE ticket_id = t.id AND prompt_id = ?)
             """;
 
         ImmutableList<ThreadToAnalyze> threads = dsl

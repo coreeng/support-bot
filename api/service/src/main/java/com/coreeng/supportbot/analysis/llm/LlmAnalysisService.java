@@ -2,7 +2,6 @@ package com.coreeng.supportbot.analysis.llm;
 
 import com.coreeng.supportbot.analysis.AnalysisRepository.AnalysisRecord;
 import com.coreeng.supportbot.summarydata.ThreadService;
-import com.google.common.base.Splitter;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -110,8 +109,7 @@ I have a Slack thread with the following content:
             String feature = null;
             String summary = null;
 
-            Iterable<String> lines = Splitter.onPattern("\\r?\\n").split(response);
-            for (String line : lines) {
+            for (String line : response.lines().toList()) {
                 if (line.startsWith("Primary Driver:")) {
                     driver = line.replace("Primary Driver:", "").trim();
                 } else if (line.startsWith("Category:")) {
@@ -123,7 +121,7 @@ I have a Slack thread with the following content:
                 }
             }
 
-            // Note: promptId is set to null here; it's added by the caller (AnalysisService)
+            // promptId is set to null here; it's added by the caller (AnalysisService)
             return new AnalysisRecord(ticketId.intValue(), driver, category, feature, summary, null);
         } catch (Exception e) {
             log.error("Failed to parse LLM response: {}. Response content: {}", e.getMessage(), response);

@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.analysis;
 
 import static com.coreeng.supportbot.dbschema.Tables.ANALYSIS;
+import static org.jooq.impl.DSL.currentLocalDateTime;
 import static org.jooq.impl.DSL.excluded;
 import static org.jooq.impl.DSL.row;
 
@@ -158,6 +159,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                 .set(ANALYSIS.FEATURE, excluded(ANALYSIS.FEATURE))
                 .set(ANALYSIS.SUMMARY, excluded(ANALYSIS.SUMMARY))
                 .set(ANALYSIS.PROMPT_ID, excluded(ANALYSIS.PROMPT_ID))
+                .set(ANALYSIS.UPDATED_AT, currentLocalDateTime())
                 .execute();
     }
 
@@ -191,6 +193,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                 .set(ANALYSIS.FEATURE, excluded(ANALYSIS.FEATURE))
                 .set(ANALYSIS.SUMMARY, excluded(ANALYSIS.SUMMARY))
                 .set(ANALYSIS.PROMPT_ID, excluded(ANALYSIS.PROMPT_ID))
+                .set(ANALYSIS.UPDATED_AT, currentLocalDateTime())
                 .execute();
     }
 }

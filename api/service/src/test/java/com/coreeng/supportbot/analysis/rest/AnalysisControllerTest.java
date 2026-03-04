@@ -7,8 +7,6 @@ import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.analysis.AnalysisService;
 import com.coreeng.supportbot.analysis.AnalysisService.AnalysisStatus;
-import com.coreeng.supportbot.config.AnalysisProps;
-import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,12 +25,7 @@ class AnalysisControllerTest {
 
     @BeforeEach
     void setUp() {
-        AnalysisProps.Vertex vertex =
-                new AnalysisProps.Vertex("test-project", "europe-west2", "gemini-2.5-flash", Duration.ofMillis(100));
-        AnalysisProps.Bundle bundle = new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip");
-        AnalysisProps.Prompt prompt = new AnalysisProps.Prompt(true, "", "");
-        AnalysisProps analysisProps = new AnalysisProps(vertex, bundle, prompt);
-        controller = new AnalysisController(analysisService, analysisProps);
+        controller = new AnalysisController(analysisService);
     }
 
     @Test
@@ -67,14 +60,6 @@ class AnalysisControllerTest {
         assertThat(negativeResponse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 
         verifyNoInteractions(analysisService);
-    }
-
-    @Test
-    void getKnowledgeGapsStatus_returnsEnabled() {
-        ResponseEntity<?> response = controller.getKnowledgeGapsStatus();
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
     }
 
     @Test

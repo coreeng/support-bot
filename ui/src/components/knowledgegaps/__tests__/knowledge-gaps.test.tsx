@@ -686,7 +686,7 @@ describe('KnowledgeGapsPage', () => {
             expect(screen.queryByText('Import')).not.toBeInTheDocument()
         })
 
-        it('shows Start Analysis button when user has SUPPORT_ENGINEER role', async () => {
+        it('shows Run Analysis button when user has SUPPORT_ENGINEER role', async () => {
             mockUseAuth.mockReturnValue({
                 user: { id: '1', email: 'test@example.com', name: 'Test User', teams: [], roles: ['SUPPORT_ENGINEER'] },
                 isLoading: false,
@@ -700,11 +700,11 @@ describe('KnowledgeGapsPage', () => {
 
             renderWithToast(<KnowledgeGapsPage />)
 
-            expect(await screen.findByText('Start Analysis')).toBeInTheDocument()
+            expect(await screen.findByText('Run Analysis')).toBeInTheDocument()
         })
     })
 
-    describe('Start Analysis functionality', () => {
+    describe('Run Analysis functionality', () => {
         beforeEach(() => {
             mockUseAnalysis.mockReturnValue({
                 data: mockAnalysisData,
@@ -757,12 +757,12 @@ describe('KnowledgeGapsPage', () => {
             renderWithToast(<KnowledgeGapsPage />)
 
             // Wait for the initial status fetch
-            await screen.findByText('Start Analysis')
+            await screen.findByText('Run Analysis')
 
             expect(mockFetch).toHaveBeenCalledWith('/api/analysis/status')
         })
 
-        it('starts analysis when Start Analysis button is clicked and shows progress immediately', async () => {
+        it('starts analysis when Run Analysis button is clicked and shows progress immediately', async () => {
             let statusCallCount = 0
             const mockFetch = jest.fn((url, options) => {
                 if (url === '/api/analysis/enabled') {
@@ -799,7 +799,7 @@ describe('KnowledgeGapsPage', () => {
 
             renderWithToast(<KnowledgeGapsPage />)
 
-            const startButton = await screen.findByText('Start Analysis')
+            const startButton = await screen.findByText('Run Analysis')
 
             // Click the button
             fireEvent.click(startButton)
@@ -812,7 +812,7 @@ describe('KnowledgeGapsPage', () => {
             })
 
             // Progress panel should appear
-            await screen.findByText(/Analysis in progress/)
+            await screen.findByText(/Checking for new threads|Analysing threads/)
         })
 
         it('shows error toast when analysis start returns 409 Conflict', async () => {
@@ -848,14 +848,14 @@ describe('KnowledgeGapsPage', () => {
 
             renderWithToast(<KnowledgeGapsPage />)
 
-            const startButton = await screen.findByText('Start Analysis')
+            const startButton = await screen.findByText('Run Analysis')
             fireEvent.click(startButton)
 
             // Wait for error toast
             await screen.findByText('Analysis was just started by someone else')
         })
 
-        it('disables Start Analysis button when analysis is running', async () => {
+        it('disables Run Analysis button when analysis is running', async () => {
             const mockFetch = jest.fn((url) => {
                 if (url === '/api/analysis/enabled') {
                     return Promise.resolve({
@@ -879,9 +879,9 @@ describe('KnowledgeGapsPage', () => {
             renderWithToast(<KnowledgeGapsPage />)
 
             // Wait for progress display to appear, which indicates status has been fetched
-            await screen.findByText(/Analysis in progress/)
+            await screen.findByText(/Checking for new threads|Analysing threads/)
 
-            const startButton = screen.getByText('Start Analysis')
+            const startButton = screen.getByText('Run Analysis')
 
             // Button should be disabled when analysis is running
             expect(startButton).toBeDisabled()
@@ -911,8 +911,8 @@ describe('KnowledgeGapsPage', () => {
             renderWithToast(<KnowledgeGapsPage />)
 
             // Wait for progress display
-            await screen.findByText(/Analysis in progress/)
-            expect(screen.getByText(/Exported: 10, Analyzed: 5/)).toBeInTheDocument()
+            await screen.findByText(/Checking for new threads|Analysing threads/)
+            expect(screen.getByText(/5 of 10 complete/)).toBeInTheDocument()
         })
 
         it('shows completion status in progress panel before hiding it', async () => {
@@ -962,13 +962,13 @@ describe('KnowledgeGapsPage', () => {
             renderWithToast(<KnowledgeGapsPage />)
 
             // Wait for initial progress display
-            await screen.findByText(/Analysis in progress/)
+            await screen.findByText(/Checking for new threads|Analysing threads/)
 
             // Fast-forward time to trigger polling
             jest.advanceTimersByTime(3000)
 
             // Wait for completion message
-            const completionMessage = await screen.findByText(/Analysis complete! Exported: 10, Analyzed: 8/)
+            const completionMessage = await screen.findByText(/Analysis complete! 8 of 10 threads analysed/)
 
             // Verify the panel shows completion status (green background)
             // The parent div with the bg-green-50 class is 3 levels up from the text
@@ -986,7 +986,7 @@ describe('KnowledgeGapsPage', () => {
     })
 
     describe('Analysis Feature Flag', () => {
-        it('shows Start Analysis button when feature is enabled', async () => {
+        it('shows Run Analysis button when feature is enabled', async () => {
             mockUseAnalysis.mockReturnValue({
                 data: mockAnalysisData,
                 isLoading: false,
@@ -1020,11 +1020,11 @@ describe('KnowledgeGapsPage', () => {
             renderWithToast(<KnowledgeGapsPage />)
 
             // Wait for the button to appear
-            const startButton = await screen.findByText('Start Analysis')
+            const startButton = await screen.findByText('Run Analysis')
             expect(startButton).toBeInTheDocument()
         })
 
-        it('hides Start Analysis button when feature is disabled', async () => {
+        it('hides Run Analysis button when feature is disabled', async () => {
             mockUseAnalysis.mockReturnValue({
                 data: mockAnalysisData,
                 isLoading: false,
@@ -1061,7 +1061,7 @@ describe('KnowledgeGapsPage', () => {
             await screen.findByText('Support Area Summary')
 
             // Verify the button is not present
-            expect(screen.queryByText('Start Analysis')).not.toBeInTheDocument()
+            expect(screen.queryByText('Run Analysis')).not.toBeInTheDocument()
             // The days selector should still be present (used for Export)
             expect(screen.getByDisplayValue('Week')).toBeInTheDocument()
         })
@@ -1103,7 +1103,7 @@ describe('KnowledgeGapsPage', () => {
             await screen.findByText('Support Area Summary')
 
             // Verify the progress panel is not shown even though analysis is running
-            expect(screen.queryByText(/Analysis in progress/)).not.toBeInTheDocument()
+            expect(screen.queryByText(/Checking for new threads|Analysing threads/)).not.toBeInTheDocument()
         })
 
         it('hides Export, Analysis Bundle, and Import buttons when feature is enabled', async () => {
