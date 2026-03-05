@@ -179,7 +179,7 @@ pr-review-tracking: # Detects PR links in support threads and manages their life
   enabled: false # Feature flag — off by default
   poll-cron: 0 0 9-18 * * 1-5 # Cron schedule for the lifecycle poller (default: business hours Mon–Fri)
   pr-emoji: pr # Slack emoji added to the message when a PR is detected — must exist in your Slack workspace
-  tags: # Required when enabled: tag codes from enums.tags applied to the ticket when the bot auto-closes it
+  tags: # Required when enabled: tag codes from enums.tags applied to the ticket when the bot auto closes it
     - <tag-code>
   impact: <impact-code> # Required when enabled: impact code from enums.impacts applied when the bot auto-closes a ticket
   repositories: # Repositories to watch. At least one entry is required when enabled.
