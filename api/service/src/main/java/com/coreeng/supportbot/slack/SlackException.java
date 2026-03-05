@@ -13,12 +13,16 @@ public class SlackException extends RuntimeException {
 
     private final ImmutableList<String> errorDetails;
 
+    @Nullable private final Integer retryAfterSeconds;
+
     public SlackException(Throwable cause) {
         super(cause);
         if (cause instanceof SlackApiException exc) {
             response = exc.getError();
+            retryAfterSeconds = parseRetryAfter(exc.getResponse().header("Retry-After"));
         } else {
             response = null;
+            retryAfterSeconds = null;
         }
         errorDetails = ImmutableList.of();
     }
@@ -27,6 +31,19 @@ public class SlackException extends RuntimeException {
         super();
         this.response = response;
         this.errorDetails = checkNotNull(errorDetails);
+        this.retryAfterSeconds = null;
+    }
+
+    @Nullable private static Integer parseRetryAfter(@Nullable String headerValue) {
+        if (headerValue == null) {
+            return null;
+        }
+        try {
+            int value = Integer.parseInt(headerValue.trim());
+            return value > 0 ? value : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     @Override
@@ -69,5 +86,9 @@ public class SlackException extends RuntimeException {
 
     @Nullable public String getProvided() {
         return response != null ? response.getProvided() : null;
+    }
+
+    @Nullable public Integer retryAfterSeconds() {
+        return retryAfterSeconds;
     }
 }
