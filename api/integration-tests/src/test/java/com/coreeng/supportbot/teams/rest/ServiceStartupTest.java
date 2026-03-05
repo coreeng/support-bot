@@ -9,9 +9,11 @@ import io.restassured.builder.RequestSpecBuilder;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -105,6 +107,54 @@ public class ServiceStartupTest {
         } catch (Exception e) {
             LOGGER.error("Error during cleanup", e);
         }
+    }
+
+    @Test
+    void analysisEnabled_shouldReturnTrue() {
+        // when
+        var response = when()
+                .get("/analysis/enabled")
+                .then()
+                .statusCode(200)
+                .extract()
+                .body()
+                .jsonPath();
+
+        // then
+        assertThat(response.getBoolean("enabled")).isTrue();
+    }
+
+    @Test
+    void analysisRun_shouldStartAndComplete() {
+        // when
+        when().post("/analysis/run?days=7")
+                .then()
+                .statusCode(202);
+
+        // then
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(120))
+                .pollInterval(Duration.ofSeconds(2))
+                .untilAsserted(() -> {
+                    var status = when()
+                            .get("/analysis/status")
+                            .then()
+                            .statusCode(200)
+                            .extract()
+                            .body()
+                            .jsonPath();
+
+                    assertThat(status.getBoolean("running")).isFalse();
+                    assertThat(status.getString("error")).isNull();
+
+                    Integer exported = status.get("exportedCount");
+                    Integer analyzed = status.get("analyzedCount");
+                    LOGGER.info("Analysis completed: exported={}, analyzed={}", exported, analyzed);
+
+                    if (exported != null && exported > 0) {
+                        assertThat(analyzed).as("Should analyze threads when threads are found").isGreaterThan(0);
+                    }
+                });
     }
 
     @Test

@@ -1,9 +1,9 @@
 package com.coreeng.supportbot.summarydata.rest;
 
 import com.coreeng.supportbot.analysis.AnalysisRepository;
-import com.coreeng.supportbot.analysis.AnalysisService;
+import com.coreeng.supportbot.analysis.AnalysisResultsService;
+import com.coreeng.supportbot.config.AnalysisProps;
 import com.coreeng.supportbot.config.SlackTicketsProps;
-import com.coreeng.supportbot.config.SummaryDataProps;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,6 +12,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -20,10 +22,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -37,8 +42,8 @@ public class SummaryDataController {
 
     private final ThreadService threadService;
     private final SlackTicketsProps slackTicketsProps;
-    private final SummaryDataProps summaryDataProps;
-    private final AnalysisService analysisService;
+    private final AnalysisProps analysisProps;
+    private final AnalysisResultsService analysisResultsService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -95,32 +100,47 @@ public class SummaryDataController {
      * Export analysis bundle analysis.zip containing AI prompt and script to run analysis on thread texts.
      * The bundle path is configurable via {@code summary-data.analysis-bundle-path}.
      * By default, serves a classpath placeholder bundle.
+     * If the path points to a directory, creates a zip file containing all files in that directory.
      *
      * @return Analysis bundle zip file
      */
     @GetMapping(value = "/analysis", produces = "application/zip")
-    public ResponseEntity<Resource> download() {
-        String bundlePath = summaryDataProps.analysisBundlePath();
+    public ResponseEntity<?> download() {
+        String bundlePath = analysisProps.bundle().path();
         try {
-            Resource res;
+            // Handle classpath resources
             if (bundlePath != null && bundlePath.startsWith("classpath:")) {
-                res = new ClassPathResource(bundlePath.substring("classpath:".length()));
-            } else {
-                Path path = Paths.get(bundlePath != null ? bundlePath : "analysis.zip");
-                res = new UrlResource(path.toUri());
+                Resource res = new ClassPathResource(bundlePath.substring("classpath:".length()));
+
+                if (!res.exists() || !res.isReadable()) {
+                    log.warn("Analysis bundle not found at: {}", bundlePath);
+                    return ResponseEntity.notFound().build();
+                }
+
+                log.info("Downloading analysis bundle from classpath: {}", bundlePath);
+
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"analysis.zip\"")
+                        .contentLength(res.contentLength())
+                        .body(res);
             }
 
-            if (!res.exists() || !res.isReadable()) {
+            // Handle file system paths
+            Path path = Paths.get(bundlePath != null ? bundlePath : "/app/analysis");
+
+            if (!Files.exists(path) || !Files.isDirectory(path)) {
                 log.warn("Analysis bundle not found at: {}", bundlePath);
                 return ResponseEntity.notFound().build();
             }
 
-            log.info("Downloading analysis bundle from {}", bundlePath);
+            // The path is a directory, create zip from all files in it
+            log.info("Creating zip from directory: {}", bundlePath);
+            byte[] zipBytes = createZipFromDirectory(path);
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"analysis.zip\"")
-                    .contentLength(res.contentLength())
-                    .body(res);
+                    .body(zipBytes);
+
         } catch (IOException e) {
             log.error("Failed to read analysis bundle from: {}", bundlePath, e);
             return ResponseEntity.internalServerError().build();
@@ -128,8 +148,44 @@ public class SummaryDataController {
     }
 
     /**
+     * Create a zip file containing all files from the specified directory.
+     *
+     * @param directory Directory to zip
+     * @return Byte array containing the zip file
+     * @throws IOException if reading files or creating zip fails
+     */
+    private byte[] createZipFromDirectory(Path directory) throws IOException {
+        try (var byteArrayOutputStream = new java.io.ByteArrayOutputStream();
+                var zip = new java.util.zip.ZipOutputStream(byteArrayOutputStream)) {
+
+            int fileCount = 0;
+
+            // Iterate over all files in the directory
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(directory)) {
+                for (Path file : stream) {
+                    // Skip subdirectories, only process files
+                    if (Files.isRegularFile(file)) {
+                        String fileName = file.getFileName().toString();
+                        log.debug("Adding file to zip: {}", fileName);
+
+                        zip.putNextEntry(new java.util.zip.ZipEntry(fileName));
+                        Files.copy(file, zip);
+                        zip.closeEntry();
+                        fileCount++;
+                    }
+                }
+            }
+
+            zip.finish();
+            log.info("Successfully created zip file with {} files from directory: {}", fileCount, directory);
+
+            return byteArrayOutputStream.toByteArray();
+        }
+    }
+
+    /**
      * Import analysis data from a JSONL file.
-     * The file should have the structure: ticket_id, Driver, Category, Feature, Summary
+     * The file should contain JSON objects with fields: ticketId, driver, category, feature, summary
      *
      * @param file JSONL file to import
      * @return Response with the number of records imported
@@ -166,7 +222,7 @@ public class SummaryDataController {
             log.info("Parsed {} valid records from {} total lines", records.size(), totalLines);
 
             // Import data using AnalysisService
-            int importedCount = analysisService.importAnalysisData(records);
+            int importedCount = analysisResultsService.importAnalysisData(records);
 
             log.info("Successfully imported {} analysis records", importedCount);
 

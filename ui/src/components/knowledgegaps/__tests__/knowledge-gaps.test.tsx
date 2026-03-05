@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import KnowledgeGapsPage from '../knowledge-gaps'
 import * as hooks from '../../../lib/hooks'
 import { ToastProvider } from '@/components/ui/toast'
@@ -141,6 +141,20 @@ describe('KnowledgeGapsPage', () => {
             actualEscalationTeams: [],
             logout: jest.fn()
         })
+
+        // Default mock for fetch to handle /api/analysis/enabled
+        global.fetch = jest.fn((url) => {
+            if (url === '/api/analysis/enabled') {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ enabled: true })
+                } as Response)
+            }
+            return Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve({})
+            } as Response)
+        }) as jest.Mock
     })
 
     it('shows loading state initially', () => {
@@ -375,7 +389,7 @@ describe('KnowledgeGapsPage', () => {
         expect(mockRevokeObjectURL).toHaveBeenCalled()
     })
 
-    it('renders time period dropdown with correct options', () => {
+    it('renders time period dropdown with correct options', async () => {
         mockUseAnalysis.mockReturnValue({
             data: mockAnalysisData,
             isLoading: false,
@@ -385,7 +399,7 @@ describe('KnowledgeGapsPage', () => {
         renderWithToast(<KnowledgeGapsPage />)
 
         // Find the select dropdown - default is Week (7 days)
-        const select = screen.getByDisplayValue('Week')
+        const select = await screen.findByDisplayValue('Week')
         expect(select).toBeInTheDocument()
 
         // Verify all options are present
@@ -404,12 +418,18 @@ describe('KnowledgeGapsPage', () => {
         } as any)
 
         // Mock fetch
-        const mockFetch = jest.fn(() =>
-            Promise.resolve({
+        const mockFetch = jest.fn((url) => {
+            if (url === '/api/analysis/enabled') {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ enabled: false })
+                } as Response)
+            }
+            return Promise.resolve({
                 ok: true,
                 blob: () => Promise.resolve(new Blob(['test'], { type: 'application/zip' }))
             } as Response)
-        )
+        })
         global.fetch = mockFetch
 
         // Mock URL.createObjectURL and revokeObjectURL
@@ -425,7 +445,7 @@ describe('KnowledgeGapsPage', () => {
         renderWithToast(<KnowledgeGapsPage />)
 
         // Change the time period to Month (31 days)
-        const select = screen.getByDisplayValue('Week')
+        const select = await screen.findByDisplayValue('Week')
         fireEvent.change(select, { target: { value: '31' } })
 
         // Click export button
@@ -451,12 +471,18 @@ describe('KnowledgeGapsPage', () => {
         } as any)
 
         // Mock fetch
-        const mockFetch = jest.fn(() =>
-            Promise.resolve({
+        const mockFetch = jest.fn((url) => {
+            if (url === '/api/analysis/enabled') {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ enabled: false })
+                } as Response)
+            }
+            return Promise.resolve({
                 ok: true,
                 blob: () => Promise.resolve(new Blob(['test'], { type: 'application/zip' }))
             } as Response)
-        )
+        })
         global.fetch = mockFetch
 
         // Mock URL.createObjectURL and revokeObjectURL
@@ -472,7 +498,7 @@ describe('KnowledgeGapsPage', () => {
         renderWithToast(<KnowledgeGapsPage />)
 
         // Change the time period to Quarter (92 days)
-        const select = screen.getByDisplayValue('Week')
+        const select = await screen.findByDisplayValue('Week')
         fireEvent.change(select, { target: { value: '92' } })
 
         // Click export button
@@ -658,6 +684,517 @@ describe('KnowledgeGapsPage', () => {
             expect(screen.queryByText('Export')).not.toBeInTheDocument()
             expect(screen.queryByText('Analysis Bundle')).not.toBeInTheDocument()
             expect(screen.queryByText('Import')).not.toBeInTheDocument()
+        })
+
+        it('shows Run Analysis button when user has SUPPORT_ENGINEER role', async () => {
+            mockUseAuth.mockReturnValue({
+                user: { id: '1', email: 'test@example.com', name: 'Test User', teams: [], roles: ['SUPPORT_ENGINEER'] },
+                isLoading: false,
+                isAuthenticated: true,
+                isLeadership: false,
+                isEscalationTeam: false,
+                isSupportEngineer: true,
+                actualEscalationTeams: [],
+                logout: jest.fn()
+            })
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            expect(await screen.findByText('Run Analysis')).toBeInTheDocument()
+        })
+    })
+
+    describe('Run Analysis functionality', () => {
+        beforeEach(() => {
+            mockUseAnalysis.mockReturnValue({
+                data: mockAnalysisData,
+                isLoading: false,
+                error: null
+            } as any)
+
+            mockUseAuth.mockReturnValue({
+                user: { id: '1', email: 'test@example.com', name: 'Test User', teams: [], roles: ['SUPPORT_ENGINEER'] },
+                isLoading: false,
+                isAuthenticated: true,
+                isLeadership: false,
+                isEscalationTeam: false,
+                isSupportEngineer: true,
+                actualEscalationTeams: [],
+                logout: jest.fn()
+            })
+
+            // Clear all timers before each test
+            jest.clearAllTimers()
+            jest.useFakeTimers()
+        })
+
+        afterEach(() => {
+            jest.runOnlyPendingTimers()
+            jest.useRealTimers()
+        })
+
+        it('fetches analysis status on mount', async () => {
+            const mockFetch = jest.fn((url) => {
+                if (url === '/api/analysis/enabled') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ enabled: true })
+                    } as Response)
+                }
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        jobId: null,
+                        exportedCount: null,
+                        analyzedCount: null,
+                        running: false,
+                        error: null
+                    })
+                } as Response)
+            })
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for the initial status fetch
+            await screen.findByText('Run Analysis')
+
+            expect(mockFetch).toHaveBeenCalledWith('/api/analysis/status')
+        })
+
+        it('starts analysis when Run Analysis button is clicked and shows progress immediately', async () => {
+            let statusCallCount = 0
+            const mockFetch = jest.fn((url, options) => {
+                if (url === '/api/analysis/enabled') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ enabled: true })
+                    } as Response)
+                }
+                if (url === '/api/analysis/status') {
+                    statusCallCount++
+                    // First call: not running (so button is enabled)
+                    // Second call (after starting): running
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: statusCallCount > 1 ? 'test-job-id' : null,
+                            exportedCount: statusCallCount > 1 ? 0 : null,
+                            analyzedCount: statusCallCount > 1 ? 0 : null,
+                            running: statusCallCount > 1,
+                            error: null
+                        })
+                    } as Response)
+                }
+                if (url.startsWith('/api/analysis/run')) {
+                    return Promise.resolve({
+                        status: 202,
+                        ok: true
+                    } as Response)
+                }
+                return Promise.resolve({ ok: true } as Response)
+            })
+
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            const startButton = await screen.findByText('Run Analysis')
+
+            // Click the button
+            fireEvent.click(startButton)
+
+            // Wait for the fetch to be called
+            await waitFor(() => {
+                expect(mockFetch).toHaveBeenCalledWith('/api/analysis/run?days=7', expect.objectContaining({
+                    method: 'POST'
+                }))
+            })
+
+            // Progress panel should appear
+            await screen.findByText(/Checking for new threads|Analysing threads/)
+        })
+
+        it('shows error toast when analysis start returns 409 Conflict', async () => {
+            const mockFetch = jest.fn((url) => {
+                if (url === '/api/analysis/enabled') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ enabled: true })
+                    } as Response)
+                }
+                if (url === '/api/analysis/status') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: null,
+                            exportedCount: null,
+                            analyzedCount: null,
+                            running: false,
+                            error: null
+                        })
+                    } as Response)
+                }
+                if (url.startsWith('/api/analysis/run')) {
+                    return Promise.resolve({
+                        status: 409,
+                        ok: false
+                    } as Response)
+                }
+                return Promise.resolve({ ok: true } as Response)
+            })
+
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            const startButton = await screen.findByText('Run Analysis')
+            fireEvent.click(startButton)
+
+            // Wait for error toast
+            await screen.findByText('Analysis was just started by someone else')
+        })
+
+        it('disables Run Analysis button when analysis is running', async () => {
+            const mockFetch = jest.fn((url) => {
+                if (url === '/api/analysis/enabled') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ enabled: true })
+                    } as Response)
+                }
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        jobId: 'test-job-id',
+                        exportedCount: 10,
+                        analyzedCount: 5,
+                        running: true,
+                        error: null
+                    })
+                } as Response)
+            })
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for progress display to appear, which indicates status has been fetched
+            await screen.findByText(/Checking for new threads|Analysing threads/)
+
+            const startButton = screen.getByText('Run Analysis')
+
+            // Button should be disabled when analysis is running
+            expect(startButton).toBeDisabled()
+        })
+
+        it('shows progress when analysis is running', async () => {
+            const mockFetch = jest.fn((url) => {
+                if (url === '/api/analysis/enabled') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ enabled: true })
+                    } as Response)
+                }
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        jobId: 'test-job-id',
+                        exportedCount: 10,
+                        analyzedCount: 5,
+                        running: true,
+                        error: null
+                    })
+                } as Response)
+            })
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for progress display
+            await screen.findByText(/Checking for new threads|Analysing threads/)
+            expect(screen.getByText(/5 of 10 complete/)).toBeInTheDocument()
+        })
+
+        it('shows completion status in progress panel before hiding it', async () => {
+            const { useQueryClient } = require('@tanstack/react-query')
+            const mockInvalidateQueries = jest.fn()
+            useQueryClient.mockReturnValue({
+                invalidateQueries: mockInvalidateQueries
+            })
+
+            let callCount = 0
+            const mockFetch = jest.fn((url) => {
+                if (url === '/api/analysis/enabled') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ enabled: true })
+                    } as Response)
+                }
+                callCount++
+                if (callCount === 1) {
+                    // Initial status check - running
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: 'test-job-id',
+                            exportedCount: 5,
+                            analyzedCount: 3,
+                            running: true,
+                            error: null
+                        })
+                    } as Response)
+                } else {
+                    // Subsequent check - completed
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: 'test-job-id',
+                            exportedCount: 10,
+                            analyzedCount: 8,
+                            running: false,
+                            error: null
+                        })
+                    } as Response)
+                }
+            })
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for initial progress display
+            await screen.findByText(/Checking for new threads|Analysing threads/)
+
+            // Fast-forward time to trigger polling
+            jest.advanceTimersByTime(3000)
+
+            // Wait for completion message
+            const completionMessage = await screen.findByText(/Analysis complete! 8 of 10 threads analysed/)
+
+            // Verify the panel shows completion status (green background gradient)
+            const completionPanel = completionMessage.parentElement?.parentElement?.parentElement
+            expect(completionPanel).toHaveClass('from-green-50')
+
+            // Fast-forward another 5 seconds to hide the panel and refresh data
+            jest.advanceTimersByTime(5000)
+
+            // Verify data was refreshed
+            await (() => {
+                expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['analysis'] })
+            })
+        })
+    })
+
+    describe('Analysis Feature Flag', () => {
+        it('shows Run Analysis button when feature is enabled', async () => {
+            mockUseAnalysis.mockReturnValue({
+                data: mockAnalysisData,
+                isLoading: false,
+                error: null
+            } as any)
+
+            const mockFetch = jest.fn((url) => {
+                if (url === '/api/analysis/enabled') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ enabled: true })
+                    } as Response)
+                }
+                if (url === '/api/analysis/status') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: null,
+                            exportedCount: null,
+                            analyzedCount: null,
+                            running: false,
+                            error: null
+                        })
+                    } as Response)
+                }
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
+            })
+
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for the button to appear
+            const startButton = await screen.findByText('Run Analysis')
+            expect(startButton).toBeInTheDocument()
+        })
+
+        it('hides Run Analysis button when feature is disabled', async () => {
+            mockUseAnalysis.mockReturnValue({
+                data: mockAnalysisData,
+                isLoading: false,
+                error: null
+            } as any)
+
+            const mockFetch = jest.fn((url) => {
+                if (url === '/api/analysis/enabled') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ enabled: false })
+                    } as Response)
+                }
+                if (url === '/api/analysis/status') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: null,
+                            exportedCount: null,
+                            analyzedCount: null,
+                            running: false,
+                            error: null
+                        })
+                    } as Response)
+                }
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
+            })
+
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for the page to render
+            await screen.findByText('Support Area Summary')
+
+            // Verify the button is not present
+            expect(screen.queryByText('Run Analysis')).not.toBeInTheDocument()
+            // The days selector should still be present (used for Export)
+            expect(screen.getByDisplayValue('Week')).toBeInTheDocument()
+        })
+
+        it('shows progress panel to all users even when feature is disabled', async () => {
+            mockUseAnalysis.mockReturnValue({
+                data: mockAnalysisData,
+                isLoading: false,
+                error: null
+            } as any)
+
+            const mockFetch = jest.fn((url) => {
+                if (url === '/api/analysis/enabled') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ enabled: false })
+                    } as Response)
+                }
+                if (url === '/api/analysis/status') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: 'test-job',
+                            exportedCount: 5,
+                            analyzedCount: 3,
+                            running: true,
+                            error: null
+                        })
+                    } as Response)
+                }
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
+            })
+
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for the page to render
+            await screen.findByText('Support Area Summary')
+
+            // Progress panel is visible to all users even when analysis feature is disabled
+            // (anyone visiting the page should see if analysis is in progress)
+            await screen.findByText(/Analysing threads... 3 of 5 complete/)
+        })
+
+        it('hides Export, Analysis Bundle, and Import buttons when feature is enabled', async () => {
+            mockUseAnalysis.mockReturnValue({
+                data: mockAnalysisData,
+                isLoading: false,
+                error: null
+            } as any)
+
+            const mockFetch = jest.fn((url) => {
+                if (url === '/api/analysis/enabled') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ enabled: true })
+                    } as Response)
+                }
+                if (url === '/api/analysis/status') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: null,
+                            exportedCount: null,
+                            analyzedCount: null,
+                            running: false,
+                            error: null
+                        })
+                    } as Response)
+                }
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
+            })
+
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for the page to render and Run Analysis button to appear (proves enabled=true took effect)
+            await screen.findByText('Run Analysis')
+
+            // Verify all three buttons are not present when feature is enabled
+            expect(screen.queryByText('Export')).not.toBeInTheDocument()
+            expect(screen.queryByText('Analysis Bundle')).not.toBeInTheDocument()
+            expect(screen.queryByText('Import')).not.toBeInTheDocument()
+        })
+
+        it('shows Export, Analysis Bundle, and Import buttons when feature is disabled', async () => {
+            mockUseAnalysis.mockReturnValue({
+                data: mockAnalysisData,
+                isLoading: false,
+                error: null
+            } as any)
+
+            const mockFetch = jest.fn((url) => {
+                if (url === '/api/analysis/enabled') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ enabled: false })
+                    } as Response)
+                }
+                if (url === '/api/analysis/status') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            jobId: null,
+                            exportedCount: null,
+                            analyzedCount: null,
+                            running: false,
+                            error: null
+                        })
+                    } as Response)
+                }
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
+            })
+
+            global.fetch = mockFetch
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            // Wait for the page to render
+            await screen.findByText('Support Area Summary')
+
+            // Verify all three buttons are present and enabled
+            const exportButton = screen.getByText('Export')
+            const bundleButton = screen.getByText('Analysis Bundle')
+            const importButton = screen.getByText('Import')
+
+            expect(exportButton).toBeInTheDocument()
+            expect(exportButton).not.toBeDisabled()
+            expect(bundleButton).toBeInTheDocument()
+            expect(bundleButton).not.toBeDisabled()
+            expect(importButton).toBeInTheDocument()
+            expect(importButton).not.toBeDisabled()
         })
     })
 })

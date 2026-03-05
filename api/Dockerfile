@@ -31,6 +31,7 @@ RUN service postgresql start && sleep 6 && \
 FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24
 WORKDIR /app
 COPY --from=build /build/service/build/libs/service.jar /app/service.jar
+COPY service/analysis analysis
 
 CMD ["java", "-jar", "/app/service.jar"]
 

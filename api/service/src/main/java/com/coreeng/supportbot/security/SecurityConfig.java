@@ -53,6 +53,9 @@ public class SecurityConfig {
                         // Summary data export/import is restricted to support engineers
                         .requestMatchers("/summary-data/**")
                         .hasAnyRole("SUPPORT_ENGINEER")
+                        // Analysis endpoints restricted to support engineers
+                        .requestMatchers("/analysis/status", "/analysis/run")
+                        .hasAnyRole("SUPPORT_ENGINEER")
                         // All other endpoints require authentication
                         .anyRequest()
                         .authenticated())

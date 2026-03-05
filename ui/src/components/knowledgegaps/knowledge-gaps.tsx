@@ -1,12 +1,20 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
-import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText } from 'lucide-react'
+import React, { useState, useRef, useEffect } from 'react'
+import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText, Play, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react'
 import { getCsrfToken } from 'next-auth/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAnalysis } from '@/lib/hooks'
 import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/hooks/useAuth'
+
+interface AnalysisStatus {
+    jobId: string | null
+    exportedCount: number | null
+    analyzedCount: number | null
+    running: boolean
+    error: string | null
+}
 
 export default function KnowledgeGapsPage() {
     const queryClient = useQueryClient()
@@ -22,6 +30,206 @@ export default function KnowledgeGapsPage() {
     const [isUploading, setIsUploading] = useState(false)
     const [selectedDays, setSelectedDays] = useState<number>(7)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus | null>(null)
+    const [isStartingAnalysis, setIsStartingAnalysis] = useState(false)
+    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const [showCompletedStatus, setShowCompletedStatus] = useState(false)
+    const [completedMessage, setCompletedMessage] = useState<string>('')
+    const [isCompletionError, setIsCompletionError] = useState(false)
+    const isCompletedRef = useRef(false)
+    const [isAnalysisEnabled, setIsAnalysisEnabled] = useState(false)
+
+    // Fetch analysis status
+    const fetchAnalysisStatus = async () => {
+        try {
+            const response = await fetch('/api/analysis/status')
+            if (response.status === 401) {
+                stopPolling()
+                showToast('Session expired. Please refresh the page.', 'error')
+                return null
+            }
+            if (response.ok) {
+                const status: AnalysisStatus = await response.json()
+                setAnalysisStatus(status)
+                return status
+            }
+            console.error('Analysis status request failed:', response.status)
+        } catch (error) {
+            console.error('Error fetching analysis status:', error)
+        }
+        return null
+    }
+
+    // Start polling for analysis status
+    const startPolling = () => {
+        if (pollingIntervalRef.current) return
+
+        pollingIntervalRef.current = setInterval(async () => {
+            // Don't fetch status if we're already showing completion
+            if (isCompletedRef.current) return
+
+            const status = await fetchAnalysisStatus()
+            if (status && !status.running) {
+                stopPolling()
+                isCompletedRef.current = true
+
+                // Show completion message in the progress panel
+                if (status.error) {
+                    setIsCompletionError(true)
+                    setCompletedMessage(`Analysis failed: ${status.error}`)
+                    setShowCompletedStatus(true)
+
+                    // Show error toast and hide panel after 5 seconds
+                    completionTimeoutRef.current = setTimeout(() => {
+                        setShowCompletedStatus(false)
+                        setAnalysisStatus(null)
+                        isCompletedRef.current = false
+                        showToast(`Analysis failed: ${status.error}`, 'error')
+                    }, 5000)
+                } else {
+                    setIsCompletionError(false)
+                    const exported = status.exportedCount ?? 0
+                        const message = exported === 0
+                            ? 'All threads are up to date'
+                            : `Analysis complete! ${status.analyzedCount || 0} of ${exported} threads analysed`
+                    setCompletedMessage(message)
+                    setShowCompletedStatus(true)
+
+                    // Refresh data immediately, then hide panel after 5 seconds
+                    queryClient.invalidateQueries({ queryKey: ['analysis'] })
+                    completionTimeoutRef.current = setTimeout(() => {
+                        setShowCompletedStatus(false)
+                        setAnalysisStatus(null)
+                        isCompletedRef.current = false
+                    }, 5000)
+                }
+            }
+        }, 3000)
+    }
+
+    // Stop polling
+    const stopPolling = () => {
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current)
+            pollingIntervalRef.current = null
+        }
+    }
+
+    // Fetch analysis enabled status
+    useEffect(() => {
+        const fetchAnalysisEnabled = async () => {
+            try {
+                const response = await fetch('/api/analysis/enabled')
+                if (response.ok) {
+                    const data = await response.json()
+                    setIsAnalysisEnabled(data.enabled)
+                } else {
+                    console.error('Failed to check analysis enabled status:', response.status)
+                }
+            } catch (error) {
+                console.error('Error fetching analysis enabled status:', error)
+            }
+        }
+
+        fetchAnalysisEnabled()
+    }, [])
+
+    // Check status on mount and when page becomes visible
+    useEffect(() => {
+        fetchAnalysisStatus()
+
+        return () => {
+            stopPolling()
+            if (completionTimeoutRef.current) {
+                clearTimeout(completionTimeoutRef.current)
+            }
+        }
+    }, [])
+
+    // Start polling if analysis is running
+    useEffect(() => {
+        if (analysisStatus?.running) {
+            startPolling()
+        } else {
+            stopPolling()
+        }
+    }, [analysisStatus?.running])
+
+    const handleStartAnalysis = async () => {
+        setIsStartingAnalysis(true)
+        try {
+            const csrfToken = await getCsrfToken()
+
+            const response = await fetch(`/api/analysis/run?days=${selectedDays}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-Token': csrfToken || '',
+                },
+            })
+
+            if (response.status === 202) {
+                // Analysis started successfully - show progress panel immediately
+                setAnalysisStatus({
+                    jobId: null,
+                    exportedCount: 0,
+                    analyzedCount: 0,
+                    running: true,
+                    error: null
+                })
+
+                // Fetch actual status
+                const status = await fetchAnalysisStatus()
+
+                // Check if analysis completed immediately (nothing to analyze)
+                if (status && !status.running) {
+                    isCompletedRef.current = true
+
+                    // Show completion message
+                    if (status.error) {
+                        setIsCompletionError(true)
+                        setCompletedMessage(`Analysis failed: ${status.error}`)
+                        setShowCompletedStatus(true)
+
+                        completionTimeoutRef.current = setTimeout(() => {
+                            setShowCompletedStatus(false)
+                            setAnalysisStatus(null)
+                            isCompletedRef.current = false
+                            showToast(`Analysis failed: ${status.error}`, 'error')
+                        }, 5000)
+                    } else {
+                        setIsCompletionError(false)
+                        const exported = status.exportedCount ?? 0
+                        const message = exported === 0
+                            ? 'All threads are up to date'
+                            : `Analysis complete! ${status.analyzedCount || 0} of ${exported} threads analysed`
+                        setCompletedMessage(message)
+                        setShowCompletedStatus(true)
+
+                        // Refresh data immediately, then hide panel after 5 seconds
+                        queryClient.invalidateQueries({ queryKey: ['analysis'] })
+                        completionTimeoutRef.current = setTimeout(() => {
+                            setShowCompletedStatus(false)
+                            setAnalysisStatus(null)
+                            isCompletedRef.current = false
+                        }, 5000)
+                    }
+                } else {
+                    // Analysis is still running, start polling
+                    startPolling()
+                }
+            } else if (response.status === 409) {
+                showToast('Analysis was just started by someone else', 'error')
+            } else {
+                showToast('Failed to start analysis.. Please try again.', 'error')
+            }
+        } catch (error) {
+            console.error('Error starting analysis:', error)
+            showToast('Failed to start analysis.. Please try again.', 'error')
+        } finally {
+            setIsStartingAnalysis(false)
+        }
+    }
 
     const toggleItemExpansion = (itemName: string) => {
         setExpandedItems(prev => {
@@ -279,48 +487,121 @@ export default function KnowledgeGapsPage() {
                     </div>
                     {isSupportEngineer && (
                         <div className="flex items-center gap-2">
-                            <select
-                                value={selectedDays}
-                                onChange={(e) => setSelectedDays(Number(e.target.value))}
-                                className="h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            >
-                                <option value={7}>Week</option>
-                                <option value={31}>Month</option>
-                                <option value={92}>Quarter</option>
-                            </select>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".jsonl"
-                                onChange={handleFileChange}
-                                className="hidden"
-                            />
-                            <button
-                                onClick={handleExportDownload}
-                                disabled={isDownloading}
-                                className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                            >
-                                <Download className="w-4 h-4" />
-                                {isDownloading ? 'Downloading...' : 'Export'}
-                            </button>
-                            <button
-                                onClick={handleAnalysisBundleDownload}
-                                className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
-                            >
-                                <FileText className="w-4 h-4" />
-                                Analysis Bundle
-                            </button>
-                            <button
-                                onClick={handleImportClick}
-                                disabled={isUploading}
-                                className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                            >
-                                <Upload className="w-4 h-4" />
-                                {isUploading ? 'Uploading...' : 'Import'}
-                            </button>
+                                <select
+                                    value={selectedDays}
+                                    onChange={(e) => setSelectedDays(Number(e.target.value))}
+                                    className="h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                    <option value={7}>Week</option>
+                                    <option value={31}>Month</option>
+                                    <option value={92}>Quarter</option>
+                                </select>
+                                {isAnalysisEnabled && (
+                                    <button
+                                        onClick={handleStartAnalysis}
+                                        disabled={analysisStatus?.running || isStartingAnalysis || showCompletedStatus}
+                                        className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        <Play className="w-4 h-4" />
+                                        {isStartingAnalysis ? 'Checking...' : 'Run Analysis'}
+                                    </button>
+                                )}
+                                {!isAnalysisEnabled && (
+                                    <>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept=".jsonl"
+                                            onChange={handleFileChange}
+                                            className="hidden"
+                                        />
+                                        <button
+                                            onClick={handleExportDownload}
+                                            disabled={isDownloading}
+                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            {isDownloading ? 'Downloading...' : 'Export'}
+                                        </button>
+                                        <button
+                                            onClick={handleAnalysisBundleDownload}
+                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                                        >
+                                            <FileText className="w-4 h-4" />
+                                            Analysis Bundle
+                                        </button>
+                                        <button
+                                            onClick={handleImportClick}
+                                            disabled={isUploading}
+                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                        >
+                                            <Upload className="w-4 h-4" />
+                                            {isUploading ? 'Uploading...' : 'Import'}
+                                        </button>
+                                    </>
+                                )}
                         </div>
                     )}
                 </div>
+
+                {/* Analysis Progress Card — visible to all users */}
+                {(analysisStatus?.running || showCompletedStatus) && (() => {
+                    const isUpToDate = showCompletedStatus && !isCompletionError && !analysisStatus?.exportedCount
+                    const isSuccess = showCompletedStatus && !isCompletionError && (analysisStatus?.exportedCount ?? 0) > 0
+                    const isError = showCompletedStatus && isCompletionError
+                    const isRunning = !showCompletedStatus
+
+                    const exported = analysisStatus?.exportedCount ?? 0
+                    const analyzed = analysisStatus?.analyzedCount ?? 0
+                    const progressPercent = exported > 0 ? Math.round((analyzed / exported) * 100) : 0
+
+                    const borderColor = isError ? 'border-red-200' : isUpToDate ? 'border-emerald-200' : isSuccess ? 'border-green-200' : 'border-blue-200'
+                    const bgGradient = isError
+                        ? 'from-red-50 to-white'
+                        : isUpToDate
+                            ? 'from-emerald-50 to-white'
+                            : isSuccess
+                                ? 'from-green-50 to-white'
+                                : 'from-purple-50 to-white'
+                    const barColor = isError ? 'bg-red-500' : isSuccess ? 'bg-green-500' : isUpToDate ? 'bg-emerald-500' : 'bg-purple-500'
+                    const barTrack = isError ? 'bg-red-100' : isSuccess ? 'bg-green-100' : isUpToDate ? 'bg-emerald-100' : 'bg-purple-100'
+
+                    return (
+                        <div className={`bg-white rounded-xl border ${borderColor} shadow-sm overflow-hidden`}>
+                            <div className={`px-6 py-5 bg-gradient-to-r ${bgGradient}`}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        {isRunning && (
+                                            <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600 shrink-0"></div>
+                                        )}
+                                        {isUpToDate && <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />}
+                                        {isSuccess && <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />}
+                                        {isError && <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />}
+                                        <span className="font-semibold text-gray-900">
+                                            {showCompletedStatus
+                                                ? completedMessage
+                                                : exported > 0
+                                                    ? `Analysing threads... ${analyzed} of ${exported} complete`
+                                                    : 'Checking for new threads to analyse...'
+                                            }
+                                        </span>
+                                    </div>
+                                    {isRunning && exported > 0 && (
+                                        <span className="text-sm font-medium text-purple-700">{progressPercent}%</span>
+                                    )}
+                                </div>
+                                {(isRunning || isSuccess) && exported > 0 && (
+                                    <div className={`mt-3 h-2.5 rounded-full ${barTrack} overflow-hidden`}>
+                                        <div
+                                            className={`h-full rounded-full ${barColor} transition-all duration-500 ease-out`}
+                                            style={{ width: `${isSuccess ? 100 : progressPercent}%` }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )
+                })()}
 
                 {/* Top Support Areas */}
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
