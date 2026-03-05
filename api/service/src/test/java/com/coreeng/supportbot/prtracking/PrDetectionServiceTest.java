@@ -414,11 +414,11 @@ class PrDetectionServiceTest {
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
-            // then
+            // then — no PR tracked, so ticket must not be marked as tracked
             verify(prTrackingRepository, never()).insertIfAbsent(any());
-            verify(slackClient, times(1)).addReaction(any());
+            verify(slackClient, never()).addReaction(any());
             verify(slackClient, never()).postMessage(any());
-            verify(ticketSlackService).markPostTracked(any(MessageRef.class));
+            verify(ticketSlackService, never()).markPostTracked(any());
         }
 
         @Test
@@ -437,13 +437,13 @@ class PrDetectionServiceTest {
             // when
             PrDetectionOutcome outcome = service.handleMessagePosted(messagePostedWith("msg"), ticket);
 
-            // then — closed PR is ignored at detection-time
+            // then — closed PR is ignored at detection-time, ticket must not be marked as tracked
             verify(prTrackingRepository, never()).insertIfAbsent(any());
             assertThat(outcome.shouldCloseTicket()).isFalse();
-            verify(slackClient, times(1)).addReaction(any());
+            verify(slackClient, never()).addReaction(any());
             verify(slackClient, never()).postMessage(any());
             verifyNoInteractions(escalationProcessingService);
-            verify(ticketSlackService).markPostTracked(any(MessageRef.class));
+            verify(ticketSlackService, never()).markPostTracked(any());
         }
 
         @Test
@@ -461,10 +461,10 @@ class PrDetectionServiceTest {
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(2L));
 
-            // then — merged PR is ignored
-            verify(slackClient, times(1)).addReaction(any());
+            // then — merged PR is ignored, ticket must not be marked as tracked
+            verify(slackClient, never()).addReaction(any());
             verify(slackClient, never()).postMessage(any());
-            verify(ticketSlackService).markPostTracked(any(MessageRef.class));
+            verify(ticketSlackService, never()).markPostTracked(any());
             verify(prTrackingRepository, never()).insertIfAbsent(any());
         }
 
@@ -543,7 +543,7 @@ class PrDetectionServiceTest {
         }
 
         @Test
-        void keepsTrackingOpenWhenCreateEscalationReturnsNull() {
+        void marksTrackingEscalatedWhenCreateEscalationReturnsNull() {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
 
@@ -564,8 +564,13 @@ class PrDetectionServiceTest {
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(5L));
 
-            // then
-            verify(prTrackingRepository, never()).updateStatus(anyLong(), any(), any(), any());
+            // then — record must be moved to ESCALATED to prevent infinite poller loop
+            verify(prTrackingRepository)
+                    .updateStatus(
+                            eq(insertedRecord.id()),
+                            eq(com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.ESCALATED),
+                            isNull(),
+                            isNull());
             verify(ticketSlackService, never()).markTicketEscalated(any());
         }
 

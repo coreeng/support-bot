@@ -64,10 +64,14 @@ public class PrTrackingGitHubConfig {
 
     private static String createJwt(String appId, PrivateKey privateKey) {
         Instant now = Instant.now();
+        // Backdate iat by 60s to tolerate clock skew between the bot and GitHub.
+        // Expiry is set to 9 minutes so the total window stays within GitHub's 10-minute hard limit.
+        // See:
+        // https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app
         return Jwts.builder()
                 .issuer(appId)
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(10, ChronoUnit.MINUTES)))
+                .issuedAt(Date.from(now.minus(60, ChronoUnit.SECONDS)))
+                .expiration(Date.from(now.plus(9, ChronoUnit.MINUTES)))
                 .signWith(privateKey, Jwts.SIG.RS256)
                 .compact();
     }

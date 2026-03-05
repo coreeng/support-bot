@@ -24,5 +24,8 @@ public record PrTrackingRecord(
         requireNonNull(slaDeadline, "slaDeadline must not be null");
         requireNonNull(owningTeam, "owningTeam must not be null");
         requireNonNull(status, "status must not be null");
+        if (status == PrTrackingStatus.CLOSED && closedAt == null) {
+            throw new IllegalArgumentException("closedAt must not be null when status is CLOSED");
+        }
     }
 }

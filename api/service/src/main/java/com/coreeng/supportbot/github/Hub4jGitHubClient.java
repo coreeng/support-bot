@@ -34,11 +34,15 @@ public final class Hub4jGitHubClient implements GitHubClient {
                 throw new GitHubApiException(
                         0, "GitHub API returned null state for %s#%d".formatted(repositoryName, pullNumber));
             }
-            return new GitHubPullRequest(
-                    repositoryName,
-                    pullNumber,
-                    createdAt.toInstant(),
-                    state == GHIssueState.OPEN ? GitHubPullRequest.PrState.OPEN : GitHubPullRequest.PrState.CLOSED);
+            GitHubPullRequest.PrState prState;
+            if (state == GHIssueState.OPEN) {
+                prState = GitHubPullRequest.PrState.OPEN;
+            } else if (pr.getMergedAt() != null) {
+                prState = GitHubPullRequest.PrState.MERGED;
+            } else {
+                prState = GitHubPullRequest.PrState.CLOSED;
+            }
+            return new GitHubPullRequest(repositoryName, pullNumber, createdAt.toInstant(), prState);
         } catch (IllegalArgumentException e) {
             throw new GitHubApiException(
                     0, "Invalid repository name '%s': %s".formatted(repositoryName, e.getMessage()), e);

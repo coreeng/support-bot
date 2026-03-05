@@ -1,9 +1,11 @@
 package com.coreeng.supportbot.prtracking;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -16,6 +18,7 @@ import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.github.GitHubPullRequest;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketProcessingService;
@@ -27,6 +30,7 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -243,7 +247,7 @@ class PrLifecyclePollerTest {
     }
 
     @Test
-    void keepsTrackingOpenWhenSlaEscalationReturnsNull() {
+    void marksTrackingEscalatedWhenSlaEscalationReturnsNull() {
         // given
         PrLifecyclePoller poller = createPoller();
         PrTrackingRecord record = record(
@@ -263,9 +267,8 @@ class PrLifecyclePollerTest {
         // when
         poller.poll();
 
-        // then
-        verify(prTrackingRepository, never())
-                .updateStatus(eq(record.id()), eq(PrTrackingStatus.ESCALATED), any(), any());
+        // then — record must be moved to ESCALATED to prevent infinite poller loop
+        verify(prTrackingRepository).updateStatus(eq(record.id()), eq(PrTrackingStatus.ESCALATED), isNull(), isNull());
         verify(ticketSlackService, never()).markTicketEscalated(any());
     }
 
@@ -300,6 +303,68 @@ class PrLifecyclePollerTest {
         // then
         verify(ticketProcessingService, never()).closeForPrResolution(any(), any(), any());
         verify(prTrackingRepository, never()).hasAnyActiveClosableForTicket(anyLong());
+    }
+
+    @Test
+    void postsMergedMessageWhenPrIsMerged() {
+        // given
+        PrLifecyclePoller poller = createPoller();
+        PrTrackingRecord record = record(
+                1L,
+                100L,
+                "my-org/repo-a",
+                42,
+                PrTrackingStatus.OPEN,
+                Instant.now().plusSeconds(7200));
+        when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+        when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
+                .thenReturn(new GitHubPullRequest(
+                        record.githubRepo(),
+                        record.prNumber(),
+                        record.prCreatedAt(),
+                        GitHubPullRequest.PrState.MERGED));
+        when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
+        when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
+                .thenReturn(true);
+
+        // when
+        poller.poll();
+
+        // then
+        ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
+        verify(slackClient).postMessage(captor.capture());
+        assertThat(captor.getValue().message().getText()).contains("has been merged");
+    }
+
+    @Test
+    void postsClosedMessageWhenPrIsClosed() {
+        // given
+        PrLifecyclePoller poller = createPoller();
+        PrTrackingRecord record = record(
+                1L,
+                100L,
+                "my-org/repo-a",
+                42,
+                PrTrackingStatus.OPEN,
+                Instant.now().plusSeconds(7200));
+        when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+        when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
+                .thenReturn(new GitHubPullRequest(
+                        record.githubRepo(),
+                        record.prNumber(),
+                        record.prCreatedAt(),
+                        GitHubPullRequest.PrState.CLOSED));
+        when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
+        when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
+                .thenReturn(true);
+
+        // when
+        poller.poll();
+
+        // then
+        ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
+        verify(slackClient).postMessage(captor.capture());
+        assertThat(captor.getValue().message().getText()).contains("has been closed");
     }
 
     private PrLifecyclePoller createPoller() {

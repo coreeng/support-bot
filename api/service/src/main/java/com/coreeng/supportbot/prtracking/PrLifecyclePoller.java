@@ -75,13 +75,13 @@ public class PrLifecyclePoller {
         }
 
         if (pr.isClosed()) {
-            handlePrClosed(record);
+            handlePrClosed(record, pr);
         } else if (record.status() == PrTrackingStatus.OPEN && Instant.now().isAfter(record.slaDeadline())) {
             handleSlaBreached(record);
         }
     }
 
-    private void handlePrClosed(PrTrackingRecord record) {
+    private void handlePrClosed(PrTrackingRecord record, GitHubPullRequest pr) {
         prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.CLOSED, Instant.now(), record.escalationId());
         log.atInfo()
                 .addArgument(record::githubRepo)
@@ -96,8 +96,9 @@ public class PrLifecyclePoller {
             return;
         }
 
+        String action = pr.state() == GitHubPullRequest.PrState.MERGED ? "merged" : "closed";
         postMessage(
-                "PR `%s#%d` has been closed. :white_check_mark:".formatted(record.githubRepo(), record.prNumber()),
+                "PR `%s#%d` has been %s. :white_check_mark:".formatted(record.githubRepo(), record.prNumber(), action),
                 ticket.channelId(),
                 ticket.queryTs(),
                 record);
@@ -134,7 +135,9 @@ public class PrLifecyclePoller {
                     .addArgument(record::githubRepo)
                     .addArgument(record::prNumber)
                     .addArgument(record::ticketId)
-                    .log("Escalation creation returned null for PR {}#{} on ticket {}, keeping tracking OPEN");
+                    .log(
+                            "Escalation creation returned null for PR {}#{} on ticket {} — marking tracking ESCALATED to avoid reprocessing");
+            prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.ESCALATED, null, null);
             return;
         }
         Long escalationId = escalation.id().id();

@@ -419,11 +419,11 @@ public class PrTrackingFunctionalTests {
         // then — ticket exists and remains opened; no PR tracking side effects.
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
             githubStub.assertIsCalled();
-            creationStubs.reactionAdded().assertIsCalled();
+            creationStubs.reactionAdded().assertIsNotCalled();
             creationStubs.ticketMessagePosted().assertIsCalled();
             creationStubs.conversationsReplies().assertIsNotCalled();
             prReactionStub.assertIsNotCalled();
-            eyesReactionStub.assertIsCalled();
+            eyesReactionStub.assertIsNotCalled();
         });
 
         var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);

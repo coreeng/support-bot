@@ -86,15 +86,25 @@ public class PrDetectionService {
                         .log("PR {}#{} already tracked for ticket {}, skipping");
                 continue;
             }
-            if (!baseReactionsAdded) {
-                addReaction(slackTicketsProps.expectedInitialReaction(), ticket.queryTs(), ticket.channelId());
-                ticketSlackService.markPostTracked(ticket.queryRef());
-                baseReactionsAdded = true;
-            }
             boolean canAutoCloseTicket = !event.messageRef().isReply();
-            PerPrResult result = processPr(pr, ticket, canAutoCloseTicket);
+            PerPrResult result;
+            try {
+                result = processPr(pr, ticket, canAutoCloseTicket);
+            } catch (Exception e) {
+                log.atError()
+                        .setCause(e)
+                        .addArgument(pr::repositoryName)
+                        .addArgument(pr::pullNumber)
+                        .log("Failed to process PR {}#{}, skipping");
+                continue;
+            }
             switch (result) {
                 case TRACKED -> {
+                    if (!baseReactionsAdded) {
+                        addReaction(slackTicketsProps.expectedInitialReaction(), ticket.queryTs(), ticket.channelId());
+                        ticketSlackService.markPostTracked(ticket.queryRef());
+                        baseReactionsAdded = true;
+                    }
                     anyOpenTracked = true;
                     if (!metadataInitialized && !event.messageRef().isReply()) {
                         ticket = initializePrMetadataIfNeeded(ticket, event);
@@ -241,7 +251,10 @@ public class PrDetectionService {
                     .addArgument(tracking::githubRepo)
                     .addArgument(tracking::prNumber)
                     .addArgument(() -> checkNotNull(ticket.id()).id())
-                    .log("Escalation creation returned null for PR {}#{} on ticket {}, keeping tracking OPEN");
+                    .log(
+                            "Escalation creation returned null for PR {}#{} on ticket {} — marking tracking ESCALATED to avoid reprocessing");
+            prTrackingRepository.updateStatus(
+                    tracking.id(), com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.ESCALATED, null, null);
             return;
         }
         Long escalationId = escalation.id().id();
