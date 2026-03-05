@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableList;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,9 +60,15 @@ public class TicketProcessingService {
             log.atInfo().addArgument(e::messageRef).log("Query is created on message({})");
 
             if (prDetectionService.isPresent() && prDetectionService.get().containsPrLinks(e.message())) {
-                Ticket ticket = createTicket(e.messageRef());
-                PrDetectionOutcome outcome = handlePrDetectionSafely(prDetectionService.get(), e, ticket);
+                PrDetectionOutcome outcome = handlePrDetectionForQueryEvent(prDetectionService.get(), e);
                 if (outcome.shouldCloseTicket()) {
+                    Ticket ticket = repository.findTicketByQuery(e.messageRef());
+                    if (ticket == null || ticket.id() == null) {
+                        log.atWarn()
+                                .addArgument(e::messageRef)
+                                .log("PR detection requested ticket close but no ticket exists for query({})");
+                        return;
+                    }
                     closeForPrResolution(checkNotNull(ticket.id()), outcome.closingTags(), outcome.closingImpact());
                 }
             }
@@ -105,6 +112,25 @@ public class TicketProcessingService {
                     .addKeyValue("queryTs", ticket.queryTs().ts())
                     .addArgument(event::messageRef)
                     .log("PR detection failed for message({}); continuing ticket processing");
+            return PrDetectionOutcome.skipped();
+        }
+    }
+
+    private PrDetectionOutcome handlePrDetectionForQueryEvent(PrDetectionService svc, MessagePosted event) {
+        Ticket existingTicket = repository.findTicketByQuery(event.messageRef());
+        if (existingTicket != null) {
+            return handlePrDetectionSafely(svc, event, existingTicket);
+        }
+        Supplier<Ticket> ticketCreator = () -> createTicket(event.messageRef());
+        try {
+            return svc.handleQueryMessagePosted(event, ticketCreator);
+        } catch (Exception ex) {
+            log.atError()
+                    .setCause(ex)
+                    .addKeyValue("channelId", event.messageRef().channelId())
+                    .addKeyValue("queryTs", event.messageRef().actualThreadTs().ts())
+                    .addArgument(event::messageRef)
+                    .log("PR detection failed for query message({}); continuing ticket processing");
             return PrDetectionOutcome.skipped();
         }
     }

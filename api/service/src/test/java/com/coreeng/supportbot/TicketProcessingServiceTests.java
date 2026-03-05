@@ -28,6 +28,7 @@ import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
 import java.time.ZoneId;
 import java.util.Optional;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -204,7 +205,12 @@ public class TicketProcessingServiceTests {
         MessageRef formRef = new MessageRef(MessageTs.of("form-ts"), MESSAGE_TS, slackTicketsProps.channelId());
 
         when(prDetectionService.containsPrLinks(any())).thenReturn(true);
-        when(prDetectionService.handleMessagePosted(any(), any())).thenReturn(PrDetectionOutcome.tracked());
+        when(prDetectionService.handleQueryMessagePosted(any(), any())).thenAnswer(invocation -> {
+            Supplier<Ticket> ticketCreator = invocation.getArgument(1);
+            Ticket created = ticketCreator.get();
+            assertNotNull(created);
+            return PrDetectionOutcome.tracked();
+        });
         when(slackService.postTicketForm(eq(new MessageRef(MESSAGE_TS, slackTicketsProps.channelId())), any()))
                 .thenReturn(formRef);
 
@@ -218,10 +224,7 @@ public class TicketProcessingServiceTests {
         assertEquals(TicketStatus.opened, ticket.status());
 
         verify(slackService).postTicketForm(eq(new MessageRef(MESSAGE_TS, slackTicketsProps.channelId())), any());
-
-        ArgumentCaptor<Ticket> ticketCaptor = ArgumentCaptor.forClass(Ticket.class);
-        verify(prDetectionService).handleMessagePosted(any(MessagePosted.class), ticketCaptor.capture());
-        assertEquals(ticket.id(), ticketCaptor.getValue().id());
+        verify(prDetectionService).handleQueryMessagePosted(any(MessagePosted.class), any());
     }
 
     @Test
@@ -270,17 +273,15 @@ public class TicketProcessingServiceTests {
         // given
         TicketProcessingService service = serviceWithPrDetection();
         MessageRef queryRef = new MessageRef(MESSAGE_TS, null, slackTicketsProps.channelId());
-        MessageRef formRef = new MessageRef(MessageTs.of("form-ts"), MESSAGE_TS, slackTicketsProps.channelId());
         when(prDetectionService.containsPrLinks(any())).thenReturn(true);
-        when(prDetectionService.handleMessagePosted(any(), any())).thenThrow(new RuntimeException("pr subsystem down"));
-        when(slackService.postTicketForm(eq(new MessageRef(MESSAGE_TS, slackTicketsProps.channelId())), any()))
-                .thenReturn(formRef);
+        when(prDetectionService.handleQueryMessagePosted(any(), any()))
+                .thenThrow(new RuntimeException("pr subsystem down"));
 
         // when / then
         assertDoesNotThrow(() -> service.handleMessagePosted(
                 new MessagePosted("https://github.com/org/repo/pull/1", USER_ID, queryRef)));
         assertTrue(ticketRepository.queryExists(queryRef));
-        assertNotNull(ticketRepository.findTicketByQuery(queryRef));
+        assertNull(ticketRepository.findTicketByQuery(queryRef));
     }
 
     @Test
@@ -315,8 +316,12 @@ public class TicketProcessingServiceTests {
         MessageRef formRef = new MessageRef(MessageTs.of("form-ts"), MESSAGE_TS, slackTicketsProps.channelId());
 
         when(prDetectionService.containsPrLinks(any())).thenReturn(true);
-        when(prDetectionService.handleMessagePosted(any(), any()))
-                .thenReturn(new PrDetectionOutcome(true, ImmutableList.of("pr-review"), "low"));
+        when(prDetectionService.handleQueryMessagePosted(any(), any())).thenAnswer(invocation -> {
+            Supplier<Ticket> ticketCreator = invocation.getArgument(1);
+            Ticket created = ticketCreator.get();
+            assertNotNull(created);
+            return new PrDetectionOutcome(true, ImmutableList.of("pr-review"), "low");
+        });
         when(slackService.postTicketForm(eq(new MessageRef(MESSAGE_TS, slackTicketsProps.channelId())), any()))
                 .thenReturn(formRef);
 
@@ -329,6 +334,23 @@ public class TicketProcessingServiceTests {
         assertEquals(TicketStatus.closed, ticket.status());
         assertEquals(ImmutableList.of("pr-review"), ticket.tags());
         assertEquals("low", ticket.impact());
+    }
+
+    @Test
+    public void shouldNotCreateTicketForClosedPrOnlyInOriginalMessage() {
+        // given
+        TicketProcessingService service = serviceWithPrDetection();
+        MessageRef queryRef = new MessageRef(MESSAGE_TS, null, slackTicketsProps.channelId());
+        when(prDetectionService.containsPrLinks(any())).thenReturn(true);
+        when(prDetectionService.handleQueryMessagePosted(any(), any())).thenReturn(PrDetectionOutcome.skipped());
+
+        // when
+        service.handleMessagePosted(new MessagePosted("https://github.com/org/repo/pull/1", USER_ID, queryRef));
+
+        // then
+        assertTrue(ticketRepository.queryExists(queryRef), "query is created");
+        assertNull(ticketRepository.findTicketByQuery(queryRef), "ticket is not created for closed-only PR links");
+        verify(slackService, never()).postTicketForm(any(), any());
     }
 
     @Test

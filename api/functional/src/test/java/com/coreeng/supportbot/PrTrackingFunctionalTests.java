@@ -374,27 +374,18 @@ public class PrTrackingFunctionalTests {
     }
 
     @Test
-    public void whenPrIsClosed_detectionSkipsTrackingAndKeepsTicketOpened() {
+    public void whenPrIsClosedInOriginalMessage_detectionSkipsTrackingAndDoesNotCreateTicket() {
         TestKit.RoledTestKit asTenant = testKit.as(tenant);
         SlackTestKit asTenantSlack = asTenant.slack();
         String channelId = testKit.config().mocks().slack().supportChannelId();
 
         MessageTs queryTs = MessageTs.now();
         String messageWithPr = "Could you review " + PR_LINK_1 + "?";
-        MessageTs ticketMessageTs = MessageTs.now();
 
         // Stub GitHub (PR is closed => detection should skip tracking entirely)
         var githubStub = testKit.slack()
                 .wiremock()
                 .stubGitHubGetPullRequest("GitHub PR closed", PR_REPO, 1, "closed", recentCreatedAt());
-
-        // Ticket creation still happens for query messages with PR links.
-        SlackMessage messageForStubs = SlackMessage.builder()
-                .slackWiremock(testKit.slack().wiremock())
-                .ts(queryTs)
-                .channelId(channelId)
-                .build();
-        var creationStubs = messageForStubs.stubTicketCreationFlow("ticket created", ticketMessageTs);
 
         // PR-specific side effects should not happen for closed PR links.
         var prReactionStub = testKit.slack()
@@ -416,23 +407,19 @@ public class PrTrackingFunctionalTests {
         // when — post original message with one PR link
         asTenantSlack.postMessage(queryTs, messageWithPr);
 
-        // then — ticket exists and remains opened; no PR tracking side effects.
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+        // then — no ticket is created and no PR tracking side effects happen.
+        await().during(Duration.ofSeconds(2))
+                .atMost(Duration.ofSeconds(10))
+                .untilAsserted(() -> {
             githubStub.assertIsCalled();
-            creationStubs.reactionAdded().assertIsNotCalled();
-            creationStubs.ticketMessagePosted().assertIsCalled();
-            creationStubs.conversationsReplies().assertIsNotCalled();
             prReactionStub.assertIsNotCalled();
             eyesReactionStub.assertIsNotCalled();
         });
 
         var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
-        assertThat(ticketResponse).isNotNull();
-        assertThat(ticketResponse.status()).isEqualTo("opened");
-        assertThat(ticketResponse.escalated()).isFalse();
+        assertThat(ticketResponse).isNull();
 
         githubStub.cleanUp();
-        creationStubs.cleanUp();
         prReactionStub.cleanUp();
         eyesReactionStub.cleanUp();
     }

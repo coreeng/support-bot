@@ -34,6 +34,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -121,6 +122,89 @@ public class PrDetectionService {
         return PrDetectionOutcome.skipped();
     }
 
+    public PrDetectionOutcome handleQueryMessagePosted(MessagePosted event, Supplier<Ticket> ticketSupplier) {
+        List<DetectedPr> detectedPrs = prUrlParser.parse(event.message());
+        if (detectedPrs.isEmpty()) {
+            return PrDetectionOutcome.skipped();
+        }
+
+        Ticket ticket = null;
+        TicketId ticketId = null;
+        boolean anyOpenTracked = false;
+        boolean metadataInitialized = false;
+        boolean baseReactionsAdded = false;
+
+        for (DetectedPr pr : detectedPrs) {
+            try {
+                PrTrackingProps.Repository repoConfig = prTrackingProps.repositories().stream()
+                        .filter(r -> r.name().equals(pr.repositoryName()))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Repo config not found for " + pr.repositoryName()));
+
+                GitHubPullRequest prMetadata;
+                try {
+                    prMetadata = gitHubClient.getPullRequest(pr.repositoryName(), pr.pullNumber());
+                } catch (GitHubApiException e) {
+                    log.atWarn()
+                            .addArgument(pr::repositoryName)
+                            .addArgument(pr::pullNumber)
+                            .addArgument(e::getMessage)
+                            .log("Could not fetch PR metadata for {}#{}, skipping: {}");
+                    continue;
+                }
+
+                if (!prMetadata.isOpen()) {
+                    log.atInfo()
+                            .addArgument(pr::repositoryName)
+                            .addArgument(pr::pullNumber)
+                            .addArgument(prMetadata::state)
+                            .log("PR {}#{} is {} — skipping tracking");
+                    continue;
+                }
+
+                if (ticket == null) {
+                    ticket = ticketSupplier.get();
+                    ticketId = checkNotNull(ticket.id());
+                }
+
+                if (prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(
+                        checkNotNull(ticketId).id(), pr.repositoryName(), pr.pullNumber())) {
+                    log.atInfo()
+                            .addArgument(pr::repositoryName)
+                            .addArgument(pr::pullNumber)
+                            .addArgument(ticketId::id)
+                            .log("PR {}#{} already tracked for ticket {}, skipping");
+                    continue;
+                }
+
+                PerPrResult result = processOpenPr(pr, checkNotNull(ticket), true, repoConfig, prMetadata);
+                if (result == PerPrResult.TRACKED) {
+                    if (!baseReactionsAdded) {
+                        addReaction(slackTicketsProps.expectedInitialReaction(), ticket.queryTs(), ticket.channelId());
+                        ticketSlackService.markPostTracked(ticket.queryRef());
+                        baseReactionsAdded = true;
+                    }
+                    anyOpenTracked = true;
+                    if (!metadataInitialized && !event.messageRef().isReply()) {
+                        ticket = initializePrMetadataIfNeeded(ticket, event);
+                        metadataInitialized = true;
+                    }
+                }
+            } catch (Exception e) {
+                log.atError()
+                        .setCause(e)
+                        .addArgument(pr::repositoryName)
+                        .addArgument(pr::pullNumber)
+                        .log("Failed to process PR {}#{}, skipping");
+            }
+        }
+
+        if (anyOpenTracked) {
+            return PrDetectionOutcome.tracked();
+        }
+        return PrDetectionOutcome.skipped();
+    }
+
     private enum PerPrResult {
         TRACKED,
         SKIPPED
@@ -153,6 +237,16 @@ public class PrDetectionService {
                     .log("PR {}#{} is {} — skipping tracking");
             return PerPrResult.SKIPPED;
         }
+
+        return processOpenPr(detectedPr, ticket, canAutoCloseTicket, repoConfig, prMetadata);
+    }
+
+    private PerPrResult processOpenPr(
+            DetectedPr detectedPr,
+            Ticket ticket,
+            boolean canAutoCloseTicket,
+            PrTrackingProps.Repository repoConfig,
+            GitHubPullRequest prMetadata) {
 
         Instant slaDeadline = prMetadata.createdAt().plus(repoConfig.sla());
         String teamLabel = resolveTeamLabel(repoConfig.owningTeam());
