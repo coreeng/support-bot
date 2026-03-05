@@ -106,6 +106,7 @@ dependencies {
     annotationProcessor("org.springframework:spring-context-indexer")
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-guava")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
     implementation("com.slack.api:bolt-jakarta-socket-mode:1.45.4")
     implementation("com.slack.api:bolt-jakarta-servlet:1.45.4")
     compileOnly("jakarta.websocket:jakarta.websocket-client-api:2.2.0")
@@ -125,6 +126,9 @@ dependencies {
 
     implementation("com.microsoft.graph:microsoft-graph:6.36.0")
     implementation("com.azure.spring:spring-cloud-azure-starter:5.22.0")
+
+    implementation("dev.langchain4j:langchain4j-vertex-ai-gemini:0.36.2")
+    implementation("dev.langchain4j:langchain4j:0.36.2")
 
     implementation("net.logstash.logback:logstash-logback-encoder:8.0")
     implementation("org.springframework.boot:spring-boot-starter-validation")
