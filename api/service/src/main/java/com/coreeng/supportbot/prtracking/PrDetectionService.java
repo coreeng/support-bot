@@ -139,7 +139,8 @@ public class PrDetectionService {
                 PrTrackingProps.Repository repoConfig = prTrackingProps.repositories().stream()
                         .filter(r -> r.name().equals(pr.repositoryName()))
                         .findFirst()
-                        .orElseThrow(() -> new IllegalStateException("Repo config not found for " + pr.repositoryName()));
+                        .orElseThrow(
+                                () -> new IllegalStateException("Repo config not found for " + pr.repositoryName()));
 
                 GitHubPullRequest prMetadata;
                 try {
