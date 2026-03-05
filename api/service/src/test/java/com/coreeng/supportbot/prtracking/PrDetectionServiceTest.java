@@ -485,7 +485,7 @@ class PrDetectionServiceTest {
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
             // then
-            verify(slackClient, times(1)).addReaction(any());
+            verify(slackClient, never()).addReaction(any());
             verify(slackClient, never()).postMessage(any());
             verifyNoInteractions(escalationProcessingService);
         }
