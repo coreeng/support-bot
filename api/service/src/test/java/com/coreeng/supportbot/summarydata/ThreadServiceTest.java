@@ -293,7 +293,7 @@ class ThreadServiceTest {
 
     private ThreadService serviceWithSanitisation(List<String> patterns, List<String> exceptions) {
         var sanitisation = new SanitisationProperties(patterns, exceptions);
-        var props = new SummaryDataProps("classpath:placeholder-analysis-bundle.zip", sanitisation);
+        var props = new SummaryDataProps(sanitisation);
         return new ThreadService(slackClient, props);
     }
 

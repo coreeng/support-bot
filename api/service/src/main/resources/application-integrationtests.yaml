@@ -39,3 +39,7 @@ platform-integration:
           cel-expression: resource.data.name
         groupRef:
           cel-expression: resource.data.groupRef
+
+analysis:
+  prompt:
+    enabled: true

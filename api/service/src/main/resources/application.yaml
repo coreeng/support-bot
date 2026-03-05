@@ -17,7 +17,6 @@ management:
         http:
           server:
             requests: true
-
 security:
   jwt:
     secret: ${JWT_SECRET}
@@ -247,5 +246,15 @@ metrics:
 knowledge-gaps:
   enabled: true
 
-summary-data:
-  analysis-bundle-path: classpath:placeholder-analysis-bundle.zip
+# Analysis configuration
+analysis:
+  vertex:
+    project-id: ${VERTEX_PROJECT_ID:support-bot-cecg-efb3c84c}
+    location: ${VERTEX_LOCATION:europe-west2}
+    model-name: ${VERTEX_MODEL_NAME:gemini-2.5-flash}
+    request-delay: ${VERTEX_REQUEST_DELAY:500ms}
+  bundle:
+    path: ${ANALYSIS_BUNDLE_PATH:classpath:placeholder-analysis-bundle.zip}
+  prompt:
+    enabled: ${ANALYSIS_PROMPT_ENABLED:false}
+    file: ${ANALYSIS_PROMPT_FILE:/app/analysis/prompt.md}
