@@ -15,6 +15,8 @@ env:
     value: "supportbotpassword"
   - name: JWT_SECRET
     value: "functional-test-jwt-secret-minimum-256-bits"
+  - name: ANALYSIS_PROMPT_FILE
+    value: "analysis/prompt.md"
 
 monitoring:
   enabled: true
