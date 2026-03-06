@@ -39,7 +39,7 @@ data:
     {{- end }}
     {{- if .Values.prReviewTracking.enabled }}
     pr-review-tracking:
-      enabled: true
+      enabled: false
       poll-cron: {{ .Values.prReviewTracking.pollCron | default "0 0 9-18 * * 1-5" | quote }}
       pr-emoji: {{ .Values.prReviewTracking.prEmoji | default "pr" | quote }}
       {{- if .Values.prReviewTracking.tags }}
