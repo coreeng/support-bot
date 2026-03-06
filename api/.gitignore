@@ -21,3 +21,6 @@ out/
 
 service/build/
 service/db-data/
+
+### Local dev overrides
+**/application-local.yaml

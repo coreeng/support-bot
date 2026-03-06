@@ -5,6 +5,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
+import com.coreeng.supportbot.prtracking.PrDetectionOutcome;
+import com.coreeng.supportbot.prtracking.PrDetectionService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.events.MessageDeleted;
@@ -12,17 +14,19 @@ import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
+import com.google.common.collect.ImmutableList;
 import java.time.Instant;
 import java.util.Objects;
-import lombok.RequiredArgsConstructor;
+import java.util.Optional;
+import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class TicketProcessingService {
     private final TicketRepository repository;
     private final TicketSlackService slackService;
@@ -30,11 +34,44 @@ public class TicketProcessingService {
     private final SlackTicketsProps slackTicketsProps;
     private final TicketAssignmentProps assignmentProps;
     private final ApplicationEventPublisher publisher;
+    private final Optional<PrDetectionService> prDetectionService;
+
+    @Autowired
+    public TicketProcessingService(
+            TicketRepository repository,
+            TicketSlackService slackService,
+            EscalationQueryService escalationQueryService,
+            SlackTicketsProps slackTicketsProps,
+            TicketAssignmentProps assignmentProps,
+            ApplicationEventPublisher publisher,
+            Optional<PrDetectionService> prDetectionService) {
+        this.repository = repository;
+        this.slackService = slackService;
+        this.escalationQueryService = escalationQueryService;
+        this.slackTicketsProps = slackTicketsProps;
+        this.assignmentProps = assignmentProps;
+        this.publisher = publisher;
+        this.prDetectionService = prDetectionService;
+    }
 
     public void handleMessagePosted(MessagePosted e) {
         if (isQueryEvent(e)) {
             repository.createQueryIfNotExists(e.messageRef());
             log.atInfo().addArgument(e::messageRef).log("Query is created on message({})");
+
+            if (prDetectionService.isPresent() && prDetectionService.get().containsPrLinks(e.message())) {
+                PrDetectionOutcome outcome = handlePrDetectionForQueryEvent(prDetectionService.get(), e);
+                if (outcome.shouldCloseTicket()) {
+                    Ticket ticket = repository.findTicketByQuery(e.messageRef());
+                    if (ticket == null || ticket.id() == null) {
+                        log.atWarn()
+                                .addArgument(e::messageRef)
+                                .log("PR detection requested ticket close but no ticket exists for query({})");
+                        return;
+                    }
+                    closeForPrResolution(checkNotNull(ticket.id()), outcome.closingTags(), outcome.closingImpact());
+                }
+            }
             return;
         }
 
@@ -55,6 +92,72 @@ public class TicketProcessingService {
             TicketId ticketId = checkNotNull(ticket.id());
             repository.touchTicketById(ticketId, Instant.now());
         }
+
+        prDetectionService.ifPresent(svc -> {
+            PrDetectionOutcome outcome = handlePrDetectionSafely(svc, e, ticket);
+            if (outcome.shouldCloseTicket()) {
+                closeForPrResolution(checkNotNull(ticket.id()), outcome.closingTags(), outcome.closingImpact());
+            }
+        });
+    }
+
+    private PrDetectionOutcome handlePrDetectionSafely(PrDetectionService svc, MessagePosted event, Ticket ticket) {
+        try {
+            return svc.handleMessagePosted(event, ticket);
+        } catch (Exception ex) {
+            log.atError()
+                    .setCause(ex)
+                    .addKeyValue("ticketId", ticket.id() != null ? ticket.id().id() : null)
+                    .addKeyValue("channelId", ticket.channelId())
+                    .addKeyValue("queryTs", ticket.queryTs().ts())
+                    .addArgument(event::messageRef)
+                    .log("PR detection failed for message({}); continuing ticket processing");
+            return PrDetectionOutcome.skipped();
+        }
+    }
+
+    private PrDetectionOutcome handlePrDetectionForQueryEvent(PrDetectionService svc, MessagePosted event) {
+        Ticket existingTicket = repository.findTicketByQuery(event.messageRef());
+        if (existingTicket != null) {
+            return handlePrDetectionSafely(svc, event, existingTicket);
+        }
+        Supplier<Ticket> ticketCreator = () -> createTicket(event.messageRef());
+        try {
+            return svc.handleQueryMessagePosted(event, ticketCreator);
+        } catch (Exception ex) {
+            log.atError()
+                    .setCause(ex)
+                    .addKeyValue("channelId", event.messageRef().channelId())
+                    .addKeyValue("queryTs", event.messageRef().actualThreadTs().ts())
+                    .addArgument(event::messageRef)
+                    .log("PR detection failed for query message({}); continuing ticket processing");
+            return PrDetectionOutcome.skipped();
+        }
+    }
+
+    private Ticket createTicket(MessageRef queryRef) {
+        Ticket newTicket = Ticket.createNew(queryRef.actualThreadTs(), queryRef.channelId());
+        newTicket = repository.createTicketIfNotExists(newTicket);
+        TicketId newTicketId = checkNotNull(newTicket.id());
+        log.atInfo()
+                .addKeyValue("ticketId", newTicketId.id())
+                .log("Ticket auto-created for PR-link message({})", queryRef.actualThreadTs());
+
+        if (newTicket.createdMessageTs() == null) {
+            MessageRef postedMessageRef = slackService.postTicketForm(
+                    new MessageRef(queryRef.actualThreadTs(), queryRef.channelId()),
+                    new TicketCreatedMessage(
+                            newTicketId,
+                            newTicket.status(),
+                            newTicket.statusLog().getLast().date()));
+            newTicket = repository.updateTicket(newTicket.toBuilder()
+                    .createdMessageTs(postedMessageRef.ts())
+                    .lastInteractedAt(Instant.now())
+                    .build());
+        } else {
+            log.atInfo().addArgument(queryRef::actualThreadTs).log("Ticket form already posted to message({})");
+        }
+        return newTicket;
     }
 
     public void handleMessageDeleted(MessageDeleted e) {
@@ -183,6 +286,28 @@ public class TicketProcessingService {
         publisher.publishEvent(new TicketEscalated(ticket, request.team(), request.threadPermalink(), request.tags()));
         log.atInfo().addKeyValue("ticketId", checkNotNull(ticket.id()).id()).log("Ticket escalated");
         slackService.markTicketEscalated(ticket.queryRef());
+    }
+
+    public void closeForPrResolution(TicketId ticketId, ImmutableList<String> tags, String impact) {
+        Ticket ticket = repository.findTicketById(ticketId);
+        if (ticket == null) {
+            log.atWarn().addArgument(ticketId).log("Ticket {} not found for bot close, skipping");
+            return;
+        }
+        if (ticket.status() == TicketStatus.closed) {
+            log.atDebug().addArgument(ticketId).log("Ticket {} already closed, skipping");
+            return;
+        }
+        Ticket updated = repository.updateTicket(ticket.toBuilder()
+                .status(TicketStatus.closed)
+                .tags(tags)
+                .impact(impact)
+                .lastInteractedAt(Instant.now())
+                .build());
+        onStatusUpdate(updated);
+        log.atInfo()
+                .addKeyValue("ticketId", ticketId.id())
+                .log("Ticket closed automatically — all tracked PRs resolved");
     }
 
     public void markAsStale(TicketId ticketId) {

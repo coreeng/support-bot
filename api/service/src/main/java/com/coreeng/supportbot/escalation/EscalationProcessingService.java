@@ -35,6 +35,10 @@ public class EscalationProcessingService {
             log.warn("Escalation already exists");
             return escalation;
         }
+        if (escalation.createdMessageTs() != null) {
+            log.atInfo().addArgument(escalation::id).log("Escalation already exists, skipping new post: {}");
+            return escalation;
+        }
 
         log.atInfo().addArgument(escalation::id).log("Escalation created: {}");
 
