@@ -32,19 +32,30 @@ public class EscalationInMemoryRepository implements EscalationRepository {
         checkNotNull(escalation);
         checkArgument(escalation.id() == null);
 
+        Escalation existing = escalations.values().stream()
+                .filter(e -> escalation.ticketId().equals(e.ticketId()))
+                .filter(e -> e.status() == EscalationStatus.opened)
+                .filter(e -> java.util.Objects.equals(escalation.team(), e.team()))
+                .findFirst()
+                .orElse(null);
+        if (existing != null) {
+            return existing;
+        }
+
         Escalation escalationWithId = escalation.toBuilder()
                 .id(new EscalationId(idSequence.getAndIncrement()))
                 .build();
 
         if (escalation.threadTs() != null) {
-            escalationsByThreadTs.computeIfAbsent(escalation.threadTs(), (threadTs) -> {
+            Escalation byThread = escalationsByThreadTs.computeIfAbsent(escalation.threadTs(), (threadTs) -> {
                 escalations.put(escalationWithId.id(), escalationWithId);
                 return escalationWithId;
             });
+            return byThread;
         } else {
             escalations.put(escalationWithId.id(), escalationWithId);
         }
-        return checkNotNull(escalations.get(escalationWithId.id()));
+        return escalationWithId;
     }
 
     @Override

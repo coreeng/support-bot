@@ -102,6 +102,31 @@ auth:
   allowedDomains: []
   allowedEmails: []
 
+# Optional typed Helm config for pr-review-tracking.
+# This block is rendered into application.yaml only when enabled=true.
+# Defaults to disabled so existing raw configMap.config behavior remains unchanged.
+prReviewTracking:
+  enabled: false
+# Example:
+# prReviewTracking:
+#   enabled: true
+#   pollCron: "0 0 9-18 * * 1-5" # Cron schedule for the lifecycle poller (example: 09:00 to 18:00 Mon–Fri)
+#   prEmoji: "pr" # Slack emoji name added to the message when a PR is detected
+#   tags: # Required when enabled: tag codes from enums.tags, applied when the bot auto-closes a ticket
+#     - "pull-request" # Required when enabled: tag codes from enums.tags, applied when the bot auto-closes a ticket
+#   impact: "prReview" # Required when enabled: impact code from enums.impacts, applied when the bot auto-closes a ticket
+#   repositories:
+#     - name: "coreeng/core-platform-environment" # Repository in org/repo format
+#       owningTeam: "infra-integration" # Team code from enums.escalation-teams — escalated when the SLA is breached
+#       sla: "PT48H"
+#   github:
+#     apiBaseUrl: "${GITHUB_API_BASE_URL:https://api.github.com}" # Supports GitHub Enterprise overrides
+#     authMode: "${GITHUB_AUTH_MODE:token}" # token | app
+#     token: "${GITHUB_TOKEN:}" # Used when authMode=token
+#     appId: "${GITHUB_APP_ID:}" # Used when authMode=app
+#     installationId: "${GITHUB_APP_INSTALLATION_ID:}" # Used when authMode=app
+#     privateKeyPem: "${GITHUB_APP_PRIVATE_KEY_PEM:}" # Used when authMode=app
+
 # Environment variables
 env:
   - name: DB_URL

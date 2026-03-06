@@ -106,6 +106,25 @@ ticket:
       enabled: true
       key: ${TICKET_ASSIGNMENT_ENCRYPTION_KEY:}
 
+pr-review-tracking:
+  enabled: false
+  poll-cron: 0 0 9-18 * * 1-5
+  pr-emoji: pr                           # Slack emoji name added to the message when a PR is detected
+  tags: PR                               # Required when enabled: tag codes from enums.tags, applied when the bot auto-closes a ticket
+  impact: Information Request            # Required when enabled: impact code from enums.impacts, applied when the bot auto-closes a ticket
+  repositories: [ ]
+  # Example repository entry:
+  #   - name: my-org/my-repo
+  #     owning-team: <team-code from enums.escalation-teams>
+  #     sla: PT48H
+  github:
+    api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
+    auth-mode: ${GITHUB_AUTH_MODE:token} # token | app
+    token: ${GITHUB_TOKEN:} # Used only when auth-mode=token (typically PAT)
+    app-id: ${GITHUB_APP_ID:}
+    installation-id: ${GITHUB_APP_INSTALLATION_ID:}
+    private-key-pem: ${GITHUB_APP_PRIVATE_KEY_PEM:}
+
 enums:
   escalation-teams:
     - label: wow

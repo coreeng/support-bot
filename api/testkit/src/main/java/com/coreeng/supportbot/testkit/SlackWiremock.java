@@ -3,6 +3,7 @@ package com.coreeng.supportbot.testkit;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.and;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
@@ -59,6 +60,7 @@ public class SlackWiremock extends WireMockServer {
     private void setupAppInitMocks() {
         LOGGER.info("Setting up initial Slack API stubs");
         stubAuthTest("initial mock");
+        stubUsersInfoDefault("initial users.info mock");
     }
 
     private void capturePermanentStubs() {
@@ -185,6 +187,83 @@ public class SlackWiremock extends WireMockServer {
                 }""".formatted(expectedChannelId))));
         return Stub.builder()
                 .mapping(stubMapping)
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    /**
+     * Stubs GitHub API GET /repos/{owner}/{repo}/pulls/{number} for PR-tracking functional tests.
+     * Use when the app is configured with pr-review-tracking and GITHUB_API_BASE_URL pointing to this wiremock.
+     *
+     * @param description   stub name for debugging and cleanup
+     * @param repositoryName repo in "owner/repo" form (e.g. "test-org/test-repo")
+     * @param pullNumber    PR number
+     * @param state         "open" or "closed"
+     * @param createdAtIso ISO-8601 instant (e.g. "2024-01-15T10:00:00Z")
+     */
+    public Stub stubGitHubGetPullRequest(
+            String description, String repositoryName, int pullNumber, String state, String createdAtIso) {
+        // hub4j's GitHub.getRepository() makes an eager GET /repos/{owner}/{repo} request before
+        // constructing the pull-request URL, so we must stub that call too.
+        String[] parts = repositoryName.split("/", 2);
+        String repoBody = """
+                {"id":1,"name":"%s","full_name":"%s","owner":{"login":"%s"},"private":false}
+                """.formatted(parts[1], repositoryName, parts[0]);
+        StubMapping repoStub = givenThat(get("/repos/" + repositoryName)
+                .withName(description + " (repo metadata)")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(repoBody)));
+
+        String prPath = "/repos/" + repositoryName + "/pulls/" + pullNumber;
+        String prBody = """
+                {"state":"%s","created_at":"%s","title":"PR title","user":{"login":"test"},"number":%d}
+                """.formatted(state, createdAtIso, pullNumber);
+        StubMapping prStub = givenThat(get(prPath)
+                .withName(description)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(prBody)));
+        return Stub.builder()
+                .mapping(prStub)
+                .extraMappings(List.of(repoStub))
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    /**
+     * Stubs GitHub API GET /repos/{owner}/{repo}/pulls/{number} with an error response.
+     * Also stubs the repository metadata call required by hub4j.
+     */
+    public Stub stubGitHubGetPullRequestError(
+            String description, String repositoryName, int pullNumber, int statusCode, String errorMessage) {
+        String[] parts = repositoryName.split("/", 2);
+        String repoBody = """
+                {"id":1,"name":"%s","full_name":"%s","owner":{"login":"%s"},"private":false}
+                """.formatted(parts[1], repositoryName, parts[0]);
+        StubMapping repoStub = givenThat(get("/repos/" + repositoryName)
+                .withName(description + " (repo metadata)")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(repoBody)));
+
+        String prPath = "/repos/" + repositoryName + "/pulls/" + pullNumber;
+        StubMapping prStub = givenThat(get(prPath)
+                .withName(description)
+                .willReturn(aResponse()
+                        .withStatus(statusCode)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"message":"%s"}
+                                """.formatted(errorMessage))));
+        return Stub.builder()
+                .mapping(prStub)
+                .extraMappings(List.of(repoStub))
                 .wireMockServer(this)
                 .description(description)
                 .build();
@@ -460,6 +539,25 @@ public class SlackWiremock extends WireMockServer {
                 .wireMockServer(this)
                 .description(userProfile.description())
                 .build();
+    }
+
+    /**
+     * Permanent fallback for users.info calls used by team suggestions.
+     * Tests can still override with a more specific users.info stub as needed.
+     */
+    public void stubUsersInfoDefault(String description) {
+        givenThat(post("/api/users.info").withName(description).willReturn(okJson("""
+                        {
+                          "ok": true,
+                          "user": {
+                            "id": "UNSET_BY_TESTS",
+                            "is_bot": false,
+                            "profile": {
+                              "email": "functional-user@example.com"
+                            }
+                          }
+                        }
+                        """)));
     }
 
     public <T> StubWithResult<T> stubEphemeralMessagePosted(EphemeralMessageExpectation<T> expectation) {

@@ -3,6 +3,7 @@ package com.coreeng.supportbot.escalation;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
@@ -46,7 +47,7 @@ class EscalationProcessingServiceTest {
     }
 
     @Test
-    public void escalationShouldBeReturnedWithNoIdGivenDatabaseDidNotInsert() {
+    public void existingEscalationShouldBeReturnedWhenRepositoryResolvesDuplicate() {
         // given
         CreateEscalationRequest escalationRequest = CreateEscalationRequest.builder()
                 .ticket(Ticket.builder()
@@ -58,15 +59,22 @@ class EscalationProcessingServiceTest {
                 .tags(ImmutableList.of("tag-1", "tag-2"))
                 .build();
 
-        when(escalationRepository.createIfNotExists(any(Escalation.class)))
-                .thenReturn(Escalation.builder().id(null).build());
+        Escalation existingEscalation = Escalation.builder()
+                .id(new EscalationId(99))
+                .ticketId(new TicketId(1))
+                .createdMessageTs(MessageTs.of("1234567899.000001"))
+                .status(EscalationStatus.opened)
+                .team("some-team")
+                .build();
+        when(escalationRepository.createIfNotExists(any(Escalation.class))).thenReturn(existingEscalation);
 
         // when
         Escalation escalation = requireNonNull(processingService.createEscalation(escalationRequest));
 
         // then
         assertThat(escalation).isNotNull();
-        assertThat(escalation.id()).isNull();
+        assertThat(escalation.id()).isEqualTo(existingEscalation.id());
+        verifyNoInteractions(slackClient);
     }
 
     @Test
