@@ -4,6 +4,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Tickets from '../tickets';
 import * as hooks from '../../../lib/hooks';
 
+const mockReplace = jest.fn();
+let mockSearchParamsValue = '';
+
+jest.mock('next/navigation', () => ({
+    useRouter: () => ({
+        replace: mockReplace,
+    }),
+    usePathname: () => '/tickets',
+    useSearchParams: () => new URLSearchParams(mockSearchParamsValue),
+}));
+
 // Mock the hooks
 jest.mock('../../../lib/hooks');
 
@@ -109,6 +120,8 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => {
 describe('Tickets Component', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockSearchParamsValue = '';
+        mockReplace.mockClear();
         
         // Default mock implementations
         mockUseTeamFilter.mockReturnValue({
@@ -1026,6 +1039,182 @@ describe('Tickets Component', () => {
                 expect(from).toBeDefined();
                 expect(to).toBeDefined();
             }
+        });
+    });
+
+    describe('URL filter sync', () => {
+        it('hydrates filters from URL query params', () => {
+            mockSearchParamsValue = 'ticketDate=custom&ticketFrom=2024-01-01&ticketTo=2024-01-31&ticketStatus=closed&ticketTeam=Team%20B&ticketImpact=high&ticketTag=bug&ticketEscalated=Yes&ticketEscalatedTo=Infra%20Team&ticketSortBy=closedAt&ticketSortDir=asc&ticketPage=1';
+            const mockTickets = getMockPaginatedTickets([
+                { ...createMockTicket('1', 'closed', 'Team B', 'high'), tags: ['bug'], escalations: [{ id: 'esc-1', team: { name: 'Infra Team' } }] },
+            ]);
+
+            mockUseTickets.mockReturnValue({
+                data: mockTickets,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+            mockUseAllTickets.mockReturnValue({
+                data: mockTickets,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useAllTickets>);
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            expect(screen.getByDisplayValue('Custom Range')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('Closed')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('Team B')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('High Impact')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('Bug')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('Yes')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('Infra Team')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('2024-01-01')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('2024-01-31')).toBeInTheDocument();
+        });
+
+        it('uses safe defaults for invalid query params', () => {
+            mockSearchParamsValue = 'ticketDate=invalid&ticketStatus=nope&ticketSortBy=bad&ticketSortDir=sideways&ticketPage=-2';
+            const mockTickets = getMockPaginatedTickets([
+                createMockTicket('1', 'opened', 'Team A', 'high')
+            ]);
+
+            mockUseTickets.mockReturnValue({
+                data: mockTickets,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            expect(screen.getByDisplayValue('Last Week')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('All Status')).toBeInTheDocument();
+            expect(screen.getByText(/Opened At ↓/i)).toBeInTheDocument();
+            expect(screen.getByText(/Page 1 of/i)).toBeInTheDocument();
+        });
+
+        it('syncs filter changes back to URL while preserving unrelated params', () => {
+            mockSearchParamsValue = 'foo=bar';
+            const mockTickets = getMockPaginatedTickets([
+                createMockTicket('1', 'opened', 'Team A', 'high')
+            ]);
+
+            mockUseTickets.mockReturnValue({
+                data: mockTickets,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<Tickets />, { wrapper: Wrapper });
+            mockReplace.mockClear();
+
+            const statusSelect = screen.getAllByRole('combobox').find(sel =>
+                Array.from((sel as HTMLSelectElement).options).some(o => o.textContent === 'All Status')
+            ) as HTMLSelectElement;
+            fireEvent.change(statusSelect, { target: { value: 'opened' } });
+
+            expect(mockReplace).toHaveBeenCalled();
+            const [url] = mockReplace.mock.calls[mockReplace.mock.calls.length - 1];
+            expect(url).toContain('/tickets?');
+            expect(url).toContain('foo=bar');
+            expect(url).toContain('tab=tickets');
+            expect(url).toContain('ticketStatus=opened');
+            expect(url).toContain('ticketDate=lastWeek');
+            expect(url).not.toContain('status=');
+            expect(url).not.toContain('date=');
+        });
+
+        it('removes escalations-only params when syncing tickets URL', () => {
+            mockSearchParamsValue = 'tab=tickets&escTeam=connected-app&escStatus=resolved&foo=bar';
+            const mockTickets = getMockPaginatedTickets([
+                createMockTicket('1', 'opened', 'Team A', 'high')
+            ]);
+
+            mockUseTickets.mockReturnValue({
+                data: mockTickets,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            expect(mockReplace).toHaveBeenCalled();
+            const [url] = mockReplace.mock.calls[mockReplace.mock.calls.length - 1];
+            expect(url).toContain('tab=tickets');
+            expect(url).toContain('foo=bar');
+            expect(url).not.toContain('escTeam=');
+            expect(url).not.toContain('escStatus=');
+            expect(url).toContain('ticketDate=lastWeek');
+        });
+
+        it('supports privileged -> non-privileged shared ticket URL views', () => {
+            mockSearchParamsValue = 'tab=tickets&ticketDate=any&ticketStatus=opened&ticketTeam=Team%20B';
+            const sharedData = getMockPaginatedTickets([
+                createMockTicket('1', 'opened', 'Team A', 'high'),
+                createMockTicket('2', 'opened', 'Team B', 'high'),
+            ]);
+
+            mockUseTickets.mockReturnValue({
+                data: sharedData,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+            mockUseAllTickets.mockReturnValue({
+                data: sharedData,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useAllTickets>);
+
+            // Non-privileged context opening a URL created by privileged user.
+            mockUseTeamFilter.mockReturnValue({
+                selectedTeam: 'Team A',
+                setSelectedTeam: jest.fn(),
+                hasFullAccess: false,
+                effectiveTeams: ['Team A'],
+                allTeams: ['Team A', 'Team B'],
+                initialized: true
+            });
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            const tableBodyText = screen.getByRole('table').querySelector('tbody')?.textContent || '';
+            expect(tableBodyText).toContain('Team B');
+            expect(tableBodyText).not.toContain('Team A');
+        });
+
+        it('supports non-privileged -> privileged shared ticket URL views', () => {
+            mockSearchParamsValue = 'tab=tickets&ticketDate=any&ticketStatus=opened&ticketTeam=Team%20B';
+            const sharedData = getMockPaginatedTickets([
+                createMockTicket('1', 'opened', 'Team A', 'high'),
+                createMockTicket('2', 'opened', 'Team B', 'high'),
+            ]);
+
+            mockUseTickets.mockReturnValue({
+                data: sharedData,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+            mockUseAllTickets.mockReturnValue({
+                data: sharedData,
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useAllTickets>);
+
+            // Privileged context opening a URL created by non-privileged user.
+            mockUseTeamFilter.mockReturnValue({
+                selectedTeam: null,
+                setSelectedTeam: jest.fn(),
+                hasFullAccess: true,
+                effectiveTeams: [],
+                allTeams: ['Team A', 'Team B'],
+                initialized: true
+            });
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            const tableBodyText = screen.getByRole('table').querySelector('tbody')?.textContent || '';
+            expect(tableBodyText).toContain('Team B');
+            expect(tableBodyText).not.toContain('Team A');
         });
     });
 });

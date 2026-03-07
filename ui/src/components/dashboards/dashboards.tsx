@@ -54,6 +54,7 @@ export default function DashboardsPage() {
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search)
+        params.set('tab', 'sla')
         params.set('section', activeSection)
         const newUrl = `${window.location.pathname}?${params.toString()}`
         window.history.replaceState({}, '', newUrl)

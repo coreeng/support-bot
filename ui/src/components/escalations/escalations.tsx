@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useEscalations, useRegistry, useTenantTeams } from '@/lib/hooks'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { useAuth } from '@/hooks/useAuth'
@@ -9,8 +9,60 @@ import EscalatedToMyTeamTable from './EscalatedToMyTeamTable'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
 import { TEAM_SCOPE } from '@/lib/constants'
 import { normalizeTeamKey } from '@/lib/teamUtils'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 type SortColumn = 'ticketId' | 'escalatingTeam' | 'escalatedTo' | 'openedAt' | 'resolvedAt' | 'duration'
+const ESCALATIONS_SORT_COLUMNS = new Set<SortColumn>([
+    'ticketId',
+    'escalatingTeam',
+    'escalatedTo',
+    'openedAt',
+    'resolvedAt',
+    'duration',
+])
+
+const parseDateFilter = (value: string | null): '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom' => {
+    if (value === 'any') return ''
+    if (value === 'lastWeek' || value === 'last2Weeks' || value === 'lastMonth' || value === 'custom') {
+        return value
+    }
+    return 'lastWeek'
+}
+
+const parseStatusFilter = (value: string | null): 'all' | 'ongoing' | 'resolved' => {
+    return value === 'ongoing' || value === 'resolved' ? value : 'all'
+}
+
+const parseSortColumn = (value: string | null): SortColumn => {
+    return value && ESCALATIONS_SORT_COLUMNS.has(value as SortColumn)
+        ? value as SortColumn
+        : 'openedAt'
+}
+
+const parseSortDirection = (value: string | null): 'asc' | 'desc' => {
+    return value === 'asc' || value === 'desc' ? value : 'desc'
+}
+
+const parsePage = (value: string | null): number => {
+    if (!value) return 0
+    const parsed = Number.parseInt(value, 10)
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+}
+
+const TICKETS_URL_PARAM_KEYS = [
+    'ticketDate',
+    'ticketFrom',
+    'ticketTo',
+    'ticketStatus',
+    'ticketTeam',
+    'ticketImpact',
+    'ticketTag',
+    'ticketEscalated',
+    'ticketEscalatedTo',
+    'ticketSortBy',
+    'ticketSortDir',
+    'ticketPage',
+]
 
 function SortableHeader({
     col,
@@ -41,20 +93,34 @@ function SortableHeader({
 }
 
 export default function EscalationsPage() {
+    const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
     const { data: escalationsData, isLoading: isLoadingEscalations, error: errorEscalations } = useEscalations()
     const { data: tenantTeamsData } = useTenantTeams()
     const { data: registryData } = useRegistry()
     const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS
-    const [selectedTeam, setSelectedTeam] = useState<string>('')
-    const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'resolved'>('all')
-    const [impactFilter, setImpactFilter] = useState<string>('all')
-    const [tagFilter, setTagFilter] = useState<string>('')
     type DateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
-    const [dateFilter, setDateFilter] = useState<DateFilter>('lastWeek')
-    const [customDateRange, setCustomDateRange] = useState<{ start?: string; end?: string }>({})
-    const [sortColumn, setSortColumn] = useState<SortColumn>('openedAt')
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
-    const [pageIndex, setPageIndex] = useState<number>(0)
+    const initialDateFilter = parseDateFilter(searchParams.get('escDate'))
+    const initialCustomDateRange = initialDateFilter === 'custom'
+        ? { start: searchParams.get('escFrom') || '', end: searchParams.get('escTo') || '' }
+        : {}
+    const initialStatusFilter = parseStatusFilter(searchParams.get('escStatus'))
+    const initialTeamFilter = searchParams.get('escTeam') || ''
+    const initialImpactFilter = searchParams.get('escImpact') || 'all'
+    const initialTagFilter = searchParams.get('escTag') || ''
+    const initialSortColumn = parseSortColumn(searchParams.get('escSortBy'))
+    const initialSortDirection = parseSortDirection(searchParams.get('escSortDir'))
+    const initialPage = parsePage(searchParams.get('escPage'))
+    const [selectedTeam, setSelectedTeam] = useState<string>(initialTeamFilter)
+    const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'resolved'>(initialStatusFilter)
+    const [impactFilter, setImpactFilter] = useState<string>(initialImpactFilter)
+    const [tagFilter, setTagFilter] = useState<string>(initialTagFilter)
+    const [dateFilter, setDateFilter] = useState<DateFilter>(initialDateFilter)
+    const [customDateRange, setCustomDateRange] = useState<{ start?: string; end?: string }>(initialCustomDateRange)
+    const [sortColumn, setSortColumn] = useState<SortColumn>(initialSortColumn)
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(initialSortDirection)
+    const [pageIndex, setPageIndex] = useState<number>(initialPage)
     const pageSize = 15
 
     const {
@@ -77,6 +143,49 @@ export default function EscalationsPage() {
         if (selectedTeam !== '') setSelectedTeam('')
         if (pageIndex !== 0) setPageIndex(0)
     }
+
+    useEffect(() => {
+        const params = new URLSearchParams(searchParams.toString())
+        // Escalations URLs should not carry tickets-specific filters.
+        TICKETS_URL_PARAM_KEYS.forEach(key => params.delete(key))
+        params.set('tab', 'escalations')
+        params.set('escDate', dateFilter === '' ? 'any' : dateFilter)
+        if (dateFilter === 'custom') {
+            customDateRange.start ? params.set('escFrom', customDateRange.start) : params.delete('escFrom')
+            customDateRange.end ? params.set('escTo', customDateRange.end) : params.delete('escTo')
+        } else {
+            params.delete('escFrom')
+            params.delete('escTo')
+        }
+        statusFilter !== 'all' ? params.set('escStatus', statusFilter) : params.delete('escStatus')
+        selectedTeam ? params.set('escTeam', selectedTeam) : params.delete('escTeam')
+        impactFilter !== 'all' ? params.set('escImpact', impactFilter) : params.delete('escImpact')
+        tagFilter ? params.set('escTag', tagFilter) : params.delete('escTag')
+        sortColumn !== 'openedAt' ? params.set('escSortBy', sortColumn) : params.delete('escSortBy')
+        sortDirection !== 'desc' ? params.set('escSortDir', sortDirection) : params.delete('escSortDir')
+        pageIndex > 0 ? params.set('escPage', String(pageIndex)) : params.delete('escPage')
+
+        const nextQuery = params.toString()
+        const currentQuery = searchParams.toString()
+        if (nextQuery !== currentQuery) {
+            const nextUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname
+            router.replace(nextUrl, { scroll: false })
+        }
+    }, [
+        pathname,
+        router,
+        searchParams,
+        dateFilter,
+        customDateRange.start,
+        customDateRange.end,
+        statusFilter,
+        selectedTeam,
+        impactFilter,
+        tagFilter,
+        sortColumn,
+        sortDirection,
+        pageIndex,
+    ])
 
     // --- Formatting helpers ---
     const formatDate = (isoString?: string) => isoString ? new Date(isoString).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '-'
