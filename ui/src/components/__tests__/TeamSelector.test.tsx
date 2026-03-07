@@ -144,6 +144,43 @@ describe('TeamSelector', () => {
     expect(screen.getByRole('option', { name: 'Tenant B' })).toBeInTheDocument()
   })
 
+  it('does not include tenant teams from API when user is not a member', () => {
+    mockUseTenantTeams.mockReturnValue({ data: [{ name: 'Tenant A' }, { name: 'Tenant X' }] })
+    mockUseAuth.mockReturnValue({
+      user: {
+        teams: [
+          { name: 'Leadership Team', types: ['leadership'], groupRefs: [] },
+          { name: 'Support Engineers', types: ['support'], groupRefs: [] },
+          { name: 'Tenant A', types: ['tenant'], groupRefs: [] },
+        ],
+      },
+      isLeadership: true,
+      isSupportEngineer: true,
+    })
+
+    renderSelector()
+
+    expect(screen.getByRole('option', { name: 'Tenant A' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Tenant X' })).not.toBeInTheDocument()
+  })
+
+  it('matches API tenant teams against session teams using normalized team names', () => {
+    mockUseTenantTeams.mockReturnValue({ data: [{ name: 'Tenant_A' }] })
+    mockUseAuth.mockReturnValue({
+      user: {
+        teams: [
+          { name: 'Tenant A', types: ['tenant'], groupRefs: [] },
+        ],
+      },
+      isLeadership: false,
+      isSupportEngineer: false,
+    })
+
+    renderSelector()
+
+    expect(screen.getByRole('option', { name: 'Tenant_A' })).toBeInTheDocument()
+  })
+
   it('resets selected team to first option if current selection is no longer valid', async () => {
     const setSelectedTeam = jest.fn()
     mockUseTenantTeams.mockReturnValue({ data: [{ name: 'Tenant A' }] })
