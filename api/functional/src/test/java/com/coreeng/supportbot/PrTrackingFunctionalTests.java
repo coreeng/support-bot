@@ -408,9 +408,7 @@ public class PrTrackingFunctionalTests {
         asTenantSlack.postMessage(queryTs, messageWithPr);
 
         // then — no ticket is created and no PR tracking side effects happen.
-        await().during(Duration.ofSeconds(2))
-                .atMost(Duration.ofSeconds(10))
-                .untilAsserted(() -> {
+        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
             githubStub.assertIsCalled();
             prReactionStub.assertIsNotCalled();
             eyesReactionStub.assertIsNotCalled();
