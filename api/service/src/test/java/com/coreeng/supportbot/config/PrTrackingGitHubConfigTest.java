@@ -2,6 +2,7 @@ package com.coreeng.supportbot.config;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.prtracking.PrTrackingGitHubConfig;
@@ -77,6 +78,62 @@ class PrTrackingGitHubConfigTest {
         // then
         assertThat(gitHub).isNotNull();
         assertThat(config.gitHubClient(gitHub)).isNotNull().isInstanceOf(GitHubClient.class);
+    }
+
+    @Test
+    void createsGitHubBeanInAppModeWithBase64EncodedPrivateKeyPem() throws Exception {
+        // given
+        PrTrackingGitHubConfig config = new PrTrackingGitHubConfig();
+        String pem = toPem(generatePrivateKey());
+        String pemBase64 = Base64.getEncoder().encodeToString(pem.getBytes(UTF_8));
+        PrTrackingProps.GitHub appGithub = new PrTrackingProps.GitHub(
+                PrTrackingProps.AuthMode.APP,
+                "https://api.github.com",
+                "",
+                "12345",
+                "67890",
+                pemBase64);
+        PrTrackingProps props = new PrTrackingProps(
+                true,
+                "0 0 9-18 * * 1-5",
+                "pr",
+                List.of("pr-review"),
+                "low",
+                List.of(new PrTrackingProps.Repository("my-org/my-repo", "wow", Duration.ofDays(2))),
+                appGithub);
+
+        // when
+        GitHub gitHub = config.gitHub(props);
+
+        // then
+        assertThat(gitHub).isNotNull();
+        assertThat(config.gitHubClient(gitHub)).isNotNull().isInstanceOf(GitHubClient.class);
+    }
+
+    @Test
+    void failsFastWhenAppModePrivateKeyIsNeitherPemNorBase64Pem() {
+        // given
+        PrTrackingGitHubConfig config = new PrTrackingGitHubConfig();
+        PrTrackingProps.GitHub appGithub = new PrTrackingProps.GitHub(
+                PrTrackingProps.AuthMode.APP,
+                "https://api.github.com",
+                "",
+                "12345",
+                "67890",
+                "not-a-pem-and-not-base64");
+        PrTrackingProps props = new PrTrackingProps(
+                true,
+                "0 0 9-18 * * 1-5",
+                "pr",
+                List.of("pr-review"),
+                "low",
+                List.of(new PrTrackingProps.Repository("my-org/my-repo", "wow", Duration.ofDays(2))),
+                appGithub);
+
+        // when / then
+        assertThatThrownBy(() -> config.gitHub(props))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unrecognised PEM object");
     }
 
     private static PrivateKey generatePrivateKey() throws Exception {

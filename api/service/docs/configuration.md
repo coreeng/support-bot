@@ -192,8 +192,14 @@ pr-review-tracking: # Detects PR links in support threads and manages their life
     token: ${GITHUB_TOKEN:} # Personal Access Token — used only when auth-mode=token
     app-id: ${GITHUB_APP_ID:} # GitHub App ID — used only when auth-mode=app
     installation-id: ${GITHUB_APP_INSTALLATION_ID:} # GitHub App installation ID — used only when auth-mode=app
-    private-key-pem: ${GITHUB_APP_PRIVATE_KEY_PEM:} # PEM-encoded private key — used only when auth-mode=app
-                                                     # Supply as a YAML block scalar or base64-decode from an env var
+    private-key-pem: ${GITHUB_APP_PRIVATE_KEY_PEM:} # Private key input — used only when auth-mode=app
+                                                     # Accepts raw PEM content or base64-encoded PEM
+```
+
+For deployment versatility across different secret delivery mechanisms, you can base64-encode the PEM file into a single line before storing it:
+
+```bash
+base64 < <pemfile> | tr -d '\n'
 ```
 
 # Integrations
