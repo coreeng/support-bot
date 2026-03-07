@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useEffect, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import StatsPage from '@/components/stats/stats'
 import TicketsPage from '@/components/tickets/tickets'
 import EscalationsPage from '@/components/escalations/escalations'
@@ -62,6 +62,34 @@ const supportSubTabs: SupportTab[] = [
     }
 ]
 
+const TICKETS_URL_PARAM_KEYS = [
+    'ticketDate',
+    'ticketFrom',
+    'ticketTo',
+    'ticketStatus',
+    'ticketTeam',
+    'ticketImpact',
+    'ticketTag',
+    'ticketEscalated',
+    'ticketEscalatedTo',
+    'ticketSortBy',
+    'ticketSortDir',
+    'ticketPage',
+]
+
+const ESCALATIONS_URL_PARAM_KEYS = [
+    'escDate',
+    'escFrom',
+    'escTo',
+    'escStatus',
+    'escTeam',
+    'escImpact',
+    'escTag',
+    'escSortBy',
+    'escSortDir',
+    'escPage',
+]
+
 // 2. Derive TabKey types
 type SupportSubTabKey = typeof supportSubTabs[number]['key']
 
@@ -70,9 +98,12 @@ export default function Dashboard() {
     const { hasFullAccess } = useTeamFilter()
     const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled()
     const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
 
     // State
     const [activeSupportSubTab, setActiveSupportSubTab] = useState<SupportSubTabKey>('home')
+    const [didHydrateTabFromUrl, setDidHydrateTabFromUrl] = useState(false)
 
     // Sidebar state
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -116,11 +147,43 @@ export default function Dashboard() {
 
     // Show all tabs based on access level and feature flags
     const supportTabs = supportSubTabs.filter(isTabVisible)
+    const searchParamTab = searchParams.get('tab')
 
-    // Compute effective tab - fallback to 'home' if current tab is not in available tabs
+    useEffect(() => {
+        if (didHydrateTabFromUrl) return
+        if (!searchParamTab) {
+            setDidHydrateTabFromUrl(true)
+            return
+        }
+        const requestedTab = supportTabs.find(tab => tab.key === searchParamTab)
+        if (requestedTab && activeSupportSubTab !== requestedTab.key) {
+            setActiveSupportSubTab(requestedTab.key)
+        }
+        setDidHydrateTabFromUrl(true)
+    }, [searchParamTab, supportTabs, activeSupportSubTab, didHydrateTabFromUrl])
+
+    // Compute effective tab - default to 'home' if current tab is not available
     const effectiveTab = supportTabs.some(tab => tab.key === activeSupportSubTab)
         ? activeSupportSubTab
         : 'home'
+
+    const handleSupportTabChange = (tabKey: SupportSubTabKey) => {
+        setActiveSupportSubTab(tabKey)
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('tab', tabKey)
+        if (tabKey !== 'tickets') {
+            TICKETS_URL_PARAM_KEYS.forEach(key => params.delete(key))
+        }
+        if (tabKey !== 'escalations') {
+            ESCALATIONS_URL_PARAM_KEYS.forEach(key => params.delete(key))
+        }
+        if (tabKey !== 'sla') {
+            params.delete('section')
+        }
+        const nextQuery = params.toString()
+        const nextUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname
+        router.replace(nextUrl, { scroll: false })
+    }
 
 
     // Show loading state while session is being fetched
@@ -199,7 +262,7 @@ export default function Dashboard() {
                                         return (
                                             <button
                                                 key={tab.key}
-                                                onClick={() => setActiveSupportSubTab(tab.key)}
+                                                onClick={() => handleSupportTabChange(tab.key)}
                                                 className={`w-full flex items-center gap-3 px-8 py-2.5 text-sm hover:bg-gray-700 transition-colors ${isActive ? 'bg-blue-600 text-white' : 'text-gray-300'
                                                     }`}
                                             >

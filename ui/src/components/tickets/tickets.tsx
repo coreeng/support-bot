@@ -1,18 +1,62 @@
 'use client'
 
-import {useMemo, useState} from 'react'
+import {useEffect, useMemo, useState} from 'react'
 import {useAllTickets, useRegistry, useTenantTeams, useTickets, useAssignmentEnabled} from '@/lib/hooks'
 import {useTeamFilter} from '@/contexts/TeamFilterContext'
 import {TicketWithLogs, PaginatedTickets, TicketImpact, TicketTag} from "@/lib/types"
 import LoadingSkeleton from '@/components/LoadingSkeleton'
 import EditTicketModal from './EditTicketModal'
 import {useQueryClient} from '@tanstack/react-query'
+import {usePathname, useRouter, useSearchParams} from 'next/navigation'
 import { TEAM_SCOPE } from '@/lib/constants'
 import { normalizeTeamKey } from '@/lib/teamUtils'
 import { getDateRangeFromFilter } from '@/lib/dateRange'
 
+const TICKET_SORT_COLUMNS = new Set(['openedAt', 'closedAt'])
+
+const parseDateFilter = (value: string | null): '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom' => {
+    if (value === 'any') return ''
+    if (value === 'lastWeek' || value === 'last2Weeks' || value === 'lastMonth' || value === 'custom') {
+        return value
+    }
+    return 'lastWeek'
+}
+
+const parseStatusFilter = (value: string | null): string => {
+    return value === 'opened' || value === 'closed' || value === 'stale' ? value : ''
+}
+
+const parseSortColumn = (value: string | null): 'openedAt' | 'closedAt' => {
+    return value && TICKET_SORT_COLUMNS.has(value) ? (value as 'openedAt' | 'closedAt') : 'openedAt'
+}
+
+const parseSortDirection = (value: string | null): 'asc' | 'desc' => {
+    return value === 'asc' || value === 'desc' ? value : 'desc'
+}
+
+const parsePage = (value: string | null): number => {
+    if (!value) return 0
+    const parsed = Number.parseInt(value, 10)
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+}
+
+const ESCALATIONS_URL_PARAM_KEYS = [
+    'escDate',
+    'escFrom',
+    'escTo',
+    'escStatus',
+    'escTeam',
+    'escImpact',
+    'escTag',
+    'escSortBy',
+    'escSortDir',
+    'escPage',
+]
 
 export default function TicketsPage() {
+    const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
     const {
         effectiveTeams,
         hasNoTeamScope: contextHasNoTeamScope,
@@ -24,27 +68,46 @@ export default function TicketsPage() {
     const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
     const isViewingAllTeams = contextIsViewingAllTeams ?? (effectiveTeams.length === 0 && !hasNoTeamScope)
     type DateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
+    const initialDateFilter = parseDateFilter(searchParams.get('ticketDate'))
+    const initialCustomDateRange = initialDateFilter === 'custom'
+        ? {
+            start: searchParams.get('ticketFrom') || '',
+            end: searchParams.get('ticketTo') || ''
+        }
+        : {}
+    const initialStatusFilter = parseStatusFilter(searchParams.get('ticketStatus'))
+    const initialTeamFilter = searchParams.get('ticketTeam') || ''
+    const initialImpactFilter = searchParams.get('ticketImpact') || ''
+    const initialTagFilter = searchParams.get('ticketTag') || ''
+    const initialEscalatedValue = searchParams.get('ticketEscalated')
+    const initialEscalatedFilter = initialEscalatedValue === 'Yes' || initialEscalatedValue === 'No'
+        ? initialEscalatedValue || ''
+        : ''
+    const initialEscalatedToFilter = searchParams.get('ticketEscalatedTo') || ''
+    const initialSortColumn = parseSortColumn(searchParams.get('ticketSortBy'))
+    const initialSortDirection = parseSortDirection(searchParams.get('ticketSortDir'))
+    const initialPage = parsePage(searchParams.get('ticketPage'))
 
     // Selected ticket
     const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
 
     // Filters
-    const [dateFilter, setDateFilter] = useState<DateFilter>('lastWeek')
-    const [customDateRange, setCustomDateRange] = useState<{ start?: string; end?: string }>({})
-    const [statusFilter, setStatusFilter] = useState('')
+    const [dateFilter, setDateFilter] = useState<DateFilter>(initialDateFilter)
+    const [customDateRange, setCustomDateRange] = useState<{ start?: string; end?: string }>(initialCustomDateRange)
+    const [statusFilter, setStatusFilter] = useState(initialStatusFilter)
     const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS
-    const [teamFilter, setTeamFilter] = useState('')
-    const [impactFilter, setImpactFilter] = useState('')
-    const [tagFilter, setTagFilter] = useState('')
-    const [escalatedFilter, setEscalatedFilter] = useState('')
-    const [escalatedToFilter, setEscalatedToFilter] = useState('')
+    const [teamFilter, setTeamFilter] = useState(initialTeamFilter)
+    const [impactFilter, setImpactFilter] = useState(initialImpactFilter)
+    const [tagFilter, setTagFilter] = useState(initialTagFilter)
+    const [escalatedFilter, setEscalatedFilter] = useState(initialEscalatedFilter)
+    const [escalatedToFilter, setEscalatedToFilter] = useState(initialEscalatedToFilter)
     type SortColumn = 'openedAt' | 'closedAt'
-    const [sortColumn, setSortColumn] = useState<SortColumn>('openedAt')
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+    const [sortColumn, setSortColumn] = useState<SortColumn>(initialSortColumn)
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(initialSortDirection)
 
     // Pagination
-    const [currentPage, setCurrentPage] = useState(0)
+    const [currentPage, setCurrentPage] = useState(initialPage)
     const pageSize = 15
 
     const dateRange = useMemo(
@@ -116,7 +179,7 @@ export default function TicketsPage() {
     }
 
     // Build team options from both registry list and the data we actually received.
-    // This prevents missing teams (e.g., escalation/legacy teams) from showing 0 results when filtered.
+    // This prevents missing teams (e.g., escalation or historic teams) from showing 0 results when filtered.
     const ticketsDataTyped = ticketsData as PaginatedTickets | undefined
     const ticketsContent = useMemo(
         () => (ticketsDataTyped?.content as TicketWithLogs[] | undefined) ?? [],
@@ -223,6 +286,54 @@ export default function TicketsPage() {
         if (teamFilter !== '') setTeamFilter('')
         if (currentPage !== 0) setCurrentPage(0)
     }
+
+    // Keep filter and pagination state in URL to support sharable views.
+    useEffect(() => {
+        const params = new URLSearchParams(searchParams.toString())
+        // Tickets URLs should not carry escalations-specific filters.
+        ESCALATIONS_URL_PARAM_KEYS.forEach(key => params.delete(key))
+        params.set('tab', 'tickets')
+        params.set('ticketDate', dateFilter === '' ? 'any' : dateFilter)
+        if (dateFilter === 'custom') {
+            customDateRange.start ? params.set('ticketFrom', customDateRange.start) : params.delete('ticketFrom')
+            customDateRange.end ? params.set('ticketTo', customDateRange.end) : params.delete('ticketTo')
+        } else {
+            params.delete('ticketFrom')
+            params.delete('ticketTo')
+        }
+        statusFilter ? params.set('ticketStatus', statusFilter) : params.delete('ticketStatus')
+        teamFilter ? params.set('ticketTeam', teamFilter) : params.delete('ticketTeam')
+        impactFilter ? params.set('ticketImpact', impactFilter) : params.delete('ticketImpact')
+        tagFilter ? params.set('ticketTag', tagFilter) : params.delete('ticketTag')
+        escalatedFilter ? params.set('ticketEscalated', escalatedFilter) : params.delete('ticketEscalated')
+        escalatedToFilter ? params.set('ticketEscalatedTo', escalatedToFilter) : params.delete('ticketEscalatedTo')
+        sortColumn !== 'openedAt' ? params.set('ticketSortBy', sortColumn) : params.delete('ticketSortBy')
+        sortDirection !== 'desc' ? params.set('ticketSortDir', sortDirection) : params.delete('ticketSortDir')
+        currentPage > 0 ? params.set('ticketPage', String(currentPage)) : params.delete('ticketPage')
+
+        const nextQuery = params.toString()
+        const currentQuery = searchParams.toString()
+        if (nextQuery !== currentQuery) {
+            const nextUrl = nextQuery ? `${pathname}?${nextQuery}` : pathname
+            router.replace(nextUrl, { scroll: false })
+        }
+    }, [
+        pathname,
+        router,
+        searchParams,
+        dateFilter,
+        customDateRange.start,
+        customDateRange.end,
+        statusFilter,
+        teamFilter,
+        impactFilter,
+        tagFilter,
+        escalatedFilter,
+        escalatedToFilter,
+        sortColumn,
+        sortDirection,
+        currentPage,
+    ])
 
     // Server pagination for all-teams without client filters; otherwise client-side pagination.
     const paginatedTickets = useMemo(() => {

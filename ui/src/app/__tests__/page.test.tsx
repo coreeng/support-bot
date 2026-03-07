@@ -5,8 +5,13 @@ import { useAuth } from '../../hooks/useAuth'
 import { useTeamFilter } from '../../contexts/TeamFilterContext'
 import { useKnowledgeGapsEnabled } from '../../lib/hooks'
 
+let mockSearchParamsValue = ''
+const mockReplace = jest.fn()
+
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(mockSearchParamsValue),
 }))
 
 jest.mock('../../hooks/useAuth', () => ({
@@ -67,16 +72,18 @@ jest.mock('next/image', () => ({
 
 const mockRouter = {
   push: jest.fn(),
+  replace: mockReplace,
 }
 
-const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>
-const mockUseTeamFilter = useTeamFilter as jest.MockedFunction<typeof useTeamFilter>
-const mockUseKnowledgeGapsEnabled = useKnowledgeGapsEnabled as jest.MockedFunction<typeof useKnowledgeGapsEnabled>
+const mockUseAuth = useAuth as unknown as jest.Mock
+const mockUseTeamFilter = useTeamFilter as unknown as jest.Mock
+const mockUseKnowledgeGapsEnabled = useKnowledgeGapsEnabled as unknown as jest.Mock
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>
 
 describe('Dashboard - Support Area Summary visibility', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockSearchParamsValue = ''
     mockUseRouter.mockReturnValue(mockRouter as any)
     mockUseTeamFilter.mockReturnValue({
       hasFullAccess: true,
@@ -410,6 +417,119 @@ describe('Dashboard - Support Area Summary visibility', () => {
         expect(screen.getByText('Tickets')).toBeInTheDocument()
         expect(screen.getByText('Escalations')).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('URL tab deep-linking', () => {
+    beforeEach(() => {
+      mockUseKnowledgeGapsEnabled.mockReturnValue({
+        data: true,
+        isLoading: false,
+        error: null,
+      } as any)
+      mockUseAuth.mockReturnValue({
+        user: {
+          name: 'User',
+          email: 'user@example.com',
+          roles: ['supportEngineer'],
+          teams: [],
+        },
+        isLoading: false,
+        isAuthenticated: true,
+        logout: jest.fn(),
+        refreshUser: jest.fn(),
+        isLeadership: false,
+        isEscalationTeam: false,
+        isSupportEngineer: true,
+        actualEscalationTeams: [],
+      })
+      mockUseTeamFilter.mockReturnValue({
+        hasFullAccess: true,
+        selectedTeam: null,
+        setSelectedTeam: jest.fn(),
+        effectiveTeams: [],
+        allTeams: [],
+        initialized: true,
+      })
+    })
+
+    it('opens tickets tab when tab=tickets is present', async () => {
+      mockSearchParamsValue = 'tab=tickets&ticketDate=lastWeek'
+      render(<Dashboard />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Tickets Page')).toBeInTheDocument()
+      })
+    })
+
+    it('uses home tab for invalid tab values', async () => {
+      mockSearchParamsValue = 'tab=not-a-real-tab'
+      render(<Dashboard />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Stats Page')).toBeInTheDocument()
+      })
+    })
+
+    it('writes tab query param when switching tabs and preserves existing params', async () => {
+      mockSearchParamsValue = 'foo=bar'
+      render(<Dashboard />)
+
+      const ticketsButton = await screen.findByRole('button', { name: 'Tickets' })
+      ticketsButton.click()
+
+      expect(mockReplace).toHaveBeenCalled()
+      const [url] = mockReplace.mock.calls[mockReplace.mock.calls.length - 1]
+      expect(url).toContain('/?')
+      expect(url).toContain('foo=bar')
+      expect(url).toContain('tab=tickets')
+    })
+
+    it('drops tickets-only params when switching to a non-tickets tab', async () => {
+      mockSearchParamsValue = 'tab=tickets&ticketDate=lastWeek&ticketStatus=closed&ticketTeam=connected-app&ticketImpact=productionBlocking&foo=bar'
+      render(<Dashboard />)
+
+      const escalationsButton = await screen.findByRole('button', { name: 'Escalations' })
+      escalationsButton.click()
+
+      expect(mockReplace).toHaveBeenCalled()
+      const [url] = mockReplace.mock.calls[mockReplace.mock.calls.length - 1]
+      expect(url).toContain('tab=escalations')
+      expect(url).toContain('foo=bar')
+      expect(url).not.toContain('ticketDate=')
+      expect(url).not.toContain('ticketStatus=')
+      expect(url).not.toContain('ticketTeam=')
+      expect(url).not.toContain('ticketImpact=')
+    })
+
+    it('drops section param when switching away from SLA tab', async () => {
+      mockSearchParamsValue = 'tab=sla&section=response&foo=bar'
+      render(<Dashboard />)
+
+      const escalationsButton = await screen.findByRole('button', { name: 'Escalations' })
+      escalationsButton.click()
+
+      expect(mockReplace).toHaveBeenCalled()
+      const [url] = mockReplace.mock.calls[mockReplace.mock.calls.length - 1]
+      expect(url).toContain('tab=escalations')
+      expect(url).toContain('foo=bar')
+      expect(url).not.toContain('section=')
+    })
+
+    it('drops escalations-only params when switching to a non-escalations tab', async () => {
+      mockSearchParamsValue = 'tab=escalations&escDate=lastWeek&escStatus=resolved&escTeam=Tenant%20Alpha&foo=bar'
+      render(<Dashboard />)
+
+      const ticketsButton = await screen.findByRole('button', { name: 'Tickets' })
+      ticketsButton.click()
+
+      expect(mockReplace).toHaveBeenCalled()
+      const [url] = mockReplace.mock.calls[mockReplace.mock.calls.length - 1]
+      expect(url).toContain('tab=tickets')
+      expect(url).toContain('foo=bar')
+      expect(url).not.toContain('escDate=')
+      expect(url).not.toContain('escStatus=')
+      expect(url).not.toContain('escTeam=')
     })
   })
 })

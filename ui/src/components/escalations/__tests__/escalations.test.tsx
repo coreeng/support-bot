@@ -6,6 +6,15 @@ import * as hooks from '../../../lib/hooks'
 import * as TeamFilterContext from '../../../contexts/TeamFilterContext'
 import * as AuthHook from '../../../hooks/useAuth'
 
+const mockReplace = jest.fn()
+let mockSearchParamsValue = ''
+
+jest.mock('next/navigation', () => ({
+    useRouter: () => ({ replace: mockReplace }),
+    usePathname: () => '/',
+    useSearchParams: () => new URLSearchParams(mockSearchParamsValue),
+}))
+
 jest.mock('../../../lib/hooks')
 jest.mock('../../../contexts/TeamFilterContext')
 jest.mock('../../../hooks/useAuth')
@@ -15,11 +24,11 @@ jest.mock('../EscalatedToMyTeamTable', () => {
     return Mock
 })
 
-const mockUseEscalations = hooks.useEscalations as jest.MockedFunction<typeof hooks.useEscalations>
-const mockUseTenantTeams = hooks.useTenantTeams as jest.MockedFunction<typeof hooks.useTenantTeams>
-const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>
-const mockUseTeamFilter = TeamFilterContext.useTeamFilter as jest.MockedFunction<typeof TeamFilterContext.useTeamFilter>
-const mockUseAuth = AuthHook.useAuth as jest.MockedFunction<typeof AuthHook.useAuth>
+const mockUseEscalations = hooks.useEscalations as unknown as jest.Mock
+const mockUseTenantTeams = hooks.useTenantTeams as unknown as jest.Mock
+const mockUseRegistry = hooks.useRegistry as unknown as jest.Mock
+const mockUseTeamFilter = TeamFilterContext.useTeamFilter as unknown as jest.Mock
+const mockUseAuth = AuthHook.useAuth as unknown as jest.Mock
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -36,6 +45,8 @@ const daysAgo = (n: number) => {
 describe('EscalationsPage', () => {
     beforeEach(() => {
         jest.clearAllMocks()
+        mockSearchParamsValue = ''
+        mockReplace.mockClear()
 
         mockUseRegistry.mockReturnValue({
             data: { impacts: [], tags: [] },
@@ -826,5 +837,177 @@ describe('EscalationsPage', () => {
 
         expect(screen.queryByTestId('escalations-team-filter')).not.toBeInTheDocument()
         expect(screen.queryByText(/Scope:/i)).not.toBeInTheDocument()
+    })
+
+    describe('URL filter sync', () => {
+        it('hydrates escalation filters from URL query params', () => {
+            mockSearchParamsValue = 'tab=escalations&escDate=custom&escFrom=2024-01-01&escTo=2024-01-31&escStatus=resolved&escTeam=Tenant%20Alpha&escImpact=high&escTag=networking&escSortBy=resolvedAt&escSortDir=asc'
+
+            mockUseTeamFilter.mockReturnValue({
+                selectedTeam: null,
+                setSelectedTeam: jest.fn(),
+                hasFullAccess: true,
+                effectiveTeams: [],
+                allTeams: [],
+                initialized: true
+            })
+
+            mockUseRegistry.mockReturnValue({
+                data: {
+                    impacts: [{ code: 'high', label: 'High' }],
+                    tags: [{ code: 'networking', label: 'Networking' }]
+                },
+                isLoading: false,
+                error: null,
+            } as unknown as ReturnType<typeof hooks.useRegistry>)
+
+            mockUseTenantTeams.mockReturnValue({
+                data: [{ name: 'Tenant Alpha' }],
+                isLoading: false,
+                error: null,
+            } as unknown as ReturnType<typeof hooks.useTenantTeams>)
+
+            mockUseEscalations.mockReturnValue({
+                data: {
+                    page: 0,
+                    totalPages: 1,
+                    totalElements: 1,
+                    content: [
+                        {
+                            id: 'esc-1',
+                            ticketId: 'T-1',
+                            escalatingTeam: 'Tenant Alpha',
+                            team: { name: 'Infra' },
+                            impact: 'high',
+                            tags: ['networking'],
+                            openedAt: daysAgo(1),
+                            resolvedAt: daysAgo(0),
+                            hasThread: false,
+                        },
+                    ],
+                },
+                isLoading: false,
+                error: null,
+            } as unknown as ReturnType<typeof hooks.useEscalations>)
+
+            render(<EscalationsPage />, { wrapper: Wrapper })
+
+            expect(screen.getByDisplayValue('Custom Range')).toBeInTheDocument()
+            expect(screen.getByDisplayValue('Resolved')).toBeInTheDocument()
+            expect(screen.getByDisplayValue('Tenant Alpha')).toBeInTheDocument()
+            expect(screen.getByDisplayValue('High')).toBeInTheDocument()
+            expect(screen.getByDisplayValue('Networking')).toBeInTheDocument()
+            expect(screen.getByDisplayValue('2024-01-01')).toBeInTheDocument()
+            expect(screen.getByDisplayValue('2024-01-31')).toBeInTheDocument()
+        })
+
+        it('syncs escalation filter changes back to URL and preserves unrelated params', () => {
+            mockSearchParamsValue = 'foo=bar'
+            render(<EscalationsPage />, { wrapper: Wrapper })
+            mockReplace.mockClear()
+
+            fireEvent.change(screen.getByTestId('escalations-status-filter'), { target: { value: 'resolved' } })
+
+            expect(mockReplace).toHaveBeenCalled()
+            const [url] = mockReplace.mock.calls[mockReplace.mock.calls.length - 1]
+            expect(url).toContain('/?')
+            expect(url).toContain('foo=bar')
+            expect(url).toContain('tab=escalations')
+            expect(url).toContain('escStatus=resolved')
+            expect(url).toContain('escDate=lastWeek')
+        })
+
+        it('removes tickets-only params when syncing escalation URL', () => {
+            mockSearchParamsValue = 'tab=escalations&ticketTeam=connected-app&ticketStatus=closed&foo=bar'
+            render(<EscalationsPage />, { wrapper: Wrapper })
+
+            expect(mockReplace).toHaveBeenCalled()
+            const [url] = mockReplace.mock.calls[mockReplace.mock.calls.length - 1]
+            expect(url).toContain('tab=escalations')
+            expect(url).toContain('foo=bar')
+            expect(url).not.toContain('ticketTeam=')
+            expect(url).not.toContain('ticketStatus=')
+            expect(url).toContain('escDate=lastWeek')
+        })
+
+        it('supports privileged -> non-privileged shared escalation URL views', () => {
+            mockSearchParamsValue = 'tab=escalations&escDate=any&escStatus=ongoing&escTeam=Tenant%20Beta'
+
+            mockUseTeamFilter.mockReturnValue({
+                selectedTeam: 'Escalation Team 2 Test',
+                setSelectedTeam: jest.fn(),
+                hasFullAccess: false,
+                effectiveTeams: ['Escalation Team 2 Test'],
+                allTeams: ['Escalation Team 2 Test'],
+                initialized: true
+            })
+            mockUseAuth.mockReturnValue({
+                user: null,
+                isLoading: false,
+                isAuthenticated: true,
+                isLeadership: false,
+                isEscalationTeam: true,
+                isSupportEngineer: false,
+                actualEscalationTeams: ['Escalation Team 2 Test'],
+                logout: jest.fn()
+            })
+            mockUseEscalations.mockReturnValue({
+                data: {
+                    page: 0,
+                    totalPages: 1,
+                    totalElements: 2,
+                    content: [
+                        { id: 'e1', ticketId: 'T-A', escalatingTeam: 'Tenant Alpha', team: { name: 'Infra' }, impact: null, tags: [], openedAt: daysAgo(1), resolvedAt: null, hasThread: false },
+                        { id: 'e2', ticketId: 'T-B', escalatingTeam: 'Tenant Beta', team: { name: 'Infra' }, impact: null, tags: [], openedAt: daysAgo(1), resolvedAt: null, hasThread: false },
+                    ],
+                },
+                isLoading: false, error: null,
+            } as unknown as ReturnType<typeof hooks.useEscalations>)
+
+            render(<EscalationsPage />, { wrapper: Wrapper })
+
+            expect(screen.getByText('T-B')).toBeInTheDocument()
+            expect(screen.queryByText('T-A')).not.toBeInTheDocument()
+        })
+
+        it('supports non-privileged -> privileged shared escalation URL views', () => {
+            mockSearchParamsValue = 'tab=escalations&escDate=any&escStatus=ongoing&escTeam=Tenant%20Beta'
+
+            mockUseTeamFilter.mockReturnValue({
+                selectedTeam: null,
+                setSelectedTeam: jest.fn(),
+                hasFullAccess: true,
+                effectiveTeams: [],
+                allTeams: [],
+                initialized: true
+            })
+            mockUseAuth.mockReturnValue({
+                user: null,
+                isLoading: false,
+                isAuthenticated: true,
+                isLeadership: true,
+                isEscalationTeam: false,
+                isSupportEngineer: false,
+                actualEscalationTeams: [],
+                logout: jest.fn()
+            })
+            mockUseEscalations.mockReturnValue({
+                data: {
+                    page: 0,
+                    totalPages: 1,
+                    totalElements: 2,
+                    content: [
+                        { id: 'e1', ticketId: 'T-A', escalatingTeam: 'Tenant Alpha', team: { name: 'Infra' }, impact: null, tags: [], openedAt: daysAgo(1), resolvedAt: null, hasThread: false },
+                        { id: 'e2', ticketId: 'T-B', escalatingTeam: 'Tenant Beta', team: { name: 'Infra' }, impact: null, tags: [], openedAt: daysAgo(1), resolvedAt: null, hasThread: false },
+                    ],
+                },
+                isLoading: false, error: null,
+            } as unknown as ReturnType<typeof hooks.useEscalations>)
+
+            render(<EscalationsPage />, { wrapper: Wrapper })
+
+            expect(screen.getByText('T-B')).toBeInTheDocument()
+            expect(screen.queryByText('T-A')).not.toBeInTheDocument()
+        })
     })
 })
