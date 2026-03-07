@@ -87,12 +87,7 @@ class PrTrackingGitHubConfigTest {
         String pem = toPem(generatePrivateKey());
         String pemBase64 = Base64.getEncoder().encodeToString(pem.getBytes(UTF_8));
         PrTrackingProps.GitHub appGithub = new PrTrackingProps.GitHub(
-                PrTrackingProps.AuthMode.APP,
-                "https://api.github.com",
-                "",
-                "12345",
-                "67890",
-                pemBase64);
+                PrTrackingProps.AuthMode.APP, "https://api.github.com", "", "12345", "67890", pemBase64);
         PrTrackingProps props = new PrTrackingProps(
                 true,
                 "0 0 9-18 * * 1-5",

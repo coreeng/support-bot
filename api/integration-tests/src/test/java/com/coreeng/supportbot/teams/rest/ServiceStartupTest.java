@@ -112,8 +112,7 @@ public class ServiceStartupTest {
     @Test
     void analysisEnabled_shouldReturnTrue() {
         // when
-        var response = when()
-                .get("/analysis/enabled")
+        var response = when().get("/analysis/enabled")
                 .then()
                 .statusCode(200)
                 .extract()
@@ -127,17 +126,14 @@ public class ServiceStartupTest {
     @Test
     void analysisRun_shouldStartAndComplete() {
         // when
-        when().post("/analysis/run?days=7")
-                .then()
-                .statusCode(202);
+        when().post("/analysis/run?days=7").then().statusCode(202);
 
         // then
         Awaitility.await()
                 .atMost(Duration.ofSeconds(120))
                 .pollInterval(Duration.ofSeconds(2))
                 .untilAsserted(() -> {
-                    var status = when()
-                            .get("/analysis/status")
+                    var status = when().get("/analysis/status")
                             .then()
                             .statusCode(200)
                             .extract()
@@ -152,7 +148,9 @@ public class ServiceStartupTest {
                     LOGGER.info("Analysis completed: exported={}, analyzed={}", exported, analyzed);
 
                     if (exported != null && exported > 0) {
-                        assertThat(analyzed).as("Should analyze threads when threads are found").isGreaterThan(0);
+                        assertThat(analyzed)
+                                .as("Should analyze threads when threads are found")
+                                .isGreaterThan(0);
                     }
                 });
     }
