@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { Suspense, useEffect, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import StatsPage from '@/components/stats/stats'
 import TicketsPage from '@/components/tickets/tickets'
@@ -93,7 +93,7 @@ const ESCALATIONS_URL_PARAM_KEYS = [
 // 2. Derive TabKey types
 type SupportSubTabKey = typeof supportSubTabs[number]['key']
 
-export default function Dashboard() {
+function DashboardContent() {
     const { user, isLoading, isAuthenticated, logout } = useAuth()
     const { hasFullAccess } = useTeamFilter()
     const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled()
@@ -360,5 +360,22 @@ export default function Dashboard() {
                 </div>
             </div>
         </div>
+    )
+}
+
+export default function Dashboard() {
+    return (
+        <Suspense
+            fallback={
+                <div className="flex items-center justify-center h-screen bg-gray-50">
+                    <div className="text-center">
+                        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+                        <p className="text-gray-600">Loading...</p>
+                    </div>
+                </div>
+            }
+        >
+            <DashboardContent />
+        </Suspense>
     )
 }
