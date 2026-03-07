@@ -4,6 +4,7 @@ import { useEffect, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { useTenantTeams } from '@/lib/hooks'
+import { normalizeTeamKey } from '@/lib/teamUtils'
 import { Users } from 'lucide-react'
 
 export default function TeamSelector() {
@@ -25,8 +26,13 @@ export default function TeamSelector() {
 
     // Tenant teams from API (same source support engineers use)
     const tenantTeamNamesFromApi = useMemo(
-        () => (apiTenantTeams?.map(t => t.name).filter(Boolean) ?? []).sort(),
-        [apiTenantTeams]
+        () => {
+            const memberTeamKeys = new Set(teams.map((team) => normalizeTeamKey(team.name)))
+            return (apiTenantTeams?.map(t => t.name).filter(Boolean) ?? [])
+                .filter((name) => memberTeamKeys.has(normalizeTeamKey(name)))
+                .sort()
+        },
+        [apiTenantTeams, teams]
     )
 
     // Fallback tenant teams from session for resiliency (e.g. transient empty API response)
