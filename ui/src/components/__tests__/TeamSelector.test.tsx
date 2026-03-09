@@ -10,13 +10,8 @@ jest.mock('../../contexts/TeamFilterContext', () => ({
   useTeamFilter: jest.fn(),
 }))
 
-jest.mock('../../lib/hooks', () => ({
-  useTenantTeams: jest.fn(),
-}))
-
 const mockUseAuth = jest.requireMock('../../hooks/useAuth').useAuth as jest.Mock
 const mockUseTeamFilter = jest.requireMock('../../contexts/TeamFilterContext').useTeamFilter as jest.Mock
-const mockUseTenantTeams = jest.requireMock('../../lib/hooks').useTenantTeams as jest.Mock
 
 const baseTeamFilter = () => ({
   selectedTeam: null,
@@ -29,7 +24,6 @@ describe('TeamSelector', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockUseTeamFilter.mockReturnValue(baseTeamFilter())
-    mockUseTenantTeams.mockReturnValue({ data: [] })
   })
 
   it('does not render when there is no user', () => {
@@ -75,7 +69,6 @@ describe('TeamSelector', () => {
   })
 
   it('shows dropdown when a non-role team exists and includes role teams as options', () => {
-    mockUseTenantTeams.mockReturnValue({ data: [{ name: 'Tenant A' }] })
     mockUseAuth.mockReturnValue({
       user: {
         teams: [
@@ -106,7 +99,6 @@ describe('TeamSelector', () => {
   })
 
   it('deduplicates team names when building options', () => {
-    mockUseTenantTeams.mockReturnValue({ data: [{ name: 'Tenant A' }, { name: 'Tenant A' }] })
     mockUseAuth.mockReturnValue({
       user: {
         teams: [
@@ -125,7 +117,6 @@ describe('TeamSelector', () => {
   })
 
   it('renders tenant options from session teams for the current logged-in user', () => {
-    mockUseTenantTeams.mockReturnValue({ data: [] })
     mockUseAuth.mockReturnValue({
       user: {
         teams: [
@@ -144,8 +135,7 @@ describe('TeamSelector', () => {
     expect(screen.getByRole('option', { name: 'Tenant B' })).toBeInTheDocument()
   })
 
-  it('does not include tenant teams from API when user is not a member', () => {
-    mockUseTenantTeams.mockReturnValue({ data: [{ name: 'Tenant A' }, { name: 'Tenant X' }] })
+  it('shows only tenant teams from the logged-in user session', () => {
     mockUseAuth.mockReturnValue({
       user: {
         teams: [
@@ -164,26 +154,8 @@ describe('TeamSelector', () => {
     expect(screen.queryByRole('option', { name: 'Tenant X' })).not.toBeInTheDocument()
   })
 
-  it('matches API tenant teams against session teams using normalized team names', () => {
-    mockUseTenantTeams.mockReturnValue({ data: [{ name: 'Tenant_A' }] })
-    mockUseAuth.mockReturnValue({
-      user: {
-        teams: [
-          { name: 'Tenant A', types: ['tenant'], groupRefs: [] },
-        ],
-      },
-      isLeadership: false,
-      isSupportEngineer: false,
-    })
-
-    renderSelector()
-
-    expect(screen.getByRole('option', { name: 'Tenant_A' })).toBeInTheDocument()
-  })
-
   it('resets selected team to first option if current selection is no longer valid', async () => {
     const setSelectedTeam = jest.fn()
-    mockUseTenantTeams.mockReturnValue({ data: [{ name: 'Tenant A' }] })
     mockUseTeamFilter.mockReturnValue({
       selectedTeam: 'Old Team',
       setSelectedTeam,
@@ -206,7 +178,6 @@ describe('TeamSelector', () => {
 
   it('selects a team when user changes the dropdown', async () => {
     const setSelectedTeam = jest.fn()
-    mockUseTenantTeams.mockReturnValue({ data: [{ name: 'Tenant A' }] })
     mockUseTeamFilter.mockReturnValue({
       selectedTeam: 'Tenant A',
       setSelectedTeam,

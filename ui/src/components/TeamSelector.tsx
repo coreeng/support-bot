@@ -3,14 +3,11 @@
 import { useEffect, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
-import { useTenantTeams } from '@/lib/hooks'
-import { normalizeTeamKey } from '@/lib/teamUtils'
 import { Users } from 'lucide-react'
 
 export default function TeamSelector() {
     const { user, isLeadership, isSupportEngineer } = useAuth()
     const { selectedTeam, setSelectedTeam } = useTeamFilter()
-    const { data: apiTenantTeams } = useTenantTeams()
 
     const teams = useMemo(() => user?.teams ?? [], [user])
     const isRoleTeam = (t: { types?: string[] }) => (t.types || []).some(type => /leadership/i.test(type) || /support/i.test(type))
@@ -24,31 +21,15 @@ export default function TeamSelector() {
         return null
     }
 
-    // Tenant teams from API (same source support engineers use)
-    const tenantTeamNamesFromApi = useMemo(
-        () => {
-            const memberTeamKeys = new Set(teams.map((team) => normalizeTeamKey(team.name)))
-            return (apiTenantTeams?.map(t => t.name).filter(Boolean) ?? [])
-                .filter((name) => memberTeamKeys.has(normalizeTeamKey(name)))
-                .sort()
-        },
-        [apiTenantTeams, teams]
-    )
-
-    // Fallback tenant teams from session for resiliency (e.g. transient empty API response)
-    const tenantTeamNamesFromSession = useMemo(
+    const tenantTeamNames = useMemo(
         () =>
-            teams
+            Array.from(new Set(
+                teams
                 .filter(t => !isRoleTeam(t) && !isEscalationTeam(t))
                 .map(t => t.name)
                 .filter(Boolean)
-                .sort(),
+            )).sort(),
         [teams]
-    )
-
-    const tenantTeamNames = useMemo(
-        () => Array.from(new Set([...tenantTeamNamesFromApi, ...tenantTeamNamesFromSession])),
-        [tenantTeamNamesFromApi, tenantTeamNamesFromSession]
     )
 
     // User's escalation teams (from session)
