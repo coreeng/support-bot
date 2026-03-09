@@ -26,8 +26,7 @@ public class AnalysisApiTests {
     @Test
     void analysisEnabled_returnsTrue() {
         // when
-        var response = given()
-                .when()
+        var response = given().when()
                 .get(baseUrl() + "/analysis/enabled")
                 .then()
                 .statusCode(200)
@@ -57,19 +56,14 @@ public class AnalysisApiTests {
                                 """)));
 
         // when
-        given()
-                .when()
-                .post(baseUrl() + "/analysis/run?days=365")
-                .then()
-                .statusCode(202);
+        given().when().post(baseUrl() + "/analysis/run?days=365").then().statusCode(202);
 
         // then
         Awaitility.await()
                 .atMost(Duration.ofSeconds(30))
                 .pollInterval(Duration.ofSeconds(1))
                 .untilAsserted(() -> {
-                    var status = given()
-                            .when()
+                    var status = given().when()
                             .get(baseUrl() + "/analysis/status")
                             .then()
                             .statusCode(200)
@@ -86,10 +80,6 @@ public class AnalysisApiTests {
 
     @Test
     void analysisRun_returns400_forInvalidDays() {
-        given()
-                .when()
-                .post(baseUrl() + "/analysis/run?days=0")
-                .then()
-                .statusCode(400);
+        given().when().post(baseUrl() + "/analysis/run?days=0").then().statusCode(400);
     }
 }
