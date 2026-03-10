@@ -45,7 +45,7 @@ overrides:
 
 Overrides are checked in order against all files changed in the PR. The first override that matches any changed file wins and its SLA applies to the whole PR. If no override matches, `default` is used.
 
-Both ISO-8601 (`PT48H`) and Go-style (`48h`, `2d`, `1w`) durations are supported. Values like `undefined` or `0` are treated as invalid. When found in a repo file, the bot falls back to inline config. When found in inline config, SLA tracking is skipped.
+Both ISO-8601 (`PT48H`) and Go-style (`48h`, `2d`, `1w`) durations are supported. Values like `undefined` or `0` are treated as invalid. If the bot can't parse the value, it falls back to inline config. If there's no inline config either, SLA tracking is skipped.
 
 ### Config
 
