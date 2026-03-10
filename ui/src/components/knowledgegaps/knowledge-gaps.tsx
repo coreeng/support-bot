@@ -46,7 +46,7 @@ export default function KnowledgeGapsPage() {
             const response = await fetch('/api/analysis/status')
             if (response.status === 401) {
                 stopPolling()
-                showToast('Session expired. Please refresh the page.', 'error')
+                window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`
                 return null
             }
             if (response.ok) {
@@ -121,6 +121,10 @@ export default function KnowledgeGapsPage() {
         const fetchAnalysisEnabled = async () => {
             try {
                 const response = await fetch('/api/analysis/enabled')
+                if (response.status === 401) {
+                    window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`
+                    return
+                }
                 if (response.ok) {
                     const data = await response.json()
                     setIsAnalysisEnabled(data.enabled)
@@ -167,6 +171,11 @@ export default function KnowledgeGapsPage() {
                     'X-CSRF-Token': csrfToken || '',
                 },
             })
+
+            if (response.status === 401) {
+                window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`
+                return
+            }
 
             if (response.status === 202) {
                 // Analysis started successfully - show progress panel immediately
@@ -286,6 +295,11 @@ export default function KnowledgeGapsPage() {
                 },
             })
 
+            if (response.status === 401) {
+                window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`
+                return
+            }
+
             if (!response.ok) {
                 throw new Error('Failed to download prompt')
             }
@@ -328,6 +342,11 @@ export default function KnowledgeGapsPage() {
                 },
                 body: formData,
             })
+
+            if (response.status === 401) {
+                window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`
+                return
+            }
 
             if (!response.ok) {
                 throw new Error('Failed to upload file')
