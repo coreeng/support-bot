@@ -54,7 +54,8 @@ Each repository can define its SLA inline, from a file, or both:
 ```yaml
 pr-review-tracking:
   sla-discovery:
-    cache: PT24H                # how long to cache the file per repo
+    # how long to cache the file per repo
+    cache: PT24H
 
   repositories:
     # SLA from a file (if file missing, SLA tracking skipped)
