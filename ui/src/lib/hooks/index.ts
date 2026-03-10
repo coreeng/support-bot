@@ -3,6 +3,7 @@
  * All hooks use React Query and call the Next.js API routes.
  */
 import { useQuery } from "@tanstack/react-query";
+import { signOut } from "next-auth/react";
 import type {
   PaginatedTickets,
   PaginatedEscalations,
@@ -19,7 +20,12 @@ async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`/api${path}`);
   if (!res.ok) {
     if (res.status === 401) {
-      window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
+      // Capture current pathname before signing out
+      const currentPath = window.location.pathname;
+      // Sign out to clear expired session
+      await signOut({ redirect: false });
+      // Redirect to login with the current page as callback
+      window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`;
     }
     throw new Error(`API error: ${res.status}`);
   }

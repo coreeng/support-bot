@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText, Play, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react'
-import { getCsrfToken } from 'next-auth/react'
+import { getCsrfToken, signOut } from 'next-auth/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAnalysis } from '@/lib/hooks'
 import { useToast } from '@/components/ui/toast'
@@ -46,7 +46,9 @@ export default function KnowledgeGapsPage() {
             const response = await fetch('/api/analysis/status')
             if (response.status === 401) {
                 stopPolling()
-                window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`
+                const currentPath = window.location.pathname
+                await signOut({ redirect: false })
+                window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
                 return null
             }
             if (response.ok) {
@@ -122,7 +124,9 @@ export default function KnowledgeGapsPage() {
             try {
                 const response = await fetch('/api/analysis/enabled')
                 if (response.status === 401) {
-                    window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`
+                    const currentPath = window.location.pathname
+                    await signOut({ redirect: false })
+                    window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
                     return
                 }
                 if (response.ok) {
@@ -173,7 +177,9 @@ export default function KnowledgeGapsPage() {
             })
 
             if (response.status === 401) {
-                window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`
+                const currentPath = window.location.pathname
+                await signOut({ redirect: false })
+                window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
                 return
             }
 
@@ -296,7 +302,9 @@ export default function KnowledgeGapsPage() {
             })
 
             if (response.status === 401) {
-                window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`
+                const currentPath = window.location.pathname
+                await signOut({ redirect: false })
+                window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
                 return
             }
 
@@ -344,7 +352,9 @@ export default function KnowledgeGapsPage() {
             })
 
             if (response.status === 401) {
-                window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`
+                const currentPath = window.location.pathname
+                await signOut({ redirect: false })
+                window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
                 return
             }
 

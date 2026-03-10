@@ -2,6 +2,7 @@ package com.coreeng.supportbot.security;
 
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.TeamService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -59,6 +60,13 @@ public class SecurityConfig {
                         // All other endpoints require authentication
                         .anyRequest()
                         .authenticated())
+                .exceptionHandling(
+                        exceptions -> exceptions.authenticationEntryPoint((request, response, authException) -> {
+                            // Return 401 for API endpoints instead of redirecting to login
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"error\":\"Unauthorized\"}");
+                        }))
                 .oauth2Login(oauth2 -> {
                     if (oauth2AvailabilityChecker.isOAuth2Available()) {
                         oauth2.successHandler(oauth2SuccessHandler());

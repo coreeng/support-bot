@@ -111,10 +111,13 @@ function LoginContent() {
         return;
       }
 
-      signIn("backend-token", {
-        token,
-        callbackUrl,
-        redirect: true,
+      signIn("backend-token", { token, redirect: false }).then((result) => {
+        if (result?.error) {
+          router.replace(`/login?error=${encodeURIComponent(result.error)}`);
+          return;
+        }
+        // Manually redirect to the callback URL after successful sign-in
+        window.location.href = callbackUrl;
       });
       return;
     }
@@ -138,10 +141,13 @@ function LoginContent() {
         return;
       }
 
-      signIn("backend-oauth", {
-        code,
-        callbackUrl,
-        redirect: true,
+      signIn("backend-oauth", { code, redirect: false }).then((result) => {
+        if (result?.error) {
+          router.replace(`/login?error=${encodeURIComponent(result.error)}`);
+          return;
+        }
+        // Manually redirect to the callback URL after successful sign-in
+        window.location.href = callbackUrl;
       });
       return;
     }
@@ -154,7 +160,8 @@ function LoginContent() {
 
   const handleLogin = (provider: "google" | "azure") => {
     // OAuth goes through API route - server handles redirect to backend
-    const oauthUrl = `/api/auth/start/${provider}`;
+    // Include callbackUrl so user returns to the right page after login
+    const oauthUrl = `/api/auth/start/${provider}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
     // Check if we're in an iframe
     const isInIframe = (() => {
