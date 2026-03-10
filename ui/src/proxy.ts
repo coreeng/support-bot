@@ -36,6 +36,12 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // API routes (except /api/auth) should never redirect - they handle auth themselves
+  // and return proper HTTP status codes (401) instead of redirects
+  if (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth")) {
+    return NextResponse.next();
+  }
+
   // Test bypass: lets Playwright functional tests skip server-side
   // JWE validation, which test tooling cannot satisfy without knowing AUTH_SECRET.
   // Gated behind an explicit env var so it is never active in real deployments.

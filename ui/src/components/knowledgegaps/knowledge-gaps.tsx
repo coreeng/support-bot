@@ -47,7 +47,11 @@ export default function KnowledgeGapsPage() {
             if (response.status === 401) {
                 stopPolling()
                 const currentPath = window.location.pathname
-                await signOut({ redirect: false })
+                try {
+                    await signOut({ redirect: false })
+                } catch (e) {
+                    console.log('SignOut error (expected if session expired):', e)
+                }
                 window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
                 return null
             }
@@ -125,7 +129,11 @@ export default function KnowledgeGapsPage() {
                 const response = await fetch('/api/analysis/enabled')
                 if (response.status === 401) {
                     const currentPath = window.location.pathname
-                    await signOut({ redirect: false })
+                    try {
+                        await signOut({ redirect: false })
+                    } catch (e) {
+                        console.log('SignOut error (expected if session expired):', e)
+                    }
                     window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
                     return
                 }
@@ -178,7 +186,12 @@ export default function KnowledgeGapsPage() {
 
             if (response.status === 401) {
                 const currentPath = window.location.pathname
-                await signOut({ redirect: false })
+                try {
+                    await signOut({ redirect: false })
+                } catch (e) {
+                    // Ignore errors from signOut (session might already be expired)
+                    console.log('SignOut error (expected if session expired):', e)
+                }
                 window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
                 return
             }
@@ -303,7 +316,11 @@ export default function KnowledgeGapsPage() {
 
             if (response.status === 401) {
                 const currentPath = window.location.pathname
-                await signOut({ redirect: false })
+                try {
+                    await signOut({ redirect: false })
+                } catch (e) {
+                    console.log('SignOut error (expected if session expired):', e)
+                }
                 window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
                 return
             }
@@ -353,7 +370,11 @@ export default function KnowledgeGapsPage() {
 
             if (response.status === 401) {
                 const currentPath = window.location.pathname
-                await signOut({ redirect: false })
+                try {
+                    await signOut({ redirect: false })
+                } catch (e) {
+                    console.log('SignOut error (expected if session expired):', e)
+                }
                 window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
                 return
             }

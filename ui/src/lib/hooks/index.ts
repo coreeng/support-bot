@@ -23,7 +23,12 @@ async function apiGet<T>(path: string): Promise<T> {
       // Capture current pathname before signing out
       const currentPath = window.location.pathname;
       // Sign out to clear expired session
-      await signOut({ redirect: false });
+      try {
+        await signOut({ redirect: false });
+      } catch (e) {
+        // Ignore errors from signOut (session might already be expired)
+        console.log('SignOut error (expected if session expired):', e);
+      }
       // Redirect to login with the current page as callback
       window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`;
     }
