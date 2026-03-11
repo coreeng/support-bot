@@ -249,7 +249,8 @@ public class PrDetectionService {
             PrTrackingProps.Repository repoConfig,
             GitHubPullRequest prMetadata) {
 
-        Instant slaDeadline = prMetadata.createdAt().plus(repoConfig.sla());
+        Duration sla = checkNotNull(repoConfig.sla().defaultSla(), "sla.default must not be null");
+        Instant slaDeadline = prMetadata.createdAt().plus(sla);
         String teamLabel = resolveTeamLabel(repoConfig.owningTeam());
         TicketId ticketId = checkNotNull(ticket.id());
 
@@ -281,10 +282,10 @@ public class PrDetectionService {
         addReaction(prTrackingProps.prEmoji(), queryTs, channelId);
 
         if (Instant.now().isAfter(slaDeadline)) {
-            postSlaBreachReply(detectedPr, repoConfig.sla(), queryTs, channelId);
+            postSlaBreachReply(detectedPr, sla, queryTs, channelId);
             escalateImmediately(tracking, ticket, repoConfig.owningTeam());
         } else {
-            postSlaReply(detectedPr, repoConfig.sla(), teamLabel, slaDeadline, queryTs, channelId);
+            postSlaReply(detectedPr, sla, teamLabel, slaDeadline, queryTs, channelId);
         }
         return PerPrResult.TRACKED;
     }

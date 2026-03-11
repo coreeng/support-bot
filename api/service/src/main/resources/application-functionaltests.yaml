@@ -99,7 +99,8 @@ pr-review-tracking:
   repositories:
     - name: test-org/pr-test-repo
       owning-team: wow
-      sla: PT24H
+      sla:
+        default: PT24H
   github:
     api-base-url: ${GITHUB_API_BASE_URL:http://localhost:8000}
     auth-mode: token
