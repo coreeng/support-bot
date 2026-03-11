@@ -135,7 +135,7 @@ Given("Tickets API endpoints are mocked with sample data", async function (this:
     await this.page.route("**/api/tickets**", (route) => {
         const url = route.request().url();
         const method = route.request().method();
-        
+
         if (method === 'PATCH') {
             const updatedTicket = {
                 ...mockTicketDetails,
@@ -145,7 +145,7 @@ Given("Tickets API endpoints are mocked with sample data", async function (this:
             route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(updatedTicket) });
             return;
         }
-        
+
         if (url.includes('/tickets/1')) {
             route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketDetails) });
         } else {
@@ -203,14 +203,7 @@ Given("Tickets API returns empty list", async function (this: CustomWorld) {
 });
 
 Given("Tickets API endpoints are mocked with escalations and varied dates", async function (this: CustomWorld) {
-    await this.page.route("**/ticket**", (route) =>
-        route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(mockTicketsEscalationsAndDates)
-        })
-    );
-    await this.page.route("**/api/ticket**", (route) =>
+    await this.page.route("**/api/tickets**", (route) =>
         route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -218,25 +211,16 @@ Given("Tickets API endpoints are mocked with escalations and varied dates", asyn
         })
     );
 
-    await this.page.route("**/team?type=tenant*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockTeamsData) })
-    );
-    await this.page.route("**/api/team?type=tenant*", (route) =>
+    await this.page.route("**/api/teams?type=TENANT*", (route) =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
     );
 
-    await this.page.route("**/registry/impact*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.impacts) })
-    );
-    await this.page.route("**/api/registry/impact*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockRegistryData.impacts) })
-    );
-
-    await this.page.route("**/registry/tag*", (route) =>
-        route.fulfill({ status: 200, body: JSON.stringify(mockRegistryData.tags) })
-    );
-    await this.page.route("**/api/registry/tag*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockRegistryData.tags) })
+    await this.page.route("**/api/registry*", (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
+        })
     );
 });
 
@@ -246,15 +230,15 @@ When("User navigates to the tickets page", async function (this: CustomWorld) {
         waitUntil: 'domcontentloaded',
         timeout: 10000
     });
-    
+
     // Wait for sidebar to be visible - Support section should be expanded by default
     await this.page.getByRole('button', { name: /Support/i }).first().waitFor({ state: 'visible', timeout: 5000 });
-    
+
     // Click on Tickets navigation in sidebar (it's a button)
     const ticketsNav = this.page.getByRole('button', { name: /^Tickets$/i });
     await ticketsNav.waitFor({ state: 'visible', timeout: 5000 });
     await ticketsNav.click();
-    
+
     // Wait for page to load
     await this.page.waitForTimeout(500);
 });
@@ -263,13 +247,13 @@ When("User navigates to the tickets page", async function (this: CustomWorld) {
 When("User selects {string} from status filter", async function (this: CustomWorld, status: string) {
     // Wait for tickets table to be visible first (ensures data is loaded)
     await this.page.locator('table').waitFor({ state: 'visible', timeout: 5000 });
-    
+
     // Status filter is the second select (after date filter)
     // Use a more specific selector to target the status filter
     const statusFilter = this.page.locator('select').filter({ hasText: 'All Status' });
     await statusFilter.waitFor({ state: 'visible', timeout: 5000 });
     await this.page.waitForTimeout(500); // Wait for React hydration
-    
+
     await statusFilter.selectOption(status);
     // Wait for React to re-render with filtered data
     await this.page.waitForTimeout(2000);
@@ -279,10 +263,10 @@ When("User clicks on the first ticket", async function (this: CustomWorld) {
     const firstRow = this.page.locator('tbody tr').first();
     await expect(firstRow).toBeVisible({ timeout: 5000 });
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-    
+
     // Click and wait for modal
     await firstRow.click({ force: true });
-    
+
     // Wait for modal to appear and ticket data to load
     const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
     const loading = this.page.locator('text=/Loading ticket details/i');
@@ -381,11 +365,11 @@ Then("Tickets should display escalated to information", async function (this: Cu
 Then("Only opened tickets should be displayed", async function (this: CustomWorld) {
     // Wait for pagination to settle
     await this.page.waitForTimeout(500);
-    
+
     // The key test: verify NO closed tickets are visible
     const allText = await this.page.locator('tbody').textContent();
     expect(allText).not.toContain('closed');
-    
+
     // And verify we have at least some tickets showing
     const rows = this.page.locator('tbody tr');
     const count = await rows.count();
@@ -420,7 +404,7 @@ Then("Ticket details panel should appear", async function (this: CustomWorld) {
     // The modal should be visible with ticket details
     const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
     await expect(modal).toBeVisible({ timeout: 5000 });
-    
+
     // Verify the table is still visible in the background
     const table = this.page.locator('table');
     await expect(table).toBeVisible();
@@ -430,7 +414,7 @@ Then("Ticket details should show the ticket ID", async function (this: CustomWor
     // The modal should display the ticket ID
     const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
     await expect(modal).toBeVisible({ timeout: 5000 });
-    
+
     // Check for ticket ID in the modal (format: "Ticket #123" or similar)
     const ticketIdPattern = /Ticket\s*#?\s*\d+/i;
     const modalText = await modal.textContent();
@@ -441,10 +425,10 @@ Then("Ticket details should show the ticket ID", async function (this: CustomWor
 Given("User is a support engineer", async function (this: CustomWorld) {
     // Override the default session from hooks.ts to be support engineer only
     try { await this.page.unroute('**/api/auth/session'); } catch {}
-    
+
     // Ensure middleware bypass cookie exists for functional tests
     const baseUrl = process.env.SERVICE_ENDPOINT || 'http://localhost:3000';
-    
+
     await this.context.addCookies([
         {
             name: '__e2e_auth_bypass',
@@ -455,7 +439,7 @@ Given("User is a support engineer", async function (this: CustomWorld) {
             sameSite: 'Lax'
         }
     ]);
-    
+
     await this.page.route('**/api/auth/session', async (route) => {
         await route.fulfill({
             status: 200,
@@ -474,7 +458,7 @@ Given("User is a support engineer", async function (this: CustomWorld) {
             })
         });
     });
-    
+
     // Navigate to trigger session reload
     await this.page.goto(BASE_URL);
     await this.page.waitForTimeout(2000);
@@ -483,10 +467,10 @@ Given("User is a support engineer", async function (this: CustomWorld) {
 Given("User is not a support engineer", async function (this: CustomWorld) {
     // Override the default session from hooks.ts to be non-support engineer
     try { await this.page.unroute('**/api/auth/session'); } catch {}
-    
+
     // Ensure middleware bypass cookie exists for functional tests
     const baseUrl = process.env.SERVICE_ENDPOINT || 'http://localhost:3000';
-    
+
     await this.context.addCookies([
         {
             name: '__e2e_auth_bypass',
@@ -497,7 +481,7 @@ Given("User is not a support engineer", async function (this: CustomWorld) {
             sameSite: 'Lax'
         }
     ]);
-    
+
     await this.page.route('**/api/auth/session', async (route) => {
         await route.fulfill({
             status: 200,
@@ -516,7 +500,7 @@ Given("User is not a support engineer", async function (this: CustomWorld) {
             })
         });
     });
-    
+
     // Navigate to trigger session reload
     await this.page.goto(BASE_URL);
     await this.page.waitForTimeout(2000);
@@ -525,18 +509,18 @@ Given("User is not a support engineer", async function (this: CustomWorld) {
 Then("Ticket edit modal should appear", async function (this: CustomWorld) {
     // Wait for modal to appear - it might take a moment after clicking
     await this.page.waitForTimeout(1000);
-    
+
     // Try multiple selectors for the modal
     const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    
+
     await expect(modal).toBeVisible({ timeout: 15000 });
-    
+
     // Wait for loading to complete if present
     const loadingText = modal.locator('text=/Loading ticket details/i');
     if (await loadingText.count() > 0) {
         await expect(loadingText).not.toBeVisible({ timeout: 15000 });
     }
-    
+
     // Verify modal has content - wait for ticket ID to appear
     await expect(modal.locator('text=/Ticket #/i')).toBeVisible({ timeout: 10000 });
 });
@@ -545,22 +529,22 @@ Then("Modal should show editable fields", async function (this: CustomWorld) {
     // Wait for modal to be stable
     const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
     await expect(modal).toBeVisible({ timeout: 15000 });
-    
+
     // Wait for content to load - check for ticket ID first
     await expect(modal.locator('text=/Ticket #/i')).toBeVisible({ timeout: 10000 });
-    
+
     // Wait for loading to complete - check that "Loading ticket details" is not visible
     const loadingIndicator = modal.locator('text=/Loading ticket details/i');
     if (await loadingIndicator.count() > 0) {
         await expect(loadingIndicator).not.toBeVisible({ timeout: 15000 });
     }
-    
+
     // Wait a bit more for all content to render
     await this.page.waitForTimeout(800);
-    
+
     // Verify modal is still visible
     await expect(modal).toBeVisible();
-    
+
     // Check for Save Changes button (implies edit mode rendered)
     const saveButton = modal.locator('button:has-text("Save Changes")');
     await expect(saveButton).toBeVisible({ timeout: 5000 });
@@ -569,11 +553,11 @@ Then("Modal should show editable fields", async function (this: CustomWorld) {
 Then("Modal should show read-only view", async function (this: CustomWorld) {
     const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
     await expect(modal).toBeVisible({ timeout: 5000 });
-    
+
     // Check for read-only indicator - it's in the title
     const readOnlyText = modal.locator('text=/Read-only/i');
     await expect(readOnlyText).toBeVisible({ timeout: 5000 });
-    
+
     // Should not have editable selects
     const selects = modal.locator('select');
     const count = await selects.count();
@@ -595,7 +579,7 @@ Then('"Close" button should be visible', async function (this: CustomWorld) {
 When('User changes ticket status to {string}', async function (this: CustomWorld, status: string) {
     const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
     await expect(modal).toBeVisible({ timeout: 5000 });
-    
+
     // Use the first select in the modal (Change Status is the first select)
     let statusSelect = modal.locator('select').first();
 
