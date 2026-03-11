@@ -54,9 +54,26 @@ data:
       {{- if .Values.prReviewTracking.repositories }}
       repositories:
       {{- range .Values.prReviewTracking.repositories }}
+        {{- if not (kindIs "map" .sla) }}
+          {{- fail (printf "prReviewTracking.repositories[].sla must be a map (e.g. sla: { default: 48h }), got %T for repository %s" .sla .name) }}
+        {{- end }}
+        {{- if not .sla.default }}
+          {{- fail (printf "prReviewTracking.repositories[].sla.default is required for repository %s" .name) }}
+        {{- end }}
         - name: {{ .name | quote }}
           owning-team: {{ .owningTeam | quote }}
-          sla: {{ .sla | quote }}
+          sla:
+            {{- if .sla.file }}
+            file: {{ .sla.file | quote }}
+            {{- end }}
+            default: {{ .sla.default | quote }}
+            {{- if .sla.overrides }}
+            overrides:
+            {{- range .sla.overrides }}
+              - path: {{ .path | quote }}
+                sla: {{ .sla | quote }}
+            {{- end }}
+            {{- end }}
       {{- end }}
       {{- else }}
       repositories: [ ]
