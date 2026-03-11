@@ -116,7 +116,12 @@ pr-review-tracking:
   # Example repository entry:
   #   - name: my-org/my-repo
   #     owning-team: <team-code from enums.escalation-teams>
-  #     sla: PT48H
+  #     sla:
+  #       file: ".pr-sla.yaml"  # optional: read SLA from this file in the repo
+  #       default: 48h          # default SLA duration (required)
+  #       overrides:            # optional: path-specific SLA overrides
+  #         - path: infra/**
+  #           sla: 7d
   github:
     api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
     auth-mode: ${GITHUB_AUTH_MODE:token} # token | app

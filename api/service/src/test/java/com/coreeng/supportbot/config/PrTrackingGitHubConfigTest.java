@@ -40,7 +40,7 @@ class PrTrackingGitHubConfigTest {
                 "pr-review-tracking.impact=low",
                 "pr-review-tracking.repositories[0].name=my-org/my-repo",
                 "pr-review-tracking.repositories[0].owning-team=wow",
-                "pr-review-tracking.repositories[0].sla=PT48H",
+                "pr-review-tracking.repositories[0].sla.default=PT48H",
                 "pr-review-tracking.github.api-base-url=https://api.github.com",
                 "pr-review-tracking.github.auth-mode=token",
                 "pr-review-tracking.github.token=test-token");
@@ -69,7 +69,8 @@ class PrTrackingGitHubConfigTest {
                 "pr",
                 List.of("pr-review"),
                 "low",
-                List.of(new PrTrackingProps.Repository("my-org/my-repo", "wow", Duration.ofDays(2))),
+                List.of(new PrTrackingProps.Repository(
+                        "my-org/my-repo", "wow", new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
                 appGithub);
 
         // when
@@ -94,7 +95,8 @@ class PrTrackingGitHubConfigTest {
                 "pr",
                 List.of("pr-review"),
                 "low",
-                List.of(new PrTrackingProps.Repository("my-org/my-repo", "wow", Duration.ofDays(2))),
+                List.of(new PrTrackingProps.Repository(
+                        "my-org/my-repo", "wow", new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
                 appGithub);
 
         // when
@@ -122,7 +124,8 @@ class PrTrackingGitHubConfigTest {
                 "pr",
                 List.of("pr-review"),
                 "low",
-                List.of(new PrTrackingProps.Repository("my-org/my-repo", "wow", Duration.ofDays(2))),
+                List.of(new PrTrackingProps.Repository(
+                        "my-org/my-repo", "wow", new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
                 appGithub);
 
         // when / then
