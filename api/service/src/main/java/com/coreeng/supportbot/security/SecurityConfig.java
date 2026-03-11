@@ -60,19 +60,14 @@ public class SecurityConfig {
                         // All other endpoints require authentication
                         .anyRequest()
                         .authenticated())
-//                .exceptionHandling(
-//                        exceptions -> exceptions.authenticationEntryPoint((request, response, authException) -> {
-//                            // Functional tests expect 302 redirect, production expects 401
-//                            if (properties.testBypass().enabled()) {
-//                                // Redirect to login for functional tests
-//                                response.sendRedirect("/login");
-//                            } else {
-//                                // Return 401 for API endpoints in production
-//                                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-//                                response.setContentType("application/json");
-//                                response.getWriter().write("{\"error\":\"Unauthorized\"}");
-//                            }
-//                        }))
+                .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint((request, response, authException) -> {
+                    if (!properties.testBypass().enabled()) {
+                        // Return 401 for API endpoints with missing or expired auth
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json");
+                        response.getWriter().write("{\"error\":\"Unauthorized\"}");
+                    }
+                }))
                 .oauth2Login(oauth2 -> {
                     if (oauth2AvailabilityChecker.isOAuth2Available()) {
                         oauth2.successHandler(oauth2SuccessHandler());
