@@ -101,6 +101,16 @@ pr-review-tracking:
       owning-team: wow
       sla:
         default: PT24H
+    - name: test-org/pr-sla-file-repo
+      owning-team: wow
+      sla:
+        file: ".pr-sla.yaml"
+        default: PT24H
+    - name: test-org/pr-sla-override-repo
+      owning-team: wow
+      sla:
+        file: ".pr-sla.yaml"
+        default: PT48H
   sla-discovery:
     cache: PT5M
   github:

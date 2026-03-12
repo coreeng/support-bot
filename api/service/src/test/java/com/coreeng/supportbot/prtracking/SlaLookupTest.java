@@ -179,12 +179,18 @@ class SlaLookupTest {
         // given
         PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", SLA_48H);
         when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml"))
-                .thenThrow(new com.coreeng.supportbot.github.GitHubApiException(500, "server error"));
+                .thenThrow(new com.coreeng.supportbot.github.GitHubApiException(500, "server error"))
+                .thenReturn("default: 72h");
 
-        // when / then
+        // when, first call throws
         org.junit.jupiter.api.Assertions.assertThrows(
                 com.coreeng.supportbot.github.GitHubApiException.class,
                 () -> slaLookup.getSla(repoConfig, REPO, PR_NUMBER));
+
+        // then, second call retries and succeeds (error was not cached)
+        Duration result = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
+        assertThat(result).isEqualTo(SLA_72H);
+        verify(gitHubClient, times(2)).getFileContent(REPO, ".pr-sla.yaml");
     }
 
     @Test
