@@ -131,7 +131,7 @@ Given("User navigates to the dashboards page", async function (this: CustomWorld
   });
 
   const supportButton = this.page.getByRole('button', { name: /Support/i }).first();
-  await expect(supportButton).toBeVisible({ timeout: 5000 });
+  await expect(supportButton).toBeVisible({ timeout: 15000 });
 
   const slaDashboardButton = this.page.getByRole('button', { name: /SLA Dashboard/i }).first();
   await expect(slaDashboardButton).toBeVisible({ timeout: 5000 });

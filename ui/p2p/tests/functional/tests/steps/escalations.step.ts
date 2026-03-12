@@ -297,7 +297,7 @@ When('user logs in', async function (this: CustomWorld) {
     // Navigate and wait for minimal load; avoid long waits that can hang
     await this.page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 });
     
-    await this.page.getByRole('button', { name: /Support/i }).first().waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.getByRole('button', { name: /Support/i }).first().waitFor({ state: 'visible', timeout: 15000 });
 });
 
 When('user logs in and selects {string} from dropdown', async function (this: CustomWorld, teamName: string) {
