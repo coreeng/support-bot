@@ -26,7 +26,7 @@ public record SecurityProperties(
         }
     }
 
-    public record OAuth2Properties(boolean enabled, String redirectUri) {}
+    public record OAuth2Properties(String redirectUri) {}
 
     public record CorsProperties(@Nullable String allowedOrigins) {}
 

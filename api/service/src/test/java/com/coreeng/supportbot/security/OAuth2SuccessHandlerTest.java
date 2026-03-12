@@ -45,7 +45,7 @@ class OAuth2SuccessHandlerTest {
     private OAuth2SuccessHandler createHandler(List<String> allowedEmails, List<String> allowedDomains) {
         var props = new SecurityProperties(
                 new SecurityProperties.JwtProperties(TEST_SECRET, Duration.ofHours(24)),
-                new SecurityProperties.OAuth2Properties(false, "http://localhost:3000/auth/callback"),
+                new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
                 new SecurityProperties.CorsProperties(null),
                 new SecurityProperties.TestBypassProperties(false),
                 new SecurityProperties.AllowListProperties(allowedEmails, allowedDomains));
