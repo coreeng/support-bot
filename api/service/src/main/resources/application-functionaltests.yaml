@@ -101,6 +101,8 @@ pr-review-tracking:
       owning-team: wow
       sla:
         default: PT24H
+  sla-discovery:
+    cache: PT5M
   github:
     api-base-url: ${GITHUB_API_BASE_URL:http://localhost:8000}
     auth-mode: token

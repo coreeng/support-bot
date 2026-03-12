@@ -10,6 +10,9 @@ import org.junit.jupiter.api.Test;
 
 class PrTrackingConfigValidationTest {
 
+    private static final PrTrackingProps.SlaDiscovery DEFAULT_SLA_DISCOVERY =
+            new PrTrackingProps.SlaDiscovery(Duration.ofHours(24));
+
     @Test
     void acceptsValidTokenModeWhenEnabled() {
         // when / then
@@ -20,7 +23,8 @@ class PrTrackingConfigValidationTest {
                         List.of("tag"),
                         "low",
                         List.of(validRepo()),
-                        validTokenGithub()))
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
                 .doesNotThrowAnyException();
     }
 
@@ -38,7 +42,8 @@ class PrTrackingConfigValidationTest {
                         List.of("tag"),
                         "low",
                         List.of(repoA, repoB),
-                        validTokenGithub()))
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("contains duplicates");
     }
@@ -51,7 +56,14 @@ class PrTrackingConfigValidationTest {
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(validRepo()), noToken))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(validRepo()),
+                        noToken,
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("github.token");
     }
@@ -64,7 +76,14 @@ class PrTrackingConfigValidationTest {
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(validRepo()), appNoInstallation))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(validRepo()),
+                        appNoInstallation,
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("installation-id");
     }
@@ -73,7 +92,14 @@ class PrTrackingConfigValidationTest {
     void rejectsMissingGitHubConfigWhenEnabled() {
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(validRepo()), null))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(validRepo()),
+                        null,
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("pr-review-tracking.github must be configured when enabled");
     }
@@ -86,7 +112,14 @@ class PrTrackingConfigValidationTest {
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(validRepo()), noAuthMode))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(validRepo()),
+                        noAuthMode,
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("github.auth-mode");
     }
@@ -104,7 +137,14 @@ class PrTrackingConfigValidationTest {
 
         // when / then
         assertThatCode(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(validRepo()), appConfig))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(validRepo()),
+                        appConfig,
+                        DEFAULT_SLA_DISCOVERY))
                 .doesNotThrowAnyException();
     }
 
@@ -116,7 +156,14 @@ class PrTrackingConfigValidationTest {
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(badName), validTokenGithub()))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(badName),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("org/repo format");
     }
@@ -128,7 +175,14 @@ class PrTrackingConfigValidationTest {
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(zeroSla), validTokenGithub()))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(zeroSla),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("sla.default must be a positive duration");
     }
@@ -147,7 +201,8 @@ class PrTrackingConfigValidationTest {
                         List.of("tag"),
                         "low",
                         List.of(negativeSla),
-                        validTokenGithub()))
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("sla.default must be a positive duration");
     }
@@ -160,9 +215,16 @@ class PrTrackingConfigValidationTest {
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(repo), validTokenGithub()))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(repo),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("sla.default must be a positive duration");
+                .hasMessageContaining("sla.default must be set when sla.file is not configured");
     }
 
     @Test
@@ -174,7 +236,14 @@ class PrTrackingConfigValidationTest {
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(repo), validTokenGithub()))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(repo),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("overrides[].sla must be a positive duration");
     }
@@ -188,7 +257,14 @@ class PrTrackingConfigValidationTest {
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(repo), validTokenGithub()))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(repo),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("overrides[].path must not be blank");
     }
@@ -204,7 +280,33 @@ class PrTrackingConfigValidationTest {
 
         // when / then
         assertThatCode(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(repo), validTokenGithub()))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(repo),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsFileOnlyRepoWithNoDefaultSla() {
+        // given (file set, no default, no overrides)
+        PrTrackingProps.Sla fileOnlySla = new PrTrackingProps.Sla(".pr-sla.yaml", null, null);
+        PrTrackingProps.Repository repo = new PrTrackingProps.Repository("my-org/repo", "wow", fileOnlySla);
+
+        // when / then
+        assertThatCode(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(repo),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
                 .doesNotThrowAnyException();
     }
 
@@ -212,7 +314,14 @@ class PrTrackingConfigValidationTest {
     void rejectsEmptyTagsWhenEnabled() {
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of(), "low", List.of(validRepo()), validTokenGithub()))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of(),
+                        "low",
+                        List.of(validRepo()),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("tags must not be empty");
     }
@@ -221,7 +330,14 @@ class PrTrackingConfigValidationTest {
     void rejectsBlankImpactWhenEnabled() {
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "", List.of(validRepo()), validTokenGithub()))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "",
+                        List.of(validRepo()),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("impact must not be blank");
     }
@@ -230,7 +346,14 @@ class PrTrackingConfigValidationTest {
     void rejectsEmptyRepositoryListWhenEnabled() {
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
-                        true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(), validTokenGithub()))
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        List.of(),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must not be empty");
     }
@@ -242,7 +365,14 @@ class PrTrackingConfigValidationTest {
 
         // when / then
         assertThatCode(() -> new PrTrackingProps(
-                        false, "", null, null, null, List.of(badRepo), PrTrackingProps.GitHub.defaultTokenModeConfig()))
+                        false,
+                        "",
+                        null,
+                        null,
+                        null,
+                        List.of(badRepo),
+                        PrTrackingProps.GitHub.defaultTokenModeConfig(),
+                        DEFAULT_SLA_DISCOVERY))
                 .doesNotThrowAnyException();
     }
 
@@ -254,7 +384,14 @@ class PrTrackingConfigValidationTest {
 
         // when
         PrTrackingProps props = new PrTrackingProps(
-                true, "0 0 9-18 * * 1-5", "pr", List.of("tag"), "low", List.of(mixedCase), validTokenGithub());
+                true,
+                "0 0 9-18 * * 1-5",
+                "pr",
+                List.of("tag"),
+                "low",
+                List.of(mixedCase),
+                validTokenGithub(),
+                DEFAULT_SLA_DISCOVERY);
 
         // then
         assertThat(props.repositories())

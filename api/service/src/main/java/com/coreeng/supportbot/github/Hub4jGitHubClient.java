@@ -1,9 +1,14 @@
 package com.coreeng.supportbot.github;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHIssueState;
 import org.kohsuke.github.GHPullRequest;
+import org.kohsuke.github.GHPullRequestFileDetail;
+import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.HttpException;
 
@@ -12,6 +17,46 @@ public final class Hub4jGitHubClient implements GitHubClient {
 
     public Hub4jGitHubClient(GitHub github) {
         this.github = github;
+    }
+
+    @Override
+    public @Nullable String getFileContent(String repositoryName, String path) {
+        try {
+            GHRepository repo = github.getRepository(repositoryName);
+            return repo.getFileContent(path).getContent();
+        } catch (GHFileNotFoundException e) {
+            return null;
+        } catch (HttpException e) {
+            throw new GitHubApiException(
+                    e.getResponseCode(),
+                    "GitHub API %d fetching %s from %s".formatted(e.getResponseCode(), path, repositoryName),
+                    e);
+        } catch (IOException e) {
+            throw new GitHubApiException(
+                    0, "GitHub API call failed fetching %s from %s".formatted(path, repositoryName), e);
+        }
+    }
+
+    @Override
+    public List<String> listPullRequestFiles(String repositoryName, int pullNumber) {
+        try {
+            GHPullRequest pr = github.getRepository(repositoryName).getPullRequest(pullNumber);
+            List<String> files = new ArrayList<>();
+            for (GHPullRequestFileDetail file : pr.listFiles()) {
+                files.add(file.getFilename());
+            }
+            return files;
+        } catch (GHFileNotFoundException e) {
+            throw new GitHubApiException(404, "PR not found: %s#%d".formatted(repositoryName, pullNumber), e);
+        } catch (HttpException e) {
+            throw new GitHubApiException(
+                    e.getResponseCode(),
+                    "GitHub API %d listing files for %s#%d".formatted(e.getResponseCode(), repositoryName, pullNumber),
+                    e);
+        } catch (IOException e) {
+            throw new GitHubApiException(
+                    0, "GitHub API call failed listing files for %s#%d".formatted(repositoryName, pullNumber), e);
+        }
     }
 
     @Override
