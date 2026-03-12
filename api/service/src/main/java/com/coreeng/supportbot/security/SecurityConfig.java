@@ -62,21 +62,17 @@ public class SecurityConfig {
                         .authenticated())
                 .exceptionHandling(
                         exceptions -> exceptions.authenticationEntryPoint((request, response, authException) -> {
-                            if (!properties.testBypass().enabled()) {
-                                // Return 401 for API endpoints with missing or expired auth
-                                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                                response.setContentType("application/json");
-                                response.getWriter().write("{\"error\":\"Unauthorized\"}");
-                            }
-                        }))
-                .oauth2Login(oauth2 -> {
-                    if (oauth2AvailabilityChecker.isOAuth2Available()) {
-                        oauth2.successHandler(oauth2SuccessHandler());
-                    } else {
-                        oauth2.disable();
-                    }
-                })
-                .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
+                            // Return 401 for API endpoints with missing or expired auth
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"error\":\"Unauthorized\"}");
+                        }));
+
+        if (oauth2AvailabilityChecker.isOAuth2Available()) {
+            http.oauth2Login(oauth2 -> oauth2.successHandler(oauth2SuccessHandler()));
+        }
+
+        http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(testAuthBypassFilter(), JwtAuthenticationFilter.class);
 
         return http.build();
