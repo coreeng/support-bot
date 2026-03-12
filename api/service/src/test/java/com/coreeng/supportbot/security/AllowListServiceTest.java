@@ -13,7 +13,7 @@ class AllowListServiceTest {
         var props = new SecurityProperties(
                 new SecurityProperties.JwtProperties(
                         "unused-secret-that-is-long-enough-for-256-bits", Duration.ofHours(1)),
-                new SecurityProperties.OAuth2Properties("http://localhost:3000/login"),
+                new SecurityProperties.OAuth2Properties(false, "http://localhost:3000/login"),
                 new SecurityProperties.CorsProperties(null),
                 new SecurityProperties.TestBypassProperties(false),
                 new SecurityProperties.AllowListProperties(emails, domains));

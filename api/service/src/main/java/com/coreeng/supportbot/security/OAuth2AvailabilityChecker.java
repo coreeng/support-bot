@@ -13,11 +13,13 @@ import org.springframework.stereotype.Component;
  * A provider is only considered available if ALL required credentials are present:
  * - Google: client-id AND client-secret
  * - Azure: client-id AND client-secret AND tenant-id
+ * Additionally, OAuth2 must be enabled via security.oauth2.enabled configuration.
  */
 @Slf4j
 @Component
 public class OAuth2AvailabilityChecker {
     private final boolean testBypassEnabled;
+    private final boolean oauth2Enabled;
     private final boolean oauth2Available;
     private final List<String> availableProviders;
 
@@ -30,19 +32,23 @@ public class OAuth2AvailabilityChecker {
             @Value("${spring.security.oauth2.client.provider.azure.tenant-id:}") String azureTenantId) {
         this.testBypassEnabled = securityProperties.testBypass() != null
                 && securityProperties.testBypass().enabled();
+        this.oauth2Enabled = securityProperties.oauth2() != null
+                && securityProperties.oauth2().enabled();
 
         // Detect available providers - all credentials must be present for a provider to be available
         var providers = new ArrayList<String>();
-        if (isNotBlank(googleClientId) && isNotBlank(googleClientSecret)) {
-            providers.add("google");
-        }
-        if (isNotBlank(azureClientId) && isNotBlank(azureClientSecret) && isNotBlank(azureTenantId)) {
-            providers.add("azure");
+        if (oauth2Enabled) {
+            if (isNotBlank(googleClientId) && isNotBlank(googleClientSecret)) {
+                providers.add("google");
+            }
+            if (isNotBlank(azureClientId) && isNotBlank(azureClientSecret) && isNotBlank(azureTenantId)) {
+                providers.add("azure");
+            }
         }
 
         // Store immutable copy to prevent accidental modification
         this.availableProviders = List.copyOf(providers);
-        this.oauth2Available = !this.availableProviders.isEmpty();
+        this.oauth2Available = oauth2Enabled && !this.availableProviders.isEmpty();
     }
 
     public boolean isOAuth2Available() {
@@ -61,6 +67,15 @@ public class OAuth2AvailabilityChecker {
     public void checkOAuth2Configuration() {
         if (oauth2Available) {
             log.info("OAuth2 authentication configured and available.");
+        } else if (!oauth2Enabled) {
+            log.info("OAuth2 is disabled via security.oauth2.enabled=false.");
+            if (testBypassEnabled) {
+                log.info("Test-bypass is enabled. Authentication will use X-Test-User/X-Test-Role headers.");
+            } else {
+                log.warn("OAuth2 is disabled and test-bypass is not enabled. "
+                        + "Users will not be able to authenticate. "
+                        + "Enable security.oauth2.enabled=true or security.test-bypass.enabled=true.");
+            }
         } else if (testBypassEnabled) {
             log.info("OAuth2 credentials not configured, but test-bypass is enabled. "
                     + "Authentication will use X-Test-User/X-Test-Role headers.");

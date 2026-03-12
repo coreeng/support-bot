@@ -11,9 +11,13 @@ import org.junit.jupiter.api.Test;
 class OAuth2AvailabilityCheckerTest {
 
     private static SecurityProperties createSecurityProperties(boolean testBypassEnabled) {
+        return createSecurityProperties(testBypassEnabled, false);
+    }
+
+    private static SecurityProperties createSecurityProperties(boolean testBypassEnabled, boolean oauth2Enabled) {
         return new SecurityProperties(
                 new SecurityProperties.JwtProperties("test-secret", Duration.ofHours(24)),
-                new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
+                new SecurityProperties.OAuth2Properties(oauth2Enabled, "http://localhost:3000/auth/callback"),
                 new SecurityProperties.CorsProperties(null),
                 new SecurityProperties.TestBypassProperties(testBypassEnabled),
                 new SecurityProperties.AllowListProperties(List.of(), List.of()));
@@ -130,5 +134,32 @@ class OAuth2AvailabilityCheckerTest {
         // then
         assertFalse(checker.isOAuth2Available());
         assertEquals(List.of(), checker.getAvailableProviders());
+    }
+
+    @Test
+    void oauth2NotAvailable_whenDisabled() {
+        // given
+        var checker = new OAuth2AvailabilityChecker(
+                createSecurityProperties(false, false),
+                "google-client-id",
+                "google-client-secret",
+                "azure-client-id",
+                "azure-client-secret",
+                "azure-tenant-id");
+
+        // then
+        assertFalse(checker.isOAuth2Available());
+        assertEquals(List.of(), checker.getAvailableProviders());
+    }
+
+    @Test
+    void oauth2Available_whenEnabledWithCredentials() {
+        // given
+        var checker = new OAuth2AvailabilityChecker(
+                createSecurityProperties(false, true), "google-client-id", "google-client-secret", "", "", "");
+
+        // then
+        assertTrue(checker.isOAuth2Available());
+        assertEquals(List.of("google"), checker.getAvailableProviders());
     }
 }
