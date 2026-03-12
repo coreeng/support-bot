@@ -151,13 +151,18 @@ class SlaLookupTest {
     void fallsBackToConfigDefaultOnYamlParseError() {
         // given
         PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", SLA_48H);
-        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml")).thenReturn("not: [valid: yaml: {{{");
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml"))
+                .thenReturn("not: [valid: yaml: {{{")
+                .thenReturn("default: 72h");
 
-        // when
+        // when — first call has invalid YAML, falls back to config default
         Duration result = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
-
-        // then
         assertThat(result).isEqualTo(SLA_48H);
+
+        // then — parse error is NOT cached, second call retries and picks up the fix
+        Duration retryResult = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
+        assertThat(retryResult).isEqualTo(SLA_72H);
+        verify(gitHubClient, times(2)).getFileContent(REPO, ".pr-sla.yaml");
     }
 
     @Test
@@ -211,13 +216,18 @@ class SlaLookupTest {
     void fallsBackToConfigDefaultOnInvalidDurationInFile() {
         // given
         PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", SLA_48H);
-        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml")).thenReturn("default: forever");
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml"))
+                .thenReturn("default: forever")
+                .thenReturn("default: 72h");
 
-        // when
+        // when — first call has invalid file, falls back to config default
         Duration result = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
-
-        // then invalid duration in file, falls back to config default
         assertThat(result).isEqualTo(SLA_48H);
+
+        // then — invalid file is NOT cached, second call retries and picks up the fix
+        Duration retryResult = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
+        assertThat(retryResult).isEqualTo(SLA_72H);
+        verify(gitHubClient, times(2)).getFileContent(REPO, ".pr-sla.yaml");
     }
 
     @Test

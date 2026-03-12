@@ -23,7 +23,12 @@ public final class Hub4jGitHubClient implements GitHubClient {
     public @Nullable String getFileContent(String repositoryName, String path) {
         try {
             GHRepository repo = github.getRepository(repositoryName);
-            return repo.getFileContent(path).getContent();
+            String decoded = repo.getFileContent(path).getContent();
+            if (decoded == null) {
+                throw new GitHubApiException(
+                        0, "GitHub returned null content for %s in %s".formatted(path, repositoryName));
+            }
+            return decoded;
         } catch (GHFileNotFoundException e) {
             return null;
         } catch (HttpException e) {

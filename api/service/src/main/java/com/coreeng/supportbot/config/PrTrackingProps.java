@@ -178,6 +178,9 @@ public record PrTrackingProps(
     public record SlaDiscovery(@Nullable Duration cache) {
         public SlaDiscovery {
             cache = cache == null ? Duration.ofHours(24) : cache;
+            if (cache.isZero() || cache.isNegative()) {
+                throw new IllegalArgumentException("slaDiscovery.cache must be a positive duration");
+            }
         }
     }
 

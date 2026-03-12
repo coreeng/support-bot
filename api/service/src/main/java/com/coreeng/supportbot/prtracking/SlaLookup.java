@@ -76,7 +76,17 @@ public class SlaLookup {
         String file = configSla.file();
         if (file != null && !file.isBlank()) {
             String cacheKey = repositoryName + ":" + file;
-            Optional<ParsedSlaFile> cached = fileCache.get(cacheKey, k -> fetchAndParse(repositoryName, file));
+            Optional<ParsedSlaFile> cached;
+            try {
+                cached = fileCache.get(cacheKey, k -> fetchAndParse(repositoryName, file));
+            } catch (InvalidSlaFileException e) {
+                log.atWarn()
+                        .addArgument(file)
+                        .addArgument(repositoryName)
+                        .addArgument(e::getMessage)
+                        .log("Invalid SLA file {} in {}: {}. Using config instead.");
+                cached = Optional.empty();
+            }
             if (cached.isPresent()) {
                 ParsedSlaFile parsed = cached.get();
                 if (parsed.defaultSla() != null) {
@@ -86,7 +96,6 @@ public class SlaLookup {
                     overrides = parsed.overrides();
                 }
             }
-            // cached empty means file not found or invalid, fall through to inline config
         }
 
         Duration matched = matchOverride(overrides, repositoryName, pullNumber);
@@ -117,8 +126,8 @@ public class SlaLookup {
 
     /**
      * Fetches the SLA file from the repository, parses the YAML, and converts all duration strings
-     * into Duration objects. Returns Optional.empty() if the file is not found, unparseable, or
-     * contains invalid values. The result is cached, so errors are logged once per cache TTL.
+     * into Duration objects. Returns Optional.empty() if the file is not found (cached — safe sentinel).
+     * Throws on parse/validation errors so Caffeine does not cache the failure.
      */
     private Optional<ParsedSlaFile> fetchAndParse(String repositoryName, String filePath) {
         String content = gitHubClient.getFileContent(repositoryName, filePath);
@@ -134,22 +143,15 @@ public class SlaLookup {
         try {
             raw = yamlMapper.readValue(content, RawSlaFile.class);
         } catch (JsonProcessingException e) {
-            log.atWarn()
-                    .addArgument(filePath)
-                    .addArgument(repositoryName)
-                    .setCause(e)
-                    .log("Failed to parse SLA file {} from {}, using config");
-            return Optional.empty();
+            throw new InvalidSlaFileException(
+                    "Failed to parse SLA file %s from %s".formatted(filePath, repositoryName), e);
         }
 
         if (raw.overrides() != null) {
             for (RawSlaOverrideEntry entry : raw.overrides()) {
                 if (entry.path() == null || entry.sla() == null) {
-                    log.atWarn()
-                            .addArgument(filePath)
-                            .addArgument(repositoryName)
-                            .log("SLA file {} from {} has override entry missing path or sla field, using config");
-                    return Optional.empty();
+                    throw new InvalidSlaFileException("SLA file %s from %s has override entry missing path or sla field"
+                            .formatted(filePath, repositoryName));
                 }
             }
         }
@@ -167,12 +169,18 @@ public class SlaLookup {
 
             return Optional.of(new ParsedSlaFile(parsedDefault, parsedOverrides));
         } catch (IllegalArgumentException e) {
-            log.atWarn()
-                    .addArgument(filePath)
-                    .addArgument(repositoryName)
-                    .setCause(e)
-                    .log("Invalid values in SLA file {} from {}, using config");
-            return Optional.empty();
+            throw new InvalidSlaFileException(
+                    "Invalid values in SLA file %s from %s: %s".formatted(filePath, repositoryName, e.getMessage()), e);
+        }
+    }
+
+    static class InvalidSlaFileException extends RuntimeException {
+        InvalidSlaFileException(String message) {
+            super(message);
+        }
+
+        InvalidSlaFileException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 
@@ -184,10 +192,16 @@ public class SlaLookup {
      */
     private static Duration parseDuration(String value) {
         String trimmed = value.trim();
+        Duration duration;
         if (trimmed.endsWith("w") || trimmed.endsWith("W")) {
             long weeks = Long.parseLong(trimmed.substring(0, trimmed.length() - 1));
-            return Duration.ofDays(weeks * 7);
+            duration = Duration.ofDays(weeks * 7);
+        } else {
+            duration = DurationStyle.detectAndParse(trimmed);
         }
-        return DurationStyle.detectAndParse(trimmed);
+        if (duration.isNegative() || duration.isZero()) {
+            throw new IllegalArgumentException("SLA duration must be positive, got: " + value);
+        }
+        return duration;
     }
 }
