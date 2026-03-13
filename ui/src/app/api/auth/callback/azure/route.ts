@@ -16,8 +16,8 @@ export async function GET(request: NextRequest) {
       loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
     }
     const response = NextResponse.redirect(loginUrl);
-    // Clear the cookie
-    response.cookies.delete("oauth-callback-url");
+    // Clear the cookie (must specify path to match the cookie that was set)
+    response.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
     return response;
   }
 
@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
       loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
     }
     const response = NextResponse.redirect(loginUrl);
-    // Clear the cookie
-    response.cookies.delete("oauth-callback-url");
+    // Clear the cookie (must specify path to match the cookie that was set)
+    response.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
     return response;
   }
 
@@ -60,8 +60,8 @@ export async function GET(request: NextRequest) {
         loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
       }
       const redirectResponse = NextResponse.redirect(loginUrl);
-      // Clear the cookie
-      redirectResponse.cookies.delete("oauth-callback-url");
+      // Clear the cookie (must specify path to match the cookie that was set)
+      redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
       return redirectResponse;
     }
 
@@ -74,8 +74,8 @@ export async function GET(request: NextRequest) {
       loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
     }
     const redirectResponse = NextResponse.redirect(loginUrl);
-    // Clear the cookie after successful use
-    redirectResponse.cookies.delete("oauth-callback-url");
+    // Clear the cookie after successful use (must specify path to match the cookie that was set)
+    redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
     return redirectResponse;
   } catch (error) {
     console.error("Azure OAuth callback error:", error);
@@ -85,8 +85,8 @@ export async function GET(request: NextRequest) {
       loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
     }
     const redirectResponse = NextResponse.redirect(loginUrl);
-    // Clear the cookie
-    redirectResponse.cookies.delete("oauth-callback-url");
+    // Clear the cookie (must specify path to match the cookie that was set)
+    redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
     return redirectResponse;
   }
 }
