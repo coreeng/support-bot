@@ -64,7 +64,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
     const handleLogout = async () => {
         await logout()
-        router.push('/login')
     }
 
     // Helper function to check if a tab should be visible
