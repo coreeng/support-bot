@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publicFetch } from "../../../_lib/public-fetch";
 
+/**
+ * Sanitize a callback URL to prevent open-redirect attacks.
+ * Only relative paths (starting with "/" but not "//") are allowed.
+ * Anything else (absolute URLs, protocol-relative, javascript: etc.) falls back to "/".
+ */
+function sanitizeCallbackUrl(url: string | null | undefined): string {
+  if (typeof url === "string" && url.startsWith("/") && !url.startsWith("//")) {
+    return url;
+  }
+  return "/";
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ provider: string }> }
@@ -12,7 +24,9 @@ export async function GET(
   }
 
   // Get the callbackUrl from query params (where user should return after login)
-  const userCallbackUrl = request.nextUrl.searchParams.get("callbackUrl") || "/";
+  // Sanitize it server-side to prevent storing malicious URLs in the cookie
+  const rawCallbackUrl = request.nextUrl.searchParams.get("callbackUrl");
+  const userCallbackUrl = sanitizeCallbackUrl(rawCallbackUrl);
 
   // Build the OAuth callback URL for this UI (where OAuth provider redirects back)
   const oauthCallbackUrl = new URL(
