@@ -152,8 +152,11 @@ export default function KnowledgeGapsPage() {
     }, [])
 
     // Check status on mount and when page becomes visible
+    // Only fetch if user has SUPPORT_ENGINEER role (required by backend) AND analysis is enabled
     useEffect(() => {
-        fetchAnalysisStatus()
+        if (isSupportEngineer && isAnalysisEnabled) {
+            fetchAnalysisStatus()
+        }
 
         return () => {
             stopPolling()
@@ -161,7 +164,8 @@ export default function KnowledgeGapsPage() {
                 clearTimeout(completionTimeoutRef.current)
             }
         }
-    }, [])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isSupportEngineer, isAnalysisEnabled])
 
     // Start polling if analysis is running
     useEffect(() => {
@@ -170,6 +174,7 @@ export default function KnowledgeGapsPage() {
         } else {
             stopPolling()
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [analysisStatus?.running])
 
     const handleStartAnalysis = async () => {

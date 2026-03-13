@@ -6,7 +6,10 @@ import { ToastProvider } from '@/components/ui/toast'
 import * as useAuthHook from '../../../hooks/useAuth'
 
 // Mock the hooks
-jest.mock('../../../lib/hooks')
+jest.mock('../../../lib/hooks', () => ({
+    useAnalysis: jest.fn(),
+    apiFetch: jest.fn(),
+}))
 jest.mock('../../../hooks/useAuth')
 
 // Mock next-auth
