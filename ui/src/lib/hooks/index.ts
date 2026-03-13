@@ -16,21 +16,30 @@ import type {
 
 // ===== Shared API Helper =====
 
+// Guard to prevent multiple concurrent 401 redirect sequences
+let redirectingToLogin = false;
+
 async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`/api${path}`);
   if (!res.ok) {
     if (res.status === 401) {
-      // Capture current pathname before signing out
-      const currentPath = window.location.pathname;
-      // Sign out to clear expired session
-      try {
-        await signOut({ redirect: false });
-      } catch (e) {
-        // Ignore errors from signOut (session might already be expired)
-        console.log('SignOut error (expected if session expired):', e);
+      // Only one redirect sequence should run, even if multiple requests fail concurrently
+      if (!redirectingToLogin) {
+        redirectingToLogin = true;
+        // Capture current pathname before signing out
+        const currentPath = window.location.pathname;
+        // Sign out to clear expired session
+        try {
+          await signOut({ redirect: false });
+        } catch (e) {
+          // Ignore errors from signOut (session might already be expired)
+          console.log('SignOut error (expected if session expired):', e);
+        }
+        // Redirect to login with the current page as callback
+        window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`;
       }
-      // Redirect to login with the current page as callback
-      window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`;
+      // Don't throw - let the redirect happen without triggering React Query retries
+      return new Promise(() => {}); // Never resolves, navigation will happen
     }
     throw new Error(`API error: ${res.status}`);
   }
