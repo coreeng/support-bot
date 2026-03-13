@@ -2,9 +2,8 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText, Play, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react'
-import { getCsrfToken, signOut } from 'next-auth/react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useAnalysis } from '@/lib/hooks'
+import { useAnalysis, apiFetch } from '@/lib/hooks'
 import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -40,21 +39,18 @@ export default function KnowledgeGapsPage() {
     const isCompletedRef = useRef(false)
     const [isAnalysisEnabled, setIsAnalysisEnabled] = useState(false)
 
+    // Stop polling
+    const stopPolling = () => {
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current)
+            pollingIntervalRef.current = null
+        }
+    }
+
     // Fetch analysis status
     const fetchAnalysisStatus = async () => {
         try {
-            const response = await fetch('/api/analysis/status')
-            if (response.status === 401) {
-                stopPolling()
-                const currentPath = window.location.pathname
-                try {
-                    await signOut({ redirect: false })
-                } catch (e) {
-                    console.log('SignOut error (expected if session expired):', e)
-                }
-                window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
-                return null
-            }
+            const response = await apiFetch('/api/analysis/status')
             if (response.ok) {
                 const status: AnalysisStatus = await response.json()
                 setAnalysisStatus(status)
@@ -76,7 +72,14 @@ export default function KnowledgeGapsPage() {
             if (isCompletedRef.current) return
 
             const status = await fetchAnalysisStatus()
-            if (status && !status.running) {
+
+            // If status is null (e.g., 401 error), stop polling
+            if (!status) {
+                stopPolling()
+                return
+            }
+
+            if (!status.running) {
                 stopPolling()
                 isCompletedRef.current = true
 
@@ -114,29 +117,11 @@ export default function KnowledgeGapsPage() {
         }, 3000)
     }
 
-    // Stop polling
-    const stopPolling = () => {
-        if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current)
-            pollingIntervalRef.current = null
-        }
-    }
-
     // Fetch analysis enabled status
     useEffect(() => {
         const fetchAnalysisEnabled = async () => {
             try {
-                const response = await fetch('/api/analysis/enabled')
-                if (response.status === 401) {
-                    const currentPath = window.location.pathname
-                    try {
-                        await signOut({ redirect: false })
-                    } catch (e) {
-                        console.log('SignOut error (expected if session expired):', e)
-                    }
-                    window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
-                    return
-                }
+                const response = await apiFetch('/api/analysis/enabled')
                 if (response.ok) {
                     const data = await response.json()
                     setIsAnalysisEnabled(data.enabled)
@@ -164,7 +149,6 @@ export default function KnowledgeGapsPage() {
                 clearTimeout(completionTimeoutRef.current)
             }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isSupportEngineer, isAnalysisEnabled])
 
     // Start polling if analysis is running
@@ -174,32 +158,16 @@ export default function KnowledgeGapsPage() {
         } else {
             stopPolling()
         }
+        // startPolling and stopPolling are stable functions that don't need to be in deps
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [analysisStatus?.running])
 
     const handleStartAnalysis = async () => {
         setIsStartingAnalysis(true)
         try {
-            const csrfToken = await getCsrfToken()
-
-            const response = await fetch(`/api/analysis/run?days=${selectedDays}`, {
+            const response = await apiFetch(`/api/analysis/run?days=${selectedDays}`, {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-Token': csrfToken || '',
-                },
             })
-
-            if (response.status === 401) {
-                const currentPath = window.location.pathname
-                try {
-                    await signOut({ redirect: false })
-                } catch (e) {
-                    // Ignore errors from signOut (session might already be expired)
-                    console.log('SignOut error (expected if session expired):', e)
-                }
-                window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
-                return
-            }
 
             if (response.status === 202) {
                 // Analysis started successfully - show progress panel immediately
@@ -214,8 +182,13 @@ export default function KnowledgeGapsPage() {
                 // Fetch actual status
                 const status = await fetchAnalysisStatus()
 
+                // If status is null (e.g., 401 error), don't start polling
+                if (!status) {
+                    return
+                }
+
                 // Check if analysis completed immediately (nothing to analyze)
-                if (status && !status.running) {
+                if (!status.running) {
                     isCompletedRef.current = true
 
                     // Show completion message
@@ -279,14 +252,7 @@ export default function KnowledgeGapsPage() {
     const handleExportDownload = async () => {
         setIsDownloading(true)
         try {
-            // Get CSRF token for protection against cross-site request forgery
-            const csrfToken = await getCsrfToken()
-
-            const response = await fetch(`/api/summary-data/export?days=${selectedDays}`, {
-                headers: {
-                    'X-CSRF-Token': csrfToken || '',
-                },
-            })
+            const response = await apiFetch(`/api/summary-data/export?days=${selectedDays}`)
             if (!response.ok) {
                 throw new Error('Failed to download export')
             }
@@ -310,25 +276,7 @@ export default function KnowledgeGapsPage() {
 
     const handleAnalysisBundleDownload = async () => {
         try {
-            // Get CSRF token for protection against cross-site request forgery
-            const csrfToken = await getCsrfToken()
-
-            const response = await fetch('/api/summary-data/analysis', {
-                headers: {
-                    'X-CSRF-Token': csrfToken || '',
-                },
-            })
-
-            if (response.status === 401) {
-                const currentPath = window.location.pathname
-                try {
-                    await signOut({ redirect: false })
-                } catch (e) {
-                    console.log('SignOut error (expected if session expired):', e)
-                }
-                window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
-                return
-            }
+            const response = await apiFetch('/api/summary-data/analysis')
 
             if (!response.ok) {
                 throw new Error('Failed to download prompt')
@@ -359,30 +307,13 @@ export default function KnowledgeGapsPage() {
 
         setIsUploading(true)
         try {
-            // Get CSRF token for protection against cross-site request forgery
-            const csrfToken = await getCsrfToken()
-
             const formData = new FormData()
             formData.append('file', file)
 
-            const response = await fetch('/api/summary-data/import', {
+            const response = await apiFetch('/api/summary-data/import', {
                 method: 'POST',
-                headers: {
-                    'X-CSRF-Token': csrfToken || '',
-                },
                 body: formData,
             })
-
-            if (response.status === 401) {
-                const currentPath = window.location.pathname
-                try {
-                    await signOut({ redirect: false })
-                } catch (e) {
-                    console.log('SignOut error (expected if session expired):', e)
-                }
-                window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`
-                return
-            }
 
             if (!response.ok) {
                 throw new Error('Failed to upload file')
