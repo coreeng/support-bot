@@ -61,6 +61,7 @@ public class PrDetectionService {
     private final TicketTeamSuggestionsService ticketTeamSuggestionsService;
     private final SlackClient slackClient;
     private final SlackTicketsProps slackTicketsProps;
+    private final SlaLookup slaLookup;
 
     public boolean containsPrLinks(String message) {
         return !prUrlParser.parse(message).isEmpty();
@@ -249,7 +250,24 @@ public class PrDetectionService {
             PrTrackingProps.Repository repoConfig,
             GitHubPullRequest prMetadata) {
 
-        Duration sla = checkNotNull(repoConfig.sla().defaultSla(), "sla.default must not be null");
+        Duration sla;
+        try {
+            sla = slaLookup.getSla(repoConfig, detectedPr.repositoryName(), detectedPr.pullNumber());
+        } catch (GitHubApiException e) {
+            log.atWarn()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .addArgument(e::getMessage)
+                    .log("Failed to look up SLA for {}#{}, skipping: {}");
+            return PerPrResult.SKIPPED;
+        }
+        if (sla == null) {
+            log.atWarn()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .log("No SLA found for {}#{}, skipping");
+            return PerPrResult.SKIPPED;
+        }
         Instant slaDeadline = prMetadata.createdAt().plus(sla);
         String teamLabel = resolveTeamLabel(repoConfig.owningTeam());
         TicketId ticketId = checkNotNull(ticket.id());

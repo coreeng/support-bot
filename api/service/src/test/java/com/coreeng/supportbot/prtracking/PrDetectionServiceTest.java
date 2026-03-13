@@ -82,6 +82,9 @@ class PrDetectionServiceTest {
     @Mock
     private SlackTicketsProps slackTicketsProps;
 
+    @Mock
+    private SlaLookup slaLookup;
+
     @Captor
     private ArgumentCaptor<SlackPostMessageRequest> postMessageCaptor;
 
@@ -103,8 +106,10 @@ class PrDetectionServiceTest {
                 ticketRepository,
                 ticketTeamSuggestionsService,
                 slackClient,
-                slackTicketsProps);
+                slackTicketsProps,
+                slaLookup);
         lenient().when(slackTicketsProps.expectedInitialReaction()).thenReturn("eyes");
+        lenient().when(slaLookup.getSla(any(), any(), anyInt())).thenReturn(SLA_24H);
         lenient().when(prTrackingProps.tags()).thenReturn(List.of("pr-review"));
         lenient().when(prTrackingProps.impact()).thenReturn("medium");
         lenient().when(ticketRepository.updateTicket(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -466,6 +471,53 @@ class PrDetectionServiceTest {
             verify(slackClient, never()).postMessage(any());
             verify(ticketSlackService, never()).markPostTracked(any());
             verify(prTrackingRepository, never()).insertIfAbsent(any());
+        }
+
+        @Test
+        void skipsWhenNoSlaResolvable() {
+            // given
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, prCreatedAt, GitHubPullRequest.PrState.OPEN));
+            when(slaLookup.getSla(any(), eq(REPO), eq(PR_NUMBER))).thenReturn(null);
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — no SLA means PR is skipped entirely
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).addReaction(any());
+            verify(slackClient, never()).postMessage(any());
+            verify(ticketSlackService, never()).markPostTracked(any());
+        }
+
+        @Test
+        void skipsWhenSlaLookupThrowsGitHubApiException() {
+            // given
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, prCreatedAt, GitHubPullRequest.PrState.OPEN));
+            when(slaLookup.getSla(any(), eq(REPO), eq(PR_NUMBER)))
+                    .thenThrow(new GitHubApiException(500, "server error"));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then, GitHubApiException from SLA lookup skips the PR
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).addReaction(any());
+            verify(slackClient, never()).postMessage(any());
+            verify(ticketSlackService, never()).markPostTracked(any());
         }
 
         @Test
@@ -836,6 +888,7 @@ class PrDetectionServiceTest {
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(sla))));
+            when(slaLookup.getSla(any(), eq(REPO), eq(PR_NUMBER))).thenReturn(sla);
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));

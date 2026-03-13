@@ -16,6 +16,7 @@ import com.coreeng.supportbot.testkit.TicketByIdQuery;
 import com.coreeng.supportbot.testkit.TicketMessage;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -32,6 +33,11 @@ public class PrTrackingFunctionalTests {
     private static final String PR_REPO = "test-org/pr-test-repo";
     private static final String PR_LINK_1 = "https://github.com/" + PR_REPO + "/pull/1";
     private static final String PR_LINK_2 = "https://github.com/" + PR_REPO + "/pull/2";
+
+    private static final String SLA_FILE_REPO = "test-org/pr-sla-file-repo";
+    private static final String SLA_FILE_PR = "https://github.com/" + SLA_FILE_REPO + "/pull/101";
+    private static final String SLA_OVERRIDE_REPO = "test-org/pr-sla-override-repo";
+    private static final String SLA_OVERRIDE_PR = "https://github.com/" + SLA_OVERRIDE_REPO + "/pull/201";
 
     /** Returns a PR created-at timestamp 1 hour ago — safely within the 24h SLA window. */
     private static String recentCreatedAt() {
@@ -519,6 +525,156 @@ public class PrTrackingFunctionalTests {
         await().during(Duration.ofSeconds(2))
                 .atMost(Duration.ofSeconds(3))
                 .untilAsserted(() -> creationStubs.ticketMessagePosted().assertIsNotCalled());
+
+        creationStubs.cleanUp();
+    }
+
+    @Test
+    public void whenSlaFileExistsInRepo_usesFileSlaInsteadOfInlineDefault() {
+        TestKit.RoledTestKit asTenant = testKit.as(tenant);
+        SlackTestKit asTenantSlack = asTenant.slack();
+        String channelId = testKit.config().mocks().slack().supportChannelId();
+
+        MessageTs queryTs = MessageTs.now();
+        MessageTs ticketMessageTs = MessageTs.now();
+
+        // PR created 2 minutes ago
+        Instant oldCreatedAt = Instant.now().minus(Duration.ofMinutes(2));
+        var githubStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("GitHub PR #101", SLA_FILE_REPO, 101, "open", oldCreatedAt.toString());
+
+        // SLA file returns 1 minute default, much shorter than the 24h inline default
+        var fileStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetFileContent("SLA file for file repo", SLA_FILE_REPO, ".pr-sla.yaml", "default: PT1M");
+
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("PR reaction")
+                        .reaction("pr")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Eyes reaction")
+                        .reaction("eyes")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+        var escalatedReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Escalated reaction")
+                        .reaction("rocket")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+
+        SlackMessage messageForStubs = SlackMessage.builder()
+                .slackWiremock(testKit.slack().wiremock())
+                .ts(queryTs)
+                .channelId(channelId)
+                .build();
+        var creationStubs = messageForStubs.stubTicketCreationFlow("ticket created", ticketMessageTs);
+
+        // when
+        asTenantSlack.postMessage(queryTs, "Please review " + SLA_FILE_PR);
+
+        // then, file SLA of 1 minute is used so PR is already in breach
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            githubStub.assertIsCalled();
+            fileStub.assertIsCalled();
+            prReactionStub.assertIsCalled();
+            eyesReactionStub.assertIsCalled();
+            escalatedReactionStub.assertIsCalled();
+        });
+
+        var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
+        assertThat(ticketResponse).isNotNull();
+        assertThat(ticketResponse.escalated()).isTrue();
+
+        creationStubs.cleanUp();
+    }
+
+    @Test
+    public void whenPrFilesMatchOverrideInSlaFile_usesOverrideDuration() {
+        TestKit.RoledTestKit asTenant = testKit.as(tenant);
+        SlackTestKit asTenantSlack = asTenant.slack();
+        String channelId = testKit.config().mocks().slack().supportChannelId();
+
+        MessageTs queryTs = MessageTs.now();
+        MessageTs ticketMessageTs = MessageTs.now();
+
+        // PR created 2 minutes ago
+        Instant oldCreatedAt = Instant.now().minus(Duration.ofMinutes(2));
+        var githubStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("GitHub PR #201", SLA_OVERRIDE_REPO, 201, "open", oldCreatedAt.toString());
+
+        // SLA file has a long default but a short override for docs/**
+        String slaYaml = "default: PT24H\noverrides:\n  - path: \"docs/**\"\n    sla: PT1M";
+        var fileStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetFileContent("SLA file for override repo", SLA_OVERRIDE_REPO, ".pr-sla.yaml", slaYaml);
+
+        // PR touches docs/README.md which matches the override
+        var filesStub = testKit.slack()
+                .wiremock()
+                .stubGitHubListPullRequestFiles("PR #201 files", SLA_OVERRIDE_REPO, 201, List.of("docs/README.md"));
+
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("PR reaction")
+                        .reaction("pr")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Eyes reaction")
+                        .reaction("eyes")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+        var escalatedReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Escalated reaction")
+                        .reaction("rocket")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+
+        SlackMessage messageForStubs = SlackMessage.builder()
+                .slackWiremock(testKit.slack().wiremock())
+                .ts(queryTs)
+                .channelId(channelId)
+                .build();
+        var creationStubs = messageForStubs.stubTicketCreationFlow("ticket created", ticketMessageTs);
+
+        // when
+        asTenantSlack.postMessage(queryTs, "Please review " + SLA_OVERRIDE_PR);
+
+        // then, override SLA of 1 minute for docs/** is used so PR is already in breach
+        // githubStub is called twice: once by getPullRequest, once by listPullRequestFiles
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            githubStub.assertIsCalled(2);
+            fileStub.assertIsCalled();
+            filesStub.assertIsCalled();
+            prReactionStub.assertIsCalled();
+            eyesReactionStub.assertIsCalled();
+            escalatedReactionStub.assertIsCalled();
+        });
+
+        var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
+        assertThat(ticketResponse).isNotNull();
+        assertThat(ticketResponse.escalated()).isTrue();
 
         creationStubs.cleanUp();
     }
