@@ -14,6 +14,8 @@ import com.coreeng.supportbot.testkit.matcher.UrlDecodedPattern;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.github.tomakehurst.wiremock.stubbing.StubMapping;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -264,6 +266,56 @@ public class SlackWiremock extends WireMockServer {
         return Stub.builder()
                 .mapping(prStub)
                 .extraMappings(List.of(repoStub))
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    public Stub stubGitHubGetFileContent(String description, String repositoryName, String path, String content) {
+        String base64 = Base64.getEncoder().encodeToString(content.getBytes(StandardCharsets.UTF_8));
+        StubMapping stub = givenThat(get("/repos/" + repositoryName + "/contents/" + path)
+                .withName(description)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"content":"%s","encoding":"base64","type":"file"}
+                                """.formatted(base64))));
+        return Stub.builder()
+                .mapping(stub)
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    public Stub stubGitHubGetFileContentNotFound(String description, String repositoryName, String path) {
+        StubMapping stub = givenThat(get("/repos/" + repositoryName + "/contents/" + path)
+                .withName(description)
+                .willReturn(aResponse()
+                        .withStatus(404)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"message":"Not Found"}
+                                """)));
+        return Stub.builder()
+                .mapping(stub)
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    public Stub stubGitHubListPullRequestFiles(
+            String description, String repositoryName, int pullNumber, List<String> fileNames) {
+        String filesJson = fileNames.stream().map(f -> """
+                        {"filename":"%s","status":"modified"}""".formatted(f)).collect(Collectors.joining(",", "[", "]"));
+        StubMapping stub = givenThat(get("/repos/" + repositoryName + "/pulls/" + pullNumber + "/files")
+                .withName(description)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(filesJson)));
+        return Stub.builder()
+                .mapping(stub)
                 .wireMockServer(this)
                 .description(description)
                 .build();

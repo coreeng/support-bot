@@ -19,6 +19,9 @@ import org.springframework.context.annotation.Configuration;
 
 class PrTrackingGitHubConfigTest {
 
+    private static final PrTrackingProps.SlaDiscovery DEFAULT_SLA_DISCOVERY =
+            new PrTrackingProps.SlaDiscovery(Duration.ofHours(24));
+
     private final ApplicationContextRunner contextRunner =
             new ApplicationContextRunner().withUserConfiguration(TestConfig.class, PrTrackingGitHubConfig.class);
 
@@ -71,7 +74,8 @@ class PrTrackingGitHubConfigTest {
                 "low",
                 List.of(new PrTrackingProps.Repository(
                         "my-org/my-repo", "wow", new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
-                appGithub);
+                appGithub,
+                DEFAULT_SLA_DISCOVERY);
 
         // when
         GitHub gitHub = config.gitHub(props);
@@ -97,7 +101,8 @@ class PrTrackingGitHubConfigTest {
                 "low",
                 List.of(new PrTrackingProps.Repository(
                         "my-org/my-repo", "wow", new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
-                appGithub);
+                appGithub,
+                DEFAULT_SLA_DISCOVERY);
 
         // when
         GitHub gitHub = config.gitHub(props);
@@ -126,7 +131,8 @@ class PrTrackingGitHubConfigTest {
                 "low",
                 List.of(new PrTrackingProps.Repository(
                         "my-org/my-repo", "wow", new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
-                appGithub);
+                appGithub,
+                DEFAULT_SLA_DISCOVERY);
 
         // when / then
         assertThatThrownBy(() -> config.gitHub(props))

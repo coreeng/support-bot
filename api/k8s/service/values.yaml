@@ -124,6 +124,8 @@ prReviewTracking:
 #         overrides: # optional: path-specific SLA overrides
 #           - path: "infra/**"
 #             sla: "7d"
+#   slaDiscovery:
+#     cache: "PT24H" # How long to cache SLA files fetched from repositories (default: 24h)
 #   github:
 #     apiBaseUrl: "${GITHUB_API_BASE_URL:https://api.github.com}" # Supports GitHub Enterprise overrides
 #     authMode: "${GITHUB_AUTH_MODE:token}" # token | app

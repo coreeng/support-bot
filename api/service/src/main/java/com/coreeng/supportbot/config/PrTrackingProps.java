@@ -20,7 +20,8 @@ public record PrTrackingProps(
         List<String> tags,
         String impact,
         List<Repository> repositories,
-        GitHub github) {
+        GitHub github,
+        SlaDiscovery slaDiscovery) {
 
     public PrTrackingProps(
             boolean enabled,
@@ -29,7 +30,8 @@ public record PrTrackingProps(
             @Nullable List<String> tags,
             @Nullable String impact,
             @Nullable List<Repository> repositories,
-            @Nullable GitHub github) {
+            @Nullable GitHub github,
+            @Nullable SlaDiscovery slaDiscovery) {
         this.enabled = enabled;
         this.pollCron = pollCron;
         this.prEmoji = prEmoji == null ? "pr" : prEmoji;
@@ -41,6 +43,7 @@ public record PrTrackingProps(
                         .map(repository -> new Repository(
                                 normalizeRepositoryName(repository.name()), repository.owningTeam(), repository.sla()))
                         .toList();
+        this.slaDiscovery = slaDiscovery == null ? new SlaDiscovery(null) : slaDiscovery;
         this.github = github == null ? GitHub.defaultTokenModeConfig() : github;
 
         if (enabled) {
@@ -81,7 +84,12 @@ public record PrTrackingProps(
                 throw new IllegalArgumentException("pr-review-tracking.repositories[].sla must not be null");
             }
             Duration defaultSla = repository.sla().defaultSla();
-            if (defaultSla == null || defaultSla.isZero() || defaultSla.isNegative()) {
+            boolean hasFile = !isBlank(repository.sla().file());
+            if (!hasFile && defaultSla == null) {
+                throw new IllegalArgumentException(
+                        "pr-review-tracking.repositories[].sla.default must be set when sla.file is not configured");
+            }
+            if (defaultSla != null && (defaultSla.isZero() || defaultSla.isNegative())) {
                 throw new IllegalArgumentException(
                         "pr-review-tracking.repositories[].sla.default must be a positive duration");
             }
@@ -164,6 +172,15 @@ public record PrTrackingProps(
         public SlaOverride {
             requireNonNull(path, "path must not be null");
             requireNonNull(sla, "sla must not be null");
+        }
+    }
+
+    public record SlaDiscovery(@Nullable Duration cache) {
+        public SlaDiscovery {
+            cache = cache == null ? Duration.ofHours(24) : cache;
+            if (cache.isZero() || cache.isNegative()) {
+                throw new IllegalArgumentException("slaDiscovery.cache must be a positive duration");
+            }
         }
     }
 
