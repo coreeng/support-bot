@@ -73,8 +73,7 @@ function LoginContent() {
       if (event.data?.type === "auth:success") {
         // Popup completed signIn — session cookie is already set (shared origin).
         // Sanitize the callbackUrl from the message to prevent open redirects.
-        const targetUrl = sanitizeCallbackUrl(event.data.callbackUrl);
-        window.location.href = targetUrl;
+        window.location.href = sanitizeCallbackUrl(event.data.callbackUrl);
       }
     };
     window.addEventListener("message", handleMessage);
@@ -97,28 +96,36 @@ function LoginContent() {
       if (isPopup) {
         // Popup: complete signIn here (first-party context, no CSRF issues),
         // then notify the iframe and close.
-        signIn("backend-token", { token, redirect: false }).then((result) => {
+        signIn("backend-token", { token, redirect: false })
+          .then((result) => {
+            if (result?.error) {
+              router.replace(`/login?error=${encodeURIComponent(result.error)}`);
+              return;
+            }
+            window.opener!.postMessage(
+              { type: "auth:success", callbackUrl },
+              window.location.origin
+            );
+            window.close();
+          })
+          .catch((error) => {
+            router.replace(`/login?error=${encodeURIComponent(error)}`);
+          });
+        return;
+      }
+
+      signIn("backend-token", { token, redirect: false })
+        .then((result) => {
           if (result?.error) {
             router.replace(`/login?error=${encodeURIComponent(result.error)}`);
             return;
           }
-          window.opener!.postMessage(
-            { type: "auth:success", callbackUrl },
-            window.location.origin
-          );
-          window.close();
+          // Manually redirect to the callback URL after successful sign-in
+          window.location.href = callbackUrl;
+        })
+        .catch((error) => {
+          router.replace(`/login?error=${encodeURIComponent(error)}`);
         });
-        return;
-      }
-
-      signIn("backend-token", { token, redirect: false }).then((result) => {
-        if (result?.error) {
-          router.replace(`/login?error=${encodeURIComponent(result.error)}`);
-          return;
-        }
-        // Manually redirect to the callback URL after successful sign-in
-        window.location.href = callbackUrl;
-      });
       return;
     }
 
@@ -127,28 +134,36 @@ function LoginContent() {
       authAttemptedRef.current = true;
 
       if (isPopup) {
-        signIn("backend-oauth", { code, redirect: false }).then((result) => {
+        signIn("backend-oauth", { code, redirect: false })
+          .then((result) => {
+            if (result?.error) {
+              router.replace(`/login?error=${encodeURIComponent(result.error)}`);
+              return;
+            }
+            window.opener!.postMessage(
+              { type: "auth:success", callbackUrl },
+              window.location.origin
+            );
+            window.close();
+          })
+          .catch((error) => {
+            router.replace(`/login?error=${encodeURIComponent(error)}`);
+          });
+        return;
+      }
+
+      signIn("backend-oauth", { code, redirect: false })
+        .then((result) => {
           if (result?.error) {
             router.replace(`/login?error=${encodeURIComponent(result.error)}`);
             return;
           }
-          window.opener!.postMessage(
-            { type: "auth:success", callbackUrl },
-            window.location.origin
-          );
-          window.close();
+          // Manually redirect to the callback URL after successful sign-in
+          window.location.href = callbackUrl;
+        })
+        .catch((error) => {
+          router.replace(`/login?error=${encodeURIComponent(error)}`);
         });
-        return;
-      }
-
-      signIn("backend-oauth", { code, redirect: false }).then((result) => {
-        if (result?.error) {
-          router.replace(`/login?error=${encodeURIComponent(result.error)}`);
-          return;
-        }
-        // Manually redirect to the callback URL after successful sign-in
-        window.location.href = callbackUrl;
-      });
       return;
     }
 
