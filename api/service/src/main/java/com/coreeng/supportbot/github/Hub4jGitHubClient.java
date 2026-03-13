@@ -1,7 +1,6 @@
 package com.coreeng.supportbot.github;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.kohsuke.github.GHFileNotFoundException;
@@ -46,11 +45,9 @@ public final class Hub4jGitHubClient implements GitHubClient {
     public List<String> listPullRequestFiles(String repositoryName, int pullNumber) {
         try {
             GHPullRequest pr = github.getRepository(repositoryName).getPullRequest(pullNumber);
-            List<String> files = new ArrayList<>();
-            for (GHPullRequestFileDetail file : pr.listFiles()) {
-                files.add(file.getFilename());
-            }
-            return files;
+            return pr.listFiles().toList().stream()
+                    .map(GHPullRequestFileDetail::getFilename)
+                    .toList();
         } catch (GHFileNotFoundException e) {
             throw new GitHubApiException(404, "PR not found: %s#%d".formatted(repositoryName, pullNumber), e);
         } catch (HttpException e) {

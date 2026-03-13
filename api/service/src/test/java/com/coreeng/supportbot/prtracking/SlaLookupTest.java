@@ -257,6 +257,72 @@ class SlaLookupTest {
     }
 
     @Test
+    void fallsBackToConfigWhenOverrideEntryMissingPath() {
+        // given
+        PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", SLA_48H);
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml"))
+                .thenReturn("default: 72h\noverrides:\n  - sla: 24h")
+                .thenReturn("default: 72h");
+
+        // when, first call has invalid override (missing path), falls back to config default
+        Duration result = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
+        assertThat(result).isEqualTo(SLA_48H);
+
+        // then, invalid file is NOT cached, second call retries and picks up the fix
+        Duration retryResult = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
+        assertThat(retryResult).isEqualTo(SLA_72H);
+        verify(gitHubClient, times(2)).getFileContent(REPO, ".pr-sla.yaml");
+    }
+
+    @Test
+    void fallsBackToConfigWhenOverrideEntryMissingSla() {
+        // given
+        PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", SLA_48H);
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml"))
+                .thenReturn("default: 72h\noverrides:\n  - path: \"docs/**\"")
+                .thenReturn("default: 72h");
+
+        // when, first call has invalid override (missing sla), falls back to config default
+        Duration result = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
+        assertThat(result).isEqualTo(SLA_48H);
+
+        // then, invalid file is NOT cached, second call retries and picks up the fix
+        Duration retryResult = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
+        assertThat(retryResult).isEqualTo(SLA_72H);
+        verify(gitHubClient, times(2)).getFileContent(REPO, ".pr-sla.yaml");
+    }
+
+    @Test
+    void fileOverridesReplaceConfigOverridesButConfigDefaultPreserved() {
+        // given, file has overrides but no default, config has default but no overrides
+        PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", SLA_48H);
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml"))
+                .thenReturn("overrides:\n  - path: \"docs/**\"\n    sla: 24h");
+        when(gitHubClient.listPullRequestFiles(REPO, PR_NUMBER)).thenReturn(List.of("docs/README.md"));
+
+        // when
+        Duration result = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
+
+        // then, file override matched, config default (48h) preserved but not used
+        assertThat(result).isEqualTo(SLA_24H);
+    }
+
+    @Test
+    void fileWithOverridesButNoDefaultFallsBackToConfigDefault() {
+        // given, file has overrides but no default, PR files don't match any override
+        PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", SLA_48H);
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml"))
+                .thenReturn("overrides:\n  - path: \"docs/**\"\n    sla: 24h");
+        when(gitHubClient.listPullRequestFiles(REPO, PR_NUMBER)).thenReturn(List.of("src/Main.java"));
+
+        // when
+        Duration result = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
+
+        // then, no override matched, config default (48h) used
+        assertThat(result).isEqualTo(SLA_48H);
+    }
+
+    @Test
     void returnsDefaultSlaWhenNoOverridesConfigured() {
         // given
         PrTrackingProps.Repository repoConfig = repo(SLA_48H);
