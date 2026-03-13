@@ -1,8 +1,8 @@
 import React from 'react'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import {fireEvent, render, screen, waitFor} from '@testing-library/react'
 import KnowledgeGapsPage from '../knowledge-gaps'
 import * as hooks from '../../../lib/hooks'
-import { ToastProvider } from '@/components/ui/toast'
+import {ToastProvider} from '@/components/ui/toast'
 import * as useAuthHook from '../../../hooks/useAuth'
 
 // Mock the hooks
@@ -450,8 +450,7 @@ describe('KnowledgeGapsPage', () => {
         global.URL.revokeObjectURL = mockRevokeObjectURL
 
         // Mock HTMLAnchorElement click
-        const mockClick = jest.fn()
-        HTMLAnchorElement.prototype.click = mockClick
+      HTMLAnchorElement.prototype.click = jest.fn()
 
         renderWithToast(<KnowledgeGapsPage />)
 
@@ -498,8 +497,7 @@ describe('KnowledgeGapsPage', () => {
         global.URL.revokeObjectURL = mockRevokeObjectURL
 
         // Mock HTMLAnchorElement click
-        const mockClick = jest.fn()
-        HTMLAnchorElement.prototype.click = mockClick
+      HTMLAnchorElement.prototype.click = jest.fn()
 
         renderWithToast(<KnowledgeGapsPage />)
 
@@ -879,7 +877,7 @@ describe('KnowledgeGapsPage', () => {
                     })
                 } as Response)
             })
-            
+
 
             renderWithToast(<KnowledgeGapsPage />)
 
@@ -911,7 +909,7 @@ describe('KnowledgeGapsPage', () => {
                     })
                 } as Response)
             })
-            
+
 
             renderWithToast(<KnowledgeGapsPage />)
 
@@ -962,7 +960,7 @@ describe('KnowledgeGapsPage', () => {
                     } as Response)
                 }
             })
-            
+
 
             renderWithToast(<KnowledgeGapsPage />)
 
@@ -1019,7 +1017,7 @@ describe('KnowledgeGapsPage', () => {
                 return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
             })
 
-            
+
 
             renderWithToast(<KnowledgeGapsPage />)
 
@@ -1057,7 +1055,7 @@ describe('KnowledgeGapsPage', () => {
                 return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
             })
 
-            
+
 
             renderWithToast(<KnowledgeGapsPage />)
 
@@ -1141,7 +1139,7 @@ describe('KnowledgeGapsPage', () => {
                 return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
             })
 
-            
+
 
             renderWithToast(<KnowledgeGapsPage />)
 
@@ -1183,7 +1181,7 @@ describe('KnowledgeGapsPage', () => {
                 return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
             })
 
-            
+
 
             renderWithToast(<KnowledgeGapsPage />)
 
