@@ -303,7 +303,7 @@ describe('LoginPage', () => {
   // -------------------------------------------------------------------
 
   describe('non-popup flow', () => {
-    it('calls signIn with redirect:true for token', async () => {
+    it('calls signIn with redirect:false for token', async () => {
       mockSignIn.mockResolvedValue({ ok: true } as any)
       mockUseSearchParams.mockReturnValue(
         new URLSearchParams('token=mytoken&callbackUrl=/dash') as any
@@ -314,13 +314,12 @@ describe('LoginPage', () => {
       await waitFor(() => {
         expect(mockSignIn).toHaveBeenCalledWith('backend-token', {
           token: 'mytoken',
-          callbackUrl: '/dash',
-          redirect: true,
+          redirect: false,
         })
       })
     })
 
-    it('calls signIn with redirect:true for code', async () => {
+    it('calls signIn with redirect:false for code', async () => {
       mockSignIn.mockResolvedValue({ ok: true } as any)
       mockUseSearchParams.mockReturnValue(
         new URLSearchParams('code=mycode&callbackUrl=/dash') as any
@@ -331,8 +330,7 @@ describe('LoginPage', () => {
       await waitFor(() => {
         expect(mockSignIn).toHaveBeenCalledWith('backend-oauth', {
           code: 'mycode',
-          callbackUrl: '/dash',
-          redirect: true,
+          redirect: false,
         })
       })
     })
@@ -348,8 +346,7 @@ describe('LoginPage', () => {
       await waitFor(() => {
         expect(mockSignIn).toHaveBeenCalledWith('backend-token', {
           token: 't',
-          callbackUrl: '/',
-          redirect: true,
+          redirect: false,
         })
       })
     })
@@ -520,12 +517,12 @@ describe('LoginPage', () => {
       Object.defineProperty(window, 'self', { value: {}, writable: true, configurable: true })
 
       render(<LoginPage />)
-      
+
       await waitFor(() => expect(screen.getByText('Continue with Google')).toBeInTheDocument())
       fireEvent.click(screen.getByText('Continue with Google'))
 
       expect(window.open).toHaveBeenCalledWith(
-        '/api/auth/start/google',
+        '/api/auth/start/google?callbackUrl=%2F',
         'supportbot-auth',
         expect.stringContaining('popup=yes')
       )
