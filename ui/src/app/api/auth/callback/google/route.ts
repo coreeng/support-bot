@@ -33,60 +33,15 @@ export async function GET(request: NextRequest) {
     return response;
   }
 
-  const callbackUrl = new URL(
-    "/api/auth/callback/google",
-    process.env.NEXTAUTH_URL
-  ).toString();
-
-  try {
-    const response = await publicFetch("/auth/oauth/exchange", {
-      method: "POST",
-      body: JSON.stringify({
-        provider: "google",
-        code,
-        redirectUri: callbackUrl
-      }),
-    });
-
-    if (!response.ok) {
-      console.error("OAuth code exchange failed:", response.status);
-      const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
-      if (response.status === 403) {
-        loginUrl.searchParams.set("error", "user_not_allowed");
-      } else {
-        loginUrl.searchParams.set("error", "Token exchange failed");
-      }
-      if (userCallbackUrl !== "/") {
-        loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
-      }
-      const redirectResponse = NextResponse.redirect(loginUrl);
-      // Clear the cookie (must specify path to match the cookie that was set)
-      redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
-      return redirectResponse;
-    }
-
-    const result = await response.json();
-
-    const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
-    loginUrl.searchParams.set("token", result.token);
-    // Preserve the user's desired callback URL
-    if (userCallbackUrl !== "/") {
-      loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
-    }
-    const redirectResponse = NextResponse.redirect(loginUrl);
-    // Clear the cookie after successful use (must specify path to match the cookie that was set)
-    redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
-    return redirectResponse;
-  } catch (error) {
-    console.error("Google OAuth callback error:", error);
-    const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
-    loginUrl.searchParams.set("error", "Token exchange failed");
-    if (userCallbackUrl !== "/") {
-      loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
-    }
-    const redirectResponse = NextResponse.redirect(loginUrl);
-    // Clear the cookie (must specify path to match the cookie that was set)
-    redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
-    return redirectResponse;
+  const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
+  loginUrl.searchParams.set("code", code);
+  loginUrl.searchParams.set("provider", "google");
+  // Preserve the user's desired callback URL
+  if (userCallbackUrl !== "/") {
+    loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
   }
+  const redirectResponse = NextResponse.redirect(loginUrl);
+  // Clear the cookie after successful use (must specify path to match the cookie that was set)
+  redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
+  return redirectResponse;
 }

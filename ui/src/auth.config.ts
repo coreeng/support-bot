@@ -1,5 +1,7 @@
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import {publicFetch} from "@/app/api/_lib/public-fetch";
+import {NextResponse} from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 
@@ -106,6 +108,66 @@ export const authConfig: NextAuthConfig = {
             console.error("Token exchange failed");
             return null;
           }
+
+          // Fetch user data using API layer
+          const userData = await fetchUserWithToken(tokenResult.token);
+          if (!userData) {
+            console.error("User fetch failed");
+            return null;
+          }
+
+          return {
+            id: userData.email as string,
+            email: userData.email as string,
+            name: userData.name as string,
+            teams: (userData.teams as Array<{ label: string; code: string; types: string[] }>).map((t) => ({
+              ...t,
+              name: t.code || t.label,
+            })),
+            roles: userData.roles as string[],
+            accessToken: tokenResult.token,
+          };
+        } catch (error) {
+          console.error("Authorization error:", error);
+          return null;
+        }
+      },
+    }),
+    Credentials({
+      id: "backend-code",
+      name: "Backend OAuth",
+      credentials: {
+        code: { label: "Auth Code", type: "text" },
+        provider: { label: "Oauth2 Provider", type: "text" },
+      },
+      async authorize(credentials) {
+        const code = credentials?.code as string;
+        if (!code) return null;
+        const provider = credentials?.provider as string;
+        if (!provider) return null;
+
+        try {
+
+          const callbackUrl = new URL(
+            "/api/auth/callback/" + provider,
+            process.env.NEXTAUTH_URL
+          ).toString();
+
+          const response = await publicFetch("/auth/oauth/exchange", {
+            method: "POST",
+            body: JSON.stringify({
+              provider,
+              code,
+              redirectUri: callbackUrl
+            }),
+          });
+
+          if (!response.ok) {
+            console.error("Token exchange failed");
+            return null;
+          }
+
+          const tokenResult = await response.json();
 
           // Fetch user data using API layer
           const userData = await fetchUserWithToken(tokenResult.token);

@@ -28,6 +28,7 @@ function LoginContent() {
 
   // Handle callback from backend OAuth
   const code = searchParams.get("code");
+  const provider = searchParams.get("provider");
   const token = searchParams.get("token");
   const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const error = searchParams.get("error");
@@ -130,11 +131,11 @@ function LoginContent() {
     }
 
     // If we have a code, exchange it via NextAuth (legacy flow)
-    if (code) {
+    if (code && provider) {
       authAttemptedRef.current = true;
 
       if (isPopup) {
-        signIn("backend-oauth", { code, redirect: false })
+        signIn("backend-code", { code, provider, redirect: false })
           .then((result) => {
             if (result?.error) {
               router.replace(`/login?error=${encodeURIComponent(result.error)}`);
@@ -152,7 +153,7 @@ function LoginContent() {
         return;
       }
 
-      signIn("backend-oauth", { code, redirect: false })
+      signIn("backend-code", { code, provider, redirect: false })
         .then((result) => {
           if (result?.error) {
             router.replace(`/login?error=${encodeURIComponent(result.error)}`);
@@ -171,7 +172,7 @@ function LoginContent() {
     if (isAuthenticated) {
       router.replace(callbackUrl);
     }
-  }, [code, token, isAuthenticated, isLoading, callbackUrl, router]);
+  }, [code, provider, token, isAuthenticated, isLoading, callbackUrl, router]);
 
   const handleLogin = (provider: "google" | "azure") => {
     // OAuth goes through API route - server handles redirect to backend
