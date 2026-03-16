@@ -149,7 +149,7 @@ export const authConfig: NextAuthConfig = {
         try {
 
           const callbackUrl = new URL(
-            "/api/auth/callback/" + provider,
+            "/api/oauth/callback/" + provider,
             process.env.NEXTAUTH_URL
           ).toString();
 

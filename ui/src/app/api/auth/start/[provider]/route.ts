@@ -30,7 +30,7 @@ export async function GET(
 
   // Build the OAuth callback URL for this UI (where OAuth provider redirects back)
   const oauthCallbackUrl = new URL(
-    `/api/auth/callback/${provider}`,
+    `/api/oauth/callback/${provider}`,
     process.env.NEXTAUTH_URL
   ).toString();
 
