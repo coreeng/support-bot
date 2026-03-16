@@ -1,12 +1,15 @@
 import React from 'react'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import {fireEvent, render, screen, waitFor} from '@testing-library/react'
 import KnowledgeGapsPage from '../knowledge-gaps'
 import * as hooks from '../../../lib/hooks'
-import { ToastProvider } from '@/components/ui/toast'
+import {ToastProvider} from '@/components/ui/toast'
 import * as useAuthHook from '../../../hooks/useAuth'
 
 // Mock the hooks
-jest.mock('../../../lib/hooks')
+jest.mock('../../../lib/hooks', () => ({
+    useAnalysis: jest.fn(),
+    apiFetch: jest.fn(),
+}))
 jest.mock('../../../hooks/useAuth')
 
 // Mock next-auth
@@ -28,6 +31,7 @@ const renderWithToast = (component: React.ReactElement) => {
 }
 
 const mockUseAnalysis = hooks.useAnalysis as jest.MockedFunction<typeof hooks.useAnalysis>
+const mockApiFetch = hooks.apiFetch as jest.MockedFunction<typeof hooks.apiFetch>
 const mockUseAuth = useAuthHook.useAuth as jest.MockedFunction<typeof useAuthHook.useAuth>
 
 const mockAnalysisData = {
@@ -142,19 +146,25 @@ describe('KnowledgeGapsPage', () => {
             logout: jest.fn()
         })
 
-        // Default mock for fetch to handle /api/analysis/enabled
-        global.fetch = jest.fn((url) => {
+        // Default mock for apiFetch to handle /api/analysis/enabled and /api/analysis/status
+        mockApiFetch.mockImplementation((url) => {
             if (url === '/api/analysis/enabled') {
                 return Promise.resolve({
                     ok: true,
                     json: () => Promise.resolve({ enabled: true })
                 } as Response)
             }
+            if (url === '/api/analysis/status') {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ running: false })
+                } as Response)
+            }
             return Promise.resolve({
                 ok: true,
                 json: () => Promise.resolve({})
             } as Response)
-        }) as jest.Mock
+        })
     })
 
     it('shows loading state initially', () => {
@@ -346,14 +356,20 @@ describe('KnowledgeGapsPage', () => {
             error: null
         } as any)
 
-        // Mock fetch
-        const mockFetch = jest.fn(() =>
-            Promise.resolve({
+        // Mock apiFetch for export
+        mockApiFetch.mockImplementation((url) => {
+            if (url === '/api/summary-data/export?days=7') {
+                return Promise.resolve({
+                    ok: true,
+                    blob: () => Promise.resolve(new Blob(['test'], { type: 'application/zip' }))
+                } as Response)
+            }
+            // Default for other calls
+            return Promise.resolve({
                 ok: true,
-                blob: () => Promise.resolve(new Blob(['test'], { type: 'application/zip' }))
+                json: () => Promise.resolve({ enabled: false })
             } as Response)
-        )
-        global.fetch = mockFetch
+        })
 
         // Mock URL.createObjectURL and revokeObjectURL
         const mockCreateObjectURL = jest.fn(() => 'blob:test-url')
@@ -373,12 +389,8 @@ describe('KnowledgeGapsPage', () => {
         // Wait for async operations
         await screen.findByText('Downloading...')
 
-        // Verify fetch was called with default value of 7 days (Week)
-        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/export?days=7', {
-            headers: {
-                'X-CSRF-Token': 'mock-csrf-token',
-            },
-        })
+        // Verify apiFetch was called with default value of 7 days (Week)
+        expect(mockApiFetch).toHaveBeenCalledWith('/api/summary-data/export?days=7')
 
         // Wait for button to return to normal state
         await screen.findByText('Export')
@@ -417,8 +429,8 @@ describe('KnowledgeGapsPage', () => {
             error: null
         } as any)
 
-        // Mock fetch
-        const mockFetch = jest.fn((url) => {
+        // Mock apiFetch
+        mockApiFetch.mockImplementation((url) => {
             if (url === '/api/analysis/enabled') {
                 return Promise.resolve({
                     ok: true,
@@ -430,7 +442,6 @@ describe('KnowledgeGapsPage', () => {
                 blob: () => Promise.resolve(new Blob(['test'], { type: 'application/zip' }))
             } as Response)
         })
-        global.fetch = mockFetch
 
         // Mock URL.createObjectURL and revokeObjectURL
         const mockCreateObjectURL = jest.fn(() => 'blob:test-url')
@@ -439,8 +450,7 @@ describe('KnowledgeGapsPage', () => {
         global.URL.revokeObjectURL = mockRevokeObjectURL
 
         // Mock HTMLAnchorElement click
-        const mockClick = jest.fn()
-        HTMLAnchorElement.prototype.click = mockClick
+      HTMLAnchorElement.prototype.click = jest.fn()
 
         renderWithToast(<KnowledgeGapsPage />)
 
@@ -455,12 +465,8 @@ describe('KnowledgeGapsPage', () => {
         // Wait for the fetch to be called
         await new Promise(resolve => setTimeout(resolve, 100))
 
-        // Verify fetch was called with days=31
-        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/export?days=31', {
-            headers: {
-                'X-CSRF-Token': 'mock-csrf-token',
-            },
-        })
+        // Verify apiFetch was called with days=31
+        expect(mockApiFetch).toHaveBeenCalledWith('/api/summary-data/export?days=31')
     })
 
     it('uses quarter time period when exporting data', async () => {
@@ -470,8 +476,8 @@ describe('KnowledgeGapsPage', () => {
             error: null
         } as any)
 
-        // Mock fetch
-        const mockFetch = jest.fn((url) => {
+        // Mock apiFetch
+        mockApiFetch.mockImplementation((url) => {
             if (url === '/api/analysis/enabled') {
                 return Promise.resolve({
                     ok: true,
@@ -483,7 +489,6 @@ describe('KnowledgeGapsPage', () => {
                 blob: () => Promise.resolve(new Blob(['test'], { type: 'application/zip' }))
             } as Response)
         })
-        global.fetch = mockFetch
 
         // Mock URL.createObjectURL and revokeObjectURL
         const mockCreateObjectURL = jest.fn(() => 'blob:test-url')
@@ -492,8 +497,7 @@ describe('KnowledgeGapsPage', () => {
         global.URL.revokeObjectURL = mockRevokeObjectURL
 
         // Mock HTMLAnchorElement click
-        const mockClick = jest.fn()
-        HTMLAnchorElement.prototype.click = mockClick
+      HTMLAnchorElement.prototype.click = jest.fn()
 
         renderWithToast(<KnowledgeGapsPage />)
 
@@ -508,12 +512,8 @@ describe('KnowledgeGapsPage', () => {
         // Wait for the fetch to be called
         await new Promise(resolve => setTimeout(resolve, 100))
 
-        // Verify fetch was called with days=92
-        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/export?days=92', {
-            headers: {
-                'X-CSRF-Token': 'mock-csrf-token',
-            },
-        })
+        // Verify apiFetch was called with days=92
+        expect(mockApiFetch).toHaveBeenCalledWith('/api/summary-data/export?days=92')
     })
 
     it('handles import button click and file upload', async () => {
@@ -529,14 +529,20 @@ describe('KnowledgeGapsPage', () => {
             error: null
         } as any)
 
-        // Mock fetch for upload
-        const mockFetch = jest.fn(() =>
-            Promise.resolve({
+        // Mock apiFetch for upload
+        mockApiFetch.mockImplementation((url, options) => {
+            if (url === '/api/summary-data/import') {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ recordsImported: 42, message: 'Import successful' })
+                } as Response)
+            }
+            // Default for other calls
+            return Promise.resolve({
                 ok: true,
-                json: () => Promise.resolve({ recordsImported: 42, message: 'Import successful' })
+                json: () => Promise.resolve({ enabled: false })
             } as Response)
-        )
-        global.fetch = mockFetch
+        })
 
         renderWithToast(<KnowledgeGapsPage />)
 
@@ -557,8 +563,8 @@ describe('KnowledgeGapsPage', () => {
         // Wait for async operations
         await screen.findByText('Uploading...')
 
-        // Verify fetch was called with FormData
-        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/import', expect.objectContaining({
+        // Verify apiFetch was called with FormData
+        expect(mockApiFetch).toHaveBeenCalledWith('/api/summary-data/import', expect.objectContaining({
             method: 'POST',
             body: expect.any(FormData)
         }))
@@ -580,14 +586,20 @@ describe('KnowledgeGapsPage', () => {
             error: null
         } as any)
 
-        // Mock fetch
-        const mockFetch = jest.fn(() =>
-            Promise.resolve({
+        // Mock apiFetch
+        mockApiFetch.mockImplementation((url) => {
+            if (url === '/api/summary-data/analysis') {
+                return Promise.resolve({
+                    ok: true,
+                    blob: () => Promise.resolve(new Blob(['test prompt'], { type: 'application/zip' }))
+                } as Response)
+            }
+            // Default for other calls
+            return Promise.resolve({
                 ok: true,
-                blob: () => Promise.resolve(new Blob(['test prompt'], { type: 'application/zip' }))
+                json: () => Promise.resolve({ enabled: false })
             } as Response)
-        )
-        global.fetch = mockFetch
+        })
 
         // Mock URL.createObjectURL and revokeObjectURL
         const mockCreateObjectURL = jest.fn(() => 'blob:test-url')
@@ -607,12 +619,8 @@ describe('KnowledgeGapsPage', () => {
         // Wait for async operations
         await new Promise(resolve => setTimeout(resolve, 100))
 
-        // Verify fetch was called
-        expect(mockFetch).toHaveBeenCalledWith('/api/summary-data/analysis', {
-            headers: {
-                'X-CSRF-Token': 'mock-csrf-token',
-            },
-        })
+        // Verify apiFetch was called
+        expect(mockApiFetch).toHaveBeenCalledWith('/api/summary-data/analysis')
 
         // Verify download was triggered
         expect(mockClick).toHaveBeenCalled()
@@ -734,7 +742,7 @@ describe('KnowledgeGapsPage', () => {
         })
 
         it('fetches analysis status on mount', async () => {
-            const mockFetch = jest.fn((url) => {
+            mockApiFetch.mockImplementation((url) => {
                 if (url === '/api/analysis/enabled') {
                     return Promise.resolve({
                         ok: true,
@@ -752,19 +760,18 @@ describe('KnowledgeGapsPage', () => {
                     })
                 } as Response)
             })
-            global.fetch = mockFetch
 
             renderWithToast(<KnowledgeGapsPage />)
 
             // Wait for the initial status fetch
             await screen.findByText('Run Analysis')
 
-            expect(mockFetch).toHaveBeenCalledWith('/api/analysis/status')
+            expect(mockApiFetch).toHaveBeenCalledWith('/api/analysis/status')
         })
 
         it('starts analysis when Run Analysis button is clicked and shows progress immediately', async () => {
             let statusCallCount = 0
-            const mockFetch = jest.fn((url, options) => {
+            mockApiFetch.mockImplementation((url, options) => {
                 if (url === '/api/analysis/enabled') {
                     return Promise.resolve({
                         ok: true,
@@ -795,8 +802,6 @@ describe('KnowledgeGapsPage', () => {
                 return Promise.resolve({ ok: true } as Response)
             })
 
-            global.fetch = mockFetch
-
             renderWithToast(<KnowledgeGapsPage />)
 
             const startButton = await screen.findByText('Run Analysis')
@@ -806,7 +811,7 @@ describe('KnowledgeGapsPage', () => {
 
             // Wait for the fetch to be called
             await waitFor(() => {
-                expect(mockFetch).toHaveBeenCalledWith('/api/analysis/run?days=7', expect.objectContaining({
+                expect(mockApiFetch).toHaveBeenCalledWith('/api/analysis/run?days=7', expect.objectContaining({
                     method: 'POST'
                 }))
             })
@@ -816,7 +821,7 @@ describe('KnowledgeGapsPage', () => {
         })
 
         it('shows error toast when analysis start returns 409 Conflict', async () => {
-            const mockFetch = jest.fn((url) => {
+            mockApiFetch.mockImplementation((url) => {
                 if (url === '/api/analysis/enabled') {
                     return Promise.resolve({
                         ok: true,
@@ -844,8 +849,6 @@ describe('KnowledgeGapsPage', () => {
                 return Promise.resolve({ ok: true } as Response)
             })
 
-            global.fetch = mockFetch
-
             renderWithToast(<KnowledgeGapsPage />)
 
             const startButton = await screen.findByText('Run Analysis')
@@ -856,7 +859,7 @@ describe('KnowledgeGapsPage', () => {
         })
 
         it('disables Run Analysis button when analysis is running', async () => {
-            const mockFetch = jest.fn((url) => {
+            mockApiFetch.mockImplementation((url) => {
                 if (url === '/api/analysis/enabled') {
                     return Promise.resolve({
                         ok: true,
@@ -874,7 +877,7 @@ describe('KnowledgeGapsPage', () => {
                     })
                 } as Response)
             })
-            global.fetch = mockFetch
+
 
             renderWithToast(<KnowledgeGapsPage />)
 
@@ -888,7 +891,7 @@ describe('KnowledgeGapsPage', () => {
         })
 
         it('shows progress when analysis is running', async () => {
-            const mockFetch = jest.fn((url) => {
+            mockApiFetch.mockImplementation((url) => {
                 if (url === '/api/analysis/enabled') {
                     return Promise.resolve({
                         ok: true,
@@ -906,7 +909,7 @@ describe('KnowledgeGapsPage', () => {
                     })
                 } as Response)
             })
-            global.fetch = mockFetch
+
 
             renderWithToast(<KnowledgeGapsPage />)
 
@@ -923,7 +926,7 @@ describe('KnowledgeGapsPage', () => {
             })
 
             let callCount = 0
-            const mockFetch = jest.fn((url) => {
+            mockApiFetch.mockImplementation((url) => {
                 if (url === '/api/analysis/enabled') {
                     return Promise.resolve({
                         ok: true,
@@ -957,7 +960,7 @@ describe('KnowledgeGapsPage', () => {
                     } as Response)
                 }
             })
-            global.fetch = mockFetch
+
 
             renderWithToast(<KnowledgeGapsPage />)
 
@@ -992,7 +995,7 @@ describe('KnowledgeGapsPage', () => {
                 error: null
             } as any)
 
-            const mockFetch = jest.fn((url) => {
+            mockApiFetch.mockImplementation((url) => {
                 if (url === '/api/analysis/enabled') {
                     return Promise.resolve({
                         ok: true,
@@ -1014,7 +1017,7 @@ describe('KnowledgeGapsPage', () => {
                 return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
             })
 
-            global.fetch = mockFetch
+
 
             renderWithToast(<KnowledgeGapsPage />)
 
@@ -1030,7 +1033,7 @@ describe('KnowledgeGapsPage', () => {
                 error: null
             } as any)
 
-            const mockFetch = jest.fn((url) => {
+            mockApiFetch.mockImplementation((url) => {
                 if (url === '/api/analysis/enabled') {
                     return Promise.resolve({
                         ok: true,
@@ -1052,7 +1055,7 @@ describe('KnowledgeGapsPage', () => {
                 return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
             })
 
-            global.fetch = mockFetch
+
 
             renderWithToast(<KnowledgeGapsPage />)
 
@@ -1065,14 +1068,14 @@ describe('KnowledgeGapsPage', () => {
             expect(screen.getByDisplayValue('Week')).toBeInTheDocument()
         })
 
-        it('shows progress panel to all users even when feature is disabled', async () => {
+        it('does not fetch analysis status when feature is disabled', async () => {
             mockUseAnalysis.mockReturnValue({
                 data: mockAnalysisData,
                 isLoading: false,
                 error: null
             } as any)
 
-            const mockFetch = jest.fn((url) => {
+            mockApiFetch.mockImplementation((url) => {
                 if (url === '/api/analysis/enabled') {
                     return Promise.resolve({
                         ok: true,
@@ -1094,16 +1097,17 @@ describe('KnowledgeGapsPage', () => {
                 return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
             })
 
-            global.fetch = mockFetch
-
             renderWithToast(<KnowledgeGapsPage />)
 
             // Wait for the page to render
             await screen.findByText('Support Area Summary')
 
-            // Progress panel is visible to all users even when analysis feature is disabled
-            // (anyone visiting the page should see if analysis is in progress)
-            await screen.findByText(/Analysing threads... 3 of 5 complete/)
+            // When feature is disabled, /api/analysis/status should not be called
+            // This prevents 401 errors when the endpoint doesn't exist
+            expect(mockApiFetch).not.toHaveBeenCalledWith('/api/analysis/status')
+
+            // Progress panel should not be visible
+            expect(screen.queryByText(/Analysing threads/)).not.toBeInTheDocument()
         })
 
         it('hides Export, Analysis Bundle, and Import buttons when feature is enabled', async () => {
@@ -1113,7 +1117,7 @@ describe('KnowledgeGapsPage', () => {
                 error: null
             } as any)
 
-            const mockFetch = jest.fn((url) => {
+            mockApiFetch.mockImplementation((url) => {
                 if (url === '/api/analysis/enabled') {
                     return Promise.resolve({
                         ok: true,
@@ -1135,7 +1139,7 @@ describe('KnowledgeGapsPage', () => {
                 return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
             })
 
-            global.fetch = mockFetch
+
 
             renderWithToast(<KnowledgeGapsPage />)
 
@@ -1155,7 +1159,7 @@ describe('KnowledgeGapsPage', () => {
                 error: null
             } as any)
 
-            const mockFetch = jest.fn((url) => {
+            mockApiFetch.mockImplementation((url) => {
                 if (url === '/api/analysis/enabled') {
                     return Promise.resolve({
                         ok: true,
@@ -1177,7 +1181,7 @@ describe('KnowledgeGapsPage', () => {
                 return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
             })
 
-            global.fetch = mockFetch
+
 
             renderWithToast(<KnowledgeGapsPage />)
 

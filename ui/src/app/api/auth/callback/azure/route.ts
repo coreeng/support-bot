@@ -6,16 +6,31 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const error = searchParams.get("error");
 
+  // Extract the user's desired callback URL from cookie
+  const userCallbackUrl = request.cookies.get("oauth-callback-url")?.value || "/";
+
   if (error) {
     const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
     loginUrl.searchParams.set("error", error);
-    return NextResponse.redirect(loginUrl);
+    if (userCallbackUrl !== "/") {
+      loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
+    }
+    const response = NextResponse.redirect(loginUrl);
+    // Clear the cookie (must specify path to match the cookie that was set)
+    response.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
+    return response;
   }
 
   if (!code) {
     const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
     loginUrl.searchParams.set("error", "No authorization code received");
-    return NextResponse.redirect(loginUrl);
+    if (userCallbackUrl !== "/") {
+      loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
+    }
+    const response = NextResponse.redirect(loginUrl);
+    // Clear the cookie (must specify path to match the cookie that was set)
+    response.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
+    return response;
   }
 
   const callbackUrl = new URL(
@@ -26,7 +41,11 @@ export async function GET(request: NextRequest) {
   try {
     const response = await publicFetch("/auth/oauth/exchange", {
       method: "POST",
-      body: JSON.stringify({ provider: "azure", code, redirectUri: callbackUrl }),
+      body: JSON.stringify({
+        provider: "azure",
+        code,
+        redirectUri: callbackUrl
+      }),
     });
 
     if (!response.ok) {
@@ -37,18 +56,37 @@ export async function GET(request: NextRequest) {
       } else {
         loginUrl.searchParams.set("error", "Token exchange failed");
       }
-      return NextResponse.redirect(loginUrl);
+      if (userCallbackUrl !== "/") {
+        loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
+      }
+      const redirectResponse = NextResponse.redirect(loginUrl);
+      // Clear the cookie (must specify path to match the cookie that was set)
+      redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
+      return redirectResponse;
     }
 
     const result = await response.json();
 
     const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
     loginUrl.searchParams.set("token", result.token);
-    return NextResponse.redirect(loginUrl);
+    // Preserve the user's desired callback URL
+    if (userCallbackUrl !== "/") {
+      loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
+    }
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    // Clear the cookie after successful use (must specify path to match the cookie that was set)
+    redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
+    return redirectResponse;
   } catch (error) {
     console.error("Azure OAuth callback error:", error);
     const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
     loginUrl.searchParams.set("error", "Token exchange failed");
-    return NextResponse.redirect(loginUrl);
+    if (userCallbackUrl !== "/") {
+      loginUrl.searchParams.set("callbackUrl", userCallbackUrl);
+    }
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    // Clear the cookie (must specify path to match the cookie that was set)
+    redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
+    return redirectResponse;
   }
 }

@@ -3,6 +3,7 @@
  * All hooks use React Query and call the Next.js API routes.
  */
 import { useQuery } from "@tanstack/react-query";
+import { signOut, getCsrfToken } from "next-auth/react";
 import type {
   PaginatedTickets,
   PaginatedEscalations,
@@ -15,15 +16,71 @@ import type {
 
 // ===== Shared API Helper =====
 
+// Guard to prevent multiple concurrent 401 redirect sequences
+let redirectingToLogin = false;
+
+/**
+ * Handle 401 responses by signing out and redirecting to login.
+ * Uses a guard to prevent multiple concurrent redirect sequences.
+ */
+async function handle401(): Promise<never> {
+  // Only one redirect sequence should run, even if multiple requests fail concurrently
+  if (!redirectingToLogin) {
+    redirectingToLogin = true;
+    // Capture current pathname before signing out
+    const currentPath = window.location.pathname;
+    // Sign out to clear expired session
+    try {
+      await signOut({ redirect: false });
+    } catch (e) {
+      // Ignore errors from signOut (session might already be expired)
+      console.log('SignOut error (expected if session expired):', e);
+    }
+    // Redirect to login with the current page as callback
+    window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`;
+  }
+  // Don't throw - let the redirect happen without triggering React Query retries
+  return new Promise(() => {}) as never; // Never resolves, navigation will happen
+}
+
 async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`/api${path}`);
   if (!res.ok) {
     if (res.status === 401) {
-      window.location.href = `/login?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
+      return handle401();
     }
     throw new Error(`API error: ${res.status}`);
   }
   return res.json();
+}
+
+/**
+ * Fetch wrapper that handles CSRF tokens and 401 redirects.
+ * Use this for authenticated requests that need CSRF protection.
+ *
+ * @param path - API path (e.g., '/api/analysis/run')
+ * @param options - Fetch options (method, body, etc.)
+ * @returns Response object
+ */
+export async function apiFetch(
+  path: string,
+  options?: RequestInit
+): Promise<Response> {
+  const csrfToken = await getCsrfToken();
+
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      'X-CSRF-Token': csrfToken || '',
+      ...options?.headers,
+    },
+  });
+
+  if (response.status === 401) {
+    await handle401();
+  }
+
+  return response;
 }
 
 function buildParams(dateFrom?: string, dateTo?: string): string {

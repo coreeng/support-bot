@@ -2,6 +2,7 @@ package com.coreeng.supportbot.security;
 
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.TeamService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -59,14 +60,19 @@ public class SecurityConfig {
                         // All other endpoints require authentication
                         .anyRequest()
                         .authenticated())
-                .oauth2Login(oauth2 -> {
-                    if (oauth2AvailabilityChecker.isOAuth2Available()) {
-                        oauth2.successHandler(oauth2SuccessHandler());
-                    } else {
-                        oauth2.disable();
-                    }
-                })
-                .addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
+                .exceptionHandling(
+                        exceptions -> exceptions.authenticationEntryPoint((request, response, authException) -> {
+                            // Return 401 for API endpoints with missing or expired auth
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"error\":\"Unauthorized\"}");
+                        }));
+
+        if (oauth2AvailabilityChecker.isOAuth2Available()) {
+            http.oauth2Login(oauth2 -> oauth2.successHandler(oauth2SuccessHandler()));
+        }
+
+        http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(testAuthBypassFilter(), JwtAuthenticationFilter.class);
 
         return http.build();
