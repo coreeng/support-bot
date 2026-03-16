@@ -3,12 +3,14 @@ package com.coreeng.supportbot.config;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.Name;
 
 @ConfigurationProperties(prefix = "pr-review-tracking")
 public record PrTrackingProps(
@@ -18,7 +20,8 @@ public record PrTrackingProps(
         List<String> tags,
         String impact,
         List<Repository> repositories,
-        GitHub github) {
+        GitHub github,
+        SlaDiscovery slaDiscovery) {
 
     public PrTrackingProps(
             boolean enabled,
@@ -27,7 +30,8 @@ public record PrTrackingProps(
             @Nullable List<String> tags,
             @Nullable String impact,
             @Nullable List<Repository> repositories,
-            @Nullable GitHub github) {
+            @Nullable GitHub github,
+            @Nullable SlaDiscovery slaDiscovery) {
         this.enabled = enabled;
         this.pollCron = pollCron;
         this.prEmoji = prEmoji == null ? "pr" : prEmoji;
@@ -39,6 +43,7 @@ public record PrTrackingProps(
                         .map(repository -> new Repository(
                                 normalizeRepositoryName(repository.name()), repository.owningTeam(), repository.sla()))
                         .toList();
+        this.slaDiscovery = slaDiscovery == null ? new SlaDiscovery(null) : slaDiscovery;
         this.github = github == null ? GitHub.defaultTokenModeConfig() : github;
 
         if (enabled) {
@@ -75,10 +80,29 @@ public record PrTrackingProps(
             if (isBlank(repository.owningTeam())) {
                 throw new IllegalArgumentException("pr-review-tracking.repositories[].owning-team must not be blank");
             }
-            if (repository.sla() == null
-                    || repository.sla().isZero()
-                    || repository.sla().isNegative()) {
-                throw new IllegalArgumentException("pr-review-tracking.repositories[].sla must be a positive duration");
+            if (repository.sla() == null) {
+                throw new IllegalArgumentException("pr-review-tracking.repositories[].sla must not be null");
+            }
+            Duration defaultSla = repository.sla().defaultSla();
+            boolean hasFile = !isBlank(repository.sla().file());
+            if (!hasFile && defaultSla == null) {
+                throw new IllegalArgumentException(
+                        "pr-review-tracking.repositories[].sla.default must be set when sla.file is not configured");
+            }
+            if (defaultSla != null && (defaultSla.isZero() || defaultSla.isNegative())) {
+                throw new IllegalArgumentException(
+                        "pr-review-tracking.repositories[].sla.default must be a positive duration");
+            }
+            List<SlaOverride> overrides = repository.sla().overrides();
+            for (SlaOverride override : overrides != null ? overrides : List.<SlaOverride>of()) {
+                if (isBlank(override.path())) {
+                    throw new IllegalArgumentException(
+                            "pr-review-tracking.repositories[].sla.overrides[].path must not be blank");
+                }
+                if (override.sla().isZero() || override.sla().isNegative()) {
+                    throw new IllegalArgumentException(
+                            "pr-review-tracking.repositories[].sla.overrides[].sla must be a positive duration");
+                }
             }
 
             String normalizedName = repository.name().toLowerCase(Locale.ROOT);
@@ -126,11 +150,37 @@ public record PrTrackingProps(
         APP
     }
 
-    public record Repository(String name, String owningTeam, java.time.Duration sla) {
+    public record Repository(String name, String owningTeam, Sla sla) {
         public Repository {
             requireNonNull(name, "name must not be null");
             requireNonNull(owningTeam, "owningTeam must not be null");
             requireNonNull(sla, "sla must not be null");
+        }
+    }
+
+    public record Sla(
+            @Nullable String file,
+            @Name("default") @Nullable Duration defaultSla,
+            @Nullable List<SlaOverride> overrides) {
+
+        public Sla {
+            overrides = overrides == null ? List.of() : List.copyOf(overrides);
+        }
+    }
+
+    public record SlaOverride(String path, Duration sla) {
+        public SlaOverride {
+            requireNonNull(path, "path must not be null");
+            requireNonNull(sla, "sla must not be null");
+        }
+    }
+
+    public record SlaDiscovery(@Nullable Duration cache) {
+        public SlaDiscovery {
+            cache = cache == null ? Duration.ofHours(24) : cache;
+            if (cache.isZero() || cache.isNegative()) {
+                throw new IllegalArgumentException("slaDiscovery.cache must be a positive duration");
+            }
         }
     }
 

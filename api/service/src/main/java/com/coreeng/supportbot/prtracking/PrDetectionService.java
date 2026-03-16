@@ -61,6 +61,7 @@ public class PrDetectionService {
     private final TicketTeamSuggestionsService ticketTeamSuggestionsService;
     private final SlackClient slackClient;
     private final SlackTicketsProps slackTicketsProps;
+    private final SlaLookup slaLookup;
 
     public boolean containsPrLinks(String message) {
         return !prUrlParser.parse(message).isEmpty();
@@ -249,7 +250,25 @@ public class PrDetectionService {
             PrTrackingProps.Repository repoConfig,
             GitHubPullRequest prMetadata) {
 
-        Instant slaDeadline = prMetadata.createdAt().plus(repoConfig.sla());
+        Duration sla;
+        try {
+            sla = slaLookup.getSla(repoConfig, detectedPr.repositoryName(), detectedPr.pullNumber());
+        } catch (GitHubApiException e) {
+            log.atWarn()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .addArgument(e::getMessage)
+                    .log("Failed to look up SLA for {}#{}, skipping: {}");
+            return PerPrResult.SKIPPED;
+        }
+        if (sla == null) {
+            log.atWarn()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .log("No SLA found for {}#{}, skipping");
+            return PerPrResult.SKIPPED;
+        }
+        Instant slaDeadline = prMetadata.createdAt().plus(sla);
         String teamLabel = resolveTeamLabel(repoConfig.owningTeam());
         TicketId ticketId = checkNotNull(ticket.id());
 
@@ -281,10 +300,10 @@ public class PrDetectionService {
         addReaction(prTrackingProps.prEmoji(), queryTs, channelId);
 
         if (Instant.now().isAfter(slaDeadline)) {
-            postSlaBreachReply(detectedPr, repoConfig.sla(), queryTs, channelId);
+            postSlaBreachReply(detectedPr, sla, queryTs, channelId);
             escalateImmediately(tracking, ticket, repoConfig.owningTeam());
         } else {
-            postSlaReply(detectedPr, repoConfig.sla(), teamLabel, slaDeadline, queryTs, channelId);
+            postSlaReply(detectedPr, sla, teamLabel, slaDeadline, queryTs, channelId);
         }
         return PerPrResult.TRACKED;
     }

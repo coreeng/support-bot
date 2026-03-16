@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.time.Instant;
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.kohsuke.github.*;
@@ -110,6 +111,140 @@ class Hub4jGitHubClientTest {
                 .satisfies(
                         ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(0))
                 .hasMessageContaining("my-org/my-repo#1");
+    }
+
+    @Test
+    void getFileContentReturnsDecodedContent() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHContent ghContent = mock(GHContent.class);
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getFileContent(".pr-sla.yaml")).thenReturn(ghContent);
+        when(ghContent.getContent()).thenReturn("default: 48h");
+
+        // when
+        String result = client.getFileContent("my-org/my-repo", ".pr-sla.yaml");
+
+        // then
+        assertThat(result).isEqualTo("default: 48h");
+    }
+
+    @Test
+    void getFileContentReturnsNullOn404() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getFileContent(".pr-sla.yaml")).thenThrow(new GHFileNotFoundException("Not Found"));
+
+        // when
+        String result = client.getFileContent("my-org/my-repo", ".pr-sla.yaml");
+
+        // then
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void getFileContentThrowsOnNullContent() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHContent ghContent = mock(GHContent.class);
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getFileContent(".pr-sla.yaml")).thenReturn(ghContent);
+        when(ghContent.getContent()).thenReturn(null);
+
+        // when / then
+        assertThatThrownBy(() -> client.getFileContent("my-org/my-repo", ".pr-sla.yaml"))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("null content")
+                .hasMessageContaining(".pr-sla.yaml");
+    }
+
+    @Test
+    void getFileContentWrapsHttpException() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getFileContent(".pr-sla.yaml")).thenThrow(new HttpException(403, "Forbidden", (String) null, null));
+
+        // when / then
+        assertThatThrownBy(() -> client.getFileContent("my-org/my-repo", ".pr-sla.yaml"))
+                .isInstanceOf(GitHubApiException.class)
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(403));
+    }
+
+    @Test
+    void getFileContentWrapsIOException() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getFileContent(".pr-sla.yaml")).thenThrow(new IOException("Connection refused"));
+
+        // when / then
+        assertThatThrownBy(() -> client.getFileContent("my-org/my-repo", ".pr-sla.yaml"))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining(".pr-sla.yaml");
+    }
+
+    @Test
+    void listPullRequestFilesReturnsFileNames() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = mock(GHPullRequest.class);
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+
+        GHPullRequestFileDetail file1 = mock(GHPullRequestFileDetail.class);
+        GHPullRequestFileDetail file2 = mock(GHPullRequestFileDetail.class);
+        when(file1.getFilename()).thenReturn("src/Main.java");
+        when(file2.getFilename()).thenReturn("docs/README.md");
+
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHPullRequestFileDetail> iterable = mock(PagedIterable.class);
+        when(pr.listFiles()).thenReturn(iterable);
+        when(iterable.toList()).thenReturn(List.of(file1, file2));
+
+        // when
+        List<String> result = client.listPullRequestFiles("my-org/my-repo", 42);
+
+        // then
+        assertThat(result).containsExactly("src/Main.java", "docs/README.md");
+    }
+
+    @Test
+    void listPullRequestFilesWraps404() throws IOException {
+        // given
+        when(gitHub.getRepository("my-org/my-repo")).thenThrow(new GHFileNotFoundException("Not Found"));
+
+        // when / then
+        assertThatThrownBy(() -> client.listPullRequestFiles("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(404));
+    }
+
+    @Test
+    void listPullRequestFilesWrapsHttpException() throws IOException {
+        // given
+        when(gitHub.getRepository("my-org/my-repo"))
+                .thenThrow(new HttpException(500, "Internal Server Error", (String) null, null));
+
+        // when / then
+        assertThatThrownBy(() -> client.listPullRequestFiles("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(500));
+    }
+
+    @Test
+    void listPullRequestFilesWrapsIOException() throws IOException {
+        // given
+        when(gitHub.getRepository("my-org/my-repo")).thenThrow(new IOException("Connection refused"));
+
+        // when / then
+        assertThatThrownBy(() -> client.listPullRequestFiles("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("my-org/my-repo#42");
     }
 
     private static void setCreatedAtRaw(GHPullRequest pr, String createdAtRaw) {
