@@ -177,7 +177,7 @@ function LoginContent() {
   const handleLogin = (provider: "google" | "azure") => {
     // OAuth goes through API route - server handles redirect to backend
     // Include callbackUrl so user returns to the right page after login
-    const oauthUrl = `/api/auth/start/${provider}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+    const oauthUrl = `/api/oauth/start/${provider}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
     // Check if we're in an iframe
     const isInIframe = (() => {

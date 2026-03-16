@@ -134,9 +134,9 @@ jwt:
 To test NextAuth session expiry, set in `ui/src/auth.config.ts`:
 ```typescript
 session: {
-  strategy: "jwt",
-  maxAge: 15, // 15 seconds
-},
+    strategy: "jwt",
+      maxAge: 15 // 15 seconds
+}
 ```
 
 **Remember to restart the servers after changing these values!**
@@ -212,7 +212,7 @@ When adding new authentication-related features:
 - `ui/src/auth.config.ts` - NextAuth configuration
 - `ui/src/lib/hooks/index.ts` - API helper with 401 handling
 - `ui/src/components/knowledgegaps/knowledge-gaps.tsx` - Component with 401 handlers
-- `ui/src/app/api/auth/start/[provider]/route.ts` - OAuth start (sets cookie)
-- `ui/src/app/api/auth/callback/google/route.ts` - OAuth callback (reads cookie)
+- `ui/src/app/api/oauth/start/[provider]/route.ts` - OAuth start (sets cookie)
+- `ui/src/app/api/oauth/callback/[provider]/route.ts` - OAuth callback (reads cookie)
 - `ui/src/app/login/page.tsx` - Login page (redirects to callback URL)
 
