@@ -91,80 +91,40 @@ function LoginContent() {
     const isPopup = !!window.opener && !window.opener.closed;
 
     // If we have a token from the new OAuth flow, use it
-    if (token) {
-      authAttemptedRef.current = true;
-
-      if (isPopup) {
-        // Popup: complete signIn here (first-party context, no CSRF issues),
-        // then notify the iframe and close.
-        signIn("backend-token", { token, redirect: false })
-          .then((result) => {
-            if (result?.error) {
-              router.replace(`/login?error=${encodeURIComponent(result.error)}`);
-              return;
-            }
-            window.opener!.postMessage(
-              { type: "auth:success", callbackUrl },
-              window.location.origin
-            );
-            window.close();
-          })
-          .catch((error) => {
-            router.replace(`/login?error=${encodeURIComponent(error)}`);
-          });
-        return;
-      }
-
-      signIn("backend-token", { token, redirect: false })
+    // Helper to perform sign-in with consistent error handling
+    const performSignIn = (providerId: string, credentials: Record<string, string>) => {
+      signIn(providerId, { ...credentials, redirect: false })
         .then((result) => {
           if (result?.error) {
             router.replace(`/login?error=${encodeURIComponent(result.error)}`);
             return;
           }
-          // Manually redirect to the callback URL after successful sign-in
-          window.location.href = callbackUrl;
+          // Success: different action for popup vs non-popup
+          if (isPopup) {
+            window.opener!.postMessage(
+              { type: "auth:success", callbackUrl },
+              window.location.origin
+            );
+            window.close();
+          } else {
+            window.location.href = callbackUrl;
+          }
         })
         .catch((error) => {
           router.replace(`/login?error=${encodeURIComponent(error)}`);
         });
+    };
+
+    if (token) {
+      authAttemptedRef.current = true;
+      performSignIn("backend-token", { token });
       return;
     }
 
-    // If we have a code, exchange it via NextAuth (legacy flow)
+    // If we have a code, exchange it via NextAuth
     if (code && provider) {
       authAttemptedRef.current = true;
-
-      if (isPopup) {
-        signIn("backend-code", { code, provider, redirect: false })
-          .then((result) => {
-            if (result?.error) {
-              router.replace(`/login?error=${encodeURIComponent(result.error)}`);
-              return;
-            }
-            window.opener!.postMessage(
-              { type: "auth:success", callbackUrl },
-              window.location.origin
-            );
-            window.close();
-          })
-          .catch((error) => {
-            router.replace(`/login?error=${encodeURIComponent(error)}`);
-          });
-        return;
-      }
-
-      signIn("backend-code", { code, provider, redirect: false })
-        .then((result) => {
-          if (result?.error) {
-            router.replace(`/login?error=${encodeURIComponent(result.error)}`);
-            return;
-          }
-          // Manually redirect to the callback URL after successful sign-in
-          window.location.href = callbackUrl;
-        })
-        .catch((error) => {
-          router.replace(`/login?error=${encodeURIComponent(error)}`);
-        });
+      performSignIn("backend-code", { code, provider });
       return;
     }
 

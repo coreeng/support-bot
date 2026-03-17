@@ -158,7 +158,7 @@ export const authConfig: NextAuthConfig = {
             if (response.ok) {
               const json = await response.json();
 
-              if (json.token && typeof json.token !== "string") {
+              if (json.token && typeof json.token == "string") {
                 // Fetch user data using API layer
                 const userData = await fetchUserWithToken(json.token);
                 if (userData) {

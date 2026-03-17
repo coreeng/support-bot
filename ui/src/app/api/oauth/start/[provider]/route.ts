@@ -6,7 +6,7 @@ import {publicFetch} from "../../../_lib/public-fetch";
  * Only relative paths (starting with "/" but not "//") are allowed.
  * Anything else (absolute URLs, protocol-relative, javascript: etc.) falls back to "/".
  */
-function sanitizeCallbackUrl(url: string | null | undefined): string {
+export function sanitizeCallbackUrl(url: string | null | undefined): string {
   if (typeof url === "string" && url.startsWith("/") && !url.startsWith("//")) {
     return url;
   }
