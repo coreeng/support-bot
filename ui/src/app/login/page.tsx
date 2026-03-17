@@ -28,6 +28,7 @@ function LoginContent() {
 
   // Handle callback from backend OAuth
   const code = searchParams.get("code");
+  const provider = searchParams.get("provider");
   const token = searchParams.get("token");
   const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const error = searchParams.get("error");
@@ -90,80 +91,40 @@ function LoginContent() {
     const isPopup = !!window.opener && !window.opener.closed;
 
     // If we have a token from the new OAuth flow, use it
-    if (token) {
-      authAttemptedRef.current = true;
-
-      if (isPopup) {
-        // Popup: complete signIn here (first-party context, no CSRF issues),
-        // then notify the iframe and close.
-        signIn("backend-token", { token, redirect: false })
-          .then((result) => {
-            if (result?.error) {
-              router.replace(`/login?error=${encodeURIComponent(result.error)}`);
-              return;
-            }
-            window.opener!.postMessage(
-              { type: "auth:success", callbackUrl },
-              window.location.origin
-            );
-            window.close();
-          })
-          .catch((error) => {
-            router.replace(`/login?error=${encodeURIComponent(error)}`);
-          });
-        return;
-      }
-
-      signIn("backend-token", { token, redirect: false })
+    // Helper to perform sign-in with consistent error handling
+    const performSignIn = (providerId: string, credentials: Record<string, string>) => {
+      signIn(providerId, { ...credentials, redirect: false })
         .then((result) => {
           if (result?.error) {
             router.replace(`/login?error=${encodeURIComponent(result.error)}`);
             return;
           }
-          // Manually redirect to the callback URL after successful sign-in
-          window.location.href = callbackUrl;
+          // Success: different action for popup vs non-popup
+          if (isPopup) {
+            window.opener!.postMessage(
+              { type: "auth:success", callbackUrl },
+              window.location.origin
+            );
+            window.close();
+          } else {
+            window.location.href = callbackUrl;
+          }
         })
         .catch((error) => {
           router.replace(`/login?error=${encodeURIComponent(error)}`);
         });
+    };
+
+    if (token) {
+      authAttemptedRef.current = true;
+      performSignIn("backend-token", { token });
       return;
     }
 
-    // If we have a code, exchange it via NextAuth (legacy flow)
-    if (code) {
+    // If we have a code, exchange it via NextAuth
+    if (code && provider) {
       authAttemptedRef.current = true;
-
-      if (isPopup) {
-        signIn("backend-oauth", { code, redirect: false })
-          .then((result) => {
-            if (result?.error) {
-              router.replace(`/login?error=${encodeURIComponent(result.error)}`);
-              return;
-            }
-            window.opener!.postMessage(
-              { type: "auth:success", callbackUrl },
-              window.location.origin
-            );
-            window.close();
-          })
-          .catch((error) => {
-            router.replace(`/login?error=${encodeURIComponent(error)}`);
-          });
-        return;
-      }
-
-      signIn("backend-oauth", { code, redirect: false })
-        .then((result) => {
-          if (result?.error) {
-            router.replace(`/login?error=${encodeURIComponent(result.error)}`);
-            return;
-          }
-          // Manually redirect to the callback URL after successful sign-in
-          window.location.href = callbackUrl;
-        })
-        .catch((error) => {
-          router.replace(`/login?error=${encodeURIComponent(error)}`);
-        });
+      performSignIn("backend-code", { code, provider });
       return;
     }
 
@@ -171,12 +132,12 @@ function LoginContent() {
     if (isAuthenticated) {
       router.replace(callbackUrl);
     }
-  }, [code, token, isAuthenticated, isLoading, callbackUrl, router]);
+  }, [code, provider, token, isAuthenticated, isLoading, callbackUrl, router]);
 
   const handleLogin = (provider: "google" | "azure") => {
     // OAuth goes through API route - server handles redirect to backend
     // Include callbackUrl so user returns to the right page after login
-    const oauthUrl = `/api/auth/start/${provider}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+    const oauthUrl = `/api/oauth/start/${provider}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
     // Check if we're in an iframe
     const isInIframe = (() => {

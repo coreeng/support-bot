@@ -2,7 +2,7 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import LoginPage, { sanitizeCallbackUrl } from '../page'
-import { useAuth } from '../../../hooks/useAuth'
+import { useAuth } from '@/hooks/useAuth'
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
@@ -222,14 +222,15 @@ describe('LoginPage', () => {
     it('handles code flow identically', async () => {
       mockSignIn.mockResolvedValue({ error: undefined, ok: true, status: 200, url: '' } as any)
       mockUseSearchParams.mockReturnValue(
-        new URLSearchParams('code=mycode&callbackUrl=/home') as any
+        new URLSearchParams('code=mycode&provider=google&callbackUrl=/home') as any
       )
 
       render(<LoginPage />)
 
       await waitFor(() => {
-        expect(mockSignIn).toHaveBeenCalledWith('backend-oauth', {
+        expect(mockSignIn).toHaveBeenCalledWith('backend-code', {
           code: 'mycode',
+          provider: 'google',
           redirect: false,
         })
       })
@@ -322,14 +323,15 @@ describe('LoginPage', () => {
     it('calls signIn with redirect:false for code', async () => {
       mockSignIn.mockResolvedValue({ ok: true } as any)
       mockUseSearchParams.mockReturnValue(
-        new URLSearchParams('code=mycode&callbackUrl=/dash') as any
+        new URLSearchParams('code=mycode&provider=azure&callbackUrl=/dash') as any
       )
 
       render(<LoginPage />)
 
       await waitFor(() => {
-        expect(mockSignIn).toHaveBeenCalledWith('backend-oauth', {
+        expect(mockSignIn).toHaveBeenCalledWith('backend-code', {
           code: 'mycode',
+          provider: 'azure',
           redirect: false,
         })
       })
@@ -522,7 +524,7 @@ describe('LoginPage', () => {
       fireEvent.click(screen.getByText('Continue with Google'))
 
       expect(window.open).toHaveBeenCalledWith(
-        '/api/auth/start/google?callbackUrl=%2F',
+        '/api/oauth/start/google?callbackUrl=%2F',
         'supportbot-auth',
         expect.stringContaining('popup=yes')
       )
