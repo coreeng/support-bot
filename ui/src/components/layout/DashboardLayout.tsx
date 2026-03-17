@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
 import { AlertCircle, BarChart2, Home, Ticket, Headphones, ChevronDown, ChevronRight, ChevronLeft, LogOut, BookOpen } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
@@ -55,7 +56,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, logout } = useAuth()
     const { hasFullAccess } = useTeamFilter()
     const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled()
-    const router = useRouter()
     const pathname = usePathname()
 
     // Sidebar state
@@ -160,14 +160,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                                     {visibleTabs.map(tab => {
                                         const isActive = pathname === tab.path
                                         return (
-                                            <button
+                                            <Link
                                                 key={tab.path}
-                                                onClick={() => router.push(tab.path)}
+                                                href={tab.path}
                                                 className={`w-full flex items-center gap-3 px-8 py-2.5 text-sm hover:bg-gray-700 transition-colors ${isActive ? 'bg-blue-600 text-white' : 'text-gray-300'
                                                     }`}
                                             >
                                                 <span>{tab.label}</span>
-                                            </button>
+                                            </Link>
                                         )
                                     })}
                                 </div>
