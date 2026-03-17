@@ -143,7 +143,7 @@ export const authConfig: NextAuthConfig = {
         const code = credentials?.code as string;
         const provider = credentials?.provider as string;
 
-        if (code && (provider == "google" || provider == "azure")) {
+        if (code && (provider === "google" || provider === "azure")) {
           try {
             const redirectUri = new URL(
               `/api/oauth/callback/${provider}`,
@@ -158,7 +158,7 @@ export const authConfig: NextAuthConfig = {
             if (response.ok) {
               const json = await response.json();
 
-              if (json.token && typeof json.token == "string") {
+              if (json.token && typeof json.token === "string") {
                 // Fetch user data using API layer
                 const userData = await fetchUserWithToken(json.token);
                 if (userData) {
