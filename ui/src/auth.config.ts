@@ -1,5 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import {publicFetch} from "@/app/api/_lib/public-fetch";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 
@@ -130,6 +131,70 @@ export const authConfig: NextAuthConfig = {
           return null;
         }
       },
+    }),
+    Credentials({
+      id: "backend-code",
+      name: "Backend OAuth",
+      credentials: {
+        code: { label: "Auth Code", type: "text" },
+        provider: { label: "Oauth2 Provider", type: "text" },
+      },
+      async authorize(credentials) {
+        const code = credentials?.code as string;
+        const provider = credentials?.provider as string;
+
+        if (code && (provider == "google" || provider == "azure")) {
+          try {
+            const redirectUri = new URL(
+              `/api/oauth/callback/${provider}`,
+              process.env.NEXTAUTH_URL
+            ).toString();
+
+            const response = await publicFetch("/auth/oauth/exchange", {
+              method: "POST",
+              body: JSON.stringify({provider, code, redirectUri}),
+            });
+
+            if (response.ok) {
+              const json = await response.json();
+
+              if (json.token && typeof json.token == "string") {
+                // Fetch user data using API layer
+                const userData = await fetchUserWithToken(json.token);
+                if (userData) {
+                  return {
+                    id: userData.email as string,
+                    email: userData.email as string,
+                    name: userData.name as string,
+                    teams: (userData.teams as Array<{ label: string; code: string; types: string[] }>).map((t) => ({
+                      ...t,
+                      name: t.code || t.label,
+                    })),
+                    roles: userData.roles as string[],
+                    accessToken: json.token,
+                  };
+                } else {
+                  console.error("User fetch failed");
+                }
+              } else {
+                console.error("Token exchange response missing token field");
+              }
+            } else {
+              if (response.status === 403) {
+                throw new Error("user_not_allowed");
+              } else {
+                throw new Error("oauth_exchange_failed");
+              }
+            }
+          } catch (error) {
+            console.error("OAuth exchange error:", error);
+            throw error;
+          }
+        } else {
+          console.error(`Missing code or invalid provider: ${provider}`);
+        }
+        return null;
+      }, // authorize()
     }),
     Credentials({
       id: "backend-token",
