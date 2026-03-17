@@ -379,10 +379,11 @@ When('user switches to {string} from dropdown', async function (this: CustomWorl
 });
 
 When('user navigates to the {string} tab', async function (this: CustomWorld, tabName: string) {
-    const button = this.page.getByRole('button', { name: new RegExp(tabName, 'i') });
-    await button.waitFor({ state: 'visible', timeout: 5000 });
-    await button.click();
-    
+    // Navigation items (Home, Tickets, Escalations, etc.) are now links, not buttons
+    const navLink = this.page.getByRole('link', { name: new RegExp(tabName, 'i') });
+    await navLink.waitFor({ state: 'visible', timeout: 5000 });
+    await navLink.click();
+
     // Wait for any loading states to complete
     await this.page.waitForTimeout(1500);
     
