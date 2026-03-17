@@ -143,7 +143,7 @@ export const authConfig: NextAuthConfig = {
         const code = credentials?.code as string;
         const provider = credentials?.provider as string;
 
-        if (code && provider) {
+        if (code && (provider == "google" || provider == "azure")) {
           try {
             const redirectUri = new URL(
               `/api/oauth/callback/${provider}`,
@@ -158,29 +158,40 @@ export const authConfig: NextAuthConfig = {
             if (response.ok) {
               const json = await response.json();
 
-              // Fetch user data using API layer
-              const userData = await fetchUserWithToken(json.token);
-              if (userData) {
-                return {
-                  id: userData.email as string,
-                  email: userData.email as string,
-                  name: userData.name as string,
-                  teams: (userData.teams as Array<{ label: string; code: string; types: string[] }>).map((t) => ({
-                    ...t,
-                    name: t.code || t.label,
-                  })),
-                  roles: userData.roles as string[],
-                  accessToken: json.token,
-                };
+              if (json.token && typeof json.token !== "string") {
+                // Fetch user data using API layer
+                const userData = await fetchUserWithToken(json.token);
+                if (userData) {
+                  return {
+                    id: userData.email as string,
+                    email: userData.email as string,
+                    name: userData.name as string,
+                    teams: (userData.teams as Array<{ label: string; code: string; types: string[] }>).map((t) => ({
+                      ...t,
+                      name: t.code || t.label,
+                    })),
+                    roles: userData.roles as string[],
+                    accessToken: json.token,
+                  };
+                } else {
+                  console.error("User fetch failed");
+                }
               } else {
-                console.error("User fetch failed");
+                console.error("Token exchange response missing token field");
               }
             } else {
-              console.error("Token exchange failed");
+              if (response.status === 403) {
+                throw new Error("user_not_allowed");
+              } else {
+                throw new Error("oauth_exchange_failed");
+              }
             }
           } catch (error) {
-            console.error("Authorization error:", error);
+            console.error("OAuth exchange error:", error);
+            throw error;
           }
+        } else {
+          console.error(`Missing code or invalid provider: ${provider}`);
         }
         return null;
       }, // authorize()

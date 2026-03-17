@@ -12,7 +12,9 @@ export async function GET(
 
   const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
   if (error) {
-    loginUrl.searchParams.set("error", error);
+    const KNOWN_ERRORS = ["access_denied", "user_not_allowed", "server_error", "temporarily_unavailable"];
+    const safeError = KNOWN_ERRORS.includes(error) ? error : "authentication_failed";
+    loginUrl.searchParams.set("error", safeError);
   } else if (provider !== "google" && provider !== "azure") {
     loginUrl.searchParams.set("error", "Invalid OAuth provider");
   } else if (code) {
@@ -22,7 +24,8 @@ export async function GET(
   }
   loginUrl.searchParams.set("provider", provider);
   // Extract from cookie the user's last visited page to redirect to after login
-  loginUrl.searchParams.set("callbackUrl", request.cookies.get("oauth-callback-url")?.value || "/");
+  const rawCallbackUrl = request.cookies.get("oauth-callback-url")?.value || "/";
+  loginUrl.searchParams.set("callbackUrl", sanitizeCallbackUrl(rawCallbackUrl));
   const redirectResponse = NextResponse.redirect(loginUrl);
   // Clear the cookie after successful use (must specify path to match the cookie that was set)
   redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
