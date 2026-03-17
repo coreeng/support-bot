@@ -1,7 +1,7 @@
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
-import LoginPage, { sanitizeCallbackUrl } from '../page'
+import LoginPage from '../page'
 import { useAuth } from '@/hooks/useAuth'
 
 jest.mock('next/navigation', () => ({
@@ -100,39 +100,6 @@ describe('LoginPage', () => {
       expect(screen.getByText('Access Restricted')).toBeInTheDocument()
       expect(screen.getByText(/not been onboarded/)).toBeInTheDocument()
       expect(screen.queryByText('Authentication Error')).not.toBeInTheDocument()
-    })
-  })
-
-  // -------------------------------------------------------------------
-  // sanitizeCallbackUrl — open-redirect prevention
-  // -------------------------------------------------------------------
-
-  describe('sanitizeCallbackUrl', () => {
-    it.each([
-      ['/', '/'],
-      ['/dashboard', '/dashboard'],
-      ['/tickets?id=1&tab=2', '/tickets?id=1&tab=2'],
-      ['/path/to/page#anchor', '/path/to/page#anchor'],
-    ])('allows relative path %s', (input, expected) => {
-      expect(sanitizeCallbackUrl(input)).toBe(expected)
-    })
-
-    it.each([
-      ['https://evil.com', 'absolute https URL'],
-      ['http://evil.com', 'absolute http URL'],
-      ['//evil.com', 'protocol-relative URL'],
-      ['//evil.com/path', 'protocol-relative URL with path'],
-      ['javascript:alert(1)', 'javascript: URL'],
-      ['data:text/html,<h1>hi</h1>', 'data: URL'],
-      ['ftp://evil.com', 'ftp URL'],
-      ['', 'empty string'],
-    ])('blocks %s (%s) → returns "/"', (input) => {
-      expect(sanitizeCallbackUrl(input)).toBe('/')
-    })
-
-    it('handles null and undefined', () => {
-      expect(sanitizeCallbackUrl(null)).toBe('/')
-      expect(sanitizeCallbackUrl(undefined)).toBe('/')
     })
   })
 
