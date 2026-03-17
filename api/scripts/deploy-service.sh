@@ -82,7 +82,14 @@ wait_for_service() {
   log "Waiting for deployment/${deploy_name} rollout..."
   kubectl rollout status deployment/"$deploy_name" -n "$ns" --timeout=${timeout_secs}s
   log "Waiting for pods of ${deploy_name} to be Ready..."
-  kubectl wait --for=condition=ready pod -l app.kubernetes.io/name="$deploy_name" -n "$ns" --timeout=${timeout_secs}s
+  # Get the current ReplicaSet pod-template-hash to avoid waiting for old terminating pods
+  local pod_template_hash=$(kubectl get rs -n "$ns" -l app.kubernetes.io/name="$deploy_name" -o jsonpath='{.items[?(@.spec.replicas>0)].metadata.labels.pod-template-hash}' | head -n1)
+  if [[ -n "$pod_template_hash" ]]; then
+    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name="$deploy_name",pod-template-hash="$pod_template_hash" -n "$ns" --timeout=${timeout_secs}s
+  else
+    # Fallback to waiting for any pod with the app label (for backwards compatibility)
+    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name="$deploy_name" -n "$ns" --timeout=${timeout_secs}s
+  fi
   log_success "Service pods are Ready"
 }
 
