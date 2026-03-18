@@ -46,7 +46,7 @@ export async function GET(
       }
     } else {
       console.error(`Failed to get OAuth URL: ${oauthUrl.status}`);
-      return NextResponse.json({ error: "Failed to get OAuth URL" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to get OAuth URL" }, { status: oauthUrl.status });
     }
   } else {
     console.error(`Invalid provider: "${provider}"`);

@@ -14,10 +14,8 @@ export async function GET(
   // Extract from cookie the user's last visited page to redirect to after login
   const rawCallbackUrl = request.cookies.get("oauth-callback-url")?.value || "/";
   loginUrl.searchParams.set("callbackUrl", sanitizeCallbackUrl(rawCallbackUrl));
-  const redirectResponse = NextResponse.redirect(loginUrl);
-  // Clear the cookie after successful use (must specify path to match the cookie that was set)
-  redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
 
+  // Add provider and code/error parameters BEFORE creating the redirect response
   if (provider === "google" || provider === "azure") {
     loginUrl.searchParams.set("provider", provider);
     if (code) {
@@ -30,6 +28,11 @@ export async function GET(
       loginUrl.searchParams.set("error", "No authorization code received");
     }
   }
+
+  // Create redirect response with the complete URL including all parameters
+  const redirectResponse = NextResponse.redirect(loginUrl);
+  // Clear the cookie after successful use (must specify path to match the cookie that was set)
+  redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
 
   return redirectResponse;
 }
