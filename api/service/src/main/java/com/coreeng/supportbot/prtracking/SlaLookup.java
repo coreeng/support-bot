@@ -185,15 +185,15 @@ public class SlaLookup {
     }
 
     /**
-     * Spring's DurationStyle.detectAndParse supports hours (48h), days (2d), and ISO-8601 (PT48H)
-     * but not weeks. Since the ADR allows "1w" style durations, we handle the "w" suffix here
-     * before delegating to Spring. Not a huge fan of this, would prefer sticking to hours or days
-     * so we should revisit whether we really need week support.
+     * Parses SLA duration strings. Supports bare integers (interpreted as days), weeks (1w),
+     * and anything Spring's DurationStyle handles (48h, 2d, PT48H).
      */
     private static Duration parseDuration(String value) {
         String trimmed = value.trim();
         Duration duration;
-        if (trimmed.endsWith("w") || trimmed.endsWith("W")) {
+        if (trimmed.matches("\\d+")) {
+            duration = Duration.ofDays(Long.parseLong(trimmed));
+        } else if (trimmed.endsWith("w") || trimmed.endsWith("W")) {
             long weeks = Long.parseLong(trimmed.substring(0, trimmed.length() - 1));
             duration = Duration.ofDays(weeks * 7);
         } else {
