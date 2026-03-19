@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { useRouter } from 'next/navigation'
-import Dashboard from '../page'
+import Dashboard from '../(dashboard)/page'
+import DashboardLayoutComponent from '../(dashboard)/layout'
 import { useAuth } from '../../hooks/useAuth'
 import { useTeamFilter } from '../../contexts/TeamFilterContext'
 import { useKnowledgeGapsEnabled } from '../../lib/hooks'
@@ -75,6 +76,15 @@ const mockUseTeamFilter = useTeamFilter as jest.MockedFunction<typeof useTeamFil
 const mockUseKnowledgeGapsEnabled = useKnowledgeGapsEnabled as jest.MockedFunction<typeof useKnowledgeGapsEnabled>
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>
 
+// Helper to render Dashboard with Layout (simulating the route group structure)
+const renderDashboard = () => {
+  return render(
+    <DashboardLayoutComponent>
+      <Dashboard />
+    </DashboardLayoutComponent>
+  )
+}
+
 describe('Dashboard - Support Area Summary visibility', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -124,7 +134,7 @@ describe('Dashboard - Support Area Summary visibility', () => {
         actualEscalationTeams: [],
       })
 
-      render(<Dashboard />)
+      renderDashboard()
 
       await waitFor(() => {
         expect(screen.getByText('Support Area Summary')).toBeInTheDocument()
@@ -167,7 +177,7 @@ describe('Dashboard - Support Area Summary visibility', () => {
         actualEscalationTeams: [],
       })
 
-      render(<Dashboard />)
+      renderDashboard()
 
       await waitFor(() => {
         expect(screen.queryByText('Support Area Summary')).not.toBeInTheDocument()
@@ -192,7 +202,7 @@ describe('Dashboard - Support Area Summary visibility', () => {
         actualEscalationTeams: [],
       })
 
-      render(<Dashboard />)
+      renderDashboard()
 
       await waitFor(() => {
         expect(screen.queryByText('Support Area Summary')).not.toBeInTheDocument()
@@ -239,7 +249,7 @@ describe('Dashboard - Support Area Summary visibility', () => {
         actualEscalationTeams: [],
       })
 
-      render(<Dashboard />)
+      renderDashboard()
 
       await waitFor(() => {
         expect(screen.queryByText('Support Area Summary')).not.toBeInTheDocument()
@@ -282,7 +292,7 @@ describe('Dashboard - Support Area Summary visibility', () => {
         actualEscalationTeams: [],
       })
 
-      render(<Dashboard />)
+      renderDashboard()
 
       await waitFor(() => {
         expect(screen.queryByText('Support Area Summary')).not.toBeInTheDocument()
@@ -326,7 +336,7 @@ describe('Dashboard - Support Area Summary visibility', () => {
         actualEscalationTeams: [],
       })
 
-      render(<Dashboard />)
+      renderDashboard()
 
       await waitFor(() => {
         expect(screen.queryByText('Analytics & Operations')).not.toBeInTheDocument()
@@ -368,7 +378,7 @@ describe('Dashboard - Support Area Summary visibility', () => {
         actualEscalationTeams: [],
       })
 
-      render(<Dashboard />)
+      renderDashboard()
 
       await waitFor(() => {
         expect(screen.getByText('Analytics & Operations')).toBeInTheDocument()
@@ -404,7 +414,7 @@ describe('Dashboard - Support Area Summary visibility', () => {
         actualEscalationTeams: [],
       })
 
-      render(<Dashboard />)
+      renderDashboard()
 
       await waitFor(() => {
         expect(screen.getByText('Home')).toBeInTheDocument()

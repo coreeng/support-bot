@@ -1,7 +1,6 @@
 'use client'
 
 import StatsPage from '@/components/stats/stats'
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { useAuth } from '@/hooks/useAuth'
 
 export default function Home() {
@@ -19,9 +18,6 @@ export default function Home() {
         )
     }
 
-    return (
-        <DashboardLayout>
-            <StatsPage />
-        </DashboardLayout>
-    )
+    return <StatsPage />
 }
+

@@ -133,7 +133,7 @@ Given("User navigates to the dashboards page", async function (this: CustomWorld
   const supportButton = this.page.getByRole('button', { name: /Support/i }).first();
   await expect(supportButton).toBeVisible({ timeout: 5000 });
 
-  const slaDashboardButton = this.page.getByRole('button', { name: /SLA Dashboard/i }).first();
+  const slaDashboardButton = this.page.getByRole('link', { name: /SLA Dashboard/i }).first();
   await expect(slaDashboardButton).toBeVisible({ timeout: 5000 });
   await slaDashboardButton.click();
 
@@ -425,8 +425,8 @@ Then("{string} navigation tab should be active", async function (this: CustomWor
 });
 
 When("User clicks on {string} navigation tab", async function (this: CustomWorld, tabName: string) {
-  const tab = this.page.getByRole("button", { name: new RegExp(tabName, 'i') });
-  await tab.click();
+  const navLink = this.page.getByRole("link", { name: new RegExp(tabName, 'i') });
+  await navLink.click();
 });
 
 Then("User should be redirected to home page", async function (this: CustomWorld) {

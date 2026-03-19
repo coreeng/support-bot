@@ -201,20 +201,20 @@ When('user selects {string} from team dropdown', async function (this: CustomWor
 });
 
 When('user navigates to {string}', async function (this: CustomWorld, tabName: string) {
-    const button = this.page.getByRole('button', { name: new RegExp(tabName, 'i') });
-    await button.click();
+    const navLink = this.page.getByRole('link', { name: new RegExp(tabName, 'i') });
+    await navLink.click();
     await this.page.waitForTimeout(500);
 });
 
 // Assertions
 Then('user should see {string} navigation button', async function (this: CustomWorld, buttonText: string) {
-    const button = this.page.getByRole('button', { name: new RegExp(buttonText, 'i') });
-    await expect(button).toBeVisible({ timeout: 5000 });
+    const navLink = this.page.getByRole('link', { name: new RegExp(buttonText, 'i') });
+    await expect(navLink).toBeVisible({ timeout: 5000 });
 });
 
 Then('user should NOT see {string} navigation button', async function (this: CustomWorld, buttonText: string) {
-    const button = this.page.getByRole('button', { name: new RegExp(buttonText, 'i') });
-    const isVisible = await button.isVisible().catch(() => false);
+    const navLink = this.page.getByRole('link', { name: new RegExp(buttonText, 'i') });
+    const isVisible = await navLink.isVisible().catch(() => false);
     expect(isVisible).toBe(false);
 });
 

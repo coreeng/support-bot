@@ -235,7 +235,7 @@ When("User navigates to the tickets page", async function (this: CustomWorld) {
     await this.page.getByRole('button', { name: /Support/i }).first().waitFor({ state: 'visible', timeout: 5000 });
 
     // Click on Tickets navigation in sidebar (it's a button)
-    const ticketsNav = this.page.getByRole('button', { name: /^Tickets$/i });
+    const ticketsNav = this.page.getByRole('link', { name: /^Tickets$/i });
     await ticketsNav.waitFor({ state: 'visible', timeout: 5000 });
     await ticketsNav.click();
 
