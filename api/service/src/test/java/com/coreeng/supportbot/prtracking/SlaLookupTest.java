@@ -333,6 +333,16 @@ class SlaLookupTest {
     }
 
     @Test
+    void parsesDaySuffixFromFile() {
+        PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", SLA_48H);
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml")).thenReturn("default: 2d");
+
+        Duration result = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
+
+        assertThat(result).isEqualTo(Duration.ofDays(2));
+    }
+
+    @Test
     void parsesBareIntegerInOverrideFromFile() {
         PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", SLA_48H);
         when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml"))
