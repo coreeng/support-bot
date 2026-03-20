@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import java.time.DateTimeException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
@@ -111,8 +112,9 @@ public class SlaLookup {
 
         List<String> prFiles = gitHubClient.listPullRequestFiles(repositoryName, pullNumber);
         for (PrTrackingProps.SlaOverride override : overrides) {
+            String pattern = override.path().endsWith("/") ? override.path() + "**" : override.path();
             for (String prFile : prFiles) {
-                if (pathMatcher.match(override.path(), prFile)) {
+                if (pathMatcher.match(pattern, prFile)) {
                     log.atDebug()
                             .addArgument(repositoryName)
                             .addArgument(pullNumber)
@@ -170,7 +172,7 @@ public class SlaLookup {
             }
 
             return Optional.of(new ParsedSlaFile(parsedDefault, parsedOverrides));
-        } catch (IllegalArgumentException | java.time.DateTimeException | ArithmeticException e) {
+        } catch (IllegalArgumentException | DateTimeException | ArithmeticException e) {
             throw new InvalidSlaFileException(
                     "Invalid values in SLA file %s from %s: %s".formatted(filePath, repositoryName, e.getMessage()), e);
         }

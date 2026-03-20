@@ -64,6 +64,20 @@ class SlaLookupTest {
     }
 
     @Test
+    void matchesTrailingSlashOverrideAsRecursiveGlob() {
+        // given an override path ending with "/" e.g. "docs/"
+        PrTrackingProps.Repository repoConfig =
+                repoWithOverrides(SLA_48H, List.of(new PrTrackingProps.SlaOverride("docs/", SLA_72H)));
+        when(gitHubClient.listPullRequestFiles(REPO, PR_NUMBER)).thenReturn(List.of("docs/guides/setup.md"));
+
+        // when the SLA is resolved for a PR touching a nested file
+        Duration result = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
+
+        // then the trailing slash is treated as "docs/**" and matches recursively
+        assertThat(result).isEqualTo(SLA_72H);
+    }
+
+    @Test
     void returnsDefaultSlaWhenNoOverrideMatches() {
         // given
         PrTrackingProps.Repository repoConfig =
