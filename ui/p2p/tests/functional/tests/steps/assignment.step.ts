@@ -241,9 +241,9 @@ When("user navigates to Analytics & Operations", async function (this: CustomWor
 
     await this.page.goto(BASE_URL);
     await this.page.waitForLoadState('networkidle');
-    const navButton = this.page.getByRole('button', { name: /Analytics & Operations/i });
-    await navButton.waitFor({ state: 'visible', timeout: 10000 });
-    await navButton.click();
+    const navLink = this.page.getByRole('link', { name: /Analytics & Operations/i });
+    await navLink.waitFor({ state: 'visible', timeout: 10000 });
+    await navLink.click();
     await this.page.waitForTimeout(500);
 });
 
