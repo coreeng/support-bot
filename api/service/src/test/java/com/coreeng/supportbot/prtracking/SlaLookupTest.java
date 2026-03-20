@@ -41,6 +41,7 @@ class SlaLookupTest {
                 "pr",
                 List.of("tag"),
                 "low",
+                "days",
                 List.of(new PrTrackingProps.Repository(REPO, "wow", new PrTrackingProps.Sla(null, SLA_48H, null))),
                 new PrTrackingProps.GitHub(
                         PrTrackingProps.AuthMode.TOKEN, "https://api.github.com", "token", "", "", ""),
@@ -231,10 +232,10 @@ class SlaLookupTest {
     }
 
     @Test
-    void parsesWeekDurationFromFile() {
+    void parsesDayDurationFromFile() {
         // given
         PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", SLA_48H);
-        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml")).thenReturn("default: 1w");
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml")).thenReturn("default: 7d");
 
         // when
         Duration result = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
@@ -244,10 +245,10 @@ class SlaLookupTest {
     }
 
     @Test
-    void parsesUppercaseWeekDurationFromFile() {
+    void parsesIsoDurationFromFile() {
         // given
         PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", SLA_48H);
-        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml")).thenReturn("default: 2W");
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml")).thenReturn("default: P14D");
 
         // when
         Duration result = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
@@ -355,6 +356,76 @@ class SlaLookupTest {
     }
 
     @Test
+    void parsesBareIntegerAsHoursWhenDurationUnitIsHours() {
+        // given duration-unit is configured as "hours"
+        SlaLookup hoursLookup = slaLookupWithDurationUnit("hours");
+        PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", null);
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml")).thenReturn("default: 4");
+
+        // when a bare integer SLA is parsed from the file
+        Duration result = hoursLookup.getSla(repoConfig, REPO, PR_NUMBER);
+
+        // then it is interpreted as hours
+        assertThat(result).isEqualTo(Duration.ofHours(4));
+    }
+
+    @Test
+    void parsesBareIntegerAsWeeksWhenDurationUnitIsWeeks() {
+        // given duration-unit is configured as "weeks"
+        SlaLookup weeksLookup = slaLookupWithDurationUnit("weeks");
+        PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", null);
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml")).thenReturn("default: 2");
+
+        // when a bare integer SLA is parsed from the file
+        Duration result = weeksLookup.getSla(repoConfig, REPO, PR_NUMBER);
+
+        // then it is interpreted as weeks (14 days)
+        assertThat(result).isEqualTo(Duration.ofDays(14));
+    }
+
+    @Test
+    void parsesWeekSuffixFromFile() {
+        // given an SLA file with a week suffix e.g. "1w"
+        PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", null);
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml")).thenReturn("default: 1w");
+
+        // when the SLA is resolved from the file
+        Duration result = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
+
+        // then it is parsed as 7 days
+        assertThat(result).isEqualTo(Duration.ofDays(7));
+    }
+
+    @Test
+    void rejectsZeroBareIntegerAndFallsBackToConfig() {
+        // given an SLA file with a zero bare integer
+        PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", SLA_48H);
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml")).thenReturn("default: 0");
+
+        // when the SLA is resolved from the file
+        Duration result = slaLookup.getSla(repoConfig, REPO, PR_NUMBER);
+
+        // then the zero value is rejected and config default is used
+        assertThat(result).isEqualTo(SLA_48H);
+    }
+
+    @Test
+    void suffixedDurationIsNotAffectedByDurationUnit() {
+        // given duration-unit is configured as "weeks" but the file uses an explicit "48h" suffix
+        SlaLookup weeksLookup = slaLookupWithDurationUnit("weeks");
+        PrTrackingProps.Repository repoConfig = repoWithFile(".pr-sla.yaml", null);
+        when(gitHubClient.getFileContent(REPO, ".pr-sla.yaml")).thenReturn("default: 48h");
+
+        // when the SLA is resolved from the file
+        Duration result = weeksLookup.getSla(repoConfig, REPO, PR_NUMBER);
+
+        // then the suffix takes precedence over the configured duration-unit
+        @SuppressWarnings("CanonicalDuration") // intentionally using hours to assert the unit
+        Duration expected = Duration.ofHours(48);
+        assertThat(result).isEqualTo(expected);
+    }
+
+    @Test
     void returnsDefaultSlaWhenNoOverridesConfigured() {
         // given
         PrTrackingProps.Repository repoConfig = repo(SLA_48H);
@@ -365,6 +436,21 @@ class SlaLookupTest {
         // then
         assertThat(result).isEqualTo(SLA_48H);
         verify(gitHubClient, never()).listPullRequestFiles(any(), anyInt());
+    }
+
+    private SlaLookup slaLookupWithDurationUnit(String durationUnit) {
+        PrTrackingProps props = new PrTrackingProps(
+                true,
+                "0 0 9-18 * * 1-5",
+                "pr",
+                List.of("tag"),
+                "low",
+                durationUnit,
+                List.of(new PrTrackingProps.Repository(REPO, "wow", new PrTrackingProps.Sla(null, SLA_48H, null))),
+                new PrTrackingProps.GitHub(
+                        PrTrackingProps.AuthMode.TOKEN, "https://api.github.com", "token", "", "", ""),
+                null);
+        return new SlaLookup(gitHubClient, props);
     }
 
     private static PrTrackingProps.Repository repo(Duration defaultSla) {
