@@ -165,6 +165,7 @@ public class SlackAppInit implements InitializingBean {
                 } catch (Exception e) {
                     errorCounter(TYPE_SUGGESTION, actionId, e.getClass().getSimpleName())
                             .increment();
+                    log.atError().setCause(e).addKeyValue("actionId", actionId).log("Error handling block suggestion");
                     throw e;
                 } finally {
                     sample.stop(durationTimer(TYPE_SUGGESTION, actionId));

@@ -43,6 +43,6 @@ public class EscalationFormSubmission implements ViewSubmission {
     public ImmutableList<Value> values() {
         return ImmutableList.of(
                 new StaticSelectValue("escalation-team", values.team()),
-                new MultiStaticSelectValue("escalation-tags", values.tags()));
+                new MultiExternalSelectValue("escalation-tags", values.tags()));
     }
 }

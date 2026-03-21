@@ -31,7 +31,7 @@ public class EnumsService implements EscalationTeamsRegistry, TagsRegistry, Impa
 
     @Override
     public ImmutableList<Tag> listAllTags() {
-        return tagsRepository.listAll();
+        return tagsRepository.listAllActive();
     }
 
     @Override

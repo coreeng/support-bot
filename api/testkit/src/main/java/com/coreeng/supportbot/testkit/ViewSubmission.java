@@ -40,4 +40,20 @@ public interface ViewSubmission {
                         """.strip(), v)).collect(Collectors.joining(",")));
         }
     }
+
+    record MultiExternalSelectValue(String name, ImmutableList<String> values) implements Value {
+        @Override
+        public String renderJson() {
+            return String.format(
+                    """
+                {"type":"multi_external_select","selected_options":[%s]}
+                """,
+                    values.stream()
+                            .map(v -> String.format(
+                                    """
+                        {"value":"%s"}
+                        """.strip(), v.replace("\\", "\\\\").replace("\"", "\\\"")))
+                            .collect(Collectors.joining(",")));
+        }
+    }
 }
