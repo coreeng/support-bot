@@ -472,8 +472,7 @@ public class TicketProcessingServiceTests {
 
         String nonSupportUser = "U_CUSTOMER";
         String supportEngineerId = "U_SUPPORT_ENG";
-        when(slackService.getReactionUserIds(any(), eq("eyes")))
-                .thenReturn(List.of(nonSupportUser, supportEngineerId));
+        when(slackService.getReactionUserIds(any(), eq("eyes"))).thenReturn(List.of(nonSupportUser, supportEngineerId));
         when(rbacService.isSupportBySlackId(SlackId.user(nonSupportUser))).thenReturn(false);
         when(rbacService.isSupportBySlackId(SlackId.user(supportEngineerId))).thenReturn(true);
 
