@@ -10,17 +10,14 @@ import com.coreeng.supportbot.prtracking.PrDetectionOutcome;
 import com.coreeng.supportbot.prtracking.PrDetectionService;
 import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.MessageRef;
+import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.SlackId;
-import com.coreeng.supportbot.slack.client.SlackClient;
-import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.slack.events.MessageDeleted;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
-import com.slack.api.model.Message;
-import com.slack.api.model.Reaction;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -44,7 +41,6 @@ public class TicketProcessingService {
     private final Optional<PrDetectionService> prDetectionService;
     private final RbacService rbacService;
     private final SupportTeamProps supportTeamProps;
-    private final SlackClient slackClient;
 
     @Autowired
     public TicketProcessingService(
@@ -56,8 +52,7 @@ public class TicketProcessingService {
             ApplicationEventPublisher publisher,
             Optional<PrDetectionService> prDetectionService,
             RbacService rbacService,
-            SupportTeamProps supportTeamProps,
-            SlackClient slackClient) {
+            SupportTeamProps supportTeamProps) {
         this.repository = repository;
         this.slackService = slackService;
         this.escalationQueryService = escalationQueryService;
@@ -67,7 +62,6 @@ public class TicketProcessingService {
         this.prDetectionService = prDetectionService;
         this.rbacService = rbacService;
         this.supportTeamProps = supportTeamProps;
-        this.slackClient = slackClient;
     }
 
     public void handleMessagePosted(MessagePosted e) {
@@ -367,34 +361,30 @@ public class TicketProcessingService {
     }
 
     StalenessTagTarget resolveStalenessTarget(Ticket ticket) {
+        if (ticket.queryRef().ts().mocked()) {
+            return new StalenessTagTarget.Squad(supportTeamProps.slackGroupId());
+        }
+
         if (assignmentProps.enabled() && ticket.assignedTo() != null) {
             return new StalenessTagTarget.User(ticket.assignedTo().id());
         }
 
         try {
-            Message message = slackClient.getMessageByTs(SlackGetMessageByTsRequest.of(ticket.queryRef()));
-            List<Reaction> reactions = message.getReactions();
-            if (reactions != null) {
-                for (Reaction reaction : reactions) {
-                    if (Objects.equals(reaction.getName(), slackTicketsProps.expectedInitialReaction())) {
-                        List<String> users = reaction.getUsers();
-                        if (users != null) {
-                            for (String userId : users) {
-                                if (rbacService.isSupportBySlackId(SlackId.user(userId))) {
-                                    return new StalenessTagTarget.User(userId);
-                                }
-                            }
-                        }
-                        break;
+            List<String> eyesReactorIds =
+                    slackService.getReactionUserIds(ticket.queryRef(), slackTicketsProps.expectedInitialReaction());
+            if (eyesReactorIds != null) {
+                for (String userId : eyesReactorIds) {
+                    if (rbacService.isSupportBySlackId(SlackId.user(userId))) {
+                        return new StalenessTagTarget.User(userId);
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (SlackException e) {
             log.atError()
                     .setCause(e)
                     .addKeyValue("ticketId", ticket.id() != null ? ticket.id().id() : null)
                     .addKeyValue("channelId", ticket.channelId())
-                    .log("Failed to resolve staleness tag target, falling back to squad");
+                    .log("Slack API error resolving staleness tag target, falling back to squad");
         }
 
         return new StalenessTagTarget.Squad(supportTeamProps.slackGroupId());

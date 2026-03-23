@@ -24,9 +24,12 @@ import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
+import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.slack.api.model.Message;
+import com.slack.api.model.Reaction;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -90,6 +93,21 @@ public class TicketSlackServiceImpl implements TicketSlackService {
 
         slackClient.postMessage(
                 new SlackPostMessageRequest(new TicketWentStaleMessage(target), queryRef.channelId(), queryRef.ts()));
+    }
+
+    @Override
+    public @Nullable List<String> getReactionUserIds(MessageRef queryRef, String reactionName) {
+        Message message = slackClient.getMessageByTs(SlackGetMessageByTsRequest.of(queryRef));
+        List<Reaction> reactions = message.getReactions();
+        if (reactions == null) {
+            return null;
+        }
+        for (Reaction reaction : reactions) {
+            if (Objects.equals(reaction.getName(), reactionName)) {
+                return reaction.getUsers();
+            }
+        }
+        return null;
     }
 
     @Override
