@@ -15,6 +15,7 @@ import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.slack.client.SlackMessage;
 import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
+import com.coreeng.supportbot.ticket.StalenessTagTarget;
 import com.coreeng.supportbot.ticket.TicketCreatedMessage;
 import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
 import com.coreeng.supportbot.ticket.TicketId;
@@ -25,10 +26,12 @@ import com.slack.api.methods.request.reactions.ReactionsRemoveRequest;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
 import com.slack.api.model.Message;
+import com.slack.api.model.Reaction;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -82,15 +85,29 @@ public class TicketSlackServiceImpl implements TicketSlackService {
     }
 
     @Override
-    public void warnStaleness(MessageRef queryRef) {
+    public void warnStaleness(MessageRef queryRef, StalenessTagTarget target) {
         if (queryRef.ts().mocked()) {
             log.atInfo().addArgument(queryRef::ts).log("Pretending to mark ticket as stale, because it's mocked: {}");
             return;
         }
 
-        Message queryMessage = slackClient.getMessageByTs(SlackGetMessageByTsRequest.of(queryRef));
-        slackClient.postMessage(new SlackPostMessageRequest(
-                new TicketWentStaleMessage(queryMessage.getUser()), queryRef.channelId(), queryRef.ts()));
+        slackClient.postMessage(
+                new SlackPostMessageRequest(new TicketWentStaleMessage(target), queryRef.channelId(), queryRef.ts()));
+    }
+
+    @Override
+    public @Nullable List<String> getReactionUserIds(MessageRef queryRef, String reactionName) {
+        Message message = slackClient.getMessageByTs(SlackGetMessageByTsRequest.of(queryRef));
+        List<Reaction> reactions = message.getReactions();
+        if (reactions == null) {
+            return null;
+        }
+        for (Reaction reaction : reactions) {
+            if (Objects.equals(reaction.getName(), reactionName)) {
+                return reaction.getUsers();
+            }
+        }
+        return null;
     }
 
     @Override

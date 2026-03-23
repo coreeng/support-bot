@@ -7,7 +7,7 @@ import com.coreeng.supportbot.slack.client.SlackMessage;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.block.LayoutBlock;
 
-public record TicketWentStaleMessage(String authorId) implements SlackMessage {
+public record TicketWentStaleMessage(StalenessTagTarget target) implements SlackMessage {
     @Override
     public String getText() {
         return messageText();
@@ -21,7 +21,6 @@ public record TicketWentStaleMessage(String authorId) implements SlackMessage {
     private String messageText() {
         return ":warning: Ticket went stale, because there were no interactions with it for a long time and it's not closed.\n"
                 + "Are any other actions required?\n"
-                + "<@"
-                + authorId + ">";
+                + target.toMention();
     }
 }
