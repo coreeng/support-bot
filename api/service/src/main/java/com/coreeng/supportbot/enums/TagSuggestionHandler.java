@@ -4,6 +4,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
 
+import com.coreeng.supportbot.homepage.HomepageFilterMapper;
 import com.coreeng.supportbot.slack.SlackBlockSuggestionHandler;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.app_backend.interactive_components.response.BlockSuggestionResponse;
@@ -26,15 +27,6 @@ public class TagSuggestionHandler implements SlackBlockSuggestionHandler {
      * Used to decide whether to prepend the special "-- No Tags --" option.
      */
     private static final String HOMEPAGE_FILTER_TAGS_ACTION_ID = "homepage-filter-tags";
-
-    /**
-     * Special option prepended when the action ID is {@code HOMEPAGE_FILTER_TAGS_ACTION_ID},
-     * allowing users to find tickets that have no tags at all.
-     * Must stay in sync with HomepageFilterMapper.NO_TAGS_VALUE / NO_TAGS_LABEL.
-     */
-    static final String NO_TAGS_VALUE = "__no_tags__";
-
-    static final String NO_TAGS_LABEL = "-- No Tags --";
 
     private static final int SLACK_OPTIONS_LIMIT = 100;
 
@@ -62,10 +54,10 @@ public class TagSuggestionHandler implements SlackBlockSuggestionHandler {
         List<Option> options = new ArrayList<>();
 
         if (HOMEPAGE_FILTER_TAGS_ACTION_ID.equals(actionId)
-                && NO_TAGS_LABEL.toLowerCase(Locale.ROOT).contains(lowerQuery)) {
+                && HomepageFilterMapper.NO_TAGS_LABEL.toLowerCase(Locale.ROOT).contains(lowerQuery)) {
             options.add(Option.builder()
-                    .text(plainText(NO_TAGS_LABEL))
-                    .value(NO_TAGS_VALUE)
+                    .text(plainText(HomepageFilterMapper.NO_TAGS_LABEL))
+                    .value(HomepageFilterMapper.NO_TAGS_VALUE)
                     .build());
         }
 

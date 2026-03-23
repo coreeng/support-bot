@@ -1,7 +1,5 @@
 package com.coreeng.supportbot.enums;
 
-import static com.coreeng.supportbot.enums.TagSuggestionHandler.NO_TAGS_LABEL;
-import static com.coreeng.supportbot.enums.TagSuggestionHandler.NO_TAGS_VALUE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -34,14 +32,6 @@ class TagSuggestionHandlerTest {
     }
 
     @Test
-    void noTagsConstants_matchHomepageFilterMapper() {
-        // Guards against silent breakage of the homepage "No Tags" filter: the value emitted by
-        // TagSuggestionHandler must equal the value that HomepageFilterMapper checks on submission.
-        assertThat(NO_TAGS_VALUE).isEqualTo(HomepageFilterMapper.NO_TAGS_VALUE);
-        assertThat(NO_TAGS_LABEL).isEqualTo(HomepageFilterMapper.NO_TAGS_LABEL);
-    }
-
-    @Test
     void pattern_matchesAllThreeActionIds() {
         assertThat(handler.getPattern().matcher("homepage-filter-tags").matches())
                 .isTrue();
@@ -70,9 +60,9 @@ class TagSuggestionHandlerTest {
                 handler.apply(request("homepage-filter-tags", ""), mock(BlockSuggestionContext.class));
 
         List<String> values = optionValues(response);
-        assertThat(values.get(0)).isEqualTo(NO_TAGS_VALUE);
-        assertThat(optionLabels(response).get(0)).isEqualTo(NO_TAGS_LABEL);
-        assertThat(values).containsExactly(NO_TAGS_VALUE, "networking");
+        assertThat(values.get(0)).isEqualTo(HomepageFilterMapper.NO_TAGS_VALUE);
+        assertThat(optionLabels(response).get(0)).isEqualTo(HomepageFilterMapper.NO_TAGS_LABEL);
+        assertThat(values).containsExactly(HomepageFilterMapper.NO_TAGS_VALUE, "networking");
     }
 
     @Test
@@ -82,7 +72,7 @@ class TagSuggestionHandlerTest {
         BlockSuggestionResponse response =
                 handler.apply(request("escalation-tags", ""), mock(BlockSuggestionContext.class));
 
-        assertThat(optionValues(response)).doesNotContain(NO_TAGS_VALUE);
+        assertThat(optionValues(response)).doesNotContain(HomepageFilterMapper.NO_TAGS_VALUE);
     }
 
     @Test
@@ -92,7 +82,7 @@ class TagSuggestionHandlerTest {
         BlockSuggestionResponse response =
                 handler.apply(request("ticket-change-tags", ""), mock(BlockSuggestionContext.class));
 
-        assertThat(optionValues(response)).doesNotContain(NO_TAGS_VALUE);
+        assertThat(optionValues(response)).doesNotContain(HomepageFilterMapper.NO_TAGS_VALUE);
     }
 
     @Test
@@ -141,7 +131,7 @@ class TagSuggestionHandlerTest {
                 handler.apply(request("homepage-filter-tags", "net"), mock(BlockSuggestionContext.class));
 
         // "net" does not match "-- No Tags --", so the special option should be absent
-        assertThat(optionValues(response)).doesNotContain(NO_TAGS_VALUE);
+        assertThat(optionValues(response)).doesNotContain(HomepageFilterMapper.NO_TAGS_VALUE);
         assertThat(optionValues(response)).containsExactly("networking");
     }
 
@@ -152,7 +142,7 @@ class TagSuggestionHandlerTest {
         BlockSuggestionResponse response =
                 handler.apply(request("homepage-filter-tags", "no tag"), mock(BlockSuggestionContext.class));
 
-        assertThat(optionValues(response)).contains(NO_TAGS_VALUE);
+        assertThat(optionValues(response)).contains(HomepageFilterMapper.NO_TAGS_VALUE);
     }
 
     @Test
@@ -179,7 +169,7 @@ class TagSuggestionHandlerTest {
                 handler.apply(request("homepage-filter-tags", ""), mock(BlockSuggestionContext.class));
 
         assertThat(response.getOptions()).hasSize(100);
-        assertThat(optionValues(response).get(0)).isEqualTo(NO_TAGS_VALUE);
+        assertThat(optionValues(response).get(0)).isEqualTo(HomepageFilterMapper.NO_TAGS_VALUE);
     }
 
     private BlockSuggestionRequest request(String actionId, String value) {

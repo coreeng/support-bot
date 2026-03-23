@@ -21,11 +21,13 @@ import java.util.List;
 import java.util.Map;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class EscalateViewMapper {
     private final JsonMapper jsonMapper;
     private final EscalationValidator escalationValidator;
@@ -74,6 +76,11 @@ public class EscalateViewMapper {
 
         ViewState.Value tagsValue =
                 checkNotNull(passedValues.get(Fields.tags.actionId()), "tags field missing from escalation view state");
+        if (tagsValue.getSelectedOptions() == null) {
+            log.atWarn()
+                    .addKeyValue("ticketId", input.ticketId())
+                    .log("Escalation tags field had null selectedOptions — treating as empty");
+        }
         ImmutableList<String> tags = tagsValue.getSelectedOptions() != null
                 ? tagsValue.getSelectedOptions().stream()
                         .map(ViewState.SelectedOption::getValue)
@@ -82,7 +89,8 @@ public class EscalateViewMapper {
 
         ViewState.Value teamValue =
                 checkNotNull(passedValues.get(Fields.team.actionId()), "team field missing from escalation view state");
-        String team = teamValue.getSelectedOption().getValue();
+        String team = checkNotNull(teamValue.getSelectedOption(), "team selection is null in escalation view state")
+                .getValue();
 
         ViewState.Value threadPermalinkValue = passedValues.get(Fields.threadPermalink.actionId());
         String threadPermalink = threadPermalinkValue != null ? threadPermalinkValue.getValue() : null;
