@@ -11,10 +11,10 @@ import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackEditMessageRequest;
-import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.slack.client.SlackMessage;
 import com.coreeng.supportbot.slack.client.SlackPostEphemeralMessageRequest;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
+import com.coreeng.supportbot.ticket.StalenessTagTarget;
 import com.coreeng.supportbot.ticket.TicketCreatedMessage;
 import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
 import com.coreeng.supportbot.ticket.TicketId;
@@ -82,15 +82,14 @@ public class TicketSlackServiceImpl implements TicketSlackService {
     }
 
     @Override
-    public void warnStaleness(MessageRef queryRef) {
+    public void warnStaleness(MessageRef queryRef, StalenessTagTarget target) {
         if (queryRef.ts().mocked()) {
             log.atInfo().addArgument(queryRef::ts).log("Pretending to mark ticket as stale, because it's mocked: {}");
             return;
         }
 
-        Message queryMessage = slackClient.getMessageByTs(SlackGetMessageByTsRequest.of(queryRef));
-        slackClient.postMessage(new SlackPostMessageRequest(
-                new TicketWentStaleMessage(queryMessage.getUser()), queryRef.channelId(), queryRef.ts()));
+        slackClient.postMessage(
+                new SlackPostMessageRequest(new TicketWentStaleMessage(target), queryRef.channelId(), queryRef.ts()));
     }
 
     @Override

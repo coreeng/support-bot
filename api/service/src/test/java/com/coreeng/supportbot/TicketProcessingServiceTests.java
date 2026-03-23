@@ -5,16 +5,20 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.SupportTeamProps;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.EscalationInMemoryRepository;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.prtracking.PrDetectionOutcome;
 import com.coreeng.supportbot.prtracking.PrDetectionService;
+import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackId;
+import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
+import com.coreeng.supportbot.ticket.StalenessTagTarget;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketCreatedMessage;
 import com.coreeng.supportbot.ticket.TicketId;
@@ -26,7 +30,10 @@ import com.coreeng.supportbot.ticket.TicketSubmission;
 import com.coreeng.supportbot.ticket.TicketTeam;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
+import com.slack.api.model.Message;
+import com.slack.api.model.Reaction;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +49,7 @@ import org.springframework.context.ApplicationEventPublisher;
 public class TicketProcessingServiceTests {
     private static final MessageTs MESSAGE_TS = MessageTs.of("some-message-ts");
     private static final String USER_ID = "some-user-id";
+    private static final String SUPPORT_GROUP_ID = "S12345SUPPORT";
 
     private TicketProcessingService ticketProcessingService;
     private TicketRepository ticketRepository;
@@ -52,14 +60,24 @@ public class TicketProcessingServiceTests {
     @Mock
     private PrDetectionService prDetectionService;
 
+    @Mock
+    private RbacService rbacService;
+
+    @Mock
+    private SlackClient slackClient;
+
     private SlackTicketsProps slackTicketsProps;
     private TicketAssignmentProps assignmentProps;
+    private SupportTeamProps supportTeamProps;
 
     @Mock
     private ApplicationEventPublisher publisher;
 
     @Captor
     private ArgumentCaptor<TicketCreatedMessage> createdMessageCaptor;
+
+    @Captor
+    private ArgumentCaptor<StalenessTagTarget> stalenessTagTargetCaptor;
 
     @BeforeEach
     public void setUp() {
@@ -69,6 +87,7 @@ public class TicketProcessingServiceTests {
         ticketRepository = new TicketInMemoryRepository(escalationQueryService, timezone);
         slackTicketsProps = new SlackTicketsProps("some-channel-id", "eyes", "ticket", "white_check_mark", "rocket");
         assignmentProps = new TicketAssignmentProps(true, new TicketAssignmentProps.Encryption(false, null));
+        supportTeamProps = new SupportTeamProps("Core Support", "support", SUPPORT_GROUP_ID);
         ticketProcessingService = new TicketProcessingService(
                 ticketRepository,
                 slackService,
@@ -76,7 +95,10 @@ public class TicketProcessingServiceTests {
                 slackTicketsProps,
                 assignmentProps,
                 publisher,
-                Optional.empty());
+                Optional.empty(),
+                rbacService,
+                supportTeamProps,
+                slackClient);
     }
 
     @Test
@@ -172,19 +194,7 @@ public class TicketProcessingServiceTests {
 
     @Test
     public void shouldNotAssignWhenFeatureDisabled() {
-        assignmentProps = new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
-        ZoneId timezone = ZoneId.of("UTC");
-        EscalationQueryService escalationQueryService =
-                new EscalationQueryService(new EscalationInMemoryRepository(timezone));
-        ticketRepository = new TicketInMemoryRepository(escalationQueryService, timezone);
-        ticketProcessingService = new TicketProcessingService(
-                ticketRepository,
-                slackService,
-                escalationQueryService,
-                slackTicketsProps,
-                assignmentProps,
-                publisher,
-                Optional.empty());
+        rebuildServiceWithAssignmentDisabled();
         MessageRef threadRef = new MessageRef(MESSAGE_TS, null, slackTicketsProps.channelId());
         when(slackService.postTicketForm(eq(threadRef), any()))
                 .thenReturn(new MessageRef(MessageTs.of("form"), MESSAGE_TS, slackTicketsProps.channelId()));
@@ -423,6 +433,252 @@ public class TicketProcessingServiceTests {
         assertEquals("low", afterSecondClose.impact());
     }
 
+    @Test
+    public void shouldTagAssigneeWhenMarkingStaleAndAssignmentEnabled() {
+        // given
+        Ticket ticket = createTrackedTicket();
+        TicketId ticketId = requireNonNull(ticket.id());
+
+        // when
+        ticketProcessingService.markAsStale(ticketId);
+
+        // then
+        verify(slackService).warnStaleness(any(), stalenessTagTargetCaptor.capture());
+        StalenessTagTarget target = stalenessTagTargetCaptor.getValue();
+        assertInstanceOf(StalenessTagTarget.User.class, target);
+        assertEquals(USER_ID, ((StalenessTagTarget.User) target).userId());
+    }
+
+    @Test
+    public void shouldTagEyesReactorWhenAssignmentDisabled() {
+        // given
+        rebuildServiceWithAssignmentDisabled();
+
+        Ticket ticket = createTrackedTicket();
+        TicketId ticketId = requireNonNull(ticket.id());
+
+        String supportEngineerId = "U_SUPPORT_ENG";
+        Message message = new Message();
+        Reaction eyesReaction = new Reaction();
+        eyesReaction.setName("eyes");
+        eyesReaction.setUsers(List.of(supportEngineerId));
+        message.setReactions(List.of(eyesReaction));
+        when(slackClient.getMessageByTs(any())).thenReturn(message);
+        when(rbacService.isSupportBySlackId(SlackId.user(supportEngineerId))).thenReturn(true);
+
+        // when
+        ticketProcessingService.markAsStale(ticketId);
+
+        // then
+        verify(slackService).warnStaleness(any(), stalenessTagTargetCaptor.capture());
+        StalenessTagTarget target = stalenessTagTargetCaptor.getValue();
+        assertInstanceOf(StalenessTagTarget.User.class, target);
+        assertEquals(supportEngineerId, ((StalenessTagTarget.User) target).userId());
+    }
+
+    @Test
+    public void shouldTagFirstSupportEngineerAmongMultipleEyesReactors() {
+        // given
+        rebuildServiceWithAssignmentDisabled();
+
+        Ticket ticket = createTrackedTicket();
+        TicketId ticketId = requireNonNull(ticket.id());
+
+        String nonSupportUser = "U_CUSTOMER";
+        String supportEngineerId = "U_SUPPORT_ENG";
+        Message message = new Message();
+        Reaction eyesReaction = new Reaction();
+        eyesReaction.setName("eyes");
+        eyesReaction.setUsers(List.of(nonSupportUser, supportEngineerId));
+        message.setReactions(List.of(eyesReaction));
+        when(slackClient.getMessageByTs(any())).thenReturn(message);
+        when(rbacService.isSupportBySlackId(SlackId.user(nonSupportUser))).thenReturn(false);
+        when(rbacService.isSupportBySlackId(SlackId.user(supportEngineerId))).thenReturn(true);
+
+        // when
+        ticketProcessingService.markAsStale(ticketId);
+
+        // then
+        verify(slackService).warnStaleness(any(), stalenessTagTargetCaptor.capture());
+        StalenessTagTarget target = stalenessTagTargetCaptor.getValue();
+        assertInstanceOf(StalenessTagTarget.User.class, target);
+        assertEquals(supportEngineerId, ((StalenessTagTarget.User) target).userId());
+    }
+
+    @Test
+    public void shouldTagSquadWhenEyesReactorIsNotSupportEngineer() {
+        // given
+        rebuildServiceWithAssignmentDisabled();
+
+        Ticket ticket = createTrackedTicket();
+        TicketId ticketId = requireNonNull(ticket.id());
+
+        String nonSupportUser = "U_CUSTOMER";
+        Message message = new Message();
+        Reaction eyesReaction = new Reaction();
+        eyesReaction.setName("eyes");
+        eyesReaction.setUsers(List.of(nonSupportUser));
+        message.setReactions(List.of(eyesReaction));
+        when(slackClient.getMessageByTs(any())).thenReturn(message);
+        when(rbacService.isSupportBySlackId(SlackId.user(nonSupportUser))).thenReturn(false);
+
+        // when
+        ticketProcessingService.markAsStale(ticketId);
+
+        // then
+        verify(slackService).warnStaleness(any(), stalenessTagTargetCaptor.capture());
+        StalenessTagTarget target = stalenessTagTargetCaptor.getValue();
+        assertInstanceOf(StalenessTagTarget.Squad.class, target);
+        assertEquals(SUPPORT_GROUP_ID, ((StalenessTagTarget.Squad) target).groupId());
+    }
+
+    @Test
+    public void shouldTagSquadWhenNoEyesReaction() {
+        // given
+        rebuildServiceWithAssignmentDisabled();
+
+        Ticket ticket = createTrackedTicket();
+        TicketId ticketId = requireNonNull(ticket.id());
+
+        Message message = new Message();
+        message.setReactions(List.of());
+        when(slackClient.getMessageByTs(any())).thenReturn(message);
+
+        // when
+        ticketProcessingService.markAsStale(ticketId);
+
+        // then
+        verify(slackService).warnStaleness(any(), stalenessTagTargetCaptor.capture());
+        StalenessTagTarget target = stalenessTagTargetCaptor.getValue();
+        assertInstanceOf(StalenessTagTarget.Squad.class, target);
+        assertEquals(SUPPORT_GROUP_ID, ((StalenessTagTarget.Squad) target).groupId());
+    }
+
+    @Test
+    public void shouldTagSquadWhenReactionsAreNull() {
+        // given
+        rebuildServiceWithAssignmentDisabled();
+
+        Ticket ticket = createTrackedTicket();
+        TicketId ticketId = requireNonNull(ticket.id());
+
+        Message message = new Message();
+        // message.getReactions() returns null by default
+        when(slackClient.getMessageByTs(any())).thenReturn(message);
+
+        // when
+        ticketProcessingService.markAsStale(ticketId);
+
+        // then
+        verify(slackService).warnStaleness(any(), stalenessTagTargetCaptor.capture());
+        StalenessTagTarget target = stalenessTagTargetCaptor.getValue();
+        assertInstanceOf(StalenessTagTarget.Squad.class, target);
+        assertEquals(SUPPORT_GROUP_ID, ((StalenessTagTarget.Squad) target).groupId());
+    }
+
+    @Test
+    public void shouldTagSquadWhenSlackApiFails() {
+        // given
+        Ticket ticket = createTrackedTicket();
+        TicketId ticketId = requireNonNull(ticket.id());
+
+        // Rebuild with assignment disabled so it falls through to eyes lookup
+        rebuildServiceWithSameRepo();
+
+        when(slackClient.getMessageByTs(any())).thenThrow(new RuntimeException("Slack API error"));
+
+        // when
+        ticketProcessingService.markAsStale(ticketId);
+
+        // then
+        verify(slackService).warnStaleness(any(), stalenessTagTargetCaptor.capture());
+        StalenessTagTarget target = stalenessTagTargetCaptor.getValue();
+        assertInstanceOf(StalenessTagTarget.Squad.class, target);
+        assertEquals(SUPPORT_GROUP_ID, ((StalenessTagTarget.Squad) target).groupId());
+    }
+
+    @Test
+    public void shouldResolveTargetWhenRemindingOfStaleTicket() {
+        // given — create ticket and mark as stale
+        Ticket ticket = createTrackedTicket();
+        TicketId ticketId = requireNonNull(ticket.id());
+        ticketProcessingService.markAsStale(ticketId);
+
+        // when
+        ticketProcessingService.remindOfStaleTicket(ticketId);
+
+        // then — warnStaleness called twice (markAsStale + remind), both with assignee target
+        verify(slackService, times(2)).warnStaleness(any(), stalenessTagTargetCaptor.capture());
+        StalenessTagTarget target = stalenessTagTargetCaptor.getValue();
+        assertInstanceOf(StalenessTagTarget.User.class, target);
+        assertEquals(USER_ID, ((StalenessTagTarget.User) target).userId());
+    }
+
+    @Test
+    public void shouldTagSquadWhenAssigneeIsNullDespiteAssignmentEnabled() {
+        // given — create ticket without assignee via direct repo creation
+        MessageRef queryRef = new MessageRef(MESSAGE_TS, null, slackTicketsProps.channelId());
+        ticketProcessingService.handleMessagePosted(new MessagePosted("some message", USER_ID, queryRef));
+
+        Ticket newTicket = Ticket.createNew(MESSAGE_TS, slackTicketsProps.channelId());
+        newTicket = ticketRepository.createTicketIfNotExists(newTicket);
+        TicketId ticketId = requireNonNull(newTicket.id());
+
+        // Set createdMessageTs so onStatusUpdate can edit the form
+        ticketRepository.updateTicket(
+                newTicket.toBuilder().createdMessageTs(MessageTs.of("form-ts")).build());
+
+        // assignee is null, so falls through to eyes lookup
+        Message message = new Message();
+        message.setReactions(List.of());
+        when(slackClient.getMessageByTs(any())).thenReturn(message);
+
+        // when
+        ticketProcessingService.markAsStale(ticketId);
+
+        // then
+        verify(slackService).warnStaleness(any(), stalenessTagTargetCaptor.capture());
+        StalenessTagTarget target = stalenessTagTargetCaptor.getValue();
+        assertInstanceOf(StalenessTagTarget.Squad.class, target);
+    }
+
+    private void rebuildServiceWithAssignmentDisabled() {
+        assignmentProps = new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
+        ZoneId timezone = ZoneId.of("UTC");
+        EscalationQueryService escalationQueryService =
+                new EscalationQueryService(new EscalationInMemoryRepository(timezone));
+        ticketRepository = new TicketInMemoryRepository(escalationQueryService, timezone);
+        ticketProcessingService = new TicketProcessingService(
+                ticketRepository,
+                slackService,
+                escalationQueryService,
+                slackTicketsProps,
+                assignmentProps,
+                publisher,
+                Optional.empty(),
+                rbacService,
+                supportTeamProps,
+                slackClient);
+    }
+
+    private void rebuildServiceWithSameRepo() {
+        assignmentProps = new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
+        ZoneId timezone = ZoneId.of("UTC");
+        EscalationQueryService escalationQueryService =
+                new EscalationQueryService(new EscalationInMemoryRepository(timezone));
+        ticketProcessingService = new TicketProcessingService(
+                ticketRepository,
+                slackService,
+                escalationQueryService,
+                slackTicketsProps,
+                assignmentProps,
+                publisher,
+                Optional.empty(),
+                rbacService,
+                supportTeamProps,
+                slackClient);
+    }
+
     private TicketProcessingService serviceWithPrDetection() {
         return new TicketProcessingService(
                 ticketRepository,
@@ -431,7 +687,10 @@ public class TicketProcessingServiceTests {
                 slackTicketsProps,
                 assignmentProps,
                 publisher,
-                Optional.of(prDetectionService));
+                Optional.of(prDetectionService),
+                rbacService,
+                supportTeamProps,
+                slackClient);
     }
 
     private Ticket createTrackedTicket() {

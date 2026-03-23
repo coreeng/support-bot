@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.ticket.slack;
 
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
@@ -8,6 +10,7 @@ import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.ticket.StalenessTagTarget;
 import com.coreeng.supportbot.ticket.TicketCreatedMessageMapper;
 import com.coreeng.supportbot.ticket.TicketId;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +40,40 @@ class TicketSlackServiceImplTest {
     void setUp() {
         service = new TicketSlackServiceImpl(
                 slackClient, slackTicketsProps, createdMessageMapper, ratingReqMessageMapper);
+    }
+
+    @Test
+    void warnStaleness_postsMessageWithUserMention() {
+        MessageRef queryRef = new MessageRef(new MessageTs("1754593000", false), "C123");
+        StalenessTagTarget target = new StalenessTagTarget.User("U_ENGINEER");
+
+        service.warnStaleness(queryRef, target);
+
+        verify(slackClient)
+                .postMessage(argThat(
+                        req -> req.message().getText().contains("<@U_ENGINEER>") && "C123".equals(req.channel())));
+    }
+
+    @Test
+    void warnStaleness_postsMessageWithSquadMention() {
+        MessageRef queryRef = new MessageRef(new MessageTs("1754593000", false), "C123");
+        StalenessTagTarget target = new StalenessTagTarget.Squad("S08948NBMED");
+
+        service.warnStaleness(queryRef, target);
+
+        verify(slackClient)
+                .postMessage(argThat(req ->
+                        req.message().getText().contains("<!subteam^S08948NBMED>") && "C123".equals(req.channel())));
+    }
+
+    @Test
+    void warnStaleness_skipsWhenMocked() {
+        MessageRef queryRef = new MessageRef(new MessageTs("1754593000", true), "C123");
+        StalenessTagTarget target = new StalenessTagTarget.User("U_ENGINEER");
+
+        service.warnStaleness(queryRef, target);
+
+        verifyNoInteractions(slackClient);
     }
 
     @Test
