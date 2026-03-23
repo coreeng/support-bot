@@ -3,19 +3,26 @@ package com.coreeng.supportbot.ticket;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.SupportTeamProps;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.prtracking.PrDetectionOutcome;
 import com.coreeng.supportbot.prtracking.PrDetectionService;
+import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.SlackId;
+import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.slack.events.MessageDeleted;
 import com.coreeng.supportbot.slack.events.MessagePosted;
 import com.coreeng.supportbot.slack.events.ReactionAdded;
 import com.coreeng.supportbot.slack.events.SlackEvent;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
+import com.slack.api.model.Message;
+import com.slack.api.model.Reaction;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -35,6 +42,9 @@ public class TicketProcessingService {
     private final TicketAssignmentProps assignmentProps;
     private final ApplicationEventPublisher publisher;
     private final Optional<PrDetectionService> prDetectionService;
+    private final RbacService rbacService;
+    private final SupportTeamProps supportTeamProps;
+    private final SlackClient slackClient;
 
     @Autowired
     public TicketProcessingService(
@@ -44,7 +54,10 @@ public class TicketProcessingService {
             SlackTicketsProps slackTicketsProps,
             TicketAssignmentProps assignmentProps,
             ApplicationEventPublisher publisher,
-            Optional<PrDetectionService> prDetectionService) {
+            Optional<PrDetectionService> prDetectionService,
+            RbacService rbacService,
+            SupportTeamProps supportTeamProps,
+            SlackClient slackClient) {
         this.repository = repository;
         this.slackService = slackService;
         this.escalationQueryService = escalationQueryService;
@@ -52,6 +65,9 @@ public class TicketProcessingService {
         this.assignmentProps = assignmentProps;
         this.publisher = publisher;
         this.prDetectionService = prDetectionService;
+        this.rbacService = rbacService;
+        this.supportTeamProps = supportTeamProps;
+        this.slackClient = slackClient;
     }
 
     public void handleMessagePosted(MessagePosted e) {
@@ -324,7 +340,8 @@ public class TicketProcessingService {
         }
 
         log.atInfo().addKeyValue("ticketId", checkNotNull(ticket.id()).id()).log("Marking ticket as stale");
-        slackService.warnStaleness(ticket.queryRef());
+        StalenessTagTarget target = resolveStalenessTarget(ticket);
+        slackService.warnStaleness(ticket.queryRef(), target);
         Ticket updatedTicket = repository.updateTicket(ticket.toBuilder()
                 .status(TicketStatus.stale)
                 .lastInteractedAt(Instant.now())
@@ -344,8 +361,43 @@ public class TicketProcessingService {
         }
 
         log.info("Reminding of stale ticket {}", ticketId);
-        slackService.warnStaleness(ticket.queryRef());
+        StalenessTagTarget target = resolveStalenessTarget(ticket);
+        slackService.warnStaleness(ticket.queryRef(), target);
         repository.touchTicketById(ticketId, Instant.now());
+    }
+
+    StalenessTagTarget resolveStalenessTarget(Ticket ticket) {
+        if (assignmentProps.enabled() && ticket.assignedTo() != null) {
+            return new StalenessTagTarget.User(ticket.assignedTo().id());
+        }
+
+        try {
+            Message message = slackClient.getMessageByTs(SlackGetMessageByTsRequest.of(ticket.queryRef()));
+            List<Reaction> reactions = message.getReactions();
+            if (reactions != null) {
+                for (Reaction reaction : reactions) {
+                    if (Objects.equals(reaction.getName(), slackTicketsProps.expectedInitialReaction())) {
+                        List<String> users = reaction.getUsers();
+                        if (users != null) {
+                            for (String userId : users) {
+                                if (rbacService.isSupportBySlackId(SlackId.user(userId))) {
+                                    return new StalenessTagTarget.User(userId);
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.atError()
+                    .setCause(e)
+                    .addKeyValue("ticketId", ticket.id() != null ? ticket.id().id() : null)
+                    .addKeyValue("channelId", ticket.channelId())
+                    .log("Failed to resolve staleness tag target, falling back to squad");
+        }
+
+        return new StalenessTagTarget.Squad(supportTeamProps.slackGroupId());
     }
 
     @NonNull private Ticket onStatusUpdate(Ticket ticket) {
