@@ -2,6 +2,7 @@
 
 import {useMemo, useState} from 'react'
 import {useUrlParams} from '@/lib/hooks/useUrlParams'
+import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 import {useRatings, useRegistry, useTickets, useSupportMembers, useAssignmentEnabled} from '@/lib/hooks'
 import {ClipboardList, Star, AlertTriangle, Headphones, ChevronDown} from 'lucide-react'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
@@ -50,7 +51,7 @@ export default function HealthPage() {
         dateTo: '',
         tab: 'tickets',
     })
-    const dateFilter = params.dateFilter as 'lastWeek' | 'lastMonth' | 'lastYear' | 'custom'
+    const dateFilter = params.dateFilter as 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'lastYear' | 'custom'
     const activeTab = (['tickets', 'ratings', 'workbench'] as const).includes(
         params.tab as 'tickets' | 'ratings' | 'workbench'
     )
@@ -78,35 +79,24 @@ export default function HealthPage() {
     // Valid when both are empty (no custom dates set yet) or start ≤ end.
     const isDateRangeValid = !params.dateFrom || !params.dateTo || params.dateFrom <= params.dateTo
 
-    // Calculate date range based on filter mode (aligned to SLA dashboard style).
-    // When switching to "custom", fall back to last-7-days until valid dates are entered.
-    const dateRange = useMemo(() => {
-        if (dateFilter === 'custom') {
-            if (!params.dateFrom || !params.dateTo || params.dateFrom > params.dateTo) {
-                // Preserve a valid range so we never fetch ALL tickets
-                const toDate = new Date()
-                const fromDate = new Date(toDate)
-                fromDate.setDate(toDate.getDate() - 6)
-                return { from: fromDate.toISOString().split('T')[0], to: toDate.toISOString().split('T')[0] }
-            }
-            return { from: params.dateFrom, to: params.dateTo }
-        }
-
-        const toDate = new Date()
-        const fromDate = new Date(toDate)
-
-        if (dateFilter === 'lastWeek') {
-            fromDate.setDate(toDate.getDate() - 6)
-        } else if (dateFilter === 'lastMonth') {
-            fromDate.setMonth(toDate.getMonth() - 1)
-        } else if (dateFilter === 'lastYear') {
-            fromDate.setFullYear(toDate.getFullYear() - 1)
-        }
-
-        const from = fromDate.toISOString().split('T')[0]
-        const to = toDate.toISOString().split('T')[0]
-        return { from, to }
-    }, [dateFilter, params.dateFrom, params.dateTo])
+    // Calculate date range based on filter mode using the shared utility.
+    // Falls back to lastWeek when custom dates are absent or invalid.
+    const dateRange = useMemo(
+        () =>
+            getDateRangeFromFilter({
+                dateFilter,
+                customDateRange: { start: params.dateFrom || undefined, end: params.dateTo || undefined },
+                customValue: 'custom',
+                fallbackValue: 'lastWeek',
+                presetDays: {
+                    lastWeek: PRESET_DAYS.lastWeek,
+                    last2Weeks: PRESET_DAYS.last2Weeks,
+                    lastMonth: PRESET_DAYS.lastMonth,
+                    lastYear: PRESET_DAYS.lastYear,
+                },
+            }),
+        [dateFilter, params.dateFrom, params.dateTo]
+    )
     
     const {data: tickets, isLoading: ticketsLoading} = useTickets(0, 1000, dateRange.from, dateRange.to)
 
@@ -618,7 +608,8 @@ export default function HealthPage() {
                             }}
                             className="p-2 border rounded text-xs"
                         >
-                            <option value="lastWeek">Last 7 Days</option>
+                            <option value="lastWeek">Last Week</option>
+                            <option value="last2Weeks">Last 2 Weeks</option>
                             <option value="lastMonth">Last Month</option>
                             <option value="lastYear">Last Year</option>
                             <option value="custom">Custom</option>

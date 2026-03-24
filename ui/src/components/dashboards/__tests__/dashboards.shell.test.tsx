@@ -74,7 +74,8 @@ describe('Dashboards shell', () => {
     expect(screen.getByText('SLA Dashboards')).toBeInTheDocument()
     // Date filter is now a picklist
     expect(screen.getByTestId('sla-date-filter')).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: /Last 7 Days/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Last Week/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Last 2 Weeks/i })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: /Last Month/i })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: /Last Year/i })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: /Custom/i })).toBeInTheDocument()

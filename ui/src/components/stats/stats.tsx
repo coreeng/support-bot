@@ -11,9 +11,9 @@ import LoadingSkeleton from '@/components/LoadingSkeleton'
 import { TEAM_SCOPE } from '@/lib/constants'
 import { normalizeTeamKey } from '@/lib/teamUtils'
 import { useUrlParams } from '@/lib/hooks/useUrlParams'
+import { type DateFilter, getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 
-type DateFilter = 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'lastYear' | 'custom' | 'all'
-const VALID_DATE_FILTERS: readonly string[] = ['lastWeek', 'last2Weeks', 'lastMonth', 'lastYear', 'custom', 'all']
+const VALID_DATE_FILTERS: readonly DateFilter[] = ['lastWeek', 'last2Weeks', 'lastMonth', 'lastYear', 'custom', 'all']
 
 export default function StatsPage() {
     // Persist date filter and custom date range in the URL.
@@ -28,49 +28,20 @@ export default function StatsPage() {
         ? (params.dateFilter as DateFilter)
         : 'lastWeek'
 
-    // Calculate date range based on filter
-    // When switching to "custom", preserve the current range until custom dates are set.
-    const dateRange = useMemo(() => {
-        if (dateFilter === 'all') {
-            return { from: undefined, to: undefined }
-        }
-
-        if (dateFilter === 'custom') {
-            // If custom dates are not set yet, preserve the previous filter's range
-            if (!params.dateFrom || !params.dateTo) {
-                // Calculate the current range based on last week (default)
-                const now = new Date()
-                const to = now.toISOString().split('T')[0]
-                const fromDate = new Date(now)
-                fromDate.setDate(now.getDate() - 7)
-                const from = fromDate.toISOString().split('T')[0]
-                return { from, to }
-            }
-            return { from: params.dateFrom, to: params.dateTo }
-        }
-
-        const now = new Date()
-        const to = now.toISOString().split('T')[0]
-        const fromDate = new Date(now)
-
-        switch (dateFilter) {
-            case 'lastWeek':
-                fromDate.setDate(now.getDate() - 7)
-                break
-            case 'last2Weeks':
-                fromDate.setDate(now.getDate() - 14)
-                break
-            case 'lastMonth':
-                fromDate.setMonth(now.getMonth() - 1)
-                break
-            case 'lastYear':
-                fromDate.setFullYear(now.getFullYear() - 1)
-                break
-        }
-
-        const from = fromDate.toISOString().split('T')[0]
-        return { from, to }
-    }, [dateFilter, params.dateFrom, params.dateTo])
+    // Calculate date range based on filter using the shared utility.
+    // Falls back to lastWeek when custom dates are not yet set.
+    const dateRange = useMemo(
+        () =>
+            getDateRangeFromFilter({
+                dateFilter,
+                customDateRange: { start: params.dateFrom || undefined, end: params.dateTo || undefined },
+                customValue: 'custom',
+                fallbackValue: 'lastWeek',
+                allValue: 'all',
+                presetDays: PRESET_DAYS,
+            }),
+        [dateFilter, params.dateFrom, params.dateTo]
+    )
     
     // Use useAllTickets to fetch all tickets within date range (not just first 1000)
     // This ensures we get complete data for accurate statistics

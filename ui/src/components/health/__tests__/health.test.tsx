@@ -163,8 +163,8 @@ describe('HealthPage', () => {
         it('defaults to Activity Trends tab', () => {
             render(<HealthPage />, { wrapper: Wrapper });
 
-            // Should show activity trends tab content (has date filter buttons like "Last 7 Days")
-            expect(screen.getByText(/Last 7 Days/i)).toBeInTheDocument();
+            // Should show activity trends tab content (has date filter picklist with "Last Week")
+            expect(screen.getByText(/Last Week/i)).toBeInTheDocument();
         });
 
         it('switches to Ticket Workbench tab when clicked', () => {

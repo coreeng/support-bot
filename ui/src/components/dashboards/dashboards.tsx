@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react'
 import { useUrlParams } from '@/lib/hooks/useUrlParams'
+import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 import { 
     useFirstResponsePercentiles,
     useTicketResolutionPercentiles,
@@ -53,28 +54,27 @@ export default function DashboardsPage() {
     const activeSection: SectionKey = sections.some(s => s.key === params.section)
         ? (params.section as SectionKey)
         : 'response'
-    const dateFilter = params.dateFilter as 'lastWeek' | 'lastMonth' | 'lastYear' | 'custom'
+    const dateFilter = params.dateFilter as 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'lastYear' | 'custom'
 
-    // Compute the effective date range for all API calls.
-    // Preset modes compute dates from today; custom mode uses the URL params with a
-    // last-7-days fallback so we never pass undefined to hooks.
-    const dateRange = useMemo(() => {
-        if (dateFilter === 'custom') {
-            if (!params.dateFrom || !params.dateTo || params.dateFrom > params.dateTo) {
-                const to = new Date()
-                const from = new Date(to)
-                from.setDate(to.getDate() - 6)
-                return { from: from.toISOString().split('T')[0], to: to.toISOString().split('T')[0] }
-            }
-            return { from: params.dateFrom, to: params.dateTo }
-        }
-        const to = new Date()
-        const from = new Date(to)
-        if (dateFilter === 'lastWeek') from.setDate(to.getDate() - 6)
-        else if (dateFilter === 'lastMonth') from.setMonth(to.getMonth() - 1)
-        else if (dateFilter === 'lastYear') from.setFullYear(to.getFullYear() - 1)
-        return { from: from.toISOString().split('T')[0], to: to.toISOString().split('T')[0] }
-    }, [dateFilter, params.dateFrom, params.dateTo])
+    // Compute the effective date range for all API calls using the shared utility.
+    // Falls back to lastWeek when custom dates are absent — the isDateRangeValid gate
+    // prevents hooks from fetching when the user has entered conflicting dates.
+    const dateRange = useMemo(
+        () =>
+            getDateRangeFromFilter({
+                dateFilter,
+                customDateRange: { start: params.dateFrom || undefined, end: params.dateTo || undefined },
+                customValue: 'custom',
+                fallbackValue: 'lastWeek',
+                presetDays: {
+                    lastWeek: PRESET_DAYS.lastWeek,
+                    last2Weeks: PRESET_DAYS.last2Weeks,
+                    lastMonth: PRESET_DAYS.lastMonth,
+                    lastYear: PRESET_DAYS.lastYear,
+                },
+            }),
+        [dateFilter, params.dateFrom, params.dateTo]
+    )
 
     // Only show the invalid-range warning when the user has entered conflicting custom dates.
     const isDateRangeValid = dateFilter !== 'custom' || !params.dateFrom || !params.dateTo || params.dateFrom <= params.dateTo
@@ -206,14 +206,15 @@ export default function DashboardsPage() {
                                     // undefined to the data hooks.
                                     setParams({
                                         dateFilter: 'custom',
-                                        dateFrom: params.dateFrom || dateRange.from,
-                                        dateTo: params.dateTo || dateRange.to,
+                                        dateFrom: params.dateFrom || dateRange.from || '',
+                                        dateTo: params.dateTo || dateRange.to || '',
                                     })
                                 }
                             }}
                             className="p-2 border rounded text-xs"
                         >
-                            <option value="lastWeek">Last 7 Days</option>
+                            <option value="lastWeek">Last Week</option>
+                            <option value="last2Weeks">Last 2 Weeks</option>
                             <option value="lastMonth">Last Month</option>
                             <option value="lastYear">Last Year</option>
                             <option value="custom">Custom</option>

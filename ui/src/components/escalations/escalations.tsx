@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useUrlParams } from '@/lib/hooks/useUrlParams'
+import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 import { useEscalations, useRegistry, useTenantTeams } from '@/lib/hooks'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { useAuth } from '@/hooks/useAuth'
@@ -119,20 +120,23 @@ export default function EscalationsPage() {
     const getDurationColor = (minutes: number) => minutes < 30 ? 'text-green-700' : minutes < 120 ? 'text-yellow-700' : 'text-indigo-700 font-semibold'
 
     // --- Date range for date filter ---
-    const dateRange = useMemo(() => {
-        if (!dateFilter) return { from: undefined, to: undefined }
-        if (dateFilter === 'custom') {
-            if (!params.dateFrom || !params.dateTo) return { from: undefined, to: undefined }
-            return { from: params.dateFrom, to: params.dateTo }
-        }
-        const now = new Date()
-        const to = now.toISOString().split('T')[0]
-        const fromDate = new Date(now)
-        if (dateFilter === 'lastWeek') fromDate.setDate(now.getDate() - 7)
-        else if (dateFilter === 'last2Weeks') fromDate.setDate(now.getDate() - 13)
-        else if (dateFilter === 'lastMonth') fromDate.setMonth(now.getMonth() - 1)
-        return { from: fromDate.toISOString().split('T')[0], to }
-    }, [dateFilter, params.dateFrom, params.dateTo])
+    // Empty string dateFilter (= "Any Date") is not in presetDays so falls through to
+    // { from: undefined, to: undefined } inside getDateRangeFromFilter, which is correct.
+    const dateRange = useMemo(
+        () =>
+            getDateRangeFromFilter({
+                dateFilter,
+                customDateRange: { start: params.dateFrom || undefined, end: params.dateTo || undefined },
+                customValue: 'custom',
+                fallbackValue: 'lastWeek',
+                presetDays: {
+                    lastWeek: PRESET_DAYS.lastWeek,
+                    last2Weeks: PRESET_DAYS.last2Weeks,
+                    lastMonth: PRESET_DAYS.lastMonth,
+                },
+            }),
+        [dateFilter, params.dateFrom, params.dateTo]
+    )
 
     // --- Filtered Escalations ---
     const filteredEscalations = useMemo(() => {

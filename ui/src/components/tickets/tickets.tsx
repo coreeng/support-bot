@@ -9,7 +9,7 @@ import EditTicketModal from './EditTicketModal'
 import {useQueryClient} from '@tanstack/react-query'
 import { TEAM_SCOPE } from '@/lib/constants'
 import { normalizeTeamKey } from '@/lib/teamUtils'
-import { getDateRangeFromFilter } from '@/lib/dateRange'
+import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 import { useUrlParams } from '@/lib/hooks/useUrlParams'
 
 
@@ -72,9 +72,9 @@ export default function TicketsPage() {
                 customValue: 'custom',
                 fallbackValue: 'lastWeek',
                 presetDays: {
-                    lastWeek: 7,
-                    last2Weeks: 14,
-                    lastMonth: 30,
+                    lastWeek: PRESET_DAYS.lastWeek,
+                    last2Weeks: PRESET_DAYS.last2Weeks,
+                    lastMonth: PRESET_DAYS.lastMonth,
                 },
             }),
         [dateFilter, params.dateFrom, params.dateTo]
