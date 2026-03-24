@@ -222,10 +222,10 @@ public class FullSummaryForm {
                         },
                         "optional": false,
                         "element": {
-                          "type": "multi_static_select",
+                          "type": "multi_external_select",
                           "action_id": "ticket-change-tags",
                           ${tagsInitialOptions}
-                          "options": ${tagsOptions}
+                          "min_query_length": 0
                         }
                       },
                       {
@@ -266,7 +266,6 @@ public class FullSummaryForm {
                             .put("assigneeBlock", assigneeBlock)
                             .put("tagsInitialOptions", tagsInitialOptions)
                             .put("impactInitialOption", impactInitialOption)
-                            .put("tagsOptions", buildTagsOptionsFromConfig())
                             .put("impactsOptions", buildImpactsOptionsFromConfig())
                             .build());
 
@@ -368,13 +367,6 @@ public class FullSummaryForm {
                     .collect(joining(", "));
         }
 
-        private String buildTagsOptionsFromConfig() {
-            return ticket.config().tags().stream()
-                    .map(tag -> """
-                    {"text": {"type": "plain_text", "text": "%s"}, "value": "%s"}""".formatted(tag.label(), tag.code()))
-                    .collect(joining(",", "[", "]"));
-        }
-
         private String buildImpactsOptionsFromConfig() {
             return ticket.config().impacts().stream()
                     .map(imp -> String.format("""
@@ -383,6 +375,11 @@ public class FullSummaryForm {
         }
 
         private String findTagLabel(String code) {
+            // Note: only looks in ticket.config().tags() (active tags from config).
+            // Soft-deleted tags are not in the config, so their label falls back to the code string.
+            // This means initial_options assertions for soft-deleted tags will use the code as the
+            // label, which may not match the stored label in the database. Functional tests should
+            // only assert initial_options for tags that are present in the test config.
             return ticket.config().tags().stream()
                     .filter(t -> t.code().equals(code))
                     .findFirst()
