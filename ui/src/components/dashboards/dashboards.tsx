@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo } from 'react'
+import { useUrlParams } from '@/lib/hooks/useUrlParams'
 import { 
     useFirstResponsePercentiles,
     useTicketResolutionPercentiles,
@@ -40,108 +41,72 @@ const sections = [
 ]
 
 export default function DashboardsPage() {
-    // Active section (tab-based navigation)
-    const [activeSection, setActiveSection] = useState<SectionKey>(() => {
-        // Only runs on client during initial render
-        if (typeof window === 'undefined') return 'response'
-        const params = new URLSearchParams(window.location.search)
-        const section = params.get('section') as SectionKey
-        if (section && sections.some(s => s.key === section)) {
-            return section
+    // Persist active section, date filter mode, and custom date range in the URL.
+    // This replaces the previous manual window.history.replaceState approach.
+    const [params, setParams] = useUrlParams({
+        section: 'response',
+        dateFilter: 'lastWeek',
+        dateFrom: '',
+        dateTo: '',
+    })
+
+    const activeSection: SectionKey = sections.some(s => s.key === params.section)
+        ? (params.section as SectionKey)
+        : 'response'
+    const dateFilter = params.dateFilter as 'lastWeek' | 'lastMonth' | 'lastYear' | 'custom'
+
+    // Compute the effective date range for all API calls.
+    // Preset modes compute dates from today; custom mode uses the URL params with a
+    // last-7-days fallback so we never pass undefined to hooks.
+    const dateRange = useMemo(() => {
+        if (dateFilter === 'custom') {
+            if (!params.dateFrom || !params.dateTo || params.dateFrom > params.dateTo) {
+                const to = new Date()
+                const from = new Date(to)
+                from.setDate(to.getDate() - 6)
+                return { from: from.toISOString().split('T')[0], to: to.toISOString().split('T')[0] }
+            }
+            return { from: params.dateFrom, to: params.dateTo }
         }
-        return 'response'
-    })
+        const to = new Date()
+        const from = new Date(to)
+        if (dateFilter === 'lastWeek') from.setDate(to.getDate() - 6)
+        else if (dateFilter === 'lastMonth') from.setMonth(to.getMonth() - 1)
+        else if (dateFilter === 'lastYear') from.setFullYear(to.getFullYear() - 1)
+        return { from: from.toISOString().split('T')[0], to: to.toISOString().split('T')[0] }
+    }, [dateFilter, params.dateFrom, params.dateTo])
 
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search)
-        params.set('section', activeSection)
-        const newUrl = `${window.location.pathname}?${params.toString()}`
-        window.history.replaceState({}, '', newUrl)
-    }, [activeSection])
-    
-    // Global date filter - default to last month
-    const [dateFilterMode, setDateFilterMode] = useState<'week' | 'month' | 'year' | 'custom'>('week')
-    const [startDate, setStartDate] = useState<string>(() => {
-        const date = new Date()
-        date.setMonth(date.getMonth() - 1)
-        return date.toISOString().split('T')[0]
-    })
-    const [endDate, setEndDate] = useState<string>(() => {
-        return new Date().toISOString().split('T')[0]
-    })
-    const isDateRangeValid = startDate <= endDate
-    
-    // Quick filter handlers
-    const setLastWeek = () => {
-        const end = new Date()
-        const start = new Date()
-        start.setDate(start.getDate() - 7)
-        setStartDate(start.toISOString().split('T')[0])
-        setEndDate(end.toISOString().split('T')[0])
-        setDateFilterMode('week')
-    }
-
-    const setLastMonth = () => {
-        const end = new Date()
-        const start = new Date()
-        start.setMonth(start.getMonth() - 1)
-        setStartDate(start.toISOString().split('T')[0])
-        setEndDate(end.toISOString().split('T')[0])
-        setDateFilterMode('month')
-    }
-
-    const setLastYear = () => {
-        const end = new Date()
-        const start = new Date()
-        start.setFullYear(start.getFullYear() - 1)
-        setStartDate(start.toISOString().split('T')[0])
-        setEndDate(end.toISOString().split('T')[0])
-        setDateFilterMode('year')
-    }
-
-    // When switching to custom mode, ensure dates are preserved if they're not already set
-    // This prevents fetching all tickets when custom mode is selected
-    const handleCustomModeClick = () => {
-        // If dates are not valid or empty, preserve the current week's range (default)
-        // This ensures we don't fetch all tickets when switching to custom mode
-        if (!isDateRangeValid || !startDate || !endDate) {
-            const end = new Date()
-            const start = new Date()
-            start.setDate(end.getDate() - 7)
-            setStartDate(start.toISOString().split('T')[0])
-            setEndDate(end.toISOString().split('T')[0])
-        }
-        setDateFilterMode('custom')
-    }
+    // Only show the invalid-range warning when the user has entered conflicting custom dates.
+    const isDateRangeValid = dateFilter !== 'custom' || !params.dateFrom || !params.dateTo || params.dateFrom <= params.dateTo
 
     // Response SLAs - only load when section is active and date range is valid
     const { data: firstResponsePercentiles, refetch: refetchFirstResponse, isFetching: isFetchingFirstResponse } = useFirstResponsePercentiles(
         activeSection === 'response' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     )
     const { data: durationDistribution, isLoading: isDistributionLoading, refetch: refetchDistribution, isFetching: isFetchingDistribution } = useFirstResponseDurationDistribution(
         activeSection === 'response' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     )
     const { data: unattendedQueries, isLoading: isUnattendedLoading, refetch: refetchUnattended, isFetching: isFetchingUnattended } = useUnattendedQueriesCount(
         activeSection === 'response' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     )
     const isRefreshingResponseSla = isFetchingFirstResponse || isFetchingDistribution || isFetchingUnattended
-    
+
     // Resolution SLAs - only load when section is active and date range is valid
     const { data: resolutionPercentiles, refetch: refetchResolutionPercentiles, isFetching: isFetchingResolutionPerc } = useTicketResolutionPercentiles(
         activeSection === 'resolution' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     )
     const { data: resolutionDurationDistribution, isLoading: isResolutionDistributionLoading, refetch: refetchResolutionDistribution, isFetching: isFetchingResDist } = useTicketResolutionDurationDistribution(
         activeSection === 'resolution' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     ) as {
         data: ResolutionDurationBucket[] | undefined
         isLoading: boolean
@@ -150,47 +115,47 @@ export default function DashboardsPage() {
     }
     const { data: resolutionTimesByWeek, refetch: refetchResolutionByWeek, isFetching: isFetchingResByWeek } = useResolutionTimesByWeek(
         activeSection === 'resolution' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     )
     const { data: unresolvedTicketAges, refetch: refetchUnresolvedAges, isFetching: isFetchingUnresolvedAges } = useUnresolvedTicketAges(
         activeSection === 'resolution' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     )
     const { data: incomingVsResolvedRate, refetch: refetchIncomingVsResolved, isFetching: isFetchingIncomingVsResolved } = useIncomingVsResolvedRate(
         activeSection === 'resolution' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     )
-    
+
     const { data: avgEscalationDurationByTag, refetch: refetchAvgEscDuration, isFetching: isFetchingAvgEsc } = useAvgEscalationDurationByTag(
         activeSection === 'escalation' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     )
     const { data: escalationPercentageByTag, refetch: refetchEscPercentage, isFetching: isFetchingEscPerc } = useEscalationPercentageByTag(
         activeSection === 'escalation' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     )
     const { data: escalationTrendsByDate, refetch: refetchEscTrends, isFetching: isFetchingEscTrends } = useEscalationTrendsByDate(
         activeSection === 'escalation' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     )
     const { data: escalationsByTeam, refetch: refetchEscByTeam, isFetching: isFetchingEscTeam } = useEscalationsByTeam(
         activeSection === 'escalation' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     )
     const { data: escalationsByImpact, refetch: refetchEscByImpact, isFetching: isFetchingEscImpact } = useEscalationsByImpact(
         activeSection === 'escalation' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     )
     const isRefreshingEscalationSla = isFetchingAvgEsc || isFetchingEscPerc || isFetchingEscTrends || isFetchingEscTeam || isFetchingEscImpact
-    
+
     // Weekly SLA Trends - only load when section is active
     const { data: weeklyTicketCounts, refetch: refetchWeeklyCounts, isFetching: isFetchingWeeklyCounts } = useWeeklyTicketCounts(
         activeSection === 'weekly'
@@ -203,8 +168,8 @@ export default function DashboardsPage() {
     )
     const { data: resolutionTimeByTag, refetch: refetchResTimeByTag, isFetching: isFetchingResTimeByTag } = useResolutionTimeByTag(
         activeSection === 'resolution' && isDateRangeValid,
-        startDate,
-        endDate
+        dateRange.from,
+        dateRange.to
     )
     
     const isRefreshingResolutionSla = isFetchingResolutionPerc || isFetchingResDist || isFetchingResByWeek || isFetchingUnresolvedAges || isFetchingResTimeByTag || isFetchingIncomingVsResolved
@@ -228,70 +193,55 @@ export default function DashboardsPage() {
                     </div>
                     
                     <div className="flex flex-wrap items-center gap-2 py-2">
-                        <button
-                            onClick={setLastWeek}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                                dateFilterMode === 'week'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
+                        <select
+                            data-testid="sla-date-filter"
+                            value={dateFilter}
+                            onChange={e => {
+                                const next = e.target.value
+                                if (next !== 'custom') {
+                                    setParams({ dateFilter: next, dateFrom: '', dateTo: '' })
+                                } else {
+                                    // Pre-fill custom inputs with the current effective range so
+                                    // the user sees what they're starting from and we never pass
+                                    // undefined to the data hooks.
+                                    setParams({
+                                        dateFilter: 'custom',
+                                        dateFrom: params.dateFrom || dateRange.from,
+                                        dateTo: params.dateTo || dateRange.to,
+                                    })
+                                }
+                            }}
+                            className="p-2 border rounded text-xs"
                         >
-                            Last 7 Days
-                        </button>
-                        <button
-                            onClick={setLastMonth}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                                dateFilterMode === 'month'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            Last Month
-                        </button>
-                        <button
-                            onClick={setLastYear}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                                dateFilterMode === 'year'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            Last Year
-                        </button>
-                        <button
-                            onClick={handleCustomModeClick}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                                dateFilterMode === 'custom'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            Custom
-                        </button>
-                        
-                        {dateFilterMode === 'custom' && (
+                            <option value="lastWeek">Last 7 Days</option>
+                            <option value="lastMonth">Last Month</option>
+                            <option value="lastYear">Last Year</option>
+                            <option value="custom">Custom</option>
+                        </select>
+
+                        {dateFilter === 'custom' && (
                             <>
                                 <input
                                     type="date"
-                                    value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
+                                    value={params.dateFrom}
+                                    onChange={e => setParams({ dateFrom: e.target.value })}
                                     className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                                 <span className="text-gray-400 text-xs">to</span>
                                 <input
                                     type="date"
-                                    value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
+                                    value={params.dateTo}
+                                    onChange={e => setParams({ dateTo: e.target.value })}
                                     className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                             </>
                         )}
-                        
+
                         <span className="text-xs text-gray-500 ml-2">
-                            📅 {startDate} → {endDate}
+                            📅 {dateRange.from} → {dateRange.to}
                         </span>
-                        
-                        {!isDateRangeValid && (
+
+                        {dateFilter === 'custom' && !isDateRangeValid && (
                             <span className="text-xs text-red-600 font-medium ml-2">
                                 ⚠️ Invalid range
                             </span>
@@ -326,7 +276,7 @@ export default function DashboardsPage() {
                             return (
                                 <button
                                     key={section.key}
-                                    onClick={() => setActiveSection(section.key)}
+                                    onClick={() => setParams({ section: section.key })}
                                     className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 text-sm font-semibold border-b-3 transition-all duration-200 ${colorClasses[section.color]}`}
                                 >
                                     <Icon className={`w-5 h-5 ${isActive ? 'animate-pulse' : ''}`} />

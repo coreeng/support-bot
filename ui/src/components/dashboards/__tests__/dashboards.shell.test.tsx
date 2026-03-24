@@ -21,6 +21,19 @@ jest.mock('../../../contexts/TeamFilterContext', () => ({
 }))
 
 // Mock hooks to avoid real data fetching / QueryClient
+// Mock useUrlParams with a useState-based implementation so section and filter
+// changes re-render the component correctly.
+jest.mock('../../../lib/hooks/useUrlParams', () => ({
+  useUrlParams: (defaults: Record<string, string>) => {
+    const { useState } = require('react') as typeof import('react')
+    const [params, setParamsState] = useState<Record<string, string>>(defaults)
+    const setParams = (updates: Record<string, string>) => {
+      setParamsState((prev: Record<string, string>) => ({ ...prev, ...updates }))
+    }
+    return [params, setParams]
+  },
+}))
+
 jest.mock('../../../lib/hooks', () => ({
   useFirstResponsePercentiles: () => ({ data: { p50: 1, p90: 2 } }),
   useTicketResolutionPercentiles: () => ({ data: { p50: 1, p75: 2, p90: 3 } }),
@@ -59,10 +72,12 @@ describe('Dashboards shell', () => {
     render(<DashboardsPage />)
 
     expect(screen.getByText('SLA Dashboards')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Last 7 Days/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Last Month/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Last Year/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Custom/i })).toBeInTheDocument()
+    // Date filter is now a picklist
+    expect(screen.getByTestId('sla-date-filter')).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Last 7 Days/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Last Month/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Last Year/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Custom/i })).toBeInTheDocument()
   })
 
   it('switches tabs when clicking Resolution SLAs and back to Response SLAs', async () => {
@@ -88,23 +103,19 @@ describe('Dashboards shell', () => {
   describe('Date Filter - Custom Range Logic', () => {
     it('should preserve date range when switching to custom mode without valid dates', () => {
       const { container } = render(<DashboardsPage />)
-      
-      // Find the Custom button
-      const customButton = screen.getByRole('button', { name: /Custom/i })
-      expect(customButton).toBeInTheDocument()
-      
-      // Click custom button - this should preserve dates, not fetch all tickets
-      fireEvent.click(customButton)
-      
-      // Find date inputs by type attribute
+
+      // Switch to custom mode via the picklist — the component pre-fills inputs
+      // with the current effective range so we never pass undefined to hooks.
+      const dateSelect = screen.getByTestId('sla-date-filter')
+      fireEvent.change(dateSelect, { target: { value: 'custom' } })
+
+      // Date inputs should now be visible
       const dateInputs = container.querySelectorAll('input[type="date"]')
-      // Date inputs should be visible when custom mode is active
       expect(dateInputs.length).toBeGreaterThanOrEqual(2)
-      
-      // The dates should be initialized (not empty), preventing all tickets fetch
+
+      // Both inputs must be non-empty (pre-filled from the effective range)
       dateInputs.forEach(input => {
         const value = (input as HTMLInputElement).value
-        // Should have a date value (initialized from previous filter)
         expect(value).toBeTruthy()
         expect(value).not.toBe('')
       })
@@ -112,36 +123,31 @@ describe('Dashboards shell', () => {
 
     it('should use custom dates when both start and end dates are set', () => {
       const { container } = render(<DashboardsPage />)
-      
-      // Switch to custom mode
-      const customButton = screen.getByRole('button', { name: /Custom/i })
-      fireEvent.click(customButton)
-      
-      // Find date inputs by type
+
+      const dateSelect = screen.getByTestId('sla-date-filter')
+      fireEvent.change(dateSelect, { target: { value: 'custom' } })
+
       const dateInputs = container.querySelectorAll('input[type="date"]')
       expect(dateInputs.length).toBeGreaterThanOrEqual(2)
-      
-      // Set custom dates
+
+      // Override with explicit custom dates
       fireEvent.change(dateInputs[0], { target: { value: '2024-01-01' } })
       fireEvent.change(dateInputs[1], { target: { value: '2024-01-31' } })
-      
-      // Verify dates are set
+
       expect((dateInputs[0] as HTMLInputElement).value).toBe('2024-01-01')
       expect((dateInputs[1] as HTMLInputElement).value).toBe('2024-01-31')
     })
 
     it('should not fetch all tickets when custom mode is selected with invalid dates', () => {
       const { container } = render(<DashboardsPage />)
-      
-      const customButton = screen.getByRole('button', { name: /Custom/i })
-      fireEvent.click(customButton)
-      
-      // Even with invalid dates initially, the useEffect should ensure valid dates
+
+      const dateSelect = screen.getByTestId('sla-date-filter')
+      fireEvent.change(dateSelect, { target: { value: 'custom' } })
+
+      // Dates are pre-filled from the effective range on switch, so inputs are never empty
       const dateInputs = container.querySelectorAll('input[type="date"]')
-      
       expect(dateInputs.length).toBeGreaterThanOrEqual(2)
-      
-      // Dates should be initialized to prevent fetching all tickets
+
       dateInputs.forEach(input => {
         const value = (input as HTMLInputElement).value
         expect(value).toBeTruthy()
@@ -150,14 +156,16 @@ describe('Dashboards shell', () => {
     })
   })
 
-  it('updates date range when quick filters are clicked', () => {
+  it('updates date range when quick filters are changed', () => {
     render(<DashboardsPage />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Last 7 Days/i }))
-    expect(screen.getByText(/Last 7 Days/i).className).toMatch(/bg-blue-600/)
+    const dateSelect = screen.getByTestId('sla-date-filter') as HTMLSelectElement
 
-    fireEvent.click(screen.getByRole('button', { name: /Last Month/i }))
-    expect(screen.getByText(/Last Month/i).className).toMatch(/bg-blue-600/)
+    fireEvent.change(dateSelect, { target: { value: 'lastWeek' } })
+    expect(dateSelect.value).toBe('lastWeek')
+
+    fireEvent.change(dateSelect, { target: { value: 'lastMonth' } })
+    expect(dateSelect.value).toBe('lastMonth')
   })
 })
 
