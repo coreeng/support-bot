@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useMemo } from 'react'
-import { useUrlParams } from '@/lib/hooks/useUrlParams'
+import React, { useEffect, useMemo } from 'react'
+import { useUrlParams, enumValidator } from '@/lib/hooks/useUrlParams'
 import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 import { 
     useFirstResponsePercentiles,
@@ -43,18 +43,25 @@ const sections = [
 
 export default function DashboardsPage() {
     // Persist active section, date filter mode, and custom date range in the URL.
-    // This replaces the previous manual window.history.replaceState approach.
-    const [params, setParams] = useUrlParams({
-        section: 'response',
-        dateFilter: 'lastWeek',
-        dateFrom: '',
-        dateTo: '',
-    })
+    // Validators guard against invalid URL values and auto-correct the URL.
+    const [params, setParams] = useUrlParams(
+        { section: 'response', dateFilter: 'lastWeek', dateFrom: '', dateTo: '' },
+        {
+            section: enumValidator(['response', 'resolution', 'escalation', 'weekly'] as const, 'response'),
+            dateFilter: enumValidator(['lastWeek', 'last2Weeks', 'lastMonth', 'lastYear', 'custom'] as const, 'lastWeek'),
+        },
+    )
 
-    const activeSection: SectionKey = sections.some(s => s.key === params.section)
-        ? (params.section as SectionKey)
-        : 'response'
-    const dateFilter = params.dateFilter as 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'lastYear' | 'custom'
+    // Safe to cast: validators guarantee these are valid enum values.
+    const activeSection = params.section as SectionKey
+    const dateFilter    = params.dateFilter as 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'lastYear' | 'custom'
+
+    // Correct the URL when custom date range is in an invalid order (dateFrom > dateTo).
+    useEffect(() => {
+        if (params.dateFilter === 'custom' && params.dateFrom && params.dateTo && params.dateFrom > params.dateTo) {
+            setParams({ dateFilter: 'lastWeek', dateFrom: '', dateTo: '' })
+        }
+    }, [params.dateFilter, params.dateFrom, params.dateTo, setParams])
 
     // Compute the effective date range for all API calls using the shared utility.
     // Falls back to lastWeek when custom dates are absent — the isDateRangeValid gate

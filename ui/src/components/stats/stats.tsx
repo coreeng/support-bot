@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useAllTickets, useRegistry } from '@/lib/hooks'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, PieLabelRenderProps } from 'recharts'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
@@ -10,23 +10,28 @@ import { useAuth } from '@/hooks/useAuth'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
 import { TEAM_SCOPE } from '@/lib/constants'
 import { normalizeTeamKey } from '@/lib/teamUtils'
-import { useUrlParams } from '@/lib/hooks/useUrlParams'
+import { useUrlParams, enumValidator } from '@/lib/hooks/useUrlParams'
 import { type DateFilter, getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 
-const VALID_DATE_FILTERS: readonly DateFilter[] = ['lastWeek', 'last2Weeks', 'lastMonth', 'lastYear', 'custom', 'all']
+const VALID_DATE_FILTERS = ['lastWeek', 'last2Weeks', 'lastMonth', 'lastYear', 'custom', 'all'] as const satisfies readonly DateFilter[]
 
 export default function StatsPage() {
     // Persist date filter and custom date range in the URL.
-    const [params, setParams] = useUrlParams({
-        dateFilter: 'lastWeek',
-        dateFrom: '',
-        dateTo: '',
-    })
+    // Validators guard against invalid URL values and auto-correct the URL.
+    const [params, setParams] = useUrlParams(
+        { dateFilter: 'lastWeek', dateFrom: '', dateTo: '' },
+        { dateFilter: enumValidator(VALID_DATE_FILTERS, 'lastWeek') },
+    )
 
-    // Validate the URL value; fall back to the default if it is unrecognised.
-    const dateFilter: DateFilter = VALID_DATE_FILTERS.includes(params.dateFilter)
-        ? (params.dateFilter as DateFilter)
-        : 'lastWeek'
+    // Safe to cast: enumValidator guarantees params.dateFilter is a valid DateFilter.
+    const dateFilter = params.dateFilter as DateFilter
+
+    // Correct the URL when custom date range is in an invalid order (dateFrom > dateTo).
+    useEffect(() => {
+        if (params.dateFilter === 'custom' && params.dateFrom && params.dateTo && params.dateFrom > params.dateTo) {
+            setParams({ dateFilter: 'lastWeek', dateFrom: '', dateTo: '' })
+        }
+    }, [params.dateFilter, params.dateFrom, params.dateTo, setParams])
 
     // Calculate date range based on filter using the shared utility.
     // Falls back to lastWeek when custom dates are not yet set.

@@ -1,9 +1,53 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 type StringRecord = Record<string, string>
+
+/**
+ * A validator for a single URL parameter.
+ * Receives the raw string from the URL and the parameter's default value.
+ * Returns the sanitised value to use. Return `defaultValue` to fall back.
+ */
+export type ParamValidator = (raw: string, defaultValue: string) => string
+
+/** Per-key validator map, keyed by parameter name. */
+export type ParamValidators<T extends StringRecord> = Partial<{
+  [K in keyof T]: ParamValidator
+}>
+
+/**
+ * Returns a validator that accepts only the listed enum values, falling back
+ * to `fallback` when provided, or the parameter's own default otherwise.
+ *
+ * @example
+ * enumValidator(['lastWeek', 'lastMonth', 'custom'] as const, 'lastWeek')
+ */
+export function enumValidator<T extends string>(
+  validValues: readonly T[],
+  fallback?: T,
+): ParamValidator {
+  return (raw: string, defaultValue: string): string =>
+    (validValues as readonly string[]).includes(raw)
+      ? raw
+      : (fallback ?? defaultValue)
+}
+
+/**
+ * Clamps a URL parameter to a non-negative integer string.
+ * Malformed or negative values fall back to the parameter's default.
+ *
+ * @example
+ * // In useUrlParams validators: { page: nonNegativeIntValidator }
+ */
+export const nonNegativeIntValidator: ParamValidator = (
+  raw: string,
+  defaultValue: string,
+): string => {
+  const n = parseInt(raw, 10)
+  return Number.isFinite(n) && n >= 0 ? String(n) : defaultValue
+}
 
 /**
  * Reads and writes URL search parameters for a given set of keys.
@@ -11,36 +55,39 @@ type StringRecord = Record<string, string>
  * Usage
  * -----
  * ```ts
- * const [params, setParams] = useUrlParams({
- *   dateFilter: 'lastWeek',
- *   dateFrom: '',
- *   dateTo: '',
- * })
- *
- * // Read:  params.dateFilter          => 'lastWeek' (from URL, or the default)
- * // Write: setParams({ dateFilter: 'custom', dateFrom: '2025-01-01' })
+ * const [params, setParams] = useUrlParams(
+ *   { dateFilter: 'lastWeek', dateFrom: '', dateTo: '', page: '0' },
+ *   {
+ *     dateFilter: enumValidator(['lastWeek', 'lastMonth', 'custom'] as const),
+ *     page: nonNegativeIntValidator,
+ *   },
+ * )
  * ```
  *
  * Notes
  * -----
- * - Only keys present in `defaults` are managed by this hook; all other search
- *   params (e.g. the global `team` param owned by TeamFilterContext) are left
- *   untouched when the setter is called.
+ * - Only keys present in `defaults` are managed; all other search params
+ *   (e.g. the global `team` param) are left untouched when the setter is called.
  * - Empty-string values are **removed** from the URL to keep it clean.
  * - Uses `router.replace()` so filter changes do not add browser-history entries.
+ * - When `validators` are provided, any URL param whose raw value fails
+ *   validation is silently corrected in the URL (via a `router.replace` in a
+ *   `useEffect`). The corrected `params` object is returned immediately so the
+ *   page renders correctly even before the URL is updated.
  * - Requires the component tree to be inside a `<Suspense>` boundary because
  *   Next.js App Router requires it for `useSearchParams`.
- * - Pass `defaults` as a stable reference (a module-level constant or `useMemo`)
- *   to avoid unnecessary recomputation. The hook captures the initial value via
- *   `useState` so inline object literals are safe too.
+ * - Pass `defaults` (and `validators`) as stable references to avoid
+ *   unnecessary recomputation. The hook captures both via `useState` so inline
+ *   object literals are safe too.
  */
 export function useUrlParams<T extends StringRecord>(
   defaults: T,
+  validators?: ParamValidators<T>,
 ): [T, (updates: Partial<T>) => void] {
-  // Capture defaults once on mount via useState so callers can pass inline
-  // object literals without causing the memoised params to recompute every render.
-  // useState's initialiser only runs on the first render (unlike useMemo).
+  // Capture defaults and validators once on mount so callers can pass inline
+  // object literals without causing memoised values to recompute every render.
   const [stableDefaults] = useState<T>(defaults)
+  const [stableValidators] = useState<ParamValidators<T> | undefined>(validators)
 
   const router = useRouter()
   const pathname = usePathname()
@@ -52,13 +99,49 @@ export function useUrlParams<T extends StringRecord>(
     // generic indexed write. The cast is safe because T extends Record<string, string>.
     const result: Record<string, string> = { ...stableDefaults }
     for (const key of Object.keys(stableDefaults)) {
-      const value = searchParams.get(key)
-      if (value !== null) {
-        result[key] = value
+      const raw = searchParams.get(key)
+      if (raw !== null) {
+        const validator = stableValidators?.[key as keyof T]
+        result[key] = validator ? validator(raw, stableDefaults[key]) : raw
       }
     }
     return result as T
-  }, [searchParams, stableDefaults])
+  }, [searchParams, stableDefaults, stableValidators])
+
+  // Auto-correct the URL when validators produce a different value than what
+  // is in the raw URL. This ensures stale / invalid params are cleaned up
+  // silently on page load without crashing or showing wrong data.
+  //
+  // Loop safety: after correction, the new URL's raw values match the
+  // validated values, so `hasCorrection` will be false on the next run.
+  useEffect(() => {
+    if (!stableValidators) return
+
+    let hasCorrection = false
+    const next = new URLSearchParams(searchParams.toString())
+
+    for (const key of Object.keys(stableDefaults)) {
+      const validator = stableValidators?.[key as keyof T]
+      if (!validator) continue
+      const raw = searchParams.get(key)
+      if (raw === null) continue
+      const validated = params[key]
+      if (raw !== validated) {
+        hasCorrection = true
+        // Remove the param when the corrected value is empty or equals the
+        // default (keeps the URL clean). Otherwise write the corrected value.
+        if (validated === '' || validated === stableDefaults[key]) {
+          next.delete(key)
+        } else {
+          next.set(key, validated)
+        }
+      }
+    }
+
+    if (!hasCorrection) return
+    const qs = next.toString()
+    router.replace(qs ? `?${qs}` : pathname)
+  }, [params, searchParams, stableDefaults, stableValidators, router, pathname])
 
   const setParams = useCallback(
     (updates: Partial<T>) => {

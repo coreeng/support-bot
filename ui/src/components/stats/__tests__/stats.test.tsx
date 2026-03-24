@@ -25,6 +25,7 @@ jest.mock('../../../contexts/TeamFilterContext');
 // re-renders correctly when setParams is called, preserving all existing
 // test interactions that fire events and then inspect API call arguments.
 jest.mock('../../../lib/hooks/useUrlParams', () => ({
+    ...jest.requireActual('../../../lib/hooks/useUrlParams'),
     useUrlParams: (defaults: Record<string, string>) => {
         const { useState } = require('react') as typeof import('react')
         const [params, setParamsState] = useState<Record<string, string>>(defaults)

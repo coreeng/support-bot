@@ -11,6 +11,7 @@ jest.mock('../../../lib/hooks');
 // changes re-render the component correctly, keeping all existing test
 // interactions that fire events and then inspect the rendered output intact.
 jest.mock('../../../lib/hooks/useUrlParams', () => ({
+    ...jest.requireActual('../../../lib/hooks/useUrlParams'),
     useUrlParams: (defaults: Record<string, string>) => {
         const { useState } = require('react') as typeof import('react')
         const [params, setParamsState] = useState<Record<string, string>>(defaults)

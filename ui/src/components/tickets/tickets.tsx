@@ -10,7 +10,7 @@ import {useQueryClient} from '@tanstack/react-query'
 import { TEAM_SCOPE } from '@/lib/constants'
 import { normalizeTeamKey } from '@/lib/teamUtils'
 import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
-import { useUrlParams } from '@/lib/hooks/useUrlParams'
+import { useUrlParams, enumValidator, nonNegativeIntValidator } from '@/lib/hooks/useUrlParams'
 
 
 export default function TicketsPage() {
@@ -32,37 +32,50 @@ export default function TicketsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
 
     // Persist all filter / sort / page controls in the URL.
+    // Validators guard against invalid URL values and auto-correct the URL.
     const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS
-    const [params, setParams] = useUrlParams({
-        dateFilter: 'lastWeek',
-        dateFrom: '',
-        dateTo: '',
-        status: '',
-        teamFilter: '',
-        impact: '',
-        tag: '',
-        escalated: '',
-        escalatedTo: '',
-        sortBy: 'openedAt',
-        sortDir: 'desc',
-        page: '0',
-    })
+    const [params, setParams] = useUrlParams(
+        {
+            dateFilter: 'lastWeek',
+            dateFrom: '',
+            dateTo: '',
+            status: '',
+            teamFilter: '',
+            impact: '',
+            tag: '',
+            escalated: '',
+            escalatedTo: '',
+            sortBy: 'openedAt',
+            sortDir: 'desc',
+            page: '0',
+        },
+        {
+            dateFilter: enumValidator(['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, 'lastWeek'),
+            sortBy: enumValidator(['openedAt', 'closedAt'] as const, 'openedAt'),
+            sortDir: enumValidator(['asc', 'desc'] as const, 'desc'),
+            page: nonNegativeIntValidator,
+        },
+    )
 
-    // Local read-aliases so the rest of the component body needs no rename churn.
-    const dateFilter: DateFilter =
-        (['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const).includes(params.dateFilter as DateFilter)
-            ? (params.dateFilter as DateFilter)
-            : 'lastWeek'
-    const statusFilter    = params.status
-    const teamFilter      = params.teamFilter
-    const impactFilter    = params.impact
-    const tagFilter       = params.tag
-    const escalatedFilter = params.escalated
-    const escalatedToFilter = params.escalatedTo
-    const sortColumn: SortColumn  = params.sortBy === 'closedAt' ? 'closedAt' : 'openedAt'
-    const sortDirection: 'asc' | 'desc' = params.sortDir === 'asc' ? 'asc' : 'desc'
-    const currentPage = Math.max(0, parseInt(params.page) || 0)
+    // Safe to cast: validators guarantee these are valid enum / numeric values.
+    const dateFilter    = params.dateFilter as DateFilter
+    const statusFilter  = params.status
+    const teamFilter    = params.teamFilter
+    const impactFilter  = params.impact
+    const tagFilter     = params.tag
+    const escalatedFilter    = params.escalated
+    const escalatedToFilter  = params.escalatedTo
+    const sortColumn: SortColumn       = params.sortBy as SortColumn
+    const sortDirection: 'asc' | 'desc' = params.sortDir as 'asc' | 'desc'
+    const currentPage = parseInt(params.page, 10)
     const pageSize = 15
+
+    // Correct the URL when custom date range is in an invalid order (dateFrom > dateTo).
+    useEffect(() => {
+        if (params.dateFilter === 'custom' && params.dateFrom && params.dateTo && params.dateFrom > params.dateTo) {
+            setParams({ dateFilter: 'lastWeek', dateFrom: '', dateTo: '' })
+        }
+    }, [params.dateFilter, params.dateFrom, params.dateTo, setParams])
 
     const dateRange = useMemo(
         () =>

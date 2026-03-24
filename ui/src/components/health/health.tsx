@@ -1,7 +1,7 @@
 'use client'
 
-import {useMemo, useState} from 'react'
-import {useUrlParams} from '@/lib/hooks/useUrlParams'
+import {useEffect, useMemo, useState} from 'react'
+import {useUrlParams, enumValidator} from '@/lib/hooks/useUrlParams'
 import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 import {useRatings, useRegistry, useTickets, useSupportMembers, useAssignmentEnabled} from '@/lib/hooks'
 import {ClipboardList, Star, AlertTriangle, Headphones, ChevronDown} from 'lucide-react'
@@ -45,18 +45,24 @@ export default function HealthPage() {
     ]
 
     // Persist date filter mode, custom date range, and active tab in the URL.
-    const [params, setParams] = useUrlParams({
-        dateFilter: 'lastWeek',
-        dateFrom: '',
-        dateTo: '',
-        tab: 'tickets',
-    })
-    const dateFilter = params.dateFilter as 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'lastYear' | 'custom'
-    const activeTab = (['tickets', 'ratings', 'workbench'] as const).includes(
-        params.tab as 'tickets' | 'ratings' | 'workbench'
+    // Validators guard against invalid URL values and auto-correct the URL.
+    const [params, setParams] = useUrlParams(
+        { dateFilter: 'lastWeek', dateFrom: '', dateTo: '', tab: 'tickets' },
+        {
+            dateFilter: enumValidator(['lastWeek', 'last2Weeks', 'lastMonth', 'lastYear', 'custom'] as const, 'lastWeek'),
+            tab: enumValidator(['tickets', 'ratings', 'workbench'] as const, 'tickets'),
+        },
     )
-        ? (params.tab as 'tickets' | 'ratings' | 'workbench')
-        : 'tickets'
+    // Safe to cast: validators guarantee these are valid enum values.
+    const dateFilter = params.dateFilter as 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'lastYear' | 'custom'
+    const activeTab  = params.tab as 'tickets' | 'ratings' | 'workbench'
+
+    // Correct the URL when custom date range is in an invalid order (dateFrom > dateTo).
+    useEffect(() => {
+        if (params.dateFilter === 'custom' && params.dateFrom && params.dateTo && params.dateFrom > params.dateTo) {
+            setParams({ dateFilter: 'lastWeek', dateFrom: '', dateTo: '' })
+        }
+    }, [params.dateFilter, params.dateFrom, params.dateTo, setParams])
 
     const [inquiringTeamFilter, setInquiringTeamFilter] = useState('')
     const [escalatedTeamFilter, setEscalatedTeamFilter] = useState('')

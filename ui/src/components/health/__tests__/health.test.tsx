@@ -33,6 +33,7 @@ jest.mock('../../../lib/hooks');
 // Mock useUrlParams with a useState-based implementation so tab and filter
 // changes re-render the component correctly, keeping all existing interactions intact.
 jest.mock('../../../lib/hooks/useUrlParams', () => ({
+    ...jest.requireActual('../../../lib/hooks/useUrlParams'),
     useUrlParams: (defaults: Record<string, string>) => {
         const { useState } = require('react') as typeof import('react')
         const [params, setParamsState] = useState<Record<string, string>>(defaults)

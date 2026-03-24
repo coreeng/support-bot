@@ -24,6 +24,7 @@ jest.mock('../../../contexts/TeamFilterContext', () => ({
 // Mock useUrlParams with a useState-based implementation so section and filter
 // changes re-render the component correctly.
 jest.mock('../../../lib/hooks/useUrlParams', () => ({
+  ...jest.requireActual('../../../lib/hooks/useUrlParams'),
   useUrlParams: (defaults: Record<string, string>) => {
     const { useState } = require('react') as typeof import('react')
     const [params, setParamsState] = useState<Record<string, string>>(defaults)

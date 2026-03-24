@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useUrlParams } from '../useUrlParams'
+import { useUrlParams, enumValidator, nonNegativeIntValidator } from '../useUrlParams'
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
@@ -132,6 +132,119 @@ describe('useUrlParams', () => {
       rerender()
       expect(result.current[1]).toBe(firstSetter)
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// enumValidator helper
+// ---------------------------------------------------------------------------
+describe('enumValidator', () => {
+  const validator = enumValidator(['lastWeek', 'lastMonth', 'custom'] as const, 'lastWeek')
+
+  it('accepts a valid value', () => {
+    expect(validator('lastMonth', 'lastWeek')).toBe('lastMonth')
+  })
+
+  it('rejects an unknown value and returns the explicit fallback', () => {
+    expect(validator('garbage', 'lastWeek')).toBe('lastWeek')
+  })
+
+  it('uses the defaultValue when no explicit fallback is provided', () => {
+    const noFallback = enumValidator(['a', 'b'] as const)
+    expect(noFallback('unknown', 'a')).toBe('a')
+  })
+
+  it('accepts an empty string when it is listed as a valid value', () => {
+    const withEmpty = enumValidator(['', 'lastWeek'] as const)
+    expect(withEmpty('', 'lastWeek')).toBe('')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// nonNegativeIntValidator helper
+// ---------------------------------------------------------------------------
+describe('nonNegativeIntValidator', () => {
+  it('passes through a valid non-negative integer string', () => {
+    expect(nonNegativeIntValidator('3', '0')).toBe('3')
+    expect(nonNegativeIntValidator('0', '0')).toBe('0')
+  })
+
+  it('falls back to the default for a negative value', () => {
+    expect(nonNegativeIntValidator('-1', '0')).toBe('0')
+  })
+
+  it('falls back to the default for NaN (non-numeric string)', () => {
+    expect(nonNegativeIntValidator('abc', '0')).toBe('0')
+  })
+
+  it('falls back to the default for a float', () => {
+    // parseInt truncates floats — 2.9 → 2 which is valid, but '2.9' string → parseInt('2.9') = 2
+    expect(nonNegativeIntValidator('2.9', '0')).toBe('2')
+    expect(nonNegativeIntValidator('-0.5', '0')).toBe('0')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// useUrlParams with validators
+// ---------------------------------------------------------------------------
+describe('useUrlParams with validators', () => {
+  const DEFAULTS_WITH_PAGE = { dateFilter: 'lastWeek', page: '0' }
+  const VALIDATORS = {
+    dateFilter: enumValidator(['lastWeek', 'lastMonth', 'custom'] as const, 'lastWeek'),
+    page: nonNegativeIntValidator,
+  }
+
+  it('returns the validated value when the raw URL value is valid', () => {
+    setupMocks({ dateFilter: 'lastMonth', page: '2' })
+    const { result } = renderHook(() =>
+      useUrlParams(DEFAULTS_WITH_PAGE, VALIDATORS),
+    )
+    expect(result.current[0].dateFilter).toBe('lastMonth')
+    expect(result.current[0].page).toBe('2')
+  })
+
+  it('falls back to the default for an unrecognised enum value', () => {
+    setupMocks({ dateFilter: 'garbage' })
+    const { result } = renderHook(() =>
+      useUrlParams(DEFAULTS_WITH_PAGE, VALIDATORS),
+    )
+    expect(result.current[0].dateFilter).toBe('lastWeek')
+  })
+
+  it('clamps a negative page to 0 (the default)', () => {
+    setupMocks({ page: '-5' })
+    const { result } = renderHook(() =>
+      useUrlParams(DEFAULTS_WITH_PAGE, VALIDATORS),
+    )
+    expect(result.current[0].page).toBe('0')
+  })
+
+  it('auto-corrects the URL via router.replace when a validator rejects a value', () => {
+    setupMocks({ dateFilter: 'garbage', page: '2' })
+    renderHook(() => useUrlParams(DEFAULTS_WITH_PAGE, VALIDATORS))
+    // The effect runs after render; mockReplace should be called to clean the URL.
+    // 'garbage' → default 'lastWeek' which equals the default → removed from URL.
+    // 'page=2' is valid so it stays.
+    expect(mockReplace).toHaveBeenCalledWith('?page=2')
+  })
+
+  it('auto-corrects an invalid page by removing it (equals default 0)', () => {
+    setupMocks({ page: '-3' })
+    renderHook(() => useUrlParams(DEFAULTS_WITH_PAGE, VALIDATORS))
+    // -3 → '0' which is the default → param removed → empty URL → pathname
+    expect(mockReplace).toHaveBeenCalledWith('/test')
+  })
+
+  it('does NOT call router.replace when all URL params are already valid', () => {
+    setupMocks({ dateFilter: 'lastMonth', page: '1' })
+    renderHook(() => useUrlParams(DEFAULTS_WITH_PAGE, VALIDATORS))
+    expect(mockReplace).not.toHaveBeenCalled()
+  })
+
+  it('does NOT call router.replace when no validators are provided', () => {
+    setupMocks({ dateFilter: 'garbage' })
+    renderHook(() => useUrlParams(DEFAULTS))
+    expect(mockReplace).not.toHaveBeenCalled()
   })
 })
 

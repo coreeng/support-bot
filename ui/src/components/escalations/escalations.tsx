@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { useUrlParams } from '@/lib/hooks/useUrlParams'
+import { useUrlParams, enumValidator, nonNegativeIntValidator } from '@/lib/hooks/useUrlParams'
 import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 import { useEscalations, useRegistry, useTenantTeams } from '@/lib/hooks'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
@@ -50,35 +50,46 @@ export default function EscalationsPage() {
     type DateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
 
     // Persist all filter / sort / page controls in the URL.
-    const [params, setParams] = useUrlParams({
-        dateFilter: 'lastWeek',
-        dateFrom: '',
-        dateTo: '',
-        status: 'all',
-        selectedTeam: '',
-        impact: 'all',
-        tag: '',
-        sortBy: 'openedAt',
-        sortDir: 'desc',
-        page: '0',
-    })
+    // Validators guard against invalid URL values and auto-correct the URL.
+    const [params, setParams] = useUrlParams(
+        {
+            dateFilter: 'lastWeek',
+            dateFrom: '',
+            dateTo: '',
+            status: 'all',
+            selectedTeam: '',
+            impact: 'all',
+            tag: '',
+            sortBy: 'openedAt',
+            sortDir: 'desc',
+            page: '0',
+        },
+        {
+            dateFilter: enumValidator(['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, 'lastWeek'),
+            status: enumValidator(['all', 'ongoing', 'resolved'] as const, 'all'),
+            sortBy: enumValidator(['ticketId', 'escalatingTeam', 'escalatedTo', 'openedAt', 'resolvedAt', 'duration'] as const, 'openedAt'),
+            sortDir: enumValidator(['asc', 'desc'] as const, 'desc'),
+            page: nonNegativeIntValidator,
+        },
+    )
 
-    // Local read-aliases so the rest of the component body needs no rename churn.
-    const selectedTeam = params.selectedTeam
-    const statusFilter = params.status as 'all' | 'ongoing' | 'resolved'
-    const impactFilter = params.impact
-    const tagFilter = params.tag
-    const dateFilter: DateFilter =
-        (['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const).includes(params.dateFilter as DateFilter)
-            ? (params.dateFilter as DateFilter)
-            : 'lastWeek'
-    const sortColumn: SortColumn =
-        (['ticketId', 'escalatingTeam', 'escalatedTo', 'openedAt', 'resolvedAt', 'duration'] as const).includes(params.sortBy as SortColumn)
-            ? (params.sortBy as SortColumn)
-            : 'openedAt'
-    const sortDirection: 'asc' | 'desc' = params.sortDir === 'asc' ? 'asc' : 'desc'
-    const pageIndex = Math.max(0, parseInt(params.page) || 0)
+    // Safe to cast: validators guarantee these are valid enum / numeric values.
+    const selectedTeam  = params.selectedTeam
+    const statusFilter  = params.status as 'all' | 'ongoing' | 'resolved'
+    const impactFilter  = params.impact
+    const tagFilter     = params.tag
+    const dateFilter    = params.dateFilter as DateFilter
+    const sortColumn    = params.sortBy as SortColumn
+    const sortDirection = params.sortDir as 'asc' | 'desc'
+    const pageIndex     = parseInt(params.page, 10)
     const pageSize = 15
+
+    // Correct the URL when custom date range is in an invalid order (dateFrom > dateTo).
+    useEffect(() => {
+        if (params.dateFilter === 'custom' && params.dateFrom && params.dateTo && params.dateFrom > params.dateTo) {
+            setParams({ dateFilter: 'lastWeek', dateFrom: '', dateTo: '' })
+        }
+    }, [params.dateFilter, params.dateFrom, params.dateTo, setParams])
 
     const {
         hasFullAccess,
