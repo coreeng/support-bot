@@ -1,16 +1,16 @@
 'use client'
 
 import {useEffect, useMemo, useRef, useState} from 'react'
-import {useAllTickets, useRegistry, useTenantTeams, useTickets, useAssignmentEnabled} from '@/lib/hooks'
+import {useAllTickets, useAssignmentEnabled, useRegistry, useTenantTeams, useTickets} from '@/lib/hooks'
 import {useTeamFilter} from '@/contexts/TeamFilterContext'
-import {TicketWithLogs, PaginatedTickets, TicketImpact, TicketTag} from "@/lib/types"
+import {PaginatedTickets, TicketImpact, TicketTag, TicketWithLogs} from "@/lib/types"
 import LoadingSkeleton from '@/components/LoadingSkeleton'
 import EditTicketModal from './EditTicketModal'
 import {useQueryClient} from '@tanstack/react-query'
-import { TEAM_SCOPE } from '@/lib/constants'
-import { normalizeTeamKey } from '@/lib/teamUtils'
-import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
-import { useUrlParams, enumValidator, nonNegativeIntValidator } from '@/lib/hooks/useUrlParams'
+import {TEAM_SCOPE} from '@/lib/constants'
+import {normalizeTeamKey} from '@/lib/teamUtils'
+import {getDateRangeFromFilter, PRESET_DAYS} from '@/lib/dateRange'
+import {enumValidator, nonNegativeIntValidator, useUrlParams} from '@/lib/hooks/useUrlParams'
 
 
 export default function TicketsPage() {
@@ -93,16 +93,14 @@ export default function TicketsPage() {
         [dateFilter, params.dateFrom, params.dateTo]
     )
 
-    const hasClientFilters = useMemo(
-        () => !!(params.status || params.teamFilter || params.impact || params.tag || params.escalated || params.escalatedTo),
-        [params.status, params.teamFilter, params.impact, params.tag, params.escalated, params.escalatedTo]
-    )
-
-    // Data hooks
+  // Data hooks
     // - When filters are applied: pull all pages client-side to avoid missing matches on later pages.
     // - When viewing all teams (no team filter): use backend pagination for efficiency.
     // - When viewing a specific team: larger single fetch + client-side paginate.
-    const shouldUseAllTickets = hasClientFilters
+    const shouldUseAllTickets = useMemo(
+      () => !!(params.status || params.teamFilter || params.impact || params.tag || params.escalated || params.escalatedTo),
+      [params.status, params.teamFilter, params.impact, params.tag, params.escalated, params.escalatedTo]
+    )
     const useServerPagination = isViewingAllTeams && !shouldUseAllTickets
     const backendPageSize = useServerPagination ? pageSize : 1000
     const backendPage = useServerPagination ? currentPage : 0

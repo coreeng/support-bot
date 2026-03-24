@@ -1,13 +1,13 @@
 'use client'
 
-import React, { useEffect, useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useUrlParams, enumValidator } from '@/lib/hooks/useUrlParams'
 import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
-import { 
+import {
     useFirstResponsePercentiles,
     useTicketResolutionPercentiles,
-    useFirstResponseDurationDistribution, 
-    useUnattendedQueriesCount, 
+    useFirstResponseDurationDistribution,
+    useUnattendedQueriesCount,
     useTicketResolutionDurationDistribution,
     useResolutionTimesByWeek,
     useUnresolvedTicketAges,
@@ -178,7 +178,7 @@ export default function DashboardsPage() {
         dateRange.from,
         dateRange.to
     )
-    
+
     const isRefreshingResolutionSla = isFetchingResolutionPerc || isFetchingResDist || isFetchingResByWeek || isFetchingUnresolvedAges || isFetchingResTimeByTag || isFetchingIncomingVsResolved
     const isRefreshingWeeklySla = isFetchingWeeklyCounts || isFetchingWeeklyComp || isFetchingTopEsc
 
@@ -198,7 +198,7 @@ export default function DashboardsPage() {
                             <p className="text-xs text-gray-500 mt-0.5">Performance at a glance</p>
                         </div>
                     </div>
-                    
+
                     <div className="flex flex-wrap items-center gap-2 py-2">
                         <select
                             data-testid="sla-date-filter"
@@ -273,14 +273,14 @@ export default function DashboardsPage() {
                                 orange: isActive ? 'border-orange-600 bg-orange-50' : 'border-transparent hover:bg-orange-50',
                                 green: isActive ? 'border-green-600 bg-green-50' : 'border-transparent hover:bg-green-50',
                             }
-                            
-                            const textColor = isActive 
+
+                            const textColor = isActive
                                 ? section.color === 'blue' ? 'text-blue-700'
                                 : section.color === 'purple' ? 'text-purple-700'
                                 : section.color === 'orange' ? 'text-orange-700'
                                 : 'text-green-700'
                                 : 'text-gray-600'
-                            
+
                             return (
                                 <button
                                     key={section.key}

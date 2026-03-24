@@ -97,6 +97,10 @@ describe('Dashboard - Support Area Summary visibility', () => {
       effectiveTeams: [],
       allTeams: [],
       initialized: true,
+      teamScope: { mode: 'uninitialized' as const },
+      hasNoTeamScope: false,
+      isViewingAllTeams: false,
+      isViewingAsEscalationTeam: false,
     })
   })
 
@@ -114,12 +118,17 @@ describe('Dashboard - Support Area Summary visibility', () => {
         effectiveTeams: [],
         allTeams: [],
         initialized: true,
+        teamScope: { mode: 'uninitialized' as const },
+        hasNoTeamScope: false,
+        isViewingAllTeams: false,
+        isViewingAsEscalationTeam: false,
       })
     })
 
     it('shows Support Area Summary when leadership/support team is selected', async () => {
       mockUseAuth.mockReturnValue({
         user: {
+          id: 'user@example.com',
           name: 'User',
           email: 'user@example.com',
           roles: ['supportEngineer'],
@@ -128,7 +137,6 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isLoading: false,
         isAuthenticated: true,
         logout: jest.fn(),
-        refreshUser: jest.fn(),
         isLeadership: false,
         isEscalationTeam: false,
         isSupportEngineer: true,
@@ -157,12 +165,17 @@ describe('Dashboard - Support Area Summary visibility', () => {
         effectiveTeams: ['tenant-team'],
         allTeams: ['tenant-team'],
         initialized: true,
+        teamScope: { mode: 'selected_teams' as const, teams: ['tenant-team'] },
+        hasNoTeamScope: false,
+        isViewingAllTeams: false,
+        isViewingAsEscalationTeam: false,
       })
     })
 
     it('does NOT show Support Area Summary when tenant team is selected', async () => {
       mockUseAuth.mockReturnValue({
         user: {
+          id: 'support@example.com',
           name: 'Support User',
           email: 'support@example.com',
           roles: ['supportEngineer'],
@@ -171,7 +184,6 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isLoading: false,
         isAuthenticated: true,
         logout: jest.fn(),
-        refreshUser: jest.fn(),
         isLeadership: false,
         isEscalationTeam: false,
         isSupportEngineer: true,
@@ -188,6 +200,7 @@ describe('Dashboard - Support Area Summary visibility', () => {
     it('does NOT show Support Area Summary when escalation team is selected', async () => {
       mockUseAuth.mockReturnValue({
         user: {
+          id: 'leader@example.com',
           name: 'Leadership User',
           email: 'leader@example.com',
           roles: ['leadership'],
@@ -196,7 +209,6 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isLoading: false,
         isAuthenticated: true,
         logout: jest.fn(),
-        refreshUser: jest.fn(),
         isLeadership: true,
         isEscalationTeam: false,
         isSupportEngineer: false,
@@ -229,12 +241,17 @@ describe('Dashboard - Support Area Summary visibility', () => {
         effectiveTeams: [],
         allTeams: [],
         initialized: true,
+        teamScope: { mode: 'uninitialized' as const },
+        hasNoTeamScope: false,
+        isViewingAllTeams: false,
+        isViewingAsEscalationTeam: false,
       })
     })
 
     it('does NOT show Support Area Summary even with full access when feature is disabled', async () => {
       mockUseAuth.mockReturnValue({
         user: {
+          id: 'user@example.com',
           name: 'User',
           email: 'user@example.com',
           roles: ['supportEngineer'],
@@ -243,7 +260,6 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isLoading: false,
         isAuthenticated: true,
         logout: jest.fn(),
-        refreshUser: jest.fn(),
         isLeadership: false,
         isEscalationTeam: false,
         isSupportEngineer: true,
@@ -272,12 +288,17 @@ describe('Dashboard - Support Area Summary visibility', () => {
         effectiveTeams: [],
         allTeams: [],
         initialized: true,
+        teamScope: { mode: 'uninitialized' as const },
+        hasNoTeamScope: false,
+        isViewingAllTeams: false,
+        isViewingAsEscalationTeam: false,
       })
     })
 
     it('does NOT show Support Area Summary while loading even with full access', async () => {
       mockUseAuth.mockReturnValue({
         user: {
+          id: 'user@example.com',
           name: 'User',
           email: 'user@example.com',
           roles: ['supportEngineer'],
@@ -286,7 +307,6 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isLoading: false,
         isAuthenticated: true,
         logout: jest.fn(),
-        refreshUser: jest.fn(),
         isLeadership: false,
         isEscalationTeam: false,
         isSupportEngineer: true,
@@ -318,10 +338,15 @@ describe('Dashboard - Support Area Summary visibility', () => {
         effectiveTeams: ['tenant-team'],
         allTeams: ['tenant-team'],
         initialized: true,
+        teamScope: { mode: 'selected_teams' as const, teams: ['tenant-team'] },
+        hasNoTeamScope: false,
+        isViewingAllTeams: false,
+        isViewingAsEscalationTeam: false,
       })
 
       mockUseAuth.mockReturnValue({
         user: {
+          id: 'user@example.com',
           name: 'User',
           email: 'user@example.com',
           roles: ['user'],
@@ -330,7 +355,6 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isLoading: false,
         isAuthenticated: true,
         logout: jest.fn(),
-        refreshUser: jest.fn(),
         isLeadership: false,
         isEscalationTeam: false,
         isSupportEngineer: false,
@@ -360,10 +384,15 @@ describe('Dashboard - Support Area Summary visibility', () => {
         effectiveTeams: [],
         allTeams: [],
         initialized: true,
+        teamScope: { mode: 'uninitialized' as const },
+        hasNoTeamScope: false,
+        isViewingAllTeams: false,
+        isViewingAsEscalationTeam: false,
       })
 
       mockUseAuth.mockReturnValue({
         user: {
+          id: 'user@example.com',
           name: 'User',
           email: 'user@example.com',
           roles: ['supportEngineer'],
@@ -372,7 +401,6 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isLoading: false,
         isAuthenticated: true,
         logout: jest.fn(),
-        refreshUser: jest.fn(),
         isLeadership: false,
         isEscalationTeam: false,
         isSupportEngineer: true,
@@ -396,10 +424,15 @@ describe('Dashboard - Support Area Summary visibility', () => {
         effectiveTeams: ['tenant-team'],
         allTeams: ['tenant-team'],
         initialized: true,
+        teamScope: { mode: 'selected_teams' as const, teams: ['tenant-team'] },
+        hasNoTeamScope: false,
+        isViewingAllTeams: false,
+        isViewingAsEscalationTeam: false,
       })
 
       mockUseAuth.mockReturnValue({
         user: {
+          id: 'user@example.com',
           name: 'User',
           email: 'user@example.com',
           roles: ['user'],
@@ -408,7 +441,6 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isLoading: false,
         isAuthenticated: true,
         logout: jest.fn(),
-        refreshUser: jest.fn(),
         isLeadership: false,
         isEscalationTeam: false,
         isSupportEngineer: false,
