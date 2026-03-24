@@ -4,6 +4,18 @@ import { CustomWorld } from "./custom-world";
 
 const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
+// Maps human-readable filter labels (including the old "Last 7 Days" alias) to
+// the <select> option values used by the SLA dashboard's date-filter picklist.
+const filterNameToValue = (name: string): string =>
+  ({
+    "Last 7 Days": "lastWeek",
+    "Last Week":   "lastWeek",
+    "Last 2 Weeks": "last2Weeks",
+    "Last Month":  "lastMonth",
+    "Last Year":   "lastYear",
+    "Custom":      "custom",
+  } as Record<string, string>)[name] ?? name;
+
 // Helper to create mock dashboard responses
 const mockDashboardData = {
   firstResponsePercentiles: { p50: 300, p90: 600 },
@@ -153,16 +165,22 @@ Then("The page subtitle should contain {string}", async function (this: CustomWo
 });
 
 // Date filter assertions
+// The SLA dashboard now uses a <select> picklist instead of individual buttons.
 Then("Date filter quick buttons should be visible", async function (this: CustomWorld) {
-  await expect(this.page.getByRole("button", { name: "Last 7 Days" })).toBeVisible({ timeout: 15000 });
-  await expect(this.page.getByRole("button", { name: "Last Month" })).toBeVisible({ timeout: 15000 });
-  await expect(this.page.getByRole("button", { name: "Last Year" })).toBeVisible({ timeout: 15000 });
-  await expect(this.page.getByRole("button", { name: "Custom" })).toBeVisible({ timeout: 15000 });
+  // Verify the date-filter select (not buttons) is visible with the expected options.
+  const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
+  await expect(dateSelect).toBeVisible({ timeout: 15000 });
+  await expect(dateSelect.locator('option[value="lastWeek"]')).toHaveCount(1);
+  await expect(dateSelect.locator('option[value="lastMonth"]')).toHaveCount(1);
+  await expect(dateSelect.locator('option[value="lastYear"]')).toHaveCount(1);
+  await expect(dateSelect.locator('option[value="custom"]')).toHaveCount(1);
 });
 
-Then("Quick filter {string} should be clickable", async function (this: CustomWorld, buttonName: string) {
-  const button = this.page.getByRole("button", { name: buttonName });
-  await expect(button).toBeEnabled({ timeout: 15000 });
+Then("Quick filter {string} should be clickable", async function (this: CustomWorld, filterName: string) {
+  // Verify the corresponding <option> exists in the date-filter select.
+  const value = filterNameToValue(filterName);
+  const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
+  await expect(dateSelect.locator(`option[value="${value}"]`)).toHaveCount(1);
 });
 
 Then("Date range inputs should be visible", async function (this: CustomWorld) {
@@ -297,28 +315,33 @@ Then("Dashboard content should be visible or show loading state", async function
 });
 
 // Date filter interactions
+// The SLA dashboard uses a <select> picklist; "clicking a filter" means selecting
+// the matching option.  The filterNameToValue helper maps legacy names like
+// "Last 7 Days" to the canonical option value "lastWeek".
 When("User clicks on {string} quick filter", async function (this: CustomWorld, filterName: string) {
-  const button = this.page.getByRole("button", { name: filterName });
-  await button.click();
+  const value = filterNameToValue(filterName);
+  const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
+  await dateSelect.selectOption(value);
   await this.page.waitForTimeout(500);
 });
 
 Then("{string} button should be active", async function (this: CustomWorld, buttonName: string) {
-  const button = this.page.getByRole("button", { name: buttonName });
-  // Active buttons have specific styling (bg-blue-600)
-  const classList = await button.getAttribute("class");
-  expect(classList).toContain("bg-blue-600");
+  // "Active" now means the select has this value selected.
+  const value = filterNameToValue(buttonName);
+  const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
+  await expect(dateSelect).toHaveValue(value, { timeout: 5000 });
 });
 
 Then("Other quick filter buttons should not be active", async function (this: CustomWorld) {
-  // Just verify the UI state changed - implementation detail test
+  // Verified implicitly by the preceding "button should be active" assertion.
   expect(true).toBeTruthy();
 });
 
 Then("{string} button should not be active", async function (this: CustomWorld, buttonName: string) {
-  const button = this.page.getByRole("button", { name: buttonName });
-  const classList = await button.getAttribute("class");
-  expect(classList).not.toContain("bg-blue-600");
+  const value = filterNameToValue(buttonName);
+  const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
+  const currentValue = await dateSelect.inputValue();
+  expect(currentValue).not.toBe(value);
 });
 
 When("User sets start date to {string}", async function (this: CustomWorld, date: string) {

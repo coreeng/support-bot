@@ -21,7 +21,10 @@ const setEscalations = async (page: Page, content: any[]) => {
     })
 };
 
-const getMainEscalationsSection = (page: Page) => page.locator('.bg-purple-50');
+// Targets the main "All Escalations" table section specifically.
+// The EscalatedToMyTeamTable widget also uses bg-purple-50 and is rendered first
+// in the DOM, so we use a data-testid to avoid ambiguity.
+const getMainEscalationsSection = (page: Page) => page.locator('[data-testid="escalations-main-section"]');
 const clearEscalationsDateFilter = async (page: Page) => {
     const dateFilter = page.locator('[data-testid="escalations-date-filter"]');
     if (await dateFilter.isVisible().catch(() => false)) {
@@ -98,6 +101,8 @@ Given('there are escalations for {string} and {string}', async function (this: C
 });
 
 Given('there are ongoing and resolved escalations for {string}', async function (this: CustomWorld, teamName: string) {
+    // Use recent dates so the records are visible under the default "last week" date filter.
+    const now = new Date().toISOString();
     await setEscalations(this.page, [
         {
             id: 'esc-1',
@@ -108,23 +113,25 @@ Given('there are ongoing and resolved escalations for {string}', async function 
             impact: 'high',
             tags: ['bug'],
             hasThread: true,
-            openedAt: '2024-01-01T10:00:00Z'
+            openedAt: now
         },
         {
             id: 'esc-2',
             ticketId: 'ticket-2',
             team: { name: teamName },
             escalatingTeam: teamName,
-            resolvedAt: '2024-01-02T12:00:00Z',
+            resolvedAt: now,
             impact: 'medium',
             tags: ['feature'],
             hasThread: true,
-            openedAt: '2024-01-01T11:00:00Z'
+            openedAt: now
         }
     ]);
 });
 
 Given('there are high and medium impact escalations for {string}', async function (this: CustomWorld, teamName: string) {
+    // Use recent dates so the records are visible under the default "last week" date filter.
+    const now = new Date().toISOString();
     await setEscalations(this.page, [
         {
             id: 'esc-1',
@@ -135,7 +142,7 @@ Given('there are high and medium impact escalations for {string}', async functio
             impact: 'high',
             tags: ['bug'],
             hasThread: true,
-            openedAt: '2024-01-01T10:00:00Z'
+            openedAt: now
         },
         {
             id: 'esc-2',
@@ -146,12 +153,14 @@ Given('there are high and medium impact escalations for {string}', async functio
             impact: 'medium',
             tags: ['feature'],
             hasThread: true,
-            openedAt: '2024-01-02T10:00:00Z'
+            openedAt: now
         }
     ]);
 });
 
 Given('there are escalations with tags {string} and {string} for {string}', async function (this: CustomWorld, tagA: string, tagB: string, teamName: string) {
+    // Use recent dates so the records are visible under the default "last week" date filter.
+    const now = new Date().toISOString();
     await setEscalations(this.page, [
         {
             id: 'esc-tag-1',
@@ -162,7 +171,7 @@ Given('there are escalations with tags {string} and {string} for {string}', asyn
             impact: 'high',
             tags: [tagA],
             hasThread: true,
-            openedAt: '2024-01-01T10:00:00Z'
+            openedAt: now
         },
         {
             id: 'esc-tag-2',
@@ -173,7 +182,7 @@ Given('there are escalations with tags {string} and {string} for {string}', asyn
             impact: 'medium',
             tags: [tagB],
             hasThread: true,
-            openedAt: '2024-01-02T10:00:00Z'
+            openedAt: now
         }
     ]);
 });
@@ -510,33 +519,33 @@ Then('user should only see ongoing escalations', async function (this: CustomWor
 });
 
 Then('user should only see resolved escalations', async function (this: CustomWorld) {
-    await clearEscalationsDateFilter(this.page);
-    const bodyText = (await getMainEscalationsSection(this.page).locator('tbody').textContent()) || '';
-    expect(bodyText).toContain('Resolved');
-    expect(bodyText).not.toContain('Unresolved');
+    // Mock data uses recent dates, so the default "last week" filter lets them through.
+    // clearEscalationsDateFilter is NOT called — it could race with the preceding status
+    // filter URL update and inadvertently reset the status param.
+    // Use Playwright's retrying assertions so we don't rely on a fixed timeout.
+    const tbody = getMainEscalationsSection(this.page).locator('tbody').first();
+    await expect(tbody).toContainText('Resolved', { ignoreCase: true, timeout: 8000 });
+    await expect(tbody).not.toContainText('Ongoing', { ignoreCase: true, timeout: 8000 });
 });
 
 Then('user should only see high impact escalations', async function (this: CustomWorld) {
-    await clearEscalationsDateFilter(this.page);
-    const bodyText = (await getMainEscalationsSection(this.page).locator('tbody').textContent()) || '';
-    expect(bodyText).toContain('high');
-    expect(bodyText).not.toContain('medium');
+    const tbody = getMainEscalationsSection(this.page).locator('tbody').first();
+    await expect(tbody).toContainText('high', { ignoreCase: true, timeout: 8000 });
+    await expect(tbody).not.toContainText('medium', { ignoreCase: true, timeout: 8000 });
 });
 
 Then('user should only see escalations for selected team {string}', async function (this: CustomWorld, teamName: string) {
-    await clearEscalationsDateFilter(this.page);
-    const bodyText = (await getMainEscalationsSection(this.page).locator('tbody').textContent()) || '';
-    expect(bodyText).toContain(teamName);
+    const tbody = getMainEscalationsSection(this.page).locator('tbody').first();
+    await expect(tbody).toContainText(teamName, { timeout: 8000 });
     const nonMatching = teamName.toLowerCase().includes('core') ? 'Other-team' : 'Core-platform';
-    expect(bodyText).not.toContain(nonMatching);
+    await expect(tbody).not.toContainText(nonMatching, { timeout: 8000 });
 });
 
 Then('user should only see escalations with tag {string}', async function (this: CustomWorld, tag: string) {
-    await clearEscalationsDateFilter(this.page);
-    const bodyText = (await getMainEscalationsSection(this.page).locator('tbody').textContent()) || '';
-    expect(bodyText.toLowerCase()).toContain(tag.toLowerCase());
+    const tbody = getMainEscalationsSection(this.page).locator('tbody').first();
+    await expect(tbody).toContainText(tag, { ignoreCase: true, timeout: 8000 });
     const nonMatching = tag.toLowerCase() === 'bug' ? 'feature' : 'bug';
-    expect(bodyText.toLowerCase()).not.toContain(nonMatching);
+    await expect(tbody).not.toContainText(nonMatching, { ignoreCase: true, timeout: 8000 });
 });
 
 Then('escalations should be sorted by {string} in {string} order', async function (this: CustomWorld, columnName: string, direction: string) {

@@ -326,7 +326,7 @@ export default function EscalationsPage() {
             <div className="border-t-2 border-gray-300 my-8"></div>
 
             {/* All Escalations / Escalated for My Team Section */}
-            <div className="space-y-6 bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
+            <div data-testid="escalations-main-section" className="space-y-6 bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-bold text-purple-900">
                         {secondTableTitle}
