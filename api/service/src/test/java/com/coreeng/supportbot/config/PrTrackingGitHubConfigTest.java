@@ -72,6 +72,7 @@ class PrTrackingGitHubConfigTest {
                 "pr",
                 List.of("pr-review"),
                 "low",
+                "days",
                 List.of(new PrTrackingProps.Repository(
                         "my-org/my-repo", "wow", new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
                 appGithub,
@@ -99,6 +100,7 @@ class PrTrackingGitHubConfigTest {
                 "pr",
                 List.of("pr-review"),
                 "low",
+                "days",
                 List.of(new PrTrackingProps.Repository(
                         "my-org/my-repo", "wow", new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
                 appGithub,
@@ -129,6 +131,7 @@ class PrTrackingGitHubConfigTest {
                 "pr",
                 List.of("pr-review"),
                 "low",
+                "days",
                 List.of(new PrTrackingProps.Repository(
                         "my-org/my-repo", "wow", new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
                 appGithub,
