@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { AlertCircle, BarChart2, Home, Ticket, Headphones, ChevronDown, ChevronRight, ChevronLeft, LogOut, BookOpen } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
+import { buildHref } from '@/lib/utils'
 import Image from 'next/image'
 import TeamSelector from '@/components/TeamSelector'
 import { useKnowledgeGapsEnabled } from '@/lib/hooks'
@@ -54,7 +55,7 @@ const supportTabs: SupportTab[] = [
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, logout } = useAuth()
-    const { hasFullAccess } = useTeamFilter()
+    const { hasFullAccess, selectedTeam } = useTeamFilter()
     const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled()
     const pathname = usePathname()
 
@@ -162,7 +163,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                                         return (
                                             <Link
                                                 key={tab.path}
-                                                href={tab.path}
+                                                href={buildHref(tab.path, { team: selectedTeam })}
                                                 className={`w-full flex items-center gap-3 px-8 py-2.5 text-sm hover:bg-gray-700 transition-colors ${isActive ? 'bg-blue-600 text-white' : 'text-gray-300'
                                                     }`}
                                             >

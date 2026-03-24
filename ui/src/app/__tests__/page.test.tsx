@@ -9,6 +9,7 @@ import { useKnowledgeGapsEnabled } from '../../lib/hooks'
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
   usePathname: jest.fn(() => '/'),
+  useSearchParams: jest.fn(() => new URLSearchParams()),
 }))
 
 jest.mock('../../hooks/useAuth', () => ({
