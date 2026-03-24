@@ -62,7 +62,9 @@ public class TicketSummaryService {
             querySummary = buildFallbackQuerySummary(ticket);
         }
         ImmutableList<TicketSummaryView.EscalationView> escalations = getEscalationViews(ticket);
-        ImmutableList<Tag> allTags = tagsRegistry.listAllTags();
+        // Resolve labels for tags on this ticket, including any soft-deleted from the database,
+        // so historical tag data remains visible in the summary view.
+        ImmutableList<Tag> currentTags = tagsRegistry.listTagsByCodes(ticket.tags());
         ImmutableList<TicketImpact> allImpacts = impactsRegistry.listAllImpacts();
 
         // Assignee fields (only if assignment is enabled)
@@ -80,8 +82,7 @@ public class TicketSummaryService {
                 ticket,
                 querySummary,
                 escalations,
-                allTags,
-                allTags.stream().filter(t -> ticket.tags().contains(t.code())).collect(toImmutableList()),
+                currentTags,
                 allImpacts,
                 ticket.impact() != null
                         ? allImpacts.stream()

@@ -165,6 +165,7 @@ public class SlackAppInit implements InitializingBean {
                 } catch (Exception e) {
                     errorCounter(TYPE_SUGGESTION, actionId, e.getClass().getSimpleName())
                             .increment();
+                    log.atError().setCause(e).addKeyValue("actionId", actionId).log("Error handling block suggestion");
                     throw e;
                 } finally {
                     sample.stop(durationTimer(TYPE_SUGGESTION, actionId));
@@ -185,6 +186,10 @@ public class SlackAppInit implements InitializingBean {
                 } catch (Exception e) {
                     errorCounter(TYPE_VIEW_SUBMISSION, callbackId, e.getClass().getSimpleName())
                             .increment();
+                    log.atError()
+                            .setCause(e)
+                            .addKeyValue("callbackId", callbackId)
+                            .log("Error handling view submission");
                     throw e;
                 } finally {
                     sample.stop(durationTimer(TYPE_VIEW_SUBMISSION, callbackId));

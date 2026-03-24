@@ -91,16 +91,14 @@ public class TicketSummaryViewMapper {
                                 input(i -> i.label(plainText("Select Tags"))
                                         .optional(false)
                                         .hint(plainText("Select all applicable tags."))
-                                        .element(multiStaticSelect(s -> s.actionId(TicketField.tags.actionId())
+                                        .element(multiExternalSelect(s -> s.actionId(TicketField.tags.actionId())
                                                 .initialOptions(
                                                         isEmpty(summaryView.currentTags())
                                                                 ? null
                                                                 : summaryView.currentTags().stream()
                                                                         .map(RenderingUtils::toOptionObject)
                                                                         .toList())
-                                                .options(summaryView.tags().stream()
-                                                        .map(RenderingUtils::toOptionObject)
-                                                        .toList())))),
+                                                .minQueryLength(0)))),
                                 input(i -> i.label(plainText("Change Impact"))
                                         .optional(false)
                                         .element(staticSelect(s -> s.actionId(TicketField.impact.actionId())

@@ -32,14 +32,6 @@ public class EscalationForm {
         }
 
         private String buildExpectedViewJson() {
-            String tagOptions = ticket.config().tags().stream()
-                    .map(tag -> String.format("""
-                        {
-                          "text": {"type": "plain_text", "text": %s},
-                          "value": %s
-                        }""", safeJson(tag.label()), safeJson(tag.code())))
-                    .collect(Collectors.joining(",\n"));
-
             String teamOptions = ticket.config().escalationTeams().stream()
                     .map(team -> String.format("""
                         {
@@ -65,9 +57,9 @@ public class EscalationForm {
                       "block_id": "escalation-tags",
                       "label": { "type": "plain_text", "text": "Pick tags" },
                       "element": {
-                        "type": "multi_static_select",
+                        "type": "multi_external_select",
                         "action_id": "escalation-tags",
-                        "options": [ ${tagOptions} ]
+                        "min_query_length": 0
                       },
                       "optional": false
                     },
@@ -88,7 +80,6 @@ public class EscalationForm {
                 """,
                     Map.of(
                             "titleText", safeJson("Escalate Ticket ID-" + ticket.id()),
-                            "tagOptions", tagOptions,
                             "teamOptions", teamOptions,
                             "privateMetadata", privateMetadataQuoted));
         }

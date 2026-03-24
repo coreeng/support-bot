@@ -8,7 +8,7 @@ import static com.google.common.collect.Iterables.isEmpty;
 import static com.slack.api.model.block.Blocks.input;
 import static com.slack.api.model.block.composition.BlockCompositions.option;
 import static com.slack.api.model.block.composition.BlockCompositions.plainText;
-import static com.slack.api.model.block.element.BlockElements.multiStaticSelect;
+import static com.slack.api.model.block.element.BlockElements.multiExternalSelect;
 import static com.slack.api.model.block.element.BlockElements.staticSelect;
 import static com.slack.api.model.view.Views.*;
 
@@ -75,10 +75,10 @@ public class HomepageFilterMapper {
                         .options(List.of(
                                 toOptionObject(HomepageFilter.Timeframe.thisWeek),
                                 toOptionObject(HomepageFilter.Timeframe.previousWeek)))))),
-                input(i -> i.label(plainText("Tags")).optional(true).element(multiStaticSelect(s -> s.actionId(
+                input(i -> i.label(plainText("Tags")).optional(true).element(multiExternalSelect(s -> s.actionId(
                                 FilterField.tags.actionId())
                         .initialOptions(buildInitialTagOptions(filter))
-                        .options(buildTagOptions())))),
+                        .minQueryLength(0)))),
                 input(i -> i.label(plainText("Impact")).optional(true).element(staticSelect(s -> s.actionId(
                                 FilterField.impact.actionId())
                         .initialOption(
@@ -117,13 +117,6 @@ public class HomepageFilterMapper {
                 .blocks(filterBlocks);
     }
 
-    private List<OptionObject> buildTagOptions() {
-        List<OptionObject> options = new ArrayList<>();
-        options.add(option(plainText(NO_TAGS_LABEL), NO_TAGS_VALUE));
-        tagsRegistry.listAllTags().stream().map(RenderingUtils::toOptionObject).forEach(options::add);
-        return options;
-    }
-
     @Nullable private List<OptionObject> buildInitialTagOptions(HomepageFilter filter) {
         if (!filter.includeNoTags() && isEmpty(filter.tags())) {
             return null;
@@ -132,9 +125,9 @@ public class HomepageFilterMapper {
         if (filter.includeNoTags()) {
             initialOptions.add(option(plainText(NO_TAGS_LABEL), NO_TAGS_VALUE));
         }
-        tagsRegistry.listTagsByCodes(filter.tags()).stream()
+        initialOptions.addAll(tagsRegistry.listTagsByCodes(filter.tags()).stream()
                 .map(RenderingUtils::toOptionObject)
-                .forEach(initialOptions::add);
+                .toList());
         return initialOptions;
     }
 

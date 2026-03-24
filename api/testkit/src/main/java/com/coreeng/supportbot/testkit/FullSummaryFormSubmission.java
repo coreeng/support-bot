@@ -47,7 +47,7 @@ public class FullSummaryFormSubmission implements ViewSubmission {
                 .add(new StaticSelectValue(
                         "ticket-change-status", values.status().code()))
                 .add(new StaticSelectValue("ticket-change-team", values.team()))
-                .add(new MultiStaticSelectValue("ticket-change-tags", values.tags()))
+                .add(new MultiExternalSelectValue("ticket-change-tags", values.tags()))
                 .add(new StaticSelectValue("ticket-change-impact", values.impact()));
 
         if (values.assignedTo() != null) {

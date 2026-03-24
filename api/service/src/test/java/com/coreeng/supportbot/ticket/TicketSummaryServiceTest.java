@@ -115,7 +115,7 @@ class TicketSummaryServiceTest {
                 supportTeamService,
                 defaultAssignmentProps);
 
-        lenient().when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of());
+        lenient().when(tagsRegistry.listTagsByCodes(any())).thenReturn(ImmutableList.of());
         lenient().when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
     }
 
@@ -138,8 +138,6 @@ class TicketSummaryServiceTest {
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
         when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
-        when(tagsRegistry.listAllTags())
-                .thenReturn(ImmutableList.of(new Tag("Bug", "bug"), new Tag("Urgent", "urgent")));
         when(impactsRegistry.listAllImpacts())
                 .thenReturn(ImmutableList.of(new TicketImpact("Production Blocking", "production-blocking")));
 
@@ -179,7 +177,6 @@ class TicketSummaryServiceTest {
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
         when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
-        when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of());
         when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
         when(supportTeamService.members()).thenReturn(members);
 
@@ -238,7 +235,6 @@ class TicketSummaryServiceTest {
                 .thenReturn("https://slack.com/escalation2-permalink");
         when(escalationQueryService.listByTicketId(ticketId))
                 .thenReturn(ImmutableList.of(escalation2, escalation1)); // reversed order
-        when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of());
         when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
         when(escalationTeamsRegistry.findEscalationTeamByCode("platform-team"))
                 .thenReturn(new EscalationTeam("Platform Team", "platform-team", "platform-support"));
@@ -274,7 +270,6 @@ class TicketSummaryServiceTest {
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
         when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
-        when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of());
         when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
 
         // when
@@ -313,7 +308,6 @@ class TicketSummaryServiceTest {
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(botMessage);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
         when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
-        when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of());
         when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
 
         // when
@@ -365,18 +359,42 @@ class TicketSummaryServiceTest {
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
         when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
-        when(tagsRegistry.listAllTags())
-                .thenReturn(ImmutableList.of(
-                        new Tag("Bug", "bug"), new Tag("Urgent", "urgent"), new Tag("Feature", "feature")));
+        when(tagsRegistry.listTagsByCodes(ticket.tags()))
+                .thenReturn(ImmutableList.of(new Tag("Bug", "bug"), new Tag("Urgent", "urgent")));
         when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
 
         // when
         TicketSummaryView result = service.summaryView(ticketId);
 
         // then
-        assertThat(result.tags()).hasSize(3);
         assertThat(result.currentTags()).hasSize(2);
         assertThat(result.currentTags().stream().map(Tag::code)).containsExactlyInAnyOrder("bug", "urgent");
+        // Verify the service uses listTagsByCodes (not listAllTags) to resolve current tags,
+        // so soft-deleted tags on the ticket are still resolved.
+        verify(tagsRegistry).listTagsByCodes(ticket.tags());
+    }
+
+    @Test
+    void softDeletedTagsOnTicket_stillAppearInCurrentTags() {
+        // Regression: after soft-deleting a tag, listAllTags() no longer returns it, but tickets that
+        // were tagged with it must still show it in the Full Summary view via listTagsByCodes().
+        Ticket taggedTicket = ticket.toBuilder()
+                .tags(ImmutableList.of("bug", "deprecated-tag"))
+                .build();
+
+        when(repository.findTicketById(ticketId)).thenReturn(taggedTicket);
+        when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
+        when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
+        when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
+        // listTagsByCodes() returns all matching tags regardless of deletion status in the database
+        when(tagsRegistry.listTagsByCodes(taggedTicket.tags()))
+                .thenReturn(ImmutableList.of(new Tag("Bug", "bug"), new Tag("Deprecated Tag", "deprecated-tag")));
+        when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
+
+        TicketSummaryView result = service.summaryView(ticketId);
+
+        assertThat(result.currentTags()).hasSize(2);
+        assertThat(result.currentTags().stream().map(Tag::code)).containsExactlyInAnyOrder("bug", "deprecated-tag");
     }
 
     @Test
@@ -398,7 +416,6 @@ class TicketSummaryServiceTest {
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
         when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
-        when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of());
         when(impactsRegistry.listAllImpacts())
                 .thenReturn(ImmutableList.of(
                         new TicketImpact("Production Blocking", "production-blocking"),
@@ -434,7 +451,6 @@ class TicketSummaryServiceTest {
         when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
         when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
         when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
-        when(tagsRegistry.listAllTags()).thenReturn(ImmutableList.of());
         when(impactsRegistry.listAllImpacts())
                 .thenReturn(ImmutableList.of(new TicketImpact("Production Blocking", "production-blocking")));
 
