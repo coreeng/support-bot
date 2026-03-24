@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 class PrTrackingConfigValidationTest {
 
+    private static final String DEFAULT_DURATION_UNIT = "days";
     private static final PrTrackingProps.SlaDiscovery DEFAULT_SLA_DISCOVERY =
             new PrTrackingProps.SlaDiscovery(Duration.ofHours(24));
 
@@ -22,6 +23,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
@@ -41,6 +43,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(repoA, repoB),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
@@ -61,6 +64,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         noToken,
                         DEFAULT_SLA_DISCOVERY))
@@ -81,6 +85,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         appNoInstallation,
                         DEFAULT_SLA_DISCOVERY))
@@ -97,6 +102,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         null,
                         DEFAULT_SLA_DISCOVERY))
@@ -117,6 +123,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         noAuthMode,
                         DEFAULT_SLA_DISCOVERY))
@@ -142,6 +149,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         appConfig,
                         DEFAULT_SLA_DISCOVERY))
@@ -161,6 +169,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(badName),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
@@ -180,6 +189,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(zeroSla),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
@@ -200,6 +210,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(negativeSla),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
@@ -220,6 +231,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(repo),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
@@ -241,6 +253,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(repo),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
@@ -262,6 +275,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(repo),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
@@ -285,6 +299,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(repo),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
@@ -304,6 +319,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(repo),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
@@ -319,6 +335,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of(),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
@@ -335,6 +352,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "",
+                        DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
@@ -351,6 +369,7 @@ class PrTrackingConfigValidationTest {
                         "pr",
                         List.of("tag"),
                         "low",
+                        DEFAULT_DURATION_UNIT,
                         List.of(),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
@@ -367,6 +386,7 @@ class PrTrackingConfigValidationTest {
         assertThatCode(() -> new PrTrackingProps(
                         false,
                         "",
+                        null,
                         null,
                         null,
                         null,
@@ -389,6 +409,7 @@ class PrTrackingConfigValidationTest {
                 "pr",
                 List.of("tag"),
                 "low",
+                DEFAULT_DURATION_UNIT,
                 List.of(mixedCase),
                 validTokenGithub(),
                 DEFAULT_SLA_DISCOVERY);
@@ -398,6 +419,69 @@ class PrTrackingConfigValidationTest {
                 .singleElement()
                 .extracting(PrTrackingProps.Repository::name)
                 .isEqualTo("my-org/my-repo");
+    }
+
+    @Test
+    void rejectsInvalidDurationUnitWhenEnabled() {
+        // given an unsupported duration unit e.g. "minutes"
+        String invalidUnit = "minutes";
+
+        // when config is created with an invalid duration unit
+        // then it throws
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        invalidUnit,
+                        List.of(validRepo()),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duration-unit must be one of");
+    }
+
+    @Test
+    void defaultsDurationUnitToDaysWhenNull() {
+        // given no duration-unit configured
+        String noDurationUnit = null;
+
+        // when config is created without a duration unit
+        PrTrackingProps props = new PrTrackingProps(
+                true,
+                "0 0 9-18 * * 1-5",
+                "pr",
+                List.of("tag"),
+                "low",
+                noDurationUnit,
+                List.of(validRepo()),
+                validTokenGithub(),
+                DEFAULT_SLA_DISCOVERY);
+
+        // then it defaults to "days"
+        assertThat(props.durationUnit()).isEqualTo("days");
+    }
+
+    @Test
+    void normalizesDurationUnitToLowerCase() {
+        // given a duration unit with mixed case e.g. "Hours"
+        String mixedCaseUnit = "Hours";
+
+        // when config is created with a mixed case duration unit
+        PrTrackingProps props = new PrTrackingProps(
+                true,
+                "0 0 9-18 * * 1-5",
+                "pr",
+                List.of("tag"),
+                "low",
+                mixedCaseUnit,
+                List.of(validRepo()),
+                validTokenGithub(),
+                DEFAULT_SLA_DISCOVERY);
+
+        // then it is normalised to lowercase
+        assertThat(props.durationUnit()).isEqualTo("hours");
     }
 
     private static PrTrackingProps.Repository validRepo() {

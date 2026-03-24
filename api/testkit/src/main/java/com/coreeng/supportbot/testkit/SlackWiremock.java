@@ -204,20 +204,24 @@ public class SlackWiremock extends WireMockServer {
      * @param state         "open" or "closed"
      * @param createdAtIso ISO-8601 instant (e.g. "2024-01-15T10:00:00Z")
      */
-    public Stub stubGitHubGetPullRequest(
-            String description, String repositoryName, int pullNumber, String state, String createdAtIso) {
-        // hub4j's GitHub.getRepository() makes an eager GET /repos/{owner}/{repo} request before
-        // constructing the pull-request URL, so we must stub that call too.
+    // hub4j eagerly calls GET /repos/{owner}/{repo} before any repo operation,
+    // so every GitHub stub needs this or WireMock will reject the request.
+    private StubMapping stubRepoMetadata(String description, String repositoryName) {
         String[] parts = repositoryName.split("/", 2);
         String repoBody = """
                 {"id":1,"name":"%s","full_name":"%s","owner":{"login":"%s"},"private":false}
                 """.formatted(parts[1], repositoryName, parts[0]);
-        StubMapping repoStub = givenThat(get("/repos/" + repositoryName)
+        return givenThat(get("/repos/" + repositoryName)
                 .withName(description + " (repo metadata)")
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(repoBody)));
+    }
+
+    public Stub stubGitHubGetPullRequest(
+            String description, String repositoryName, int pullNumber, String state, String createdAtIso) {
+        StubMapping repoStub = stubRepoMetadata(description, repositoryName);
 
         String prPath = "/repos/" + repositoryName + "/pulls/" + pullNumber;
         String prBody = """
@@ -243,16 +247,7 @@ public class SlackWiremock extends WireMockServer {
      */
     public Stub stubGitHubGetPullRequestError(
             String description, String repositoryName, int pullNumber, int statusCode, String errorMessage) {
-        String[] parts = repositoryName.split("/", 2);
-        String repoBody = """
-                {"id":1,"name":"%s","full_name":"%s","owner":{"login":"%s"},"private":false}
-                """.formatted(parts[1], repositoryName, parts[0]);
-        StubMapping repoStub = givenThat(get("/repos/" + repositoryName)
-                .withName(description + " (repo metadata)")
-                .willReturn(aResponse()
-                        .withStatus(200)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody(repoBody)));
+        StubMapping repoStub = stubRepoMetadata(description, repositoryName);
 
         String prPath = "/repos/" + repositoryName + "/pulls/" + pullNumber;
         StubMapping prStub = givenThat(get(prPath)
@@ -272,6 +267,7 @@ public class SlackWiremock extends WireMockServer {
     }
 
     public Stub stubGitHubGetFileContent(String description, String repositoryName, String path, String content) {
+        StubMapping repoStub = stubRepoMetadata(description, repositoryName);
         String base64 = Base64.getEncoder().encodeToString(content.getBytes(StandardCharsets.UTF_8));
         StubMapping stub = givenThat(get("/repos/" + repositoryName + "/contents/" + path)
                 .withName(description)
@@ -283,12 +279,14 @@ public class SlackWiremock extends WireMockServer {
                                 """.formatted(base64))));
         return Stub.builder()
                 .mapping(stub)
+                .extraMappings(List.of(repoStub))
                 .wireMockServer(this)
                 .description(description)
                 .build();
     }
 
     public Stub stubGitHubGetFileContentNotFound(String description, String repositoryName, String path) {
+        StubMapping repoStub = stubRepoMetadata(description, repositoryName);
         StubMapping stub = givenThat(get("/repos/" + repositoryName + "/contents/" + path)
                 .withName(description)
                 .willReturn(aResponse()
@@ -299,6 +297,7 @@ public class SlackWiremock extends WireMockServer {
                                 """)));
         return Stub.builder()
                 .mapping(stub)
+                .extraMappings(List.of(repoStub))
                 .wireMockServer(this)
                 .description(description)
                 .build();
@@ -306,6 +305,7 @@ public class SlackWiremock extends WireMockServer {
 
     public Stub stubGitHubListPullRequestFiles(
             String description, String repositoryName, int pullNumber, List<String> fileNames) {
+        StubMapping repoStub = stubRepoMetadata(description, repositoryName);
         String filesJson = fileNames.stream().map(f -> """
                         {"filename":"%s","status":"modified"}""".formatted(f)).collect(Collectors.joining(",", "[", "]"));
         StubMapping stub = givenThat(get("/repos/" + repositoryName + "/pulls/" + pullNumber + "/files")
@@ -316,6 +316,7 @@ public class SlackWiremock extends WireMockServer {
                         .withBody(filesJson)));
         return Stub.builder()
                 .mapping(stub)
+                .extraMappings(List.of(repoStub))
                 .wireMockServer(this)
                 .description(description)
                 .build();
