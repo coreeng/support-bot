@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { useUrlParams } from '@/lib/hooks/useUrlParams'
 import { useEscalations, useRegistry, useTenantTeams } from '@/lib/hooks'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { useAuth } from '@/hooks/useAuth'
@@ -45,16 +46,37 @@ export default function EscalationsPage() {
     const { data: tenantTeamsData } = useTenantTeams()
     const { data: registryData } = useRegistry()
     const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS
-    const [selectedTeam, setSelectedTeam] = useState<string>('')
-    const [statusFilter, setStatusFilter] = useState<'all' | 'ongoing' | 'resolved'>('all')
-    const [impactFilter, setImpactFilter] = useState<string>('all')
-    const [tagFilter, setTagFilter] = useState<string>('')
     type DateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
-    const [dateFilter, setDateFilter] = useState<DateFilter>('lastWeek')
-    const [customDateRange, setCustomDateRange] = useState<{ start?: string; end?: string }>({})
-    const [sortColumn, setSortColumn] = useState<SortColumn>('openedAt')
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
-    const [pageIndex, setPageIndex] = useState<number>(0)
+
+    // Persist all filter / sort / page controls in the URL.
+    const [params, setParams] = useUrlParams({
+        dateFilter: 'lastWeek',
+        dateFrom: '',
+        dateTo: '',
+        status: 'all',
+        selectedTeam: '',
+        impact: 'all',
+        tag: '',
+        sortBy: 'openedAt',
+        sortDir: 'desc',
+        page: '0',
+    })
+
+    // Local read-aliases so the rest of the component body needs no rename churn.
+    const selectedTeam = params.selectedTeam
+    const statusFilter = params.status as 'all' | 'ongoing' | 'resolved'
+    const impactFilter = params.impact
+    const tagFilter = params.tag
+    const dateFilter: DateFilter =
+        (['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const).includes(params.dateFilter as DateFilter)
+            ? (params.dateFilter as DateFilter)
+            : 'lastWeek'
+    const sortColumn: SortColumn =
+        (['ticketId', 'escalatingTeam', 'escalatedTo', 'openedAt', 'resolvedAt', 'duration'] as const).includes(params.sortBy as SortColumn)
+            ? (params.sortBy as SortColumn)
+            : 'openedAt'
+    const sortDirection: 'asc' | 'desc' = params.sortDir === 'asc' ? 'asc' : 'desc'
+    const pageIndex = Math.max(0, parseInt(params.page) || 0)
     const pageSize = 15
 
     const {
@@ -70,13 +92,18 @@ export default function EscalationsPage() {
         (!!teamFilterSelectedTeam && actualEscalationTeams.includes(teamFilterSelectedTeam))
     const now = useNow()
 
-    // Reset page-level tenant team filter synchronously when sidebar "View as" scope changes.
-    const [prevTeamFilterSelectedTeam, setPrevTeamFilterSelectedTeam] = useState(teamFilterSelectedTeam)
-    if (prevTeamFilterSelectedTeam !== teamFilterSelectedTeam) {
-        setPrevTeamFilterSelectedTeam(teamFilterSelectedTeam)
-        if (selectedTeam !== '') setSelectedTeam('')
-        if (pageIndex !== 0) setPageIndex(0)
-    }
+    // Reset the page-level team filter when the sidebar "View as" scope changes.
+    // The ref starts as `undefined` (sentinel for "not yet seen") so the initial
+    // context hydration sequence (null → firstTeam) is never mistaken for a
+    // user-initiated team switch, matching the fix applied to tickets.tsx.
+    const prevSelectedTeamRef = useRef<string | null | undefined>(undefined)
+    useEffect(() => {
+        const prev = prevSelectedTeamRef.current
+        prevSelectedTeamRef.current = teamFilterSelectedTeam
+        // Skip: first run (undefined) and context hydration (null → firstTeam).
+        if (!prev || prev === teamFilterSelectedTeam) return
+        setParams({ selectedTeam: '', page: '0' })
+    }, [teamFilterSelectedTeam, setParams])
 
     // --- Formatting helpers ---
     const formatDate = (isoString?: string) => isoString ? new Date(isoString).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '-'
@@ -95,8 +122,8 @@ export default function EscalationsPage() {
     const dateRange = useMemo(() => {
         if (!dateFilter) return { from: undefined, to: undefined }
         if (dateFilter === 'custom') {
-            if (!customDateRange.start || !customDateRange.end) return { from: undefined, to: undefined }
-            return { from: customDateRange.start, to: customDateRange.end }
+            if (!params.dateFrom || !params.dateTo) return { from: undefined, to: undefined }
+            return { from: params.dateFrom, to: params.dateTo }
         }
         const now = new Date()
         const to = now.toISOString().split('T')[0]
@@ -105,7 +132,7 @@ export default function EscalationsPage() {
         else if (dateFilter === 'last2Weeks') fromDate.setDate(now.getDate() - 13)
         else if (dateFilter === 'lastMonth') fromDate.setMonth(now.getMonth() - 1)
         return { from: fromDate.toISOString().split('T')[0], to }
-    }, [dateFilter, customDateRange])
+    }, [dateFilter, params.dateFrom, params.dateTo])
 
     // --- Filtered Escalations ---
     const filteredEscalations = useMemo(() => {
@@ -181,12 +208,10 @@ export default function EscalationsPage() {
     // --- Sorting ---
     const handleSort = (column: SortColumn) => {
         if (sortColumn === column) {
-            setSortDirection(d => d === 'asc' ? 'desc' : 'asc')
+            setParams({ sortDir: sortDirection === 'asc' ? 'desc' : 'asc', page: '0' })
         } else {
-            setSortColumn(column)
-            setSortDirection(column === 'openedAt' || column === 'resolvedAt' ? 'desc' : 'asc')
+            setParams({ sortBy: column, sortDir: column === 'openedAt' || column === 'resolvedAt' ? 'desc' : 'asc', page: '0' })
         }
-        setPageIndex(0)
     }
 
     const sortedEscalations = useMemo(() => {
@@ -307,7 +332,12 @@ export default function EscalationsPage() {
                         data-testid="escalations-date-filter"
                         aria-label="Escalation date filter"
                         value={dateFilter}
-                        onChange={e => { setDateFilter(e.target.value as DateFilter); setPageIndex(0) }}
+                        onChange={e => {
+                            const next = e.target.value as DateFilter
+                            setParams(next !== 'custom'
+                                ? { dateFilter: next, dateFrom: '', dateTo: '', page: '0' }
+                                : { dateFilter: next, page: '0' })
+                        }}
                         className="p-2 border rounded"
                     >
                         <option value="">Any Date</option>
@@ -321,16 +351,16 @@ export default function EscalationsPage() {
                             <input
                                 type="date"
                                 aria-label="Date filter start"
-                                value={customDateRange.start || ''}
-                                onChange={e => { setCustomDateRange(r => ({ ...r, start: e.target.value })); setPageIndex(0) }}
+                                value={params.dateFrom}
+                                onChange={e => setParams({ dateFrom: e.target.value, page: '0' })}
                                 className="p-2 border rounded text-sm"
                             />
                             <span className="text-gray-500 text-sm">to</span>
                             <input
                                 type="date"
                                 aria-label="Date filter end"
-                                value={customDateRange.end || ''}
-                                onChange={e => { setCustomDateRange(r => ({ ...r, end: e.target.value })); setPageIndex(0) }}
+                                value={params.dateTo}
+                                onChange={e => setParams({ dateTo: e.target.value, page: '0' })}
                                 className="p-2 border rounded text-sm"
                             />
                         </>
@@ -342,7 +372,7 @@ export default function EscalationsPage() {
                         data-testid="escalations-status-filter"
                         aria-label="Escalation status filter"
                         value={statusFilter}
-                        onChange={e => { setStatusFilter(e.target.value as 'all' | 'ongoing' | 'resolved'); setPageIndex(0) }}
+                        onChange={e => setParams({ status: e.target.value, page: '0' })}
                         className="p-2 border rounded"
                     >
                         <option value="all">All</option>
@@ -356,7 +386,7 @@ export default function EscalationsPage() {
                         data-testid="escalations-impact-filter"
                         aria-label="Escalation impact filter"
                         value={impactFilter}
-                        onChange={e => { setImpactFilter(e.target.value); setPageIndex(0) }}
+                        onChange={e => setParams({ impact: e.target.value, page: '0' })}
                         className="p-2 border rounded"
                     >
                         <option value="all">All</option>
@@ -372,7 +402,7 @@ export default function EscalationsPage() {
                             data-testid="escalations-team-filter"
                             aria-label="Escalation team filter"
                             value={selectedTeam}
-                            onChange={e => { setSelectedTeam(e.target.value); setPageIndex(0) }}
+                            onChange={e => setParams({ selectedTeam: e.target.value, page: '0' })}
                             className="p-2 border rounded"
                         >
                             <option value="">Current Team Scope</option>
@@ -387,7 +417,7 @@ export default function EscalationsPage() {
                         data-testid="escalations-tag-filter"
                         aria-label="Escalation tag filter"
                         value={tagFilter}
-                        onChange={e => { setTagFilter(e.target.value); setPageIndex(0) }}
+                        onChange={e => setParams({ tag: e.target.value, page: '0' })}
                         className="p-2 border rounded"
                     >
                         <option value="">All Tags</option>
@@ -529,7 +559,7 @@ export default function EscalationsPage() {
                     <div className="flex justify-between mt-4">
                         <button
                             className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-                            onClick={() => setPageIndex(prev => Math.max(prev - 1, 0))}
+                            onClick={() => setParams({ page: String(Math.max(pageIndex - 1, 0)) })}
                             disabled={pageIndex === 0}
                         >
                             Previous
@@ -537,7 +567,7 @@ export default function EscalationsPage() {
                         <span>Page {pageIndex + 1} of {totalPages}</span>
                         <button
                             className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-                            onClick={() => setPageIndex(prev => Math.min(prev + 1, totalPages - 1))}
+                            onClick={() => setParams({ page: String(Math.min(pageIndex + 1, totalPages - 1)) })}
                             disabled={pageIndex >= totalPages - 1}
                         >
                             Next
