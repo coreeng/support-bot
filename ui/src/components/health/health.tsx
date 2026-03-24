@@ -1,6 +1,7 @@
 'use client'
 
 import {useMemo, useState} from 'react'
+import {useUrlParams} from '@/lib/hooks/useUrlParams'
 import {useRatings, useRegistry, useTickets, useSupportMembers, useAssignmentEnabled} from '@/lib/hooks'
 import {ClipboardList, Star, AlertTriangle, Headphones, ChevronDown} from 'lucide-react'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
@@ -42,13 +43,20 @@ export default function HealthPage() {
         {key: 'workbench' as const, label: 'Ticket Workbench', icon: Headphones, color: 'purple'},
     ]
 
-    const [dateFilterMode, setDateFilterMode] = useState<'week' | 'month' | 'year' | 'custom'>('week')
-    const [startDate, setStartDate] = useState<string>(() => {
-        const date = new Date()
-        date.setMonth(date.getMonth() - 1)
-        return date.toISOString().split('T')[0]
+    // Persist date filter mode, custom date range, and active tab in the URL.
+    const [params, setParams] = useUrlParams({
+        dateFilter: 'lastWeek',
+        dateFrom: '',
+        dateTo: '',
+        tab: 'tickets',
     })
-    const [endDate, setEndDate] = useState<string>(() => new Date().toISOString().split('T')[0])
+    const dateFilter = params.dateFilter as 'lastWeek' | 'lastMonth' | 'lastYear' | 'custom'
+    const activeTab = (['tickets', 'ratings', 'workbench'] as const).includes(
+        params.tab as 'tickets' | 'ratings' | 'workbench'
+    )
+        ? (params.tab as 'tickets' | 'ratings' | 'workbench')
+        : 'tickets'
+
     const [inquiringTeamFilter, setInquiringTeamFilter] = useState('')
     const [escalatedTeamFilter, setEscalatedTeamFilter] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
@@ -62,45 +70,43 @@ export default function HealthPage() {
     const [confirmationDetails, setConfirmationDetails] = useState<{from: string, to: string, count: number, tickets: TicketWithLogs[]} | null>(null)
     const [bulkReassignExpanded, setBulkReassignExpanded] = useState(false)
     const [capacityInsightsExpanded, setCapacityInsightsExpanded] = useState(false)
-    const [activeTab, setActiveTab] = useState<'tickets' | 'ratings' | 'workbench'>('tickets')
+
     const [engineersOnRota, setEngineersOnRota] = useState<number>(2) // Default to 2, configurable
     const [ticketsPerEngineerCapacity, setTicketsPerEngineerCapacity] = useState<number>(5) // Default to 5, configurable
     
     const now = useMemo(() => new Date(), [])
-    const isDateRangeValid = startDate <= endDate
+    // Valid when both are empty (no custom dates set yet) or start ≤ end.
+    const isDateRangeValid = !params.dateFrom || !params.dateTo || params.dateFrom <= params.dateTo
 
-    // Calculate date range based on filter mode (aligned to SLA dashboard style)
-    // When switching to "custom", preserve the current range until custom dates are set
+    // Calculate date range based on filter mode (aligned to SLA dashboard style).
+    // When switching to "custom", fall back to last-7-days until valid dates are entered.
     const dateRange = useMemo(() => {
-        if (dateFilterMode === 'custom') {
-            // If custom dates are not set or invalid, preserve the previous filter's range
-            if (!isDateRangeValid || !startDate || !endDate) {
-                // Calculate the current range based on week (default)
+        if (dateFilter === 'custom') {
+            if (!params.dateFrom || !params.dateTo || params.dateFrom > params.dateTo) {
+                // Preserve a valid range so we never fetch ALL tickets
                 const toDate = new Date()
                 const fromDate = new Date(toDate)
                 fromDate.setDate(toDate.getDate() - 6)
-                const from = fromDate.toISOString().split('T')[0]
-                const to = toDate.toISOString().split('T')[0]
-                return { from, to }
+                return { from: fromDate.toISOString().split('T')[0], to: toDate.toISOString().split('T')[0] }
             }
-            return { from: startDate || undefined, to: endDate || undefined }
+            return { from: params.dateFrom, to: params.dateTo }
         }
 
         const toDate = new Date()
         const fromDate = new Date(toDate)
 
-        if (dateFilterMode === 'week') {
+        if (dateFilter === 'lastWeek') {
             fromDate.setDate(toDate.getDate() - 6)
-        } else if (dateFilterMode === 'month') {
+        } else if (dateFilter === 'lastMonth') {
             fromDate.setMonth(toDate.getMonth() - 1)
-        } else if (dateFilterMode === 'year') {
+        } else if (dateFilter === 'lastYear') {
             fromDate.setFullYear(toDate.getFullYear() - 1)
         }
 
         const from = fromDate.toISOString().split('T')[0]
         const to = toDate.toISOString().split('T')[0]
         return { from, to }
-    }, [dateFilterMode, startDate, endDate, isDateRangeValid])
+    }, [dateFilter, params.dateFrom, params.dateTo])
     
     const {data: tickets, isLoading: ticketsLoading} = useTickets(0, 1000, dateRange.from, dateRange.to)
 
@@ -599,132 +605,56 @@ export default function HealthPage() {
                         </div>
                     </div>
 
-                    <form 
-                        className="flex flex-wrap items-center gap-2 py-2"
-                        onSubmit={(e) => e.preventDefault()}
-                    >
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                const end = new Date()
-                                const start = new Date()
-                                start.setDate(start.getDate() - 7)
-                                setStartDate(start.toISOString().split('T')[0])
-                                setEndDate(end.toISOString().split('T')[0])
-                                setDateFilterMode('week')
+                    <div className="flex flex-wrap items-center gap-2 py-2">
+                        <select
+                            data-testid="health-date-filter"
+                            value={dateFilter}
+                            onChange={e => {
+                                const next = e.target.value
+                                setParams(next !== 'custom'
+                                    ? { dateFilter: next, dateFrom: '', dateTo: '' }
+                                    : { dateFilter: next })
                                 setCurrentPage(1)
                             }}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                                dateFilterMode === 'week'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
+                            className="p-2 border rounded text-xs"
                         >
-                            Last 7 Days
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                const end = new Date()
-                                const start = new Date()
-                                start.setMonth(start.getMonth() - 1)
-                                setStartDate(start.toISOString().split('T')[0])
-                                setEndDate(end.toISOString().split('T')[0])
-                                setDateFilterMode('month')
-                                setCurrentPage(1)
-                            }}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                                dateFilterMode === 'month'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            Last Month
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                const end = new Date()
-                                const start = new Date()
-                                start.setFullYear(start.getFullYear() - 1)
-                                setStartDate(start.toISOString().split('T')[0])
-                                setEndDate(end.toISOString().split('T')[0])
-                                setDateFilterMode('year')
-                                setCurrentPage(1)
-                            }}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                                dateFilterMode === 'year'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            Last Year
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                setDateFilterMode('custom')
-                            }}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                                dateFilterMode === 'custom'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            Custom
-                        </button>
+                            <option value="lastWeek">Last 7 Days</option>
+                            <option value="lastMonth">Last Month</option>
+                            <option value="lastYear">Last Year</option>
+                            <option value="custom">Custom</option>
+                        </select>
 
-                        {dateFilterMode === 'custom' && (
+                        {dateFilter === 'custom' && (
                             <>
                                 <input
                                     type="date"
-                                    value={startDate}
+                                    value={params.dateFrom}
                                     onChange={e => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        setStartDate(e.target.value)
+                                        setParams({ dateFrom: e.target.value })
                                         setCurrentPage(1)
-                                    }}
-                                    onBlur={e => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
                                     }}
                                     className="border rounded px-2 py-1 text-sm"
                                 />
                                 <input
                                     type="date"
-                                    value={endDate}
+                                    value={params.dateTo}
                                     onChange={e => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        setEndDate(e.target.value)
+                                        setParams({ dateTo: e.target.value })
                                         setCurrentPage(1)
-                                    }}
-                                    onBlur={e => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
                                     }}
                                     className="border rounded px-2 py-1 text-sm"
                                 />
                             </>
                         )}
                         <span className="text-xs text-gray-500 ml-2">
-                            📅 {startDate} → {endDate}
+                            📅 {dateRange.from} → {dateRange.to}
                         </span>
-                        {!isDateRangeValid && (
+                        {dateFilter === 'custom' && !isDateRangeValid && (
                             <span className="text-xs text-red-600 font-medium ml-2">
                                 ⚠️ Invalid range
                             </span>
                         )}
-                    </form>
+                    </div>
                 </div>
             </div>
 
@@ -743,7 +673,7 @@ export default function HealthPage() {
                             return (
                                 <button
                                     key={tab.key}
-                                    onClick={() => setActiveTab(tab.key)}
+                                    onClick={() => setParams({ tab: tab.key })}
                                     className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 text-sm font-semibold border-b-3 transition-all duration-200 ${colorClasses[tab.color]}`}
                                 >
                                     <Icon className={`w-5 h-5 ${isActive ? 'animate-pulse' : ''}`} />
