@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useAllTickets, useRegistry } from '@/lib/hooks'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, PieLabelRenderProps } from 'recharts'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
@@ -10,23 +10,34 @@ import { useAuth } from '@/hooks/useAuth'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
 import { TEAM_SCOPE } from '@/lib/constants'
 import { normalizeTeamKey } from '@/lib/teamUtils'
+import { useUrlParams } from '@/lib/hooks/useUrlParams'
+
+type DateFilter = 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'lastYear' | 'custom' | 'all'
+const VALID_DATE_FILTERS: readonly string[] = ['lastWeek', 'last2Weeks', 'lastMonth', 'lastYear', 'custom', 'all']
 
 export default function StatsPage() {
-    // Date filter state - default to last week to match other views
-    type DateFilter = 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'lastYear' | 'custom' | 'all'
-    const [dateFilter, setDateFilter] = useState<DateFilter>('lastWeek')
-    const [customDateRange, setCustomDateRange] = useState<{ start?: string; end?: string }>({})
+    // Persist date filter and custom date range in the URL.
+    const [params, setParams] = useUrlParams({
+        dateFilter: 'lastWeek',
+        dateFrom: '',
+        dateTo: '',
+    })
+
+    // Validate the URL value; fall back to the default if it is unrecognised.
+    const dateFilter: DateFilter = VALID_DATE_FILTERS.includes(params.dateFilter)
+        ? (params.dateFilter as DateFilter)
+        : 'lastWeek'
 
     // Calculate date range based on filter
-    // When switching to "custom", preserve the current range until custom dates are set
+    // When switching to "custom", preserve the current range until custom dates are set.
     const dateRange = useMemo(() => {
         if (dateFilter === 'all') {
             return { from: undefined, to: undefined }
         }
-        
+
         if (dateFilter === 'custom') {
             // If custom dates are not set yet, preserve the previous filter's range
-            if (!customDateRange.start || !customDateRange.end) {
+            if (!params.dateFrom || !params.dateTo) {
                 // Calculate the current range based on last week (default)
                 const now = new Date()
                 const to = now.toISOString().split('T')[0]
@@ -35,16 +46,13 @@ export default function StatsPage() {
                 const from = fromDate.toISOString().split('T')[0]
                 return { from, to }
             }
-            return {
-                from: customDateRange.start,
-                to: customDateRange.end
-            }
+            return { from: params.dateFrom, to: params.dateTo }
         }
-        
+
         const now = new Date()
         const to = now.toISOString().split('T')[0]
         const fromDate = new Date(now)
-        
+
         switch (dateFilter) {
             case 'lastWeek':
                 fromDate.setDate(now.getDate() - 7)
@@ -59,10 +67,10 @@ export default function StatsPage() {
                 fromDate.setFullYear(now.getFullYear() - 1)
                 break
         }
-        
+
         const from = fromDate.toISOString().split('T')[0]
         return { from, to }
-    }, [dateFilter, customDateRange])
+    }, [dateFilter, params.dateFrom, params.dateTo])
     
     // Use useAllTickets to fetch all tickets within date range (not just first 1000)
     // This ensures we get complete data for accurate statistics
@@ -180,9 +188,15 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }:
                     </h1>
                     {/* Date Filter */}
                     <div className="flex items-center gap-2">
-                        <select 
-                            value={dateFilter} 
-                            onChange={e => setDateFilter(e.target.value as DateFilter)} 
+                        <select
+                            value={dateFilter}
+                            onChange={e => {
+                                const next = e.target.value as DateFilter
+                                // Switching away from custom clears the stored date range.
+                                setParams(next !== 'custom'
+                                    ? { dateFilter: next, dateFrom: '', dateTo: '' }
+                                    : { dateFilter: next })
+                            }}
                             className="p-2 border rounded text-sm"
                         >
                             <option value="lastWeek">Last Week</option>
@@ -194,17 +208,17 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }:
                         </select>
                         {dateFilter === 'custom' && (
                             <>
-                                <input 
-                                    type="date" 
-                                    value={customDateRange.start || ''}
-                                    onChange={e => setCustomDateRange({...customDateRange, start: e.target.value})}
+                                <input
+                                    type="date"
+                                    value={params.dateFrom}
+                                    onChange={e => setParams({ dateFrom: e.target.value })}
                                     className="p-2 border rounded text-sm"
                                 />
                                 <span className="text-gray-500">to</span>
-                                <input 
-                                    type="date" 
-                                    value={customDateRange.end || ''}
-                                    onChange={e => setCustomDateRange({...customDateRange, end: e.target.value})}
+                                <input
+                                    type="date"
+                                    value={params.dateTo}
+                                    onChange={e => setParams({ dateTo: e.target.value })}
                                     className="p-2 border rounded text-sm"
                                 />
                             </>
@@ -316,9 +330,15 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }:
                 </h1>
                 {/* Date Filter */}
                 <div className="flex items-center gap-2">
-                    <select 
-                        value={dateFilter} 
-                        onChange={e => setDateFilter(e.target.value as DateFilter)} 
+                    <select
+                        value={dateFilter}
+                        onChange={e => {
+                            const next = e.target.value as DateFilter
+                            // Switching away from custom clears the stored date range.
+                            setParams(next !== 'custom'
+                                ? { dateFilter: next, dateFrom: '', dateTo: '' }
+                                : { dateFilter: next })
+                        }}
                         className="p-2 border rounded text-sm"
                     >
                         <option value="lastWeek">Last Week</option>
@@ -330,17 +350,17 @@ const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }:
                     </select>
                     {dateFilter === 'custom' && (
                         <>
-                            <input 
-                                type="date" 
-                                value={customDateRange.start || ''}
-                                onChange={e => setCustomDateRange({...customDateRange, start: e.target.value})}
+                            <input
+                                type="date"
+                                value={params.dateFrom}
+                                onChange={e => setParams({ dateFrom: e.target.value })}
                                 className="p-2 border rounded text-sm"
                             />
                             <span className="text-gray-500">to</span>
-                            <input 
-                                type="date" 
-                                value={customDateRange.end || ''}
-                                onChange={e => setCustomDateRange({...customDateRange, end: e.target.value})}
+                            <input
+                                type="date"
+                                value={params.dateTo}
+                                onChange={e => setParams({ dateTo: e.target.value })}
                                 className="p-2 border rounded text-sm"
                             />
                         </>
