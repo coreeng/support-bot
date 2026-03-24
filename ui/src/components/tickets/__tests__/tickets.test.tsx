@@ -7,6 +7,20 @@ import * as hooks from '../../../lib/hooks';
 // Mock the hooks
 jest.mock('../../../lib/hooks');
 
+// Mock useUrlParams with a useState-based implementation so filter/sort/page
+// changes re-render the component correctly, keeping all existing test
+// interactions that fire events and then inspect the rendered output intact.
+jest.mock('../../../lib/hooks/useUrlParams', () => ({
+    useUrlParams: (defaults: Record<string, string>) => {
+        const { useState } = require('react') as typeof import('react')
+        const [params, setParamsState] = useState<Record<string, string>>(defaults)
+        const setParams = (updates: Record<string, string>) => {
+            setParamsState((prev: Record<string, string>) => ({ ...prev, ...updates }))
+        }
+        return [params, setParams]
+    },
+}))
+
 const mockUseTickets = hooks.useTickets as jest.MockedFunction<typeof hooks.useTickets>;
 const mockUseAllTickets = hooks.useAllTickets as jest.MockedFunction<typeof hooks.useAllTickets>;
 const mockUseTicket = hooks.useTicket as jest.MockedFunction<typeof hooks.useTicket>;
@@ -89,8 +103,12 @@ jest.mock('../../../contexts/TeamFilterContext', () => ({
 const mockUseTeamFilter = jest.requireMock('../../../contexts/TeamFilterContext').useTeamFilter as jest.MockedFunction<() => {
     selectedTeam: string | null
     setSelectedTeam: jest.Mock
-    hasFullAccess: boolean
+    teamScope: { mode: string; teams?: string[] }
     effectiveTeams: string[]
+    hasNoTeamScope: boolean
+    isViewingAllTeams: boolean
+    isViewingAsEscalationTeam: boolean
+    hasFullAccess: boolean
     allTeams?: string[]
     initialized?: boolean
 }>;
@@ -114,8 +132,12 @@ describe('Tickets Component', () => {
         mockUseTeamFilter.mockReturnValue({
             selectedTeam: null,
             setSelectedTeam: jest.fn(),
-            hasFullAccess: true,
+            teamScope: { mode: 'all_teams' },
             effectiveTeams: [],
+            hasNoTeamScope: false,
+            isViewingAllTeams: true,
+            isViewingAsEscalationTeam: false,
+            hasFullAccess: true,
             allTeams: ['Team A', 'Team B'],
             initialized: true
         });
@@ -248,8 +270,12 @@ describe('Tickets Component', () => {
             mockUseTeamFilter.mockReturnValue({
                 selectedTeam: 'Team A',
                 setSelectedTeam: jest.fn(),
-                hasFullAccess: false,
+                teamScope: { mode: 'selected_teams', teams: ['Team A'] },
                 effectiveTeams: ['Team A'],
+                hasNoTeamScope: false,
+                isViewingAllTeams: false,
+                isViewingAsEscalationTeam: false,
+                hasFullAccess: false,
                 allTeams: ['Team A', 'Team B'],
                 initialized: true
             });
@@ -266,8 +292,12 @@ describe('Tickets Component', () => {
             mockUseTeamFilter.mockReturnValue({
                 selectedTeam: 'Team B',
                 setSelectedTeam: jest.fn(),
-                hasFullAccess: false,
+                teamScope: { mode: 'selected_teams', teams: ['Team B'] },
                 effectiveTeams: ['Team B'],
+                hasNoTeamScope: false,
+                isViewingAllTeams: false,
+                isViewingAsEscalationTeam: false,
+                hasFullAccess: false,
                 allTeams: ['Team A', 'Team B'],
                 initialized: true
             });
@@ -302,8 +332,12 @@ describe('Tickets Component', () => {
             mockUseTeamFilter.mockReturnValue({
                 selectedTeam: 'Team A',
                 setSelectedTeam: jest.fn(),
-                hasFullAccess: false,
+                teamScope: { mode: 'selected_teams', teams: ['Team A'] },
                 effectiveTeams: ['Team A'],
+                hasNoTeamScope: false,
+                isViewingAllTeams: false,
+                isViewingAsEscalationTeam: false,
+                hasFullAccess: false,
                 allTeams: ['Team A', 'Team B'],
                 initialized: true
             });
@@ -344,8 +378,12 @@ describe('Tickets Component', () => {
             mockUseTeamFilter.mockReturnValue({
                 selectedTeam: null,
                 setSelectedTeam: jest.fn(),
-                hasFullAccess: false,
+                teamScope: { mode: 'no_teams' },
                 effectiveTeams: ['__no_teams__'],
+                hasNoTeamScope: true,
+                isViewingAllTeams: false,
+                isViewingAsEscalationTeam: false,
+                hasFullAccess: false,
                 allTeams: ['Team A'],
                 initialized: true
             });
@@ -389,8 +427,12 @@ describe('Tickets Component', () => {
             mockUseTeamFilter.mockReturnValue({
                 selectedTeam: null,
                 setSelectedTeam: jest.fn(),
-                hasFullAccess: false,
+                teamScope: { mode: 'selected_teams', teams: ['Team A', 'Wow Team'] },
                 effectiveTeams: ['Team A', 'Wow Team'],
+                hasNoTeamScope: false,
+                isViewingAllTeams: false,
+                isViewingAsEscalationTeam: false,
+                hasFullAccess: false,
                 allTeams: ['Team A', 'Wow Team'],
                 initialized: true
             });
