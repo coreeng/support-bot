@@ -72,7 +72,7 @@ describe('useUrlParams', () => {
       act(() => {
         result.current[1]({ dateFilter: 'custom' })
       })
-      expect(mockReplace).toHaveBeenCalledWith('?dateFilter=custom')
+      expect(mockReplace).toHaveBeenCalledWith('/test?dateFilter=custom')
     })
 
     it('merges updates with existing search params not in defaults', () => {
@@ -83,7 +83,7 @@ describe('useUrlParams', () => {
         result.current[1]({ dateFilter: 'lastMonth' })
       })
       const called = mockReplace.mock.calls[0][0] as string
-      const resultParams = new URLSearchParams(called.slice(1))
+      const resultParams = new URLSearchParams(called.split('?')[1] ?? '')
       expect(resultParams.get('team')).toBe('platform')
       expect(resultParams.get('dateFilter')).toBe('lastMonth')
     })
@@ -95,7 +95,7 @@ describe('useUrlParams', () => {
         result.current[1]({ dateFilter: 'lastWeek', dateFrom: '', dateTo: '' })
       })
       const called = mockReplace.mock.calls[0][0] as string
-      const resultParams = new URLSearchParams(called.slice(1))
+      const resultParams = new URLSearchParams(called.split('?')[1] ?? '')
       expect(resultParams.has('dateFrom')).toBe(false)
       expect(resultParams.has('dateTo')).toBe(false)
       expect(resultParams.get('dateFilter')).toBe('lastWeek')
@@ -117,7 +117,7 @@ describe('useUrlParams', () => {
         result.current[1]({ dateFilter: 'custom', dateFrom: '2025-03-01', dateTo: '2025-03-31' })
       })
       const called = mockReplace.mock.calls[0][0] as string
-      const resultParams = new URLSearchParams(called.slice(1))
+      const resultParams = new URLSearchParams(called.split('?')[1] ?? '')
       expect(resultParams.get('dateFilter')).toBe('custom')
       expect(resultParams.get('dateFrom')).toBe('2025-03-01')
       expect(resultParams.get('dateTo')).toBe('2025-03-31')
@@ -259,7 +259,7 @@ describe('useUrlParams with validators', () => {
     // The effect runs after render; mockReplace should be called to clean the URL.
     // 'garbage' → default 'lastWeek' which equals the default → removed from URL.
     // 'page=2' is valid so it stays.
-    expect(mockReplace).toHaveBeenCalledWith('?page=2')
+    expect(mockReplace).toHaveBeenCalledWith('/test?page=2')
   })
 
   it('auto-corrects an invalid page by removing it (equals default 0)', () => {
