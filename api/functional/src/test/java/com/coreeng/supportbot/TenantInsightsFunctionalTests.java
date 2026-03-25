@@ -4,6 +4,7 @@ import static com.coreeng.supportbot.testkit.UserRole.support;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.coreeng.supportbot.testkit.Config;
 import com.coreeng.supportbot.testkit.SupportBotClient;
 import com.coreeng.supportbot.testkit.Ticket;
 import com.coreeng.supportbot.testkit.TestKit;
@@ -24,10 +25,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @ExtendWith(TestKitExtension.class)
 public class TenantInsightsFunctionalTests {
 
-    private static final String SERVICE_URL =
-            System.getProperty("serviceEndpoint", "http://localhost:8080");
-
     private TestKit testKit;
+    private Config config;
     private SupportBotClient supportBotClient;
 
     @BeforeEach
@@ -92,7 +91,7 @@ public class TenantInsightsFunctionalTests {
         given()
                 .queryParam("dateFrom", "2026-12-31")
                 .queryParam("dateTo", "2026-01-01")
-                .get(SERVICE_URL + "/tenant-insights/pr-stats")
+                .get(config.supportBot().baseUrl() + "/tenant-insights/pr-stats")
                 .then()
                 // then — 400 Bad Request
                 .statusCode(400);
@@ -103,7 +102,7 @@ public class TenantInsightsFunctionalTests {
         return given()
                 .queryParam("dateFrom", dateFrom.toString())
                 .queryParam("dateTo", dateTo.toString())
-                .get(SERVICE_URL + "/tenant-insights/pr-stats")
+                .get(config.supportBot().baseUrl() + "/tenant-insights/pr-stats")
                 .then()
                 .statusCode(200)
                 .extract()
@@ -113,7 +112,7 @@ public class TenantInsightsFunctionalTests {
 
     private List<RepoInsights> getAllTimeStats() {
         return given()
-                .get(SERVICE_URL + "/tenant-insights/pr-stats")
+                .get(config.supportBot().baseUrl() + "/tenant-insights/pr-stats")
                 .then()
                 .statusCode(200)
                 .extract()
