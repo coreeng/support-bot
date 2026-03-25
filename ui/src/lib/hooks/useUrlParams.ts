@@ -165,7 +165,7 @@ export function useUrlParams<T extends StringRecord>(
 
     if (!hasCorrection) return
     const qs = next.toString()
-    router.replace(qs ? `?${qs}` : pathname)
+    router.replace(qs ? `${pathname}?${qs}` : pathname)
   }, [params, searchParams, stableDefaults, stableValidators, router, pathname])
 
   const setParams = useCallback(
@@ -184,7 +184,7 @@ export function useUrlParams<T extends StringRecord>(
       }
 
       const qs = next.toString()
-      router.replace(qs ? `?${qs}` : pathname)
+      router.replace(qs ? `${pathname}?${qs}` : pathname)
     },
     [router, pathname, searchParams],
   )
