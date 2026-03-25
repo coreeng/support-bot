@@ -19,9 +19,12 @@ public record PrTrackingProps(
         String prEmoji,
         List<String> tags,
         String impact,
+        @Name("duration-unit") String durationUnit,
         List<Repository> repositories,
         GitHub github,
         SlaDiscovery slaDiscovery) {
+
+    private static final Set<String> VALID_DURATION_UNITS = Set.of("hours", "days", "weeks");
 
     public PrTrackingProps(
             boolean enabled,
@@ -29,11 +32,13 @@ public record PrTrackingProps(
             @Nullable String prEmoji,
             @Nullable List<String> tags,
             @Nullable String impact,
+            @Nullable @Name("duration-unit") String durationUnit,
             @Nullable List<Repository> repositories,
             @Nullable GitHub github,
             @Nullable SlaDiscovery slaDiscovery) {
         this.enabled = enabled;
         this.pollCron = pollCron;
+        this.durationUnit = durationUnit == null ? "days" : durationUnit.toLowerCase(Locale.ROOT);
         this.prEmoji = prEmoji == null ? "pr" : prEmoji;
         this.tags = tags == null ? List.of() : List.copyOf(tags);
         this.impact = impact == null ? "" : impact;
@@ -47,6 +52,11 @@ public record PrTrackingProps(
         this.github = github == null ? GitHub.defaultTokenModeConfig() : github;
 
         if (enabled) {
+            if (!VALID_DURATION_UNITS.contains(this.durationUnit)) {
+                throw new IllegalArgumentException(
+                        "pr-review-tracking.duration-unit must be one of [hours, days, weeks], got: "
+                                + this.durationUnit);
+            }
             requireNotBlank(this.prEmoji, "pr-review-tracking.pr-emoji must not be blank");
             if (this.tags.isEmpty()) {
                 throw new IllegalArgumentException("pr-review-tracking.tags must not be empty when enabled");
