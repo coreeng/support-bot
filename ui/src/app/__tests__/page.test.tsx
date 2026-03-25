@@ -2,9 +2,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { useRouter } from 'next/navigation'
 import Dashboard from '../(dashboard)/page'
 import DashboardLayoutComponent from '../(dashboard)/layout'
-import { useAuth } from '../../hooks/useAuth'
-import { useTeamFilter } from '../../contexts/TeamFilterContext'
-import { useKnowledgeGapsEnabled } from '../../lib/hooks'
+import { useAuth } from '@/hooks/useAuth'
+import { useTeamFilter } from '@/contexts/TeamFilterContext'
+import { useKnowledgeGapsEnabled } from '@/lib/hooks'
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),

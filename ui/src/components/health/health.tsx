@@ -1,35 +1,35 @@
 'use client'
 
 import {useEffect, useMemo, useState} from 'react'
-import {useUrlParams, enumValidator} from '@/lib/hooks/useUrlParams'
-import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
-import {useRatings, useRegistry, useTickets, useSupportMembers, useAssignmentEnabled} from '@/lib/hooks'
-import {ClipboardList, Star, AlertTriangle, Headphones, ChevronDown} from 'lucide-react'
+import {enumValidator, useUrlParams} from '@/lib/hooks/useUrlParams'
+import {getDateRangeFromFilter, PRESET_DAYS} from '@/lib/dateRange'
+import {useAssignmentEnabled, useRatings, useRegistry, useSupportMembers, useTickets} from '@/lib/hooks'
+import {AlertTriangle, ChevronDown, ClipboardList, Headphones, Star} from 'lucide-react'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
 import {useQueryClient} from '@tanstack/react-query'
 import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    Legend,
-    Line,
-    LineChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts'
 import {
-    AggregatedTicketStats,
-    BulkReassignRequest,
-    BulkReassignResult,
-    Escalation,
-    ParsedTicketLog,
-    TicketImpact,
-    TicketLog,
-    TicketWithLogs,
-    SupportMember
+  AggregatedTicketStats,
+  BulkReassignRequest,
+  BulkReassignResult,
+  Escalation,
+  ParsedTicketLog,
+  SupportMember,
+  TicketImpact,
+  TicketLog,
+  TicketWithLogs
 } from "@/lib/types";
 
 export default function HealthPage() {
@@ -285,15 +285,13 @@ export default function HealthPage() {
         })
 
         // Calculate average and sort by date
-        const values = Object.values(map).map(entry => ({
-            date: entry.date,
-            avgAssignments: entry.engineerCount > 0
-                ? parseFloat((entry.totalAssignments / entry.engineerCount).toFixed(2))
-                : 0,
-            totalAssignments: entry.totalAssignments
+      return Object.values(map).map(entry => ({
+          date: entry.date,
+          avgAssignments: entry.engineerCount > 0
+            ? parseFloat((entry.totalAssignments / entry.engineerCount).toFixed(2))
+            : 0,
+          totalAssignments: entry.totalAssignments
         })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-        return values
     }, [filteredTickets, isAssignmentEnabled, supportMembers])
 
     // --- Timeline data: aggregate by ISO date (YYYY-MM-DD) ---
