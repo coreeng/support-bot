@@ -1,11 +1,12 @@
 package com.coreeng.supportbot.dashboard;
 
+import static com.coreeng.supportbot.util.JooqUtils.nullToZero;
+
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
@@ -648,13 +649,5 @@ public class JdbcDashboardRepository implements DashboardRepository {
                     + "::date <= '" + dateTo.format(ISO_DATE) + "'::date";
         }
         return "";
-    }
-
-    private static double nullToZero(Double value) {
-        return Objects.requireNonNullElse(value, 0.0);
-    }
-
-    private static long nullToZero(Long value) {
-        return Objects.requireNonNullElse(value, 0L);
     }
 }
