@@ -29,7 +29,7 @@ public class TenantInsightsController {
 
     public record FeatureStatus(boolean enabled) {}
 
-    @GetMapping("/stats")
+    @GetMapping("/pr-stats")
     public ResponseEntity<List<RepoInsights>> stats(@RequestParam(defaultValue = "30d") String window) {
         if (!VALID_WINDOWS.contains(window)) {
             return ResponseEntity.badRequest().build();
