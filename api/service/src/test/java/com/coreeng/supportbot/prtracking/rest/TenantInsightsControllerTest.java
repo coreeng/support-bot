@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.prtracking.rest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -12,10 +13,11 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class TenantInsightsControllerTest {
@@ -50,13 +52,12 @@ class TenantInsightsControllerTest {
         when(prTrackingRepository.getInsightsByRepo(from, TO)).thenReturn(insights);
 
         // when requesting with a date range
-        ResponseEntity<List<RepoInsights>> response = controller.prStats(from, TO);
+        List<RepoInsights> response = controller.prStats(from, TO);
 
         // then returns the repo insights with owning team
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(1);
-        assertThat(response.getBody().get(0).repo()).isEqualTo("org/repo-a");
-        assertThat(response.getBody().get(0).owningTeam()).isEqualTo("team-foo");
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).repo()).isEqualTo("org/repo-a");
+        assertThat(response.get(0).owningTeam()).isEqualTo("team-foo");
         verify(prTrackingRepository).getInsightsByRepo(from, TO);
     }
 
@@ -70,54 +71,26 @@ class TenantInsightsControllerTest {
         when(prTrackingRepository.getInsightsByRepo(from, TO)).thenReturn(insights);
 
         // when requesting stats
-        ResponseEntity<List<RepoInsights>> response = controller.prStats(from, TO);
+        List<RepoInsights> response = controller.prStats(from, TO);
 
         // then returns both repos with their owning teams
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasSize(2);
-        assertThat(response.getBody().get(0).owningTeam()).isEqualTo("team-foo");
-        assertThat(response.getBody().get(1).owningTeam()).isEqualTo("team-bar");
+        assertThat(response).hasSize(2);
+        assertThat(response.get(0).owningTeam()).isEqualTo("team-foo");
+        assertThat(response.get(1).owningTeam()).isEqualTo("team-bar");
     }
 
-    @Test
-    void prStats_accepts7DayRange() {
-        // given no PRs in the last 7 days
-        LocalDate from = TO.minusDays(7);
+    @ParameterizedTest
+    @ValueSource(ints = {7, 30, 90})
+    void prStats_acceptsVariousDateRanges(int days) {
+        // given no PRs in the date range
+        LocalDate from = TO.minusDays(days);
         when(prTrackingRepository.getInsightsByRepo(from, TO)).thenReturn(List.of());
 
-        // when requesting 7-day range
-        ResponseEntity<List<RepoInsights>> response = controller.prStats(from, TO);
+        // when requesting the range
+        List<RepoInsights> response = controller.prStats(from, TO);
 
-        // then queries for 7 days
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(prTrackingRepository).getInsightsByRepo(from, TO);
-    }
-
-    @Test
-    void prStats_accepts30DayRange() {
-        // given no PRs in the last 30 days
-        LocalDate from = TO.minusDays(30);
-        when(prTrackingRepository.getInsightsByRepo(from, TO)).thenReturn(List.of());
-
-        // when requesting 30-day range
-        ResponseEntity<List<RepoInsights>> response = controller.prStats(from, TO);
-
-        // then queries for 30 days
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        verify(prTrackingRepository).getInsightsByRepo(from, TO);
-    }
-
-    @Test
-    void prStats_accepts90DayRange() {
-        // given no PRs in the last 90 days
-        LocalDate from = TO.minusDays(90);
-        when(prTrackingRepository.getInsightsByRepo(from, TO)).thenReturn(List.of());
-
-        // when requesting 90-day range
-        ResponseEntity<List<RepoInsights>> response = controller.prStats(from, TO);
-
-        // then queries for 90 days
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        // then queries for the correct range
+        assertThat(response).isEmpty();
         verify(prTrackingRepository).getInsightsByRepo(from, TO);
     }
 
@@ -127,10 +100,10 @@ class TenantInsightsControllerTest {
         when(prTrackingRepository.getInsightsByRepo(null, null)).thenReturn(List.of());
 
         // when requesting without dates
-        ResponseEntity<List<RepoInsights>> response = controller.prStats(null, null);
+        List<RepoInsights> response = controller.prStats(null, null);
 
         // then queries with null dates (all time)
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response).isEmpty();
         verify(prTrackingRepository).getInsightsByRepo(null, null);
     }
 
@@ -141,10 +114,10 @@ class TenantInsightsControllerTest {
         when(prTrackingRepository.getInsightsByRepo(from, null)).thenReturn(List.of());
 
         // when requesting with dateFrom only
-        ResponseEntity<List<RepoInsights>> response = controller.prStats(from, null);
+        List<RepoInsights> response = controller.prStats(from, null);
 
         // then queries with dateFrom and null dateTo
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response).isEmpty();
         verify(prTrackingRepository).getInsightsByRepo(from, null);
     }
 
@@ -154,10 +127,10 @@ class TenantInsightsControllerTest {
         when(prTrackingRepository.getInsightsByRepo(null, TO)).thenReturn(List.of());
 
         // when requesting with dateTo only
-        ResponseEntity<List<RepoInsights>> response = controller.prStats(null, TO);
+        List<RepoInsights> response = controller.prStats(null, TO);
 
         // then queries with null dateFrom and dateTo
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response).isEmpty();
         verify(prTrackingRepository).getInsightsByRepo(null, TO);
     }
 
@@ -167,22 +140,23 @@ class TenantInsightsControllerTest {
         when(prTrackingRepository.getInsightsByRepo(TO, TO)).thenReturn(List.of());
 
         // when requesting a single day
-        ResponseEntity<List<RepoInsights>> response = controller.prStats(TO, TO);
+        List<RepoInsights> response = controller.prStats(TO, TO);
 
         // then accepts the request
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response).isEmpty();
         verify(prTrackingRepository).getInsightsByRepo(TO, TO);
     }
 
     @Test
-    void prStats_returnsBadRequestForInvertedDateRange() {
+    void prStats_throwsForInvertedDateRange() {
         // when dateFrom is after dateTo
         LocalDate from = LocalDate.of(2026, 4, 1);
         LocalDate to = LocalDate.of(2026, 3, 1);
-        ResponseEntity<List<RepoInsights>> response = controller.prStats(from, to);
 
-        // then rejects with 400, never hits the database
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        // then rejects with 400 and descriptive message, never hits the database
+        assertThatThrownBy(() -> controller.prStats(from, to))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("dateFrom must not be after dateTo");
         verifyNoInteractions(prTrackingRepository);
     }
 }

@@ -1,14 +1,14 @@
 package com.coreeng.supportbot.prtracking;
 
 import static com.coreeng.supportbot.dbschema.Tables.PR_TRACKING;
+import static com.coreeng.supportbot.util.JooqUtils.nullToZero;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
@@ -109,20 +109,21 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     @Transactional(readOnly = true)
     @Override
     public List<RepoInsights> getInsightsByRepo(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
-        String dateFilter = buildDateFilter(dateFrom, dateTo, "pr_created_at");
+        List<Object> binds = new ArrayList<>();
+        String dateFilter = buildDateFilter(dateFrom, dateTo, "pr_created_at", binds);
         String sql = """
                 SELECT
                     github_repo,
-                    MIN(owning_team) AS owning_team,
+                    COALESCE(MIN(owning_team), 'unknown') AS owning_team,
                     COUNT(*) AS pr_count,
                     COUNT(*) FILTER (WHERE status = 'OPEN' OR status = 'ESCALATED') AS open_count,
-                    COUNT(*) FILTER (WHERE escalation_id IS NOT NULL) AS escalated_count,
+                    COUNT(*) FILTER (WHERE status = 'ESCALATED') AS escalated_count,
                     COUNT(*) FILTER (WHERE sla_deadline < COALESCE(closed_at, now())) AS breached_count,
                     percentile_cont(0.5) WITHIN GROUP (ORDER BY lifetime) AS p50,
                     percentile_cont(0.9) WITHIN GROUP (ORDER BY lifetime) AS p90,
                     percentile_cont(0.99) WITHIN GROUP (ORDER BY lifetime) AS p99
                 FROM (
-                    SELECT github_repo, owning_team, status, escalation_id, sla_deadline, closed_at,
+                    SELECT github_repo, owning_team, status, sla_deadline, closed_at,
                         EXTRACT(EPOCH FROM
                             CASE WHEN closed_at IS NOT NULL THEN closed_at - pr_created_at
                                  ELSE now() - pr_created_at END
@@ -135,44 +136,31 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 ORDER BY github_repo
                 """.formatted(dateFilter);
 
-        return dsl.resultQuery(sql)
+        return dsl.resultQuery(sql, binds.toArray())
                 .fetch(r -> new RepoInsights(
                         r.get("github_repo", String.class),
                         r.get("owning_team", String.class),
-                        nullToZero(r.get("pr_count", Long.class)),
-                        nullToZero(r.get("open_count", Long.class)),
-                        nullToZero(r.get("escalated_count", Long.class)),
-                        nullToZero(r.get("breached_count", Long.class)),
+                        r.get("pr_count", Long.class),
+                        r.get("open_count", Long.class),
+                        r.get("escalated_count", Long.class),
+                        r.get("breached_count", Long.class),
                         nullToZero(r.get("p50", Double.class)),
                         nullToZero(r.get("p90", Double.class)),
                         nullToZero(r.get("p99", Double.class))));
     }
 
-    private static String buildDateFilter(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo, String column) {
+    private static String buildDateFilter(
+            @Nullable LocalDate dateFrom, @Nullable LocalDate dateTo, String column, List<Object> binds) {
         StringBuilder sb = new StringBuilder();
         if (dateFrom != null) {
-            sb.append("AND ")
-                    .append(column)
-                    .append("::date >= '")
-                    .append(dateFrom.format(DateTimeFormatter.ISO_LOCAL_DATE))
-                    .append("'::date ");
+            sb.append("AND ").append(column).append("::date >= ?::date ");
+            binds.add(dateFrom);
         }
         if (dateTo != null) {
-            sb.append("AND ")
-                    .append(column)
-                    .append("::date <= '")
-                    .append(dateTo.format(DateTimeFormatter.ISO_LOCAL_DATE))
-                    .append("'::date ");
+            sb.append("AND ").append(column).append("::date <= ?::date ");
+            binds.add(dateTo);
         }
         return sb.toString();
-    }
-
-    private static double nullToZero(Double value) {
-        return Objects.requireNonNullElse(value, 0.0);
-    }
-
-    private static long nullToZero(Long value) {
-        return Objects.requireNonNullElse(value, 0L);
     }
 
     private static PrTrackingRecord toRecord(com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row) {

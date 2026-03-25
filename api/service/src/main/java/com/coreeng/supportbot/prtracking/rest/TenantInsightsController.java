@@ -8,11 +8,12 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/tenant-insights")
@@ -20,22 +21,24 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class TenantInsightsController {
 
+    private static final FeatureStatus ENABLED = new FeatureStatus(true);
+
     private final PrTrackingRepository prTrackingRepository;
 
     @GetMapping("/enabled")
     public FeatureStatus enabled() {
-        return new FeatureStatus(true);
+        return ENABLED;
     }
 
     public record FeatureStatus(boolean enabled) {}
 
     @GetMapping("/pr-stats")
-    public ResponseEntity<List<RepoInsights>> prStats(
+    public List<RepoInsights> prStats(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate dateTo) {
         if (dateFrom != null && dateTo != null && dateFrom.isAfter(dateTo)) {
-            return ResponseEntity.badRequest().build();
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateFrom must not be after dateTo");
         }
-        return ResponseEntity.ok(prTrackingRepository.getInsightsByRepo(dateFrom, dateTo));
+        return prTrackingRepository.getInsightsByRepo(dateFrom, dateTo);
     }
 }
