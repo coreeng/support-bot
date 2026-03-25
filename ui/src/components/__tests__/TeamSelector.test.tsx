@@ -261,5 +261,34 @@ describe('TeamSelector', () => {
     expect(setSelectedTeam).toHaveBeenCalledWith('Tenant A')
     expect(setSelectedTeam).not.toHaveBeenCalledWith('Other Team')
   })
+
+  it('rewrites a stale invalid ?team URL param when selectedTeam is already valid', () => {
+    // Scenario: user opens a shared URL with ?team=OldTeam but their context
+    // already has a valid selectedTeam (e.g. from a previous navigation).
+    // The stale param must be cleaned up without touching selectedTeam.
+    mockUseSearchParams.mockReturnValue(new URLSearchParams({ team: 'OldTeam' }))
+    const setSelectedTeam = jest.fn()
+    mockUseTeamFilter.mockReturnValue({
+      selectedTeam: 'Tenant A',   // already valid
+      setSelectedTeam,
+    })
+    mockUseAuth.mockReturnValue({
+      user: {
+        teams: [
+          { name: 'Tenant A', types: ['tenant'], groupRefs: [] },
+        ],
+      },
+      isLeadership: false,
+      isSupportEngineer: false,
+    })
+
+    renderSelector()
+
+    // selectedTeam should not change — it is already correct
+    expect(setSelectedTeam).not.toHaveBeenCalled()
+    // URL must be updated to replace the stale invalid team with the valid one
+    expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('team=Tenant+A'))
+    expect(mockReplace).not.toHaveBeenCalledWith(expect.stringContaining('OldTeam'))
+  })
 })
 

@@ -35,8 +35,8 @@ export function enumValidator<T extends string>(
 }
 
 /**
- * Clamps a URL parameter to a non-negative integer string.
- * Malformed or negative values fall back to the parameter's default.
+ * Validates a URL parameter as a non-negative integer string.
+ * Malformed, negative, or non-numeric values fall back to the parameter's default. Fractional strings are truncated to their integer part by parseInt.
  *
  * @example
  * // In useUrlParams validators: { page: nonNegativeIntValidator }

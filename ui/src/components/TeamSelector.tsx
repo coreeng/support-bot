@@ -71,6 +71,19 @@ export default function TeamSelector() {
             return
         }
 
+        // URL team is present but invalid for this user — clean up the URL.
+        // This handles shared/bookmarked URLs with a garbage ?team value when
+        // selectedTeam is already correctly set (none of the branches below fire
+        // in that case, so the stale param would persist without this guard).
+        if (urlTeam && validSelections.size > 0 && !validSelections.has(urlTeam)) {
+            if (selectedTeam && validSelections.has(selectedTeam)) {
+                setTeamParam({ team: selectedTeam })
+                return
+            }
+            // selectedTeam is also absent/invalid — fall through to the
+            // initialisation/reset branches below, which will fix both.
+        }
+
         // No valid URL team — apply the existing initialisation / reset logic
         // and write the resolved team back into the URL.
         if (!selectedTeam && firstAvailableSelection) {
