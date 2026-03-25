@@ -11,7 +11,7 @@ Feature: SLA Dashboards
   Scenario: Date filter controls are visible and functional
     Given User navigates to the dashboards page
     Then Date filter options should be visible
-    And Date filter option "Last 7 Days" should be available
+    And Date filter option "Last Week" should be available
     And Date filter option "Last Month" should be available
     And Date filter option "Last Year" should be available
     And Date filter option "Custom" should be available
@@ -49,12 +49,12 @@ Feature: SLA Dashboards
 
   Scenario: Date filter selection changes state
     Given User navigates to the dashboards page
-    When User selects "Last 7 Days" date filter
-    Then "Last 7 Days" should be the selected date filter
+    When User selects "Last Week" date filter
+    Then "Last Week" should be the selected date filter
     And Other date filter options should not be selected
     When User selects "Last Month" date filter
     Then "Last Month" should be the selected date filter
-    And "Last 7 Days" should not be the selected date filter
+    And "Last Week" should not be the selected date filter
 
   Scenario: Custom date range can be set
     Given User navigates to the dashboards page

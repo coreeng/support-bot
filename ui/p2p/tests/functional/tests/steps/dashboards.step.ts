@@ -4,16 +4,15 @@ import { CustomWorld } from "./custom-world";
 
 const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
-// Maps human-readable filter labels (including the old "Last 7 Days" alias) to
-// the <select> option values used by the SLA dashboard's date-filter picklist.
+// Maps human-readable filter labels to the <select> option values used by the
+// SLA dashboard's date-filter picklist.
 const filterNameToValue = (name: string): string =>
   ({
-    "Last 7 Days": "lastWeek",
-    "Last Week":   "lastWeek",
+    "Last Week":    "lastWeek",
     "Last 2 Weeks": "last2Weeks",
-    "Last Month":  "lastMonth",
-    "Last Year":   "lastYear",
-    "Custom":      "custom",
+    "Last Month":   "lastMonth",
+    "Last Year":    "lastYear",
+    "Custom":       "custom",
   } as Record<string, string>)[name] ?? name;
 
 // Helper to create mock dashboard responses
@@ -37,67 +36,67 @@ Given("Dashboard API endpoints are mocked", async function (this: CustomWorld) {
   await this.page.route("**/api/dashboard/first-response-percentiles*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify(mockDashboardData.firstResponsePercentiles) })
   );
-  
+
   await this.page.route("**/api/dashboard/first-response-distribution*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify(mockDashboardData.durationDistribution) })
   );
-  
+
   await this.page.route("**/api/dashboard/unattended-queries-count*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify(mockDashboardData.unattendedQueries) })
   );
-  
+
   await this.page.route("**/api/dashboard/resolution-percentiles*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify(mockDashboardData.resolutionPercentiles) })
   );
-  
+
   await this.page.route("**/api/dashboard/resolution-duration-distribution*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify(mockDashboardData.durationDistribution) })
   );
-  
+
   await this.page.route("**/api/dashboard/resolution-times-by-week*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
-  
+
   await this.page.route("**/api/dashboard/unresolved-ticket-ages*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify({ p50: "1 day", p90: "3 days" }) })
   );
-  
+
   await this.page.route("**/api/dashboard/resolution-time-by-tag*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
-  
+
   await this.page.route("**/api/dashboard/avg-escalation-duration-by-tag*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
-  
+
   await this.page.route("**/api/dashboard/escalation-percentage-by-tag*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
-  
+
   await this.page.route("**/api/dashboard/escalation-trends-by-date*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
-  
+
   await this.page.route("**/api/dashboard/escalations-by-team*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
-  
+
   await this.page.route("**/api/dashboard/escalations-by-impact*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
-  
+
   await this.page.route("**/api/dashboard/weekly-ticket-counts*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
-  
+
   await this.page.route("**/api/dashboard/weekly-comparison*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify({ opened: 10, closed: 8, stale: 2, escalated: 1 }) })
   );
-  
+
   await this.page.route("**/api/dashboard/top-escalated-tags-this-week*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
-  
+
   await this.page.route("**/api/dashboard/incoming-vs-resolved-rate*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
@@ -115,7 +114,7 @@ Given("Dashboard API has delayed responses", async function (this: CustomWorld) 
   await this.page.route("**/api/dashboard/**", async (route) => {
     const url = route.request().url();
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     // Return appropriate data format based on endpoint
     let responseData;
     if (url.includes('distribution')) {
@@ -127,10 +126,10 @@ Given("Dashboard API has delayed responses", async function (this: CustomWorld) 
     } else {
       responseData = []; // Default to empty array
     }
-    
-    await route.fulfill({ 
-      status: 200, 
-      body: JSON.stringify(responseData) 
+
+    await route.fulfill({
+      status: 200,
+      body: JSON.stringify(responseData)
     });
   });
 });
@@ -197,7 +196,7 @@ Then("All tab sections should be visible", async function (this: CustomWorld) {
   const resolutionSLATab = this.page.getByRole('button', { name: /Resolution SLAs/i });
   const escalationSLATab = this.page.getByRole('button', { name: /Escalation SLAs/i });
   const weeklyTrendsTab = this.page.getByRole('button', { name: /Weekly Trends/i });
-  
+
   await expect(responseSLATab).toBeVisible({ timeout: 15000 });
   await expect(resolutionSLATab).toBeVisible({ timeout: 15000 });
   await expect(escalationSLATab).toBeVisible({ timeout: 15000 });
@@ -239,7 +238,7 @@ When("User clicks on {string} tab", async function (this: CustomWorld, tabName: 
 });
 
 Then("{string} tab should be active", async function (this: CustomWorld, sectionName: string) {
-  
+
   // Check if content is now visible based on section name
   if (sectionName.includes('Response')) {
     // Look for any content in Response SLAs - be more lenient with the text
@@ -277,7 +276,7 @@ Then("Loading indicators should be visible", async function (this: CustomWorld) 
   // Check for loading text or spinners
   const loadingText = this.page.getByText(/loading/i);
   const hasLoading = await loadingText.count() > 0;
-  
+
   // Test passes if we detect loading state (may be too fast to catch)
   // We check but don't fail if loading is too fast
   expect(typeof hasLoading).toBe('boolean');
@@ -294,30 +293,29 @@ Then("Content should appear after loading completes", async function (this: Cust
 Then("Empty state or zero values should be displayed", async function (this: CustomWorld) {
   // Wait for content to render
   await this.page.waitForTimeout(1000);
-  
+
   // Check for "No data" messages or zero values
   const noDataText = this.page.getByText(/no data|no.*available|0/i);
   const hasEmptyState = await noDataText.count() > 0;
-  
+
   expect(hasEmptyState).toBeTruthy();
 });
 
 Then("Dashboard content should be visible or show loading state", async function (this: CustomWorld) {
   // Either content or loading state should be present
   await this.page.waitForTimeout(1000);
-  
+
   // Check for any dashboard content (percentile cards, charts, or loading states)
   const hasPercentileCard = await this.page.locator('text=P50').count() > 0;
   const hasChart = await this.page.locator('svg').count() > 0;
   const hasLoading = await this.page.locator('text=Loading').count() > 0;
-  
+
   expect(hasPercentileCard || hasChart || hasLoading).toBeTruthy();
 });
 
 // Date filter interactions
-// The SLA dashboard uses a <select> picklist; "clicking a filter" means selecting
-// the matching option.  The filterNameToValue helper maps legacy names like
-// "Last 7 Days" to the canonical option value "lastWeek".
+// The SLA dashboard uses a <select> picklist; "selecting a filter" means choosing
+// the matching option via filterNameToValue.
 When("User selects {string} date filter", async function (this: CustomWorld, filterName: string) {
   const value = filterNameToValue(filterName);
   const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
@@ -359,10 +357,10 @@ When("User sets end date to {string}", async function (this: CustomWorld, date: 
 Then("Custom date inputs should display the selected dates", async function (this: CustomWorld) {
   const startInput = this.page.locator('input[type="date"]').first();
   const endInput = this.page.locator('input[type="date"]').last();
-  
+
   const startValue = await startInput.inputValue();
   const endValue = await endInput.inputValue();
-  
+
   expect(startValue).toBeTruthy();
   expect(endValue).toBeTruthy();
   expect(startValue).not.toBe("");
@@ -388,10 +386,10 @@ When("User clicks the refresh button", async function (this: CustomWorld) {
 Then("Refresh button should show loading state", async function (this: CustomWorld) {
   // Check for loading indicator (spinner or disabled state)
   const refreshButton = this.page.getByRole("button", { name: /refresh/i });
-  
+
   // Button should be disabled during loading
   const isDisabled = await refreshButton.isDisabled();
-  
+
   // It might already be done loading, so we check if it was disabled or has loader
   // We check but don't fail if loading is too fast
   expect(typeof isDisabled).toBe('boolean');
@@ -406,7 +404,7 @@ Then("Refresh button should become enabled again", async function (this: CustomW
 // Tab switching - only one section visible at a time
 Then('Only {} content should be visible', async function (this: CustomWorld, sectionName: string) {
   await this.page.waitForTimeout(500);
-  
+
   // Check that the active tab content is visible
   if (sectionName.includes('Resolution')) {
     const content = this.page.locator('text=Ticket Resolution Durations');
