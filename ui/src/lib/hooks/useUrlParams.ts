@@ -50,6 +50,29 @@ export const nonNegativeIntValidator: ParamValidator = (
 }
 
 /**
+ * Accepts only well-formed calendar dates in `YYYY-MM-DD` format that
+ * produce a valid `Date` object.  Anything else (e.g. `'AAAA'`, `'ZZZZ'`,
+ * `'2024-99-99'`, `'2024-02-30'`) falls back to the parameter's default
+ * (typically an empty string, which removes the param from the URL).
+ *
+ * @example
+ * // In useUrlParams validators: { dateFrom: isoDateValidator, dateTo: isoDateValidator }
+ */
+export const isoDateValidator: ParamValidator = (
+  raw: string,
+  defaultValue: string,
+): string => {
+  if (!raw) return defaultValue
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return defaultValue
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return defaultValue
+  // Round-trip check: V8 silently overflows invalid calendar dates
+  // (e.g. new Date('2024-02-30') → 2024-03-01).  If the formatted
+  // UTC date doesn't match the input, the date was not a real calendar day.
+  return d.toISOString().slice(0, 10) === raw ? raw : defaultValue
+}
+
+/**
  * Reads and writes URL search parameters for a given set of keys.
  *
  * Usage
@@ -59,6 +82,8 @@ export const nonNegativeIntValidator: ParamValidator = (
  *   { dateFilter: 'lastWeek', dateFrom: '', dateTo: '', page: '0' },
  *   {
  *     dateFilter: enumValidator(['lastWeek', 'lastMonth', 'custom'] as const),
+ *     dateFrom: isoDateValidator,
+ *     dateTo: isoDateValidator,
  *     page: nonNegativeIntValidator,
  *   },
  * )

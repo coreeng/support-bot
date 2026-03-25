@@ -1,7 +1,7 @@
 'use client'
 
 import {useEffect, useMemo, useState} from 'react'
-import {enumValidator, useUrlParams} from '@/lib/hooks/useUrlParams'
+import { enumValidator, isoDateValidator, useUrlParams } from '@/lib/hooks/useUrlParams'
 import {getDateRangeFromFilter, PRESET_DAYS} from '@/lib/dateRange'
 import {useAssignmentEnabled, useRatings, useRegistry, useSupportMembers, useTickets} from '@/lib/hooks'
 import {AlertTriangle, ChevronDown, ClipboardList, Headphones, Star} from 'lucide-react'
@@ -50,6 +50,8 @@ export default function HealthPage() {
         { dateFilter: 'lastWeek', dateFrom: '', dateTo: '', tab: 'tickets' },
         {
             dateFilter: enumValidator(['lastWeek', 'last2Weeks', 'lastMonth', 'lastYear', 'custom'] as const, 'lastWeek'),
+            dateFrom: isoDateValidator,
+            dateTo: isoDateValidator,
             tab: enumValidator(['tickets', 'ratings', 'workbench'] as const, 'tickets'),
         },
     )

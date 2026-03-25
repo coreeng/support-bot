@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { useUrlParams, enumValidator, nonNegativeIntValidator } from '@/lib/hooks/useUrlParams'
+import { useUrlParams, enumValidator, isoDateValidator, nonNegativeIntValidator } from '@/lib/hooks/useUrlParams'
 import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 import { useEscalations, useRegistry, useTenantTeams } from '@/lib/hooks'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
@@ -66,6 +66,8 @@ export default function EscalationsPage() {
         },
         {
             dateFilter: enumValidator(['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, 'lastWeek'),
+            dateFrom: isoDateValidator,
+            dateTo: isoDateValidator,
             status: enumValidator(['all', 'ongoing', 'resolved'] as const, 'all'),
             sortBy: enumValidator(['ticketId', 'escalatingTeam', 'escalatedTo', 'openedAt', 'resolvedAt', 'duration'] as const, 'openedAt'),
             sortDir: enumValidator(['asc', 'desc'] as const, 'desc'),

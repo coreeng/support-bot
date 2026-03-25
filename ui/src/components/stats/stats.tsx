@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
 import { TEAM_SCOPE } from '@/lib/constants'
 import { normalizeTeamKey } from '@/lib/teamUtils'
-import { useUrlParams, enumValidator } from '@/lib/hooks/useUrlParams'
+import { useUrlParams, enumValidator, isoDateValidator } from '@/lib/hooks/useUrlParams'
 import { type DateFilter, getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 
 const VALID_DATE_FILTERS = ['lastWeek', 'last2Weeks', 'lastMonth', 'lastYear', 'custom', 'all'] as const satisfies readonly DateFilter[]
@@ -20,7 +20,7 @@ export default function StatsPage() {
     // Validators guard against invalid URL values and auto-correct the URL.
     const [params, setParams] = useUrlParams(
         { dateFilter: 'lastWeek', dateFrom: '', dateTo: '' },
-        { dateFilter: enumValidator(VALID_DATE_FILTERS, 'lastWeek') },
+        { dateFilter: enumValidator(VALID_DATE_FILTERS, 'lastWeek'), dateFrom: isoDateValidator, dateTo: isoDateValidator },
     )
 
     // Safe to cast: enumValidator guarantees params.dateFilter is a valid DateFilter.

@@ -10,7 +10,7 @@ import {useQueryClient} from '@tanstack/react-query'
 import {TEAM_SCOPE} from '@/lib/constants'
 import {normalizeTeamKey} from '@/lib/teamUtils'
 import {getDateRangeFromFilter, PRESET_DAYS} from '@/lib/dateRange'
-import {enumValidator, nonNegativeIntValidator, useUrlParams} from '@/lib/hooks/useUrlParams'
+import { enumValidator, isoDateValidator, nonNegativeIntValidator, useUrlParams } from '@/lib/hooks/useUrlParams'
 
 
 export default function TicketsPage() {
@@ -51,6 +51,8 @@ export default function TicketsPage() {
         },
         {
             dateFilter: enumValidator(['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, 'lastWeek'),
+            dateFrom: isoDateValidator,
+            dateTo: isoDateValidator,
             sortBy: enumValidator(['openedAt', 'closedAt'] as const, 'openedAt'),
             sortDir: enumValidator(['asc', 'desc'] as const, 'desc'),
             page: nonNegativeIntValidator,

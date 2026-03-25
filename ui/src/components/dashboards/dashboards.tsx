@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
-import { useUrlParams, enumValidator } from '@/lib/hooks/useUrlParams'
+import { useUrlParams, enumValidator, isoDateValidator } from '@/lib/hooks/useUrlParams'
 import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 import {
     useFirstResponsePercentiles,
@@ -49,6 +49,8 @@ export default function DashboardsPage() {
         {
             section: enumValidator(['response', 'resolution', 'escalation', 'weekly'] as const, 'response'),
             dateFilter: enumValidator(['lastWeek', 'last2Weeks', 'lastMonth', 'lastYear', 'custom'] as const, 'lastWeek'),
+            dateFrom: isoDateValidator,
+            dateTo: isoDateValidator,
         },
     )
 

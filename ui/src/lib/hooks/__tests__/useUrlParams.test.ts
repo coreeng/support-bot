@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useUrlParams, enumValidator, nonNegativeIntValidator } from '../useUrlParams'
+import { useUrlParams, enumValidator, nonNegativeIntValidator, isoDateValidator } from '../useUrlParams'
 
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
@@ -183,6 +183,38 @@ describe('nonNegativeIntValidator', () => {
 
   it('falls back to the default for a negative float', () => {
     expect(nonNegativeIntValidator('-1.5', '0')).toBe('0')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// isoDateValidator helper
+// ---------------------------------------------------------------------------
+describe('isoDateValidator', () => {
+  it('passes through a valid YYYY-MM-DD date', () => {
+    expect(isoDateValidator('2024-06-15', '')).toBe('2024-06-15')
+  })
+
+  it('returns default for an empty string', () => {
+    expect(isoDateValidator('', '')).toBe('')
+  })
+
+  it('returns default for a plain word (fails regex)', () => {
+    expect(isoDateValidator('AAAA', '')).toBe('')
+    expect(isoDateValidator('ZZZZ', '')).toBe('')
+  })
+
+  it('returns default for a string that passes the regex but is an invalid calendar date', () => {
+    expect(isoDateValidator('2024-99-99', '')).toBe('')
+    expect(isoDateValidator('2024-02-30', '')).toBe('')
+  })
+
+  it('returns default for a datetime string with time component', () => {
+    expect(isoDateValidator('2024-06-15T12:00:00Z', '')).toBe('')
+  })
+
+  it('returns default for partial date strings', () => {
+    expect(isoDateValidator('2024-06', '')).toBe('')
+    expect(isoDateValidator('2024', '')).toBe('')
   })
 })
 
