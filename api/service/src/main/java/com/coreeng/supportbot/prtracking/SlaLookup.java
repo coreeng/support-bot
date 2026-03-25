@@ -8,14 +8,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import java.time.DateTimeException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.convert.DurationStyle;
 import org.springframework.stereotype.Service;
 import org.springframework.util.AntPathMatcher;
 
@@ -25,12 +26,14 @@ import org.springframework.util.AntPathMatcher;
 public class SlaLookup {
 
     private final GitHubClient gitHubClient;
+    private final String durationUnit;
     private final ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
     private final Cache<String, Optional<ParsedSlaFile>> fileCache;
 
     public SlaLookup(GitHubClient gitHubClient, PrTrackingProps prTrackingProps) {
         this.gitHubClient = gitHubClient;
+        this.durationUnit = prTrackingProps.durationUnit();
         Duration cacheTtl =
                 Objects.requireNonNull(prTrackingProps.slaDiscovery().cache(), "slaDiscovery.cache must not be null");
         this.fileCache = Caffeine.newBuilder()
@@ -109,8 +112,9 @@ public class SlaLookup {
 
         List<String> prFiles = gitHubClient.listPullRequestFiles(repositoryName, pullNumber);
         for (PrTrackingProps.SlaOverride override : overrides) {
+            String pattern = override.path().endsWith("/") ? override.path() + "**" : override.path();
             for (String prFile : prFiles) {
-                if (pathMatcher.match(override.path(), prFile)) {
+                if (pathMatcher.match(pattern, prFile)) {
                     log.atDebug()
                             .addArgument(repositoryName)
                             .addArgument(pullNumber)
@@ -168,7 +172,7 @@ public class SlaLookup {
             }
 
             return Optional.of(new ParsedSlaFile(parsedDefault, parsedOverrides));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | DateTimeException | ArithmeticException e) {
             throw new InvalidSlaFileException(
                     "Invalid values in SLA file %s from %s: %s".formatted(filePath, repositoryName, e.getMessage()), e);
         }
@@ -185,23 +189,39 @@ public class SlaLookup {
     }
 
     /**
-     * Spring's DurationStyle.detectAndParse supports hours (48h), days (2d), and ISO-8601 (PT48H)
-     * but not weeks. Since the ADR allows "1w" style durations, we handle the "w" suffix here
-     * before delegating to Spring. Not a huge fan of this, would prefer sticking to hours or days
-     * so we should revisit whether we really need week support.
+     * Bare integers use the configured duration-unit. Everything else is treated as ISO-8601
+     * with P/PT prepended if missing. java.time.Duration doesn't support weeks, so P&lt;n&gt;W
+     * is converted to days before parsing.
      */
-    private static Duration parseDuration(String value) {
-        String trimmed = value.trim();
+    Duration parseDuration(String value) {
+        String trimmed = value.strip();
         Duration duration;
-        if (trimmed.endsWith("w") || trimmed.endsWith("W")) {
-            long weeks = Long.parseLong(trimmed.substring(0, trimmed.length() - 1));
-            duration = Duration.ofDays(weeks * 7);
+        if (trimmed.matches("\\d+")) {
+            duration = parseWithDefaultUnit(Long.parseLong(trimmed), durationUnit);
         } else {
-            duration = DurationStyle.detectAndParse(trimmed);
+            String upper = trimmed.toUpperCase(Locale.ROOT);
+            if (!upper.startsWith("P")) {
+                upper = (upper.endsWith("D") || upper.endsWith("W")) ? "P" + upper : "PT" + upper;
+            }
+            if (upper.matches("P\\d+W")) {
+                long weeks = Long.parseLong(upper.substring(1, upper.length() - 1));
+                duration = Duration.ofDays(Math.multiplyExact(weeks, 7));
+            } else {
+                duration = Duration.parse(upper);
+            }
         }
         if (duration.isNegative() || duration.isZero()) {
             throw new IllegalArgumentException("SLA duration must be positive, got: " + value);
         }
         return duration;
+    }
+
+    private static Duration parseWithDefaultUnit(long value, String unit) {
+        return switch (unit) {
+            case "hours" -> Duration.ofHours(value);
+            case "days" -> Duration.ofDays(value);
+            case "weeks" -> Duration.ofDays(Math.multiplyExact(value, 7));
+            default -> throw new IllegalArgumentException("Unknown duration-unit: " + unit);
+        };
     }
 }

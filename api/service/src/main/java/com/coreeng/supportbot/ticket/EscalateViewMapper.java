@@ -9,7 +9,6 @@ import static com.slack.api.model.block.element.BlockElements.*;
 import static com.slack.api.model.view.Views.*;
 
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
-import com.coreeng.supportbot.enums.TagsRegistry;
 import com.coreeng.supportbot.escalation.EscalationValidator;
 import com.coreeng.supportbot.slack.RenderingUtils;
 import com.coreeng.supportbot.util.JsonMapper;
@@ -22,15 +21,16 @@ import java.util.List;
 import java.util.Map;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class EscalateViewMapper {
     private final JsonMapper jsonMapper;
     private final EscalationValidator escalationValidator;
-    private final TagsRegistry tagsRegistry;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
 
     public View.ViewBuilder render(TicketEscalateInput input, View.ViewBuilder view) {
@@ -47,10 +47,8 @@ public class EscalateViewMapper {
                 input(i -> i.optional(false)
                         .label(plainText("Pick tags"))
                         .blockId(Fields.tags.actionId())
-                        .element(multiStaticSelect(s -> s.actionId(Fields.tags.actionId())
-                                .options(tagsRegistry.listAllTags().stream()
-                                        .map(RenderingUtils::toOptionObject)
-                                        .toList())))),
+                        .element(multiExternalSelect(
+                                s -> s.actionId(Fields.tags.actionId()).minQueryLength(0)))),
                 input(i -> i.optional(false)
                         .label(plainText("Team to escalate to"))
                         .blockId(Fields.team.actionId())
@@ -76,13 +74,23 @@ public class EscalateViewMapper {
                 .flatMap(entry -> entry.getValue().entrySet().stream())
                 .collect(toImmutableMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        ViewState.Value tagsValue = checkNotNull(passedValues.get(Fields.tags.actionId()));
-        ImmutableList<String> tags = tagsValue.getSelectedOptions().stream()
-                .map(ViewState.SelectedOption::getValue)
-                .collect(toImmutableList());
+        ViewState.Value tagsValue =
+                checkNotNull(passedValues.get(Fields.tags.actionId()), "tags field missing from escalation view state");
+        if (tagsValue.getSelectedOptions() == null) {
+            log.atWarn()
+                    .addKeyValue("ticketId", input.ticketId())
+                    .log("Escalation tags field had null selectedOptions — treating as empty");
+        }
+        ImmutableList<String> tags = tagsValue.getSelectedOptions() != null
+                ? tagsValue.getSelectedOptions().stream()
+                        .map(ViewState.SelectedOption::getValue)
+                        .collect(toImmutableList())
+                : ImmutableList.of();
 
-        ViewState.Value teamValue = checkNotNull(passedValues.get(Fields.team.actionId()));
-        String team = teamValue.getSelectedOption().getValue();
+        ViewState.Value teamValue =
+                checkNotNull(passedValues.get(Fields.team.actionId()), "team field missing from escalation view state");
+        String team = checkNotNull(teamValue.getSelectedOption(), "team selection is null in escalation view state")
+                .getValue();
 
         ViewState.Value threadPermalinkValue = passedValues.get(Fields.threadPermalink.actionId());
         String threadPermalink = threadPermalinkValue != null ? threadPermalinkValue.getValue() : null;
