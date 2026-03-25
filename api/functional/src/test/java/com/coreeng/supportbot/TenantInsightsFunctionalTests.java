@@ -1,10 +1,11 @@
 package com.coreeng.supportbot;
 
+import static com.coreeng.supportbot.testkit.UserRole.support;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.coreeng.supportbot.testkit.MessageTs;
 import com.coreeng.supportbot.testkit.SupportBotClient;
+import com.coreeng.supportbot.testkit.Ticket;
 import com.coreeng.supportbot.testkit.TestKit;
 import com.coreeng.supportbot.testkit.TestKitExtension;
 import java.time.Duration;
@@ -17,9 +18,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
  * Functional tests for the /tenant-insights/pr-stats endpoint.
+ * Seeds PR tracking data via test helpers and verifies the SQL query
+ * (percentile_cont, FILTER, date filtering) against a real database.
  */
 @ExtendWith(TestKitExtension.class)
 public class TenantInsightsFunctionalTests {
+
+    private static final String SERVICE_URL =
+            System.getProperty("serviceEndpoint", "http://localhost:8080");
 
     private TestKit testKit;
     private SupportBotClient supportBotClient;
@@ -86,7 +92,7 @@ public class TenantInsightsFunctionalTests {
         given()
                 .queryParam("dateFrom", "2026-12-31")
                 .queryParam("dateTo", "2026-01-01")
-                .get("/tenant-insights/pr-stats")
+                .get(SERVICE_URL + "/tenant-insights/pr-stats")
                 .then()
                 // then — 400 Bad Request
                 .statusCode(400);
@@ -97,7 +103,7 @@ public class TenantInsightsFunctionalTests {
         return given()
                 .queryParam("dateFrom", dateFrom.toString())
                 .queryParam("dateTo", dateTo.toString())
-                .get("/tenant-insights/pr-stats")
+                .get(SERVICE_URL + "/tenant-insights/pr-stats")
                 .then()
                 .statusCode(200)
                 .extract()
@@ -107,7 +113,7 @@ public class TenantInsightsFunctionalTests {
 
     private List<RepoInsights> getAllTimeStats() {
         return given()
-                .get("/tenant-insights/pr-stats")
+                .get(SERVICE_URL + "/tenant-insights/pr-stats")
                 .then()
                 .statusCode(200)
                 .extract()
@@ -116,13 +122,8 @@ public class TenantInsightsFunctionalTests {
     }
 
     private long createTicket() {
-        return supportBotClient.test()
-                .createTicket(SupportBotClient.TicketToCreateRequest.builder()
-                        .channelId("C-TEST-INSIGHTS")
-                        .queryTs(MessageTs.now())
-                        .createdMessageTs(MessageTs.now())
-                        .build())
-                .id();
+        Ticket ticket = testKit.as(support).ticket().create(builder -> builder.message("PR insights test"));
+        return ticket.id();
     }
 
     private void createPr(long ticketId, String repo, int prNumber, Instant createdAt, String owningTeam) {
