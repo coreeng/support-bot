@@ -10,12 +10,12 @@ Feature: SLA Dashboards
 
   Scenario: Date filter controls are visible and functional
     Given User navigates to the dashboards page
-    Then Date filter quick buttons should be visible
-    And Quick filter "Last 7 Days" should be clickable
-    And Quick filter "Last Month" should be clickable
-    And Quick filter "Last Year" should be clickable
-    And Quick filter "Custom" should be clickable
-    When User clicks on "Custom" quick filter
+    Then Date filter options should be visible
+    And Date filter option "Last 7 Days" should be available
+    And Date filter option "Last Month" should be available
+    And Date filter option "Last Year" should be available
+    And Date filter option "Custom" should be available
+    When User selects "Custom" date filter
     Then Date range inputs should be visible
 
   Scenario: Tab sections are available for navigation (lazy loading)
@@ -47,18 +47,18 @@ Feature: SLA Dashboards
     When User clicks on "Escalation SLAs" tab
     Then Only Escalation SLAs content should be visible
 
-  Scenario: Date filter quick buttons change state
+  Scenario: Date filter selection changes state
     Given User navigates to the dashboards page
-    When User clicks on "Last 7 Days" quick filter
-    Then "Last 7 Days" button should be active
-    And Other quick filter buttons should not be active
-    When User clicks on "Last Month" quick filter
-    Then "Last Month" button should be active
-    And "Last 7 Days" button should not be active
+    When User selects "Last 7 Days" date filter
+    Then "Last 7 Days" should be the selected date filter
+    And Other date filter options should not be selected
+    When User selects "Last Month" date filter
+    Then "Last Month" should be the selected date filter
+    And "Last 7 Days" should not be the selected date filter
 
   Scenario: Custom date range can be set
     Given User navigates to the dashboards page
-    When User clicks on "Custom" quick filter
+    When User selects "Custom" date filter
     And User sets start date to "2025-01-01"
     And User sets end date to "2025-01-31"
     Then Custom date inputs should display the selected dates

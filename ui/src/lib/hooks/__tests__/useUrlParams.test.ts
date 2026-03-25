@@ -177,10 +177,12 @@ describe('nonNegativeIntValidator', () => {
     expect(nonNegativeIntValidator('abc', '0')).toBe('0')
   })
 
-  it('falls back to the default for a float', () => {
-    // parseInt truncates floats — 2.9 → 2 which is valid, but '2.9' string → parseInt('2.9') = 2
+  it('truncates floats', () => {
     expect(nonNegativeIntValidator('2.9', '0')).toBe('2')
-    expect(nonNegativeIntValidator('-0.5', '0')).toBe('0')
+  })
+
+  it('falls back to the default for a negative float', () => {
+    expect(nonNegativeIntValidator('-1.5', '0')).toBe('0')
   })
 })
 
