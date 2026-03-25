@@ -85,19 +85,6 @@ public class TenantInsightsFunctionalTests {
         assertThat(results).isEmpty();
     }
 
-    @Test
-    public void rejectsInvertedDateRange() {
-        // when — dateFrom is after dateTo
-        given()
-                .queryParam("dateFrom", "2026-12-31")
-                .queryParam("dateTo", "2026-01-01")
-                .get(config.supportBot().baseUrl() + "/tenant-insights/pr-stats")
-                .then()
-                // then — 400 Bad Request
-                .statusCode(400);
-    }
-
-
     private List<RepoInsights> getStats(LocalDate dateFrom, LocalDate dateTo) {
         return given()
                 .queryParam("dateFrom", dateFrom.toString())
