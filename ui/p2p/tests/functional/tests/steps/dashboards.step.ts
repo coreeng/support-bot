@@ -331,7 +331,7 @@ Then("{string} should be the selected date filter", async function (this: Custom
 });
 
 Then("Other date filter options should not be selected", async function (this: CustomWorld) {
-  // Verified implicitly by the preceding "button should be active" assertion.
+  // Verified implicitly by the preceding assertion.
   expect(true).toBeTruthy();
 });
 
