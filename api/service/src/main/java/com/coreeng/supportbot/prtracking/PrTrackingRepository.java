@@ -2,6 +2,7 @@ package com.coreeng.supportbot.prtracking;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
@@ -25,6 +26,6 @@ public interface PrTrackingRepository {
 
     boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, String githubRepo, int prNumber);
 
-    /** Stats per repo for PRs created in the last N days. */
-    List<RepoInsights> getInsightsByRepo(int windowDays);
+    /** Stats per repo for PRs created within the given date range. */
+    List<RepoInsights> getInsightsByRepo(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo);
 }

@@ -5,6 +5,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -106,7 +108,8 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
 
     @Transactional(readOnly = true)
     @Override
-    public List<RepoInsights> getInsightsByRepo(int windowDays) {
+    public List<RepoInsights> getInsightsByRepo(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
+        String dateFilter = buildDateFilter(dateFrom, dateTo, "pr_created_at");
         String sql = """
                 SELECT
                     github_repo,
@@ -125,11 +128,12 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                                  ELSE now() - pr_created_at END
                         ) AS lifetime
                     FROM pr_tracking
-                    WHERE pr_created_at >= now() - make_interval(days => %d)
+                    WHERE 1=1
+                      %s
                 ) sub
                 GROUP BY github_repo
                 ORDER BY github_repo
-                """.formatted(windowDays);
+                """.formatted(dateFilter);
 
         return dsl.resultQuery(sql)
                 .fetch(r -> new RepoInsights(
@@ -142,6 +146,25 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                         nullToZero(r.get("p50", Double.class)),
                         nullToZero(r.get("p90", Double.class)),
                         nullToZero(r.get("p99", Double.class))));
+    }
+
+    private static String buildDateFilter(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo, String column) {
+        StringBuilder sb = new StringBuilder();
+        if (dateFrom != null) {
+            sb.append("AND ")
+                    .append(column)
+                    .append("::date >= '")
+                    .append(dateFrom.format(DateTimeFormatter.ISO_LOCAL_DATE))
+                    .append("'::date ");
+        }
+        if (dateTo != null) {
+            sb.append("AND ")
+                    .append(column)
+                    .append("::date <= '")
+                    .append(dateTo.format(DateTimeFormatter.ISO_LOCAL_DATE))
+                    .append("'::date ");
+        }
+        return sb.toString();
     }
 
     private static double nullToZero(Double value) {
