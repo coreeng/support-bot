@@ -1,6 +1,8 @@
 package com.coreeng.supportbot.enums;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.concurrent.ConcurrentMapCache;
 
 @ExtendWith(MockitoExtension.class)
 class EnumsServiceTest {
@@ -26,7 +29,7 @@ class EnumsServiceTest {
     @BeforeEach
     void setUp() {
         EnumProps enumProps = new EnumProps(ImmutableList.of(), ImmutableList.of(), ImmutableList.of());
-        service = new EnumsService(impactsRepository, tagsRepository, enumProps);
+        service = new EnumsService(impactsRepository, tagsRepository, new ConcurrentMapCache("tags"), enumProps);
     }
 
     @Test
@@ -38,6 +41,27 @@ class EnumsServiceTest {
 
         assertThat(result).isEqualTo(activeTags);
         verify(tagsRepository).listAllActive();
+    }
+
+    @Test
+    void listAllTags_cachesResultAcrossMultipleCalls() {
+        ImmutableList<Tag> activeTags = ImmutableList.of(new Tag("Networking", "networking"));
+        when(tagsRepository.listAllActive()).thenReturn(activeTags);
+
+        ImmutableList<Tag> first = service.listAllTags();
+        ImmutableList<Tag> second = service.listAllTags();
+
+        assertThat(first).isEqualTo(activeTags);
+        assertThat(second).isSameAs(first);
+        verify(tagsRepository, times(1)).listAllActive();
+    }
+
+    @Test
+    void listAllTags_unwrapsRuntimeException_whenRepositoryFails() {
+        var dbError = new RuntimeException("DB connection failed");
+        when(tagsRepository.listAllActive()).thenThrow(dbError);
+
+        assertThatThrownBy(() -> service.listAllTags()).isSameAs(dbError);
     }
 
     @Test
