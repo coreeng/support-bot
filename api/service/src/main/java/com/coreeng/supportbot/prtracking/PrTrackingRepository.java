@@ -24,4 +24,7 @@ public interface PrTrackingRepository {
     boolean hasAnyActiveClosableForTicket(long ticketId);
 
     boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, String githubRepo, int prNumber);
+
+    /** Stats per repo for PRs created in the last N days. */
+    List<RepoInsights> getInsightsByRepo(int windowDays);
 }
