@@ -183,12 +183,17 @@ export default function TicketsPage() {
             return []
         }
 
-        // Step 1: filter by effective teams (considers team selector)
-        // If the page-level Team filter is explicitly set, it should override sidebar scope.
+        // Step 1: filter by effective teams (considers team selector).
+        // ALL three branches produce a correctly scoped subset so that Step 2
+        // only needs to apply the remaining UI filters (status, impact, tag, etc.)
+        // on an already-reduced dataset.
         const visibleTickets = teamFilter === ALL_TEAMS_FILTER
             ? ticketsContent // explicit page-level override: show all teams
             : teamFilter
-                ? ticketsContent // explicit page-level team selection
+                ? ticketsContent.filter((t: TicketWithLogs) => {  // explicit page-level team selection
+                    if (!t.team?.name) return false
+                    return normalizeTeamKey(t.team.name) === normalizeTeamKey(teamFilter)
+                })
                 : effectiveTeams.length === 0
                     ? ticketsContent // role-team view -> show all
                     : ticketsContent.filter((t: TicketWithLogs) => {
@@ -197,12 +202,10 @@ export default function TicketsPage() {
                         return effectiveTeams.some(team => normalizeTeamKey(team) === ticketTeam)
                     })
 
-        // Step 2: apply UI filters
+        // Step 2: apply remaining UI filters.
+        // Team filtering is already handled by Step 1 — matchesTeam is not needed here.
         return visibleTickets.filter((t: TicketWithLogs) => {
             const matchesStatus = statusFilter ? t.status === statusFilter : true
-            const matchesTeam = (teamFilter && teamFilter !== ALL_TEAMS_FILTER)
-                ? normalizeTeamKey(t.team?.name) === normalizeTeamKey(teamFilter)
-                : true
             const matchesImpact = impactFilter ? t.impact === impactFilter : true
             const matchesTag = tagFilter ? t.tags?.includes(tagFilter) : true
             const matchesEscalated = escalatedFilter
@@ -214,7 +217,7 @@ export default function TicketsPage() {
                 ? (t.escalations ?? []).some(e => e.team?.name === escalatedToFilter)
                 : true
 
-            return matchesStatus && matchesTeam && matchesImpact && matchesTag && matchesEscalated && matchesEscalatedTo
+            return matchesStatus && matchesImpact && matchesTag && matchesEscalated && matchesEscalatedTo
         })
     }, [ticketsContent, hasNoTeamScope, effectiveTeams, statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter, escalatedToFilter, ALL_TEAMS_FILTER])
 
