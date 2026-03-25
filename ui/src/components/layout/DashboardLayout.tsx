@@ -8,13 +8,13 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import Image from 'next/image'
 import TeamSelector from '@/components/TeamSelector'
-import { useKnowledgeGapsEnabled } from '@/lib/hooks'
+import { useKnowledgeGapsEnabled, useTenantInsightsEnabled } from '@/lib/hooks'
 
 // Types for tab visibility requirements
 type TabVisibilityRequirements = {
     requiresFullAccess?: boolean
     requiresRoles?: string[]
-    requiresFeatureFlag?: 'knowledgeGaps'
+    requiresFeatureFlag?: 'knowledgeGaps' | 'tenantInsights'
 }
 
 type SupportTab = {
@@ -49,6 +49,15 @@ const supportTabs: SupportTab[] = [
         label: 'SLA Dashboard',
         icon: <BarChart2 className="w-5 h-5 mr-2" />,
         visibility: { requiresFullAccess: true }
+    },
+    {
+        path: '/tenant-requests',
+        label: 'Tenant Requests',
+        icon: <BarChart2 className="w-5 h-5 mr-2" />,
+        visibility: {
+            requiresFullAccess: true,
+            requiresFeatureFlag: 'tenantInsights'
+        }
     }
 ]
 
@@ -56,6 +65,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, logout } = useAuth()
     const { hasFullAccess } = useTeamFilter()
     const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled()
+    const { data: isTenantInsightsEnabled } = useTenantInsightsEnabled()
     const pathname = usePathname()
 
     // Sidebar state
@@ -90,6 +100,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         // Check feature flag requirement
         if (requiresFeatureFlag === 'knowledgeGaps') {
             if (isKnowledgeGapsEnabled !== true) {
+                return false
+            }
+        }
+
+        if (requiresFeatureFlag === 'tenantInsights') {
+            if (isTenantInsightsEnabled !== true) {
                 return false
             }
         }

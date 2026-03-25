@@ -13,6 +13,7 @@ import type {
   KnowledgeGapsStatus,
   AnalysisData,
 } from "@/lib/types";
+import type { RepoInsights } from "@/lib/types/dashboard";
 
 // ===== Shared API Helper =====
 
@@ -528,5 +529,26 @@ export function useAnalysis() {
     queryKey: ["analysis"],
     queryFn: () => apiGet("/summary-data/results"),
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useTenantInsightsEnabled() {
+  return useQuery<boolean>({
+    queryKey: ["tenant-insights", "enabled"],
+    queryFn: async () => {
+      const response = await apiGet<{ enabled: boolean }>(
+        "/tenant-insights/enabled"
+      );
+      return response.enabled;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useTenantInsightsStats(dateFrom?: string, dateTo?: string) {
+  return useQuery<RepoInsights[]>({
+    queryKey: ["tenant-insights", "stats", dateFrom, dateTo],
+    queryFn: () =>
+      apiGet(`/tenant-insights/stats${buildParams(dateFrom, dateTo)}`),
   });
 }

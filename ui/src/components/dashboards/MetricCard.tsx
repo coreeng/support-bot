@@ -6,7 +6,7 @@ interface MetricCardProps {
     value: string | number
     description?: string
     isLoading?: boolean
-    colorScheme?: 'blue' | 'orange' | 'green' | 'purple' | 'cyan'
+    colorScheme?: 'blue' | 'orange' | 'green' | 'purple' | 'cyan' | 'red'
 }
 
 export function MetricCard({ 
@@ -46,6 +46,12 @@ export function MetricCard({
             border: 'border-cyan-200',
             title: 'text-cyan-800',
             value: 'text-cyan-600'
+        },
+        red: {
+            bg: 'bg-red-50',
+            border: 'border-red-200',
+            title: 'text-red-800',
+            value: 'text-red-600'
         }
     }
 
