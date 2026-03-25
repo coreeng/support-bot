@@ -244,10 +244,14 @@ export default function TicketsPage() {
     const prevFilterKeyRef = useRef<string | undefined>(undefined)
     useEffect(() => {
         if (prevFilterKeyRef.current !== undefined && prevFilterKeyRef.current !== filterKey) {
-            setParams({ page: '0' })
+            // Only write page=0 when the page isn't already 0.
+            // Skipping the setParams call when currentPage===0 avoids a redundant
+            // router.replace (the filter handler already called one), which would
+            // otherwise cause an address-bar flicker on every filter change.
+            if (currentPage !== 0) setParams({ page: '0' })
         }
         prevFilterKeyRef.current = filterKey
-    }, [filterKey, setParams])
+    }, [filterKey, setParams, currentPage])
 
     // Reset the page-level team filter when the sidebar "View as" scope changes.
     // The ref starts as `undefined` (sentinel for "not yet seen") so that the
