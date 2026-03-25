@@ -61,7 +61,9 @@ export default function TicketsPage() {
         },
     )
 
-    // Safe to cast: validators guarantee these are valid enum / numeric values.
+    // Casts are safe for dateFilter, status, escalated, sortBy, sortDir, and page —
+    // each has an enumValidator or nonNegativeIntValidator in the useUrlParams call above.
+    // teamFilter, impact, tag, and escalatedTo have no validators and carry raw URL strings.
     const dateFilter    = params.dateFilter as DateFilter
     const statusFilter  = params.status
     const teamFilter    = params.teamFilter

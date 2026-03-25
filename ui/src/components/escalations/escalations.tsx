@@ -75,7 +75,9 @@ export default function EscalationsPage() {
         },
     )
 
-    // Safe to cast: validators guarantee these are valid enum / numeric values.
+    // Casts are safe for status, dateFilter, sortBy, sortDir, and page —
+    // each has an enumValidator or nonNegativeIntValidator in the useUrlParams call above.
+    // selectedTeam, impact, and tag have no validators and carry raw URL strings.
     const selectedTeam  = params.selectedTeam
     const statusFilter  = params.status as 'all' | 'ongoing' | 'resolved'
     const impactFilter  = params.impact
