@@ -21,50 +21,50 @@ public class CacheConfig {
 
     @Bean("permalink-cache")
     public Cache permalinkCache() {
-        return new CaffeineCache(
-                "permalink",
-                Caffeine.newBuilder()
-                        .expireAfterAccess(1, TimeUnit.DAYS)
-                        .maximumSize(10_000)
-                        .recordStats()
-                        .build());
+        return caffeineCache("permalink", 10_000);
     }
 
     @Bean("slack-user-cache")
     public Cache slackUserCache() {
-        return new CaffeineCache(
-                "slack-user",
-                Caffeine.newBuilder()
-                        .expireAfterAccess(1, TimeUnit.DAYS)
-                        .maximumSize(10_000)
-                        .recordStats()
-                        .build());
+        return caffeineCache("slack-user", 10_000);
     }
 
     @Bean("slack-group-cache")
     public Cache slackGroupCache() {
-        return new CaffeineCache(
-                "slack-group",
-                Caffeine.newBuilder()
-                        .expireAfterAccess(1, TimeUnit.DAYS)
-                        .maximumSize(1_000)
-                        .recordStats()
-                        .build());
+        return caffeineCache("slack-group", 1_000);
     }
 
     @Bean("slack-channel-cache")
     public Cache slackChannelCache() {
+        return caffeineCache("slack-channel", 1_000);
+    }
+
+    // Single-entry cache: stores the full active-tags list under one key.
+    // Uses expireAfterWrite (not expireAfterAccess) so tags refresh daily
+    // regardless of read frequency.
+    @Bean("tags-cache")
+    public Cache tagsCache() {
         return new CaffeineCache(
-                "slack-channel",
+                "tags",
+                Caffeine.newBuilder()
+                        .expireAfterWrite(1, TimeUnit.DAYS)
+                        .maximumSize(1)
+                        .recordStats()
+                        .build());
+    }
+
+    private static CaffeineCache caffeineCache(String name, long maximumSize) {
+        return new CaffeineCache(
+                name,
                 Caffeine.newBuilder()
                         .expireAfterAccess(1, TimeUnit.DAYS)
-                        .maximumSize(1_000)
+                        .maximumSize(maximumSize)
                         .recordStats()
                         .build());
     }
 
     @Bean
-    public MeterBinder slackCacheMetrics(List<CaffeineCache> caches) {
+    public MeterBinder caffeineCacheMetrics(List<CaffeineCache> caches) {
         return registry -> {
             for (var cache : caches) {
                 CaffeineCacheMetrics.monitor(registry, cache.getNativeCache(), cache.getName());

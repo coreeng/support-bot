@@ -4,18 +4,32 @@ import com.coreeng.supportbot.config.EnumProps;
 import com.coreeng.supportbot.config.EnumerationValue;
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
+import java.util.Objects;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.Cache;
+import org.springframework.cache.Cache.ValueRetrievalException;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 public class EnumsService implements EscalationTeamsRegistry, TagsRegistry, ImpactsRegistry {
+    private static final String TAGS_CACHE_KEY = "all-active";
+
     private final ImpactsRepository impactsRepository;
     private final TagsRepository tagsRepository;
+    private final Cache tagsCache;
     private final ImmutableList<EscalationTeam> escalationTeams;
 
-    public EnumsService(ImpactsRepository impactsRepository, TagsRepository tagsRepository, EnumProps enumProps) {
+    public EnumsService(
+            ImpactsRepository impactsRepository,
+            TagsRepository tagsRepository,
+            @Qualifier("tags-cache") Cache tagsCache,
+            EnumProps enumProps) {
         this.impactsRepository = impactsRepository;
         this.tagsRepository = tagsRepository;
+        this.tagsCache = tagsCache;
         this.escalationTeams = ImmutableList.copyOf(enumProps.escalationTeams());
     }
 
@@ -31,7 +45,23 @@ public class EnumsService implements EscalationTeamsRegistry, TagsRegistry, Impa
 
     @Override
     public ImmutableList<Tag> listAllTags() {
-        return tagsRepository.listAllActive();
+        try {
+            return Objects.requireNonNull(
+                    tagsCache.get(TAGS_CACHE_KEY, tagsRepository::listAllActive),
+                    "tags cache returned null for key: " + TAGS_CACHE_KEY);
+        } catch (ValueRetrievalException e) {
+            // Cache.get(key, Callable) wraps loader exceptions in ValueRetrievalException;
+            // unwrap so callers see the original exception.
+            log.error("Failed to populate tags cache", e);
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException re) {
+                throw re;
+            }
+            if (cause != null) {
+                throw new RuntimeException(cause);
+            }
+            throw new RuntimeException("Cache retrieval failed for key: " + TAGS_CACHE_KEY, e);
+        }
     }
 
     @Override
