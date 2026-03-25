@@ -53,6 +53,8 @@ export default function TicketsPage() {
             dateFilter: enumValidator(['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, 'lastWeek'),
             dateFrom: isoDateValidator,
             dateTo: isoDateValidator,
+            status: enumValidator(['', 'opened', 'closed', 'stale'] as const, ''),
+            escalated: enumValidator(['', 'Yes', 'No'] as const, ''),
             sortBy: enumValidator(['openedAt', 'closedAt'] as const, 'openedAt'),
             sortDir: enumValidator(['asc', 'desc'] as const, 'desc'),
             page: nonNegativeIntValidator,
