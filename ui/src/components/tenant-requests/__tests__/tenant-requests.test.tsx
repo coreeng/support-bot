@@ -88,15 +88,24 @@ describe('TenantRequestsPage', () => {
         })
 
         it('should render table headers', () => {
-            mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false })
+            mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false, error: null })
 
             render(<TenantRequestsPage />)
 
             const headers = screen.getAllByRole('columnheader')
-            const headerTexts = headers.map(h => h.textContent?.trim())
-            expect(headerTexts).toEqual(
-                expect.arrayContaining(['Repository', 'Team', 'PRs', 'Open', 'Escalated', 'Breached', 'p50', 'p90', 'p99'])
-            )
+            expect(headers).toHaveLength(9)
+            ;['Repository', 'Team', 'PRs', 'Open', 'Escalated', 'Breached', 'p50', 'p90', 'p99'].forEach(label => {
+                expect(screen.getAllByText(label).length).toBeGreaterThanOrEqual(1)
+            })
+        })
+
+        it('should render info icons on percentile headers', () => {
+            mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false, error: null })
+
+            const { container } = render(<TenantRequestsPage />)
+
+            const infoIcons = container.querySelectorAll('.lucide-info')
+            expect(infoIcons).toHaveLength(3) // p50, p90, p99
         })
 
         it('should render repo row with formatted durations', () => {

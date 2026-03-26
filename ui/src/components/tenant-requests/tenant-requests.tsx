@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useMemo, useState } from 'react'
-import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, Info } from 'lucide-react'
+import * as Tooltip from '@radix-ui/react-tooltip'
 import { useTenantInsightsStats } from '@/lib/hooks'
 import { formatDuration } from '@/lib/utils/format'
 import type { RepoInsights } from '@/lib/types/dashboard'
@@ -133,6 +134,7 @@ export default function TenantRequestsPage() {
     const repoCount = repos.length
 
     return (
+        <Tooltip.Provider delayDuration={200}>
         <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
             <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200">
                 <div className="max-w-[1400px] mx-auto px-8 py-4">
@@ -269,9 +271,9 @@ export default function TenantRequestsPage() {
                                     <SortHeader label="Open" sortKey="openCount" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                                     <SortHeader label="Escalated" sortKey="escalatedCount" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                                     <SortHeader label="Breached" sortKey="breachedCount" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                                    <SortHeader label="p50" sortKey="p50" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                                    <SortHeader label="p90" sortKey="p90" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                                    <SortHeader label="p99" sortKey="p99" last activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                                    <SortHeader label="p50" sortKey="p50" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} tooltip="50% of PRs are resolved within this time" />
+                                    <SortHeader label="p90" sortKey="p90" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} tooltip="90% of PRs are resolved within this time" />
+                                    <SortHeader label="p99" sortKey="p99" last activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} tooltip="99% of PRs are resolved within this time" />
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -334,6 +336,7 @@ export default function TenantRequestsPage() {
                 </div>
             </div>
         </div>
+        </Tooltip.Provider>
     )
 }
 
@@ -360,7 +363,7 @@ function StatCard({ label, value, isLoading, gradient, iconBg }: {
     )
 }
 
-function SortHeader({ label, sortKey, activeSortKey, sortDir, onSort, align, first, last }: {
+function SortHeader({ label, sortKey, activeSortKey, sortDir, onSort, align, first, last, tooltip }: {
     label: string
     sortKey: SortKey
     activeSortKey: SortKey
@@ -369,6 +372,7 @@ function SortHeader({ label, sortKey, activeSortKey, sortDir, onSort, align, fir
     align?: 'left' | 'right'
     first?: boolean
     last?: boolean
+    tooltip?: string
 }) {
     const isActive = activeSortKey === sortKey
     const textAlign = align === 'left' ? 'text-left' : 'text-right'
@@ -386,6 +390,23 @@ function SortHeader({ label, sortKey, activeSortKey, sortDir, onSort, align, fir
                     <ChevronDown className={`w-3 h-3 ${isActive && sortDir === 'desc' ? 'text-indigo-500' : ''}`} />
                 </span>
                 {align !== 'left' ? label : null}
+                {tooltip && (
+                    <Tooltip.Root>
+                        <Tooltip.Trigger asChild onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                            <Info className="w-3 h-3 text-slate-300 hover:text-indigo-400 cursor-help transition-colors" />
+                        </Tooltip.Trigger>
+                        <Tooltip.Portal>
+                            <Tooltip.Content
+                                side="bottom"
+                                sideOffset={6}
+                                className="z-50 max-w-[200px] px-3 py-2 text-xs leading-relaxed text-white bg-slate-900 rounded-lg shadow-lg animate-in fade-in-0 zoom-in-95"
+                            >
+                                {tooltip}
+                                <Tooltip.Arrow className="fill-slate-900" />
+                            </Tooltip.Content>
+                        </Tooltip.Portal>
+                    </Tooltip.Root>
+                )}
             </span>
         </th>
     )
