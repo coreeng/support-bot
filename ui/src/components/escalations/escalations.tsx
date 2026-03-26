@@ -47,7 +47,7 @@ export default function EscalationsPage() {
     const { data: tenantTeamsData } = useTenantTeams()
     const { data: registryData } = useRegistry()
     const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS
-    type DateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
+    type EscalationDateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
 
     // Persist all filter / sort / page controls in the URL.
     // Validators guard against invalid URL values and auto-correct the URL.
@@ -82,7 +82,7 @@ export default function EscalationsPage() {
     const statusFilter  = params.status as 'all' | 'ongoing' | 'resolved'
     const impactFilter  = params.impact
     const tagFilter     = params.tag
-    const dateFilter    = params.dateFilter as DateFilter
+    const dateFilter    = params.dateFilter as EscalationDateFilter
     const sortColumn    = params.sortBy as SortColumn
     const sortDirection = params.sortDir as 'asc' | 'desc'
     const pageIndex     = parseInt(params.page, 10)
@@ -352,7 +352,7 @@ export default function EscalationsPage() {
                         aria-label="Escalation date filter"
                         value={dateFilter}
                         onChange={e => {
-                            const next = e.target.value as DateFilter
+                            const next = e.target.value as EscalationDateFilter
                             setParams(next !== 'custom'
                                 ? { dateFilter: next, dateFrom: '', dateTo: '', page: '0' }
                                 : { dateFilter: next, page: '0' })

@@ -24,7 +24,7 @@ export default function TicketsPage() {
     const {data: isAssignmentEnabled} = useAssignmentEnabled()
     const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
     const isViewingAllTeams = contextIsViewingAllTeams ?? (effectiveTeams.length === 0 && !hasNoTeamScope)
-    type DateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
+    type TicketDateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
     type SortColumn = 'openedAt' | 'closedAt'
 
     // Selected ticket (UI-only — not persisted in the URL)
@@ -64,7 +64,7 @@ export default function TicketsPage() {
     // Casts are safe for dateFilter, status, escalated, sortBy, sortDir, and page —
     // each has an enumValidator or nonNegativeIntValidator in the useUrlParams call above.
     // teamFilter, impact, tag, and escalatedTo have no validators and carry raw URL strings.
-    const dateFilter    = params.dateFilter as DateFilter
+    const dateFilter    = params.dateFilter as TicketDateFilter
     const statusFilter  = params.status
     const teamFilter    = params.teamFilter
     const impactFilter  = params.impact
@@ -311,7 +311,7 @@ export default function TicketsPage() {
             <div className={`grid grid-cols-1 gap-2 mb-4 ${hasNoTeamScope ? 'sm:grid-cols-5' : 'sm:grid-cols-6'}`}>
                 {/* Date Filter - First */}
                 <select value={dateFilter} onChange={e => {
-                    const next = e.target.value as DateFilter
+                    const next = e.target.value as TicketDateFilter
                     setParams(next !== 'custom'
                         ? { dateFilter: next, dateFrom: '', dateTo: '' }
                         : { dateFilter: next })
