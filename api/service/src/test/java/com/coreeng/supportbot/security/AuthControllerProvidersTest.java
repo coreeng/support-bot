@@ -77,6 +77,20 @@ class AuthControllerProvidersTest {
     }
 
     @Test
+    void shouldReturnDexOnly_whenOnlyDexConfigured() {
+        // given
+        when(oauth2AvailabilityChecker.getAvailableProviders()).thenReturn(List.of("dex"));
+
+        // when
+        var response = controller.getAvailableProviders();
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().providers()).containsExactly("dex");
+    }
+
+    @Test
     void shouldReturnEmptyArray_whenNoProvidersConfigured() {
         // given
         when(oauth2AvailabilityChecker.getAvailableProviders()).thenReturn(List.of());

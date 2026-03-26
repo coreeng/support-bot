@@ -220,6 +220,29 @@ buildscript {
 val postgresService =
     project.gradle.sharedServices.registerIfAbsent("postgresContainer", PostgresService::class.java) {}
 
+/**
+ * When `-Ddocker=true`, Flyway/jOOQ use a Postgres on the host (not Testcontainers).
+ * Defaults match [service/docker-compose.yaml] (`make db-up`).
+ *
+ * Override order: `-Dsupportbot.localDb.*` system properties, then env
+ * `SUPPORTBOT_LOCAL_DB_URL` / `SUPPORTBOT_LOCAL_DB_USER` / `SUPPORTBOT_LOCAL_DB_PASSWORD`,
+ * then defaults. API Dockerfile passes `-Dsupportbot.localDb.*` for its embedded Postgres.
+ */
+fun localPostgresJdbcUrl(): String =
+    System.getProperty("supportbot.localDb.url")
+        ?: System.getenv("SUPPORTBOT_LOCAL_DB_URL")
+        ?: "jdbc:postgresql://localhost:5432/postgres"
+
+fun localPostgresUser(): String =
+    System.getProperty("supportbot.localDb.user")
+        ?: System.getenv("SUPPORTBOT_LOCAL_DB_USER")
+        ?: "postgres"
+
+fun localPostgresPassword(): String =
+    System.getProperty("supportbot.localDb.password")
+        ?: System.getenv("SUPPORTBOT_LOCAL_DB_PASSWORD")
+        ?: "postgres"
+
 flyway {
     locations = arrayOf("filesystem:./src/main/resources/db/migration")
 }
@@ -233,9 +256,9 @@ tasks.withType<AbstractFlywayTask> {
         val container = if (dockerBuild != "true") {
             postgresService.get().container
         } else null
-        url = container?.jdbcUrl ?: "jdbc:postgresql://localhost:5432/flywaydb"
-        user = container?.username ?: "postgres"
-        password = container?.password ?: "fly"
+        url = container?.jdbcUrl ?: localPostgresJdbcUrl()
+        user = container?.username ?: localPostgresUser()
+        password = container?.password ?: localPostgresPassword()
     }
 }
 
@@ -280,9 +303,9 @@ tasks.withType<CodegenTask> {
             configuration {
                 jdbc {
                     driver = "org.postgresql.Driver"
-                    url = container?.jdbcUrl ?: "jdbc:postgresql://localhost:5432/flywaydb"
-                    user = container?.username ?: "postgres"
-                    password = container?.password ?: "fly"
+                    url = container?.jdbcUrl ?: localPostgresJdbcUrl()
+                    user = container?.username ?: localPostgresUser()
+                    password = container?.password ?: localPostgresPassword()
                 }
             }
         }
@@ -291,6 +314,11 @@ tasks.withType<CodegenTask> {
 
 tasks.withType<JavaCompile> {
     mustRunAfter("jooqCodegen")
+}
+
+// mustRunAfter does not schedule jooqCodegen; without this, compileJava can run with no generated dbschema.
+tasks.named<JavaCompile>("compileJava") {
+    dependsOn(tasks.named("jooqCodegen"))
 }
 
 abstract class PostgresService : BuildService<BuildServiceParameters.None>, AutoCloseable {

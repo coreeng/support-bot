@@ -8,7 +8,7 @@ export async function GET(
 ) {
   const { provider } = await params;
 
-  if (provider === "google" || provider === "azure") {
+  if (provider === "google" || provider === "azure" || provider === "dex") {
     const redirectUri = new URL(
       `/api/oauth/callback/${provider}`,
       process.env.NEXTAUTH_URL

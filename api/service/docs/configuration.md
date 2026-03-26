@@ -247,6 +247,8 @@ settings:
   token_rotation_enabled: false
 ```
 
+Use **`SLACK_TOKEN` = Bot User OAuth Token** (`xoxb-...`) from **OAuth & Permissions** after the app is installed to the workspace. An Incoming Webhooks–only setup (or a token whose scopes are just `incoming-webhook`) is not sufficient: on startup the service loads support team membership via Slack user groups and needs scopes such as **`usergroups:read`** (see manifest above). If you see `missing_scope` / `Needed: usergroups:read`, add the missing **Bot Token Scopes** in the Slack app, click **Reinstall to Workspace**, then update `SLACK_TOKEN` with the new `xoxb-` token.
+
 ## Kubernetes Cluster
 Kubernetes cluster integration is used for scraping team to cloud group relations.
 It requires ServiceAccount configuration depending on your scraping mode.
@@ -281,8 +283,8 @@ to create a secret for the registered application so that it can be used for aut
 
 ## Single Sign-On (SSO)
 
-SSO is supported via Google and Azure AD using the OAuth2 Authorisation Code flow that is faciliated by the API.
-One or both providers can be enabled depending on what your organisation uses.
+SSO is supported via Google, Azure AD, and Dex (OIDC) using the OAuth2 Authorisation Code flow that is faciliated by the API.
+One or more providers can be enabled depending on what your organisation uses.
 At least one provider must be configured. A provider is enabled when both its client ID and client secret are set.
 
 ### Environment variables
@@ -298,6 +300,10 @@ Set these on the **API**:
 | `AZURE_CLIENT_ID` | Azure AD application (client) ID. Leave empty to disable Azure AD SSO.                                                                 |
 | `AZURE_CLIENT_SECRET` | Azure AD client secret.                                                                                                                |
 | `AZURE_TENANT_ID` | Azure AD directory (tenant) ID.                                                                                                        |
+| `DEX_CLIENT_ID` | Dex OAuth2 client ID. Leave empty to disable Dex SSO.                                                                                     |
+| `DEX_CLIENT_SECRET` | Dex OAuth2 client secret.                                                                                                              |
+| `DEX_ISSUER_URI` | Dex OIDC issuer URI, for example `https://dex.example.com/dex`.                                                                         |
+| `DEX_SCOPES` | Optional comma-separated scopes used for Dex login. Defaults to `openid,email,profile,groups`.                                            |
 
 > Note: The `AZURE_*` variables above are shared between SSO (user login) and
 > [Azure Cloud integration](#azure-cloud) (reading group memberships from Entra ID).
@@ -337,3 +343,19 @@ Portal: https://portal.azure.com > Microsoft Entra ID > App registrations
    - `profile`
 
 > Note: The redirect URIs registered in each provider must match the API's publicly accessible URL.
+
+### Dex (OIDC)
+
+Dex docs: https://dexidp.io/
+
+1. Create a Dex OAuth2 client for Support Bot.
+2. Set:
+   - `DEX_CLIENT_ID`
+   - `DEX_CLIENT_SECRET`
+   - `DEX_ISSUER_URI`
+3. Configure redirect URIs in Dex:
+   - `http://localhost:8080/login/oauth2/code/dex`
+   - `https://<your-api-domain>/login/oauth2/code/dex`
+4. Ensure Dex is configured to return the claims Support Bot needs for login (`email` and `name`/`preferred_username`).
+
+> Note: Dex can be enabled alongside Google and Azure. The login screen only shows providers that are fully configured.

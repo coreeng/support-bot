@@ -417,11 +417,28 @@ describe('LoginPage', () => {
       })
     })
 
+    it('shows only Dex when only Dex is configured', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ['dex'] }),
+        } as Response)
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Continue with Dex')).toBeInTheDocument()
+        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
+        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
+      })
+    })
+
     it('filters out unknown providers from API response', async () => {
       global.fetch = jest.fn(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ providers: ['google', 'unknown-provider', 'azure'] }),
+          json: () => Promise.resolve({ providers: ['google', 'unknown-provider', 'azure', 'dex'] }),
         } as Response)
       )
 
@@ -430,6 +447,7 @@ describe('LoginPage', () => {
       await waitFor(() => {
         expect(screen.getByText('Continue with Google')).toBeInTheDocument()
         expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
+        expect(screen.getByText('Continue with Dex')).toBeInTheDocument()
         // No button for "unknown-provider" should be rendered
       })
     })

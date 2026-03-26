@@ -52,10 +52,18 @@ spring:
             scope: openid, email, profile
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+          dex:
+            client-id: ${DEX_CLIENT_ID:}
+            client-secret: ${DEX_CLIENT_SECRET:}
+            scope: ${DEX_SCOPES:openid,email,profile,groups}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
         provider:
           azure:
             tenant-id: ${AZURE_TENANT_ID:}
             issuer-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID:common}/v2.0
+          dex:
+            issuer-uri: ${DEX_ISSUER_URI:}
   cloud:
 # Uncomment in case you require Azure integration
 #    azure:

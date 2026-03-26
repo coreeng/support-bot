@@ -22,7 +22,10 @@ public class OAuth2ClientConfig {
             @Value("${spring.security.oauth2.client.registration.google.client-secret:}") String googleClientSecret,
             @Value("${spring.security.oauth2.client.registration.azure.client-id:}") String azureClientId,
             @Value("${spring.security.oauth2.client.registration.azure.client-secret:}") String azureClientSecret,
-            @Value("${spring.security.oauth2.client.provider.azure.tenant-id:}") String azureTenantId) {
+            @Value("${spring.security.oauth2.client.provider.azure.tenant-id:}") String azureTenantId,
+            @Value("${spring.security.oauth2.client.registration.dex.client-id:}") String dexClientId,
+            @Value("${spring.security.oauth2.client.registration.dex.client-secret:}") String dexClientSecret,
+            @Value("${spring.security.oauth2.client.provider.dex.issuer-uri:}") String dexIssuerUri) {
         var registrations = new ArrayList<ClientRegistration>();
 
         if (isNotBlank(googleClientId) && isNotBlank(googleClientSecret)) {
@@ -33,6 +36,10 @@ public class OAuth2ClientConfig {
         if (isNotBlank(azureClientId) && isNotBlank(azureClientSecret) && isNotBlank(azureTenantId)) {
             registrations.add(azureClientRegistration(azureClientId, azureClientSecret, azureTenantId));
             log.info("Azure AD OAuth2 client registered");
+        }
+        if (isNotBlank(dexClientId) && isNotBlank(dexClientSecret) && isNotBlank(dexIssuerUri)) {
+            registrations.add(dexClientRegistration(dexClientId, dexClientSecret, dexIssuerUri));
+            log.info("Dex OAuth2 client registered");
         }
 
         if (registrations.isEmpty()) {
@@ -76,6 +83,25 @@ public class OAuth2ClientConfig {
                 .userInfoUri("https://graph.microsoft.com/oidc/userinfo")
                 .userNameAttributeName(IdTokenClaimNames.SUB)
                 .clientName("Azure AD")
+                .build();
+    }
+
+    private ClientRegistration dexClientRegistration(String clientId, String clientSecret, String issuerUri) {
+        String normalizedIssuerUri =
+                issuerUri.endsWith("/") ? issuerUri.substring(0, issuerUri.length() - 1) : issuerUri;
+        return ClientRegistration.withRegistrationId("dex")
+                .clientId(clientId)
+                .clientSecret(clientSecret)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                .scope("openid", "email", "profile", "groups")
+                .authorizationUri(normalizedIssuerUri + "/auth")
+                .tokenUri(normalizedIssuerUri + "/token")
+                .jwkSetUri(normalizedIssuerUri + "/keys")
+                .userInfoUri(normalizedIssuerUri + "/userinfo")
+                .userNameAttributeName(IdTokenClaimNames.SUB)
+                .clientName("Dex")
                 .build();
     }
 

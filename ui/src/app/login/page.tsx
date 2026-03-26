@@ -6,12 +6,14 @@ import { signIn } from "next-auth/react";
 import { useAuth } from "@/hooks/useAuth";
 import { sanitizeCallbackUrl } from "@/lib/utils/url";
 
+type LoginProvider = "google" | "azure" | "dex";
+
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading } = useAuth();
   const authAttemptedRef = useRef(false);
-  const [providers, setProviders] = useState<("google" | "azure")[]>(["google", "azure"]);
+  const [providers, setProviders] = useState<LoginProvider[]>(["google", "azure"]);
   const [providersLoading, setProvidersLoading] = useState(true);
   const [providersError, setProvidersError] = useState(false);
 
@@ -38,7 +40,7 @@ function LoginContent() {
           setProviders([]);
         } else {
           const availableProviders = (data.providers || []).filter(
-            (p: string): p is "google" | "azure" => p === "google" || p === "azure"
+            (p: string): p is LoginProvider => p === "google" || p === "azure" || p === "dex"
           );
           setProviders(availableProviders);
           setProvidersError(false);
@@ -123,7 +125,7 @@ function LoginContent() {
     }
   }, [code, provider, token, isAuthenticated, isLoading, callbackUrl, router]);
 
-  const handleLogin = (provider: "google" | "azure") => {
+  const handleLogin = (provider: LoginProvider) => {
     // OAuth goes through API route - server handles redirect to backend
     // Include callbackUrl so user returns to the right page after login
     const oauthUrl = `/api/oauth/start/${provider}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
@@ -278,6 +280,15 @@ function LoginContent() {
                 <path fill="#ffba08" d="M12 12h10v10H12z" />
               </svg>
               Continue with Microsoft
+            </button>
+          )}
+
+          {providers.includes("dex") && (
+            <button
+              onClick={() => handleLogin("dex")}
+              className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors"
+            >
+              Continue with Dex
             </button>
           )}
         </div>

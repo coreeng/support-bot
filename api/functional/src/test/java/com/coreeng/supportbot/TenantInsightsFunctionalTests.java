@@ -6,9 +6,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.testkit.Config;
 import com.coreeng.supportbot.testkit.SupportBotClient;
-import com.coreeng.supportbot.testkit.Ticket;
 import com.coreeng.supportbot.testkit.TestKit;
 import com.coreeng.supportbot.testkit.TestKitExtension;
+import com.coreeng.supportbot.testkit.Ticket;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -46,7 +46,8 @@ public class TenantInsightsFunctionalTests {
         createPr(ticketId, "test-org/pr-insights-storage", 1, sixtyDaysAgo, "infra");
 
         // when — querying the last 30 days
-        List<RepoInsights> results = getStats(LocalDate.now().minusDays(30), LocalDate.now().plusDays(1));
+        List<RepoInsights> results =
+                getStats(LocalDate.now().minusDays(30), LocalDate.now().plusDays(1));
 
         // then — only networking PRs appear
         assertThat(results).hasSize(1);
@@ -68,7 +69,8 @@ public class TenantInsightsFunctionalTests {
         List<RepoInsights> results = getAllTimeStats();
 
         // then — both repos returned
-        assertThat(results).extracting(RepoInsights::repo)
+        assertThat(results)
+                .extracting(RepoInsights::repo)
                 .contains("test-org/pr-insights-networking", "test-org/pr-insights-storage");
     }
 
@@ -79,15 +81,15 @@ public class TenantInsightsFunctionalTests {
         createPr(ticketId, "test-org/pr-insights-networking", 1, Instant.now().minus(Duration.ofDays(200)), "platform");
 
         // when — querying the last 7 days
-        List<RepoInsights> results = getStats(LocalDate.now().minusDays(7), LocalDate.now().plusDays(1));
+        List<RepoInsights> results =
+                getStats(LocalDate.now().minusDays(7), LocalDate.now().plusDays(1));
 
         // then — empty list, not an error
         assertThat(results).isEmpty();
     }
 
     private List<RepoInsights> getStats(LocalDate dateFrom, LocalDate dateTo) {
-        return given()
-                .queryParam("dateFrom", dateFrom.toString())
+        return given().queryParam("dateFrom", dateFrom.toString())
                 .queryParam("dateTo", dateTo.toString())
                 .get(config.supportBot().baseUrl() + "/tenant-insights/pr-stats")
                 .then()
@@ -98,8 +100,7 @@ public class TenantInsightsFunctionalTests {
     }
 
     private List<RepoInsights> getAllTimeStats() {
-        return given()
-                .get(config.supportBot().baseUrl() + "/tenant-insights/pr-stats")
+        return given().get(config.supportBot().baseUrl() + "/tenant-insights/pr-stats")
                 .then()
                 .statusCode(200)
                 .extract()
@@ -113,7 +114,8 @@ public class TenantInsightsFunctionalTests {
     }
 
     private void createPr(long ticketId, String repo, int prNumber, Instant createdAt, String owningTeam) {
-        supportBotClient.test()
+        supportBotClient
+                .test()
                 .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
                         .ticketId(ticketId)
                         .githubRepo(repo)
@@ -125,7 +127,13 @@ public class TenantInsightsFunctionalTests {
     }
 
     public record RepoInsights(
-            String repo, String owningTeam,
-            long prCount, long openCount, long escalatedCount, long breachedCount,
-            double p50Seconds, double p90Seconds, double p99Seconds) {}
+            String repo,
+            String owningTeam,
+            long prCount,
+            long openCount,
+            long escalatedCount,
+            long breachedCount,
+            double p50Seconds,
+            double p90Seconds,
+            double p99Seconds) {}
 }

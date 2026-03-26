@@ -16,7 +16,7 @@ export async function GET(
   loginUrl.searchParams.set("callbackUrl", sanitizeCallbackUrl(rawCallbackUrl));
 
   // Add provider and code/error parameters BEFORE creating the redirect response
-  if (provider === "google" || provider === "azure") {
+  if (provider === "google" || provider === "azure" || provider === "dex") {
     loginUrl.searchParams.set("provider", provider);
     if (code) {
       loginUrl.searchParams.set("code", code);

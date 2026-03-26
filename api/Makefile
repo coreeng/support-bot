@@ -21,7 +21,7 @@ db-down: ## Stop PostgreSQL database container
 run-local: db-up ## Run API locally (starts DB, loads .env.local)
 	@if [ -f .env.local ]; then \
 		set -a && source .env.local && set +a && \
-		cd service && ../gradlew bootRun; \
+		cd service && ../gradlew -Ddocker=true bootRun; \
 	else \
 		echo "Error: .env.local not found. Copy from .env.example and update values."; \
 		exit 1; \
@@ -36,5 +36,13 @@ test: ## Run tests
 	cd service && ../gradlew test
 
 .PHONY: codegen
-codegen: ## Generate JOOQ classes
+codegen: ## Generate JOOQ classes (uses Testcontainers unless Docker is unavailable)
 	cd service && ../gradlew jooqCodegen
+
+.PHONY: codegen-local
+codegen-local: ## Generate JOOQ classes against Postgres from `make db-up` (no Testcontainers)
+	cd service && ../gradlew -Ddocker=true jooqCodegen
+
+.PHONY: build-local
+build-local: ## Build against Postgres from `make db-up` (no Testcontainers)
+	cd service && ../gradlew -Ddocker=true build
