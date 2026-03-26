@@ -217,19 +217,6 @@ export default function HealthPage() {
 
 
     // --- Metrics ---
-    // Tickets are already filtered by date from server
-  useMemo(() => {
-    return filteredTickets.filter((t: TicketWithLogs) => {
-      const { opened } = getOpenedClosed(t)
-      return opened !== null
-    })
-  }, [filteredTickets]);
-  useMemo(() => {
-    return filteredTickets.filter((t: TicketWithLogs) => {
-      const { closed } = getOpenedClosed(t)
-      return closed !== null
-    })
-  }, [filteredTickets]);
   const staleTicketsCount = useMemo(() => {
         return filteredTickets.filter((t: TicketWithLogs) => t.status === 'stale').length
     }, [filteredTickets])
