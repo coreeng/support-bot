@@ -3,11 +3,13 @@ package com.coreeng.supportbot.github;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -245,6 +247,188 @@ class Hub4jGitHubClientTest {
         assertThatThrownBy(() -> client.listPullRequestFiles("my-org/my-repo", 42))
                 .isInstanceOf(GitHubApiException.class)
                 .hasMessageContaining("my-org/my-repo#42");
+    }
+
+    @Test
+    void listReviewsReturnsReviewsOnHappyPath() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = mock(GHPullRequest.class);
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+
+        GHUser user1 = mock(GHUser.class);
+        GHUser user2 = mock(GHUser.class);
+
+        GHPullRequestReview review1 =
+                spyReview(user1, "reviewer-a", GHPullRequestReviewState.APPROVED, "2026-03-01T10:00:00Z");
+        GHPullRequestReview review2 =
+                spyReview(user2, "reviewer-b", GHPullRequestReviewState.CHANGES_REQUESTED, "2026-03-02T12:00:00Z");
+
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHPullRequestReview> iterable = mock(PagedIterable.class);
+        when(pr.listReviews()).thenReturn(iterable);
+        when(iterable.toList()).thenReturn(List.of(review1, review2));
+
+        // when
+        List<GitHubPullRequestReview> result = client.listReviews("my-org/my-repo", 42);
+
+        // then
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).userLogin()).isEqualTo("reviewer-a");
+        assertThat(result.get(0).state()).isEqualTo(GitHubPullRequestReview.ReviewState.APPROVED);
+        assertThat(result.get(0).submittedAt()).isEqualTo(Instant.parse("2026-03-01T10:00:00Z"));
+        assertThat(result.get(1).userLogin()).isEqualTo("reviewer-b");
+        assertThat(result.get(1).state()).isEqualTo(GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED);
+        assertThat(result.get(1).submittedAt()).isEqualTo(Instant.parse("2026-03-02T12:00:00Z"));
+    }
+
+    @Test
+    void listReviewsMapsDeprecatedRequestChangesState() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = mock(GHPullRequest.class);
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+
+        GHUser user = mock(GHUser.class);
+        GHPullRequestReview review =
+                spyReview(user, "reviewer", GHPullRequestReviewState.REQUEST_CHANGES, "2026-03-01T10:00:00Z");
+
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHPullRequestReview> iterable = mock(PagedIterable.class);
+        when(pr.listReviews()).thenReturn(iterable);
+        when(iterable.toList()).thenReturn(List.of(review));
+
+        // when
+        List<GitHubPullRequestReview> result = client.listReviews("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.get(0).state()).isEqualTo(GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED);
+    }
+
+    @Test
+    void listReviewsThrowsOnNullUser() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = mock(GHPullRequest.class);
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+
+        GHPullRequestReview review = spy(new GHPullRequestReview());
+        // getUser() returns null by default on a real instance
+
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHPullRequestReview> iterable = mock(PagedIterable.class);
+        when(pr.listReviews()).thenReturn(iterable);
+        when(iterable.toList()).thenReturn(List.of(review));
+
+        // when / then
+        assertThatThrownBy(() -> client.listReviews("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("null user");
+    }
+
+    @Test
+    void listReviewsThrowsOnNullState() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = mock(GHPullRequest.class);
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+
+        GHPullRequestReview review = spy(new GHPullRequestReview());
+        GHUser user = mock(GHUser.class);
+        when(review.getUser()).thenReturn(user);
+        when(user.getLogin()).thenReturn("reviewer");
+        // getState() returns null by default on a real instance
+
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHPullRequestReview> iterable = mock(PagedIterable.class);
+        when(pr.listReviews()).thenReturn(iterable);
+        when(iterable.toList()).thenReturn(List.of(review));
+
+        // when / then
+        assertThatThrownBy(() -> client.listReviews("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("null state");
+    }
+
+    @Test
+    void listReviewsThrowsOnNullSubmittedAt() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = mock(GHPullRequest.class);
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+
+        GHPullRequestReview review = spy(new GHPullRequestReview());
+        GHUser user = mock(GHUser.class);
+        when(review.getUser()).thenReturn(user);
+        when(user.getLogin()).thenReturn("reviewer");
+        when(review.getState()).thenReturn(GHPullRequestReviewState.APPROVED);
+        // getSubmittedAt() returns null by default on a real instance
+
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHPullRequestReview> iterable = mock(PagedIterable.class);
+        when(pr.listReviews()).thenReturn(iterable);
+        when(iterable.toList()).thenReturn(List.of(review));
+
+        // when / then
+        assertThatThrownBy(() -> client.listReviews("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("null submitted_at");
+    }
+
+    @Test
+    void listReviewsWraps404() throws IOException {
+        // given
+        when(gitHub.getRepository("my-org/my-repo")).thenThrow(new GHFileNotFoundException("Not Found"));
+
+        // when / then
+        assertThatThrownBy(() -> client.listReviews("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(404));
+    }
+
+    @Test
+    void listReviewsWrapsHttpException() throws IOException {
+        // given
+        when(gitHub.getRepository("my-org/my-repo"))
+                .thenThrow(new HttpException(500, "Internal Server Error", (String) null, null));
+
+        // when / then
+        assertThatThrownBy(() -> client.listReviews("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(500));
+    }
+
+    @Test
+    void listReviewsWrapsIOException() throws IOException {
+        // given
+        when(gitHub.getRepository("my-org/my-repo")).thenThrow(new IOException("Connection refused"));
+
+        // when / then
+        assertThatThrownBy(() -> client.listReviews("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("my-org/my-repo#42");
+    }
+
+    /**
+     * Creates a spy on a real GHPullRequestReview and stubs the methods we need.
+     * We use spy instead of mock because GHObject.getId() has @WithBridgeMethods
+     * which generates bridge methods that are incompatible with Mockito mock stubbing.
+     */
+    private static GHPullRequestReview spyReview(
+            GHUser user, String login, GHPullRequestReviewState state, String submittedAtIso) throws IOException {
+        GHPullRequestReview review = spy(new GHPullRequestReview());
+        when(review.getUser()).thenReturn(user);
+        when(user.getLogin()).thenReturn(login);
+        when(review.getState()).thenReturn(state);
+        when(review.getSubmittedAt()).thenReturn(Date.from(Instant.parse(submittedAtIso)));
+        return review;
     }
 
     private static void setCreatedAtRaw(GHPullRequest pr, String createdAtRaw) {

@@ -13,4 +13,10 @@ public interface GitHubClient {
     @Nullable String getFileContent(String repositoryName, String path);
 
     List<String> listPullRequestFiles(String repositoryName, int pullNumber);
+
+    /**
+     * @return all reviews for the given pull request
+     * @throws GitHubApiException on any GitHub API failure (not found, auth, server errors, network)
+     */
+    List<GitHubPullRequestReview> listReviews(String repositoryName, int pullNumber);
 }
