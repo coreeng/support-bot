@@ -276,12 +276,13 @@ export default function DashboardsPage() {
                                 green: isActive ? 'border-green-600 bg-green-50' : 'border-transparent hover:bg-green-50',
                             }
 
-                            const textColor = isActive
-                                ? section.color === 'blue' ? 'text-blue-700'
-                                : section.color === 'purple' ? 'text-purple-700'
-                                : section.color === 'orange' ? 'text-orange-700'
-                                : 'text-green-700'
-                                : 'text-gray-600'
+                            const activeTextColors: Record<string, string> = {
+                              blue: 'text-blue-700',
+                              purple: 'text-purple-700',
+                              orange: 'text-orange-700',
+                              green: 'text-green-700',
+                            }
+                            const textColor = isActive ? activeTextColors[section.color] : 'text-gray-600'
 
                             return (
                                 <button
