@@ -10,7 +10,7 @@ import {useQueryClient} from '@tanstack/react-query'
 import {TEAM_SCOPE} from '@/lib/constants'
 import {normalizeTeamKey} from '@/lib/teamUtils'
 import {getDateRangeFromFilter, PRESET_DAYS} from '@/lib/dateRange'
-import { enumValidator, isoDateValidator, nonNegativeIntValidator, useUrlParams } from '@/lib/hooks/useUrlParams'
+import { enumValidator, isoDateValidator, nonNegativeIntValidator, impactValidator, tagValidator, useUrlParams } from '@/lib/hooks/useUrlParams'
 
 
 export default function TicketsPage() {
@@ -31,7 +31,10 @@ export default function TicketsPage() {
     const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
     const [isModalOpen, setIsModalOpen] = useState(false)
 
-    // Persist all filter / sort / page controls in the URL.
+    const {data: registryData} = useRegistry()
+    const {data: teamsData} = useTenantTeams()
+
+  // Persist all filter / sort / page controls in the URL.
     // Validators guard against invalid URL values and auto-correct the URL.
     const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS
     const [params, setParams] = useUrlParams(
@@ -58,6 +61,8 @@ export default function TicketsPage() {
             sortBy: enumValidator(['openedAt', 'closedAt'] as const, 'openedAt'),
             sortDir: enumValidator(['asc', 'desc'] as const, 'desc'),
             page: nonNegativeIntValidator,
+            impact: impactValidator(registryData),
+            tag: tagValidator(registryData)
         },
     )
 
@@ -73,7 +78,7 @@ export default function TicketsPage() {
     const escalatedToFilter  = params.escalatedTo
     const sortColumn: SortColumn       = params.sortBy as SortColumn
     const sortDirection: 'asc' | 'desc' = params.sortDir as 'asc' | 'desc'
-    const currentPage = parseInt(params.page, 10)
+    const unvalidatedCurrentPage = parseInt(params.page, 10)
     const pageSize = 15
 
     // Correct the URL when custom date range is in an invalid order (dateFrom > dateTo).
@@ -109,15 +114,13 @@ export default function TicketsPage() {
     )
     const useServerPagination = isViewingAllTeams && !shouldUseAllTickets
     const backendPageSize = useServerPagination ? pageSize : 1000
-    const backendPage = useServerPagination ? currentPage : 0
+    const backendPage = useServerPagination ? unvalidatedCurrentPage : 0
     const allTicketsQuery = useAllTickets(200, dateRange.from, dateRange.to, shouldUseAllTickets)
     const pagedTicketsQuery = useTickets(backendPage, backendPageSize, dateRange.from, dateRange.to)
 
     const ticketsData = shouldUseAllTickets ? allTicketsQuery.data : pagedTicketsQuery.data
     const ticketsLoading = shouldUseAllTickets ? allTicketsQuery.isLoading : pagedTicketsQuery.isLoading
     const ticketsError = shouldUseAllTickets ? allTicketsQuery.error : pagedTicketsQuery.error
-    const {data: teamsData} = useTenantTeams()
-    const {data: registryData} = useRegistry()
 
     const statusColors: Record<string, string> = {
         opened: 'bg-blue-100 text-blue-800',
@@ -239,7 +242,13 @@ export default function TicketsPage() {
         })
     }, [filteredTickets, sortColumn, sortDirection])
 
-    // Reset page to 0 whenever any filter param changes.
+    // Calculate pagination info
+    const totalPages = useServerPagination
+      ? (ticketsDataTyped?.totalPages || 0)
+      : Math.ceil(sortedTickets.length / pageSize)
+    const currentPage = Math.min(unvalidatedCurrentPage, Math.max(0, totalPages -1))
+
+  // Reset page to 0 whenever any filter param changes.
     // useEffect is required here because setParams calls router.replace (a side effect)
     // and side effects must not be triggered during render.
     const filterKey = [
@@ -281,10 +290,6 @@ export default function TicketsPage() {
         return sortedTickets.slice(start, start + pageSize)
     }, [sortedTickets, currentPage, pageSize, useServerPagination])
 
-    // Calculate pagination info
-    const totalPages = useServerPagination
-        ? (ticketsDataTyped?.totalPages || 0)
-        : Math.ceil(sortedTickets.length / pageSize)
     const totalTickets = useServerPagination
         ? (ticketsDataTyped?.totalElements || 0)
         : sortedTickets.length

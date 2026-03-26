@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { Registry, Team } from '@/lib/hooks/index'
 
 type StringRecord = Record<string, string>
 
@@ -48,6 +49,36 @@ export const nonNegativeIntValidator: ParamValidator = (
   if (!/^\d+$/.test(raw)) return defaultValue
   const n = parseInt(raw, 10)
   return Number.isFinite(n) && n >= 0 ? String(n) : defaultValue
+}
+
+/**
+ * Returns a validator that accepts only the valid impact codes from the backend registry.
+ */
+export function impactValidator(registry: Registry | undefined): ParamValidator {
+  return (raw: string, defaultValue: string): string =>
+    registry && registry.impacts.some(impact => impact.code === raw)
+      ? raw
+      : defaultValue
+}
+
+/**
+ * Returns a validator that accepts only the valid tag codes from the backend registry.
+ */
+export function tagValidator(registry: Registry | undefined): ParamValidator {
+  return (raw: string, defaultValue: string): string =>
+    registry && registry.tags.some(tag => tag.code === raw)
+      ? raw
+      : defaultValue
+}
+
+/**
+ * Returns a validator that accepts only the valid tag codes from the backend registry.
+ */
+export function teamValidator(registry: Registry | undefined): ParamValidator {
+  return (raw: string, defaultValue: string): string =>
+    registry && registry.tags.some(tag => tag.code === raw)
+      ? raw
+      : defaultValue
 }
 
 /**
