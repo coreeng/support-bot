@@ -7,7 +7,7 @@
 
 ## Context
 
-[ADR-004](adr-004-pr-identification-and-sla-tracking.md) introduced PR detection and SLA tracking. SLA deadlines are calculated from the PR creation date, and escalation triggers purely on SLA expiry with the PR still open. The system has no awareness of review activity.
+[ADR-004](adr-004-pr-identification-and-sla-tracking.md) introduced PR detection and SLA tracking. The system calculates SLA deadlines from the PR creation date and triggers escalation purely on SLA expiry with the PR still open. It has no awareness of review activity.
 
 This creates problems:
 
@@ -16,7 +16,7 @@ This creates problems:
 - **SLA runs regardless of context** — the clock ticks even when the tenant is the blocker, making SLA metrics unreliable.
 - **Tickets stay open after approval** — a PR approved and ready to merge still shows as an open support ticket until someone actually clicks merge.
 
-ADR-004 explicitly deferred review-awareness to this follow-up. This ADR describes how to incorporate GitHub review state into the PR lifecycle, pause/resume SLA tracking based on whose turn it is, and close tickets earlier when PRs are approved and mergeable.
+ADR-004 explicitly deferred review-awareness to this follow-up. This ADR proposes incorporating GitHub review state into the PR lifecycle, pausing SLA tracking when the tenant is the blocker, and closing tickets when PRs are approved and mergeable.
 
 ---
 
@@ -38,17 +38,27 @@ ADR-004 explicitly deferred review-awareness to this follow-up. This ADR describ
 
 ---
 
+## Options Considered
+
+### GitHub webhooks vs. polling
+
+Webhooks would provide real-time review state detection but require additional infrastructure (webhook receiver, secret management, retry handling) and a publicly reachable endpoint. Polling is simpler, consistent with the existing v1 approach, and sufficient for hour/day-scale SLAs. Webhooks can be added later if latency becomes a concern.
+
+### SLA resume vs. SLA reset
+
+When the SLA clock resumes after a pause (e.g., tenant addresses requested changes), the clock could either resume with the remaining time or reset to a fresh duration. Resuming remaining time is proposed as the default — it preserves the original SLA commitment. Resetting would be more forgiving but could allow indefinite SLA extension through repeated pause/resume cycles. This is flagged as an open question for team review.
+
+### Close on approval vs. close only on merge
+
+Closing the support ticket on approval (when the PR is mergeable) reduces open ticket noise and reflects that the owning team's obligation is fulfilled. The risk is that a PR sits approved-but-unmerged indefinitely, but at that point the blocker is the tenant, not the owning team. Closing only on merge is simpler but leaves tickets open unnecessarily when the owning team has done their part.
+
+---
+
 ## Decision
 
 ### 1. GitHub Review State Awareness
 
-The bot will fetch review activity from the GitHub Reviews API (`GET /repos/{owner}/{repo}/pulls/{number}/reviews`) during each poll cycle, in addition to the existing PR state check. This provides:
-
-- `APPROVED` — a reviewer has approved the PR.
-- `CHANGES_REQUESTED` — a reviewer has requested changes.
-- `COMMENTED` — a reviewer has left a comment (informational, not blocking).
-
-The bot will also check the PR's `mergeable` state via the GitHub API to determine whether the merge button is actionable (all required reviews approved, CI passing, no merge conflicts).
+The bot will consume review verdicts (approved, changes requested, commented) and PR mergeable status from GitHub during each poll cycle, in addition to the existing PR state check.
 
 ### 2. Extended PR Tracking States
 
@@ -77,95 +87,72 @@ OPEN ─────────────────────────
   ├─→ APPROVED ───→ CLOSED (mergeable)    ├─→ APPROVED ──→ CLOSED (mergeable)
   │                                       │
   └─→ CLOSED (merged/closed)              └─→ CLOSED (merged/closed)
-```
 
-Any state can transition to `CLOSED` if the PR is merged or closed on GitHub.
+  * ─→ CLOSED (any state, if PR is merged or closed on GitHub)
+```
 
 ### 3. SLA Clock Pausing and Resuming
 
-The SLA deadline is currently stored as an absolute timestamp (`sla_deadline`). To support pausing, we introduce:
+The SLA clock pauses when the owning team is not the blocker and resumes when they are:
 
-- `sla_remaining` — the remaining SLA duration at the point the clock was paused (stored as an interval).
-- When the clock **pauses** (transition to `CHANGES_REQUESTED` or `APPROVED`): `sla_remaining = sla_deadline - now()`. The `sla_deadline` is set to `NULL` to indicate the clock is paused.
-- When the clock **resumes** (transition back to `OPEN`): `sla_deadline = now() + sla_remaining`. The `sla_remaining` is set to `NULL`.
-- Escalation only triggers when `status = OPEN` and `now() > sla_deadline` (unchanged logic, but now only fires when the owning team is genuinely the blocker).
-
-**Open question for team review:** Should the SLA clock resume with remaining time, or reset to a fresh duration? This ADR proposes resuming remaining time, but this should be confirmed during review.
+- When the tracking state transitions to `CHANGES_REQUESTED`, the SLA clock pauses. The remaining SLA duration is preserved. The owning team has acted; the tenant needs to address feedback.
+- When the tracking state transitions to `APPROVED` (approved but not yet mergeable — e.g., CI still running or merge conflicts), the SLA clock pauses. The owning team has fulfilled their review obligation; the PR is blocked on external factors, not the owning team. If the PR is both approved and mergeable, it transitions directly to `CLOSED` (see section 5), so `APPROVED` is only reached when merge is not yet possible.
+- When the tracking state transitions back to `OPEN` (e.g., tenant pushes new commits after changes were requested), the SLA clock resumes with the previously remaining duration.
+- Escalation only triggers when the status is `OPEN` and the SLA deadline has passed — unchanged logic, but now only fires when the owning team is genuinely the blocker.
 
 ### 4. Approval Validation
 
-Not all approvals are meaningful for closing a support ticket. The bot must verify that the approval comes from the owning team:
+Only approvals from the owning team trigger ticket closure. An approval is considered valid if the approving user is a member of the configured owning team or is listed as a required reviewer / CODEOWNER for the changed files. Approvals from the PR author's own team or unrelated users are ignored for the purpose of ticket closure.
 
-- On each poll cycle, fetch the list of reviews for the PR.
-- An approval is considered valid if the approving user is a member of the configured `owning-team`'s GitHub team or is listed as a required reviewer / CODEOWNER for the changed files.
-- Approvals from the PR author's own team or unrelated users are ignored for the purpose of ticket closure.
-
-**Implementation note:** Validating team membership requires the GitHub Teams API (`GET /orgs/{org}/teams/{team}/members`) or checking the PR's requested reviewers against the configured team. The specific mechanism will be determined during implementation based on GitHub API access and permissions available.
+The validation mechanism (Teams API, requested reviewers, or CODEOWNERS) will be determined during implementation based on available GitHub permissions.
 
 ### 5. Ticket Closure Conditions
 
-A support ticket is closed when **all** active closable PR tracking records for that ticket reach `CLOSED` status. A PR tracking record transitions to `CLOSED` when any of the following occurs:
+A support ticket is closed when all active closable PR tracking records for that ticket reach `CLOSED` status. A PR tracking record transitions to `CLOSED` when any of the following occurs:
 
-| Condition | Slack Message |
-|-----------|---------------|
-| PR is merged | "PR `repo#123` has been merged. :white_check_mark:" (existing) |
-| PR is closed (not merged) | "PR `repo#123` has been closed. :white_check_mark:" (existing) |
-| PR is approved by owning team AND mergeable | "PR `repo#123` has been approved and is ready to merge. :white_check_mark:" |
+| Condition | Outcome |
+|-----------|---------|
+| PR is merged | Closure notification (existing) |
+| PR is closed (not merged) | Closure notification (existing) |
+| PR is approved by owning team AND mergeable | Approval + ready-to-merge notification |
 
-"Mergeable" means the GitHub API reports the PR as mergeable (`mergeable = true`, checks passing, no blocking reviews outstanding). If the PR is approved but not yet mergeable (e.g., CI still running, merge conflicts), the bot does not close — it remains in `APPROVED` state and will be checked again on the next poll cycle.
+"Mergeable" means the GitHub API reports the PR as mergeable (checks passing, no blocking reviews outstanding, no merge conflicts). If the PR is approved but not yet mergeable, it remains in `APPROVED` state and will be checked again on the next poll cycle.
 
 ### 6. Polling Enhancements
 
-The existing `PrLifecyclePoller` is extended to handle the new states. For each active record (`OPEN`, `CHANGES_REQUESTED`, `APPROVED`, `ESCALATED`):
-
-1. Fetch PR state, reviews, and mergeable status from GitHub.
-2. If **merged or closed** → transition to `CLOSED`, post message, check ticket auto-close. This takes priority regardless of current tracking status.
-3. If **approved by owning team**:
-   - If **mergeable** → transition to `CLOSED`, post approval message, check ticket auto-close. Applies from any non-CLOSED status, including `ESCALATED` (owning team responded after escalation).
-   - If **not mergeable** → transition to `APPROVED`, pause SLA clock (if not already paused/expired).
-4. If **changes requested by owning team** and current status is `OPEN` or `ESCALATED` → transition to `CHANGES_REQUESTED`, pause SLA clock, post message: "PR `repo#123`: changes have been requested by the reviewing team. SLA clock paused." For `ESCALATED` records, the SLA is already expired so pausing has no practical effect, but the status change provides accurate visibility.
-5. If status is `CHANGES_REQUESTED` and **new commits pushed since the last `CHANGES_REQUESTED` review** → transition back to `OPEN`, resume SLA clock, post message: "PR `repo#123`: changes have been addressed. SLA clock resumed." This is determined by comparing the timestamp of the most recent commit on the PR head against the `submitted_at` timestamp of the last `CHANGES_REQUESTED` review.
-6. If status is `OPEN` and **SLA deadline passed** → escalate (existing behaviour).
+The existing `PrLifecyclePoller` is extended to evaluate the new states on each poll cycle. Merge/close detection takes priority over review state changes. Transition logic follows the state diagram in section 2.
 
 ### 7. Activity Tracking
 
-To support "last time the team interacted with a PR" and dashboard reporting, we track key activity timestamps:
+To support "last time the team interacted with a PR" and dashboard reporting, the bot tracks key activity timestamps on each PR tracking record:
 
 - `last_review_at` — timestamp of the most recent review from the owning team (approval, changes requested, or comment).
 - `last_author_activity_at` — timestamp of the most recent push or comment from the PR author.
 
-These are updated on each poll cycle from GitHub API data and stored on the `pr_tracking` record.
+These are updated on each poll cycle from GitHub API data.
 
 ### 8. Schema Changes
 
-```sql
--- Extend the status enum
-ALTER TYPE pr_tracking_status ADD VALUE 'CHANGES_REQUESTED';
-ALTER TYPE pr_tracking_status ADD VALUE 'APPROVED';
+The `pr_tracking` table is extended with:
 
--- Add new columns to pr_tracking
-ALTER TABLE pr_tracking ADD COLUMN sla_remaining interval;
-ALTER TABLE pr_tracking ADD COLUMN last_review_at timestamptz;
-ALTER TABLE pr_tracking ADD COLUMN last_author_activity_at timestamptz;
-```
-
-When `sla_deadline` is `NULL` and `sla_remaining` is not `NULL`, the SLA clock is paused. When `sla_deadline` is not `NULL` and `sla_remaining` is `NULL`, the SLA clock is running.
+- Two new enum values: `CHANGES_REQUESTED` and `APPROVED` added to `pr_tracking_status`.
+- `sla_remaining` — stores the remaining SLA duration when the clock is paused. `sla_deadline` becomes nullable (NULL when paused).
+- `last_review_at` and `last_author_activity_at` — activity tracking timestamps.
 
 ### 9. Dashboard
 
-A new tab in the support UI (Analytics & Operations) will display pending PR tracking records per team. Details of layout and filtering will be defined separately, but the API will expose the data needed:
-
-- PR link, repository, PR number
-- Current tracking status (`OPEN`, `CHANGES_REQUESTED`, `APPROVED`, `ESCALATED`)
-- SLA deadline or remaining time (if paused)
-- Last reviewer activity timestamp
-- Last author activity timestamp
-- Owning team
-- Associated ticket
+The API will expose PR lifecycle state, SLA status, and activity timestamps per team, enabling a dashboard view in the support UI (Analytics & Operations tab). Dashboard design is separate.
 
 ### 10. Multi-Team Reviews
 
-Some PRs may require reviews from multiple teams (e.g., CODEOWNERS assigns both the owning team and the tenant's team as required reviewers). This ADR acknowledges the scenario but defers detailed design. The current model tracks one `owning_team` per PR tracking record. Supporting multi-team review tracking may require multiple tracking records per PR or a separate review-tracking model, to be designed as a follow-up.
+The current model tracks one owning team per PR. Multi-team review tracking will require either multiple tracking records per PR or a separate review model, to be designed as a follow-up.
+
+---
+
+## Open Questions
+
+- **SLA resume vs. reset**: Should the SLA clock resume with remaining time or reset to a fresh duration when transitioning back to `OPEN`? This ADR proposes resuming remaining time (see Options Considered), but this should be confirmed during review.
+- **Approval validation mechanism**: The specific approach for verifying owning-team membership (Teams API, requested reviewers, CODEOWNERS) depends on available GitHub API permissions and will be determined during implementation.
 
 ---
 
@@ -181,9 +168,9 @@ Some PRs may require reviews from multiple teams (e.g., CODEOWNERS assigns both 
 
 ### Negative / Trade-offs
 
-- **Increased GitHub API usage** — each poll cycle now fetches reviews and mergeable status in addition to PR state. Rate limit impact should be monitored; batching or conditional fetching (e.g., only fetch reviews for OPEN records near SLA deadline) can mitigate this.
-- **Team membership validation complexity** — checking whether an approver belongs to the owning team requires additional API calls or a cached team membership list. The implementation approach depends on available GitHub permissions.
-- **SLA pause/resume adds complexity** — the `sla_deadline` / `sla_remaining` swap requires careful handling to avoid clock drift or missed escalations. Edge cases (e.g., multiple rapid state changes) need thorough testing.
+- **Increased GitHub API usage** — each poll cycle now fetches reviews and mergeable status in addition to PR state. Rate-limit impact should be monitored.
+- **Team membership validation** — checking whether an approver belongs to the owning team requires additional API calls. The approach depends on available GitHub permissions.
+- **SLA pause/resume adds complexity** — edge cases (e.g., multiple rapid state changes) need thorough testing.
 - **No real-time state detection** — review state changes are detected at next poll interval. GitHub webhooks could provide real-time updates but are deferred.
 
 ### Neutral
