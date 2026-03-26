@@ -68,6 +68,7 @@ public final class Hub4jGitHubClient implements GitHubClient {
         try {
             GHPullRequest pr = github.getRepository(repositoryName).getPullRequest(pullNumber);
             return pr.listReviews().toList().stream()
+                    .filter(review -> review.getState() != GHPullRequestReviewState.PENDING)
                     .map(review -> mapReview(review, repositoryName, pullNumber))
                     .toList();
         } catch (GHFileNotFoundException e) {
@@ -149,7 +150,10 @@ public final class Hub4jGitHubClient implements GitHubClient {
             } else {
                 prState = GitHubPullRequest.PrState.CLOSED;
             }
-            return new GitHubPullRequest(repositoryName, pullNumber, createdAt.toInstant(), prState);
+            Boolean mergeable = pr.getMergeable();
+            String mergeableState = pr.getMergeableState();
+            return new GitHubPullRequest(
+                    repositoryName, pullNumber, createdAt.toInstant(), prState, mergeable, mergeableState);
         } catch (IllegalArgumentException e) {
             throw new GitHubApiException(
                     0, "Invalid repository name '%s': %s".formatted(repositoryName, e.getMessage()), e);

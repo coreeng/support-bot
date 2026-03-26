@@ -6,12 +6,14 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import com.coreeng.supportbot.escalation.EscalationSource;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
+import org.jooq.types.YearToSecond;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,7 +55,11 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     @Override
     public List<PrTrackingRecord> findAllActive() {
         return dsl.selectFrom(PR_TRACKING)
-                .where(PR_TRACKING.STATUS.in(PrTrackingStatus.OPEN, PrTrackingStatus.ESCALATED))
+                .where(PR_TRACKING.STATUS.in(
+                        PrTrackingStatus.OPEN,
+                        PrTrackingStatus.ESCALATED,
+                        PrTrackingStatus.CHANGES_REQUESTED,
+                        PrTrackingStatus.APPROVED))
                 .fetch()
                 .map(JdbcPrTrackingRepository::toRecord);
     }
@@ -80,7 +86,11 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 PR_TRACKING
                         .TICKET_ID
                         .eq(ticketId)
-                        .and(PR_TRACKING.STATUS.in(PrTrackingStatus.OPEN, PrTrackingStatus.ESCALATED)));
+                        .and(PR_TRACKING.STATUS.in(
+                                PrTrackingStatus.OPEN,
+                                PrTrackingStatus.ESCALATED,
+                                PrTrackingStatus.CHANGES_REQUESTED,
+                                PrTrackingStatus.APPROVED)));
     }
 
     @Transactional(readOnly = true)
@@ -92,7 +102,11 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                         .TICKET_ID
                         .eq(ticketId)
                         .and(PR_TRACKING.CAN_AUTO_CLOSE_TICKET.isTrue())
-                        .and(PR_TRACKING.STATUS.in(PrTrackingStatus.OPEN, PrTrackingStatus.ESCALATED)));
+                        .and(PR_TRACKING.STATUS.in(
+                                PrTrackingStatus.OPEN,
+                                PrTrackingStatus.ESCALATED,
+                                PrTrackingStatus.CHANGES_REQUESTED,
+                                PrTrackingStatus.APPROVED)));
     }
 
     @Transactional(readOnly = true)
@@ -119,7 +133,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                     github_repo,
                     COALESCE(MIN(owning_team), 'unknown') AS owning_team,
                     COUNT(*) AS pr_count,
-                    COUNT(*) FILTER (WHERE status = 'OPEN' OR status = 'ESCALATED') AS open_count,
+                    COUNT(*) FILTER (WHERE status IN ('OPEN', 'ESCALATED', 'CHANGES_REQUESTED', 'APPROVED')) AS open_count,
                     COUNT(*) FILTER (WHERE status = 'ESCALATED') AS escalated_count,
                     COUNT(*) FILTER (WHERE sla_deadline < COALESCE(closed_at, now())) AS breached_count,
                     COUNT(DISTINCT ticket_id) FILTER (
@@ -215,17 +229,22 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     }
 
     private static PrTrackingRecord toRecord(com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row) {
+        YearToSecond slaRemainingRaw = row.getSlaRemaining();
+        Duration slaRemaining = slaRemainingRaw != null ? slaRemainingRaw.toDuration() : null;
         return new PrTrackingRecord(
                 checkNotNull(row.getId()),
                 checkNotNull(row.getTicketId()),
                 checkNotNull(row.getGithubRepo()),
                 checkNotNull(row.getPrNumber()),
                 checkNotNull(row.getPrCreatedAt()),
-                checkNotNull(row.getSlaDeadline()),
+                row.getSlaDeadline(),
                 checkNotNull(row.getOwningTeam()),
                 checkNotNull(row.getCanAutoCloseTicket()),
                 checkNotNull(row.getStatus()),
                 row.getEscalationId(),
-                row.getClosedAt());
+                row.getClosedAt(),
+                slaRemaining,
+                row.getLastReviewAt(),
+                row.getLastAuthorActivityAt());
     }
 }

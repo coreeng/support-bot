@@ -12,16 +12,19 @@ public interface PrTrackingRepository {
 
     List<PrTrackingRecord> findAllByStatus(PrTrackingStatus status);
 
-    /** Returns all records with status OPEN or ESCALATED. */
+    /** Returns all records with status OPEN, ESCALATED, CHANGES_REQUESTED, or APPROVED. */
     List<PrTrackingRecord> findAllActive();
 
     PrTrackingRecord updateStatus(
             long id, PrTrackingStatus newStatus, @Nullable Instant closedAt, @Nullable Long escalationId);
 
-    /** Returns true if any OPEN or ESCALATED record still exists for this ticket. */
+    /** Returns true if any OPEN, ESCALATED, CHANGES_REQUESTED, or APPROVED record still exists for this ticket. */
     boolean hasAnyActiveForTicket(long ticketId);
 
-    /** Returns true if any OPEN or ESCALATED record that can auto-close ticket still exists for this ticket. */
+    /**
+     * Returns true if any OPEN, ESCALATED, CHANGES_REQUESTED, or APPROVED record that can auto-close ticket still
+     * exists for this ticket.
+     */
     boolean hasAnyActiveClosableForTicket(long ticketId);
 
     boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, String githubRepo, int prNumber);

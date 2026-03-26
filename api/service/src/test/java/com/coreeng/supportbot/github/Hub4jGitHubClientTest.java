@@ -30,6 +30,8 @@ class Hub4jGitHubClientTest {
         when(repo.getPullRequest(42)).thenReturn(pr);
         setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
         setStateRaw(pr, "open");
+        setMergeableRaw(pr, true);
+        setMergeableStateRaw(pr, "clean");
 
         // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
@@ -39,6 +41,44 @@ class Hub4jGitHubClientTest {
         assertThat(result.pullRequestNumber()).isEqualTo(42);
         assertThat(result.createdAt()).isEqualTo(createdAt);
         assertThat(result.state()).isEqualTo(GitHubPullRequest.PrState.OPEN);
+        assertThat(result.mergeable()).isTrue();
+        assertThat(result.mergeableState()).isEqualTo("clean");
+    }
+
+    @Test
+    void returnsMergedStateWhenMergedAtIsNonNull() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = new GHPullRequest();
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "closed");
+        setMergedAtRaw(pr, "2026-01-15T10:00:00Z");
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.state()).isEqualTo(GitHubPullRequest.PrState.MERGED);
+    }
+
+    @Test
+    void returnsPullRequestWithNullMergeableWhenNotYetComputed() throws IOException {
+        // given - mergeable/mergeableState not set, GitHub returns null when not yet computed
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = new GHPullRequest();
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "open");
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.mergeable()).isNull();
+        assertThat(result.mergeableState()).isNull();
     }
 
     @Test
@@ -250,6 +290,53 @@ class Hub4jGitHubClientTest {
     }
 
     @Test
+    void listReviewsReturnsEmptyListForPrWithNoReviews() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = mock(GHPullRequest.class);
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHPullRequestReview> iterable = mock(PagedIterable.class);
+        when(pr.listReviews()).thenReturn(iterable);
+        when(iterable.toList()).thenReturn(List.of());
+
+        // when
+        List<GitHubPullRequestReview> result = client.listReviews("my-org/my-repo", 42);
+
+        // then
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void listReviewsFiltersPendingReviews() throws IOException {
+        // given - PENDING reviews have null submitted_at on the GitHub API; they should be silently excluded
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = mock(GHPullRequest.class);
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+
+        GHUser user = mock(GHUser.class);
+        GHPullRequestReview pendingReview = spy(new GHPullRequestReview());
+        when(pendingReview.getState()).thenReturn(GHPullRequestReviewState.PENDING);
+        GHPullRequestReview approvedReview =
+                spyReview(user, "reviewer", GHPullRequestReviewState.APPROVED, "2026-03-01T10:00:00Z");
+
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHPullRequestReview> iterable = mock(PagedIterable.class);
+        when(pr.listReviews()).thenReturn(iterable);
+        when(iterable.toList()).thenReturn(List.of(pendingReview, approvedReview));
+
+        // when
+        List<GitHubPullRequestReview> result = client.listReviews("my-org/my-repo", 42);
+
+        // then - only the approved review is returned; pending (null submitted_at) is excluded
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).state()).isEqualTo(GitHubPullRequestReview.ReviewState.APPROVED);
+    }
+
+    @Test
     void listReviewsReturnsReviewsOnHappyPath() throws IOException {
         // given
         GHRepository repo = mock(GHRepository.class);
@@ -437,6 +524,18 @@ class Hub4jGitHubClientTest {
 
     private static void setStateRaw(GHPullRequest pr, @Nullable String stateRaw) {
         setFieldOnClassHierarchy(pr, "state", stateRaw);
+    }
+
+    private static void setMergedAtRaw(GHPullRequest pr, @Nullable String mergedAtRaw) {
+        setFieldOnClassHierarchy(pr, "merged_at", mergedAtRaw);
+    }
+
+    private static void setMergeableRaw(GHPullRequest pr, @Nullable Boolean mergeable) {
+        setFieldOnClassHierarchy(pr, "mergeable", mergeable);
+    }
+
+    private static void setMergeableStateRaw(GHPullRequest pr, @Nullable String mergeableState) {
+        setFieldOnClassHierarchy(pr, "mergeable_state", mergeableState);
     }
 
     private static void setFieldOnClassHierarchy(Object target, String fieldName, @Nullable Object value) {

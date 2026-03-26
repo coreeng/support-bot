@@ -83,12 +83,22 @@ class PrLifecyclePollerTest {
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(first, second));
         when(gitHubClient.getPullRequest(first.githubRepo(), first.prNumber()))
                 .thenReturn(new GitHubPullRequest(
-                        first.githubRepo(), first.prNumber(), first.prCreatedAt(), GitHubPullRequest.PrState.CLOSED));
+                        first.githubRepo(),
+                        first.prNumber(),
+                        first.prCreatedAt(),
+                        GitHubPullRequest.PrState.CLOSED,
+                        null,
+                        null));
         when(ticketRepository.findTicketById(new TicketId(first.ticketId())))
                 .thenThrow(new RuntimeException("database temporarily unavailable"));
         when(gitHubClient.getPullRequest(second.githubRepo(), second.prNumber()))
                 .thenReturn(new GitHubPullRequest(
-                        second.githubRepo(), second.prNumber(), second.prCreatedAt(), GitHubPullRequest.PrState.OPEN));
+                        second.githubRepo(),
+                        second.prNumber(),
+                        second.prCreatedAt(),
+                        GitHubPullRequest.PrState.OPEN,
+                        null,
+                        null));
 
         // when / then
         assertDoesNotThrow(poller::poll);
@@ -114,7 +124,9 @@ class PrLifecyclePollerTest {
                         record.githubRepo(),
                         record.prNumber(),
                         record.prCreatedAt(),
-                        GitHubPullRequest.PrState.CLOSED));
+                        GitHubPullRequest.PrState.CLOSED,
+                        null,
+                        null));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket);
         when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
                 .thenReturn(false);
@@ -147,7 +159,9 @@ class PrLifecyclePollerTest {
                         record.githubRepo(),
                         record.prNumber(),
                         record.prCreatedAt(),
-                        GitHubPullRequest.PrState.CLOSED));
+                        GitHubPullRequest.PrState.CLOSED,
+                        null,
+                        null));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket);
         when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
                 .thenReturn(false);
@@ -181,7 +195,9 @@ class PrLifecyclePollerTest {
                         record.githubRepo(),
                         record.prNumber(),
                         record.prCreatedAt(),
-                        GitHubPullRequest.PrState.CLOSED));
+                        GitHubPullRequest.PrState.CLOSED,
+                        null,
+                        null));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
                 .thenReturn(true);
@@ -207,7 +223,12 @@ class PrLifecyclePollerTest {
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
         when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
                 .thenReturn(new GitHubPullRequest(
-                        record.githubRepo(), record.prNumber(), record.prCreatedAt(), GitHubPullRequest.PrState.OPEN));
+                        record.githubRepo(),
+                        record.prNumber(),
+                        record.prCreatedAt(),
+                        GitHubPullRequest.PrState.OPEN,
+                        null,
+                        null));
 
         // when
         poller.poll();
@@ -233,7 +254,9 @@ class PrLifecyclePollerTest {
                         record.githubRepo(),
                         record.prNumber(),
                         record.prCreatedAt(),
-                        GitHubPullRequest.PrState.CLOSED));
+                        GitHubPullRequest.PrState.CLOSED,
+                        null,
+                        null));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(null);
 
         // when
@@ -260,7 +283,12 @@ class PrLifecyclePollerTest {
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
         when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
                 .thenReturn(new GitHubPullRequest(
-                        record.githubRepo(), record.prNumber(), record.prCreatedAt(), GitHubPullRequest.PrState.OPEN));
+                        record.githubRepo(),
+                        record.prNumber(),
+                        record.prCreatedAt(),
+                        GitHubPullRequest.PrState.OPEN,
+                        null,
+                        null));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(escalationProcessingService.createEscalation(any())).thenReturn(null);
 
@@ -287,6 +315,9 @@ class PrLifecyclePollerTest {
                 false,
                 PrTrackingStatus.OPEN,
                 null,
+                null,
+                null,
+                null,
                 null);
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
         when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
@@ -294,7 +325,9 @@ class PrLifecyclePollerTest {
                         record.githubRepo(),
                         record.prNumber(),
                         record.prCreatedAt(),
-                        GitHubPullRequest.PrState.CLOSED));
+                        GitHubPullRequest.PrState.CLOSED,
+                        null,
+                        null));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
 
         // when
@@ -322,7 +355,9 @@ class PrLifecyclePollerTest {
                         record.githubRepo(),
                         record.prNumber(),
                         record.prCreatedAt(),
-                        GitHubPullRequest.PrState.MERGED));
+                        GitHubPullRequest.PrState.MERGED,
+                        null,
+                        null));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
                 .thenReturn(true);
@@ -353,7 +388,9 @@ class PrLifecyclePollerTest {
                         record.githubRepo(),
                         record.prNumber(),
                         record.prCreatedAt(),
-                        GitHubPullRequest.PrState.CLOSED));
+                        GitHubPullRequest.PrState.CLOSED,
+                        null,
+                        null));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
                 .thenReturn(true);
@@ -391,6 +428,9 @@ class PrLifecyclePollerTest {
                 "wow",
                 true,
                 status,
+                null,
+                null,
+                null,
                 null,
                 null);
     }

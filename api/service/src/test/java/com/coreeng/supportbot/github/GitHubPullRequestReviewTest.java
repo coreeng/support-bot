@@ -60,8 +60,22 @@ class GitHubPullRequestReviewTest {
     }
 
     @Test
-    void convenienceMethodsReturnFalseForOtherStates() {
+    void convenienceMethodsReturnFalseForCommented() {
         var review = new GitHubPullRequestReview("user", GitHubPullRequestReview.ReviewState.COMMENTED, SUBMITTED_AT);
+        assertThat(review.isApproved()).isFalse();
+        assertThat(review.requestsChanges()).isFalse();
+    }
+
+    @Test
+    void convenienceMethodsReturnFalseForDismissed() {
+        var review = new GitHubPullRequestReview("user", GitHubPullRequestReview.ReviewState.DISMISSED, SUBMITTED_AT);
+        assertThat(review.isApproved()).isFalse();
+        assertThat(review.requestsChanges()).isFalse();
+    }
+
+    @Test
+    void convenienceMethodsReturnFalseForPending() {
+        var review = new GitHubPullRequestReview("user", GitHubPullRequestReview.ReviewState.PENDING, SUBMITTED_AT);
         assertThat(review.isApproved()).isFalse();
         assertThat(review.requestsChanges()).isFalse();
     }

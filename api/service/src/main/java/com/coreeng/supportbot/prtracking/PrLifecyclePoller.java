@@ -77,7 +77,9 @@ public class PrLifecyclePoller {
 
         if (pr.isClosed()) {
             handlePrClosed(record, pr);
-        } else if (record.status() == PrTrackingStatus.OPEN && Instant.now().isAfter(record.slaDeadline())) {
+        } else if (record.status() == PrTrackingStatus.OPEN
+                && record.slaDeadline() != null
+                && Instant.now().isAfter(record.slaDeadline())) {
             handleSlaBreached(record);
         }
     }
