@@ -64,8 +64,11 @@ const supportTabs: SupportTab[] = [
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, logout } = useAuth()
     const { hasFullAccess } = useTeamFilter()
-    const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled()
-    const { data: isTenantInsightsEnabled } = useTenantInsightsEnabled()
+    const { data: isKnowledgeGapsEnabled, error: knowledgeGapsError } = useKnowledgeGapsEnabled()
+    const { data: isTenantInsightsEnabled, error: tenantInsightsError } = useTenantInsightsEnabled()
+
+    if (knowledgeGapsError) console.warn('Failed to check knowledge-gaps feature flag:', knowledgeGapsError)
+    if (tenantInsightsError) console.warn('Failed to check tenant-insights feature flag:', tenantInsightsError)
     const pathname = usePathname()
 
     // Sidebar state
