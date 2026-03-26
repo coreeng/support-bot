@@ -47,7 +47,7 @@ function makeRepos(count: number): RepoInsights[] {
 describe('TenantRequestsPage', () => {
     beforeEach(() => {
         jest.clearAllMocks()
-        mockUseTenantInsightsStats.mockReturnValue({ data: [], isLoading: false })
+        mockUseTenantInsightsStats.mockReturnValue({ data: [], isLoading: false, error: null })
     })
 
     describe('Rendering', () => {
@@ -141,7 +141,7 @@ describe('TenantRequestsPage', () => {
         })
 
         it('should show search-specific empty message when filter has no matches', () => {
-            mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false })
+            mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false, error: null })
 
             render(<TenantRequestsPage />)
 
@@ -149,6 +149,32 @@ describe('TenantRequestsPage', () => {
             fireEvent.change(input, { target: { value: 'nonexistent' } })
 
             expect(screen.getByText('No repos match your search')).toBeInTheDocument()
+        })
+    })
+
+    describe('Error State', () => {
+        it('should show error message when fetch fails', () => {
+            mockUseTenantInsightsStats.mockReturnValue({
+                data: undefined,
+                isLoading: false,
+                error: new Error('Network error'),
+            })
+
+            render(<TenantRequestsPage />)
+
+            expect(screen.getByText('Failed to load data — please try again')).toBeInTheDocument()
+        })
+
+        it('should show error instead of empty message', () => {
+            mockUseTenantInsightsStats.mockReturnValue({
+                data: undefined,
+                isLoading: false,
+                error: new Error('500'),
+            })
+
+            render(<TenantRequestsPage />)
+
+            expect(screen.queryByText('No PR data for this period')).not.toBeInTheDocument()
         })
     })
 
@@ -332,12 +358,12 @@ describe('TenantRequestsPage', () => {
 
         it('should reset to page 0 when sort changes', () => {
             // 25 repos to have 2 pages
-            mockUseTenantInsightsStats.mockReturnValue({ data: makeRepos(25), isLoading: false })
+            mockUseTenantInsightsStats.mockReturnValue({ data: makeRepos(25), isLoading: false, error: null })
 
             render(<TenantRequestsPage />)
 
             // Go to page 2
-            fireEvent.click(screen.getByText('Page 1 of 2').parentElement!.querySelector('button:last-child')!)
+            fireEvent.click(screen.getByLabelText('Next page'))
 
             expect(screen.getByText(/Page 2/)).toBeInTheDocument()
 
@@ -367,57 +393,51 @@ describe('TenantRequestsPage', () => {
         })
 
         it('should navigate to next page', () => {
-            mockUseTenantInsightsStats.mockReturnValue({ data: makeRepos(25), isLoading: false })
+            mockUseTenantInsightsStats.mockReturnValue({ data: makeRepos(25), isLoading: false, error: null })
 
             render(<TenantRequestsPage />)
 
-            // Click the next (right) button
-            const nextButton = screen.getByText('Page 1 of 2').parentElement!.querySelectorAll('button')[1]
-            fireEvent.click(nextButton)
+            fireEvent.click(screen.getByLabelText('Next page'))
 
             expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
             expect(screen.getByText('21–25 of 25')).toBeInTheDocument()
         })
 
         it('should navigate back to previous page', () => {
-            mockUseTenantInsightsStats.mockReturnValue({ data: makeRepos(25), isLoading: false })
+            mockUseTenantInsightsStats.mockReturnValue({ data: makeRepos(25), isLoading: false, error: null })
 
             render(<TenantRequestsPage />)
 
-            const buttons = screen.getByText('Page 1 of 2').parentElement!.querySelectorAll('button')
-            fireEvent.click(buttons[1]) // next
-            fireEvent.click(buttons[0]) // prev
+            fireEvent.click(screen.getByLabelText('Next page'))
+            fireEvent.click(screen.getByLabelText('Previous page'))
 
             expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
         })
 
         it('should disable prev button on first page', () => {
-            mockUseTenantInsightsStats.mockReturnValue({ data: makeRepos(25), isLoading: false })
+            mockUseTenantInsightsStats.mockReturnValue({ data: makeRepos(25), isLoading: false, error: null })
 
             render(<TenantRequestsPage />)
 
-            const prevButton = screen.getByText('Page 1 of 2').parentElement!.querySelectorAll('button')[0]
-            expect(prevButton).toBeDisabled()
+            expect(screen.getByLabelText('Previous page')).toBeDisabled()
         })
 
         it('should disable next button on last page', () => {
-            mockUseTenantInsightsStats.mockReturnValue({ data: makeRepos(25), isLoading: false })
+            mockUseTenantInsightsStats.mockReturnValue({ data: makeRepos(25), isLoading: false, error: null })
 
             render(<TenantRequestsPage />)
 
-            const nextButton = screen.getByText('Page 1 of 2').parentElement!.querySelectorAll('button')[1]
-            fireEvent.click(nextButton)
+            fireEvent.click(screen.getByLabelText('Next page'))
 
-            expect(nextButton).toBeDisabled()
+            expect(screen.getByLabelText('Next page')).toBeDisabled()
         })
 
         it('should reset to page 0 when search changes', () => {
-            mockUseTenantInsightsStats.mockReturnValue({ data: makeRepos(25), isLoading: false })
+            mockUseTenantInsightsStats.mockReturnValue({ data: makeRepos(25), isLoading: false, error: null })
 
             render(<TenantRequestsPage />)
 
-            const buttons = screen.getByText('Page 1 of 2').parentElement!.querySelectorAll('button')
-            fireEvent.click(buttons[1])
+            fireEvent.click(screen.getByLabelText('Next page'))
             expect(screen.getByText(/Page 2/)).toBeInTheDocument()
 
             const input = screen.getByPlaceholderText('Filter repos or teams...')

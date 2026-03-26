@@ -98,14 +98,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         }
 
         // Check feature flag requirement
-        if (requiresFeatureFlag === 'knowledgeGaps') {
-            if (isKnowledgeGapsEnabled !== true) {
-                return false
+        if (requiresFeatureFlag) {
+            const flags: Record<string, boolean | undefined> = {
+                knowledgeGaps: isKnowledgeGapsEnabled,
+                tenantInsights: isTenantInsightsEnabled,
             }
-        }
-
-        if (requiresFeatureFlag === 'tenantInsights') {
-            if (isTenantInsightsEnabled !== true) {
+            if (flags[requiresFeatureFlag] !== true) {
                 return false
             }
         }

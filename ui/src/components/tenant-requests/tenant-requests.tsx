@@ -36,15 +36,15 @@ function durationStyle(seconds: number): string {
 }
 
 function compareBySeverity(a: RepoInsights, b: RepoInsights): number {
-    return (b.breachedCount - a.breachedCount)
-        || (b.escalatedCount - a.escalatedCount)
-        || (b.prCount - a.prCount)
+    return (a.breachedCount - b.breachedCount)
+        || (a.escalatedCount - b.escalatedCount)
+        || (a.prCount - b.prCount)
 }
 
 function compareByKey(a: RepoInsights, b: RepoInsights, key: SortKey, dir: SortDir): number {
     let cmp = 0
     switch (key) {
-        case 'severity': return compareBySeverity(a, b)
+        case 'severity': cmp = compareBySeverity(a, b); break
         case 'repo': cmp = a.repo.localeCompare(b.repo); break
         case 'team': cmp = a.owningTeam.localeCompare(b.owningTeam); break
         case 'prCount': cmp = a.prCount - b.prCount; break
@@ -54,6 +54,7 @@ function compareByKey(a: RepoInsights, b: RepoInsights, key: SortKey, dir: SortD
         case 'p50': cmp = a.p50Seconds - b.p50Seconds; break
         case 'p90': cmp = a.p90Seconds - b.p90Seconds; break
         case 'p99': cmp = a.p99Seconds - b.p99Seconds; break
+        default: key satisfies never
     }
     return dir === 'desc' ? -cmp : cmp
 }
@@ -69,15 +70,16 @@ export default function TenantRequestsPage() {
     const pageSize = 20
 
     const isDateRangeValid = dateFrom <= dateTo
-    const { data: realRepos, isLoading } = useTenantInsightsStats(
+    const { data: realRepos, isLoading, error } = useTenantInsightsStats(
         isDateRangeValid ? dateFrom : undefined,
-        isDateRangeValid ? dateTo : undefined
+        isDateRangeValid ? dateTo : undefined,
+        isDateRangeValid
     )
 
     const repos = realRepos ?? []
 
     const totals = useMemo(() => {
-        if (!repos || repos.length === 0) {
+        if (repos.length === 0) {
             return { prCount: 0, openCount: 0, escalatedCount: 0, breachedCount: 0 }
         }
         return repos.reduce(
@@ -92,7 +94,6 @@ export default function TenantRequestsPage() {
     }, [repos])
 
     const filteredAndSorted = useMemo(() => {
-        if (!repos) return []
         const q = search.toLowerCase()
         const filtered = q
             ? repos.filter(r => r.repo.toLowerCase().includes(q) || r.owningTeam.toLowerCase().includes(q))
@@ -249,7 +250,9 @@ export default function TenantRequestsPage() {
                         </div>
                     </div>
 
-                    {isLoading ? (
+                    {error ? (
+                        <div className="p-16 text-center text-red-500 text-sm">Failed to load data — please try again</div>
+                    ) : isLoading ? (
                         <div className="p-16 text-center text-slate-400 text-sm">Loading...</div>
                     ) : filteredAndSorted.length === 0 ? (
                         <div className="p-16 text-center text-slate-400 text-sm">
@@ -307,6 +310,7 @@ export default function TenantRequestsPage() {
                                     <button
                                         onClick={() => setPage(p => p - 1)}
                                         disabled={page === 0}
+                                        aria-label="Previous page"
                                         className="p-1.5 rounded-md hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                     >
                                         <ChevronLeft className="w-4 h-4 text-slate-600" />
@@ -317,6 +321,7 @@ export default function TenantRequestsPage() {
                                     <button
                                         onClick={() => setPage(p => p + 1)}
                                         disabled={page >= totalPages - 1}
+                                        aria-label="Next page"
                                         className="p-1.5 rounded-md hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                     >
                                         <ChevronRight className="w-4 h-4 text-slate-600" />

@@ -545,10 +545,12 @@ export function useTenantInsightsEnabled() {
   });
 }
 
-export function useTenantInsightsStats(dateFrom?: string, dateTo?: string) {
+export function useTenantInsightsStats(dateFrom?: string, dateTo?: string, enabled = true) {
   return useQuery<RepoInsights[]>({
     queryKey: ["tenant-insights", "stats", dateFrom, dateTo],
     queryFn: () =>
       apiGet(`/tenant-insights/stats${buildParams(dateFrom, dateTo)}`),
+    enabled,
+    staleTime: 5 * 60 * 1000,
   });
 }
