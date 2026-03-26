@@ -88,7 +88,6 @@ export default function TeamSelector() {
         // and write the resolved team back into the URL.
         if (!selectedTeam && firstAvailableSelection) {
             setSelectedTeam(firstAvailableSelection)
-            setTeamParam({ team: firstAvailableSelection })
             return
         }
         if (selectedTeam && validSelections.size > 0 && !validSelections.has(selectedTeam)) {
