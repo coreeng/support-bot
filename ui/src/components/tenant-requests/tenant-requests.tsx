@@ -121,7 +121,8 @@ export default function TenantRequestsPage() {
     const handlePreset = (p: DatePreset) => {
         setPreset(p)
         setPage(0)
-        const days = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 }[p]
+        const daysMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 }
+        const days = daysMap[p]
         if (days) {
             setDateFrom(daysAgo(days))
             setDateTo(today())
