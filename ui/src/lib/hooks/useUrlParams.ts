@@ -45,6 +45,7 @@ export const nonNegativeIntValidator: ParamValidator = (
   raw: string,
   defaultValue: string,
 ): string => {
+  if (!/^\d+$/.test(raw)) return defaultValue
   const n = parseInt(raw, 10)
   return Number.isFinite(n) && n >= 0 ? String(n) : defaultValue
 }

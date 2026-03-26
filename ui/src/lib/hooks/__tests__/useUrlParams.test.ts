@@ -184,6 +184,11 @@ describe('nonNegativeIntValidator', () => {
   it('falls back to the default for a negative float', () => {
     expect(nonNegativeIntValidator('-1.5', '0')).toBe('0')
   })
+
+  it('falls back to the default for a non-number', () => {
+    expect(nonNegativeIntValidator('3abc', '0')).toBe('0')
+    expect(nonNegativeIntValidator('abc', '0')).toBe('0')
+  })
 })
 
 // ---------------------------------------------------------------------------
