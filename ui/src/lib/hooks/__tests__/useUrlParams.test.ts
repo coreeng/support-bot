@@ -177,17 +177,14 @@ describe('nonNegativeIntValidator', () => {
     expect(nonNegativeIntValidator('abc', '0')).toBe('0')
   })
 
-  it('truncates floats', () => {
-    expect(nonNegativeIntValidator('2.9', '0')).toBe('2')
-  })
-
   it('falls back to the default for a negative float', () => {
     expect(nonNegativeIntValidator('-1.5', '0')).toBe('0')
   })
 
-  it('falls back to the default for a non-number', () => {
+  it('falls back to the default for a non-integer', () => {
     expect(nonNegativeIntValidator('3abc', '0')).toBe('0')
     expect(nonNegativeIntValidator('abc', '0')).toBe('0')
+    expect(nonNegativeIntValidator('2.9', '0')).toBe('0')
   })
 })
 
