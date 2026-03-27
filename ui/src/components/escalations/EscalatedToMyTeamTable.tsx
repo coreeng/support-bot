@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 import { useEscalations, useRegistry } from '@/lib/hooks'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
@@ -25,20 +26,23 @@ export default function EscalatedToMyTeamTable() {
     const [pageIndex, setPageIndex] = useState(0)
     const pageSize = 15
 
-    const dateRange = useMemo(() => {
-        if (!dateFilter) return { from: undefined, to: undefined }
-        if (dateFilter === 'custom') {
-            if (!customDateRange.start || !customDateRange.end) return { from: undefined, to: undefined }
-            return { from: customDateRange.start, to: customDateRange.end }
-        }
-        const now = new Date()
-        const to = now.toISOString().split('T')[0]
-        const fromDate = new Date(now)
-        if (dateFilter === 'lastWeek') fromDate.setDate(now.getDate() - 6)
-        else if (dateFilter === 'last2Weeks') fromDate.setDate(now.getDate() - 13)
-        else if (dateFilter === 'lastMonth') fromDate.setMonth(now.getMonth() - 1)
-        return { from: fromDate.toISOString().split('T')[0], to }
-    }, [dateFilter, customDateRange])
+    // Empty string (= "Any Date") is not in presetDays so falls through to
+    // { from: undefined, to: undefined } inside getDateRangeFromFilter, which is correct.
+    const dateRange = useMemo(
+        () =>
+            getDateRangeFromFilter({
+                dateFilter,
+                customDateRange,
+                customValue: 'custom',
+                fallbackValue: 'lastWeek',
+                presetDays: {
+                    lastWeek: PRESET_DAYS.lastWeek,
+                    last2Weeks: PRESET_DAYS.last2Weeks,
+                    lastMonth: PRESET_DAYS.lastMonth,
+                },
+            }),
+        [dateFilter, customDateRange]
+    )
 
     const handleSort = (column: SortColumn) => {
         if (sortColumn === column) {

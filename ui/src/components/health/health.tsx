@@ -1,33 +1,35 @@
 'use client'
 
-import {useMemo, useState} from 'react'
-import {useRatings, useRegistry, useTickets, useSupportMembers, useAssignmentEnabled} from '@/lib/hooks'
-import {ClipboardList, Star, AlertTriangle, Headphones, ChevronDown} from 'lucide-react'
+import {useEffect, useMemo, useState} from 'react'
+import { enumValidator, isoDateValidator, useUrlParams } from '@/lib/hooks/useUrlParams'
+import {getDateRangeFromFilter, PRESET_DAYS} from '@/lib/dateRange'
+import {useAssignmentEnabled, useRatings, useRegistry, useSupportMembers, useTickets} from '@/lib/hooks'
+import {AlertTriangle, ChevronDown, ClipboardList, Headphones, Star} from 'lucide-react'
 import LoadingSkeleton from '@/components/LoadingSkeleton'
 import {useQueryClient} from '@tanstack/react-query'
 import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    Legend,
-    Line,
-    LineChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts'
 import {
-    AggregatedTicketStats,
-    BulkReassignRequest,
-    BulkReassignResult,
-    Escalation,
-    ParsedTicketLog,
-    TicketImpact,
-    TicketLog,
-    TicketWithLogs,
-    SupportMember
+  AggregatedTicketStats,
+  BulkReassignRequest,
+  BulkReassignResult,
+  Escalation,
+  ParsedTicketLog,
+  SupportMember,
+  TicketImpact,
+  TicketLog,
+  TicketWithLogs
 } from "@/lib/types";
 
 export default function HealthPage() {
@@ -42,13 +44,28 @@ export default function HealthPage() {
         {key: 'workbench' as const, label: 'Ticket Workbench', icon: Headphones, color: 'purple'},
     ]
 
-    const [dateFilterMode, setDateFilterMode] = useState<'week' | 'month' | 'year' | 'custom'>('week')
-    const [startDate, setStartDate] = useState<string>(() => {
-        const date = new Date()
-        date.setMonth(date.getMonth() - 1)
-        return date.toISOString().split('T')[0]
-    })
-    const [endDate, setEndDate] = useState<string>(() => new Date().toISOString().split('T')[0])
+    // Persist date filter mode, custom date range, and active tab in the URL.
+    // Validators guard against invalid URL values and auto-correct the URL.
+    const [params, setParams] = useUrlParams(
+        { dateFilter: 'lastWeek', dateFrom: '', dateTo: '', tab: 'tickets' },
+        {
+            dateFilter: enumValidator(['lastWeek', 'last2Weeks', 'lastMonth', 'lastYear', 'custom'] as const, 'lastWeek'),
+            dateFrom: isoDateValidator,
+            dateTo: isoDateValidator,
+            tab: enumValidator(['tickets', 'ratings', 'workbench'] as const, 'tickets'),
+        },
+    )
+    // Safe to cast: validators guarantee these are valid enum values.
+    const dateFilter = params.dateFilter as 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'lastYear' | 'custom'
+    const activeTab  = params.tab as 'tickets' | 'ratings' | 'workbench'
+
+    // Correct the URL when custom date range is in an invalid order (dateFrom > dateTo).
+    useEffect(() => {
+        if (params.dateFilter === 'custom' && params.dateFrom && params.dateTo && params.dateFrom > params.dateTo) {
+            setParams({ dateFilter: 'lastWeek', dateFrom: '', dateTo: '' })
+        }
+    }, [params.dateFilter, params.dateFrom, params.dateTo, setParams])
+
     const [inquiringTeamFilter, setInquiringTeamFilter] = useState('')
     const [escalatedTeamFilter, setEscalatedTeamFilter] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
@@ -62,46 +79,33 @@ export default function HealthPage() {
     const [confirmationDetails, setConfirmationDetails] = useState<{from: string, to: string, count: number, tickets: TicketWithLogs[]} | null>(null)
     const [bulkReassignExpanded, setBulkReassignExpanded] = useState(false)
     const [capacityInsightsExpanded, setCapacityInsightsExpanded] = useState(false)
-    const [activeTab, setActiveTab] = useState<'tickets' | 'ratings' | 'workbench'>('tickets')
+
     const [engineersOnRota, setEngineersOnRota] = useState<number>(2) // Default to 2, configurable
     const [ticketsPerEngineerCapacity, setTicketsPerEngineerCapacity] = useState<number>(5) // Default to 5, configurable
-    
+
     const now = useMemo(() => new Date(), [])
-    const isDateRangeValid = startDate <= endDate
+    // Valid when both are empty (no custom dates set yet) or start ≤ end.
+    const isDateRangeValid = !params.dateFrom || !params.dateTo || params.dateFrom <= params.dateTo
 
-    // Calculate date range based on filter mode (aligned to SLA dashboard style)
-    // When switching to "custom", preserve the current range until custom dates are set
-    const dateRange = useMemo(() => {
-        if (dateFilterMode === 'custom') {
-            // If custom dates are not set or invalid, preserve the previous filter's range
-            if (!isDateRangeValid || !startDate || !endDate) {
-                // Calculate the current range based on week (default)
-                const toDate = new Date()
-                const fromDate = new Date(toDate)
-                fromDate.setDate(toDate.getDate() - 6)
-                const from = fromDate.toISOString().split('T')[0]
-                const to = toDate.toISOString().split('T')[0]
-                return { from, to }
-            }
-            return { from: startDate || undefined, to: endDate || undefined }
-        }
+    // Calculate date range based on filter mode using the shared utility.
+    // Falls back to lastWeek when custom dates are absent or invalid.
+    const dateRange = useMemo(
+        () =>
+            getDateRangeFromFilter({
+                dateFilter,
+                customDateRange: { start: params.dateFrom || undefined, end: params.dateTo || undefined },
+                customValue: 'custom',
+                fallbackValue: 'lastWeek',
+                presetDays: {
+                    lastWeek: PRESET_DAYS.lastWeek,
+                    last2Weeks: PRESET_DAYS.last2Weeks,
+                    lastMonth: PRESET_DAYS.lastMonth,
+                    lastYear: PRESET_DAYS.lastYear,
+                },
+            }),
+        [dateFilter, params.dateFrom, params.dateTo]
+    )
 
-        const toDate = new Date()
-        const fromDate = new Date(toDate)
-
-        if (dateFilterMode === 'week') {
-            fromDate.setDate(toDate.getDate() - 6)
-        } else if (dateFilterMode === 'month') {
-            fromDate.setMonth(toDate.getMonth() - 1)
-        } else if (dateFilterMode === 'year') {
-            fromDate.setFullYear(toDate.getFullYear() - 1)
-        }
-
-        const from = fromDate.toISOString().split('T')[0]
-        const to = toDate.toISOString().split('T')[0]
-        return { from, to }
-    }, [dateFilterMode, startDate, endDate, isDateRangeValid])
-    
     const {data: tickets, isLoading: ticketsLoading} = useTickets(0, 1000, dateRange.from, dateRange.to)
 
     // Count actual weekdays (Mon-Fri) in the selected date range. Used as the denominator
@@ -213,23 +217,7 @@ export default function HealthPage() {
 
 
     // --- Metrics ---
-    // Tickets are already filtered by date from server
-    const openedTickets = useMemo(() => {
-        return filteredTickets.filter((t: TicketWithLogs) => {
-            const { opened } = getOpenedClosed(t)
-            return opened !== null
-        })
-    }, [filteredTickets])
-
-    const closedTickets = useMemo(() => {
-        return filteredTickets.filter((t: TicketWithLogs) => {
-            const { closed } = getOpenedClosed(t)
-            return closed !== null
-        })
-    }, [filteredTickets])
-
-
-    const staleTicketsCount = useMemo(() => {
+  const staleTicketsCount = useMemo(() => {
         return filteredTickets.filter((t: TicketWithLogs) => t.status === 'stale').length
     }, [filteredTickets])
 
@@ -286,15 +274,13 @@ export default function HealthPage() {
         })
 
         // Calculate average and sort by date
-        const values = Object.values(map).map(entry => ({
-            date: entry.date,
-            avgAssignments: entry.engineerCount > 0 
-                ? parseFloat((entry.totalAssignments / entry.engineerCount).toFixed(2))
-                : 0,
-            totalAssignments: entry.totalAssignments
+      return Object.values(map).map(entry => ({
+          date: entry.date,
+          avgAssignments: entry.engineerCount > 0
+            ? parseFloat((entry.totalAssignments / entry.engineerCount).toFixed(2))
+            : 0,
+          totalAssignments: entry.totalAssignments
         })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-        return values
     }, [filteredTickets, isAssignmentEnabled, supportMembers])
 
     // --- Timeline data: aggregate by ISO date (YYYY-MM-DD) ---
@@ -358,16 +344,16 @@ export default function HealthPage() {
         if (!isAssignmentEnabled || !supportMembers || supportMembers.length === 0) {
             return []
         }
-        
+
         const counts: Record<string, number> = {}
         const openTickets = filteredTickets.filter(t => t.status?.toLowerCase() === 'opened')
-        
+
         openTickets.forEach(t => {
             if (t.assignedTo) {
                 counts[t.assignedTo] = (counts[t.assignedTo] || 0) + 1
             }
         })
-        
+
         // Include all engineers, even if they have 0 tickets
         return supportMembers.map(member => ({
             name: member.displayName,
@@ -382,7 +368,7 @@ export default function HealthPage() {
         for (let i = 7; i <= 19; i++) {
             counts[i] = 0
         }
-        
+
         filteredTickets.forEach(t => {
             const {opened} = getOpenedClosed(t)
             if (opened) {
@@ -393,7 +379,7 @@ export default function HealthPage() {
                 }
             }
         })
-        
+
         return Object.entries(counts)
             .map(([hour, count]) => ({
                 hour: parseInt(hour),
@@ -417,14 +403,14 @@ export default function HealthPage() {
             5: 'Friday'
         }
         const heatmap: Record<string, Record<number, number>> = {}
-        
+
         days.forEach(day => {
             heatmap[day] = {}
             for (let hour = 7; hour <= 18; hour++) {
                 heatmap[day][hour] = 0
             }
         })
-        
+
         filteredTickets.forEach(t => {
             const {opened} = getOpenedClosed(t)
             if (opened) {
@@ -438,7 +424,7 @@ export default function HealthPage() {
                 }
             }
         })
-        
+
         return days.map(day => {
             const row: { day: string; [key: number]: number } = { day }
             for (let hour = 7; hour <= 18; hour++) {
@@ -497,9 +483,9 @@ export default function HealthPage() {
             // Average tickets per weekday in the selected date range.
             // weekdaysInRange is the actual number of Mon-Fri days in the range (not just 1-5).
             const avgTickets = parseFloat((totalTicketsInBlock / weekdaysInRange).toFixed(2))
-            
+
             // Capacity for 2-hour block (same as single hour since it's concurrent capacity)
-            const utilization = currentCapacity > 0 
+            const utilization = currentCapacity > 0
                 ? Math.round((avgTickets / currentCapacity) * 100)
                 : 0
 
@@ -534,21 +520,21 @@ export default function HealthPage() {
 
     // --- Capacity vs Demand ---
     const capacityVsDemand = useMemo(() => {
-        
+
         const openTickets = filteredTickets.filter(t => t.status?.toLowerCase() === 'opened')
         const ticketsCount = openTickets.length
-        
+
         // Use engineersOnRota instead of total support members
         const rotaCount = Math.max(1, engineersOnRota) // Ensure at least 1
-        
+
         const capacityPerEngineer = Math.max(1, ticketsPerEngineerCapacity) // Ensure at least 1
         const totalCapacity = rotaCount * capacityPerEngineer
-        
+
         return {
             engineersOnRota: rotaCount,
             totalEngineers: supportMembers?.length || 0,
             openTickets: ticketsCount,
-            ticketsPerEngineer: rotaCount > 0 
+            ticketsPerEngineer: rotaCount > 0
                 ? parseFloat((ticketsCount / rotaCount).toFixed(2))
                 : 0,
             capacityPerEngineer: capacityPerEngineer,
@@ -599,132 +585,57 @@ export default function HealthPage() {
                         </div>
                     </div>
 
-                    <form 
-                        className="flex flex-wrap items-center gap-2 py-2"
-                        onSubmit={(e) => e.preventDefault()}
-                    >
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                const end = new Date()
-                                const start = new Date()
-                                start.setDate(start.getDate() - 7)
-                                setStartDate(start.toISOString().split('T')[0])
-                                setEndDate(end.toISOString().split('T')[0])
-                                setDateFilterMode('week')
+                    <div className="flex flex-wrap items-center gap-2 py-2">
+                        <select
+                            data-testid="health-date-filter"
+                            value={dateFilter}
+                            onChange={e => {
+                                const next = e.target.value
+                                setParams(next !== 'custom'
+                                    ? { dateFilter: next, dateFrom: '', dateTo: '' }
+                                    : { dateFilter: next })
                                 setCurrentPage(1)
                             }}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                                dateFilterMode === 'week'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
+                            className="p-2 border rounded text-xs"
                         >
-                            Last 7 Days
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                const end = new Date()
-                                const start = new Date()
-                                start.setMonth(start.getMonth() - 1)
-                                setStartDate(start.toISOString().split('T')[0])
-                                setEndDate(end.toISOString().split('T')[0])
-                                setDateFilterMode('month')
-                                setCurrentPage(1)
-                            }}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                                dateFilterMode === 'month'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            Last Month
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                const end = new Date()
-                                const start = new Date()
-                                start.setFullYear(start.getFullYear() - 1)
-                                setStartDate(start.toISOString().split('T')[0])
-                                setEndDate(end.toISOString().split('T')[0])
-                                setDateFilterMode('year')
-                                setCurrentPage(1)
-                            }}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                                dateFilterMode === 'year'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            Last Year
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                setDateFilterMode('custom')
-                            }}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${
-                                dateFilterMode === 'custom'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            Custom
-                        </button>
+                            <option value="lastWeek">Last Week</option>
+                            <option value="last2Weeks">Last 2 Weeks</option>
+                            <option value="lastMonth">Last Month</option>
+                            <option value="lastYear">Last Year</option>
+                            <option value="custom">Custom</option>
+                        </select>
 
-                        {dateFilterMode === 'custom' && (
+                        {dateFilter === 'custom' && (
                             <>
                                 <input
                                     type="date"
-                                    value={startDate}
+                                    value={params.dateFrom}
                                     onChange={e => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        setStartDate(e.target.value)
+                                        setParams({ dateFrom: e.target.value })
                                         setCurrentPage(1)
-                                    }}
-                                    onBlur={e => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
                                     }}
                                     className="border rounded px-2 py-1 text-sm"
                                 />
                                 <input
                                     type="date"
-                                    value={endDate}
+                                    value={params.dateTo}
                                     onChange={e => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        setEndDate(e.target.value)
+                                        setParams({ dateTo: e.target.value })
                                         setCurrentPage(1)
-                                    }}
-                                    onBlur={e => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
                                     }}
                                     className="border rounded px-2 py-1 text-sm"
                                 />
                             </>
                         )}
                         <span className="text-xs text-gray-500 ml-2">
-                            📅 {startDate} → {endDate}
+                            📅 {dateRange.from} → {dateRange.to}
                         </span>
-                        {!isDateRangeValid && (
+                        {dateFilter === 'custom' && !isDateRangeValid && (
                             <span className="text-xs text-red-600 font-medium ml-2">
                                 ⚠️ Invalid range
                             </span>
                         )}
-                    </form>
+                    </div>
                 </div>
             </div>
 
@@ -743,7 +654,7 @@ export default function HealthPage() {
                             return (
                                 <button
                                     key={tab.key}
-                                    onClick={() => setActiveTab(tab.key)}
+                                    onClick={() => setParams({ tab: tab.key })}
                                     className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 text-sm font-semibold border-b-3 transition-all duration-200 ${colorClasses[tab.color]}`}
                                 >
                                     <Icon className={`w-5 h-5 ${isActive ? 'animate-pulse' : ''}`} />
@@ -793,15 +704,15 @@ export default function HealthPage() {
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <LineChart data={assignmentsByDay}>
                                                     <CartesianGrid strokeDasharray="3 3"/>
-                                                    <XAxis 
-                                                        dataKey="date" 
+                                                    <XAxis
+                                                        dataKey="date"
                                                         tickFormatter={(date: string) => new Date(date).toLocaleDateString()}
                                                     />
-                                                    <YAxis 
+                                                    <YAxis
                                                         label={{ value: 'Avg Tickets/Engineer', angle: -90, position: 'insideLeft' }}
                                                         allowDecimals={true}
                                                     />
-                                                    <Tooltip 
+                                                    <Tooltip
                                                         labelFormatter={(label) => new Date(label as string).toLocaleDateString()}
                                                         formatter={(value: number, name: string) => {
                                                             if (name === 'avgAssignments') return [value.toFixed(2), 'Avg per Engineer']
@@ -809,24 +720,24 @@ export default function HealthPage() {
                                                             return [value, name]
                                                         }}
                                                     />
-                                                    <Legend 
+                                                    <Legend
                                                         formatter={(value: string) => {
                                                             if (value === 'avgAssignments') return 'Avg per Engineer'
                                                             if (value === 'totalAssignments') return 'Total Assigned'
                                                             return value
                                                         }}
                                                     />
-                                                    <Line 
-                                                        type="monotone" 
-                                                        dataKey="avgAssignments" 
-                                                        stroke="#8b5cf6" 
+                                                    <Line
+                                                        type="monotone"
+                                                        dataKey="avgAssignments"
+                                                        stroke="#8b5cf6"
                                                         strokeWidth={2}
                                                         activeDot={{r: 6}}
                                                     />
-                                                    <Line 
-                                                        type="monotone" 
-                                                        dataKey="totalAssignments" 
-                                                        stroke="#a78bfa" 
+                                                    <Line
+                                                        type="monotone"
+                                                        dataKey="totalAssignments"
+                                                        stroke="#a78bfa"
                                                         strokeWidth={2}
                                                         strokeDasharray="5 5"
                                                     />
@@ -844,8 +755,8 @@ export default function HealthPage() {
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <BarChart data={ticketsByTeam}>
                                                     <CartesianGrid strokeDasharray="3 3"/>
-                                                    <XAxis 
-                                                        dataKey="name" 
+                                                    <XAxis
+                                                        dataKey="name"
                                                         angle={-45}
                                                         textAnchor="end"
                                                         height={100}
@@ -871,8 +782,8 @@ export default function HealthPage() {
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <BarChart data={activeTicketsPerEngineer}>
                                                     <CartesianGrid strokeDasharray="3 3"/>
-                                                    <XAxis 
-                                                        dataKey="name" 
+                                                    <XAxis
+                                                        dataKey="name"
                                                         angle={-45}
                                                         textAnchor="end"
                                                         height={100}
@@ -903,7 +814,7 @@ export default function HealthPage() {
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <BarChart data={ticketsByHour}>
                                                         <CartesianGrid strokeDasharray="3 3"/>
-                                                        <XAxis 
+                                                        <XAxis
                                                             dataKey="hourLabel"
                                                             angle={-45}
                                                             textAnchor="end"
@@ -949,16 +860,16 @@ export default function HealthPage() {
                                                                         const hour = idx + 7 // Hours 7-18
                                                                         const value = row[hour] as number
                                                                         const intensity = maxValue > 0 ? (value / maxValue) * 100 : 0
-                                                                        const bgColor = intensity > 70 
-                                                                            ? 'bg-red-500' 
-                                                                            : intensity > 40 
-                                                                            ? 'bg-orange-400' 
-                                                                            : intensity > 20 
-                                                                            ? 'bg-yellow-300' 
+                                                                        const bgColor = intensity > 70
+                                                                            ? 'bg-red-500'
+                                                                            : intensity > 40
+                                                                            ? 'bg-orange-400'
+                                                                            : intensity > 20
+                                                                            ? 'bg-yellow-300'
                                                                             : 'bg-green-100'
                                                                         return (
-                                                                            <td 
-                                                                                key={hour} 
+                                                                            <td
+                                                                                key={hour}
                                                                                 className={`p-1 text-center ${bgColor} text-gray-800 font-medium`}
                                                                                 title={`${row.day} ${String(hour).padStart(2, '0')}:00 - ${value} tickets`}
                                                                             >
@@ -1048,7 +959,7 @@ export default function HealthPage() {
                                                         </span>
                                                     </div>
                                                     <div className="w-full bg-gray-200 rounded-full h-4 relative overflow-hidden">
-                                                        <div 
+                                                        <div
                                                             className={`h-4 rounded-full ${
                                                                 capacityVsDemand.capacityUtilization > 100 ? 'bg-red-600' :
                                                                 capacityVsDemand.capacityUtilization > 80 ? 'bg-red-500' :
@@ -1086,7 +997,7 @@ export default function HealthPage() {
                                                     </div>
                                                     <ChevronDown className={`w-4 h-4 text-purple-600 transition-transform duration-200 ${capacityInsightsExpanded ? 'rotate-180' : ''}`} />
                                                 </button>
-                                                
+
                                                 {capacityInsightsExpanded && (
                                                     <div className="px-3 pb-3 border-t border-purple-200 pt-3">
                                                         <p className="text-xs text-gray-500 text-center mb-3">
@@ -1231,7 +1142,7 @@ export default function HealthPage() {
                                             </div>
                                             <ChevronDown className={`w-5 h-5 text-purple-600 transition-transform duration-200 ${bulkReassignExpanded ? 'rotate-180' : ''}`} />
                                         </button>
-                                        
+
                                         {/* Expandable Content */}
                                         {bulkReassignExpanded && (
                                             <div className="px-4 pb-4 border-t border-purple-200 pt-4">
@@ -1252,7 +1163,7 @@ export default function HealthPage() {
                                                     ))}
                                                 </select>
                                             </div>
-                                            
+
                                             <div className="flex items-center gap-2">
                                                 <label className="text-sm font-medium text-gray-700">To:</label>
                                                 <select
@@ -1274,17 +1185,17 @@ export default function HealthPage() {
                                                     if (bulkReassignFrom && bulkReassignTo) {
                                                         if (bulkReassignFrom === bulkReassignTo) {
                                                             setReassignMessage({
-                                                                type: 'error', 
+                                                                type: 'error',
                                                                 text: 'Source and target assignee cannot be the same. Please select different assignees.'
                                                             })
                                                             setTimeout(() => setReassignMessage(null), 5000)
                                                             return
                                                         }
-                                                        
-                                                        const affectedTickets = filteredTickets.filter(t => 
+
+                                                        const affectedTickets = filteredTickets.filter(t =>
                                                             t.status?.toLowerCase() === 'opened' && (
-                                                                bulkReassignFrom === 'unassigned' 
-                                                                    ? !t.assignedTo 
+                                                                bulkReassignFrom === 'unassigned'
+                                                                    ? !t.assignedTo
                                                                     : t.assignedTo === bulkReassignFrom
                                                             )
                                                         )
@@ -1294,7 +1205,7 @@ export default function HealthPage() {
                                                             setTimeout(() => setReassignMessage(null), 5000)
                                                             return
                                                         }
-                                                        
+
                                                         setConfirmationDetails({
                                                             from: bulkReassignFrom,
                                                             to: bulkReassignTo,
@@ -1310,35 +1221,35 @@ export default function HealthPage() {
                                             >
                                                 Reassign All
                                             </button>
-                                            
+
                                             {bulkReassignFrom && (
                                                 <span className="text-sm font-medium text-purple-700 bg-purple-100 border border-purple-200 rounded px-3 py-1">
-                                                    {filteredTickets.filter(t => 
+                                                    {filteredTickets.filter(t =>
                                                         t.status?.toLowerCase() === 'opened' && (
-                                                            bulkReassignFrom === 'unassigned' 
-                                                                ? !t.assignedTo 
+                                                            bulkReassignFrom === 'unassigned'
+                                                                ? !t.assignedTo
                                                                 : t.assignedTo === bulkReassignFrom
                                                         )
-                                                    ).length} ticket{filteredTickets.filter(t => 
+                                                    ).length} ticket{filteredTickets.filter(t =>
                                                         t.status?.toLowerCase() === 'opened' && (
-                                                            bulkReassignFrom === 'unassigned' 
-                                                                ? !t.assignedTo 
+                                                            bulkReassignFrom === 'unassigned'
+                                                                ? !t.assignedTo
                                                                 : t.assignedTo === bulkReassignFrom
                                                         )
                                                     ).length === 1 ? '' : 's'} (open)
                                                 </span>
                                             )}
                                         </div>
-                                        
+
                                         <p className="text-xs text-gray-600 mt-2">
                                             ℹ️ Only <strong>open tickets</strong> will be reassigned
                                         </p>
-                                        
+
                                         {/* Success/Error Messages - Inside bulk reassign section */}
                                         {reassignMessage && (
                                             <div className={`mt-3 border rounded-md p-3 text-sm ${
-                                                reassignMessage.type === 'success' 
-                                                    ? 'bg-green-50 border-green-300 text-green-800' 
+                                                reassignMessage.type === 'success'
+                                                    ? 'bg-green-50 border-green-300 text-green-800'
                                                     : 'bg-red-50 border-red-300 text-red-800'
                                             }`}>
                                                 <p className="font-medium">{reassignMessage.text}</p>
@@ -1363,20 +1274,20 @@ export default function HealthPage() {
                                                                     setShowConfirmation(false)
                                                                     setIsReassigning(true)
                                                                     setReassignMessage(null)
-                                                                    
+
                                                                     try {
                                                                         const ticketIds = confirmationDetails.tickets.map(t => t.id)
                                                                         const targetUserId = supportMembers?.find(m => m.displayName === confirmationDetails.to)?.userId || ''
-                                                                        
+
                                                                         if (!targetUserId) {
                                                                             throw new Error('Could not find user ID for selected assignee')
                                                                         }
-                                                                        
+
                                                                         const request: BulkReassignRequest = {
                                                                             ticketIds,
                                                                             assignedTo: targetUserId
                                                                         }
-                                                                        
+
                                                                         const response = await fetch('/api/assignment/bulk-reassign', {
                                                                             method: 'POST',
                                                                             headers: {
@@ -1390,22 +1301,22 @@ export default function HealthPage() {
                                                                         }
 
                                                                         const result: BulkReassignResult = await response.json()
-                                                                        
+
                                                                         setReassignMessage({
-                                                                            type: 'success', 
+                                                                            type: 'success',
                                                                             text: `${result.message} (${result.successCount} ticket${result.successCount === 1 ? '' : 's'})`
                                                                         })
-                                                                        
+
                                                                         setBulkReassignFrom('')
                                                                         setBulkReassignTo('')
                                                                         setConfirmationDetails(null)
-                                                                        
+
                                                                         await queryClient.invalidateQueries({ queryKey: ['tickets'] })
-                                                                        
+
                                                                     } catch (error) {
                                                                         console.error('Bulk reassign failed:', error)
                                                                         setReassignMessage({
-                                                                            type: 'error', 
+                                                                            type: 'error',
                                                                             text: `Failed to reassign tickets: ${error instanceof Error ? error.message : 'Unknown error'}`
                                                                         })
                                                                     } finally {
@@ -1551,8 +1462,8 @@ export default function HealthPage() {
                                                     {isAssignmentEnabled && (
                                                         <td className="px-4 py-3 text-sm">
                                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                                t.assignedTo 
-                                                                    ? 'bg-green-100 text-green-800' 
+                                                                t.assignedTo
+                                                                    ? 'bg-green-100 text-green-800'
                                                                     : 'bg-gray-100 text-gray-600'
                                                             }`}>
                                                                 {t.assignedTo || 'Unassigned'}
