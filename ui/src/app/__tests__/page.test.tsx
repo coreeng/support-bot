@@ -22,6 +22,7 @@ jest.mock('../../contexts/TeamFilterContext', () => ({
 
 jest.mock('../../lib/hooks', () => ({
   useKnowledgeGapsEnabled: jest.fn(),
+  useTenantInsightsEnabled: jest.fn(() => ({ data: false, isLoading: false, error: null })),
 }))
 
 // Mock all the page components

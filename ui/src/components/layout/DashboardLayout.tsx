@@ -9,13 +9,13 @@ import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { buildHref } from '@/lib/utils'
 import Image from 'next/image'
 import TeamSelector from '@/components/TeamSelector'
-import { useKnowledgeGapsEnabled } from '@/lib/hooks'
+import { useKnowledgeGapsEnabled, useTenantInsightsEnabled } from '@/lib/hooks'
 
 // Types for tab visibility requirements
 type TabVisibilityRequirements = {
     requiresFullAccess?: boolean
     requiresRoles?: string[]
-    requiresFeatureFlag?: 'knowledgeGaps'
+    requiresFeatureFlag?: 'knowledgeGaps' | 'tenantInsights'
 }
 
 type SupportTab = {
@@ -50,13 +50,26 @@ const supportTabs: SupportTab[] = [
         label: 'SLA Dashboard',
         icon: <BarChart2 className="w-5 h-5 mr-2" />,
         visibility: { requiresFullAccess: true }
+    },
+    {
+        path: '/tenant-requests',
+        label: 'Tenant Requests',
+        icon: <BarChart2 className="w-5 h-5 mr-2" />,
+        visibility: {
+            requiresFullAccess: true,
+            requiresFeatureFlag: 'tenantInsights'
+        }
     }
 ]
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, logout } = useAuth()
-    const { hasFullAccess, selectedTeam } = useTeamFilter()
-    const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled()
+    const { hasFullAccess } = useTeamFilter()
+    const { data: isKnowledgeGapsEnabled, error: knowledgeGapsError } = useKnowledgeGapsEnabled()
+    const { data: isTenantInsightsEnabled, error: tenantInsightsError } = useTenantInsightsEnabled()
+
+    if (knowledgeGapsError) console.warn('Failed to check knowledge-gaps feature flag:', knowledgeGapsError)
+    if (tenantInsightsError) console.warn('Failed to check tenant-insights feature flag:', tenantInsightsError)
     const pathname = usePathname()
 
     // Sidebar state
@@ -89,8 +102,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         }
 
         // Check feature flag requirement
-        if (requiresFeatureFlag === 'knowledgeGaps') {
-            if (isKnowledgeGapsEnabled !== true) {
+        if (requiresFeatureFlag) {
+            const flags: Record<string, boolean | undefined> = {
+                knowledgeGaps: isKnowledgeGapsEnabled,
+                tenantInsights: isTenantInsightsEnabled,
+            }
+            if (flags[requiresFeatureFlag] !== true) {
                 return false
             }
         }
@@ -163,7 +180,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                                         return (
                                             <Link
                                                 key={tab.path}
-                                                href={buildHref(tab.path, { team: selectedTeam })}
+                                                href={tab.path}
                                                 className={`w-full flex items-center gap-3 px-8 py-2.5 text-sm hover:bg-gray-700 transition-colors ${isActive ? 'bg-blue-600 text-white' : 'text-gray-300'
                                                     }`}
                                             >
