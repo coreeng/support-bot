@@ -1,6 +1,12 @@
-import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import TeamSelector from '../TeamSelector'
+
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(),
+  useSearchParams: jest.fn(),
+  usePathname: jest.fn(),
+}))
 
 jest.mock('../../hooks/useAuth', () => ({
   useAuth: jest.fn(),
@@ -12,6 +18,10 @@ jest.mock('../../contexts/TeamFilterContext', () => ({
 
 const mockUseAuth = jest.requireMock('../../hooks/useAuth').useAuth as jest.Mock
 const mockUseTeamFilter = jest.requireMock('../../contexts/TeamFilterContext').useTeamFilter as jest.Mock
+const mockUseRouter = useRouter as jest.Mock
+const mockUseSearchParams = useSearchParams as jest.Mock
+const mockUsePathname = usePathname as jest.Mock
+const mockReplace = jest.fn()
 
 const baseTeamFilter = () => ({
   selectedTeam: null,
@@ -23,6 +33,9 @@ const renderSelector = () => render(<TeamSelector />)
 describe('TeamSelector', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockUseRouter.mockReturnValue({ replace: mockReplace })
+    mockUseSearchParams.mockReturnValue(new URLSearchParams())
+    mockUsePathname.mockReturnValue('/')
     mockUseTeamFilter.mockReturnValue(baseTeamFilter())
   })
 
@@ -197,6 +210,85 @@ describe('TeamSelector', () => {
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Leadership Team' } })
 
     expect(setSelectedTeam).toHaveBeenCalledWith('Leadership Team')
+    // Also writes the new team into the URL
+    expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('team=Leadership+Team'))
+  })
+
+  it('initialises selected team from URL ?team param when valid', () => {
+    mockUseSearchParams.mockReturnValue(new URLSearchParams({ team: 'Tenant B' }))
+    const setSelectedTeam = jest.fn()
+    mockUseTeamFilter.mockReturnValue({
+      selectedTeam: null,
+      setSelectedTeam,
+    })
+    mockUseAuth.mockReturnValue({
+      user: {
+        teams: [
+          { name: 'Tenant A', types: ['tenant'], groupRefs: [] },
+          { name: 'Tenant B', types: ['tenant'], groupRefs: [] },
+        ],
+      },
+      isLeadership: false,
+      isSupportEngineer: false,
+    })
+
+    renderSelector()
+
+    // URL team param wins over the auth-based default (Tenant A)
+    expect(setSelectedTeam).toHaveBeenCalledWith('Tenant B')
+  })
+
+  it('ignores URL ?team param when it is not a valid selection for this user', () => {
+    mockUseSearchParams.mockReturnValue(new URLSearchParams({ team: 'Other Team' }))
+    const setSelectedTeam = jest.fn()
+    mockUseTeamFilter.mockReturnValue({
+      selectedTeam: null,
+      setSelectedTeam,
+    })
+    mockUseAuth.mockReturnValue({
+      user: {
+        teams: [
+          { name: 'Tenant A', types: ['tenant'], groupRefs: [] },
+        ],
+      },
+      isLeadership: false,
+      isSupportEngineer: false,
+    })
+
+    renderSelector()
+
+    // Falls back to first available team; invalid URL team is ignored
+    expect(setSelectedTeam).toHaveBeenCalledWith('Tenant A')
+    expect(setSelectedTeam).not.toHaveBeenCalledWith('Other Team')
+  })
+
+  it('rewrites a stale invalid ?team URL param when selectedTeam is already valid', () => {
+    // Scenario: user opens a shared URL with ?team=OldTeam but their context
+    // already has a valid selectedTeam (e.g. from a previous navigation).
+    // The stale param must be cleaned up without touching selectedTeam.
+    mockUseSearchParams.mockReturnValue(new URLSearchParams({ team: 'OldTeam' }))
+    const setSelectedTeam = jest.fn()
+    mockUseTeamFilter.mockReturnValue({
+      selectedTeam: 'Tenant A',   // already valid
+      setSelectedTeam,
+    })
+    mockUseAuth.mockReturnValue({
+      user: {
+        teams: [
+          { name: 'Tenant A', types: ['tenant'], groupRefs: [] },
+        ],
+      },
+      isLeadership: false,
+      isSupportEngineer: false,
+    })
+
+    renderSelector()
+
+    // selectedTeam should not change — it is already correct
+    expect(setSelectedTeam).not.toHaveBeenCalled()
+    // URL must be updated to replace the stale invalid team with the valid one
+    expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('team=Tenant+A'))
+    expect(mockReplace).not.toHaveBeenCalledWith(expect.stringContaining('OldTeam'))
   })
 })
 

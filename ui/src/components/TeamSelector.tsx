@@ -3,11 +3,13 @@
 import { useEffect, useMemo } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
+import { useUrlParams } from '@/lib/hooks/useUrlParams'
 import { Users } from 'lucide-react'
 
 export default function TeamSelector() {
     const { user, isLeadership, isSupportEngineer } = useAuth()
     const { selectedTeam, setSelectedTeam } = useTeamFilter()
+    const [teamParams, setTeamParam] = useUrlParams({ team: '' })
 
     const teams = useMemo(() => user?.teams ?? [], [user])
     const isRoleTeam = (t: { types?: string[] }) => (t.types || []).some(type => /leadership/i.test(type) || /support/i.test(type))
@@ -55,17 +57,44 @@ export default function TeamSelector() {
         return set
     }, [tenantTeamNames, userEscalationTeams, userRoleTeams])
 
-    // Ensure selectedTeam is initialized and valid, otherwise reset.
-    // Default stays aligned with user's first team in session ordering.
+    // Ensure selectedTeam is initialised and valid, otherwise reset.
+    // The URL ?team param takes priority over the auth-based default so that
+    // bookmarked or shared URLs restore the intended view.
     useEffect(() => {
+        const urlTeam = teamParams.team
+
+        // URL team is present and valid — sync it into context.
+        if (urlTeam && validSelections.size > 0 && validSelections.has(urlTeam)) {
+            if (urlTeam !== selectedTeam) {
+                setSelectedTeam(urlTeam)
+            }
+            return
+        }
+
+        // URL team is present but invalid for this user — clean up the URL.
+        // This handles shared/bookmarked URLs with a garbage ?team value when
+        // selectedTeam is already correctly set (none of the branches below fire
+        // in that case, so the stale param would persist without this guard).
+        if (urlTeam && validSelections.size > 0 && !validSelections.has(urlTeam)) {
+            if (selectedTeam && validSelections.has(selectedTeam)) {
+                setTeamParam({ team: selectedTeam })
+                return
+            }
+            // selectedTeam is also absent/invalid — fall through to the
+            // initialisation/reset branches below, which will fix both.
+        }
+
+        // No valid URL team — apply the existing initialisation / reset logic
+        // and write the resolved team back into the URL.
         if (!selectedTeam && firstAvailableSelection) {
             setSelectedTeam(firstAvailableSelection)
             return
         }
         if (selectedTeam && validSelections.size > 0 && !validSelections.has(selectedTeam)) {
             setSelectedTeam(firstAvailableSelection)
+            setTeamParam({ team: firstAvailableSelection ?? '' })
         }
-    }, [selectedTeam, validSelections, firstAvailableSelection, setSelectedTeam])
+    }, [selectedTeam, validSelections, firstAvailableSelection, setSelectedTeam, teamParams.team, setTeamParam])
 
     if (user && teams.length === 0) {
         return (
@@ -98,7 +127,10 @@ export default function TeamSelector() {
             <select
                 data-testid="team-selector"
                 value={displayValue}
-                onChange={(e) => setSelectedTeam(e.target.value)}
+                onChange={(e) => {
+                    setSelectedTeam(e.target.value)
+                    setTeamParam({ team: e.target.value })
+                }}
                 className="w-full text-xs border border-gray-600 rounded px-2 py-1.5 bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-600 transition-colors max-h-56"
             >
                 {tenantTeamNames.length > 0 && (

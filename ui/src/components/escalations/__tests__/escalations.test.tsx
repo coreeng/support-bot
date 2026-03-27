@@ -9,6 +9,21 @@ import * as AuthHook from '../../../hooks/useAuth'
 jest.mock('../../../lib/hooks')
 jest.mock('../../../contexts/TeamFilterContext')
 jest.mock('../../../hooks/useAuth')
+
+// Mock useUrlParams with a useState-based implementation so filter/sort/page
+// changes re-render the component correctly, keeping all existing test
+// interactions that fire events and then inspect the rendered output intact.
+jest.mock('../../../lib/hooks/useUrlParams', () => ({
+    ...jest.requireActual('../../../lib/hooks/useUrlParams'),
+    useUrlParams: (defaults: Record<string, string>) => {
+        const { useState } = require('react') as typeof import('react')
+        const [params, setParamsState] = useState<Record<string, string>>(defaults)
+        const setParams = (updates: Record<string, string>) => {
+            setParamsState((prev: Record<string, string>) => ({ ...prev, ...updates }))
+        }
+        return [params, setParams]
+    },
+}))
 jest.mock('../EscalatedToMyTeamTable', () => {
     const Mock = () => <div data-testid="escalated-to-my-team-table" />
     Mock.displayName = 'MockEscalatedToMyTeamTable'
@@ -52,8 +67,12 @@ describe('EscalationsPage', () => {
         mockUseTeamFilter.mockReturnValue({
             selectedTeam: 'Escalation Team 2 Test',
             setSelectedTeam: jest.fn(),
-            hasFullAccess: false,
+            teamScope: { mode: 'selected_teams', teams: ['Escalation Team 2 Test'] },
             effectiveTeams: ['Escalation Team 2 Test'],
+            hasNoTeamScope: false,
+            isViewingAllTeams: false,
+            isViewingAsEscalationTeam: true,
+            hasFullAccess: false,
             allTeams: ['Escalation Team 2 Test'],
             initialized: true
         })
@@ -105,8 +124,12 @@ describe('EscalationsPage', () => {
         mockUseTeamFilter.mockReturnValue({
             selectedTeam: 'Escalation Team 2 Test',
             setSelectedTeam: jest.fn(),
-            hasFullAccess: false,
+            teamScope: { mode: 'selected_teams', teams: ['Escalation Team 2 Test'] },
             effectiveTeams: ['Escalation Team 2 Test'],
+            hasNoTeamScope: false,
+            isViewingAllTeams: false,
+            isViewingAsEscalationTeam: true,
+            hasFullAccess: false,
             allTeams: ['Escalation Team 2 Test'],
             initialized: true
         })
@@ -155,8 +178,12 @@ describe('EscalationsPage', () => {
         mockUseTeamFilter.mockReturnValue({
             selectedTeam: null,
             setSelectedTeam: jest.fn(),
-            hasFullAccess: true,
+            teamScope: { mode: 'all_teams' },
             effectiveTeams: [],
+            hasNoTeamScope: false,
+            isViewingAllTeams: true,
+            isViewingAsEscalationTeam: false,
+            hasFullAccess: true,
             allTeams: [],
             initialized: true
         })
@@ -207,8 +234,12 @@ describe('EscalationsPage', () => {
         mockUseTeamFilter.mockReturnValue({
             selectedTeam: 'Escalation Team 2 Test',
             setSelectedTeam: jest.fn(),
-            hasFullAccess: false,
+            teamScope: { mode: 'selected_teams', teams: ['Escalation Team 2 Test'] },
             effectiveTeams: ['Escalation Team 2 Test'],
+            hasNoTeamScope: false,
+            isViewingAllTeams: false,
+            isViewingAsEscalationTeam: true,
+            hasFullAccess: false,
             allTeams: ['Escalation Team 2 Test'],
             initialized: true
         })
@@ -282,8 +313,12 @@ describe('EscalationsPage', () => {
             mockUseTeamFilter.mockReturnValue({
                 selectedTeam: null,
                 setSelectedTeam: jest.fn(),
-                hasFullAccess: true,
+                teamScope: { mode: 'all_teams' },
                 effectiveTeams: [],
+                hasNoTeamScope: false,
+                isViewingAllTeams: true,
+                isViewingAsEscalationTeam: false,
+                hasFullAccess: true,
                 allTeams: [],
                 initialized: true
             })
@@ -352,8 +387,12 @@ describe('EscalationsPage', () => {
             mockUseTeamFilter.mockReturnValue({
                 selectedTeam: null,
                 setSelectedTeam: jest.fn(),
-                hasFullAccess: true,
+                teamScope: { mode: 'all_teams' },
                 effectiveTeams: [],
+                hasNoTeamScope: false,
+                isViewingAllTeams: true,
+                isViewingAsEscalationTeam: false,
+                hasFullAccess: true,
                 allTeams: [],
                 initialized: true
             })
@@ -419,8 +458,12 @@ describe('EscalationsPage', () => {
         mockUseTeamFilter.mockReturnValue({
             selectedTeam: 'Escalation Team 2 Test',
             setSelectedTeam: jest.fn(),
-            hasFullAccess: false,
+            teamScope: { mode: 'selected_teams', teams: ['Escalation Team 2 Test'] },
             effectiveTeams: ['Escalation Team 2 Test'],
+            hasNoTeamScope: false,
+            isViewingAllTeams: false,
+            isViewingAsEscalationTeam: true,
+            hasFullAccess: false,
             allTeams: ['Escalation Team 2 Test'],
             initialized: true
         })
@@ -499,8 +542,12 @@ describe('EscalationsPage', () => {
         mockUseTeamFilter.mockReturnValue({
             selectedTeam: 'Escalation Team 2 Test',
             setSelectedTeam: jest.fn(),
-            hasFullAccess: false,
+            teamScope: { mode: 'selected_teams', teams: ['Escalation Team 2 Test'] },
             effectiveTeams: ['Escalation Team 2 Test'],
+            hasNoTeamScope: false,
+            isViewingAllTeams: false,
+            isViewingAsEscalationTeam: true,
+            hasFullAccess: false,
             allTeams: ['Escalation Team 2 Test'],
             initialized: true
         })
@@ -631,8 +678,12 @@ describe('EscalationsPage', () => {
         mockUseTeamFilter.mockReturnValue({
             selectedTeam: 'Escalation Team 2 Test',
             setSelectedTeam: jest.fn(),
-            hasFullAccess: false,
+            teamScope: { mode: 'selected_teams', teams: ['Escalation Team 2 Test'] },
             effectiveTeams: ['Escalation Team 2 Test'],
+            hasNoTeamScope: false,
+            isViewingAllTeams: false,
+            isViewingAsEscalationTeam: true,
+            hasFullAccess: false,
             allTeams: ['Escalation Team 2 Test', 'Escalation Team 3 Test'],
             initialized: true
         })
@@ -647,8 +698,12 @@ describe('EscalationsPage', () => {
         mockUseTeamFilter.mockReturnValue({
             selectedTeam: 'Escalation Team 3 Test',
             setSelectedTeam: jest.fn(),
-            hasFullAccess: false,
+            teamScope: { mode: 'selected_teams', teams: ['Escalation Team 3 Test'] },
             effectiveTeams: ['Escalation Team 3 Test'],
+            hasNoTeamScope: false,
+            isViewingAllTeams: false,
+            isViewingAsEscalationTeam: true,
+            hasFullAccess: false,
             allTeams: ['Escalation Team 2 Test', 'Escalation Team 3 Test'],
             initialized: true
         })
@@ -663,8 +718,12 @@ describe('EscalationsPage', () => {
         mockUseTeamFilter.mockReturnValue({
             selectedTeam: null,
             setSelectedTeam: jest.fn(),
-            hasFullAccess: true,
+            teamScope: { mode: 'all_teams' },
             effectiveTeams: [],
+            hasNoTeamScope: false,
+            isViewingAllTeams: true,
+            isViewingAsEscalationTeam: false,
+            hasFullAccess: true,
             allTeams: [],
             initialized: true
         })
@@ -793,8 +852,12 @@ describe('EscalationsPage', () => {
         mockUseTeamFilter.mockReturnValue({
             selectedTeam: null,
             setSelectedTeam: jest.fn(),
-            hasFullAccess: false,
+            teamScope: { mode: 'no_teams' },
             effectiveTeams: ['__no_teams__'],
+            hasNoTeamScope: true,
+            isViewingAllTeams: false,
+            isViewingAsEscalationTeam: false,
+            hasFullAccess: false,
             allTeams: [],
             initialized: true
         })
