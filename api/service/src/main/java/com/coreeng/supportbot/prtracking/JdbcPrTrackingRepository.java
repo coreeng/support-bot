@@ -154,8 +154,8 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     @Override
     public EscalationBreakdown getEscalationBreakdown(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
         List<Object> binds = new ArrayList<>();
-        binds.add(EscalationSource.BOT);
-        binds.add(EscalationSource.MANUAL);
+        binds.add(EscalationSource.bot.name());
+        binds.add(EscalationSource.manual.name());
         String dateFilter = buildDateFilter(dateFrom, dateTo, "pr_created_at", binds);
         String sql = """
                 SELECT

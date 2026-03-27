@@ -129,7 +129,7 @@ public class PrLifecyclePoller {
                 .ticket(ticket)
                 .team(record.owningTeam())
                 .tags(ImmutableList.of())
-                .source(EscalationSource.BOT)
+                .source(EscalationSource.bot)
                 .build());
 
         if (escalation == null || escalation.id() == null) {

@@ -359,7 +359,7 @@ public class PrDetectionService {
                 .ticket(ticket)
                 .team(owningTeam)
                 .tags(ImmutableList.of())
-                .source(EscalationSource.BOT)
+                .source(EscalationSource.bot)
                 .build());
 
         if (escalation == null || escalation.id() == null) {

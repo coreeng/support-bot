@@ -68,7 +68,7 @@ public class JdbcEscalationRepository implements EscalationRepository {
                         com.coreeng.supportbot.dbschema.enums.EscalationStatus.lookupLiteral(
                                 escalation.status().name()),
                         escalation.team(),
-                        escalation.source())
+                        escalation.source().name())
                 .onConflict()
                 .doNothing()
                 .returning(ESCALATION.ID)
@@ -342,7 +342,7 @@ public class JdbcEscalationRepository implements EscalationRepository {
                 .createdMessageTs(MessageTs.ofOrNull(r.get(ESCALATION.CREATED_MESSAGE_TS)))
                 .status(EscalationStatus.valueOf(r.get(ESCALATION.STATUS).getLiteral()))
                 .team(r.get(ESCALATION.TEAM))
-                .source(r.get(ESCALATION.SOURCE))
+                .source(EscalationSource.valueOf(r.get(ESCALATION.SOURCE)))
                 .build();
     }
 

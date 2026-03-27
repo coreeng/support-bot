@@ -8,6 +8,7 @@ import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketQueryService;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,12 +33,9 @@ public class EscalationTestController {
         if (ticket == null) {
             return ResponseEntity.notFound().build();
         }
+        EscalationSource source = req.source() != null ? req.source() : EscalationSource.manual;
         Escalation escalation = Escalation.createNew(
-                        ticketId,
-                        req.team(),
-                        ImmutableList.copyOf(req.tags()),
-                        ticket.queryRef(),
-                        EscalationSource.MANUAL)
+                        ticketId, req.team(), ImmutableList.copyOf(req.tags()), ticket.queryRef(), source)
                 .toBuilder()
                 .createdMessageTs(MessageTs.of(req.createdMessageTs()))
                 .build();
@@ -46,5 +44,10 @@ public class EscalationTestController {
         return ResponseEntity.ok().build();
     }
 
-    public record EscalationToCreate(long ticketId, String team, String createdMessageTs, ImmutableList<String> tags) {}
+    public record EscalationToCreate(
+            long ticketId,
+            String team,
+            String createdMessageTs,
+            ImmutableList<String> tags,
+            @Nullable EscalationSource source) {}
 }

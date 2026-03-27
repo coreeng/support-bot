@@ -31,7 +31,7 @@ public class TicketEventsHandler {
                     .ticket(event.ticket())
                     .team(event.team())
                     .tags(event.tags())
-                    .source(EscalationSource.MANUAL)
+                    .source(EscalationSource.manual)
                     .build());
         } catch (Exception e) {
             log.atError()

@@ -215,7 +215,7 @@ public class MockDataGenerator implements ApplicationRunner {
                 escalationTeam.code(),
                 pickedTags.stream().map(Tag::code).collect(toImmutableList()),
                 ticket.queryRef(),
-                EscalationSource.MANUAL);
+                EscalationSource.manual);
         escalation = escalation.toBuilder()
                 .openedAt(escalationTs.getDate())
                 .createdMessageTs(createdMessageTs)

@@ -15,5 +15,5 @@ public class CreateEscalationRequest {
     private ImmutableList<String> tags = ImmutableList.of();
 
     @Builder.Default
-    private String source = EscalationSource.MANUAL;
+    private EscalationSource source = EscalationSource.manual;
 }

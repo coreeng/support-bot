@@ -35,10 +35,14 @@ public class Escalation {
     @Nullable private String team;
 
     @Builder.Default
-    private String source = EscalationSource.MANUAL;
+    private EscalationSource source = EscalationSource.manual;
 
     public static Escalation createNew(
-            TicketId ticketId, @Nullable String team, ImmutableList<String> tags, MessageRef queryRef, String source) {
+            TicketId ticketId,
+            @Nullable String team,
+            ImmutableList<String> tags,
+            MessageRef queryRef,
+            EscalationSource source) {
         checkNotNull(source, "escalation source must not be null");
         return Escalation.builder()
                 .ticketId(ticketId)
