@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.escalation;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
@@ -32,8 +34,12 @@ public class Escalation {
 
     @Nullable private String team;
 
+    @Builder.Default
+    private String source = EscalationSource.MANUAL;
+
     public static Escalation createNew(
-            TicketId ticketId, @Nullable String team, ImmutableList<String> tags, MessageRef queryRef) {
+            TicketId ticketId, @Nullable String team, ImmutableList<String> tags, MessageRef queryRef, String source) {
+        checkNotNull(source, "escalation source must not be null");
         return Escalation.builder()
                 .ticketId(ticketId)
                 .status(EscalationStatus.opened)
@@ -42,6 +48,7 @@ public class Escalation {
                 .tags(tags)
                 .channelId(queryRef.channelId())
                 .threadTs(queryRef.ts())
+                .source(source)
                 .build();
     }
 

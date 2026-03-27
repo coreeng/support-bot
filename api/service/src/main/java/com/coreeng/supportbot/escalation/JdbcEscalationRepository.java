@@ -56,7 +56,8 @@ public class JdbcEscalationRepository implements EscalationRepository {
                         ESCALATION.THREAD_TS,
                         ESCALATION.CREATED_MESSAGE_TS,
                         ESCALATION.STATUS,
-                        ESCALATION.TEAM)
+                        ESCALATION.TEAM,
+                        ESCALATION.SOURCE)
                 .values(
                         escalation.ticketId().id(),
                         escalation.channelId(),
@@ -66,7 +67,8 @@ public class JdbcEscalationRepository implements EscalationRepository {
                                 : null,
                         com.coreeng.supportbot.dbschema.enums.EscalationStatus.lookupLiteral(
                                 escalation.status().name()),
-                        escalation.team())
+                        escalation.team(),
+                        escalation.source())
                 .onConflict()
                 .doNothing()
                 .returning(ESCALATION.ID)
@@ -340,6 +342,7 @@ public class JdbcEscalationRepository implements EscalationRepository {
                 .createdMessageTs(MessageTs.ofOrNull(r.get(ESCALATION.CREATED_MESSAGE_TS)))
                 .status(EscalationStatus.valueOf(r.get(ESCALATION.STATUS).getLiteral()))
                 .team(r.get(ESCALATION.TEAM))
+                .source(r.get(ESCALATION.SOURCE))
                 .build();
     }
 
@@ -351,7 +354,8 @@ public class JdbcEscalationRepository implements EscalationRepository {
                 ESCALATION.THREAD_TS,
                 ESCALATION.CREATED_MESSAGE_TS,
                 ESCALATION.STATUS,
-                ESCALATION.TEAM);
+                ESCALATION.TEAM,
+                ESCALATION.SOURCE);
     }
 
     record Log(EscalationStatus event, Instant date) {}

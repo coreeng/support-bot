@@ -7,6 +7,7 @@ import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import com.coreeng.supportbot.escalation.CreateEscalationRequest;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
+import com.coreeng.supportbot.escalation.EscalationSource;
 import com.coreeng.supportbot.github.GitHubApiException;
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.github.GitHubPullRequest;
@@ -128,6 +129,7 @@ public class PrLifecyclePoller {
                 .ticket(ticket)
                 .team(record.owningTeam())
                 .tags(ImmutableList.of())
+                .source(EscalationSource.BOT)
                 .build());
 
         if (escalation == null || escalation.id() == null) {
