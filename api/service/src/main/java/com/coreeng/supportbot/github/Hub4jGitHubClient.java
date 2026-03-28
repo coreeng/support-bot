@@ -10,6 +10,8 @@ import org.kohsuke.github.GHPullRequestFileDetail;
 import org.kohsuke.github.GHPullRequestReview;
 import org.kohsuke.github.GHPullRequestReviewState;
 import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GHTeam;
+import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.HttpException;
 
@@ -120,6 +122,64 @@ public final class Hub4jGitHubClient implements GitHubClient {
             case DISMISSED -> GitHubPullRequestReview.ReviewState.DISMISSED;
             case PENDING -> GitHubPullRequestReview.ReviewState.PENDING;
         };
+    }
+
+    @Override
+    public List<String> resolveTeamReviewers(String org, String teamSlug) {
+        try {
+            return github.getOrganization(org).getTeamBySlug(teamSlug).listMembers().toList().stream()
+                    .map(GHUser::getLogin)
+                    .toList();
+        } catch (GHFileNotFoundException e) {
+            throw new GitHubApiException(404, "Team not found: %s/%s".formatted(org, teamSlug), e);
+        } catch (HttpException e) {
+            throw new GitHubApiException(
+                    e.getResponseCode(),
+                    "GitHub API %d listing team members for %s/%s".formatted(e.getResponseCode(), org, teamSlug),
+                    e);
+        } catch (IOException e) {
+            throw new GitHubApiException(
+                    0, "GitHub API call failed listing team members for %s/%s".formatted(org, teamSlug), e);
+        }
+    }
+
+    @Override
+    public List<String> resolveRequestedReviewers(String repositoryName, int pullNumber) {
+        try {
+            GHPullRequest pr = github.getRepository(repositoryName).getPullRequest(pullNumber);
+            List<GHTeam> requestedTeams = pr.getRequestedTeams();
+            if (requestedTeams == null || requestedTeams.isEmpty()) {
+                return List.of();
+            }
+            return requestedTeams.stream()
+                    .flatMap(team -> {
+                        try {
+                            return team.listMembers().toList().stream();
+                        } catch (IOException e) {
+                            throw new GitHubApiException(
+                                    0,
+                                    "GitHub API call failed listing members for requested team on %s#%d"
+                                            .formatted(repositoryName, pullNumber),
+                                    e);
+                        }
+                    })
+                    .map(GHUser::getLogin)
+                    .distinct()
+                    .toList();
+        } catch (GHFileNotFoundException e) {
+            throw new GitHubApiException(404, "PR not found: %s#%d".formatted(repositoryName, pullNumber), e);
+        } catch (HttpException e) {
+            throw new GitHubApiException(
+                    e.getResponseCode(),
+                    "GitHub API %d fetching requested teams for %s#%d"
+                            .formatted(e.getResponseCode(), repositoryName, pullNumber),
+                    e);
+        } catch (IOException e) {
+            throw new GitHubApiException(
+                    0,
+                    "GitHub API call failed fetching requested teams for %s#%d".formatted(repositoryName, pullNumber),
+                    e);
+        }
     }
 
     @Override

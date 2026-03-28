@@ -4,6 +4,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.escalation.CreateEscalationRequest;
@@ -13,6 +14,7 @@ import com.coreeng.supportbot.escalation.EscalationSource;
 import com.coreeng.supportbot.github.GitHubApiException;
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.github.GitHubPullRequest;
+import com.coreeng.supportbot.github.GitHubPullRequestReview;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.SlackId;
@@ -27,14 +29,19 @@ import com.coreeng.supportbot.ticket.TicketTeam;
 import com.coreeng.supportbot.ticket.TicketTeamSuggestionsService;
 import com.coreeng.supportbot.ticket.TicketTeamsSuggestion;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -78,6 +85,7 @@ public class PrDetectionService {
         boolean anyOpenTracked = false;
         boolean metadataInitialized = false;
         boolean baseReactionsAdded = false;
+        Map<String, @Nullable Set<String>> teamReviewerCache = new HashMap<>();
 
         for (DetectedPr pr : detectedPrs) {
             if (prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(
@@ -92,7 +100,7 @@ public class PrDetectionService {
             boolean canAutoCloseTicket = !event.messageRef().isReply();
             PerPrResult result;
             try {
-                result = processPr(pr, ticket, canAutoCloseTicket);
+                result = processPr(pr, ticket, canAutoCloseTicket, teamReviewerCache);
             } catch (Exception e) {
                 log.atError()
                         .setCause(e)
@@ -135,6 +143,7 @@ public class PrDetectionService {
         boolean anyOpenTracked = false;
         boolean metadataInitialized = false;
         boolean baseReactionsAdded = false;
+        Map<String, @Nullable Set<String>> teamReviewerCache = new HashMap<>();
 
         for (DetectedPr pr : detectedPrs) {
             try {
@@ -180,7 +189,8 @@ public class PrDetectionService {
                     continue;
                 }
 
-                PerPrResult result = processOpenPr(pr, checkNotNull(ticket), true, repoConfig, prMetadata);
+                PerPrResult result =
+                        processOpenPr(pr, checkNotNull(ticket), true, repoConfig, prMetadata, teamReviewerCache);
                 if (result == PerPrResult.TRACKED) {
                     if (!baseReactionsAdded) {
                         addReaction(slackTicketsProps.expectedInitialReaction(), ticket.queryTs(), ticket.channelId());
@@ -213,7 +223,11 @@ public class PrDetectionService {
         SKIPPED
     }
 
-    private PerPrResult processPr(DetectedPr detectedPr, Ticket ticket, boolean canAutoCloseTicket) {
+    private PerPrResult processPr(
+            DetectedPr detectedPr,
+            Ticket ticket,
+            boolean canAutoCloseTicket,
+            Map<String, @Nullable Set<String>> teamReviewerCache) {
         PrTrackingProps.Repository repoConfig = prTrackingProps.repositories().stream()
                 .filter(r -> r.name().equals(detectedPr.repositoryName()))
                 .findFirst()
@@ -241,7 +255,7 @@ public class PrDetectionService {
             return PerPrResult.SKIPPED;
         }
 
-        return processOpenPr(detectedPr, ticket, canAutoCloseTicket, repoConfig, prMetadata);
+        return processOpenPr(detectedPr, ticket, canAutoCloseTicket, repoConfig, prMetadata, teamReviewerCache);
     }
 
     private PerPrResult processOpenPr(
@@ -249,7 +263,8 @@ public class PrDetectionService {
             Ticket ticket,
             boolean canAutoCloseTicket,
             PrTrackingProps.Repository repoConfig,
-            GitHubPullRequest prMetadata) {
+            GitHubPullRequest prMetadata,
+            Map<String, @Nullable Set<String>> teamReviewerCache) {
 
         Duration sla;
         try {
@@ -300,9 +315,28 @@ public class PrDetectionService {
         String channelId = ticket.channelId();
         addReaction(prTrackingProps.prEmoji(), queryTs, channelId);
 
+        // Check review state so we start in the correct lifecycle state (with team filtering)
+        GitHubPullRequestReview latestVerdict = fetchLatestTeamVerdict(detectedPr, repoConfig, teamReviewerCache);
+
         if (Instant.now().isAfter(slaDeadline)) {
-            postSlaBreachReply(detectedPr, sla, queryTs, channelId);
-            escalateImmediately(tracking, ticket, repoConfig.owningTeam());
+            if (latestVerdict != null && latestVerdict.requestsChanges()) {
+                prTrackingRepository.pauseSla(tracking.id(), PrTrackingStatus.CHANGES_REQUESTED, Duration.ZERO);
+                postChangesRequestedReply(detectedPr, queryTs, channelId);
+            } else if (latestVerdict != null && latestVerdict.isApproved()) {
+                prTrackingRepository.pauseSla(tracking.id(), PrTrackingStatus.APPROVED, Duration.ZERO);
+                postApprovedReply(detectedPr, queryTs, channelId);
+            } else {
+                postSlaBreachReply(detectedPr, sla, queryTs, channelId);
+                escalateImmediately(tracking, ticket, repoConfig.owningTeam());
+            }
+        } else if (latestVerdict != null && latestVerdict.requestsChanges()) {
+            Duration remaining = clampNonNegative(Duration.between(Instant.now(), slaDeadline));
+            prTrackingRepository.pauseSla(tracking.id(), PrTrackingStatus.CHANGES_REQUESTED, remaining);
+            postChangesRequestedReply(detectedPr, queryTs, channelId);
+        } else if (latestVerdict != null && latestVerdict.isApproved()) {
+            Duration remaining = clampNonNegative(Duration.between(Instant.now(), slaDeadline));
+            prTrackingRepository.pauseSla(tracking.id(), PrTrackingStatus.APPROVED, remaining);
+            postApprovedReply(detectedPr, queryTs, channelId);
         } else {
             postSlaReply(detectedPr, sla, teamLabel, slaDeadline, queryTs, channelId);
         }
@@ -349,6 +383,90 @@ public class PrDetectionService {
         }
     }
 
+    private @Nullable GitHubPullRequestReview fetchLatestTeamVerdict(
+            DetectedPr pr,
+            PrTrackingProps.Repository repoConfig,
+            Map<String, @Nullable Set<String>> teamReviewerCache) {
+        List<GitHubPullRequestReview> reviews;
+        try {
+            reviews = gitHubClient.listReviews(pr.repositoryName(), pr.pullNumber());
+        } catch (GitHubApiException e) {
+            log.atWarn()
+                    .addArgument(pr::repositoryName)
+                    .addArgument(pr::pullNumber)
+                    .addArgument(e::getMessage)
+                    .log("Could not fetch reviews for PR {}#{}: {} — proceeding without review state");
+            return null;
+        }
+
+        List<GitHubPullRequestReview> teamReviews =
+                filterReviewsToOwningTeam(reviews, pr, repoConfig, teamReviewerCache);
+        return teamReviews.stream()
+                .filter(r -> r.isApproved() || r.requestsChanges())
+                .max(java.util.Comparator.comparing(GitHubPullRequestReview::submittedAt))
+                .orElse(null);
+    }
+
+    private List<GitHubPullRequestReview> filterReviewsToOwningTeam(
+            List<GitHubPullRequestReview> reviews,
+            DetectedPr pr,
+            PrTrackingProps.Repository repoConfig,
+            Map<String, @Nullable Set<String>> cache) {
+        if (repoConfig.githubTeamSlug() != null) {
+            String org = Iterables.get(Splitter.on('/').split(pr.repositoryName()), 0);
+            String teamSlug = repoConfig.githubTeamSlug();
+            String cacheKey = org + "/" + teamSlug;
+            Set<String> members = resolveCached(cacheKey, cache, () -> {
+                try {
+                    return Set.copyOf(gitHubClient.resolveTeamReviewers(org, teamSlug));
+                } catch (GitHubApiException e) {
+                    log.atWarn()
+                            .addArgument(repoConfig::githubTeamSlug)
+                            .addArgument(e::getMessage)
+                            .log("Could not resolve team reviewers for {} at detection — accepting all reviews: {}");
+                    return null;
+                }
+            });
+            if (members == null || members.isEmpty()) {
+                return reviews;
+            }
+            return reviews.stream().filter(r -> members.contains(r.userLogin())).toList();
+        }
+
+        // Tier 2: requested team reviewers on the PR (cached by repo#pr)
+        String cacheKey = "requested:" + pr.repositoryName() + "#" + pr.pullNumber();
+        Set<String> members = resolveCached(cacheKey, cache, () -> {
+            try {
+                List<String> requestedMembers =
+                        gitHubClient.resolveRequestedReviewers(pr.repositoryName(), pr.pullNumber());
+                return requestedMembers.isEmpty() ? Set.of() : Set.copyOf(requestedMembers);
+            } catch (GitHubApiException e) {
+                log.atWarn()
+                        .addArgument(pr::repositoryName)
+                        .addArgument(pr::pullNumber)
+                        .addArgument(e::getMessage)
+                        .log("Could not fetch requested teams for PR {}#{} at detection — accepting all reviews: {}");
+                return null;
+            }
+        });
+        if (members == null || members.isEmpty()) {
+            return reviews;
+        }
+        return reviews.stream().filter(r -> members.contains(r.userLogin())).toList();
+    }
+
+    private @Nullable Set<String> resolveCached(
+            String key,
+            Map<String, @Nullable Set<String>> cache,
+            java.util.function.Supplier<@Nullable Set<String>> loader) {
+        if (cache.containsKey(key)) {
+            return cache.get(key);
+        }
+        Set<String> result = loader.get();
+        cache.put(key, result);
+        return result;
+    }
+
     private void escalateImmediately(PrTrackingRecord tracking, Ticket ticket, String owningTeam) {
         log.atInfo()
                 .addArgument(tracking::githubRepo)
@@ -369,14 +487,42 @@ public class PrDetectionService {
                     .addArgument(() -> checkNotNull(ticket.id()).id())
                     .log(
                             "Escalation creation returned null for PR {}#{} on ticket {} — marking tracking ESCALATED to avoid reprocessing");
-            prTrackingRepository.updateStatus(
-                    tracking.id(), com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.ESCALATED, null, null);
+            prTrackingRepository.updateStatus(tracking.id(), PrTrackingStatus.ESCALATED, null, null);
             return;
         }
         Long escalationId = escalation.id().id();
-        prTrackingRepository.updateStatus(
-                tracking.id(), com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.ESCALATED, null, escalationId);
+        prTrackingRepository.updateStatus(tracking.id(), PrTrackingStatus.ESCALATED, null, escalationId);
         ticketSlackService.markTicketEscalated(ticket.queryRef());
+    }
+
+    private void postApprovedReply(DetectedPr pr, MessageTs queryTs, String channelId) {
+        String text = "PR `%s#%d` has been approved and is ready to merge. :white_check_mark:"
+                .formatted(pr.repositoryName(), pr.pullNumber());
+        try {
+            slackClient.postMessage(new SlackPostMessageRequest(
+                    SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
+        } catch (Exception e) {
+            log.atWarn()
+                    .setCause(e)
+                    .addArgument(pr::repositoryName)
+                    .addArgument(pr::pullNumber)
+                    .log("Failed to post approved message for PR {}#{}");
+        }
+    }
+
+    private void postChangesRequestedReply(DetectedPr pr, MessageTs queryTs, String channelId) {
+        String text = "PR `%s#%d` has been reviewed and changes have been requested. :eyes:"
+                .formatted(pr.repositoryName(), pr.pullNumber());
+        try {
+            slackClient.postMessage(new SlackPostMessageRequest(
+                    SimpleSlackMessage.builder().text(text).build(), channelId, queryTs));
+        } catch (Exception e) {
+            log.atWarn()
+                    .setCause(e)
+                    .addArgument(pr::repositoryName)
+                    .addArgument(pr::pullNumber)
+                    .log("Failed to post changes-requested message for PR {}#{}");
+        }
     }
 
     private void postSlaBreachReply(DetectedPr pr, Duration sla, MessageTs queryTs, String channelId) {
@@ -425,6 +571,10 @@ public class PrDetectionService {
                     .addArgument(queryTs::ts)
                     .log("Failed to post SLA reply for PR {}#{} in thread {}");
         }
+    }
+
+    private static Duration clampNonNegative(Duration duration) {
+        return duration.isNegative() ? Duration.ZERO : duration;
     }
 
     private void addReaction(String emoji, MessageTs queryTs, String channelId) {

@@ -169,6 +169,48 @@ class PrTrackingRecordTest {
     }
 
     @Test
+    void rejectsBothSlaDeadlineAndSlaRemainingSet() {
+        assertThatThrownBy(() -> new PrTrackingRecord(
+                        1L,
+                        1L,
+                        "org/repo",
+                        42,
+                        NOW,
+                        DEADLINE,
+                        "team",
+                        true,
+                        PrTrackingStatus.OPEN,
+                        null,
+                        null,
+                        SLA_REMAINING,
+                        LAST_REVIEW,
+                        LAST_AUTHOR_ACTIVITY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("slaDeadline and slaRemaining must not both be set");
+    }
+
+    @Test
+    void rejectsNegativeSlaRemaining() {
+        assertThatThrownBy(() -> new PrTrackingRecord(
+                        1L,
+                        1L,
+                        "org/repo",
+                        42,
+                        NOW,
+                        null,
+                        "team",
+                        true,
+                        PrTrackingStatus.CHANGES_REQUESTED,
+                        null,
+                        null,
+                        Duration.ofHours(-1),
+                        LAST_REVIEW,
+                        LAST_AUTHOR_ACTIVITY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("slaRemaining must not be negative");
+    }
+
+    @Test
     void storesLifecycleFieldsCorrectly() {
         var record = new PrTrackingRecord(
                 1L,

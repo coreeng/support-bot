@@ -102,9 +102,14 @@ The SLA clock pauses when the owning team is not the blocker and resumes when th
 
 ### 4. Approval Validation
 
-Only approvals from the owning team trigger ticket closure. An approval is considered valid if the approving user is a member of the configured owning team or is listed as a required reviewer / CODEOWNER for the changed files. Approvals from the PR author's own team or unrelated users are ignored for the purpose of ticket closure.
+Only approvals from the owning team trigger state transitions and ticket closure. Approvals from the PR author's own team or unrelated users are ignored.
 
-The validation mechanism (Teams API, requested reviewers, or CODEOWNERS) will be determined during implementation based on available GitHub permissions.
+Validation uses a two-tier resolution strategy:
+
+1. **Explicit team slug** — if `github-team-slug` is configured on the repository entry, the GitHub Teams API is used to resolve team members. This is the most reliable mechanism.
+2. **Requested team reviewers** — if no slug is configured, the bot checks which teams GitHub has requested as reviewers on the PR (auto-assigned via CODEOWNERS or branch protection). Members of those teams are considered the owning team.
+
+If neither tier resolves team members (no slug configured, no teams requested, or API failure), all reviews are accepted without team filtering. This ensures backward compatibility for teams without CODEOWNERS or branch protection.
 
 ### 5. Ticket Closure Conditions
 
@@ -122,14 +127,14 @@ A support ticket is closed when all active closable PR tracking records for that
 
 The existing `PrLifecyclePoller` is extended to evaluate the new states on each poll cycle. Merge/close detection takes priority over review state changes. Transition logic follows the state diagram in section 2.
 
+When a PR is first detected, the detection service fetches review state and sets the correct initial lifecycle status. If the owning team has already requested changes or approved, the record starts in `CHANGES_REQUESTED` or `APPROVED` rather than `OPEN`. Escalation only occurs at detection time when the SLA is breached **and** no actionable reviews exist.
+
 ### 7. Activity Tracking
 
 To support "last time the team interacted with a PR" and dashboard reporting, the bot tracks key activity timestamps on each PR tracking record:
 
-- `last_review_at` — timestamp of the most recent review from the owning team (approval, changes requested, or comment).
-- `last_author_activity_at` — timestamp of the most recent push or comment from the PR author.
-
-These are updated on each poll cycle from GitHub API data.
+- `last_review_at` — timestamp of the most recent review from the owning team (approval, changes requested, or comment). Updated on each poll cycle from GitHub review data.
+- `last_author_activity_at` — timestamp of the most recent push or comment from the PR author. Provisioned in the schema for future use; not yet populated (requires commit or event data not currently fetched).
 
 ### 8. Schema Changes
 
@@ -149,10 +154,10 @@ The current model tracks one owning team per PR. Multi-team review tracking will
 
 ---
 
-## Open Questions
+## Resolved Questions
 
-- **SLA resume vs. reset**: Should the SLA clock resume with remaining time or reset to a fresh duration when transitioning back to `OPEN`? This ADR proposes resuming remaining time (see Options Considered), but this should be confirmed during review.
-- **Approval validation mechanism**: The specific approach for verifying owning-team membership (Teams API, requested reviewers, CODEOWNERS) depends on available GitHub API permissions and will be determined during implementation.
+- **SLA resume vs. reset**: Resolved — the SLA clock resumes with remaining time (not reset).
+- **Approval validation mechanism**: Resolved — two-tier strategy: explicit `github-team-slug` config, then GitHub requested team reviewers. See section 4.
 
 ---
 

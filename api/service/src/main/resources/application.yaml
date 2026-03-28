@@ -116,6 +116,7 @@ pr-review-tracking:
   # Example repository entry:
   #   - name: my-org/my-repo
   #     owning-team: <team-code from enums.escalation-teams>
+  #     github-team-slug: <slug>  # optional: GitHub team slug for review validation; when absent, falls back to PR requested teams
   #     sla:
   #       file: ".pr-sla.yaml"  # optional: read SLA from this file in the repo
   #       default: 48h          # default SLA duration (required when file is not configured)

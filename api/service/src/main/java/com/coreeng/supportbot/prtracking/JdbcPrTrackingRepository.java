@@ -12,7 +12,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jooq.DSLContext;
+import org.jooq.types.DayToSecond;
+import org.jooq.types.YearToMonth;
 import org.jooq.types.YearToSecond;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
@@ -21,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class JdbcPrTrackingRepository implements PrTrackingRepository {
 
     private final DSLContext dsl;
@@ -67,10 +71,30 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     @Override
     public PrTrackingRecord updateStatus(
             long id, PrTrackingStatus newStatus, @Nullable Instant closedAt, @Nullable Long escalationId) {
-        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.update(PR_TRACKING)
+        var query = dsl.update(PR_TRACKING)
                 .set(PR_TRACKING.STATUS, newStatus)
                 .set(PR_TRACKING.CLOSED_AT, closedAt)
-                .set(PR_TRACKING.ESCALATION_ID, escalationId)
+                .set(PR_TRACKING.ESCALATION_ID, escalationId);
+        if (newStatus == PrTrackingStatus.CLOSED) {
+            query = query.setNull(PR_TRACKING.SLA_DEADLINE).setNull(PR_TRACKING.SLA_REMAINING);
+        }
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = query.where(PR_TRACKING.ID.eq(id))
+                .returning()
+                .fetchOptional()
+                .orElseThrow(() -> new IllegalStateException("PR tracking record not found for id " + id));
+        return toRecord(row);
+    }
+
+    @Override
+    public PrTrackingRecord pauseSla(long id, PrTrackingStatus newStatus, Duration remaining) {
+        if (newStatus != PrTrackingStatus.CHANGES_REQUESTED && newStatus != PrTrackingStatus.APPROVED) {
+            throw new IllegalArgumentException(
+                    "pauseSla only supports CHANGES_REQUESTED or APPROVED, got: " + newStatus);
+        }
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.update(PR_TRACKING)
+                .set(PR_TRACKING.STATUS, newStatus)
+                .set(PR_TRACKING.SLA_REMAINING, toInterval(remaining))
+                .setNull(PR_TRACKING.SLA_DEADLINE)
                 .where(PR_TRACKING.ID.eq(id))
                 .returning()
                 .fetchOptional()
@@ -78,19 +102,17 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
         return toRecord(row);
     }
 
-    @Transactional(readOnly = true)
     @Override
-    public boolean hasAnyActiveForTicket(long ticketId) {
-        return dsl.fetchExists(
-                PR_TRACKING,
-                PR_TRACKING
-                        .TICKET_ID
-                        .eq(ticketId)
-                        .and(PR_TRACKING.STATUS.in(
-                                PrTrackingStatus.OPEN,
-                                PrTrackingStatus.ESCALATED,
-                                PrTrackingStatus.CHANGES_REQUESTED,
-                                PrTrackingStatus.APPROVED)));
+    public PrTrackingRecord resumeSla(long id, Instant newDeadline) {
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.update(PR_TRACKING)
+                .set(PR_TRACKING.STATUS, PrTrackingStatus.OPEN)
+                .set(PR_TRACKING.SLA_DEADLINE, newDeadline)
+                .setNull(PR_TRACKING.SLA_REMAINING)
+                .where(PR_TRACKING.ID.eq(id))
+                .returning()
+                .fetchOptional()
+                .orElseThrow(() -> new IllegalStateException("PR tracking record not found for id " + id));
+        return toRecord(row);
     }
 
     @Transactional(readOnly = true)
@@ -107,6 +129,19 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                                 PrTrackingStatus.ESCALATED,
                                 PrTrackingStatus.CHANGES_REQUESTED,
                                 PrTrackingStatus.APPROVED)));
+    }
+
+    @Override
+    public void updateActivityTimestamps(
+            long id, @Nullable Instant lastReviewAt, @Nullable Instant lastAuthorActivityAt) {
+        int updated = dsl.update(PR_TRACKING)
+                .set(PR_TRACKING.LAST_REVIEW_AT, lastReviewAt)
+                .set(PR_TRACKING.LAST_AUTHOR_ACTIVITY_AT, lastAuthorActivityAt)
+                .where(PR_TRACKING.ID.eq(id))
+                .execute();
+        if (updated == 0) {
+            log.atWarn().addArgument(id).log("updateActivityTimestamps affected 0 rows for record {}");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -226,6 +261,15 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
             binds.add(dateTo);
         }
         return sb.toString();
+    }
+
+    private static YearToSecond toInterval(Duration duration) {
+        long totalSeconds = duration.getSeconds();
+        int days = (int) (totalSeconds / 86400);
+        int hours = (int) ((totalSeconds % 86400) / 3600);
+        int minutes = (int) ((totalSeconds % 3600) / 60);
+        int seconds = (int) (totalSeconds % 60);
+        return new YearToSecond(new YearToMonth(0), new DayToSecond(days, hours, minutes, seconds, duration.getNano()));
     }
 
     private static PrTrackingRecord toRecord(com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row) {

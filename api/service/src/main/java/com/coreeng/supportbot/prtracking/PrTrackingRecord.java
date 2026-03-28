@@ -33,5 +33,11 @@ public record PrTrackingRecord(
         if (status == PrTrackingStatus.CLOSED && closedAt == null) {
             throw new IllegalArgumentException("closedAt must not be null when status is CLOSED");
         }
+        if (slaDeadline != null && slaRemaining != null) {
+            throw new IllegalArgumentException("slaDeadline and slaRemaining must not both be set");
+        }
+        if (slaRemaining != null && slaRemaining.isNegative()) {
+            throw new IllegalArgumentException("slaRemaining must not be negative");
+        }
     }
 }

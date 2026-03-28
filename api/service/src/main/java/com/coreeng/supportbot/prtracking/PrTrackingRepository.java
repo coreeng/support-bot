@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.prtracking;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -18,14 +19,24 @@ public interface PrTrackingRepository {
     PrTrackingRecord updateStatus(
             long id, PrTrackingStatus newStatus, @Nullable Instant closedAt, @Nullable Long escalationId);
 
-    /** Returns true if any OPEN, ESCALATED, CHANGES_REQUESTED, or APPROVED record still exists for this ticket. */
-    boolean hasAnyActiveForTicket(long ticketId);
+    /** Pauses the SLA clock, storing the remaining duration and nulling the deadline. */
+    PrTrackingRecord pauseSla(long id, PrTrackingStatus newStatus, Duration remaining);
+
+    /** Resumes the SLA clock with a new deadline, nulling the remaining duration and setting status to OPEN. */
+    PrTrackingRecord resumeSla(long id, Instant newDeadline);
 
     /**
      * Returns true if any OPEN, ESCALATED, CHANGES_REQUESTED, or APPROVED record that can auto-close ticket still
      * exists for this ticket.
      */
     boolean hasAnyActiveClosableForTicket(long ticketId);
+
+    /**
+     * Updates activity timestamps. Both columns are always written (including nulls), so callers must pass the
+     * current value for any field they do not wish to change. Note: lastAuthorActivityAt is not yet populated by
+     * any caller.
+     */
+    void updateActivityTimestamps(long id, @Nullable Instant lastReviewAt, @Nullable Instant lastAuthorActivityAt);
 
     boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, String githubRepo, int prNumber);
 
