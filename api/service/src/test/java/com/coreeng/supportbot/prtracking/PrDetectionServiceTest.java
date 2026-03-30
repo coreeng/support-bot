@@ -28,6 +28,7 @@ import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -1348,6 +1349,177 @@ class PrDetectionServiceTest {
             // then
             verify(slackClient).postMessage(postMessageCaptor.capture());
             assertThat(postMessageCaptor.getValue().message().getText()).contains("unknown-team");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // handleQueryMessagePosted — lazy ticket creation
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class HandleQueryMessagePosted {
+
+        @BeforeEach
+        void setUpStubs() {
+            lenient().when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            lenient()
+                    .when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
+            lenient()
+                    .when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
+                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void tracksOpenPrAndCreatesTicketViaSupplier() {
+            // given
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+
+            Supplier<Ticket> supplier = mock(Supplier.class);
+            when(supplier.get()).thenReturn(ticketWithId(100L));
+
+            // when
+            PrDetectionOutcome outcome = service.handleQueryMessagePosted(messagePostedWith("msg"), supplier);
+
+            // then
+            verify(supplier).get();
+            verify(prTrackingRepository).insertIfAbsent(any());
+            verify(slackClient).postMessage(any());
+            assertThat(outcome.shouldCloseTicket()).isFalse();
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void doesNotCreateTicketWhenAllPrsClosed() {
+            // given
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(5));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.MERGED,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+
+            Supplier<Ticket> supplier = mock(Supplier.class);
+
+            // when
+            service.handleQueryMessagePosted(messagePostedWith("msg"), supplier);
+
+            // then
+            verify(supplier, never()).get();
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void doesNotCreateTicketWhenPrFetchFails() {
+            // given
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenThrow(new GitHubApiException(404, "PR not found: " + REPO + "#" + PR_NUMBER));
+
+            Supplier<Ticket> supplier = mock(Supplier.class);
+
+            // when
+            service.handleQueryMessagePosted(messagePostedWith("msg"), supplier);
+
+            // then
+            verify(supplier, never()).get();
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void skipsAlreadyTrackedPr() {
+            // given
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(100L, REPO, PR_NUMBER))
+                    .thenReturn(true);
+
+            Supplier<Ticket> supplier = mock(Supplier.class);
+            when(supplier.get()).thenReturn(ticketWithId(100L));
+
+            // when
+            service.handleQueryMessagePosted(messagePostedWith("msg"), supplier);
+
+            // then
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).postMessage(any());
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void supplierCalledOnlyOnce() {
+            // given — two open PRs, supplier should be called exactly once
+            String repoB = "my-org/other-repo";
+            int prB = 99;
+            Instant createdAt = Instant.now().minus(Duration.ofHours(1));
+
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(
+                            new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H)),
+                            new PrTrackingProps.Repository(repoB, TEAM_CODE, null, sla(SLA_24H))));
+            when(prUrlParser.parse(any()))
+                    .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(repoB, prB)));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.getPullRequest(repoB, prB))
+                    .thenReturn(new GitHubPullRequest(
+                            repoB, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(1L, createdAt, createdAt.plus(SLA_24H)))
+                    .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
+
+            Supplier<Ticket> supplier = mock(Supplier.class);
+            when(supplier.get()).thenReturn(ticketWithId(100L));
+
+            // when
+            service.handleQueryMessagePosted(messagePostedWith("two PRs"), supplier);
+
+            // then
+            verify(supplier, times(1)).get();
         }
     }
 
