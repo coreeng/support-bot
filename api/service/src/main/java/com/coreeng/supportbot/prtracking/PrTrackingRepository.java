@@ -31,11 +31,7 @@ public interface PrTrackingRepository {
      */
     boolean hasAnyActiveClosableForTicket(long ticketId);
 
-    /**
-     * Updates activity timestamps. Both columns are always written (including nulls), so callers must pass the
-     * current value for any field they do not wish to change. Note: lastAuthorActivityAt is not yet populated by
-     * any caller.
-     */
+    /** Updates activity timestamps on a tracking record. */
     void updateActivityTimestamps(long id, @Nullable Instant lastReviewAt, @Nullable Instant lastAuthorActivityAt);
 
     boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, String githubRepo, int prNumber);

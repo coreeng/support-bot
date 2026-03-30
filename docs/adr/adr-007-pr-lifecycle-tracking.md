@@ -104,12 +104,12 @@ The SLA clock pauses when the owning team is not the blocker and resumes when th
 
 Only approvals from the owning team trigger state transitions and ticket closure. Approvals from the PR author's own team or unrelated users are ignored.
 
-Validation uses a two-tier resolution strategy:
+Validation uses a two-step resolution strategy:
 
 1. **Explicit team slug** — if `github-team-slug` is configured on the repository entry, the GitHub Teams API is used to resolve team members. This is the most reliable mechanism.
 2. **Requested team reviewers** — if no slug is configured, the bot checks which teams GitHub has requested as reviewers on the PR (auto-assigned via CODEOWNERS or branch protection). Members of those teams are considered the owning team.
 
-If neither tier resolves team members (no slug configured, no teams requested, or API failure), all reviews are accepted without team filtering. This ensures backward compatibility for teams without CODEOWNERS or branch protection.
+If neither step resolves team members (no slug configured, no teams requested, or API failure), all reviews are accepted without team filtering. This ensures backward compatibility for teams without CODEOWNERS or branch protection.
 
 ### 5. Ticket Closure Conditions
 
@@ -157,7 +157,7 @@ The current model tracks one owning team per PR. Multi-team review tracking will
 ## Resolved Questions
 
 - **SLA resume vs. reset**: Resolved — the SLA clock resumes with remaining time (not reset).
-- **Approval validation mechanism**: Resolved — two-tier strategy: explicit `github-team-slug` config, then GitHub requested team reviewers. See section 4.
+- **Approval validation mechanism**: Resolved — explicit `github-team-slug` config, then GitHub requested team reviewers. See section 4.
 
 ---
 

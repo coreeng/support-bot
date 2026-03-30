@@ -160,9 +160,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     @Override
     public List<RepoInsights> getInsightsByRepo(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
         List<Object> binds = new ArrayList<>();
-        binds.add(EscalationSource.bot.name());
-        binds.add(EscalationSource.manual.name());
-        String dateFilter = buildDateFilter(dateFrom, dateTo, "pr_created_at", binds);
+        String dateFilter = buildDateFilter(dateFrom, dateTo, binds);
         String sql = """
                 SELECT
                     github_repo,
@@ -250,14 +248,14 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     }
 
     private static String buildDateFilter(
-            @Nullable LocalDate dateFrom, @Nullable LocalDate dateTo, String column, List<Object> binds) {
+            @Nullable LocalDate dateFrom, @Nullable LocalDate dateTo, List<Object> binds) {
         StringBuilder sb = new StringBuilder();
         if (dateFrom != null) {
-            sb.append("AND ").append(column).append("::date >= ?::date ");
+            sb.append("AND pr_created_at::date >= ?::date ");
             binds.add(dateFrom);
         }
         if (dateTo != null) {
-            sb.append("AND ").append(column).append("::date <= ?::date ");
+            sb.append("AND pr_created_at::date <= ?::date ");
             binds.add(dateTo);
         }
         return sb.toString();

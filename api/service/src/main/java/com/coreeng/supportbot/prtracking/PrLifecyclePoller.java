@@ -91,19 +91,7 @@ public class PrLifecyclePoller {
             return;
         }
 
-        List<GitHubPullRequestReview> reviews;
-        try {
-            reviews = gitHubClient.listReviews(record.githubRepo(), record.prNumber());
-        } catch (GitHubApiException e) {
-            log.atWarn()
-                    .addArgument(record::githubRepo)
-                    .addArgument(record::prNumber)
-                    .addArgument(e::getMessage)
-                    .log("Could not fetch reviews for PR {}#{}: {}");
-            return;
-        }
-
-        List<GitHubPullRequestReview> teamReviews = filterToOwningTeam(record, reviews, teamMemberCache);
+        List<GitHubPullRequestReview> teamReviews = filterToOwningTeam(record, pr, pr.reviews(), teamMemberCache);
         GitHubPullRequestReview latestVerdict = findLatestActionableReview(teamReviews);
 
         switch (record.status()) {
@@ -118,8 +106,11 @@ public class PrLifecyclePoller {
     }
 
     private List<GitHubPullRequestReview> filterToOwningTeam(
-            PrTrackingRecord record, List<GitHubPullRequestReview> reviews, Map<String, @Nullable Set<String>> cache) {
-        Set<String> teamMembers = resolveOwningTeamMembers(record, cache);
+            PrTrackingRecord record,
+            GitHubPullRequest pr,
+            List<GitHubPullRequestReview> reviews,
+            Map<String, @Nullable Set<String>> cache) {
+        Set<String> teamMembers = resolveOwningTeamMembers(record, pr, cache);
 
         if (teamMembers == null || teamMembers.isEmpty()) {
             return reviews;
@@ -129,36 +120,18 @@ public class PrLifecyclePoller {
     }
 
     private @Nullable Set<String> resolveOwningTeamMembers(
-            PrTrackingRecord record, Map<String, @Nullable Set<String>> cache) {
-        // Tier 1: explicit GitHub team slug in config
+            PrTrackingRecord record, GitHubPullRequest pr, Map<String, @Nullable Set<String>> cache) {
+        // Explicit team slug configured — use Teams API
         PrTrackingProps.Repository repoConfig = findRepoConfig(record.githubRepo());
         if (repoConfig != null && repoConfig.githubTeamSlug() != null) {
             String org = Iterables.get(Splitter.on('/').split(record.githubRepo()), 0);
             return resolveTeamReviewers(org, repoConfig.githubTeamSlug(), cache);
         }
 
-        // Tier 2: requested team reviewers on the PR.
-        // If neither tier resolves members (empty = no teams requested, null = API failure),
-        // all reviews are accepted without filtering.
-        String cacheKey = "requested:" + record.githubRepo() + "#" + record.prNumber();
-        if (cache.containsKey(cacheKey)) {
-            return cache.get(cacheKey);
-        }
-        try {
-            List<String> requestedMembers =
-                    gitHubClient.resolveRequestedReviewers(record.githubRepo(), record.prNumber());
-            Set<String> members = requestedMembers.isEmpty() ? Set.of() : Set.copyOf(requestedMembers);
-            cache.put(cacheKey, members);
-            return members;
-        } catch (GitHubApiException e) {
-            log.atWarn()
-                    .addArgument(record::githubRepo)
-                    .addArgument(record::prNumber)
-                    .addArgument(e::getMessage)
-                    .log("Could not fetch requested teams for PR {}#{} — skipping team validation: {}");
-            cache.put(cacheKey, null);
-            return null;
-        }
+        // No slug — use requested team reviewers already fetched with the PR.
+        // If empty (no teams requested), all reviews are accepted without filtering.
+        List<String> requestedMembers = pr.requestedTeamReviewerLogins();
+        return requestedMembers.isEmpty() ? Set.of() : Set.copyOf(requestedMembers);
     }
 
     private @Nullable Set<String> resolveTeamReviewers(
@@ -195,7 +168,7 @@ public class PrLifecyclePoller {
                 .orElse(null);
     }
 
-    // OPEN → CHANGES_REQUESTED | APPROVED | CLOSED (approved+mergeable) | ESCALATED (SLA breach) | no-op
+    // OPEN → CHANGES_REQUESTED | APPROVED | CLOSED (via approved+mergeable) | ESCALATED (SLA breach) | no-op
     private void processOpenRecord(
             PrTrackingRecord record, GitHubPullRequest pr, @Nullable GitHubPullRequestReview latestVerdict) {
         if (latestVerdict != null && latestVerdict.requestsChanges()) {
@@ -222,7 +195,7 @@ public class PrLifecyclePoller {
         }
     }
 
-    // APPROVED → CLOSED (mergeable) | CHANGES_REQUESTED (re-review) | no-op (awaiting merge)
+    // APPROVED → CLOSED (mergeable, checked first) | CHANGES_REQUESTED (re-review, only if not mergeable) | no-op
     private void processApprovedRecord(
             PrTrackingRecord record, GitHubPullRequest pr, @Nullable GitHubPullRequestReview latestVerdict) {
         if (pr.isMergeable()) {
@@ -254,7 +227,7 @@ public class PrLifecyclePoller {
         }
     }
 
-    // Called from OPEN and CHANGES_REQUESTED — pauses SLA when OPEN, just updates status otherwise
+    // Called from OPEN and CHANGES_REQUESTED. Closes if mergeable; pauses SLA when OPEN; updates status otherwise.
     private void handleApproval(PrTrackingRecord record, GitHubPullRequest pr) {
         if (pr.isMergeable()) {
             handleApprovalClosure(record);

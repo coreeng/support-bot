@@ -14,8 +14,11 @@ import org.kohsuke.github.GHTeam;
 import org.kohsuke.github.GHUser;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.HttpException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Hub4jGitHubClient implements GitHubClient {
+    private static final Logger log = LoggerFactory.getLogger(Hub4jGitHubClient.class);
     private final GitHub github;
 
     public Hub4jGitHubClient(GitHub github) {
@@ -62,28 +65,6 @@ public final class Hub4jGitHubClient implements GitHubClient {
         } catch (IOException e) {
             throw new GitHubApiException(
                     0, "GitHub API call failed listing files for %s#%d".formatted(repositoryName, pullNumber), e);
-        }
-    }
-
-    @Override
-    public List<GitHubPullRequestReview> listReviews(String repositoryName, int pullNumber) {
-        try {
-            GHPullRequest pr = github.getRepository(repositoryName).getPullRequest(pullNumber);
-            return pr.listReviews().toList().stream()
-                    .filter(review -> review.getState() != GHPullRequestReviewState.PENDING)
-                    .map(review -> mapReview(review, repositoryName, pullNumber))
-                    .toList();
-        } catch (GHFileNotFoundException e) {
-            throw new GitHubApiException(404, "PR not found: %s#%d".formatted(repositoryName, pullNumber), e);
-        } catch (HttpException e) {
-            throw new GitHubApiException(
-                    e.getResponseCode(),
-                    "GitHub API %d listing reviews for %s#%d"
-                            .formatted(e.getResponseCode(), repositoryName, pullNumber),
-                    e);
-        } catch (IOException e) {
-            throw new GitHubApiException(
-                    0, "GitHub API call failed listing reviews for %s#%d".formatted(repositoryName, pullNumber), e);
         }
     }
 
@@ -143,43 +124,34 @@ public final class Hub4jGitHubClient implements GitHubClient {
         }
     }
 
-    @Override
-    public List<String> resolveRequestedReviewers(String repositoryName, int pullNumber) {
+    private List<String> resolveRequestedTeamMembers(GHPullRequest pr, String repositoryName, int pullNumber) {
+        List<GHTeam> requestedTeams;
         try {
-            GHPullRequest pr = github.getRepository(repositoryName).getPullRequest(pullNumber);
-            List<GHTeam> requestedTeams = pr.getRequestedTeams();
-            if (requestedTeams == null || requestedTeams.isEmpty()) {
-                return List.of();
-            }
-            return requestedTeams.stream()
-                    .flatMap(team -> {
-                        try {
-                            return team.listMembers().toList().stream();
-                        } catch (IOException e) {
-                            throw new GitHubApiException(
-                                    0,
-                                    "GitHub API call failed listing members for requested team on %s#%d"
-                                            .formatted(repositoryName, pullNumber),
-                                    e);
-                        }
-                    })
-                    .map(GHUser::getLogin)
-                    .distinct()
-                    .toList();
-        } catch (GHFileNotFoundException e) {
-            throw new GitHubApiException(404, "PR not found: %s#%d".formatted(repositoryName, pullNumber), e);
-        } catch (HttpException e) {
-            throw new GitHubApiException(
-                    e.getResponseCode(),
-                    "GitHub API %d fetching requested teams for %s#%d"
-                            .formatted(e.getResponseCode(), repositoryName, pullNumber),
-                    e);
+            requestedTeams = pr.getRequestedTeams();
         } catch (IOException e) {
             throw new GitHubApiException(
                     0,
                     "GitHub API call failed fetching requested teams for %s#%d".formatted(repositoryName, pullNumber),
                     e);
         }
+        if (requestedTeams == null || requestedTeams.isEmpty()) {
+            return List.of();
+        }
+        return requestedTeams.stream()
+                .flatMap(team -> {
+                    try {
+                        return team.listMembers().toList().stream();
+                    } catch (IOException e) {
+                        throw new GitHubApiException(
+                                0,
+                                "GitHub API call failed listing members for requested team on %s#%d"
+                                        .formatted(repositoryName, pullNumber),
+                                e);
+                    }
+                })
+                .map(GHUser::getLogin)
+                .distinct()
+                .toList();
     }
 
     @Override
@@ -212,8 +184,41 @@ public final class Hub4jGitHubClient implements GitHubClient {
             }
             Boolean mergeable = pr.getMergeable();
             String mergeableState = pr.getMergeableState();
+            List<String> requestedTeamReviewerLogins;
+            try {
+                requestedTeamReviewerLogins = resolveRequestedTeamMembers(pr, repositoryName, pullNumber);
+            } catch (GitHubApiException e) {
+                log.atWarn()
+                        .setCause(e)
+                        .addArgument(() -> repositoryName)
+                        .addArgument(() -> pullNumber)
+                        .log(
+                                "Failed to resolve requested team members for {}#{} — team filtering disabled for this PR");
+                requestedTeamReviewerLogins = List.of();
+            }
+            List<GitHubPullRequestReview> reviews;
+            try {
+                reviews = pr.listReviews().toList().stream()
+                        .filter(review -> review.getState() != GHPullRequestReviewState.PENDING)
+                        .map(review -> mapReview(review, repositoryName, pullNumber))
+                        .toList();
+            } catch (IOException e) {
+                log.atWarn()
+                        .setCause(e)
+                        .addArgument(() -> repositoryName)
+                        .addArgument(() -> pullNumber)
+                        .log("Failed to fetch reviews for {}#{} — proceeding without review data");
+                reviews = List.of();
+            }
             return new GitHubPullRequest(
-                    repositoryName, pullNumber, createdAt.toInstant(), prState, mergeable, mergeableState);
+                    repositoryName,
+                    pullNumber,
+                    createdAt.toInstant(),
+                    prState,
+                    mergeable,
+                    mergeableState,
+                    requestedTeamReviewerLogins,
+                    reviews);
         } catch (IllegalArgumentException e) {
             throw new GitHubApiException(
                     0, "Invalid repository name '%s': %s".formatted(repositoryName, e.getMessage()), e);
