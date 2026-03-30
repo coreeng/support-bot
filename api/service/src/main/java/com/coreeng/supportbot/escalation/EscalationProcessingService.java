@@ -30,7 +30,7 @@ public class EscalationProcessingService {
     @Nullable public Escalation createEscalation(CreateEscalationRequest request) {
         TicketId ticketId = checkNotNull(request.ticket().id());
         Escalation escalation = repository.createIfNotExists(Escalation.createNew(
-                ticketId, request.team(), request.tags(), request.ticket().queryRef()));
+                ticketId, request.team(), request.tags(), request.ticket().queryRef(), request.source()));
         if (escalation == null || escalation.id() == null) {
             log.warn("Escalation already exists");
             return escalation;

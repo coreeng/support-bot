@@ -5,6 +5,7 @@ import static com.coreeng.supportbot.util.JooqUtils.nullToZero;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
+import com.coreeng.supportbot.escalation.EscalationSource;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -147,6 +148,40 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                         nullToZero(r.get("p50", Double.class)),
                         nullToZero(r.get("p90", Double.class)),
                         nullToZero(r.get("p99", Double.class))));
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public EscalationBreakdown getEscalationBreakdown(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
+        List<Object> binds = new ArrayList<>();
+        binds.add(EscalationSource.bot.name());
+        binds.add(EscalationSource.manual.name());
+        String dateFilter = buildDateFilter(dateFrom, dateTo, "pr_created_at", binds);
+        String sql = """
+                SELECT
+                    COUNT(DISTINCT ticket_id) AS total_pr_tickets,
+                    COUNT(DISTINCT ticket_id) FILTER (
+                        WHERE EXISTS (
+                            SELECT 1 FROM escalation e
+                            WHERE e.ticket_id = pt.ticket_id AND e.source = ?
+                        )
+                    ) AS bot_escalated_tickets,
+                    COUNT(DISTINCT ticket_id) FILTER (
+                        WHERE EXISTS (
+                            SELECT 1 FROM escalation e
+                            WHERE e.ticket_id = pt.ticket_id AND e.source = ?
+                        )
+                    ) AS manually_escalated_tickets
+                FROM pr_tracking pt
+                WHERE 1=1
+                  %s
+                """.formatted(dateFilter);
+
+        return checkNotNull(dsl.resultQuery(sql, binds.toArray())
+                .fetchOne(r -> new EscalationBreakdown(
+                        r.get("total_pr_tickets", Long.class),
+                        r.get("bot_escalated_tickets", Long.class),
+                        r.get("manually_escalated_tickets", Long.class))));
     }
 
     private static String buildDateFilter(

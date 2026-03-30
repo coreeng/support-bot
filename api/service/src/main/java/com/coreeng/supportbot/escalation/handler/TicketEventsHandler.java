@@ -2,6 +2,7 @@ package com.coreeng.supportbot.escalation.handler;
 
 import com.coreeng.supportbot.escalation.CreateEscalationRequest;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
+import com.coreeng.supportbot.escalation.EscalationSource;
 import com.coreeng.supportbot.ticket.TicketEscalated;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketStatusChanged;
@@ -30,6 +31,7 @@ public class TicketEventsHandler {
                     .ticket(event.ticket())
                     .team(event.team())
                     .tags(event.tags())
+                    .source(EscalationSource.manual)
                     .build());
         } catch (Exception e) {
             log.atError()
