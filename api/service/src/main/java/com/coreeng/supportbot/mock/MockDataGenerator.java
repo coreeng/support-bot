@@ -14,6 +14,7 @@ import com.coreeng.supportbot.enums.TagsRegistry;
 import com.coreeng.supportbot.enums.TicketImpact;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationRepository;
+import com.coreeng.supportbot.escalation.EscalationSource;
 import com.coreeng.supportbot.escalation.EscalationStatus;
 import com.coreeng.supportbot.sentiment.SentimentRepository;
 import com.coreeng.supportbot.sentiment.TicketSentimentResults;
@@ -213,7 +214,8 @@ public class MockDataGenerator implements ApplicationRunner {
                 checkNotNull(ticket.id()),
                 escalationTeam.code(),
                 pickedTags.stream().map(Tag::code).collect(toImmutableList()),
-                ticket.queryRef());
+                ticket.queryRef(),
+                EscalationSource.manual);
         escalation = escalation.toBuilder()
                 .openedAt(escalationTs.getDate())
                 .createdMessageTs(createdMessageTs)

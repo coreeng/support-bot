@@ -13,4 +13,7 @@ public class CreateEscalationRequest {
 
     @Builder.Default
     private ImmutableList<String> tags = ImmutableList.of();
+
+    @Builder.Default
+    private EscalationSource source = EscalationSource.manual;
 }

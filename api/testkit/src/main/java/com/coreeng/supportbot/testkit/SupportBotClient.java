@@ -295,6 +295,8 @@ public class SupportBotClient {
         private String team;
         private MessageTs createdMessageTs;
         private ImmutableList<@NonNull String> tags;
+
+        @Nullable private String source;
     }
 
     @Builder
