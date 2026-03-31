@@ -343,3 +343,15 @@ monitoring-deploy: ## Deploy monitoring stack (Prometheus + Grafana) for support
 	helm upgrade --install support-bot-dashboard ./api/k8s/dashboard \
 	  $(if $(DRY_RUN),--dry-run --debug,)
 
+##@ Dex module lifecycle (implemented in dex/Makefile)
+
+.PHONY: dex-template dex-deploy-integration dex-deploy-prod
+dex-template: ## Validate Dex values by rendering core-platform-app chart
+	@$(MAKE) -C dex template
+
+dex-deploy-integration: ## Deploy Dex module to integration environment
+	@$(MAKE) -C dex deploy-integration
+
+dex-deploy-prod: ## Deploy Dex module to production environment
+	@$(MAKE) -C dex deploy-prod
+

@@ -64,3 +64,23 @@ Ensure Dex redirect URI list includes:
 - `https://<your-api-domain>/login/oauth2/code/dex`
 
 The issuer URL must match ingress host/path exactly.
+
+## Stage 1 lifecycle
+
+This module is operated through root `Makefile` commands:
+
+```bash
+# Validate Dex values render against core-platform-app
+make dex-template
+
+# Deploy Dex module in integration
+make dex-deploy-integration
+
+# Deploy Dex module in production
+make dex-deploy-prod
+```
+
+Automation workflows:
+
+- `.github/workflows/support-bot-dex-fast-feedback.yaml`
+- `.github/workflows/support-bot-dex-integration.yaml`

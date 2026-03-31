@@ -15,7 +15,7 @@ Update `dex/.env.local` values.
 Generate a password hash for Dex local user (replace `admin` with your password):
 
 ```bash
-docker run --rm ghcr.io/dexidp/dex:v2.44.0 dex hash-password "admin"
+htpasswd -bnBC 10 "" "admin" | tr -d ':\n' | sed 's/$2y/$2a/'
 ```
 
 Use the output as `DEX_LOCAL_USER_PASSWORD_HASH`.
@@ -32,7 +32,7 @@ make -C dex render-config
 ```bash
 docker compose -f dex/docker-compose.yaml up -d
 # or:
-make -C dex up-local
+make -C dex run-local
 ```
 
 Dex endpoints:
@@ -61,5 +61,30 @@ cd api && make run-local
 
 Ensure Dex `staticClients.redirectURIs` includes:
 
-- `http://localhost:8080/login/oauth2/code/dex`
-- `http://127.0.0.1:8080/login/oauth2/code/dex`
+- `http://localhost:3000/api/oauth/callback/dex`
+- `http://127.0.0.1:3000/api/oauth/callback/dex`
+
+## 6) Stage 1 lifecycle commands
+
+Validate Dex module values against `core-platform-app`:
+
+```bash
+make dex-template
+```
+
+Deploy Dex module to integration:
+
+```bash
+make dex-deploy-integration
+```
+
+Deploy Dex module to production:
+
+```bash
+make dex-deploy-prod
+```
+
+GitHub workflows:
+
+- `.github/workflows/support-bot-dex-fast-feedback.yaml` (template validation on Dex-related changes)
+- `.github/workflows/support-bot-dex-integration.yaml` (integration deploy command)
