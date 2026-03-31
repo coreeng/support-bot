@@ -189,7 +189,11 @@ describe('TeamSelector', () => {
     expect(setSelectedTeam).toHaveBeenCalledWith('Tenant A')
   })
 
-  it('selects a team when user changes the dropdown', async () => {
+  it('writes the new team into the URL when the user changes the dropdown', async () => {
+    // Context is updated via the useEffect (URL → context) once the URL commits,
+    // not synchronously in the onChange handler. This avoids a race where the
+    // page's own reset effect uses a stale searchParams snapshot and overwrites
+    // the new ?team= value before it is committed.
     const setSelectedTeam = jest.fn()
     mockUseTeamFilter.mockReturnValue({
       selectedTeam: 'Tenant A',
@@ -209,9 +213,11 @@ describe('TeamSelector', () => {
     renderSelector()
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Leadership Team' } })
 
-    expect(setSelectedTeam).toHaveBeenCalledWith('Leadership Team')
-    // Also writes the new team into the URL
+    // The URL is updated with the new team value
     expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('team=Leadership+Team'))
+    // setSelectedTeam is NOT called directly from onChange — it fires via the
+    // useEffect once the URL has committed (tested by the URL-sync tests below).
+    expect(setSelectedTeam).not.toHaveBeenCalledWith('Leadership Team')
   })
 
   it('initialises selected team from URL ?team param when valid', () => {

@@ -128,7 +128,9 @@ export default function TeamSelector() {
                 data-testid="team-selector"
                 value={displayValue}
                 onChange={(e) => {
-                    setSelectedTeam(e.target.value)
+                    // Only update the URL here. The useEffect above will sync the context
+                    // once the URL commits, avoiding a race where a stale searchParams
+                    // snapshot in the page's own reset effect overwrites the new ?team= value.
                     setTeamParam({ team: e.target.value })
                 }}
                 className="w-full text-xs border border-gray-600 rounded px-2 py-1.5 bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-600 transition-colors max-h-56"

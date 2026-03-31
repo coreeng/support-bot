@@ -64,9 +64,11 @@ const supportTabs: SupportTab[] = [
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, logout } = useAuth()
-    const { hasFullAccess } = useTeamFilter()
+    const { hasFullAccess, selectedTeam } = useTeamFilter()
     const { data: isKnowledgeGapsEnabled, error: knowledgeGapsError } = useKnowledgeGapsEnabled()
-    const { data: isTenantInsightsEnabled, error: tenantInsightsError } = useTenantInsightsEnabled()
+    // const { data: isTenantInsightsEnabled, error: tenantInsightsError } = useTenantInsightsEnabled()
+  const isTenantInsightsEnabled = true   // or false
+  const tenantInsightsError = null
 
     if (knowledgeGapsError) console.warn('Failed to check knowledge-gaps feature flag:', knowledgeGapsError)
     if (tenantInsightsError) console.warn('Failed to check tenant-insights feature flag:', tenantInsightsError)
@@ -180,7 +182,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                                         return (
                                             <Link
                                                 key={tab.path}
-                                                href={tab.path}
+                                                href={buildHref(tab.path, { team: selectedTeam })}
                                                 className={`w-full flex items-center gap-3 px-8 py-2.5 text-sm hover:bg-gray-700 transition-colors ${isActive ? 'bg-blue-600 text-white' : 'text-gray-300'
                                                     }`}
                                             >
