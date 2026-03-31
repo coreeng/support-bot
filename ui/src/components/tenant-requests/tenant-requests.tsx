@@ -246,8 +246,8 @@ export default function TenantRequestsPage() {
                         value={interventionRate}
                         suffix="%"
                         isLoading={isLoading}
-                        gradient={interventionRate > 0 ? 'from-violet-500 to-purple-600' : 'from-emerald-500 to-emerald-600'}
-                        iconBg={interventionRate > 0 ? 'bg-violet-400/30' : 'bg-emerald-400/30'}
+                        gradient={interventionRate !== null && interventionRate > 0 ? 'from-violet-500 to-purple-600' : 'from-emerald-500 to-emerald-600'}
+                        iconBg={interventionRate !== null && interventionRate > 0 ? 'bg-violet-400/30' : 'bg-emerald-400/30'}
                         tooltip="% of PR tickets requiring manual engineer escalation"
                     />
                 </div>
