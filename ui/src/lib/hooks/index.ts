@@ -13,7 +13,7 @@ import type {
   KnowledgeGapsStatus,
   AnalysisData,
 } from "@/lib/types";
-import type { RepoInsights } from "@/lib/types/dashboard";
+import type { RepoInsights, EscalationBreakdown } from "@/lib/types/dashboard";
 
 // ===== Shared API Helper =====
 
@@ -550,6 +550,16 @@ export function useTenantInsightsStats(dateFrom?: string, dateTo?: string, enabl
     queryKey: ["tenant-insights", "stats", dateFrom, dateTo],
     queryFn: () =>
       apiGet(`/tenant-insights/stats${buildParams(dateFrom, dateTo)}`),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useEscalationBreakdown(dateFrom?: string, dateTo?: string, enabled = true) {
+  return useQuery<EscalationBreakdown>({
+    queryKey: ["tenant-insights", "escalation-breakdown", dateFrom, dateTo],
+    queryFn: () =>
+      apiGet(`/tenant-insights/escalation-breakdown${buildParams(dateFrom, dateTo)}`),
     enabled,
     staleTime: 5 * 60 * 1000,
   });
