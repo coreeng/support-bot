@@ -4,12 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -33,16 +31,13 @@ class TicketControllerTest {
     @Mock
     private TicketUIMapper mapper;
 
-    @Mock
-    private AnalysisRepository analysisRepository;
-
     private TicketController controller;
 
     private TicketId ticketId;
 
     @BeforeEach
     void setUp() {
-        controller = new TicketController(analysisRepository, queryService, ticketUpdateService, mapper);
+        controller = new TicketController(queryService, ticketUpdateService, mapper);
         ticketId = new TicketId(123L);
     }
 
@@ -102,23 +97,18 @@ class TicketControllerTest {
     }
 
     @Test
-    void listEnrichesTicketsWithSummaries() {
+    void listDelegatesToMapperForBatchMapping() {
         // given
-        TicketId firstTicketId = new TicketId(1L);
-        TicketId secondTicketId = new TicketId(2L);
-        DetailedTicket firstDetailedTicket = detailedTicket(firstTicketId);
-        DetailedTicket secondDetailedTicket = detailedTicket(secondTicketId);
-        Page<DetailedTicket> detailedTicketsPage =
-                new Page<>(ImmutableList.of(firstDetailedTicket, secondDetailedTicket), 0, 1, 2);
+        DetailedTicket firstDetailedTicket = detailedTicket(new TicketId(1L));
+        DetailedTicket secondDetailedTicket = detailedTicket(new TicketId(2L));
+        ImmutableList<DetailedTicket> detailedTickets = ImmutableList.of(firstDetailedTicket, secondDetailedTicket);
+        Page<DetailedTicket> detailedTicketsPage = new Page<>(detailedTickets, 0, 1, 2);
         TicketUI firstTicketUi = mock(TicketUI.class);
         TicketUI secondTicketUi = mock(TicketUI.class);
-        ImmutableMap<TicketId, String> summariesByTicketId = ImmutableMap.of(firstTicketId, "First ticket summary");
+        ImmutableList<TicketUI> mappedTickets = ImmutableList.of(firstTicketUi, secondTicketUi);
 
         when(queryService.findDetailedTicketByQuery(any())).thenReturn(detailedTicketsPage);
-        when(analysisRepository.findSummariesByTicketIds(ImmutableList.of(firstTicketId, secondTicketId)))
-                .thenReturn(summariesByTicketId);
-        when(mapper.mapToUI(firstDetailedTicket, null, "First ticket summary")).thenReturn(firstTicketUi);
-        when(mapper.mapToUI(secondDetailedTicket, null, null)).thenReturn(secondTicketUi);
+        when(mapper.mapToUIList(detailedTickets)).thenReturn(mappedTickets);
 
         // when
         ResponseEntity<Page<TicketUI>> response = controller.list(
@@ -137,22 +127,18 @@ class TicketControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().content()).containsExactly(firstTicketUi, secondTicketUi);
-        verify(analysisRepository).findSummariesByTicketIds(ImmutableList.of(firstTicketId, secondTicketId));
-        verify(mapper).mapToUI(firstDetailedTicket, null, "First ticket summary");
-        verify(mapper).mapToUI(secondDetailedTicket, null, null);
+        verify(mapper).mapToUIList(detailedTickets);
     }
 
     @Test
-    void findByIdEnrichesTicketWithSummary() {
+    void findByIdDelegatesToMapper() {
         // given
         DetailedTicket detailedTicket = detailedTicket(ticketId);
         TicketUI mappedTicketUI = mock(TicketUI.class);
 
         when(queryService.findDetailedById(ticketId)).thenReturn(detailedTicket);
         when(queryService.fetchQueryText(detailedTicket.ticket())).thenReturn("Original message");
-        when(analysisRepository.findSummaryByTicketId(ticketId)).thenReturn("Resolved via config fix");
-        when(mapper.mapToUI(detailedTicket, "Original message", "Resolved via config fix"))
-                .thenReturn(mappedTicketUI);
+        when(mapper.mapToUI(detailedTicket, "Original message")).thenReturn(mappedTicketUI);
 
         // when
         ResponseEntity<TicketUI> response = controller.findById(ticketId);
@@ -160,8 +146,7 @@ class TicketControllerTest {
         // then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(mappedTicketUI);
-        verify(analysisRepository).findSummaryByTicketId(ticketId);
-        verify(mapper).mapToUI(detailedTicket, "Original message", "Resolved via config fix");
+        verify(mapper).mapToUI(detailedTicket, "Original message");
     }
 
     private static DetailedTicket detailedTicket(TicketId id) {

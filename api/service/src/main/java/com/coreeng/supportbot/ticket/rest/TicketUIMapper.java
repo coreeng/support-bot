@@ -2,6 +2,7 @@ package com.coreeng.supportbot.ticket.rest;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
+import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.rest.EscalationUIMapper;
 import com.coreeng.supportbot.slack.SlackException;
@@ -15,8 +16,10 @@ import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.rest.TeamUI;
 import com.coreeng.supportbot.teams.rest.TeamUIMapper;
 import com.coreeng.supportbot.ticket.DetailedTicket;
+import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketTeam;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +30,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 public class TicketUIMapper {
+    private final AnalysisRepository analysisRepository;
     private final EscalationUIMapper escalationUIMapper;
     private final SlackClient slackClient;
     private final TeamService teamService;
@@ -35,14 +39,27 @@ public class TicketUIMapper {
     private final TicketAssignmentProps assignmentProps;
 
     public TicketUI mapToUI(DetailedTicket ticket) {
-        return mapToUI(ticket, null, null);
+        return mapToUI(ticket, null);
     }
 
     public TicketUI mapToUI(DetailedTicket ticket, @Nullable String queryText) {
-        return mapToUI(ticket, queryText, null);
+        String summary = analysisRepository.findSummaryByTicketId(
+                Objects.requireNonNull(ticket.ticket().id()));
+        return mapToUIInternal(ticket, queryText, summary);
     }
 
-    public TicketUI mapToUI(DetailedTicket ticket, @Nullable String queryText, @Nullable String summary) {
+    /** Maps a batch of tickets, pre-fetching summaries to avoid N+1 queries. */
+    public ImmutableList<TicketUI> mapToUIList(ImmutableList<DetailedTicket> tickets) {
+        ImmutableList<TicketId> ticketIds =
+                tickets.stream().map(dt -> dt.ticket().id()).collect(toImmutableList());
+        ImmutableMap<TicketId, String> summaries = analysisRepository.findSummariesByTicketIds(ticketIds);
+        return tickets.stream()
+                .map(ticket -> mapToUIInternal(
+                        ticket, null, summaries.get(ticket.ticket().id())))
+                .collect(toImmutableList());
+    }
+
+    private TicketUI mapToUIInternal(DetailedTicket ticket, @Nullable String queryText, @Nullable String summary) {
         String permalink = queryText != null ? resolveQueryPermalink(ticket) : null;
         return TicketUI.builder()
                 .id(Objects.requireNonNull(ticket.ticket().id()))

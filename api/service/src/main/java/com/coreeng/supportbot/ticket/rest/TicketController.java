@@ -1,12 +1,8 @@
 package com.coreeng.supportbot.ticket.rest;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
-
-import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/ticket")
 @RequiredArgsConstructor
 public class TicketController {
-    private final AnalysisRepository analysisRepository;
     private final TicketQueryService queryService;
     private final TicketUpdateService ticketUpdateService;
     private final TicketUIMapper mapper;
@@ -49,15 +44,7 @@ public class TicketController {
                 .build();
 
         Page<DetailedTicket> detailedTicketsPage = queryService.findDetailedTicketByQuery(ticketQuery);
-        ImmutableList<TicketId> ticketIds = detailedTicketsPage.content().stream()
-                .map(detailedTicket -> detailedTicket.ticket().id())
-                .collect(toImmutableList());
-        ImmutableMap<TicketId, String> summariesByTicketId = analysisRepository.findSummariesByTicketIds(ticketIds);
-
-        ImmutableList<TicketUI> ticketUIs = detailedTicketsPage.content().stream()
-                .map(ticket -> mapper.mapToUI(
-                        ticket, null, summariesByTicketId.get(ticket.ticket().id())))
-                .collect(toImmutableList());
+        ImmutableList<TicketUI> ticketUIs = mapper.mapToUIList(detailedTicketsPage.content());
 
         Page<TicketUI> ticketUIPage = new Page<>(
                 ticketUIs,
@@ -75,8 +62,7 @@ public class TicketController {
             return ResponseEntity.notFound().build();
         }
         String queryText = queryService.fetchQueryText(ticket.ticket());
-        String summary = analysisRepository.findSummaryByTicketId(id);
-        return ResponseEntity.ok(mapper.mapToUI(ticket, queryText, summary));
+        return ResponseEntity.ok(mapper.mapToUI(ticket, queryText));
     }
 
     @PatchMapping("/{id}")
