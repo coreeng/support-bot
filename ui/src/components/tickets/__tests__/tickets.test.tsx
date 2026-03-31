@@ -279,6 +279,23 @@ describe('Tickets Component', () => {
 
             expect(screen.getByText('—')).toBeInTheDocument();
         });
+
+        it('renders em dash when summary is whitespace-only', () => {
+            mockUseTickets.mockReturnValue({
+                data: getMockPaginatedTickets([
+                    {
+                        ...createMockTicket('1', 'closed', 'Team A', 'high'),
+                        summary: '   '
+                    }
+                ]),
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            expect(screen.getByText('—')).toBeInTheDocument();
+        });
     });
 
     describe('Team filter options', () => {

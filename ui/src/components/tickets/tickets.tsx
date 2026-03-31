@@ -22,6 +22,9 @@ export default function TicketsPage() {
     } = useTeamFilter()
     const queryClient = useQueryClient()
     const {data: isAssignmentEnabled} = useAssignmentEnabled()
+    const SUMMARY_COLUMN_WIDTH = '16rem'
+    const BASE_COLUMN_COUNT = 9
+    const columnCount = isAssignmentEnabled ? BASE_COLUMN_COUNT + 1 : BASE_COLUMN_COUNT
     const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
     const isViewingAllTeams = contextIsViewingAllTeams ?? (effectiveTeams.length === 0 && !hasNoTeamScope)
     type TicketDateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
@@ -399,7 +402,7 @@ export default function TicketsPage() {
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
                                 <th
                                     className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider"
-                                    style={{ width: '16rem'}}
+                                    style={{ width: SUMMARY_COLUMN_WIDTH }}
                                 >
                                     Summary
                                 </th>
@@ -460,7 +463,7 @@ export default function TicketsPage() {
                                         </td>
                                         <td
                                             className="px-4 py-4 text-sm text-gray-700 whitespace-normal break-words align-top"
-                                            style={{ width: '16rem', minWidth: '16rem' }}
+                                            style={{ width: SUMMARY_COLUMN_WIDTH, minWidth: SUMMARY_COLUMN_WIDTH }}
                                         >
                                             <div
                                                 className="overflow-hidden"
@@ -498,7 +501,7 @@ export default function TicketsPage() {
                                 )
                             })}
                             {filteredTickets.length === 0 && <tr>
-                                <td colSpan={isAssignmentEnabled ? 10 : 9} className="text-center py-4 text-gray-500">No tickets found</td>
+                                <td colSpan={columnCount} className="text-center py-4 text-gray-500">No tickets found</td>
                             </tr>}
                             </tbody>
                         </table>

@@ -1086,6 +1086,37 @@ describe('EditTicketModal', () => {
 
             expect(screen.queryByText('AI Summary')).not.toBeInTheDocument();
         });
+
+        it('does not render the summary section when summary is whitespace-only', () => {
+            mockUseAuth.mockReturnValue({
+                isSupportEngineer: true,
+                user: null,
+                isLoading: false,
+                isAuthenticated: true,
+                isLeadership: false,
+                isEscalationTeam: false,
+                actualEscalationTeams: [],
+                logout: jest.fn()
+            });
+
+            mockUseTicket.mockReturnValue({
+                data: { ...mockTicketDetails, summary: '   ' },
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTicket>);
+
+            render(
+                <EditTicketModal
+                    ticketId="123"
+                    open={true}
+                    onOpenChange={mockOnOpenChange}
+                    onSuccess={mockOnSuccess}
+                />,
+                { wrapper: Wrapper }
+            );
+
+            expect(screen.queryByText('AI Summary')).not.toBeInTheDocument();
+        });
     });
 
     describe('Escalation Warning', () => {
