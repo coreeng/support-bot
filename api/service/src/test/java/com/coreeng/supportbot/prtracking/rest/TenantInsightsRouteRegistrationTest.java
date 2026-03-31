@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
+import com.coreeng.supportbot.prtracking.EscalationBreakdown;
 import com.coreeng.supportbot.prtracking.PrTrackingRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -37,19 +38,16 @@ class TenantInsightsRouteRegistrationTest {
 
     @Test
     void enabledEndpointRemainsAvailable_whenPrTrackingDisabled() {
-        contextRunner
-                .withPropertyValues("pr-review-tracking.enabled=false")
-                .run(context -> {
-                    MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+        contextRunner.withPropertyValues("pr-review-tracking.enabled=false").run(context -> {
+            MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
 
-                    mockMvc.perform(get("/tenant-insights/enabled"))
-                            .andExpect(status().isOk())
-                            .andExpect(content().json("{\"enabled\":false}"));
+            mockMvc.perform(get("/tenant-insights/enabled"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().json("{\"enabled\":false}"));
 
-                    mockMvc.perform(get("/tenant-insights/pr-stats")).andExpect(status().isNotFound());
-                    mockMvc.perform(get("/tenant-insights/escalation-breakdown"))
-                            .andExpect(status().isNotFound());
-                });
+            mockMvc.perform(get("/tenant-insights/pr-stats")).andExpect(status().isNotFound());
+            mockMvc.perform(get("/tenant-insights/escalation-breakdown")).andExpect(status().isNotFound());
+        });
     }
 
     @Test
@@ -71,8 +69,10 @@ class TenantInsightsRouteRegistrationTest {
                 .run(context -> {
                     PrTrackingRepository repository = context.getBean(PrTrackingRepository.class);
                     when(repository.getInsightsByRepo(null, null)).thenReturn(List.of());
+                    when(repository.getEscalationBreakdown(null, null)).thenReturn(new EscalationBreakdown(0, 0, 0));
 
-                    MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+                    MockMvc mockMvc =
+                            MockMvcBuilders.webAppContextSetup(context).build();
 
                     mockMvc.perform(get("/tenant-insights/enabled"))
                             .andExpect(status().isOk())
@@ -80,6 +80,8 @@ class TenantInsightsRouteRegistrationTest {
                     mockMvc.perform(get("/tenant-insights/pr-stats"))
                             .andExpect(status().isOk())
                             .andExpect(content().json("[]"));
+                    mockMvc.perform(get("/tenant-insights/escalation-breakdown"))
+                            .andExpect(status().isOk());
                 });
     }
 
