@@ -81,6 +81,56 @@ const mockTeamsData = [
     { name: 'support', code: 'support', label: 'Support', types: ['tenant'] }
 ];
 
+const mockTicketsWithSummaries = {
+    content: [
+        {
+            ...mockTicket('1', 'opened', 'engineering', 'high'),
+            summary: 'Cache invalidation issue causing stale data in production'
+        },
+        {
+            ...mockTicket('2', 'closed', 'support', 'medium'),
+            summary: null
+        },
+        {
+            ...mockTicket('3', 'opened', 'qa', 'low'),
+            summary: 'Flaky integration test in CI pipeline needs retry logic'
+        }
+    ],
+    page: 0,
+    totalPages: 1,
+    totalElements: 3
+};
+
+const mockTicketDetailsWithSummary = {
+    id: '1',
+    status: 'opened',
+    team: { name: 'engineering' },
+    impact: 'high',
+    tags: ['bug'],
+    escalations: [],
+    logs: [
+        { event: 'ticket opened', date: '2025-01-01T10:00:00Z' }
+    ],
+    query: { link: 'https://slack.com/thread1', text: 'Original slack message about cache issue' },
+    assignedTo: 'support-engineer-1@example.com',
+    summary: 'Cache invalidation issue causing stale data in production'
+};
+
+const mockTicketDetailsWithoutSummary = {
+    id: '2',
+    status: 'closed',
+    team: { name: 'support' },
+    impact: 'medium',
+    tags: ['bug'],
+    escalations: [],
+    logs: [
+        { event: 'ticket opened', date: '2025-01-01T10:00:00Z' }
+    ],
+    query: { link: 'https://slack.com/thread2' },
+    assignedTo: 'support-engineer-1@example.com',
+    summary: null
+};
+
 const mockRegistryData = {
     impacts: [
         { code: 'high', label: 'High Impact' },
@@ -210,6 +260,31 @@ Given("Tickets API endpoints are mocked with escalations and varied dates", asyn
             body: JSON.stringify(mockTicketsEscalationsAndDates)
         })
     );
+
+    await this.page.route("**/api/teams?type=TENANT*", (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
+    );
+
+    await this.page.route("**/api/registry*", (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
+        })
+    );
+});
+
+Given("Tickets API endpoints are mocked with summaries", async function (this: CustomWorld) {
+    await this.page.route("**/api/tickets**", (route) => {
+        const url = route.request().url();
+        if (url.includes('/tickets/1')) {
+            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketDetailsWithSummary) });
+        } else if (url.includes('/tickets/2')) {
+            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketDetailsWithoutSummary) });
+        } else {
+            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketsWithSummaries) });
+        }
+    });
 
     await this.page.route("**/api/teams?type=TENANT*", (route) =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
@@ -385,17 +460,17 @@ Then("Only tickets escalated to {string} should be displayed", async function (t
 });
 
 Then("Tickets should be sorted by opened at descending", async function (this: CustomWorld) {
-    const firstTeamCellText = await this.page.locator('tbody tr').first().locator('td').nth(1).textContent();
+    const firstTeamCellText = await this.page.locator('tbody tr').first().locator('td').nth(2).textContent();
     expect((firstTeamCellText || '').trim().toLowerCase()).toBe('qa');
 });
 
 Then("Tickets should be sorted by opened at ascending", async function (this: CustomWorld) {
-    const firstTeamCellText = await this.page.locator('tbody tr').first().locator('td').nth(1).textContent();
+    const firstTeamCellText = await this.page.locator('tbody tr').first().locator('td').nth(2).textContent();
     expect((firstTeamCellText || '').trim().toLowerCase()).toBe('engineering');
 });
 
 Then("Tickets should be sorted by closed at descending", async function (this: CustomWorld) {
-    const firstTeamCellText = await this.page.locator('tbody tr').first().locator('td').nth(1).textContent();
+    const firstTeamCellText = await this.page.locator('tbody tr').first().locator('td').nth(2).textContent();
     expect((firstTeamCellText || '').trim().toLowerCase()).toBe('support');
 });
 
@@ -653,4 +728,60 @@ Then("Modal should close", async function (this: CustomWorld) {
 Then("Empty state message should be visible", async function (this: CustomWorld) {
     const emptyMessage = this.page.locator('text=No tickets found');
     await expect(emptyMessage).toBeVisible({ timeout: 5000 });
+});
+
+
+// Summary column and modal steps
+
+Then("Tickets table should have a Summary header", async function (this: CustomWorld) {
+    await expect(this.page.locator('thead th', { hasText: 'Summary' })).toBeVisible({ timeout: 5000 });
+});
+
+Then("Tickets with a summary should display the summary text", async function (this: CustomWorld) {
+    const bodyText = await this.page.locator('tbody').textContent();
+    expect(bodyText).toContain('Cache invalidation issue');
+});
+
+Then("Tickets without a summary should display an em dash", async function (this: CustomWorld) {
+    // The second row (ticket without summary) should have an em dash in the summary column (td index 1)
+    const summaryCell = this.page.locator('tbody tr').nth(1).locator('td').nth(1);
+    const cellText = await summaryCell.textContent();
+    expect((cellText || '').trim()).toBe('—');
+});
+
+When("User clicks on a ticket that has a summary", async function (this: CustomWorld) {
+    // Click the first row which has a summary
+    const firstRow = this.page.locator('tbody tr').first();
+    await expect(firstRow).toBeVisible({ timeout: 5000 });
+    await firstRow.click({ force: true });
+    await this.page.waitForTimeout(800);
+});
+
+When("User clicks on a ticket without a summary", async function (this: CustomWorld) {
+    // Click the second row which has no summary
+    const secondRow = this.page.locator('tbody tr').nth(1);
+    await expect(secondRow).toBeVisible({ timeout: 5000 });
+    await secondRow.click({ force: true });
+    await this.page.waitForTimeout(800);
+});
+
+Then("Modal should show AI Summary section", async function (this: CustomWorld) {
+    const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
+    await expect(modal).toBeVisible({ timeout: 5000 });
+    await expect(modal.locator('text=AI Summary')).toBeVisible({ timeout: 5000 });
+});
+
+Then("AI Summary should contain the summary text", async function (this: CustomWorld) {
+    const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
+    const modalText = await modal.textContent();
+    expect(modalText).toContain('Cache invalidation issue causing stale data in production');
+});
+
+Then("Modal should not show AI Summary section", async function (this: CustomWorld) {
+    const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
+    await expect(modal).toBeVisible({ timeout: 5000 });
+    // Wait for content to load
+    await expect(modal.locator('text=/Ticket #/i')).toBeVisible({ timeout: 10000 });
+    await this.page.waitForTimeout(500);
+    await expect(modal.locator('text=AI Summary')).not.toBeVisible();
 });
