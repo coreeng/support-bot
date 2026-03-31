@@ -1,0 +1,30 @@
+# Test user: uid alice, password password123 (SSHA generated via osixia slappasswd)
+dn: uid=alice,ou=People,dc=supportbot,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: alice
+sn: User
+givenName: Alice
+cn: Alice User
+displayName: Alice User
+mail: alice@supportbot.local
+userPassword: {SSHA}bim+tmQMR8i4Bu9W0BOJYH0ZkziIoSjf
+uidNumber: 10001
+gidNumber: 10001
+homeDirectory: /home/alice
+
+dn: uid=bob,ou=People,dc=supportbot,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: bob
+sn: User
+givenName: Bob
+cn: Bob User
+displayName: Bob User
+mail: bob@supportbot.local
+userPassword: {SSHA}bim+tmQMR8i4Bu9W0BOJYH0ZkziIoSjf
+uidNumber: 10002
+gidNumber: 10002
+homeDirectory: /home/bob

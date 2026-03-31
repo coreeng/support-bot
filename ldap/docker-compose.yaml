@@ -1,0 +1,31 @@
+services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    env_file:
+      - .env.local
+    environment:
+      LDAP_ORGANISATION: Support Bot
+      LDAP_DOMAIN: supportbot.local
+      LDAP_TLS: "false"
+    ports:
+      - "389:389"
+    volumes:
+      - ldap-data:/var/lib/ldap
+      - ldap-config:/etc/ldap/slapd.d
+      - ./bootstrap:/container/service/slapd/assets/config/bootstrap/ldif/custom:ro
+    restart: unless-stopped
+
+  phpldapadmin:
+    image: osixia/phpldapadmin:0.9.0
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: openldap
+      PHPLDAPADMIN_HTTPS: "false"
+    ports:
+      - "8081:80"
+    depends_on:
+      - openldap
+    restart: unless-stopped
+
+volumes:
+  ldap-data:
+  ldap-config:

@@ -355,3 +355,12 @@ dex-deploy-integration: ## Deploy Dex module to integration environment
 dex-deploy-prod: ## Deploy Dex module to production environment
 	@$(MAKE) -C dex deploy-prod
 
+##@ LDAP module lifecycle (implemented in ldap/Makefile)
+
+.PHONY: ldap-template ldap-deploy-integration
+ldap-template: ## Validate LDAP values by rendering core-platform-app chart
+	@$(MAKE) -C ldap template
+
+ldap-deploy-integration: ## Deploy LDAP module to integration environment
+	@$(MAKE) -C ldap deploy-integration
+

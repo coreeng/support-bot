@@ -1,0 +1,12 @@
+dn: cn=developers,ou=Groups,dc=supportbot,dc=local
+objectClass: groupOfUniqueNames
+objectClass: top
+cn: developers
+uniqueMember: uid=alice,ou=People,dc=supportbot,dc=local
+uniqueMember: uid=bob,ou=People,dc=supportbot,dc=local
+
+dn: cn=support-admins,ou=Groups,dc=supportbot,dc=local
+objectClass: groupOfUniqueNames
+objectClass: top
+cn: support-admins
+uniqueMember: uid=alice,ou=People,dc=supportbot,dc=local

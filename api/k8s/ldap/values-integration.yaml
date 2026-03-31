@@ -1,0 +1,9 @@
+# Integration overrides for OpenLDAP (same DIT as local; tune resources/DNS in your tenant).
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 384Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi
