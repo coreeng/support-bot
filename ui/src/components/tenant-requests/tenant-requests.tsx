@@ -72,20 +72,25 @@ export default function TenantRequestsPage() {
 
     const isDateRangeValid = dateFrom <= dateTo
 
-    const { data: realRepos, isLoading, error } = useTenantInsightsStats(
+    const { data: realRepos, isLoading: statsLoading, error: statsError } = useTenantInsightsStats(
         isDateRangeValid ? dateFrom : undefined,
         isDateRangeValid ? dateTo : undefined,
         isDateRangeValid
     )
 
-    const { data: breakdown } = useEscalationBreakdown(
+    const { data: breakdown, isLoading: breakdownLoading, error: breakdownError } = useEscalationBreakdown(
         isDateRangeValid ? dateFrom : undefined,
         isDateRangeValid ? dateTo : undefined,
         isDateRangeValid
     )
+
+    const isLoading = statsLoading || breakdownLoading
+    const error = statsError || breakdownError
 
     const repos = realRepos ?? []
 
+    // Intervention rate = manual escalations only; bot escalations are automated
+    // workflow (SLA breach) and don't represent human intervention.
     const interventionRate = breakdown && breakdown.totalPrTickets > 0
         ? Math.round((breakdown.manuallyEscalatedTickets / breakdown.totalPrTickets) * 100)
         : null
@@ -241,8 +246,8 @@ export default function TenantRequestsPage() {
                         value={interventionRate}
                         suffix="%"
                         isLoading={isLoading}
-                        gradient={interventionRate !== null && interventionRate > 0 ? 'from-violet-500 to-purple-600' : 'from-emerald-500 to-emerald-600'}
-                        iconBg={interventionRate !== null && interventionRate > 0 ? 'bg-violet-400/30' : 'bg-emerald-400/30'}
+                        gradient={interventionRate > 0 ? 'from-violet-500 to-purple-600' : 'from-emerald-500 to-emerald-600'}
+                        iconBg={interventionRate > 0 ? 'bg-violet-400/30' : 'bg-emerald-400/30'}
                         tooltip="% of PR tickets requiring manual engineer escalation"
                     />
                 </div>
@@ -369,36 +374,38 @@ function StatCard({ label, value, suffix, isLoading, gradient, iconBg, tooltip }
     iconBg: string
     tooltip?: string
 }) {
+    const card = (
+        <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${gradient} p-5 shadow-sm`}>
+            <div className={`absolute -top-4 -right-4 w-24 h-24 rounded-full ${iconBg}`} />
+            <div className={`absolute -bottom-6 -right-6 w-20 h-20 rounded-full ${iconBg}`} />
+            <div className="relative">
+                <p className="text-sm font-medium text-white/80">{label}</p>
+                {isLoading ? (
+                    <div className="h-9 mt-1 w-16 bg-white/20 rounded animate-pulse" />
+                ) : (
+                    <p className="text-3xl font-bold text-white mt-1 tabular-nums">
+                        {value !== null ? `${value}${suffix ?? ''}` : '—'}
+                    </p>
+                )}
+            </div>
+        </div>
+    )
+
+    if (!tooltip) return card
+
     return (
         <Tooltip.Root>
-            <Tooltip.Trigger asChild>
-                <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${gradient} p-5 shadow-sm`}>
-                    <div className={`absolute -top-4 -right-4 w-24 h-24 rounded-full ${iconBg}`} />
-                    <div className={`absolute -bottom-6 -right-6 w-20 h-20 rounded-full ${iconBg}`} />
-                    <div className="relative">
-                        <p className="text-sm font-medium text-white/80">{label}</p>
-                        {isLoading ? (
-                            <div className="h-9 mt-1 w-16 bg-white/20 rounded animate-pulse" />
-                        ) : (
-                            <p className="text-3xl font-bold text-white mt-1 tabular-nums">
-                                {value !== null ? `${value}${suffix ?? ''}` : '—'}
-                            </p>
-                        )}
-                    </div>
-                </div>
-            </Tooltip.Trigger>
-            {tooltip && (
-                <Tooltip.Portal>
-                    <Tooltip.Content
-                        side="bottom"
-                        sideOffset={6}
-                        className="z-50 max-w-[220px] px-3 py-2 text-xs leading-relaxed text-white bg-slate-900 rounded-lg shadow-lg animate-in fade-in-0 zoom-in-95"
-                    >
-                        {tooltip}
-                        <Tooltip.Arrow className="fill-slate-900" />
-                    </Tooltip.Content>
-                </Tooltip.Portal>
-            )}
+            <Tooltip.Trigger asChild>{card}</Tooltip.Trigger>
+            <Tooltip.Portal>
+                <Tooltip.Content
+                    side="bottom"
+                    sideOffset={6}
+                    className="z-50 max-w-[220px] px-3 py-2 text-xs leading-relaxed text-white bg-slate-900 rounded-lg shadow-lg animate-in fade-in-0 zoom-in-95"
+                >
+                    {tooltip}
+                    <Tooltip.Arrow className="fill-slate-900" />
+                </Tooltip.Content>
+            </Tooltip.Portal>
         </Tooltip.Root>
     )
 }

@@ -207,14 +207,17 @@ describe('TenantRequestsPage', () => {
             expect(screen.getByText('30 Days').className).not.toContain('bg-white')
         })
 
-        it('should call hook with updated dates when preset changes', () => {
+        it('should call hooks with updated dates when preset changes', () => {
             render(<TenantRequestsPage />)
 
             fireEvent.click(screen.getByText('90 Days'))
 
-            const lastCall = mockUseTenantInsightsStats.mock.calls.at(-1)
-            expect(lastCall[0]).toBeDefined() // dateFrom
-            expect(lastCall[1]).toBeDefined() // dateTo
+            const statsCall = mockUseTenantInsightsStats.mock.calls.at(-1)
+            const breakdownCall = mockUseEscalationBreakdown.mock.calls.at(-1)
+            expect(statsCall[0]).toBeDefined() // dateFrom
+            expect(statsCall[1]).toBeDefined() // dateTo
+            expect(breakdownCall[0]).toBe(statsCall[0]) // same dateFrom
+            expect(breakdownCall[1]).toBe(statsCall[1]) // same dateTo
         })
 
         it('should show date pickers when Custom is selected', () => {
@@ -590,6 +593,20 @@ describe('TenantRequestsPage', () => {
             )
             expect(statValues).toHaveLength(1)
             expect(statValues[0].textContent).toBe('10%')
+        })
+
+        it('should show dash when totalPrTickets is 0', () => {
+            mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false })
+            mockUseEscalationBreakdown.mockReturnValue({
+                data: { totalPrTickets: 0, botEscalatedTickets: 0, manuallyEscalatedTickets: 0 },
+            })
+
+            render(<TenantRequestsPage />)
+
+            const statValues = screen.getAllByText('—').filter(
+                el => el.className.includes('text-3xl')
+            )
+            expect(statValues).toHaveLength(1)
         })
 
         it('should show dash when no breakdown data', () => {
