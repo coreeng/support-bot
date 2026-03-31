@@ -28,3 +28,5 @@ staticClients:
     redirectURIs:
       - ${DEX_REDIRECT_URI_1}
       - ${DEX_REDIRECT_URI_2}
+
+@LDAP_CONNECTOR@

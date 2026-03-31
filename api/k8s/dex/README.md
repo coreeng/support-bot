@@ -24,6 +24,8 @@ metadata:
 type: Opaque
 stringData:
   client-secret: "<support-bot-dex-client-secret>"
+  # Required when dex.ldap.enabled is true (bind password for LDAP connector).
+  ldap-bind-password: ""
 ```
 
 Apply:

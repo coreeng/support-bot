@@ -57,6 +57,13 @@ Then run the API:
 cd api && make run-local
 ```
 
+### LDAP via Dex (Stage 3)
+
+1. Start OpenLDAP first (`make -C ldap run-local`). Use a host reachable from the Dex container, e.g. `host.docker.internal:389` (macOS/Windows) or attach Dex to the same Docker network as LDAP.
+2. In `dex/.env.local`, set `DEX_LDAP_ENABLED=true` and the `DEX_LDAP_*` variables from `dex/.env.example`, then `make -C dex render-config` and restart Dex.
+3. On the API, set `platform-integration.jwt-groups.enabled: true` and `mappings` so Dex `groups` claim values (e.g. LDAP `cn` of `groupOfUniqueNames`) map to your platform team codes — see `api/service/docs/configuration.md`.
+4. Allow LDAP test users if you use an allow-list, e.g. `ALLOWED_DOMAINS=supportbot.local`.
+
 ## 5) Redirect URIs
 
 Ensure Dex `staticClients.redirectURIs` includes:
@@ -86,5 +93,4 @@ make dex-deploy-prod
 
 GitHub workflows:
 
-- `.github/workflows/support-bot-dex-fast-feedback.yaml` (template validation on Dex-related changes)
-- `.github/workflows/support-bot-dex-integration.yaml` (integration deploy command)
+- `.github/workflows/dex-fast-feedback.yaml` (P2P fast feedback for the Dex module)

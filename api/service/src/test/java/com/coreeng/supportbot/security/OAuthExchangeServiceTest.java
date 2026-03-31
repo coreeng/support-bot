@@ -41,6 +41,9 @@ class OAuthExchangeServiceTest {
     @Mock
     private SupportTeamService supportTeamService;
 
+    @Mock
+    private JwtGroupTeamMerger jwtGroupTeamMerger;
+
     private OAuthExchangeService createService(List<String> allowedEmails, List<String> allowedDomains) {
         var props = new SecurityProperties(
                 new SecurityProperties.JwtProperties(
@@ -51,13 +54,19 @@ class OAuthExchangeServiceTest {
                 new SecurityProperties.AllowListProperties(allowedEmails, allowedDomains));
         var jwtService = new JwtService(props);
         var allowListService = new AllowListService(props);
+        when(jwtGroupTeamMerger.mergeForProvider(
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
         return new OAuthExchangeService(
                 clientRegistrationRepository,
                 restTemplate,
                 jwtService,
                 teamService,
                 supportTeamService,
-                allowListService);
+                allowListService,
+                jwtGroupTeamMerger);
     }
 
     private void mockGoogleOAuth(String email) {

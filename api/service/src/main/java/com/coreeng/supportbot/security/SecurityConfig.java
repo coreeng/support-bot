@@ -20,7 +20,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@EnableConfigurationProperties(SecurityProperties.class)
+@EnableConfigurationProperties({SecurityProperties.class, JwtGroupsProperties.class})
 @RequiredArgsConstructor
 public class SecurityConfig {
     private final SecurityProperties properties;
@@ -30,6 +30,7 @@ public class SecurityConfig {
     private final SupportTeamService supportTeamService;
     private final OAuth2AvailabilityChecker oauth2AvailabilityChecker;
     private final AllowListService allowListService;
+    private final JwtGroupTeamMerger jwtGroupTeamMerger;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, CorsConfigurationSource corsConfigurationSource)
@@ -91,7 +92,13 @@ public class SecurityConfig {
     @Bean
     public OAuth2SuccessHandler oauth2SuccessHandler() {
         return new OAuth2SuccessHandler(
-                properties, jwtService, authCodeStore, teamService, supportTeamService, allowListService);
+                properties,
+                jwtService,
+                authCodeStore,
+                teamService,
+                supportTeamService,
+                allowListService,
+                jwtGroupTeamMerger);
     }
 
     @Bean

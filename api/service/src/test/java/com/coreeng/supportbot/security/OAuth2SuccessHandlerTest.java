@@ -23,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,6 +43,9 @@ class OAuth2SuccessHandlerTest {
     @Mock
     private HttpServletResponse response;
 
+    @Mock
+    private JwtGroupTeamMerger jwtGroupTeamMerger;
+
     private OAuth2SuccessHandler createHandler(List<String> allowedEmails, List<String> allowedDomains) {
         var props = new SecurityProperties(
                 new SecurityProperties.JwtProperties(TEST_SECRET, Duration.ofHours(24)),
@@ -52,8 +56,19 @@ class OAuth2SuccessHandlerTest {
         var jwtService = new JwtService(props);
         var authCodeStore = new AuthCodeStore();
         var allowListService = new AllowListService(props);
+        when(jwtGroupTeamMerger.mergeForProvider(
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
         return new OAuth2SuccessHandler(
-                props, jwtService, authCodeStore, teamService, supportTeamService, allowListService);
+                props,
+                jwtService,
+                authCodeStore,
+                teamService,
+                supportTeamService,
+                allowListService,
+                jwtGroupTeamMerger);
     }
 
     private OAuth2SuccessHandler createHandler() {
@@ -61,10 +76,16 @@ class OAuth2SuccessHandlerTest {
     }
 
     private Authentication mockAuth(Map<String, Object> attributes) {
+        return mockAuth("google", attributes);
+    }
+
+    private Authentication mockAuth(String registrationId, Map<String, Object> attributes) {
         var oauth2User = mock(OAuth2User.class);
         when(oauth2User.getAttribute(anyString())).thenAnswer(inv -> attributes.get(inv.getArgument(0, String.class)));
-        var authentication = mock(Authentication.class);
+        when(oauth2User.getAttributes()).thenReturn(attributes);
+        var authentication = mock(OAuth2AuthenticationToken.class);
         when(authentication.getPrincipal()).thenReturn(oauth2User);
+        when(authentication.getAuthorizedClientRegistrationId()).thenReturn(registrationId);
         return authentication;
     }
 

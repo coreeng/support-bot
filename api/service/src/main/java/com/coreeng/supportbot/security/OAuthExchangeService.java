@@ -37,6 +37,7 @@ public class OAuthExchangeService {
     private final TeamService teamService;
     private final SupportTeamService supportTeamService;
     private final AllowListService allowListService;
+    private final JwtGroupTeamMerger jwtGroupTeamMerger;
 
     public String exchangeCodeForToken(String provider, String code, String redirectUri) {
         var registration = clientRegistrationRepository.findByRegistrationId(provider);
@@ -105,8 +106,8 @@ public class OAuthExchangeService {
 
             log.info("OAuth2 login successful for user");
 
-            // Compute roles
-            var teams = teamService.listTeamsByUserEmail(email);
+            // Compute roles (Dex: merge LDAP groups claim into email-based platform teams)
+            var teams = jwtGroupTeamMerger.mergeForProvider(provider, userInfo, teamService.listTeamsByUserEmail(email));
             var roles = computeRoles(email, teams);
 
             var principal = new UserPrincipal(email, name, teams, roles);

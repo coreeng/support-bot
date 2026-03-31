@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -30,12 +31,15 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private final TeamService teamService;
     private final SupportTeamService supportTeamService;
     private final AllowListService allowListService;
+    private final JwtGroupTeamMerger jwtGroupTeamMerger;
 
     @Override
     public void onAuthenticationSuccess(
             HttpServletRequest request, HttpServletResponse response, Authentication authentication)
             throws IOException {
         var oauth2User = (OAuth2User) authentication.getPrincipal();
+        var registrationId =
+                authentication instanceof OAuth2AuthenticationToken token ? token.getAuthorizedClientRegistrationId() : "";
         var email = extractEmail(oauth2User);
         if (!allowListService.isAllowed(email)) {
             log.warn("Allow-list rejected user during OAuth2 redirect login");
@@ -51,7 +55,8 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
         log.info("OAuth2 login successful for user");
 
-        var teams = teamService.listTeamsByUserEmail(email);
+        var teams = jwtGroupTeamMerger.mergeForProvider(
+                registrationId, oauth2User.getAttributes(), teamService.listTeamsByUserEmail(email));
         var roles = computeRoles(email, teams);
 
         var principal = new UserPrincipal(email, name, teams, roles);

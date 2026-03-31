@@ -75,6 +75,11 @@ envVarsArr:
       secretKeyRef:
         name: dex-secrets
         key: client-secret
+  - name: DEX_LDAP_BIND_PW
+    valueFrom:
+      secretKeyRef:
+        name: dex-secrets
+        key: ldap-bind-password
 
 configMaps:
   - name: dex-config
@@ -102,9 +107,35 @@ configMaps:
             name: Support Bot
             secret: ${DEX_CLIENT_SECRET}
             redirectURIs:
-{{- range .Values.dex.redirectUris }}
+        {{- range .Values.dex.redirectUris }}
               - {{ . | quote }}
-{{- end }}
+        {{- end }}
+        {{- if .Values.dex.ldap.enabled }}
+        connectors:
+          - type: ldap
+            id: ldap
+            name: LDAP
+            config:
+              host: {{ .Values.dex.ldap.host | quote }}
+              insecureNoSSL: true
+              bindDN: {{ .Values.dex.ldap.bindDN | quote }}
+              bindPW: ${DEX_LDAP_BIND_PW}
+              usernamePrompt: Email Address
+              userSearch:
+                baseDN: {{ .Values.dex.ldap.userSearchBaseDN | quote }}
+                filter: "(objectClass=posixAccount)"
+                username: mail
+                idAttr: uid
+                emailAttr: mail
+                nameAttr: cn
+              groupSearch:
+                baseDN: {{ .Values.dex.ldap.groupSearchBaseDN | quote }}
+                filter: "(objectClass=groupOfUniqueNames)"
+                userMatchers:
+                  - userAttr: DN
+                    groupAttr: uniqueMember
+                nameAttr: cn
+        {{- end }}
 
 volumes:
   - name: dex-config
@@ -126,6 +157,12 @@ dex:
   clientId: support-bot-dex
   redirectUris:
     - https://support-bot-api.example.com/login/oauth2/code/dex
+  ldap:
+    enabled: false
+    host: ldap:389
+    bindDN: cn=admin,dc=supportbot,dc=local
+    userSearchBaseDN: ou=People,dc=supportbot,dc=local
+    groupSearchBaseDN: ou=Groups,dc=supportbot,dc=local
   localUser:
     email: admin@example.com
     username: admin

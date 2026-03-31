@@ -115,6 +115,12 @@ platform-integration: # Whether to enable platform integration to automatically 
     ignore-unknown-teams: false # Whether to allow escalation teams that don't exist in platform teams.
                                  # If false, startup will fail if any escalation team is not found in platform teams.
                                  # If true, escalation-only teams are allowed (they will have only 'escalation' type).
+  jwt-groups: # Optional: map Dex ID-token group claims (LDAP) into platform tenant teams
+    enabled: false # When true, merges mapped teams for OAuth provider "dex" only; Google/Azure still use static-user / Azure / GCP below
+    claim-name: groups # OIDC claim to read (Dex LDAP connector should populate this)
+    mappings: # Each entry: if any claim value matches (case-insensitive), add team-code to the user's resolved teams
+      - claim-values: [developers] # Example: LDAP group name or full DN string as Dex emits it
+        team-code: wow # Must match a platform team name/code from teams-scraping
   gcp:
     app-name: Support Bot # Used by GCP client
     enabled: true
