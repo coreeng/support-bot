@@ -112,8 +112,7 @@ class TicketControllerTest {
                 new Page<>(ImmutableList.of(firstDetailedTicket, secondDetailedTicket), 0, 1, 2);
         TicketUI firstTicketUi = mock(TicketUI.class);
         TicketUI secondTicketUi = mock(TicketUI.class);
-        ImmutableMap<TicketId, String> summariesByTicketId =
-                ImmutableMap.of(firstTicketId, "First ticket summary");
+        ImmutableMap<TicketId, String> summariesByTicketId = ImmutableMap.of(firstTicketId, "First ticket summary");
 
         when(queryService.findDetailedTicketByQuery(any())).thenReturn(detailedTicketsPage);
         when(analysisRepository.findSummariesByTicketIds(ImmutableList.of(firstTicketId, secondTicketId)))
@@ -152,7 +151,8 @@ class TicketControllerTest {
         when(queryService.findDetailedById(ticketId)).thenReturn(detailedTicket);
         when(queryService.fetchQueryText(detailedTicket.ticket())).thenReturn("Original message");
         when(analysisRepository.findSummaryByTicketId(ticketId)).thenReturn("Resolved via config fix");
-        when(mapper.mapToUI(detailedTicket, "Original message", "Resolved via config fix")).thenReturn(mappedTicketUI);
+        when(mapper.mapToUI(detailedTicket, "Original message", "Resolved via config fix"))
+                .thenReturn(mappedTicketUI);
 
         // when
         ResponseEntity<TicketUI> response = controller.findById(ticketId);

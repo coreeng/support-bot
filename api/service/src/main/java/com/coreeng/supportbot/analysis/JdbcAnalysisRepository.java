@@ -137,7 +137,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
     public @Nullable String findSummaryByTicketId(TicketId ticketId) {
         return dsl.select(ANALYSIS.SUMMARY)
                 .from(ANALYSIS)
-                .where(ANALYSIS.TICKET_ID.eq((int) ticketId.id()))
+                .where(ANALYSIS.TICKET_ID.eq(Math.toIntExact(ticketId.id())))
                 .fetchOne(ANALYSIS.SUMMARY);
     }
 
@@ -151,8 +151,9 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
         ImmutableMap.Builder<TicketId, String> summaries = ImmutableMap.builder();
         dsl.select(ANALYSIS.TICKET_ID, ANALYSIS.SUMMARY)
                 .from(ANALYSIS)
-                .where(ANALYSIS.TICKET_ID.in(
-                        ticketIds.stream().map(ticketId -> (int) ticketId.id()).toList()))
+                .where(ANALYSIS.TICKET_ID.in(ticketIds.stream()
+                        .map(ticketId -> Math.toIntExact(ticketId.id()))
+                        .toList()))
                 .and(ANALYSIS.SUMMARY.isNotNull())
                 .fetch()
                 .forEach(row -> {
