@@ -35,10 +35,20 @@ public interface AnalysisRepository {
      */
     List<DimensionSummary> getDriversWithSummaries();
 
-    /** Finds the analysis summary for a single ticket. */
+    /**
+     * Finds the stored analysis summary for a single ticket.
+     *
+     * @return the summary text, or {@code null} if no analysis exists or the summary is absent
+     */
     @Nullable String findSummaryByTicketId(TicketId ticketId);
 
-    /** Finds analysis summaries for a batch of ticket IDs keyed by ticket id. */
+    /**
+     * Finds stored analysis summaries for the given ticket IDs. Tickets without a stored summary are
+     * omitted from the result.
+     *
+     * @param ticketIds batch of ticket IDs to look up
+     * @return summaries keyed by ticket ID (sparse — only tickets with summaries are present)
+     */
     ImmutableMap<TicketId, String> findSummariesByTicketIds(ImmutableList<TicketId> ticketIds);
 
     /**
