@@ -1,4 +1,3 @@
-# Test user: uid alice, password password123 (SSHA generated via osixia slappasswd)
 dn: uid=alice,ou=People,dc=supportbot,dc=local
 objectClass: inetOrgPerson
 objectClass: posixAccount

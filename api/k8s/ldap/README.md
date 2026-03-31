@@ -38,6 +38,10 @@ make ldap-template
 
 (`ldap` uses `scripts/helm_ldap.sh` to work around `core-platform-app` test-hook YAML issues with `secretKeyRef` in `envVarsArr`; see `ldap/README.md`.)
 
+## Integration deploy order (with Dex)
+
+Deploy **LDAP** (this chart) **before** Dex when Dex uses `dex.ldap.enabled`, so the `ldap` Service is available. Then deploy Dex with `dex.ldap.host` set to that Service. Finish with the Support Bot API and `platform-integration.jwt-groups` if you map LDAP groups to teams. See [docs/runbooks/auth-dex-ldap.md](../../../docs/runbooks/auth-dex-ldap.md).
+
 ## Module docs
 
 See `ldap/README.md` for local Docker usage and seed users.

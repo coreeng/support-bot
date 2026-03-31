@@ -2,6 +2,8 @@
 
 This module runs Dex locally with Docker using the upstream image.
 
+For **start order** (LDAP → Dex → API → UI), **integration deploy order**, and **troubleshooting** (`redirect_uri`, `user_not_allowed`, JWT groups), see [docs/runbooks/auth-dex-ldap.md](../docs/runbooks/auth-dex-ldap.md).
+
 ## 1) Prepare `.env.local`
 
 Copy the example env file:
@@ -59,7 +61,7 @@ cd api && make run-local
 
 ### LDAP via Dex (Stage 3)
 
-1. Start OpenLDAP first (`make -C ldap run-local`). Use a host reachable from the Dex container, e.g. `host.docker.internal:389` (macOS/Windows) or attach Dex to the same Docker network as LDAP.
+1. Start OpenLDAP first (`make -C ldap run-local`). With the repo compose files, Dex joins network `supportbot-ldap`; set `DEX_LDAP_HOST=openldap:389` in `dex/.env.local`. Otherwise use `host.docker.internal:389` (macOS/Windows) only if LDAP is published on the host and Dex is not on the LDAP network.
 2. In `dex/.env.local`, set `DEX_LDAP_ENABLED=true` and the `DEX_LDAP_*` variables from `dex/.env.example`, then `make -C dex render-config` and restart Dex.
 3. On the API, set `platform-integration.jwt-groups.enabled: true` and `mappings` so Dex `groups` claim values (e.g. LDAP `cn` of `groupOfUniqueNames`) map to your platform team codes — see `api/service/docs/configuration.md`.
 4. Allow LDAP test users if you use an allow-list, e.g. `ALLOWED_DOMAINS=supportbot.local`.
@@ -94,3 +96,12 @@ make dex-deploy-prod
 GitHub workflows:
 
 - `.github/workflows/dex-fast-feedback.yaml` (P2P fast feedback for the Dex module)
+
+## Troubleshooting (quick)
+
+| Issue | Hint |
+|-------|------|
+| Unregistered **`redirect_uri`** | Add exact UI/API callback URLs to `staticClients.redirectURIs` in rendered `config/config.yaml`; see [runbook](../docs/runbooks/auth-dex-ldap.md). |
+| **`user_not_allowed`** after Dex login | API allow-list must allow the user email/domain (`ALLOWED_EMAILS` / `ALLOWED_DOMAINS`). |
+| LDAP bind / connector errors | Check `DEX_LDAP_*` in `.env.local`, `DEX_LDAP_ENABLED=true`, and `make -C dex render-config` after changes. |
+| Bcrypt / hash errors | Use `make -C dex render-config` (Python) so `$` in hashes is not mangled by the shell. |

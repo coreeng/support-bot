@@ -64,6 +64,8 @@ envVarsArr:
         key: admin-password
   - name: LDAP_TLS
     value: "false"
+  - name: LDAP_REMOVE_CONFIG_AFTER_SETUP
+    value: "false"
 
 configMaps:
   - name: ldap-bootstrap

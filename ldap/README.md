@@ -2,6 +2,8 @@
 
 OpenLDAP for Support Bot, independent of Dex. Use this for local smoke tests and for the integration cluster deployment (Dex LDAP connector wiring is Stage 3).
 
+Operational **order** and **troubleshooting**: [docs/runbooks/auth-dex-ldap.md](../docs/runbooks/auth-dex-ldap.md) (local: start LDAP before Dex; integration: deploy LDAP before Dex).
+
 ## Local
 
 1. Copy `ldap/.env.example` to `ldap/.env.local` and set `LDAP_ADMIN_PASSWORD`.
@@ -12,7 +14,7 @@ make -C ldap run-local
 ```
 
 - **LDAP:** `localhost:389` (plain LDAP, `LDAP_TLS=false`).
-- **phpLDAPadmin:** http://localhost:8081 — bind as `cn=admin,dc=supportbot,dc=local` with your admin password.
+- **phpLDAPadmin:** http://localhost:18081 — bind as `cn=admin,dc=supportbot,dc=local` with your admin password. (Host port `18081` avoids conflict with the API management port `8081`.)
 
 3. Stop:
 
@@ -73,3 +75,12 @@ Current `core-platform-app` chart test hooks under `templates/tests` produce inv
 ## Keeping seeds in sync
 
 Bootstrap LDIF is duplicated in `api/k8s/ldap/values.yaml` (`configMaps.ldap-bootstrap`). If you change files under `ldap/bootstrap/`, update the ConfigMap entries in `values.yaml` as well.
+
+## Troubleshooting (quick)
+
+| Issue | Hint |
+|-------|------|
+| **`chown` … Read-only file system** on bootstrap LDIF | The compose mount must be writable (not `:ro`); the image adjusts ownership on startup. |
+| **`sed: can't read ... replication-disable.ldif`** / container restart loop | Set `LDAP_REMOVE_CONFIG_AFTER_SETUP=false` (already in `docker-compose.yaml`). If the DB volume was created during a broken run, `docker compose down -v` and start again. |
+| Cannot connect from **Dex** container | Use `host.docker.internal:389` or attach Dex and LDAP to the same Docker network; see [runbook](../docs/runbooks/auth-dex-ldap.md). |
+| **Wrong members** after seed change | Remove OpenLDAP volumes and recreate the stack so bootstrap LDIF runs on a fresh database (`docker compose down -v`). |

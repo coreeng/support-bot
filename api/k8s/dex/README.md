@@ -53,6 +53,10 @@ helm upgrade --install support-bot-dex \
   -f api/k8s/dex/values-integration.yaml
 ```
 
+## Integration deploy order (with LDAP)
+
+When both modules run in Kubernetes, apply **LDAP before Dex** so the LDAP Service exists, then point Dex at it (`dex.ldap.host`, e.g. `ldap:389` when colocated). Deploy or upgrade the **Support Bot API** after Dex with matching `DEX_*` env vars. See [docs/runbooks/auth-dex-ldap.md](../../../docs/runbooks/auth-dex-ldap.md).
+
 ## Support Bot API wiring
 
 Set these on the Support Bot API deployment:
@@ -84,5 +88,4 @@ make dex-deploy-prod
 
 Automation workflows:
 
-- `.github/workflows/support-bot-dex-fast-feedback.yaml`
-- `.github/workflows/support-bot-dex-integration.yaml`
+- `.github/workflows/dex-fast-feedback.yaml`

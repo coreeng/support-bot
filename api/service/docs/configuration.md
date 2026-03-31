@@ -366,5 +366,16 @@ For Kubernetes deployment values (platform chart), see [`api/k8s/dex/README.md`]
    - `http://localhost:8080/login/oauth2/code/dex`
    - `https://<your-api-domain>/login/oauth2/code/dex`
 4. Ensure Dex is configured to return the claims Support Bot needs for login (`email` and `name`/`preferred_username`).
+5. For **LDAP → Dex → JWT groups → tenant teams**, enable `platform-integration.jwt-groups` and map claim values to `team-code` (see the `jwt-groups` block under `platform-integration` earlier in this document).
 
 > Note: Dex can be enabled alongside Google and Azure. The login screen only shows providers that are fully configured.
+
+#### Troubleshooting (Dex / OAuth / LDAP)
+
+| Symptom | What to check |
+|--------|----------------|
+| **`redirect_uri` / unregistered redirect** | Dex `staticClients.redirectURIs` must list both API callbacks (`/login/oauth2/code/dex`) and UI callbacks (`/api/oauth/callback/dex` on the UI origin). Match scheme, host, and port exactly. |
+| **`user_not_allowed`** | `security.allow-list` (`ALLOWED_EMAILS` / `ALLOWED_DOMAINS`) must include the user’s email or domain (e.g. LDAP users under `@supportbot.local`). |
+| **Missing or wrong teams after LDAP login** | Dex must emit the configured claim (default `groups`). `jwt-groups.mappings[].claim-values` must match those strings (case-insensitive). `team-code` must match a platform team. Only the **`dex`** registration uses `jwt-groups`; Google/Azure direct clients use static-user / Azure / GCP only. |
+
+Full operational order and integration sequencing: [auth Dex/LDAP runbook](../../../../docs/runbooks/auth-dex-ldap.md).

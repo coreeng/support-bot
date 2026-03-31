@@ -1,0 +1,7 @@
+platform-integration:
+  jwt-groups:
+    enabled: true
+    claim-name: groups
+    mappings:
+      - claim-values: [developers]
+        team-code: wow

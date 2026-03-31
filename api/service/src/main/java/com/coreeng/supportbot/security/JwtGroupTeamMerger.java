@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -78,7 +79,7 @@ public class JwtGroupTeamMerger {
         return false;
     }
 
-    private static List<String> extractGroupStrings(Object claim) {
+    private static List<String> extractGroupStrings(@Nullable Object claim) {
         if (claim == null) {
             return List.of();
         }
