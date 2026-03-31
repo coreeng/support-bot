@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react'
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, Info } from 'lucide-react'
 import * as Tooltip from '@radix-ui/react-tooltip'
-import { useTenantInsightsStats } from '@/lib/hooks'
+import { useTenantInsightsStats, useEscalationBreakdown } from '@/lib/hooks'
 import { formatDuration } from '@/lib/utils/format'
 import type { RepoInsights } from '@/lib/types/dashboard'
 
@@ -71,13 +71,24 @@ export default function TenantRequestsPage() {
     const pageSize = 20
 
     const isDateRangeValid = dateFrom <= dateTo
+
     const { data: realRepos, isLoading, error } = useTenantInsightsStats(
         isDateRangeValid ? dateFrom : undefined,
         isDateRangeValid ? dateTo : undefined,
         isDateRangeValid
     )
 
+    const { data: breakdown } = useEscalationBreakdown(
+        isDateRangeValid ? dateFrom : undefined,
+        isDateRangeValid ? dateTo : undefined,
+        isDateRangeValid
+    )
+
     const repos = realRepos ?? []
+
+    const interventionRate = breakdown && breakdown.totalPrTickets > 0
+        ? Math.round((breakdown.manuallyEscalatedTickets / breakdown.totalPrTickets) * 100)
+        : null
 
     const totals = useMemo(() => {
         if (repos.length === 0) {
@@ -189,7 +200,7 @@ export default function TenantRequestsPage() {
                     <p className="text-xs text-slate-400 mt-0.5">Pull request tracking across repositories</p>
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
                     <StatCard
                         label="Repositories"
                         value={repoCount}
@@ -224,6 +235,15 @@ export default function TenantRequestsPage() {
                         isLoading={isLoading}
                         gradient={totals.breachedCount > 0 ? 'from-rose-500 to-red-600' : 'from-emerald-500 to-emerald-600'}
                         iconBg={totals.breachedCount > 0 ? 'bg-rose-400/30' : 'bg-emerald-400/30'}
+                    />
+                    <StatCard
+                        label="Intervention Rate"
+                        value={interventionRate}
+                        suffix="%"
+                        isLoading={isLoading}
+                        gradient={interventionRate !== null && interventionRate > 0 ? 'from-violet-500 to-purple-600' : 'from-emerald-500 to-emerald-600'}
+                        iconBg={interventionRate !== null && interventionRate > 0 ? 'bg-violet-400/30' : 'bg-emerald-400/30'}
+                        tooltip="% of PR tickets requiring manual engineer escalation"
                     />
                 </div>
 
@@ -340,26 +360,46 @@ export default function TenantRequestsPage() {
     )
 }
 
-function StatCard({ label, value, isLoading, gradient, iconBg }: {
+function StatCard({ label, value, suffix, isLoading, gradient, iconBg, tooltip }: {
     label: string
-    value: number
+    value: number | null
+    suffix?: string
     isLoading: boolean
     gradient: string
     iconBg: string
+    tooltip?: string
 }) {
     return (
-        <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${gradient} p-5 shadow-sm`}>
-            <div className={`absolute -top-4 -right-4 w-24 h-24 rounded-full ${iconBg}`} />
-            <div className={`absolute -bottom-6 -right-6 w-20 h-20 rounded-full ${iconBg}`} />
-            <div className="relative">
-                <p className="text-sm font-medium text-white/80">{label}</p>
-                {isLoading ? (
-                    <div className="h-9 mt-1 w-16 bg-white/20 rounded animate-pulse" />
-                ) : (
-                    <p className="text-3xl font-bold text-white mt-1 tabular-nums">{value}</p>
-                )}
-            </div>
-        </div>
+        <Tooltip.Root>
+            <Tooltip.Trigger asChild>
+                <div className={`relative overflow-hidden rounded-xl bg-gradient-to-br ${gradient} p-5 shadow-sm`}>
+                    <div className={`absolute -top-4 -right-4 w-24 h-24 rounded-full ${iconBg}`} />
+                    <div className={`absolute -bottom-6 -right-6 w-20 h-20 rounded-full ${iconBg}`} />
+                    <div className="relative">
+                        <p className="text-sm font-medium text-white/80">{label}</p>
+                        {isLoading ? (
+                            <div className="h-9 mt-1 w-16 bg-white/20 rounded animate-pulse" />
+                        ) : (
+                            <p className="text-3xl font-bold text-white mt-1 tabular-nums">
+                                {value !== null ? `${value}${suffix ?? ''}` : '—'}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            </Tooltip.Trigger>
+            {tooltip && (
+                <Tooltip.Portal>
+                    <Tooltip.Content
+                        side="bottom"
+                        sideOffset={6}
+                        className="z-50 max-w-[220px] px-3 py-2 text-xs leading-relaxed text-white bg-slate-900 rounded-lg shadow-lg animate-in fade-in-0 zoom-in-95"
+                    >
+                        {tooltip}
+                        <Tooltip.Arrow className="fill-slate-900" />
+                    </Tooltip.Content>
+                </Tooltip.Portal>
+            )}
+        </Tooltip.Root>
     )
 }
 
