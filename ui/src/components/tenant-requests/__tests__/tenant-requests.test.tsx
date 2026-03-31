@@ -4,9 +4,11 @@ import TenantRequestsPage from '../tenant-requests'
 import type { RepoInsights } from '../../../lib/types/dashboard'
 
 const mockUseTenantInsightsStats = jest.fn()
+const mockUseEscalationBreakdown = jest.fn()
 
 jest.mock('../../../lib/hooks', () => ({
     useTenantInsightsStats: (...args: unknown[]) => mockUseTenantInsightsStats(...args),
+    useEscalationBreakdown: (...args: unknown[]) => mockUseEscalationBreakdown(...args),
 }))
 
 jest.mock('../../../lib/utils/format', () => ({
@@ -48,6 +50,7 @@ describe('TenantRequestsPage', () => {
     beforeEach(() => {
         jest.clearAllMocks()
         mockUseTenantInsightsStats.mockReturnValue({ data: [], isLoading: false, error: null })
+        mockUseEscalationBreakdown.mockReturnValue({ data: undefined })
     })
 
     describe('Rendering', () => {
@@ -204,14 +207,17 @@ describe('TenantRequestsPage', () => {
             expect(screen.getByText('30 Days').className).not.toContain('bg-white')
         })
 
-        it('should call hook with updated dates when preset changes', () => {
+        it('should call hooks with updated dates when preset changes', () => {
             render(<TenantRequestsPage />)
 
             fireEvent.click(screen.getByText('90 Days'))
 
-            const lastCall = mockUseTenantInsightsStats.mock.calls.at(-1)
-            expect(lastCall[0]).toBeDefined() // dateFrom
-            expect(lastCall[1]).toBeDefined() // dateTo
+            const statsCall = mockUseTenantInsightsStats.mock.calls.at(-1)
+            const breakdownCall = mockUseEscalationBreakdown.mock.calls.at(-1)
+            expect(statsCall[0]).toBeDefined() // dateFrom
+            expect(statsCall[1]).toBeDefined() // dateTo
+            expect(breakdownCall[0]).toBe(statsCall[0]) // same dateFrom
+            expect(breakdownCall[1]).toBe(statsCall[1]) // same dateTo
         })
 
         it('should show date pickers when Custom is selected', () => {
@@ -545,7 +551,7 @@ describe('TenantRequestsPage', () => {
             const { container } = render(<TenantRequestsPage />)
 
             const greenCards = container.querySelectorAll('[class*="from-emerald"]')
-            expect(greenCards.length).toBe(2) // escalated + breached
+            expect(greenCards.length).toBe(3) // escalated + breached + intervention (no breakdown data)
         })
 
         it('should show amber gradient when escalated > 0', () => {
@@ -570,6 +576,75 @@ describe('TenantRequestsPage', () => {
 
             const redCard = container.querySelector('[class*="from-rose"]')
             expect(redCard).toBeInTheDocument()
+        })
+    })
+
+    describe('Intervention Rate', () => {
+        it('should show intervention rate percentage when breakdown data available', () => {
+            mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false })
+            mockUseEscalationBreakdown.mockReturnValue({
+                data: { totalPrTickets: 50, botEscalatedTickets: 10, manuallyEscalatedTickets: 5 },
+            })
+
+            render(<TenantRequestsPage />)
+
+            const statValues = screen.getAllByText(/^\d+%$/).filter(
+                el => el.className.includes('text-3xl')
+            )
+            expect(statValues).toHaveLength(1)
+            expect(statValues[0].textContent).toBe('10%')
+        })
+
+        it('should show dash when totalPrTickets is 0', () => {
+            mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false })
+            mockUseEscalationBreakdown.mockReturnValue({
+                data: { totalPrTickets: 0, botEscalatedTickets: 0, manuallyEscalatedTickets: 0 },
+            })
+
+            render(<TenantRequestsPage />)
+
+            const statValues = screen.getAllByText('—').filter(
+                el => el.className.includes('text-3xl')
+            )
+            expect(statValues).toHaveLength(1)
+        })
+
+        it('should show dash when no breakdown data', () => {
+            mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false })
+            mockUseEscalationBreakdown.mockReturnValue({ data: undefined })
+
+            render(<TenantRequestsPage />)
+
+            const statValues = screen.getAllByText('—').filter(
+                el => el.className.includes('text-3xl')
+            )
+            expect(statValues).toHaveLength(1)
+        })
+
+        it('should show 0% with green gradient when no manual escalations', () => {
+            mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false })
+            mockUseEscalationBreakdown.mockReturnValue({
+                data: { totalPrTickets: 20, botEscalatedTickets: 5, manuallyEscalatedTickets: 0 },
+            })
+
+            render(<TenantRequestsPage />)
+
+            const statValues = screen.getAllByText('0%').filter(
+                el => el.className.includes('text-3xl')
+            )
+            expect(statValues).toHaveLength(1)
+        })
+
+        it('should show purple gradient when intervention rate > 0', () => {
+            mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false })
+            mockUseEscalationBreakdown.mockReturnValue({
+                data: { totalPrTickets: 10, botEscalatedTickets: 2, manuallyEscalatedTickets: 3 },
+            })
+
+            const { container } = render(<TenantRequestsPage />)
+
+            const purpleCard = container.querySelector('[class*="from-violet"]')
+            expect(purpleCard).toBeInTheDocument()
         })
     })
 })

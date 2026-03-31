@@ -96,6 +96,15 @@ export interface RepoInsights {
 }
 
 /**
+ * Escalation breakdown from /tenant-insights/escalation-breakdown
+ */
+export interface EscalationBreakdown {
+    totalPrTickets: number
+    botEscalatedTickets: number
+    manuallyEscalatedTickets: number
+}
+
+/**
  * Histogram data point for distribution charts
  */
 export interface HistogramBin {
