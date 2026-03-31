@@ -1,0 +1,13 @@
+# Integration environment overrides for Dex.
+
+ingress:
+  hosts:
+    - host: dex.integration.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+dex:
+  issuer: https://dex.integration.example.com
+  redirectUris:
+    - https://support-bot-api.integration.example.com/login/oauth2/code/dex

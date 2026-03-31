@@ -143,7 +143,10 @@ export const authConfig: NextAuthConfig = {
         const code = credentials?.code as string;
         const provider = credentials?.provider as string;
 
-        if (code && (provider === "google" || provider === "azure")) {
+        if (
+          code &&
+          (provider === "google" || provider === "azure" || provider === "dex")
+        ) {
           try {
             const redirectUri = new URL(
               `/api/oauth/callback/${provider}`,

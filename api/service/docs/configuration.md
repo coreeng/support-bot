@@ -348,6 +348,9 @@ Portal: https://portal.azure.com > Microsoft Entra ID > App registrations
 
 Dex docs: https://dexidp.io/
 
+For local Dex setup in this repository, see [`dex/README.md`](../../../../dex/README.md).
+For Kubernetes deployment values (platform chart), see [`api/k8s/dex/README.md`](../../../k8s/dex/README.md).
+
 1. Create a Dex OAuth2 client for Support Bot.
 2. Set:
    - `DEX_CLIENT_ID`

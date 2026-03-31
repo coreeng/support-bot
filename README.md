@@ -85,6 +85,7 @@ For a more detailed explanation of all configuration options see the [Configurat
 
 We've built a helm chart that you can use to make the deployment easier.
 Find the documentation for it [here](https://github.com/coreeng/support-bot/blob/main/api/k8s/service/README.md).
+Dex deployment values for the platform chart are documented [here](https://github.com/coreeng/support-bot/blob/main/api/k8s/dex/README.md).
 
 How to use the helm chart:
 ```bash
