@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import TeamSelector from '../TeamSelector'
 
@@ -266,6 +266,11 @@ describe('TeamSelector', () => {
     // Falls back to first available team; invalid URL team is ignored
     expect(setSelectedTeam).toHaveBeenCalledWith('Tenant A')
     expect(setSelectedTeam).not.toHaveBeenCalledWith('Other Team')
+    // The access-denied modal must appear naming the invalid team and the fallback
+    const modal = screen.getByTestId('team-access-denied-modal')
+    expect(modal).toBeInTheDocument()
+    expect(within(modal).getByText(/Other Team/)).toBeInTheDocument()
+    expect(within(modal).getByText(/Tenant A/)).toBeInTheDocument()
   })
 
   it('rewrites a stale invalid ?team URL param when selectedTeam is already valid', () => {
@@ -292,6 +297,11 @@ describe('TeamSelector', () => {
 
     // selectedTeam should not change — it is already correct
     expect(setSelectedTeam).not.toHaveBeenCalled()
+    // The access-denied modal must appear naming the invalid team and the fallback
+    const modal = screen.getByTestId('team-access-denied-modal')
+    expect(modal).toBeInTheDocument()
+    expect(within(modal).getByText(/OldTeam/)).toBeInTheDocument()
+    expect(within(modal).getByText(/Tenant A/)).toBeInTheDocument()
     // URL must be updated to replace the stale invalid team with the valid one
     expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('team=Tenant+A'))
     expect(mockReplace).not.toHaveBeenCalledWith(expect.stringContaining('OldTeam'))
