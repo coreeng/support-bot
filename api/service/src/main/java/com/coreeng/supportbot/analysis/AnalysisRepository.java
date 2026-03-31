@@ -1,5 +1,8 @@
 package com.coreeng.supportbot.analysis;
 
+import com.coreeng.supportbot.ticket.TicketId;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
@@ -31,6 +34,12 @@ public interface AnalysisRepository {
      * @return List of DimensionSummary records with dimension (driver), count, summary, channelId, and queryTs
      */
     List<DimensionSummary> getDriversWithSummaries();
+
+    /** Finds the analysis summary for a single ticket. */
+    @Nullable String findSummaryByTicketId(TicketId ticketId);
+
+    /** Finds analysis summaries for a batch of ticket IDs keyed by ticket id. */
+    ImmutableMap<TicketId, String> findSummariesByTicketIds(ImmutableList<TicketId> ticketIds);
 
     /**
      * Upserts analysis records.

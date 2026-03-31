@@ -35,10 +35,14 @@ public class TicketUIMapper {
     private final TicketAssignmentProps assignmentProps;
 
     public TicketUI mapToUI(DetailedTicket ticket) {
-        return mapToUI(ticket, null);
+        return mapToUI(ticket, null, null);
     }
 
     public TicketUI mapToUI(DetailedTicket ticket, @Nullable String queryText) {
+        return mapToUI(ticket, queryText, null);
+    }
+
+    public TicketUI mapToUI(DetailedTicket ticket, @Nullable String queryText, @Nullable String summary) {
         String permalink = queryText != null ? resolveQueryPermalink(ticket) : null;
         return TicketUI.builder()
                 .id(Objects.requireNonNull(ticket.ticket().id()))
@@ -59,6 +63,7 @@ public class TicketUIMapper {
                             case TicketTeam.KnownTeam k -> mapKnownTeamToUI(k.code());
                         })
                 .impact(ticket.ticket().impact())
+                .summary(summary)
                 .tags(ticket.ticket().tags())
                 .logs(ticket.ticket().statusLog().stream()
                         .map(s -> new TicketUI.Log(

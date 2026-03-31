@@ -5,9 +5,13 @@ import static org.jooq.impl.DSL.currentLocalDateTime;
 import static org.jooq.impl.DSL.excluded;
 import static org.jooq.impl.DSL.row;
 
+import com.coreeng.supportbot.ticket.TicketId;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -126,6 +130,39 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("summary", String.class),
                         r.get("channel_id", String.class),
                         r.get("query_ts", String.class)));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public @Nullable String findSummaryByTicketId(TicketId ticketId) {
+        return dsl.select(ANALYSIS.SUMMARY)
+                .from(ANALYSIS)
+                .where(ANALYSIS.TICKET_ID.eq((int) ticketId.id()))
+                .fetchOne(ANALYSIS.SUMMARY);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ImmutableMap<TicketId, String> findSummariesByTicketIds(ImmutableList<TicketId> ticketIds) {
+        if (ticketIds.isEmpty()) {
+            return ImmutableMap.of();
+        }
+
+        ImmutableMap.Builder<TicketId, String> summaries = ImmutableMap.builder();
+        dsl.select(ANALYSIS.TICKET_ID, ANALYSIS.SUMMARY)
+                .from(ANALYSIS)
+                .where(ANALYSIS.TICKET_ID.in(
+                        ticketIds.stream().map(ticketId -> (int) ticketId.id()).toList()))
+                .and(ANALYSIS.SUMMARY.isNotNull())
+                .fetch()
+                .forEach(row -> {
+                    Integer rowTicketId = row.get(ANALYSIS.TICKET_ID);
+                    String summary = row.get(ANALYSIS.SUMMARY);
+                    if (rowTicketId != null && summary != null) {
+                        summaries.put(new TicketId(rowTicketId.longValue()), summary);
+                    }
+                });
+        return summaries.buildOrThrow();
     }
 
     /**

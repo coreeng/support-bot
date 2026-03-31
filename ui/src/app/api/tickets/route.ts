@@ -19,6 +19,7 @@ function mapTicket(ticket: Record<string, unknown>) {
 
   return {
     ...ticket,
+    summary: ticket.summary as string | null | undefined,
     id: String(ticket.id),
     team: team ? { name: team.code || team.label || "" } : null,
     escalations:

@@ -369,4 +369,76 @@ public class TicketUIMapperTest {
         // then
         assertNull(result.query().link());
     }
+
+    @Test
+    void mapToUIIncludesSummaryWhenProvided() {
+        // given
+        Ticket ticket = Ticket.builder()
+                .id(new TicketId(1))
+                .channelId("C123")
+                .queryTs(MessageTs.of("123.456"))
+                .createdMessageTs(MessageTs.of("123.457"))
+                .status(TicketStatus.opened)
+                .team(null)
+                .impact("production-blocking")
+                .tags(ImmutableList.of())
+                .lastInteractedAt(Instant.now())
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+                .build();
+        DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
+
+        // when
+        TicketUI result = ticketUIMapper.mapToUI(detailedTicket, null, "Cache invalidation resolved the incident");
+
+        // then
+        assertEquals("Cache invalidation resolved the incident", result.summary());
+    }
+
+    @Test
+    void mapToUIKeepsSummaryNullWhenNotProvided() {
+        // given
+        Ticket ticket = Ticket.builder()
+                .id(new TicketId(1))
+                .channelId("C123")
+                .queryTs(MessageTs.of("123.456"))
+                .createdMessageTs(MessageTs.of("123.457"))
+                .status(TicketStatus.opened)
+                .team(null)
+                .impact("production-blocking")
+                .tags(ImmutableList.of())
+                .lastInteractedAt(Instant.now())
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+                .build();
+        DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
+
+        // when
+        TicketUI result = ticketUIMapper.mapToUI(detailedTicket, null, null);
+
+        // then
+        assertNull(result.summary());
+    }
+
+    @Test
+    void mapToUIWithQueryTextAndSummaryPreservesSummary() {
+        // given
+        Ticket ticket = Ticket.builder()
+                .id(new TicketId(1))
+                .channelId("C123")
+                .queryTs(MessageTs.of("123.456"))
+                .createdMessageTs(MessageTs.of("123.457"))
+                .status(TicketStatus.opened)
+                .team(null)
+                .impact("production-blocking")
+                .tags(ImmutableList.of())
+                .lastInteractedAt(Instant.now())
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+                .build();
+        DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
+
+        // when
+        TicketUI result = ticketUIMapper.mapToUI(detailedTicket, "Original message", "Resolved via config fix");
+
+        // then
+        assertEquals("Resolved via config fix", result.summary());
+    }
 }
