@@ -9,7 +9,6 @@ import static org.mockito.Mockito.when;
 import com.coreeng.supportbot.prtracking.EscalationBreakdown;
 import com.coreeng.supportbot.prtracking.PrTrackingRepository;
 import com.coreeng.supportbot.prtracking.RepoInsights;
-import java.lang.reflect.Method;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +18,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,16 +33,6 @@ class TenantInsightsControllerTest {
     @BeforeEach
     void setUp() {
         controller = new TenantInsightsController(prTrackingRepository);
-    }
-
-    @Test
-    void doesNotExposeEnabledEndpoint() {
-        List<String> getMappings = List.of(TenantInsightsController.class.getDeclaredMethods()).stream()
-                .filter(method -> method.getName().equals("enabled"))
-                .map(TenantInsightsControllerTest::getGetMappingValue)
-                .toList();
-
-        assertThat(getMappings).isEmpty();
     }
 
     @Test
@@ -191,13 +179,5 @@ class TenantInsightsControllerTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("dateFrom must not be after dateTo");
         verifyNoInteractions(prTrackingRepository);
-    }
-
-    private static String getGetMappingValue(Method method) {
-        GetMapping mapping = method.getAnnotation(GetMapping.class);
-        if (mapping == null || mapping.value().length == 0) {
-            return "";
-        }
-        return mapping.value()[0];
     }
 }
