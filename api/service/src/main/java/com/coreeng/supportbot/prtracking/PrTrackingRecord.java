@@ -24,6 +24,9 @@ public record PrTrackingRecord(
         @Nullable Instant lastAuthorActivityAt) {
     public PrTrackingRecord {
         requireNonNull(githubRepo, "githubRepo must not be null");
+        if (prNumber <= 0) {
+            throw new IllegalArgumentException("prNumber must be positive, was " + prNumber);
+        }
         requireNonNull(prCreatedAt, "prCreatedAt must not be null");
         requireNonNull(owningTeam, "owningTeam must not be null");
         if (owningTeam.isBlank()) {

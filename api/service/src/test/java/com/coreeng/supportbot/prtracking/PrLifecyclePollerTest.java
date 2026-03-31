@@ -1286,6 +1286,7 @@ class PrLifecyclePollerTest {
         return new PrLifecyclePoller(
                 prTrackingRepository,
                 gitHubClient,
+                new TeamReviewFilter(gitHubClient),
                 ticketRepository,
                 ticketProcessingService,
                 escalationProcessingService,

@@ -15,7 +15,7 @@ public interface GitHubClient {
     List<String> listPullRequestFiles(String repositoryName, int pullNumber);
 
     /**
-     * Resolves the members of a GitHub team's members for review validation.
+     * Resolves the members of a GitHub team for review validation.
      *
      * @throws GitHubApiException on any GitHub API failure (not found, auth, server errors, network)
      */

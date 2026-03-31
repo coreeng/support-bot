@@ -473,6 +473,68 @@ class Hub4jGitHubClientTest {
                 .hasMessageContaining("null submitted_at");
     }
 
+    @Test
+    void resolveTeamReviewersReturnsLogins() throws IOException {
+        // given
+        GHOrganization org = mock(GHOrganization.class);
+        GHTeam team = mock(GHTeam.class);
+        when(gitHub.getOrganization("my-org")).thenReturn(org);
+        when(org.getTeamBySlug("platform-team")).thenReturn(team);
+
+        GHUser alice = mock(GHUser.class);
+        GHUser bob = mock(GHUser.class);
+        when(alice.getLogin()).thenReturn("alice");
+        when(bob.getLogin()).thenReturn("bob");
+
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHUser> iterable = mock(PagedIterable.class);
+        when(team.listMembers()).thenReturn(iterable);
+        when(iterable.toList()).thenReturn(List.of(alice, bob));
+
+        // when
+        List<String> result = client.resolveTeamReviewers("my-org", "platform-team");
+
+        // then
+        assertThat(result).containsExactly("alice", "bob");
+    }
+
+    @Test
+    void resolveTeamReviewersWraps404() throws IOException {
+        // given
+        when(gitHub.getOrganization("my-org")).thenThrow(new GHFileNotFoundException("Not Found"));
+
+        // when / then
+        assertThatThrownBy(() -> client.resolveTeamReviewers("my-org", "platform-team"))
+                .isInstanceOf(GitHubApiException.class)
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(404));
+    }
+
+    @Test
+    void resolveTeamReviewersWrapsHttpException() throws IOException {
+        // given
+        when(gitHub.getOrganization("my-org")).thenThrow(new HttpException(403, "Forbidden", (String) null, null));
+
+        // when / then
+        assertThatThrownBy(() -> client.resolveTeamReviewers("my-org", "platform-team"))
+                .isInstanceOf(GitHubApiException.class)
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(403));
+    }
+
+    @Test
+    void resolveTeamReviewersWrapsIOException() throws IOException {
+        // given
+        when(gitHub.getOrganization("my-org")).thenThrow(new IOException("Connection refused"));
+
+        // when / then
+        assertThatThrownBy(() -> client.resolveTeamReviewers("my-org", "platform-team"))
+                .isInstanceOf(GitHubApiException.class)
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(0))
+                .hasMessageContaining("my-org/platform-team");
+    }
+
     /**
      * Creates a spy on a real GHPullRequestReview and stubs the methods we need.
      * We use spy instead of mock because GHObject.getId() has @WithBridgeMethods

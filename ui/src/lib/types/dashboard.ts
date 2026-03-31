@@ -98,12 +98,24 @@ export interface RepoInsights {
 }
 
 /**
- * Escalation breakdown from /tenant-insights/escalation-breakdown
+ * A single in-flight (currently open) pull request returned by
+ * /tenant-insights/in-flight-prs
  */
-export interface EscalationBreakdown {
-    totalPrTickets: number
-    botEscalatedTickets: number
-    manuallyEscalatedTickets: number
+export interface InFlightPr {
+    githubRepo: string
+    prNumber: number
+    prUrl: string
+    status: string
+    waitingOn: string
+    prCreatedAt: string
+    slaDeadline: string | null
+    slaRemainingSeconds: number | null
+    lastReviewAt: string | null
+    owningTeam: string
+    owningTeamLabel: string
+    ticketChannelId: string
+    ticketQueryTs: string
+    escalatedAt: string | null
 }
 
 /**

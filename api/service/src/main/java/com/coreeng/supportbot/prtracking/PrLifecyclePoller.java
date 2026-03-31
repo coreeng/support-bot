@@ -21,9 +21,7 @@ import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketProcessingService;
 import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
@@ -46,6 +44,7 @@ public class PrLifecyclePoller {
 
     private final PrTrackingRepository prTrackingRepository;
     private final GitHubClient gitHubClient;
+    private final TeamReviewFilter teamReviewFilter;
     private final TicketRepository ticketRepository;
     private final TicketProcessingService ticketProcessingService;
     private final EscalationProcessingService escalationProcessingService;
@@ -91,8 +90,9 @@ public class PrLifecyclePoller {
             return;
         }
 
-        List<GitHubPullRequestReview> teamReviews = filterToOwningTeam(record, pr, pr.reviews(), teamMemberCache);
-        GitHubPullRequestReview latestVerdict = findLatestActionableReview(teamReviews);
+        List<GitHubPullRequestReview> teamReviews = teamReviewFilter.filterToOwningTeam(
+                pr.reviews(), pr, findRepoConfig(record.githubRepo()), teamMemberCache);
+        GitHubPullRequestReview latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
 
         switch (record.status()) {
             case OPEN -> processOpenRecord(record, pr, latestVerdict);
@@ -105,66 +105,10 @@ public class PrLifecyclePoller {
         updateActivityTimestamps(record, teamReviews);
     }
 
-    private List<GitHubPullRequestReview> filterToOwningTeam(
-            PrTrackingRecord record,
-            GitHubPullRequest pr,
-            List<GitHubPullRequestReview> reviews,
-            Map<String, @Nullable Set<String>> cache) {
-        Set<String> teamMembers = resolveOwningTeamMembers(record, pr, cache);
-
-        if (teamMembers == null || teamMembers.isEmpty()) {
-            return reviews;
-        }
-
-        return reviews.stream().filter(r -> teamMembers.contains(r.userLogin())).toList();
-    }
-
-    private @Nullable Set<String> resolveOwningTeamMembers(
-            PrTrackingRecord record, GitHubPullRequest pr, Map<String, @Nullable Set<String>> cache) {
-        // Explicit team slug configured — use Teams API
-        PrTrackingProps.Repository repoConfig = findRepoConfig(record.githubRepo());
-        if (repoConfig != null && repoConfig.githubTeamSlug() != null) {
-            String org = Iterables.get(Splitter.on('/').split(record.githubRepo()), 0);
-            return resolveTeamReviewers(org, repoConfig.githubTeamSlug(), cache);
-        }
-
-        // No slug — use requested team reviewers already fetched with the PR.
-        // If empty (no teams requested), all reviews are accepted without filtering.
-        List<String> requestedMembers = pr.requestedTeamReviewerLogins();
-        return requestedMembers.isEmpty() ? Set.of() : Set.copyOf(requestedMembers);
-    }
-
-    private @Nullable Set<String> resolveTeamReviewers(
-            String org, String teamSlug, Map<String, @Nullable Set<String>> cache) {
-        String key = org + "/" + teamSlug;
-        if (cache.containsKey(key)) {
-            return cache.get(key);
-        }
-        try {
-            Set<String> members = Set.copyOf(gitHubClient.resolveTeamReviewers(org, teamSlug));
-            cache.put(key, members);
-            return members;
-        } catch (GitHubApiException e) {
-            log.atWarn()
-                    .addArgument(() -> org + "/" + teamSlug)
-                    .addArgument(e::getMessage)
-                    .log("Could not fetch team members for {} — skipping team validation: {}");
-            cache.put(key, null);
-            return null;
-        }
-    }
-
     private PrTrackingProps.@Nullable Repository findRepoConfig(String githubRepo) {
         return prTrackingProps.repositories().stream()
                 .filter(r -> r.name().equalsIgnoreCase(githubRepo))
                 .findFirst()
-                .orElse(null);
-    }
-
-    private @Nullable GitHubPullRequestReview findLatestActionableReview(List<GitHubPullRequestReview> reviews) {
-        return reviews.stream()
-                .filter(r -> r.isApproved() || r.requestsChanges())
-                .max(Comparator.comparing(GitHubPullRequestReview::submittedAt))
                 .orElse(null);
     }
 
@@ -201,6 +145,8 @@ public class PrLifecyclePoller {
         if (pr.isMergeable()) {
             handleApprovalClosure(record);
         } else if (latestVerdict != null && latestVerdict.requestsChanges()) {
+            // SLA remains paused: updateStatus does not touch sla_remaining/sla_deadline for non-CLOSED
+            // transitions. The existing sla_remaining from APPROVED carries over to CHANGES_REQUESTED.
             prTrackingRepository.updateStatus(
                     record.id(), PrTrackingStatus.CHANGES_REQUESTED, null, record.escalationId());
             notifyChangesRequested(record);
@@ -227,7 +173,8 @@ public class PrLifecyclePoller {
         }
     }
 
-    // Called from OPEN and CHANGES_REQUESTED. Closes if mergeable; pauses SLA when OPEN; updates status otherwise.
+    // Called from OPEN and CHANGES_REQUESTED. Closes if mergeable; pauses SLA (APPROVED) when OPEN; transitions to
+    // APPROVED otherwise.
     private void handleApproval(PrTrackingRecord record, GitHubPullRequest pr) {
         if (pr.isMergeable()) {
             handleApprovalClosure(record);

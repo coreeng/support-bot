@@ -29,9 +29,7 @@ import com.coreeng.supportbot.ticket.TicketTeam;
 import com.coreeng.supportbot.ticket.TicketTeamSuggestionsService;
 import com.coreeng.supportbot.ticket.TicketTeamsSuggestion;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
 import java.time.Duration;
 import java.time.Instant;
@@ -63,6 +61,7 @@ public class PrDetectionService {
 
     private final GitHubPrUrlParser prUrlParser;
     private final GitHubClient gitHubClient;
+    private final TeamReviewFilter teamReviewFilter;
     private final PrTrackingRepository prTrackingRepository;
     private final PrTrackingProps prTrackingProps;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
@@ -252,9 +251,22 @@ public class PrDetectionService {
     }
 
     private record PendingNotification(
-            String repo, int prNumber, NotificationType type, Duration sla, Instant slaDeadline, String teamLabel) {}
+            String repo, int prNumber, NotificationType type, Duration sla, Instant slaDeadline, String teamLabel) {
+        PendingNotification {
+            checkNotNull(repo);
+            checkNotNull(type);
+            checkNotNull(sla);
+            checkNotNull(slaDeadline);
+            checkNotNull(teamLabel);
+        }
+    }
 
-    private record PendingEscalation(PrTrackingRecord tracking, Ticket ticket, String owningTeam) {}
+    private record PendingEscalation(PrTrackingRecord tracking, Ticket ticket) {
+        PendingEscalation {
+            checkNotNull(tracking);
+            checkNotNull(ticket);
+        }
+    }
 
     private PerPrResult processPr(
             DetectedPr detectedPr,
@@ -364,7 +376,9 @@ public class PrDetectionService {
         // Note: wall-clock time progresses between the review evaluation and the SLA deadline check
         // below. For deadlines very close to now, remaining duration may go slightly negative;
         // clamping to Duration.ZERO handles this.
-        GitHubPullRequestReview latestVerdict = fetchLatestTeamVerdict(prMetadata, repoConfig, teamReviewerCache);
+        List<GitHubPullRequestReview> teamReviews =
+                teamReviewFilter.filterToOwningTeam(prMetadata.reviews(), prMetadata, repoConfig, teamReviewerCache);
+        GitHubPullRequestReview latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
 
         if (Instant.now().isAfter(slaDeadline)) {
             if (latestVerdict != null && latestVerdict.requestsChanges()) {
@@ -393,7 +407,7 @@ public class PrDetectionService {
                         sla,
                         slaDeadline,
                         teamLabel));
-                pendingEscalations.add(new PendingEscalation(tracking, ticket, repoConfig.owningTeam()));
+                pendingEscalations.add(new PendingEscalation(tracking, ticket));
             }
         } else if (latestVerdict != null && latestVerdict.requestsChanges()) {
             Duration remaining = clampNonNegative(Duration.between(Instant.now(), slaDeadline));
@@ -467,66 +481,6 @@ public class PrDetectionService {
         }
     }
 
-    private @Nullable GitHubPullRequestReview fetchLatestTeamVerdict(
-            GitHubPullRequest prMetadata,
-            PrTrackingProps.Repository repoConfig,
-            Map<String, @Nullable Set<String>> teamReviewerCache) {
-        List<GitHubPullRequestReview> teamReviews =
-                filterReviewsToOwningTeam(prMetadata.reviews(), prMetadata, repoConfig, teamReviewerCache);
-        return teamReviews.stream()
-                .filter(r -> r.isApproved() || r.requestsChanges())
-                .max(java.util.Comparator.comparing(GitHubPullRequestReview::submittedAt))
-                .orElse(null);
-    }
-
-    private List<GitHubPullRequestReview> filterReviewsToOwningTeam(
-            List<GitHubPullRequestReview> reviews,
-            GitHubPullRequest prMetadata,
-            PrTrackingProps.Repository repoConfig,
-            Map<String, @Nullable Set<String>> cache) {
-        // Explicit team slug configured — use Teams API
-        if (repoConfig.githubTeamSlug() != null) {
-            String org = Iterables.get(Splitter.on('/').split(prMetadata.repositoryName()), 0);
-            String teamSlug = repoConfig.githubTeamSlug();
-            String cacheKey = org + "/" + teamSlug;
-            Set<String> members = resolveCached(cacheKey, cache, () -> {
-                try {
-                    return Set.copyOf(gitHubClient.resolveTeamReviewers(org, teamSlug));
-                } catch (GitHubApiException e) {
-                    log.atWarn()
-                            .addArgument(repoConfig::githubTeamSlug)
-                            .addArgument(e::getMessage)
-                            .log("Could not resolve team reviewers for {} at detection — accepting all reviews: {}");
-                    return null;
-                }
-            });
-            if (members == null || members.isEmpty()) {
-                return reviews;
-            }
-            return reviews.stream().filter(r -> members.contains(r.userLogin())).toList();
-        }
-
-        // No slug — use requested team reviewers already fetched with the PR
-        List<String> requestedMembers = prMetadata.requestedTeamReviewerLogins();
-        if (requestedMembers.isEmpty()) {
-            return reviews;
-        }
-        Set<String> members = Set.copyOf(requestedMembers);
-        return reviews.stream().filter(r -> members.contains(r.userLogin())).toList();
-    }
-
-    private @Nullable Set<String> resolveCached(
-            String key,
-            Map<String, @Nullable Set<String>> cache,
-            java.util.function.Supplier<@Nullable Set<String>> loader) {
-        if (cache.containsKey(key)) {
-            return cache.get(key);
-        }
-        Set<String> result = loader.get();
-        cache.put(key, result);
-        return result;
-    }
-
     private void postNotificationsAndEscalations(
             List<PendingNotification> notifications,
             List<PendingEscalation> pendingEscalations,
@@ -559,7 +513,7 @@ public class PrDetectionService {
                 }
 
                 for (PendingEscalation e : escalationsByRepo.getOrDefault(repo, List.of())) {
-                    escalateImmediately(e.tracking(), e.ticket(), e.owningTeam());
+                    escalateImmediately(e.tracking(), e.ticket(), e.tracking().owningTeam());
                 }
             } catch (Exception e) {
                 log.atError()

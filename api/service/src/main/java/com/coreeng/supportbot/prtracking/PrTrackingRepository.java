@@ -19,7 +19,7 @@ public interface PrTrackingRepository {
     PrTrackingRecord updateStatus(
             long id, PrTrackingStatus newStatus, @Nullable Instant closedAt, @Nullable Long escalationId);
 
-    /** Pauses the SLA clock, storing the remaining duration and nulling the deadline. */
+    /** Pauses the SLA clock: sets status to newStatus, stores the remaining duration, and nulls the deadline. */
     PrTrackingRecord pauseSla(long id, PrTrackingStatus newStatus, Duration remaining);
 
     /** Resumes the SLA clock with a new deadline, nulling the remaining duration and setting status to OPEN. */
@@ -35,6 +35,9 @@ public interface PrTrackingRepository {
     void updateActivityTimestamps(long id, @Nullable Instant lastReviewAt, @Nullable Instant lastAuthorActivityAt);
 
     boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, String githubRepo, int prNumber);
+
+    /** Returns all active (OPEN, ESCALATED, CHANGES_REQUESTED, APPROVED) PR tracking records, optionally filtered by owning team. */
+    List<InFlightPr> findAllInFlight(@Nullable String owningTeam);
 
     /** Stats per repo for PRs created within the given date range. */
     List<RepoInsights> getInsightsByRepo(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo);

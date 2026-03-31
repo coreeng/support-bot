@@ -10,7 +10,7 @@ alter table pr_tracking
     alter column sla_deadline drop not null;
 
 -- SLA clock consistency: at most one of deadline/remaining is set at any time.
--- Both null is permitted (e.g., closed records or records pending initial SLA computation).
+-- Both null is permitted for closed records where the SLA fields are cleared.
 alter table pr_tracking add constraint chk_sla_clock_consistency
     check (
         (sla_deadline is not null and sla_remaining is null)

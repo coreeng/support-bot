@@ -158,6 +158,84 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
 
     @Transactional(readOnly = true)
     @Override
+    public List<InFlightPr> findAllInFlight(@Nullable String owningTeam) {
+        List<Object> binds = new ArrayList<>();
+        String teamFilter = "";
+        if (owningTeam != null && !owningTeam.isBlank()) {
+            teamFilter = "AND pt.owning_team = ? ";
+            binds.add(owningTeam);
+        }
+        String sql = """
+                SELECT github_repo, pr_number, status, pr_created_at,
+                       sla_deadline, sla_remaining, last_review_at, owning_team,
+                       ticket_channel_id, ticket_query_ts, escalated_at
+                FROM (
+                    SELECT DISTINCT ON (pt.github_repo, pt.pr_number)
+                           pt.github_repo, pt.pr_number, pt.status, pt.pr_created_at,
+                           pt.sla_deadline, pt.sla_remaining, pt.last_review_at, pt.owning_team,
+                           q.channel_id AS ticket_channel_id, q.ts AS ticket_query_ts,
+                           (SELECT el.date FROM escalation_log el
+                            WHERE el.escalation_id = pt.escalation_id AND el.event = 'opened'
+                            LIMIT 1) AS escalated_at
+                    FROM pr_tracking pt
+                    JOIN ticket t ON t.id = pt.ticket_id
+                    JOIN query q ON q.id = t.query_id
+                    WHERE pt.status IN ('OPEN', 'ESCALATED', 'CHANGES_REQUESTED', 'APPROVED')
+                      %s
+                    ORDER BY
+                        pt.github_repo,
+                        pt.pr_number,
+                        CASE pt.status
+                            WHEN 'ESCALATED' THEN 1
+                            WHEN 'OPEN' THEN 2
+                            WHEN 'CHANGES_REQUESTED' THEN 3
+                            WHEN 'APPROVED' THEN 4
+                        END,
+                        pt.sla_deadline ASC NULLS LAST
+                ) deduped
+                ORDER BY
+                    CASE status
+                        WHEN 'ESCALATED' THEN 1
+                        WHEN 'OPEN' THEN 2
+                        WHEN 'CHANGES_REQUESTED' THEN 3
+                        WHEN 'APPROVED' THEN 4
+                    END,
+                    sla_deadline ASC NULLS LAST
+                """.formatted(teamFilter);
+
+        return dsl.resultQuery(sql, binds.toArray()).fetch(r -> {
+            String status = checkNotNull(r.get("status", String.class));
+            String waitingOn =
+                    switch (status) {
+                        case "OPEN", "ESCALATED" -> "TEAM";
+                        case "CHANGES_REQUESTED" -> "TENANT";
+                        case "APPROVED" -> "MERGE";
+                        default -> "UNKNOWN";
+                    };
+            String repo = checkNotNull(r.get("github_repo", String.class));
+            int prNumber = checkNotNull(r.get("pr_number", Integer.class));
+            org.jooq.types.YearToSecond slaRemainingRaw = r.get("sla_remaining", org.jooq.types.YearToSecond.class);
+            Long slaRemainingSeconds =
+                    slaRemainingRaw != null ? slaRemainingRaw.toDuration().toSeconds() : null;
+            return new InFlightPr(
+                    repo,
+                    prNumber,
+                    "https://github.com/%s/pull/%d".formatted(repo, prNumber),
+                    status,
+                    waitingOn,
+                    checkNotNull(r.get("pr_created_at", Instant.class)),
+                    r.get("sla_deadline", Instant.class),
+                    slaRemainingSeconds,
+                    r.get("last_review_at", Instant.class),
+                    checkNotNull(r.get("owning_team", String.class)),
+                    checkNotNull(r.get("ticket_channel_id", String.class)),
+                    checkNotNull(r.get("ticket_query_ts", String.class)),
+                    r.get("escalated_at", Instant.class));
+        });
+    }
+
+    @Transactional(readOnly = true)
+    @Override
     public List<RepoInsights> getInsightsByRepo(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
         List<Object> binds = new ArrayList<>();
         String dateFilter = buildDateFilter(dateFrom, dateTo, binds);
@@ -219,7 +297,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
         List<Object> binds = new ArrayList<>();
         binds.add(EscalationSource.bot.name());
         binds.add(EscalationSource.manual.name());
-        String dateFilter = buildDateFilter(dateFrom, dateTo, "pr_created_at", binds);
+        String dateFilter = buildDateFilter(dateFrom, dateTo, binds);
         String sql = """
                 SELECT
                     COUNT(DISTINCT ticket_id) AS total_pr_tickets,

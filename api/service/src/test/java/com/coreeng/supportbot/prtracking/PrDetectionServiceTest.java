@@ -99,6 +99,7 @@ class PrDetectionServiceTest {
         service = new PrDetectionService(
                 prUrlParser,
                 gitHubClient,
+                new TeamReviewFilter(gitHubClient),
                 prTrackingRepository,
                 prTrackingProps,
                 escalationTeamsRegistry,
@@ -796,6 +797,53 @@ class PrDetectionServiceTest {
             verifyNoInteractions(escalationProcessingService);
         }
 
+        @Test
+        void filtersReviewsToOwningTeamAtDetectionTime() {
+            // given — repo configured with explicit team slug
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
+            Instant slaDeadline = prCreatedAt.plus(SLA_24H);
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(
+                            List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, "platform-team", sla(SLA_24H))));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
+                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+
+            // stub team resolver — "team-member" is in the owning team, "outsider" is not
+            when(gitHubClient.resolveTeamReviewers("my-org", "platform-team")).thenReturn(List.of("team-member"));
+
+            // PR has two reviews: outsider APPROVED + team-member CHANGES_REQUESTED
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of(
+                                    new GitHubPullRequestReview(
+                                            "outsider",
+                                            GitHubPullRequestReview.ReviewState.APPROVED,
+                                            Instant.now().minusSeconds(7200)),
+                                    new GitHubPullRequestReview(
+                                            "team-member",
+                                            GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                                            Instant.now().minusSeconds(3600)))));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, slaDeadline));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(5L));
+
+            // then — outsider's approval is ignored; team-member's CHANGES_REQUESTED wins
+            verify(prTrackingRepository).pauseSla(anyLong(), eq(PrTrackingStatus.CHANGES_REQUESTED), eq(Duration.ZERO));
+            verifyNoInteractions(escalationProcessingService);
+        }
+
         private void stubBreachedPrDetection(Instant prCreatedAt, Ticket ticket) {
             Instant slaDeadline = prCreatedAt.plus(SLA_24H);
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
@@ -1242,6 +1290,21 @@ class PrDetectionServiceTest {
         @Test
         void formatsSingleSecond() {
             assertSlaReplyContains(Duration.ofSeconds(1), "1 second");
+        }
+
+        @Test
+        void formatsPluralDays() {
+            assertThat(PrDetectionService.formatDuration(Duration.ofDays(3))).isEqualTo("3 days");
+        }
+
+        @Test
+        void formatsSingularDay() {
+            assertThat(PrDetectionService.formatDuration(Duration.ofDays(1))).isEqualTo("1 day");
+        }
+
+        @Test
+        void formatsDaysAndHours() {
+            assertThat(PrDetectionService.formatDuration(Duration.ofHours(50))).isEqualTo("2 days 2 hours");
         }
 
         private void assertSlaReplyContains(Duration sla, String expectedDurationText) {

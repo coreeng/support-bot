@@ -13,7 +13,7 @@ import type {
   KnowledgeGapsStatus,
   AnalysisData,
 } from "@/lib/types";
-import type { RepoInsights, EscalationBreakdown } from "@/lib/types/dashboard";
+import type { RepoInsights, InFlightPr } from "@/lib/types/dashboard";
 
 // ===== Shared API Helper =====
 
@@ -568,12 +568,14 @@ export function useTenantInsightsStats(dateFrom?: string, dateTo?: string, enabl
   });
 }
 
-export function useEscalationBreakdown(dateFrom?: string, dateTo?: string, enabled = true) {
-  return useQuery<EscalationBreakdown>({
-    queryKey: ["tenant-insights", "escalation-breakdown", dateFrom, dateTo],
+export function useInFlightPrs(team?: string) {
+  const params = new URLSearchParams();
+  if (team) params.append("team", team);
+  const query = params.toString();
+  return useQuery<InFlightPr[]>({
+    queryKey: ["tenant-insights", "in-flight-prs", team],
     queryFn: () =>
-      apiGet(`/tenant-insights/escalation-breakdown${buildParams(dateFrom, dateTo)}`),
-    enabled,
-    staleTime: 5 * 60 * 1000,
+      apiGet(`/tenant-insights/in-flight-prs${query ? `?${query}` : ""}`),
+    staleTime: 60 * 1000,
   });
 }
