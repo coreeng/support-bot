@@ -54,6 +54,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         a.category,
                         tc.query_count,
                         a.summary,
+                        a.ticket_id,
                         q.channel_id,
                         q.ts as query_ts,
                         ROW_NUMBER() OVER (PARTITION BY a.category ORDER BY a.created_at DESC) as rn
@@ -67,6 +68,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                     category as dimension,
                     query_count,
                     summary,
+                    ticket_id,
                     channel_id,
                     query_ts
                 FROM ranked_summaries
@@ -79,6 +81,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("dimension", String.class),
                         r.get("query_count", Long.class),
                         r.get("summary", String.class),
+                        r.get("ticket_id", Integer.class),
                         r.get("channel_id", String.class),
                         r.get("query_ts", String.class)));
     }
@@ -104,6 +107,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         a.driver,
                         td.query_count,
                         a.summary,
+                        a.ticket_id,
                         q.channel_id,
                         q.ts as query_ts,
                         ROW_NUMBER() OVER (PARTITION BY a.driver ORDER BY a.created_at DESC) as rn
@@ -116,6 +120,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                     driver as dimension,
                     query_count,
                     summary,
+                    ticket_id,
                     channel_id,
                     query_ts
                 FROM ranked_summaries
@@ -128,6 +133,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("dimension", String.class),
                         r.get("query_count", Long.class),
                         r.get("summary", String.class),
+                        r.get("ticket_id", Integer.class),
                         r.get("channel_id", String.class),
                         r.get("query_ts", String.class)));
     }

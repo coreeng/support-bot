@@ -16,7 +16,13 @@ public record DimensionSummaryUI(String name, int coveragePercentage, long query
      * Individual query summary.
      *
      * @param text The summary text
-     * @param link Slack permalink for the related query
+     * @param timestamp The original query timestamp
+     * @param ticketId The related ticket ID
+     * @param link Reserved field for links; currently always null
      */
-    public record QuerySummary(String text, @Nullable String link) {}
+    public record QuerySummary(
+            String text,
+            String timestamp,
+            String ticketId,
+            @Nullable String link) {}
 }

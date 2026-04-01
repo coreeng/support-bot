@@ -1,15 +1,11 @@
 package com.coreeng.supportbot.analysis.rest;
 
 import com.coreeng.supportbot.analysis.AnalysisRepository.DimensionSummary;
-import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SlackClient;
-import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -17,10 +13,11 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class DimensionMapper {
 
     private static final int COVERAGE_PERCENTAGE = 100;
+
+    @SuppressWarnings("unused")
     private final SlackClient slackClient;
 
     /**
@@ -47,7 +44,7 @@ public class DimensionMapper {
                     // Map summaries to QuerySummary objects
                     List<DimensionSummaryUI.QuerySummary> queries = summaries.stream()
                             .map(summary -> new DimensionSummaryUI.QuerySummary(
-                                    summary.summary(), resolveQueryPermalink(summary)))
+                                    summary.summary(), summary.queryTs(), String.valueOf(summary.ticketId()), null))
                             .toList();
 
                     return new DimensionSummaryUI(dimension, COVERAGE_PERCENTAGE, queryCount, queries);
@@ -55,19 +52,5 @@ public class DimensionMapper {
                 // Sort by query count descending to maintain top categories first
                 .sorted((a, b) -> Long.compare(b.queryCount(), a.queryCount()))
                 .toList();
-    }
-
-    @Nullable private String resolveQueryPermalink(DimensionSummary summary) {
-        try {
-            return slackClient.getPermalink(
-                    new SlackGetMessageByTsRequest(summary.channelId(), MessageTs.of(summary.queryTs())));
-        } catch (Exception ex) {
-            log.atError()
-                    .setCause(ex)
-                    .addKeyValue("channelId", summary.channelId())
-                    .addKeyValue("queryTs", summary.queryTs())
-                    .log("Failed to resolve summary query permalink from Slack");
-            return null;
-        }
     }
 }

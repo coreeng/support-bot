@@ -82,4 +82,21 @@ public class AnalysisApiTests {
     void analysisRun_returns400_forInvalidDays() {
         given().when().post(baseUrl() + "/analysis/run?days=0").then().statusCode(400);
     }
+
+    @Test
+    void analysisResults_includeQueryTimestampAndTicketId() {
+        var response = given().when()
+                .get(baseUrl() + "/summary-data/results")
+                .then()
+                .statusCode(200)
+                .extract()
+                .body()
+                .jsonPath();
+
+        assertThat(response.getList("supportAreas")).isNotEmpty();
+        assertThat(response.getString("supportAreas[0].queries[0].text")).isNotBlank();
+        assertThat(response.getString("supportAreas[0].queries[0].timestamp")).isNotBlank();
+        assertThat(response.getString("supportAreas[0].queries[0].ticketId")).isNotBlank();
+        assertThat(response.getString("supportAreas[0].queries[0].link")).isNull();
+    }
 }
