@@ -16,9 +16,9 @@ public record DimensionSummaryUI(String name, int coveragePercentage, long query
      * Individual query summary.
      *
      * @param text The summary text
-     * @param timestamp The original query timestamp
-     * @param ticketId The related ticket ID
-     * @param link Reserved field for links; currently always null
+     * @param timestamp The original query timestamp (Slack epoch "seconds.microseconds")
+     * @param ticketId The related ticket ID (string to match the UI convention for safe JSON number handling)
+     * @param link Reserved for future use; currently always null
      */
     public record QuerySummary(
             String text,

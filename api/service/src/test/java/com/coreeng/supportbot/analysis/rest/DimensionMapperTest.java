@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.coreeng.supportbot.analysis.AnalysisRepository.DimensionSummary;
+import com.coreeng.supportbot.ticket.TicketId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,10 +20,12 @@ class DimensionMapperTest {
     }
 
     @Test
-    void mapToUIIncludesQuerySummaryMetadata() {
+    void mapToUI_withSummaries_includesTimestampAndTicketId() {
         List<DimensionSummary> summaries = List.of(
-                new DimensionSummary("Networking", 10, "DNS resolution failures", 101, "1740988800.000001"),
-                new DimensionSummary("Networking", 10, "Ingress timeout issues", 102, "1740988800.000002"));
+                new DimensionSummary(
+                        "Networking", 10, "DNS resolution failures", new TicketId(101), "1740988800.000001"),
+                new DimensionSummary(
+                        "Networking", 10, "Ingress timeout issues", new TicketId(102), "1740988800.000002"));
 
         List<DimensionSummaryUI> result = mapper.mapToUI(summaries);
 
@@ -39,11 +42,13 @@ class DimensionMapperTest {
     }
 
     @Test
-    void mapToUIGroupsByDimensionAndSortsByCountDescending() {
+    void mapToUI_withMultipleDimensions_groupsAndSortsByCountDescending() {
         List<DimensionSummary> summaries = List.of(
-                new DimensionSummary("Secrets", 5, "Vault access denied", 201, "1740988800.000003"),
-                new DimensionSummary("Networking", 20, "DNS resolution failures", 202, "1740988800.000004"),
-                new DimensionSummary("Networking", 20, "Ingress timeout issues", 203, "1740988800.000005"));
+                new DimensionSummary("Secrets", 5, "Vault access denied", new TicketId(201), "1740988800.000003"),
+                new DimensionSummary(
+                        "Networking", 20, "DNS resolution failures", new TicketId(202), "1740988800.000004"),
+                new DimensionSummary(
+                        "Networking", 20, "Ingress timeout issues", new TicketId(203), "1740988800.000005"));
 
         List<DimensionSummaryUI> result = mapper.mapToUI(summaries);
 
@@ -60,7 +65,7 @@ class DimensionMapperTest {
     }
 
     @Test
-    void mapToUIReturnsEmptyListForEmptyInput() {
+    void mapToUI_withEmptyInput_returnsEmptyList() {
         List<DimensionSummary> summaries = List.of();
 
         List<DimensionSummaryUI> result = mapper.mapToUI(summaries);

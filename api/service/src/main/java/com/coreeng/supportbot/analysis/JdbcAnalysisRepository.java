@@ -79,7 +79,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("dimension", String.class),
                         r.get("query_count", Long.class),
                         r.get("summary", String.class),
-                        r.get("ticket_id", Integer.class),
+                        new TicketId(r.get("ticket_id", Integer.class).longValue()),
                         r.get("query_ts", String.class)));
     }
 
@@ -128,7 +128,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("dimension", String.class),
                         r.get("query_count", Long.class),
                         r.get("summary", String.class),
-                        r.get("ticket_id", Integer.class),
+                        new TicketId(r.get("ticket_id", Integer.class).longValue()),
                         r.get("query_ts", String.class)));
     }
 

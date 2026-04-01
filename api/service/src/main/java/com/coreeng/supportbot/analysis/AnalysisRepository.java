@@ -74,8 +74,10 @@ public interface AnalysisRepository {
      * @param dimension The dimension value (e.g., "Knowledge Gap" or "Monitoring & Troubleshooting")
      * @param queryCount Total number of tickets with this dimension
      * @param summary One example summary for this dimension
+     * @param ticketId ID of the related support ticket
+     * @param queryTs Original query timestamp (Slack epoch format "seconds.microseconds")
      */
-    record DimensionSummary(String dimension, long queryCount, String summary, int ticketId, String queryTs) {}
+    record DimensionSummary(String dimension, long queryCount, String summary, TicketId ticketId, String queryTs) {}
 
     /**
      * DTO for an analysis record.

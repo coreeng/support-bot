@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.analysis.rest;
 
 import com.coreeng.supportbot.analysis.AnalysisRepository.DimensionSummary;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -22,29 +23,27 @@ public class DimensionMapper {
      * @return List of DimensionSummaryUI with grouped summaries
      */
     public List<DimensionSummaryUI> mapToUI(List<DimensionSummary> dimensionSummaries) {
-        // Group summaries by dimension (category)
         Map<String, List<DimensionSummary>> groupedByDimension =
                 dimensionSummaries.stream().collect(Collectors.groupingBy(DimensionSummary::dimension));
 
-        // Transform each dimension group into a response object
         return groupedByDimension.entrySet().stream()
                 .map(entry -> {
                     String dimension = entry.getKey();
                     List<DimensionSummary> summaries = entry.getValue();
+                    long queryCount =
+                            summaries.isEmpty() ? 0 : summaries.getFirst().queryCount();
 
-                    // Get query count from the first summary (all have the same count for the same dimension)
-                    long queryCount = summaries.isEmpty() ? 0 : summaries.get(0).queryCount();
-
-                    // Map summaries to QuerySummary objects
                     List<DimensionSummaryUI.QuerySummary> queries = summaries.stream()
                             .map(summary -> new DimensionSummaryUI.QuerySummary(
-                                    summary.summary(), summary.queryTs(), String.valueOf(summary.ticketId()), null))
+                                    summary.summary(),
+                                    summary.queryTs(),
+                                    String.valueOf(summary.ticketId().id()),
+                                    null))
                             .toList();
 
                     return new DimensionSummaryUI(dimension, COVERAGE_PERCENTAGE, queryCount, queries);
                 })
-                // Sort by query count descending to maintain top categories first
-                .sorted((a, b) -> Long.compare(b.queryCount(), a.queryCount()))
+                .sorted(Comparator.comparingLong(DimensionSummaryUI::queryCount).reversed())
                 .toList();
     }
 }
