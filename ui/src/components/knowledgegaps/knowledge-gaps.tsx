@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useId } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText, Play, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAnalysis, apiFetch } from '@/lib/hooks'
@@ -40,6 +40,10 @@ export default function KnowledgeGapsPage() {
     const isCompletedRef = useRef(false)
     const [isAnalysisEnabled, setIsAnalysisEnabled] = useState(false)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const settingsContainerRef = useRef<HTMLDivElement>(null)
+    const settingsTitleId = useId()
+    const settingsDescriptionId = useId()
+    const settingsPanelId = 'analysis-settings-popover'
 
     const formatQueryTimestamp = (timestamp: string) => (
         new Intl.DateTimeFormat('en-US', {
@@ -176,7 +180,34 @@ export default function KnowledgeGapsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [analysisStatus?.running])
 
+    useEffect(() => {
+        if (!isSettingsOpen) {
+            return
+        }
+
+        const handlePointerDown = (event: MouseEvent) => {
+            if (!settingsContainerRef.current?.contains(event.target as Node)) {
+                setIsSettingsOpen(false)
+            }
+        }
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsSettingsOpen(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handlePointerDown)
+        document.addEventListener('keydown', handleKeyDown)
+
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown)
+            document.removeEventListener('keydown', handleKeyDown)
+        }
+    }, [isSettingsOpen])
+
     const handleStartAnalysis = async () => {
+        setIsSettingsOpen(false)
         setIsStartingAnalysis(true)
         try {
             const response = await apiFetch(`/api/analysis/run?days=${selectedDays}`, {
@@ -522,7 +553,7 @@ export default function KnowledgeGapsPage() {
                         </p>
                     </div>
                     {isSupportEngineer && (
-                        <div className="relative">
+                        <div ref={settingsContainerRef} className="relative">
                             {!isAnalysisEnabled && (
                                 <input
                                     ref={fileInputRef}
@@ -536,17 +567,27 @@ export default function KnowledgeGapsPage() {
                                 type="button"
                                 onClick={() => setIsSettingsOpen(current => !current)}
                                 disabled={isAnalysisEnabled && (analysisStatus?.running || isStartingAnalysis || showCompletedStatus)}
+                                aria-haspopup="dialog"
+                                aria-expanded={isSettingsOpen}
+                                aria-controls={settingsPanelId}
                                 className="h-10 inline-flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                             >
                                 <Play className="w-4 h-4" />
                                 {isAnalysisEnabled && isStartingAnalysis ? 'Checking...' : 'Run Analysis'}
                             </button>
                             {isSettingsOpen && (
-                                <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-gray-200 bg-white p-4 shadow-xl z-10">
+                                <div
+                                    id={settingsPanelId}
+                                    role="dialog"
+                                    aria-modal="false"
+                                    aria-labelledby={settingsTitleId}
+                                    aria-describedby={settingsDescriptionId}
+                                    className="absolute right-0 mt-2 w-80 rounded-2xl border border-gray-200 bg-white p-4 shadow-xl z-10"
+                                >
                                     <div className="space-y-4">
                                         <div>
-                                            <h2 className="text-sm font-semibold text-gray-900">Analysis settings</h2>
-                                            <p className="mt-1 text-sm text-gray-600">
+                                            <h2 id={settingsTitleId} className="text-sm font-semibold text-gray-900">Analysis settings</h2>
+                                            <p id={settingsDescriptionId} className="mt-1 text-sm text-gray-600">
                                                 Choose how far back to pull queries for this run.
                                             </p>
                                         </div>
@@ -580,7 +621,10 @@ export default function KnowledgeGapsPage() {
                                             <div className="flex flex-col gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={handleExportDownload}
+                                                    onClick={() => {
+                                                        setIsSettingsOpen(false)
+                                                        handleExportDownload()
+                                                    }}
                                                     disabled={isDownloading}
                                                     className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                                 >
@@ -589,7 +633,10 @@ export default function KnowledgeGapsPage() {
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={handleAnalysisBundleDownload}
+                                                    onClick={() => {
+                                                        setIsSettingsOpen(false)
+                                                        handleAnalysisBundleDownload()
+                                                    }}
                                                     className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
                                                 >
                                                     <FileText className="w-4 h-4" />
@@ -597,7 +644,10 @@ export default function KnowledgeGapsPage() {
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={handleImportClick}
+                                                    onClick={() => {
+                                                        setIsSettingsOpen(false)
+                                                        handleImportClick()
+                                                    }}
                                                     disabled={isUploading}
                                                     className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                                 >

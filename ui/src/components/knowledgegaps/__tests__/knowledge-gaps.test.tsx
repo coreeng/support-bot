@@ -479,14 +479,11 @@ describe('KnowledgeGapsPage', () => {
         const exportButton = screen.getByText('Export')
         fireEvent.click(exportButton)
 
-        // Wait for async operations
-        await screen.findByText('Downloading...')
-
         // Verify apiFetch was called with default value of 7 days (Week)
-        expect(mockApiFetch).toHaveBeenCalledWith('/api/summary-data/export?days=7')
-
-        // Wait for button to return to normal state
-        await screen.findByText('Export')
+        await waitFor(() => {
+            expect(mockApiFetch).toHaveBeenCalledWith('/api/summary-data/export?days=7')
+        })
+        expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
 
         // Verify download was triggered
         expect(mockClick).toHaveBeenCalled()
@@ -921,6 +918,7 @@ describe('KnowledgeGapsPage', () => {
 
             // Progress panel should appear
             await screen.findByText(/Checking for new threads|Analysing threads/)
+            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
         })
 
         it('shows error toast when analysis start returns 409 Conflict', async () => {
@@ -1127,16 +1125,25 @@ describe('KnowledgeGapsPage', () => {
 
             const startButton = await screen.findByText('Run Analysis')
             expect(startButton).toBeInTheDocument()
+            expect(startButton).toHaveAttribute('aria-haspopup', 'dialog')
+            expect(startButton).toHaveAttribute('aria-expanded', 'false')
+            expect(startButton).toHaveAttribute('aria-controls', 'analysis-settings-popover')
             expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
 
             fireEvent.click(startButton)
 
-            expect(screen.getByText('Analysis settings')).toBeInTheDocument()
+            expect(startButton).toHaveAttribute('aria-expanded', 'true')
+            expect(screen.getByRole('dialog', { name: 'Analysis settings' })).toBeInTheDocument()
             expect(screen.getByLabelText('Query window')).toBeInTheDocument()
             expect(screen.getByText('Choose how far back to pull queries for this run.')).toBeInTheDocument()
+
+            fireEvent.click(startButton)
+
+            expect(startButton).toHaveAttribute('aria-expanded', 'false')
+            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
         })
 
-        it('hides Run Analysis button when feature is disabled', async () => {
+        it('keeps the settings trigger available when feature is disabled', async () => {
             mockUseAnalysis.mockReturnValue({
                 data: mockAnalysisData,
                 isLoading: false,
@@ -1172,7 +1179,6 @@ describe('KnowledgeGapsPage', () => {
             // Wait for the page to render
             await screen.findByText('Support Area Summary')
 
-            // Verify the button is not present
             expect(screen.getByRole('button', { name: 'Run Analysis' })).toBeInTheDocument()
             expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
         })
@@ -1314,6 +1320,30 @@ describe('KnowledgeGapsPage', () => {
             expect(bundleButton).not.toBeDisabled()
             expect(importButton).toBeInTheDocument()
             expect(importButton).not.toBeDisabled()
+        })
+
+        it('closes the settings panel on Escape and outside click', async () => {
+            mockUseAnalysis.mockReturnValue({
+                data: mockAnalysisData,
+                isLoading: false,
+                error: null
+            } as any)
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            const settingsTrigger = await screen.findByRole('button', { name: 'Run Analysis' })
+            fireEvent.click(settingsTrigger)
+
+            expect(screen.getByRole('dialog', { name: 'Analysis settings' })).toBeInTheDocument()
+
+            fireEvent.keyDown(document, { key: 'Escape' })
+            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
+
+            fireEvent.click(settingsTrigger)
+            expect(screen.getByRole('dialog', { name: 'Analysis settings' })).toBeInTheDocument()
+
+            fireEvent.mouseDown(document.body)
+            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
         })
     })
 })
