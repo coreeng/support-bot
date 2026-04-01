@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.analysis.rest;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -15,8 +16,8 @@ public record DimensionSummaryUI(String name, int coveragePercentage, long query
      * Individual query summary.
      *
      * @param text The summary text
-     * @param timestamp The query timestamp as an ISO-8601 instant (e.g., "2025-03-31T12:34:00Z")
+     * @param timestamp The query timestamp (serialized as ISO-8601 by Jackson)
      * @param ticketId The related ticket ID (string to match the UI convention for safe JSON number handling)
      */
-    public record QuerySummary(String text, String timestamp, String ticketId) {}
+    public record QuerySummary(String text, Instant timestamp, String ticketId) {}
 }

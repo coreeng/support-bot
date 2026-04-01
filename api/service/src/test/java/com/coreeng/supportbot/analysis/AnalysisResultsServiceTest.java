@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import com.coreeng.supportbot.analysis.AnalysisRepository.AnalysisRecord;
 import com.coreeng.supportbot.analysis.AnalysisRepository.DimensionSummary;
+import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,9 +36,13 @@ class AnalysisResultsServiceTest {
                         25L,
                         "Example summary 1",
                         new TicketId(1001),
-                        "1740988800.000001"),
+                        MessageTs.of("1740988800.000001")),
                 new DimensionSummary(
-                        "Configuration", 15L, "Example summary 2", new TicketId(1002), "1740988800.000002"));
+                        "Configuration",
+                        15L,
+                        "Example summary 2",
+                        new TicketId(1002),
+                        MessageTs.of("1740988800.000002")));
 
         when(analysisRepository.getKnowledgeGapCategoriesWithSummaries()).thenReturn(expectedSummaries);
 
@@ -54,10 +59,19 @@ class AnalysisResultsServiceTest {
         // given
         List<DimensionSummary> expectedSummaries = List.of(
                 new DimensionSummary(
-                        "Knowledge Gap", 50L, "Example summary 1", new TicketId(1003), "1740988800.000003"),
-                new DimensionSummary("Bug", 30L, "Example summary 2", new TicketId(1004), "1740988800.000004"),
+                        "Knowledge Gap",
+                        50L,
+                        "Example summary 1",
+                        new TicketId(1003),
+                        MessageTs.of("1740988800.000003")),
                 new DimensionSummary(
-                        "Feature Request", 20L, "Example summary 3", new TicketId(1005), "1740988800.000005"));
+                        "Bug", 30L, "Example summary 2", new TicketId(1004), MessageTs.of("1740988800.000004")),
+                new DimensionSummary(
+                        "Feature Request",
+                        20L,
+                        "Example summary 3",
+                        new TicketId(1005),
+                        MessageTs.of("1740988800.000005")));
 
         when(analysisRepository.getDriversWithSummaries()).thenReturn(expectedSummaries);
 

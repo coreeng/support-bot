@@ -5,6 +5,7 @@ import static org.jooq.impl.DSL.currentLocalDateTime;
 import static org.jooq.impl.DSL.excluded;
 import static org.jooq.impl.DSL.row;
 
+import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -80,7 +81,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("query_count", Long.class),
                         r.get("summary", String.class),
                         new TicketId(r.get("ticket_id", Integer.class).longValue()),
-                        r.get("query_ts", String.class)));
+                        MessageTs.of(r.get("query_ts", String.class))));
     }
 
     /**
@@ -129,7 +130,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("query_count", Long.class),
                         r.get("summary", String.class),
                         new TicketId(r.get("ticket_id", Integer.class).longValue()),
-                        r.get("query_ts", String.class)));
+                        MessageTs.of(r.get("query_ts", String.class))));
     }
 
     @Override

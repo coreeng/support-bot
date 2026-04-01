@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.analysis;
 
+import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -75,9 +76,9 @@ public interface AnalysisRepository {
      * @param queryCount Total number of tickets with this dimension
      * @param summary One example summary for this dimension
      * @param ticketId ID of the related support ticket
-     * @param queryTs Original query timestamp (Slack epoch format "seconds.microseconds")
+     * @param queryTs Original Slack message timestamp
      */
-    record DimensionSummary(String dimension, long queryCount, String summary, TicketId ticketId, String queryTs) {}
+    record DimensionSummary(String dimension, long queryCount, String summary, TicketId ticketId, MessageTs queryTs) {}
 
     /**
      * DTO for an analysis record.
