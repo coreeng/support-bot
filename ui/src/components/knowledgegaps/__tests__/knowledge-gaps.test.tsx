@@ -230,15 +230,21 @@ describe('KnowledgeGapsPage', () => {
 
         // Collapse support areas
         const supportAreasButton = screen.getByRole('button', { name: /Top Support Areas/i })
+        expect(supportAreasButton).toHaveAttribute('aria-expanded', 'true')
+        expect(supportAreasButton).toHaveAttribute('aria-controls', 'support-areas-section')
         fireEvent.click(supportAreasButton)
 
         // List item hidden
+        expect(supportAreasButton).toHaveAttribute('aria-expanded', 'false')
         expect(screen.queryByText('Knowledge Gap')).not.toBeInTheDocument()
 
         // Collapse knowledge gaps
         const knowledgeGapsButton = screen.getByRole('button', { name: /Top Knowledge Gaps/i })
+        expect(knowledgeGapsButton).toHaveAttribute('aria-expanded', 'true')
+        expect(knowledgeGapsButton).toHaveAttribute('aria-controls', 'knowledge-gaps-section')
         fireEvent.click(knowledgeGapsButton)
 
+        expect(knowledgeGapsButton).toHaveAttribute('aria-expanded', 'false')
         expect(screen.queryByText('CI')).not.toBeInTheDocument()
     })
 

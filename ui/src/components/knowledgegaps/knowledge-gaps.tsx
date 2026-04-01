@@ -642,6 +642,8 @@ export default function KnowledgeGapsPage() {
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                     <button
                         onClick={() => setSupportAreasExpanded(!supportAreasExpanded)}
+                        aria-expanded={supportAreasExpanded}
+                        aria-controls="support-areas-section"
                         className="w-full px-6 py-5 flex items-center justify-between bg-gradient-to-r from-blue-50 to-white hover:from-blue-100 hover:to-blue-50 transition-colors"
                     >
                         <div className="flex items-center gap-4">
@@ -657,7 +659,7 @@ export default function KnowledgeGapsPage() {
                     </button>
 
                     {supportAreasExpanded && (
-                        <div className="px-6 pb-6 pt-2 space-y-3">
+                        <div id="support-areas-section" className="px-6 pb-6 pt-2 space-y-3">
                             {(() => {
                                 const items = showAllSupportAreas ? analysisData.supportAreas : analysisData.supportAreas.slice(0, 5)
                                 const maxCount = items[0]?.queryCount ?? 1
@@ -679,6 +681,8 @@ export default function KnowledgeGapsPage() {
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                     <button
                         onClick={() => setKnowledgeGapsExpanded(!knowledgeGapsExpanded)}
+                        aria-expanded={knowledgeGapsExpanded}
+                        aria-controls="knowledge-gaps-section"
                         className="w-full px-6 py-5 flex items-center justify-between bg-gradient-to-r from-amber-50 to-white hover:from-amber-100 hover:to-amber-50 transition-colors"
                     >
                         <div className="flex items-center gap-4">
@@ -694,7 +698,7 @@ export default function KnowledgeGapsPage() {
                     </button>
 
                     {knowledgeGapsExpanded && (
-                        <div className="px-6 pb-6 pt-2 space-y-3">
+                        <div id="knowledge-gaps-section" className="px-6 pb-6 pt-2 space-y-3">
                             {(() => {
                                 const items = showAllKnowledgeGaps ? analysisData.knowledgeGaps : analysisData.knowledgeGaps.slice(0, 5)
                                 const maxCount = items[0]?.queryCount ?? 1
