@@ -1,24 +1,18 @@
 package com.coreeng.supportbot.analysis.rest;
 
 import com.coreeng.supportbot.analysis.AnalysisRepository.DimensionSummary;
-import com.coreeng.supportbot.slack.client.SlackClient;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
  * Mapper to transform DimensionSummary records to DimensionSummaryUI.
  */
 @Component
-@RequiredArgsConstructor
 public class DimensionMapper {
 
     private static final int COVERAGE_PERCENTAGE = 100;
-
-    @SuppressWarnings("unused")
-    private final SlackClient slackClient;
 
     /**
      * Transform a list of DimensionSummary records to DimensionSummaryUI.

@@ -55,7 +55,6 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         tc.query_count,
                         a.summary,
                         a.ticket_id,
-                        q.channel_id,
                         q.ts as query_ts,
                         ROW_NUMBER() OVER (PARTITION BY a.category ORDER BY a.created_at DESC) as rn
                     FROM analysis a
@@ -69,7 +68,6 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                     query_count,
                     summary,
                     ticket_id,
-                    channel_id,
                     query_ts
                 FROM ranked_summaries
                 WHERE rn <= 5
@@ -82,7 +80,6 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("query_count", Long.class),
                         r.get("summary", String.class),
                         r.get("ticket_id", Integer.class),
-                        r.get("channel_id", String.class),
                         r.get("query_ts", String.class)));
     }
 
@@ -108,7 +105,6 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         td.query_count,
                         a.summary,
                         a.ticket_id,
-                        q.channel_id,
                         q.ts as query_ts,
                         ROW_NUMBER() OVER (PARTITION BY a.driver ORDER BY a.created_at DESC) as rn
                     FROM analysis a
@@ -121,7 +117,6 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                     query_count,
                     summary,
                     ticket_id,
-                    channel_id,
                     query_ts
                 FROM ranked_summaries
                 WHERE rn <= 5
@@ -134,7 +129,6 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("query_count", Long.class),
                         r.get("summary", String.class),
                         r.get("ticket_id", Integer.class),
-                        r.get("channel_id", String.class),
                         r.get("query_ts", String.class)));
     }
 
