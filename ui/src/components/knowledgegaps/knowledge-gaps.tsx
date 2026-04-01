@@ -53,12 +53,9 @@ export default function KnowledgeGapsPage() {
     const settingsPanelId = 'analysis-settings-popover'
 
     const formatQueryTimestamp = (timestamp: string): string => {
-        const slackTsMatch = /^(\d+)(?:\.\d+)?$/.exec(timestamp)
-        const parsedTimestamp = slackTsMatch
-            ? new Date(Number(slackTsMatch[1]) * 1000)
-            : new Date(timestamp)
+        const parsed = new Date(timestamp)
 
-        if (isNaN(parsedTimestamp.getTime())) {
+        if (isNaN(parsed.getTime())) {
             return timestamp
         }
 
@@ -70,7 +67,7 @@ export default function KnowledgeGapsPage() {
             minute: '2-digit',
             hour12: true,
             timeZone: 'UTC',
-        }).format(parsedTimestamp)
+        }).format(parsed)
     }
 
     const openTicketModal = (ticketId: string) => {

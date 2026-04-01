@@ -31,10 +31,10 @@ class DimensionMapperTest {
         assertEquals(1, result.size());
         List<DimensionSummaryUI.QuerySummary> queries = result.get(0).queries();
         assertEquals("DNS resolution failures", queries.get(0).text());
-        assertEquals("1740988800.000001", queries.get(0).timestamp());
+        assertEquals("2025-03-03T08:00:00Z", queries.get(0).timestamp());
         assertEquals("101", queries.get(0).ticketId());
         assertEquals("Ingress timeout issues", queries.get(1).text());
-        assertEquals("1740988800.000002", queries.get(1).timestamp());
+        assertEquals("2025-03-03T08:00:00Z", queries.get(1).timestamp());
         assertEquals("102", queries.get(1).ticketId());
     }
 
@@ -53,7 +53,7 @@ class DimensionMapperTest {
         assertEquals("Networking", result.get(0).name());
         assertEquals(20, result.get(0).queryCount());
         assertEquals(2, result.get(0).queries().size());
-        assertEquals("1740988800.000004", result.get(0).queries().get(0).timestamp());
+        assertEquals("2025-03-03T08:00:00Z", result.get(0).queries().get(0).timestamp());
         assertEquals("202", result.get(0).queries().get(0).ticketId());
         assertEquals("Secrets", result.get(1).name());
         assertEquals(5, result.get(1).queryCount());

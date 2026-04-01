@@ -54,8 +54,8 @@ const mockAnalysisData = {
             coveragePercentage: 90,
             queryCount: 28,
             queries: [
-                { text: 'Firewall rules for output traffic', timestamp: '1743426900.000001', ticketId: '101' },
-                { text: 'DNS resolution issues', timestamp: '1743344400.000001', ticketId: '102' }
+                { text: 'Firewall rules for output traffic', timestamp: '2025-03-31T13:15:00Z', ticketId: '101' },
+                { text: 'DNS resolution issues', timestamp: '2025-03-30T14:20:00Z', ticketId: '102' }
             ]
         },
         {
@@ -63,8 +63,8 @@ const mockAnalysisData = {
             coveragePercentage: 88,
             queryCount: 50,
             queries: [
-                { text: 'How to view application logs?', timestamp: '1743242400.000001', ticketId: '103' },
-                { text: 'Setting up custom metrics', timestamp: '1743141900.000001', ticketId: '104' }
+                { text: 'How to view application logs?', timestamp: '2025-03-29T10:00:00Z', ticketId: '103' },
+                { text: 'Setting up custom metrics', timestamp: '2025-03-28T06:05:00Z', ticketId: '104' }
             ]
         },
         {
@@ -72,8 +72,8 @@ const mockAnalysisData = {
             coveragePercentage: 75,
             queryCount: 42,
             queries: [
-                { text: 'How do I fix the CI pipeline failure?', timestamp: '1743075000.000001', ticketId: '105' },
-                { text: 'What is the correct configuration for the build step?', timestamp: '1743005400.000001', ticketId: '106' }
+                { text: 'How do I fix the CI pipeline failure?', timestamp: '2025-03-27T11:30:00Z', ticketId: '105' },
+                { text: 'What is the correct configuration for the build step?', timestamp: '2025-03-26T16:10:00Z', ticketId: '106' }
             ]
         },
         {
@@ -81,8 +81,8 @@ const mockAnalysisData = {
             coveragePercentage: 60,
             queryCount: 35,
             queries: [
-                { text: 'How to setup Kafka consumers?', timestamp: '1742919000.000001', ticketId: '107' },
-                { text: 'Dial configuration for new tenant', timestamp: '1742838000.000001', ticketId: '108' }
+                { text: 'How to setup Kafka consumers?', timestamp: '2025-03-25T16:10:00Z', ticketId: '107' },
+                { text: 'Dial configuration for new tenant', timestamp: '2025-03-24T17:40:00Z', ticketId: '108' }
             ]
         },
         {
@@ -90,8 +90,8 @@ const mockAnalysisData = {
             coveragePercentage: 45,
             queryCount: 15,
             queries: [
-                { text: 'Deployment failed with timeout', timestamp: '1742732700.000001', ticketId: '109' },
-                { text: 'Configuring environment variables', timestamp: '1742680200.000001', ticketId: '110' }
+                { text: 'Deployment failed with timeout', timestamp: '2025-03-23T12:25:00Z', ticketId: '109' },
+                { text: 'Configuring environment variables', timestamp: '2025-03-22T21:50:00Z', ticketId: '110' }
             ]
         }
     ],
@@ -101,8 +101,8 @@ const mockAnalysisData = {
             coveragePercentage: 56,
             queryCount: 2127,
             queries: [
-                { text: 'Documentation missing for new API', timestamp: '1743424496.000001', ticketId: '201' },
-                { text: 'How to configure advanced settings?', timestamp: '1743318489.000001', ticketId: '210' }
+                { text: 'Documentation missing for new API', timestamp: '2025-03-31T12:34:56Z', ticketId: '201' },
+                { text: 'How to configure advanced settings?', timestamp: '2025-03-30T07:08:09Z', ticketId: '210' }
             ]
         },
         {
@@ -110,8 +110,8 @@ const mockAnalysisData = {
             coveragePercentage: 22,
             queryCount: 825,
             queries: [
-                { text: 'Service temporarily unavailable', timestamp: '1743228000.000001', ticketId: '202' },
-                { text: '503 errors on login', timestamp: '1743185700.000001', ticketId: '203' }
+                { text: 'Service temporarily unavailable', timestamp: '2025-03-29T06:00:00Z', ticketId: '202' },
+                { text: '503 errors on login', timestamp: '2025-03-28T18:15:00Z', ticketId: '203' }
             ]
         },
         {
@@ -119,8 +119,8 @@ const mockAnalysisData = {
             coveragePercentage: 13,
             queryCount: 493,
             queries: [
-                { text: 'Please reset my API key', timestamp: '1743087600.000001', ticketId: '204' },
-                { text: 'Update billing address', timestamp: '1742977800.000001', ticketId: '205' }
+                { text: 'Please reset my API key', timestamp: '2025-03-27T15:00:00Z', ticketId: '204' },
+                { text: 'Update billing address', timestamp: '2025-03-26T08:30:00Z', ticketId: '205' }
             ]
         },
         {
@@ -128,8 +128,8 @@ const mockAnalysisData = {
             coveragePercentage: 5,
             queryCount: 196,
             queries: [
-                { text: 'Cannot find the logout button', timestamp: '1742901060.000001', ticketId: '206' },
-                { text: 'Dashboard is confusing', timestamp: '1742826120.000001', ticketId: '207' }
+                { text: 'Cannot find the logout button', timestamp: '2025-03-25T11:11:00Z', ticketId: '206' },
+                { text: 'Dashboard is confusing', timestamp: '2025-03-24T14:22:00Z', ticketId: '207' }
             ]
         },
         {
@@ -137,8 +137,8 @@ const mockAnalysisData = {
             coveragePercentage: 4,
             queryCount: 163,
             queries: [
-                { text: 'Add dark mode support', timestamp: '1742759100.000001', ticketId: '208' },
-                { text: 'Export report to PDF', timestamp: '1742677800.000001', ticketId: '209' }
+                { text: 'Add dark mode support', timestamp: '2025-03-23T19:45:00Z', ticketId: '208' },
+                { text: 'Export report to PDF', timestamp: '2025-03-22T21:10:00Z', ticketId: '209' }
             ]
         }
     ]
@@ -304,7 +304,7 @@ describe('KnowledgeGapsPage', () => {
                     coveragePercentage: 56,
                     queryCount: 12,
                     queries: [
-                        { text: 'Support area query', timestamp: '1743424496.000001', ticketId: '401' }
+                        { text: 'Support area query', timestamp: '2025-03-31T12:34:56Z', ticketId: '401' }
                     ]
                 }
             ],
@@ -314,7 +314,7 @@ describe('KnowledgeGapsPage', () => {
                     coveragePercentage: 44,
                     queryCount: 8,
                     queries: [
-                        { text: 'Knowledge gap query', timestamp: '1743318489.000001', ticketId: '402' }
+                        { text: 'Knowledge gap query', timestamp: '2025-03-30T07:08:09Z', ticketId: '402' }
                     ]
                 }
             ]
@@ -391,8 +391,8 @@ describe('KnowledgeGapsPage', () => {
                     coveragePercentage: 50,
                     queryCount: 10,
                     queries: [
-                        { text: 'Query with ticket', timestamp: '1743422400.000001', ticketId: '301' },
-                        { text: 'Another query', timestamp: '1743422460.000001', ticketId: '302' }
+                        { text: 'Query with ticket', timestamp: '2025-03-31T12:00:00Z', ticketId: '301' },
+                        { text: 'Another query', timestamp: '2025-03-31T12:01:00Z', ticketId: '302' }
                     ]
                 }
             ]

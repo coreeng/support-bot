@@ -15,7 +15,7 @@ public record DimensionSummaryUI(String name, int coveragePercentage, long query
      * Individual query summary.
      *
      * @param text The summary text
-     * @param timestamp The original query timestamp (Slack epoch "seconds.microseconds")
+     * @param timestamp The query timestamp as an ISO-8601 instant (e.g., "2025-03-31T12:34:00Z")
      * @param ticketId The related ticket ID (string to match the UI convention for safe JSON number handling)
      */
     public record QuerySummary(String text, String timestamp, String ticketId) {}

@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.analysis.rest;
 
 import com.coreeng.supportbot.analysis.AnalysisRepository.DimensionSummary;
+import com.coreeng.supportbot.slack.MessageTs;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +37,7 @@ public class DimensionMapper {
                     List<DimensionSummaryUI.QuerySummary> queries = summaries.stream()
                             .map(summary -> new DimensionSummaryUI.QuerySummary(
                                     summary.summary(),
-                                    summary.queryTs(),
+                                    MessageTs.of(summary.queryTs()).getDate().toString(),
                                     String.valueOf(summary.ticketId().id())))
                             .toList();
 
