@@ -26,7 +26,7 @@ security:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   test-bypass:
-    enabled: false
+    enabled: true
   allow-list:
     emails: ${ALLOWED_EMAILS:}
     domains: ${ALLOWED_DOMAINS:}

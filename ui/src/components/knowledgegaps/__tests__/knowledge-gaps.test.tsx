@@ -54,8 +54,8 @@ const mockAnalysisData = {
             coveragePercentage: 90,
             queryCount: 28,
             queries: [
-                { text: 'Firewall rules for output traffic', timestamp: '1743426900.000001', ticketId: '101', link: null },
-                { text: 'DNS resolution issues', timestamp: '1743344400.000001', ticketId: '102', link: null }
+                { text: 'Firewall rules for output traffic', timestamp: '1743426900.000001', ticketId: '101' },
+                { text: 'DNS resolution issues', timestamp: '1743344400.000001', ticketId: '102' }
             ]
         },
         {
@@ -63,8 +63,8 @@ const mockAnalysisData = {
             coveragePercentage: 88,
             queryCount: 50,
             queries: [
-                { text: 'How to view application logs?', timestamp: '1743242400.000001', ticketId: '103', link: null },
-                { text: 'Setting up custom metrics', timestamp: '1743141900.000001', ticketId: '104', link: null }
+                { text: 'How to view application logs?', timestamp: '1743242400.000001', ticketId: '103' },
+                { text: 'Setting up custom metrics', timestamp: '1743141900.000001', ticketId: '104' }
             ]
         },
         {
@@ -72,8 +72,8 @@ const mockAnalysisData = {
             coveragePercentage: 75,
             queryCount: 42,
             queries: [
-                { text: 'How do I fix the CI pipeline failure?', timestamp: '1743075000.000001', ticketId: '105', link: null },
-                { text: 'What is the correct configuration for the build step?', timestamp: '1743005400.000001', ticketId: '106', link: null }
+                { text: 'How do I fix the CI pipeline failure?', timestamp: '1743075000.000001', ticketId: '105' },
+                { text: 'What is the correct configuration for the build step?', timestamp: '1743005400.000001', ticketId: '106' }
             ]
         },
         {
@@ -81,8 +81,8 @@ const mockAnalysisData = {
             coveragePercentage: 60,
             queryCount: 35,
             queries: [
-                { text: 'How to setup Kafka consumers?', timestamp: '1742919000.000001', ticketId: '107', link: null },
-                { text: 'Dial configuration for new tenant', timestamp: '1742838000.000001', ticketId: '108', link: null }
+                { text: 'How to setup Kafka consumers?', timestamp: '1742919000.000001', ticketId: '107' },
+                { text: 'Dial configuration for new tenant', timestamp: '1742838000.000001', ticketId: '108' }
             ]
         },
         {
@@ -90,8 +90,8 @@ const mockAnalysisData = {
             coveragePercentage: 45,
             queryCount: 15,
             queries: [
-                { text: 'Deployment failed with timeout', timestamp: '1742732700.000001', ticketId: '109', link: null },
-                { text: 'Configuring environment variables', timestamp: '1742680200.000001', ticketId: '110', link: null }
+                { text: 'Deployment failed with timeout', timestamp: '1742732700.000001', ticketId: '109' },
+                { text: 'Configuring environment variables', timestamp: '1742680200.000001', ticketId: '110' }
             ]
         }
     ],
@@ -101,8 +101,8 @@ const mockAnalysisData = {
             coveragePercentage: 56,
             queryCount: 2127,
             queries: [
-                { text: 'Documentation missing for new API', timestamp: '1743424496.000001', ticketId: '201', link: null },
-                { text: 'How to configure advanced settings?', timestamp: '1743318489.000001', ticketId: '210', link: null }
+                { text: 'Documentation missing for new API', timestamp: '1743424496.000001', ticketId: '201' },
+                { text: 'How to configure advanced settings?', timestamp: '1743318489.000001', ticketId: '210' }
             ]
         },
         {
@@ -110,8 +110,8 @@ const mockAnalysisData = {
             coveragePercentage: 22,
             queryCount: 825,
             queries: [
-                { text: 'Service temporarily unavailable', timestamp: '1743228000.000001', ticketId: '202', link: null },
-                { text: '503 errors on login', timestamp: '1743185700.000001', ticketId: '203', link: null }
+                { text: 'Service temporarily unavailable', timestamp: '1743228000.000001', ticketId: '202' },
+                { text: '503 errors on login', timestamp: '1743185700.000001', ticketId: '203' }
             ]
         },
         {
@@ -119,8 +119,8 @@ const mockAnalysisData = {
             coveragePercentage: 13,
             queryCount: 493,
             queries: [
-                { text: 'Please reset my API key', timestamp: '1743087600.000001', ticketId: '204', link: null },
-                { text: 'Update billing address', timestamp: '1742977800.000001', ticketId: '205', link: null }
+                { text: 'Please reset my API key', timestamp: '1743087600.000001', ticketId: '204' },
+                { text: 'Update billing address', timestamp: '1742977800.000001', ticketId: '205' }
             ]
         },
         {
@@ -128,8 +128,8 @@ const mockAnalysisData = {
             coveragePercentage: 5,
             queryCount: 196,
             queries: [
-                { text: 'Cannot find the logout button', timestamp: '1742901060.000001', ticketId: '206', link: null },
-                { text: 'Dashboard is confusing', timestamp: '1742826120.000001', ticketId: '207', link: null }
+                { text: 'Cannot find the logout button', timestamp: '1742901060.000001', ticketId: '206' },
+                { text: 'Dashboard is confusing', timestamp: '1742826120.000001', ticketId: '207' }
             ]
         },
         {
@@ -137,8 +137,8 @@ const mockAnalysisData = {
             coveragePercentage: 4,
             queryCount: 163,
             queries: [
-                { text: 'Add dark mode support', timestamp: '1742759100.000001', ticketId: '208', link: null },
-                { text: 'Export report to PDF', timestamp: '1742677800.000001', ticketId: '209', link: null }
+                { text: 'Add dark mode support', timestamp: '1742759100.000001', ticketId: '208' },
+                { text: 'Export report to PDF', timestamp: '1742677800.000001', ticketId: '209' }
             ]
         }
     ]
@@ -304,7 +304,7 @@ describe('KnowledgeGapsPage', () => {
                     coveragePercentage: 56,
                     queryCount: 12,
                     queries: [
-                        { text: 'Support area query', timestamp: '1743424496.000001', ticketId: '401', link: null }
+                        { text: 'Support area query', timestamp: '1743424496.000001', ticketId: '401' }
                     ]
                 }
             ],
@@ -314,7 +314,7 @@ describe('KnowledgeGapsPage', () => {
                     coveragePercentage: 44,
                     queryCount: 8,
                     queries: [
-                        { text: 'Knowledge gap query', timestamp: '1743318489.000001', ticketId: '402', link: null }
+                        { text: 'Knowledge gap query', timestamp: '1743318489.000001', ticketId: '402' }
                     ]
                 }
             ]
@@ -352,7 +352,7 @@ describe('KnowledgeGapsPage', () => {
         fireEvent.click(screen.getByText('Knowledge Gap'))
 
         expect(screen.getByText('Mar 31, 2025, 12:34 PM')).toBeInTheDocument()
-        fireEvent.click(screen.getByRole('button', { name: /documentation missing for new api/i }))
+        fireEvent.click(screen.getByRole('button', { name: /view ticket 201/i }))
 
         await waitFor(() => {
             expect(screen.getByTestId('edit-ticket-modal')).toHaveTextContent('Ticket modal for 201')
@@ -369,7 +369,7 @@ describe('KnowledgeGapsPage', () => {
         renderWithToast(<KnowledgeGapsPage />)
 
         fireEvent.click(screen.getByText('Knowledge Gap'))
-        fireEvent.click(screen.getByRole('button', { name: /documentation missing for new api/i }))
+        fireEvent.click(screen.getByRole('button', { name: /view ticket 201/i }))
 
         await waitFor(() => {
             expect(screen.getByTestId('edit-ticket-modal')).toBeInTheDocument()
@@ -391,8 +391,8 @@ describe('KnowledgeGapsPage', () => {
                     coveragePercentage: 50,
                     queryCount: 10,
                     queries: [
-                        { text: 'Query with ticket', timestamp: '1743422400.000001', ticketId: '301', link: null },
-                        { text: 'Another query', timestamp: '1743422460.000001', ticketId: '302', link: null }
+                        { text: 'Query with ticket', timestamp: '1743422400.000001', ticketId: '301' },
+                        { text: 'Another query', timestamp: '1743422460.000001', ticketId: '302' }
                     ]
                 }
             ]
@@ -409,8 +409,8 @@ describe('KnowledgeGapsPage', () => {
         // Expand the item to reveal queries
         fireEvent.click(screen.getByText('Mixed Links'))
 
-        expect(screen.getByRole('button', { name: /query with ticket/i })).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: /another query/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /view ticket 301/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /view ticket 302/i })).toBeInTheDocument()
     })
 
     it('renders invalid timestamps as raw strings instead of crashing', () => {
@@ -422,7 +422,7 @@ describe('KnowledgeGapsPage', () => {
                     coveragePercentage: 100,
                     queryCount: 1,
                     queries: [
-                        { text: 'Query with bad timestamp', timestamp: 'not-a-date', ticketId: '999', link: null }
+                        { text: 'Query with bad timestamp', timestamp: 'not-a-date', ticketId: '999' }
                     ]
                 }
             ]

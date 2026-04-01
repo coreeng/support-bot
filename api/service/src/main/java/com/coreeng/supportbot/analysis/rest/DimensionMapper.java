@@ -37,8 +37,7 @@ public class DimensionMapper {
                             .map(summary -> new DimensionSummaryUI.QuerySummary(
                                     summary.summary(),
                                     summary.queryTs(),
-                                    String.valueOf(summary.ticketId().id()),
-                                    null))
+                                    String.valueOf(summary.ticketId().id())))
                             .toList();
 
                     return new DimensionSummaryUI(dimension, COVERAGE_PERCENTAGE, queryCount, queries);

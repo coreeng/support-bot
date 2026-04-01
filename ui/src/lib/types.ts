@@ -127,7 +127,6 @@ export interface QuerySummary {
     text: string
     timestamp: string
     ticketId: string
-    link: string | null
 }
 
 export interface DimensionSummary {

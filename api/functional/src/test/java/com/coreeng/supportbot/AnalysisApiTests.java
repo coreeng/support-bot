@@ -97,6 +97,5 @@ public class AnalysisApiTests {
         assertThat(response.getString("supportAreas[0].queries[0].text")).isNotBlank();
         assertThat(response.getString("supportAreas[0].queries[0].timestamp")).isNotBlank();
         assertThat(response.getString("supportAreas[0].queries[0].ticketId")).isNotBlank();
-        assertThat(response.getString("supportAreas[0].queries[0].link")).isNull();
     }
 }

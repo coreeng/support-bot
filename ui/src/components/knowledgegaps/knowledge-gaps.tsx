@@ -458,6 +458,7 @@ export default function KnowledgeGapsPage() {
         <button
             key={qIndex}
             type="button"
+            aria-label={`View ticket ${query.ticketId}`}
             onClick={() => openTicketModal(query.ticketId)}
             className={`flex items-center justify-between gap-3 p-3.5 rounded-lg border-l-4 ${colors.queryAccent} ${colors.queryBg} transition-all duration-150 cursor-pointer hover:brightness-95 text-left`}
         >
