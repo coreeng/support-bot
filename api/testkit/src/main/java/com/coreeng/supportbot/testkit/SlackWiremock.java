@@ -7,6 +7,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
@@ -63,6 +64,18 @@ public class SlackWiremock extends WireMockServer {
         LOGGER.info("Setting up initial Slack API stubs");
         stubAuthTest("initial mock");
         stubUsersInfoDefault("initial users.info mock");
+        // Catch-all for hub4j user profile lookups triggered by review processing
+        givenThat(get(urlMatching("/users/.*"))
+                .withName("GitHub user lookup catch-all")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(
+                                "{\"login\":\"{{request.pathSegments.[1]}}\",\"id\":1,\"type\":\"User\"}")));
+        // Catch-all for conversations.history (triggered by createTicket test API fetching query text)
+        givenThat(post("/api/conversations.history")
+                .withName("conversations history catch-all")
+                .willReturn(okJson("{\"ok\":true,\"messages\":[],\"has_more\":false}")));
     }
 
     private void capturePermanentStubs() {

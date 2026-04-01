@@ -17,6 +17,7 @@ import com.coreeng.supportbot.testkit.TicketMessage;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -46,6 +47,11 @@ public class PrTrackingFunctionalTests {
 
     private TestKit testKit;
     private SupportBotClient supportBotClient;
+
+    @BeforeEach
+    void cleanUpPrTrackingRecords() {
+        supportBotClient.test().cleanupPrTrackingRecords();
+    }
 
     @Test
     public void whenSamePrIsPostedAgainOnSameTicket_itIsNotTrackedTwice() {
@@ -717,12 +723,14 @@ public class PrTrackingFunctionalTests {
 
         prStub.assertIsCalled();
         slackMessageStub.assertIsCalled();
-        assertThat(supportBotClient.test().getPrTrackingRecord(record.id()).status())
-                .isEqualTo("CHANGES_REQUESTED");
+        var updatedRecord = supportBotClient.test().getPrTrackingRecord(record.id());
+        assertThat(updatedRecord.status()).isEqualTo("CHANGES_REQUESTED");
+        assertThat(updatedRecord.slaDeadline()).isNull();
+        assertThat(updatedRecord.slaRemaining()).isNotNull().isPositive();
     }
 
     @Test
-    public void whenPollDetectsApproval_prNotMergeable_transitionsToApprovedSilently() {
+    public void whenPollDetectsApprovalWithMergeConflicts_pausesSlaAndTransitionsToApproved() {
         String channelId = testKit.config().mocks().slack().supportChannelId();
         MessageTs queryTs = MessageTs.now();
         MessageTs ticketTs = MessageTs.now();
@@ -760,7 +768,10 @@ public class PrTrackingFunctionalTests {
         prStub.assertIsCalled();
         unexpectedMessageStub.assertIsNotCalled();
         unexpectedMessageStub.cleanUp();
-        assertThat(supportBotClient.test().getPrTrackingRecord(record.id()).status()).isEqualTo("APPROVED");
+        var updatedRecord = supportBotClient.test().getPrTrackingRecord(record.id());
+        assertThat(updatedRecord.status()).isEqualTo("APPROVED");
+        assertThat(updatedRecord.slaDeadline()).isNull();
+        assertThat(updatedRecord.slaRemaining()).isNotNull().isPositive();
     }
 
     @Test

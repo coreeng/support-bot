@@ -15,6 +15,7 @@ import io.restassured.config.ObjectMapperConfig;
 import io.restassured.config.RestAssuredConfig;
 import io.restassured.filter.log.LogDetail;
 import io.restassured.http.ContentType;
+import java.time.Duration;
 import java.time.Instant;
 import lombok.Builder;
 import lombok.Getter;
@@ -367,6 +368,7 @@ public class SupportBotClient {
         private String status;
         private Instant closedAt;
         private Long escalationId;
+        @Nullable private Duration slaRemaining;
     }
 
     @Builder
