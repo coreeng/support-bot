@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useId } from 'react'
-import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText, Play, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react'
+import { ChevronDown, ChevronRight, BarChart3, Download, Upload, FileText, Play, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAnalysis, apiFetch } from '@/lib/hooks'
 import { useToast } from '@/components/ui/toast'
@@ -439,7 +439,6 @@ export default function KnowledgeGapsPage() {
             countPill: 'bg-blue-100 text-blue-700',
             queryBg: 'bg-blue-50 hover:bg-blue-100',
             queryAccent: 'border-l-blue-400',
-            link: 'text-blue-600 hover:text-blue-700',
             border: 'border-blue-100',
             volumeBar: 'bg-blue-400',
             volumeTrack: 'bg-blue-100',
@@ -449,7 +448,6 @@ export default function KnowledgeGapsPage() {
             countPill: 'bg-amber-100 text-amber-700',
             queryBg: 'bg-amber-50 hover:bg-amber-100',
             queryAccent: 'border-l-amber-400',
-            link: 'text-amber-600 hover:text-amber-700',
             border: 'border-amber-100',
             volumeBar: 'bg-amber-400',
             volumeTrack: 'bg-amber-100',
@@ -461,16 +459,10 @@ export default function KnowledgeGapsPage() {
             key={qIndex}
             type="button"
             onClick={() => openTicketModal(query.ticketId)}
-            className={`flex items-start gap-3 p-3.5 rounded-lg border-l-4 ${colors.queryAccent} ${colors.queryBg} transition-all duration-150 group no-underline`}
+            className={`flex items-center justify-between gap-3 p-3.5 rounded-lg border-l-4 ${colors.queryAccent} ${colors.queryBg} transition-all duration-150 cursor-pointer hover:brightness-95 text-left`}
         >
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 leading-relaxed">{query.text}</p>
-                <p className="mt-1 text-xs text-gray-500">{formatQueryTimestamp(query.timestamp)}</p>
-            </div>
-            <span className={`shrink-0 ${colors.link} flex items-center gap-1.5 text-xs font-semibold opacity-60 group-hover:opacity-100 transition-opacity`}>
-                <span className="hidden sm:inline">View</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-            </span>
+            <p className="flex-1 min-w-0 text-sm font-medium text-gray-800 leading-relaxed">{query.text}</p>
+            <span className="shrink-0 text-xs text-gray-400 whitespace-nowrap">{formatQueryTimestamp(query.timestamp)}</span>
         </button>
     )
 
@@ -527,8 +519,7 @@ export default function KnowledgeGapsPage() {
 
                     {isExpanded && (
                         <div id={contentId} className={`mt-5 pt-5 border-t ${colors.border}`}>
-                            <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Relevant Support Queries</h4>
-                            <p className="mb-3 text-sm text-gray-500">Showing up to 5 most recent queries in this category</p>
+                            <p className="mb-3 text-xs text-gray-400">Up to 5 most recent queries</p>
                             <div className="space-y-2">
                                 {item.queries.map((query, qIndex) => renderQueryRow(query, qIndex, colors))}
                             </div>
@@ -611,7 +602,7 @@ export default function KnowledgeGapsPage() {
                                     aria-modal="false"
                                     aria-labelledby={settingsTitleId}
                                     aria-describedby={settingsDescriptionId}
-                                    className="absolute right-0 mt-2 w-80 rounded-2xl border border-gray-200 bg-white p-4 shadow-xl z-10"
+                                    className="absolute right-0 mt-2 w-64 rounded-2xl border border-gray-200 bg-white p-4 shadow-xl z-10"
                                 >
                                     <div className="space-y-4">
                                         <div>

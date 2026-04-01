@@ -282,7 +282,7 @@ describe('KnowledgeGapsPage', () => {
 
         // Now queries should be visible
         expect(disclosure).toHaveAttribute('aria-expanded', 'true')
-        expect(screen.getByText('Showing up to 5 most recent queries in this category')).toBeInTheDocument()
+        expect(screen.getByText('Up to 5 most recent queries')).toBeInTheDocument()
         expect(screen.getByText('Documentation missing for new API')).toBeInTheDocument()
         expect(screen.getByText('How to configure advanced settings?')).toBeInTheDocument()
         expect(screen.getByText('Mar 31, 2025, 12:34 PM')).toBeInTheDocument()
