@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAnalysis, apiFetch } from '@/lib/hooks'
 import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/hooks/useAuth'
+import type { DimensionSummary, QuerySummary } from '@/lib/types'
 
 interface AnalysisStatus {
     jobId: string | null
@@ -38,6 +39,18 @@ export default function KnowledgeGapsPage() {
     const [isCompletionError, setIsCompletionError] = useState(false)
     const isCompletedRef = useRef(false)
     const [isAnalysisEnabled, setIsAnalysisEnabled] = useState(false)
+
+    const formatQueryTimestamp = (timestamp: string) => (
+        new Intl.DateTimeFormat('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+            timeZone: 'UTC',
+        }).format(new Date(timestamp))
+    )
 
     // Stop polling
     const stopPolling = () => {
@@ -362,7 +375,47 @@ export default function KnowledgeGapsPage() {
         },
     }
 
-    const renderAreaItem = (item: { name: string; coveragePercentage: number; queryCount: number; queries: { text: string; link: string | null }[] }, index: number, theme: ColorTheme = 'blue', maxQueryCount: number = 1) => {
+    const renderQueryRow = (query: QuerySummary, qIndex: number, colors: typeof themeClasses.blue) => {
+        const content = (
+            <>
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 leading-relaxed">{query.text}</p>
+                    <p className="mt-1 text-xs text-gray-500">{formatQueryTimestamp(query.timestamp)}</p>
+                </div>
+                {query.ticketId && query.link ? (
+                    <span className={`shrink-0 ${colors.link} flex items-center gap-1.5 text-xs font-semibold opacity-60 group-hover:opacity-100 transition-opacity`}>
+                        <span className="hidden sm:inline">View</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                    </span>
+                ) : null}
+            </>
+        )
+
+        if (query.ticketId && query.link) {
+            return (
+                <a
+                    key={qIndex}
+                    href={query.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`flex items-start gap-3 p-3.5 rounded-lg border-l-4 ${colors.queryAccent} ${colors.queryBg} transition-all duration-150 group no-underline`}
+                >
+                    {content}
+                </a>
+            )
+        }
+
+        return (
+            <div
+                key={qIndex}
+                className={`flex items-start gap-3 p-3.5 rounded-lg border-l-4 ${colors.queryAccent} ${colors.queryBg}`}
+            >
+                {content}
+            </div>
+        )
+    }
+
+    const renderAreaItem = (item: DimensionSummary, index: number, theme: ColorTheme = 'blue', maxQueryCount: number = 1) => {
         const isExpanded = expandedItems.has(item.name)
         const colors = themeClasses[theme]
         const volumePercent = Math.round((item.queryCount / maxQueryCount) * 100)
@@ -379,7 +432,7 @@ export default function KnowledgeGapsPage() {
                                 <h3 className="font-semibold text-gray-900 text-lg truncate">{item.name}</h3>
                                 <div className="flex items-center gap-3 shrink-0 ml-3">
                                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${colors.countPill}`}>
-                                        {item.queryCount.toLocaleString()} {item.queryCount === 1 ? 'query' : 'queries'}
+                                        {item.queryCount.toLocaleString()} {item.queryCount === 1 ? 'total query' : 'total queries'}
                                     </span>
                                     {isExpanded ? (
                                         <ChevronDown className="w-5 h-5 text-gray-400" />
@@ -400,31 +453,9 @@ export default function KnowledgeGapsPage() {
                     {isExpanded && (
                         <div className={`mt-5 pt-5 border-t ${colors.border}`} onClick={(e) => e.stopPropagation()}>
                             <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Relevant Support Queries</h4>
+                            <p className="mb-3 text-sm text-gray-500">Showing up to 5 most recent queries in this category</p>
                             <div className="space-y-2">
-                                {item.queries.map((query, qIndex) => (
-                                    query.link ? (
-                                        <a
-                                            key={qIndex}
-                                            href={query.link}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className={`flex items-start gap-3 p-3.5 rounded-lg border-l-4 ${colors.queryAccent} ${colors.queryBg} transition-all duration-150 group no-underline`}
-                                        >
-                                            <span className="text-sm font-medium text-gray-800 flex-1 leading-relaxed">{query.text}</span>
-                                            <span className={`shrink-0 ${colors.link} flex items-center gap-1.5 text-xs font-semibold opacity-60 group-hover:opacity-100 transition-opacity`}>
-                                                <span className="hidden sm:inline">View</span>
-                                                <ExternalLink className="w-3.5 h-3.5" />
-                                            </span>
-                                        </a>
-                                    ) : (
-                                        <div
-                                            key={qIndex}
-                                            className={`flex items-start gap-3 p-3.5 rounded-lg border-l-4 ${colors.queryAccent} ${colors.queryBg}`}
-                                        >
-                                            <span className="text-sm font-medium text-gray-800 flex-1 leading-relaxed">{query.text}</span>
-                                        </div>
-                                    )
-                                ))}
+                                {item.queries.map((query, qIndex) => renderQueryRow(query, qIndex, colors))}
                             </div>
                         </div>
                     )}
