@@ -5,6 +5,8 @@ import * as hooks from '../../../lib/hooks'
 import {ToastProvider} from '@/components/ui/toast'
 import * as useAuthHook from '../../../hooks/useAuth'
 
+const mockInvalidateQueries = jest.fn()
+
 // Mock the hooks
 jest.mock('../../../lib/hooks', () => ({
     useAnalysis: jest.fn(),
@@ -13,8 +15,13 @@ jest.mock('../../../lib/hooks', () => ({
 jest.mock('../../../hooks/useAuth')
 jest.mock('../../tickets/EditTicketModal', () => ({
     __esModule: true,
-    default: ({ ticketId, open }: { ticketId: string | null; open: boolean }) => (
-        open ? <div data-testid="edit-ticket-modal">Ticket modal for {ticketId}</div> : null
+    default: ({ ticketId, open, onSuccess }: { ticketId: string | null; open: boolean; onSuccess?: () => void }) => (
+        open ? (
+            <div data-testid="edit-ticket-modal">
+                <span>Ticket modal for {ticketId}</span>
+                <button type="button" onClick={onSuccess}>Trigger modal success</button>
+            </div>
+        ) : null
     )
 }))
 
@@ -27,7 +34,7 @@ jest.mock('next-auth/react', () => ({
 jest.mock('@tanstack/react-query', () => ({
     ...jest.requireActual('@tanstack/react-query'),
     useQueryClient: jest.fn(() => ({
-        invalidateQueries: jest.fn()
+        invalidateQueries: mockInvalidateQueries
     }))
 }))
 
@@ -140,6 +147,7 @@ const mockAnalysisData = {
 describe('KnowledgeGapsPage', () => {
     beforeEach(() => {
         jest.clearAllMocks()
+        mockInvalidateQueries.mockClear()
         // Default mock for useAuth - SUPPORT_ENGINEER role
         mockUseAuth.mockReturnValue({
             user: { id: '1', email: 'test@example.com', name: 'Test User', teams: [], roles: ['SUPPORT_ENGINEER'] },
@@ -348,6 +356,29 @@ describe('KnowledgeGapsPage', () => {
         await waitFor(() => {
             expect(screen.getByTestId('edit-ticket-modal')).toHaveTextContent('Ticket modal for T-201')
         })
+    })
+
+    it('invalidates ticket and analysis queries when the ticket modal succeeds from this page', async () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        fireEvent.click(screen.getByText('Knowledge Gap'))
+        fireEvent.click(screen.getByRole('button', { name: /documentation missing for new api/i }))
+
+        await waitFor(() => {
+            expect(screen.getByTestId('edit-ticket-modal')).toBeInTheDocument()
+        })
+
+        fireEvent.click(screen.getByRole('button', { name: /trigger modal success/i }))
+
+        expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['ticket', 'T-201'] })
+        expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['tickets'] })
+        expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['analysis'] })
     })
 
     it('renders rows without ticket targets as non-clickable content', () => {

@@ -69,6 +69,14 @@ export default function KnowledgeGapsPage() {
         setIsTicketModalOpen(true)
     }
 
+    const handleTicketModalSuccess = () => {
+        if (selectedTicketId) {
+            queryClient.invalidateQueries({ queryKey: ['ticket', selectedTicketId] })
+        }
+        queryClient.invalidateQueries({ queryKey: ['tickets'] })
+        queryClient.invalidateQueries({ queryKey: ['analysis'] })
+    }
+
     // Stop polling
     const stopPolling = () => {
         if (pollingIntervalRef.current) {
@@ -843,6 +851,7 @@ export default function KnowledgeGapsPage() {
                             setSelectedTicketId(null)
                         }
                     }}
+                    onSuccess={handleTicketModalSuccess}
                 />
             </div>
         </div>
