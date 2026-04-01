@@ -21,7 +21,7 @@ TIMEOUT="${TIMEOUT:-1200}"
 CLEANUP="${CLEANUP:-true}"
 DEPLOY_SERVICE="${DEPLOY_SERVICE:-true}"
 
-SERVICE_CHART_PATH="${SERVICE_CHART_PATH:-${SCRIPT_DIR}/../k8s/service}"
+SERVICE_CHART_PATH="${SERVICE_CHART_PATH:-${SCRIPT_DIR}/../../helm-chart}"
 TEST_CHART_PATH="${TEST_CHART_PATH:-${SCRIPT_DIR}/../k8s/nft-tests}"
 
 cleanup() {
@@ -185,4 +185,3 @@ main() {
 }
 
 main "$@"
-

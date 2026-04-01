@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Config
 NAMESPACE="${NAMESPACE:-support-bot-functional}"
 SERVICE_RELEASE="${SERVICE_RELEASE:-support-bot}"
-SERVICE_CHART_PATH="${SERVICE_CHART_PATH:-${SCRIPT_DIR}/../k8s/service}"
+SERVICE_CHART_PATH="${SERVICE_CHART_PATH:-${SCRIPT_DIR}/../../helm-chart}"
 VALUES_FILE="${VALUES_FILE:-}" # optional -f values.yaml
 DEPLOY_DB="${DEPLOY_DB:-true}"  # true|false (affects deploy and delete)
 DB_RELEASE="${DB_RELEASE:-support-bot-db}"

@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "${SCRIPT_DIR}/lib.sh"
 
 NAMESPACE="${NAMESPACE:-support-bot-functional}"
-SERVICE_CHART_PATH="${SERVICE_CHART_PATH:-${SCRIPT_DIR}/../k8s/service}"
+SERVICE_CHART_PATH="${SERVICE_CHART_PATH:-${SCRIPT_DIR}/../../helm-chart}"
 TEST_CHART_PATH="${TEST_CHART_PATH:-${SCRIPT_DIR}/../k8s/functional-tests}"
 
 DB_RELEASE="${DB_RELEASE:-support-bot-db}"
@@ -91,7 +91,7 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   echo ""
   echo "Environment variables:"
   echo "  NAMESPACE                  Kubernetes namespace (default: support-bot-functional)"
-  echo "  SERVICE_CHART_PATH         Path to service Helm chart (default: ../k8s/service)"
+  echo "  SERVICE_CHART_PATH         Path to service Helm chart (default: ../../helm-chart)"
   echo "  TEST_CHART_PATH            Path to functional-tests Helm chart (default: ../k8s/functional-tests)"
   echo "  DB_RELEASE                 DB Helm release name (default: support-bot-db)"
   echo "  SERVICE_RELEASE            Service Helm release name (default: support-bot)"

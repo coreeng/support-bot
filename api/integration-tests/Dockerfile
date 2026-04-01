@@ -20,14 +20,14 @@ RUN set -euxo pipefail; \
   rm -f kubectl kubectl.sha256
 
 # Copy gradle wrapper and settings
-COPY gradlew .
-COPY settings.gradle.kts .
-COPY gradle gradle
+COPY api/gradlew .
+COPY api/settings.gradle.kts .
+COPY api/gradle gradle
 
 RUN ./gradlew --no-daemon
 
-COPY integration-tests/build.gradle.kts integration-tests/build.gradle.kts
-COPY integration-tests/src integration-tests/src
+COPY api/integration-tests/build.gradle.kts integration-tests/build.gradle.kts
+COPY api/integration-tests/src integration-tests/src
 
 RUN ./gradlew :integration-tests:jar --no-daemon
 
@@ -39,8 +39,8 @@ COPY --from=builder /usr/local/bin/kubectl /usr/local/bin/kubectl
 
 COPY --from=builder /home/gradle/project/integration-tests/build/libs/integration-tests.jar .
 
-COPY k8s/service k8s/service
-COPY scripts scripts
+COPY helm-chart helm-chart
+COPY api/scripts scripts
 
 ENV INTEGRATION_TEST_CONFIG=integration-test-docker.yaml
 
