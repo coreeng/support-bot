@@ -122,6 +122,12 @@ configMaps:
         cn: support-admins
         uniqueMember: uid=alice,ou=People,dc=supportbot,dc=local
 
+        dn: cn=ldap-leadership,ou=Groups,dc=supportbot,dc=local
+        objectClass: groupOfUniqueNames
+        objectClass: top
+        cn: ldap-leadership
+        uniqueMember: uid=alice,ou=People,dc=supportbot,dc=local
+
 volumes:
   - name: ldap-bootstrap
     configMap:

@@ -118,9 +118,13 @@ platform-integration: # Whether to enable platform integration to automatically 
   jwt-groups: # Optional: map Dex ID-token group claims (LDAP) into platform tenant teams
     enabled: false # When true, merges mapped teams for OAuth provider "dex" only; Google/Azure still use static-user / Azure / GCP below
     claim-name: groups # OIDC claim to read (Dex LDAP connector should populate this)
-    mappings: # Each entry: if any claim value matches (case-insensitive), add team-code to the user's resolved teams
-      - claim-values: [developers] # Example: LDAP group name or full DN string as Dex emits it
-        team-code: wow # Must match a platform team name/code from teams-scraping
+    mappings: # Each LDAP group value Dex puts in `groups` matches at most one mapping (first match wins per value). Use separate LDAP groups if you need several jwt-mapped teams.
+      - claim-values: [developers] # Example: LDAP group cn when Dex groupSearch nameAttr is cn (or full DN if Dex emits that)
+        team-code: wow # Platform/escalation team code from teams-scraping / enums (adds TENANT + ESCALATION → ESCALATION app role)
+      - claim-values: [support-admins]
+        team-code: support # Must match team.support.code (→ SUPPORT_ENGINEER role)
+      - claim-values: [ldap-leadership]
+        team-code: support-leadership # Must match team.leadership.code (→ LEADERSHIP role)
   gcp:
     app-name: Support Bot # Used by GCP client
     enabled: true

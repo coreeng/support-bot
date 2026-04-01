@@ -116,12 +116,16 @@ configMaps:
           http: 0.0.0.0:5558
         oauth2:
           skipApprovalScreen: true
+        {{- if .Values.dex.enablePasswordDb }}
         enablePasswordDB: true
         staticPasswords:
           - email: {{ .Values.dex.localUser.email | quote }}
             hash: {{ .Values.dex.localUser.passwordHash | quote }}
             username: {{ .Values.dex.localUser.username | quote }}
             userID: {{ .Values.dex.localUser.userId | quote }}
+        {{- else }}
+        enablePasswordDB: false
+        {{- end }}
         staticClients:
           - id: {{ .Values.dex.clientId | quote }}
             name: Support Bot
@@ -195,6 +199,8 @@ volumeMounts:
 
 dex:
   issuer: https://dex.example.com
+  # When false, Dex shows only connectors (LDAP / Google / Microsoft), no static email/password.
+  enablePasswordDb: true
   clientId: support-bot-dex
   redirectUris:
     - https://support-bot-api.example.com/login/oauth2/code/dex

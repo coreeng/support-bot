@@ -28,7 +28,7 @@ make -C ldap down-local
 
 - `ou=People`, `ou=Groups` under `dc=supportbot,dc=local`
 - Users `alice` / `bob` (password **`password123`** for both — dev only)
-- Groups `developers`, `support-admins`
+- Groups `developers`, `support-admins`, `ldap-leadership` (alice is in all three for local JWT-group testing)
 
 ## Integration / Helm
 

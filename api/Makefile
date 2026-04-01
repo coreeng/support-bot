@@ -21,6 +21,7 @@ db-down: ## Stop PostgreSQL database container
 run-local: db-up ## Run API locally (starts DB, loads .env.local)
 	@if [ -f .env.local ]; then \
 		set -a && source .env.local && set +a && \
+		export SPRING_PROFILES_ACTIVE="$${SPRING_PROFILES_ACTIVE:-local}" && \
 		cd service && ../gradlew -Ddocker=true bootRun; \
 	else \
 		echo "Error: .env.local not found. Copy from .env.example and update values."; \

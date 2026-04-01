@@ -91,6 +91,11 @@ public class OAuthExchangeService {
                 try {
                     var claims = SignedJWT.parse(idToken).getJWTClaimsSet().getClaims();
                     claims.forEach(userInfo::putIfAbsent);
+                    // Dex (and some IdPs) return an empty "groups" on userinfo while LDAP groups live only
+                    // on the ID token — putIfAbsent would keep the empty list and break jwt-groups.
+                    if (claims.containsKey("groups")) {
+                        userInfo.put("groups", claims.get("groups"));
+                    }
                 } catch (ParseException e) {
                     log.warn("Failed to parse id_token claims", e);
                 }

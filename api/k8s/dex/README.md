@@ -11,6 +11,8 @@ mounted `config.yaml`.
 - `values.yaml` - baseline values.
 - `values-integration.yaml` - sample integration overrides.
 
+Set **`dex.enablePasswordDb: false`** in values to disable Dex’s static email/password screen and rely on connectors only (ensure LDAP and/or Google/Microsoft is enabled).
+
 ## Required secret
 
 Create a secret named `dex-secrets` with OAuth client secret used by Dex

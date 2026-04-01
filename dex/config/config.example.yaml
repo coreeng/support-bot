@@ -14,12 +14,7 @@ telemetry:
 oauth2:
   skipApprovalScreen: true
 
-enablePasswordDB: true
-staticPasswords:
-  - email: ${DEX_LOCAL_USER_EMAIL}
-    hash: "${DEX_LOCAL_USER_PASSWORD_HASH}"
-    username: ${DEX_LOCAL_USER_USERNAME}
-    userID: "${DEX_LOCAL_USER_ID}"
+@PASSWORD_DB@
 
 staticClients:
   - id: ${DEX_CLIENT_ID}

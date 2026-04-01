@@ -22,6 +22,23 @@ def _truthy(key: str, e: dict) -> bool:
     return e.get(key, "").lower() in ("1", "true", "yes")
 
 
+def _falsy(key: str, e: dict) -> bool:
+    return e.get(key, "").lower() in ("0", "false", "no")
+
+
+def build_password_db(e: dict) -> str:
+    """Dex local email/password login. Off when DEX_ENABLE_PASSWORD_DB=false (connectors-only login)."""
+    if _falsy("DEX_ENABLE_PASSWORD_DB", e):
+        return "enablePasswordDB: false\n"
+    return """enablePasswordDB: true
+staticPasswords:
+  - email: ${DEX_LOCAL_USER_EMAIL}
+    hash: "${DEX_LOCAL_USER_PASSWORD_HASH}"
+    username: ${DEX_LOCAL_USER_USERNAME}
+    userID: "${DEX_LOCAL_USER_ID}"
+"""
+
+
 def _dex_callback_issuer(e: dict) -> str:
     """Issuer URL without trailing slash; used for {issuer}/callback (matches Helm)."""
     issuer = e.get("DEX_ISSUER", "http://127.0.0.1:5556").strip()
@@ -119,6 +136,7 @@ def build_connectors(e: dict) -> str:
 
 
 template = template_file.read_text()
+template = template.replace("@PASSWORD_DB@", build_password_db(env))
 template = template.replace("@CONNECTORS@", build_connectors(env))
 
 
