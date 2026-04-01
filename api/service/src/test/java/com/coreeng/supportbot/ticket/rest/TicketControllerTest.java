@@ -5,9 +5,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.slack.SlackId;
+import com.coreeng.supportbot.slack.client.SlackClient;
+import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
+import com.slack.api.model.Message;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -31,13 +35,23 @@ class TicketControllerTest {
     @Mock
     private TicketUIMapper mapper;
 
+    @Mock
+    private TicketRepository ticketRepository;
+
+    @Mock
+    private SlackClient slackClient;
+
+    @Mock
+    private TicketTeamSuggestionsService teamSuggestionsService;
+
     private TicketController controller;
 
     private TicketId ticketId;
 
     @BeforeEach
     void setUp() {
-        controller = new TicketController(queryService, ticketUpdateService, mapper);
+        controller = new TicketController(
+                queryService, ticketUpdateService, mapper, ticketRepository, slackClient, teamSuggestionsService);
         ticketId = new TicketId(123L);
     }
 
@@ -147,6 +161,137 @@ class TicketControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(mappedTicketUI);
         verify(mapper).mapToUI(detailedTicket, "Original message");
+    }
+
+    @Test
+    void getTeamSuggestions_returnsGroupedTeams() {
+        // given
+        Ticket ticket = Ticket.builder()
+                .id(ticketId)
+                .channelId("C123")
+                .queryTs(MessageTs.of("111.222"))
+                .status(TicketStatus.opened)
+                .lastInteractedAt(Instant.now())
+                .build();
+        when(ticketRepository.findTicketById(ticketId)).thenReturn(ticket);
+
+        Message message = new Message();
+        message.setUser("U456");
+        when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(message);
+
+        TicketTeamsSuggestion suggestion =
+                new TicketTeamsSuggestion(ImmutableList.of("AuthorTeam"), ImmutableList.of("OtherTeam"));
+        when(teamSuggestionsService.getTeamSuggestions("", SlackId.user("U456")))
+                .thenReturn(suggestion);
+
+        // when
+        ResponseEntity<TicketTeamSuggestionsUI> response = controller.getTeamSuggestions(ticketId);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        TicketTeamSuggestionsUI body = response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.suggestedTeams()).containsExactly("AuthorTeam");
+        assertThat(body.otherTeams()).containsExactly("OtherTeam");
+    }
+
+    @Test
+    void getTeamSuggestions_ticketNotFound_returns404() {
+        // given
+        when(ticketRepository.findTicketById(ticketId)).thenReturn(null);
+
+        // when
+        ResponseEntity<TicketTeamSuggestionsUI> response = controller.getTeamSuggestions(ticketId);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void getTeamSuggestions_slackbotAuthor_returnsFallback() {
+        // given
+        Ticket ticket = Ticket.builder()
+                .id(ticketId)
+                .channelId("C123")
+                .queryTs(MessageTs.of("111.222"))
+                .status(TicketStatus.opened)
+                .lastInteractedAt(Instant.now())
+                .build();
+        when(ticketRepository.findTicketById(ticketId)).thenReturn(ticket);
+
+        Message message = new Message();
+        message.setUser(SlackId.SLACKBOT.id());
+        when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(message);
+
+        TicketTeamsSuggestion fallback =
+                new TicketTeamsSuggestion(ImmutableList.of(), ImmutableList.of("TeamA", "TeamB"));
+        when(teamSuggestionsService.getFallbackSuggestions("")).thenReturn(fallback);
+
+        // when
+        ResponseEntity<TicketTeamSuggestionsUI> response = controller.getTeamSuggestions(ticketId);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        TicketTeamSuggestionsUI body = response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.suggestedTeams()).isEmpty();
+        assertThat(body.otherTeams()).containsExactly("TeamA", "TeamB");
+    }
+
+    @Test
+    void getTeamSuggestions_slackError_returnsFallback() {
+        // given
+        Ticket ticket = Ticket.builder()
+                .id(ticketId)
+                .channelId("C123")
+                .queryTs(MessageTs.of("111.222"))
+                .status(TicketStatus.opened)
+                .lastInteractedAt(Instant.now())
+                .build();
+        when(ticketRepository.findTicketById(ticketId)).thenReturn(ticket);
+
+        when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class)))
+                .thenThrow(new RuntimeException("Slack API error"));
+
+        TicketTeamsSuggestion fallback = new TicketTeamsSuggestion(ImmutableList.of(), ImmutableList.of("TeamA"));
+        when(teamSuggestionsService.getFallbackSuggestions("")).thenReturn(fallback);
+
+        // when
+        ResponseEntity<TicketTeamSuggestionsUI> response = controller.getTeamSuggestions(ticketId);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        TicketTeamSuggestionsUI body = response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.suggestedTeams()).isEmpty();
+        assertThat(body.otherTeams()).containsExactly("TeamA");
+    }
+
+    @Test
+    void getTeamSuggestions_botAuthor_returnsSuggestions() {
+        // given
+        Ticket ticket = Ticket.builder()
+                .id(ticketId)
+                .channelId("C123")
+                .queryTs(MessageTs.of("111.222"))
+                .status(TicketStatus.opened)
+                .lastInteractedAt(Instant.now())
+                .build();
+        when(ticketRepository.findTicketById(ticketId)).thenReturn(ticket);
+
+        Message message = new Message();
+        message.setUser(null);
+        message.setBotId("B789");
+        when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(message);
+
+        TicketTeamsSuggestion suggestion = new TicketTeamsSuggestion(ImmutableList.of(), ImmutableList.of("TeamA"));
+        when(teamSuggestionsService.getTeamSuggestions("", SlackId.bot("B789"))).thenReturn(suggestion);
+
+        // when
+        ResponseEntity<TicketTeamSuggestionsUI> response = controller.getTeamSuggestions(ticketId);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     private static DetailedTicket detailedTicket(TicketId id) {
