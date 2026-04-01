@@ -11,6 +11,12 @@ jest.mock('../../../lib/hooks', () => ({
     apiFetch: jest.fn(),
 }))
 jest.mock('../../../hooks/useAuth')
+jest.mock('../../tickets/EditTicketModal', () => ({
+    __esModule: true,
+    default: ({ ticketId, open }: { ticketId: string | null; open: boolean }) => (
+        open ? <div data-testid="edit-ticket-modal">Ticket modal for {ticketId}</div> : null
+    )
+}))
 
 // Mock next-auth
 jest.mock('next-auth/react', () => ({
@@ -325,7 +331,7 @@ describe('KnowledgeGapsPage', () => {
         expect(disclosures[1]).toHaveAttribute('aria-expanded', 'false')
     })
 
-    it('query links point to Slack permalinks', () => {
+    it('opens the ticket modal when a summarized query with a ticket id is clicked', async () => {
         mockUseAnalysis.mockReturnValue({
             data: mockAnalysisData,
             isLoading: false,
@@ -337,16 +343,15 @@ describe('KnowledgeGapsPage', () => {
         // Expand the "Knowledge Gap" support area to reveal queries
         fireEvent.click(screen.getByText('Knowledge Gap'))
 
-        // Query links should point to Slack permalinks and open in a new tab
-        const links = screen.getAllByRole('link', { name: /view/i })
-        expect(links).toHaveLength(1)
-        expect(links[0]).toHaveAttribute('href', 'https://slack.com/archives/CTEST/p')
-        expect(links[0]).toHaveAttribute('target', '_blank')
-        expect(links[0]).toHaveAttribute('rel', 'noopener noreferrer')
+        fireEvent.click(screen.getByRole('button', { name: /documentation missing for new api/i }))
+
+        await waitFor(() => {
+            expect(screen.getByTestId('edit-ticket-modal')).toHaveTextContent('Ticket modal for T-201')
+        })
     })
 
-    it('renders queries with null links as plain text without anchor tags', () => {
-        const dataWithNullLinks = {
+    it('renders rows without ticket targets as non-clickable content', () => {
+        const dataWithMixedTargets = {
             ...mockAnalysisData,
             supportAreas: [
                 {
@@ -354,15 +359,15 @@ describe('KnowledgeGapsPage', () => {
                     coveragePercentage: 50,
                     queryCount: 10,
                     queries: [
-                        { text: 'Query with link', timestamp: '2026-03-31T12:00:00Z', ticketId: 'T-301', link: 'https://slack.com/archives/CTEST/p123' },
-                        { text: 'Query without link', timestamp: '2026-03-31T12:01:00Z', ticketId: null, link: null }
+                        { text: 'Query with ticket', timestamp: '2026-03-31T12:00:00Z', ticketId: 'T-301', link: 'https://slack.com/archives/CTEST/p123' },
+                        { text: 'Query without ticket', timestamp: '2026-03-31T12:01:00Z', ticketId: null, link: 'https://slack.com/archives/CTEST/p789' }
                     ]
                 }
             ]
         }
 
         mockUseAnalysis.mockReturnValue({
-            data: dataWithNullLinks,
+            data: dataWithMixedTargets,
             isLoading: false,
             error: null
         } as any)
@@ -372,48 +377,10 @@ describe('KnowledgeGapsPage', () => {
         // Expand the item to reveal queries
         fireEvent.click(screen.getByText('Mixed Links'))
 
-        // Both query texts should be visible
-        expect(screen.getByText('Query with link')).toBeInTheDocument()
-        expect(screen.getByText('Query without link')).toBeInTheDocument()
-
-        // Only the non-null query has a clickable link
-        const links = screen.getAllByRole('link', { name: /view/i })
-        expect(links).toHaveLength(1)
-        expect(links[0]).toHaveAttribute('href', 'https://slack.com/archives/CTEST/p123')
-    })
-
-    it('renders queries without ticket IDs as plain text even when a link is present', () => {
-        const dataWithoutTicketIds = {
-            ...mockAnalysisData,
-            supportAreas: [
-                {
-                    name: 'No Ticket Links',
-                    coveragePercentage: 50,
-                    queryCount: 2,
-                    queries: [
-                        { text: 'Linked ticket query', timestamp: '2026-03-31T12:00:00Z', ticketId: 'T-302', link: 'https://slack.com/archives/CTEST/p456' },
-                        { text: 'Link without ticket ID', timestamp: '2026-03-31T12:01:00Z', ticketId: null, link: 'https://slack.com/archives/CTEST/p789' }
-                    ]
-                }
-            ]
-        }
-
-        mockUseAnalysis.mockReturnValue({
-            data: dataWithoutTicketIds,
-            isLoading: false,
-            error: null
-        } as any)
-
-        renderWithToast(<KnowledgeGapsPage />)
-
-        fireEvent.click(screen.getByText('No Ticket Links'))
-
-        expect(screen.getByText('Linked ticket query')).toBeInTheDocument()
-        expect(screen.getByText('Link without ticket ID')).toBeInTheDocument()
-
-        const links = screen.getAllByRole('link', { name: /view/i })
-        expect(links).toHaveLength(1)
-        expect(links[0]).toHaveAttribute('href', 'https://slack.com/archives/CTEST/p456')
+        expect(screen.getByRole('button', { name: /query with ticket/i })).toBeInTheDocument()
+        expect(screen.getByText('Query without ticket')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /query without ticket/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('link', { name: /view/i })).not.toBeInTheDocument()
     })
 
     it('displays all 5 items in each section', () => {
