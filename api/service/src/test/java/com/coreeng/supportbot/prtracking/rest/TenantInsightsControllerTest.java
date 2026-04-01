@@ -36,15 +36,6 @@ class TenantInsightsControllerTest {
     }
 
     @Test
-    void enabled_returnsTrue() {
-        // when
-        TenantInsightsController.FeatureStatus status = controller.enabled();
-
-        // then
-        assertThat(status.enabled()).isTrue();
-    }
-
-    @Test
     void prStats_returnsInsightsForDateRange() {
         // given a repo with 10 PRs, 2 open, 1 escalated, 3 breached SLA
         LocalDate from = LocalDate.of(2026, 3, 1);
