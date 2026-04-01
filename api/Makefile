@@ -17,6 +17,10 @@ db-up: ## Start PostgreSQL database container
 db-down: ## Stop PostgreSQL database container
 	@docker compose -f service/docker-compose.yaml stop db
 
+.PHONY: stop-local
+stop-local: ## Best-effort: stop process listening on API dev port (default 8080)
+	@for p in $$(lsof -ti :8080 -sTCP:LISTEN 2>/dev/null); do kill $$p 2>/dev/null || true; done
+
 .PHONY: run-local
 run-local: db-up ## Run API locally (starts DB, loads .env.local)
 	@if [ -f .env.local ]; then \

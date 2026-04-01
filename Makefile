@@ -41,6 +41,35 @@ db-up: ## Start PostgreSQL database container
 db-down: ## Stop PostgreSQL database container
 	@docker compose -f api/service/docker-compose.yaml stop db
 
+##@ Local full stack (Postgres + LDAP + Dex + API + UI)
+
+.PHONY: run-local-dex-ldap
+run-local-dex-ldap: ## Start Postgres, LDAP, Dex, API, UI (needs api/.env.local, ldap/.env.local, dex/.env.local)
+	@$(MAKE) db-up
+	@$(MAKE) -C ldap run-local
+	@echo "Waiting for LDAP container..."
+	@n=0; until docker compose -f ldap/docker-compose.yaml exec -T openldap true 2>/dev/null; do \
+		n=$$((n+1)); if [ "$$n" -ge 120 ]; then echo "Timeout waiting for LDAP"; exit 1; fi; sleep 1; \
+	done
+	@$(MAKE) -C dex run-local
+	@echo "Starting API and UI (Ctrl+C stops API and UI)..."
+	@trap 'kill 0' EXIT INT TERM; \
+		(cd api && $(MAKE) run-local 2>&1 | sed 's/^/[API] /') & \
+		(cd ui && $(MAKE) run-local 2>&1 | sed 's/^/[UI]  /') & \
+		wait
+
+.PHONY: stop-local-api-ui
+stop-local-api-ui: ## Best-effort: stop API (:8080) and UI (:3000) dev servers
+	@$(MAKE) -C api stop-local
+	@$(MAKE) -C ui stop-local
+
+.PHONY: stop-local-dex-ldap
+stop-local-dex-ldap: ## Stop API/UI, Dex, LDAP, Postgres (Docker + dev ports)
+	@$(MAKE) stop-local-api-ui
+	@$(MAKE) -C dex down-local
+	@$(MAKE) -C ldap down-local
+	@$(MAKE) db-down
+
 ##@ General
 
 # The help target prints out all targets with their descriptions organized
