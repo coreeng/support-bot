@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.escalation.rest.EscalationUIMapper;
 import com.coreeng.supportbot.slack.MessageTs;
@@ -29,6 +30,7 @@ import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketStatus;
 import com.coreeng.supportbot.ticket.TicketTeam;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 public class TicketUIMapperTest {
+
+    @Mock
+    private AnalysisRepository analysisRepository;
 
     @Mock
     private EscalationUIMapper escalationUIMapper;
@@ -62,7 +67,13 @@ public class TicketUIMapperTest {
     @BeforeEach
     void setUp() {
         ticketUIMapper = new TicketUIMapper(
-                escalationUIMapper, slackClient, teamService, teamUIMapper, supportTeamService, assignmentProps);
+                analysisRepository,
+                escalationUIMapper,
+                slackClient,
+                teamService,
+                teamUIMapper,
+                supportTeamService,
+                assignmentProps);
     }
 
     @Test
@@ -368,5 +379,70 @@ public class TicketUIMapperTest {
 
         // then
         assertNull(result.query().link());
+    }
+
+    @Test
+    void mapToUIIncludesSummaryWhenAvailable() {
+        // given
+        TicketId id = new TicketId(1);
+        DetailedTicket detailedTicket = minimalDetailedTicket(id);
+        when(analysisRepository.findSummaryByTicketId(id)).thenReturn("Cache invalidation resolved the incident");
+
+        // when
+        TicketUI result = ticketUIMapper.mapToUI(detailedTicket);
+
+        // then
+        assertEquals("Cache invalidation resolved the incident", result.summary());
+    }
+
+    @Test
+    void mapToUIKeepsSummaryNullWhenNotAvailable() {
+        // given
+        TicketId id = new TicketId(1);
+        DetailedTicket detailedTicket = minimalDetailedTicket(id);
+        when(analysisRepository.findSummaryByTicketId(id)).thenReturn(null);
+
+        // when
+        TicketUI result = ticketUIMapper.mapToUI(detailedTicket);
+
+        // then
+        assertNull(result.summary());
+    }
+
+    @Test
+    void mapToUIListBatchFetchesSummaries() {
+        // given
+        TicketId id1 = new TicketId(1);
+        TicketId id2 = new TicketId(2);
+        DetailedTicket ticket1 = minimalDetailedTicket(id1);
+        DetailedTicket ticket2 = minimalDetailedTicket(id2);
+        ImmutableList<DetailedTicket> tickets = ImmutableList.of(ticket1, ticket2);
+
+        when(analysisRepository.findSummariesByTicketIds(ImmutableList.of(id1, id2)))
+                .thenReturn(ImmutableMap.of(id1, "Summary for ticket 1"));
+
+        // when
+        ImmutableList<TicketUI> results = ticketUIMapper.mapToUIList(tickets);
+
+        // then
+        assertEquals(2, results.size());
+        assertEquals("Summary for ticket 1", results.get(0).summary());
+        assertNull(results.get(1).summary());
+    }
+
+    private static DetailedTicket minimalDetailedTicket(TicketId id) {
+        Ticket ticket = Ticket.builder()
+                .id(id)
+                .channelId("C123")
+                .queryTs(MessageTs.of("123.456"))
+                .createdMessageTs(MessageTs.of("123.457"))
+                .status(TicketStatus.opened)
+                .team(null)
+                .impact("production-blocking")
+                .tags(ImmutableList.of())
+                .lastInteractedAt(Instant.now())
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+                .build();
+        return new DetailedTicket(ticket, ImmutableList.of());
     }
 }

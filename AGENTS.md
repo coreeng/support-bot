@@ -36,6 +36,11 @@ refactor(api): extract CORS configuration to dedicated class
 docs: update README with setup instructions
 ```
 
+# CLI usage
+
+We use mise to manage CLI dependencies.
+Use `mise exec` to run a command in the CLI context in case `mise` is available.
+
 # Other AGENT.md / CLAUDE.md files
 
 - `ui/AGENTS.md`

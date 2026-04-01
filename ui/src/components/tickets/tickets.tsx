@@ -22,6 +22,9 @@ export default function TicketsPage() {
     } = useTeamFilter()
     const queryClient = useQueryClient()
     const {data: isAssignmentEnabled} = useAssignmentEnabled()
+    const SUMMARY_COLUMN_WIDTH = '16rem'
+    const BASE_COLUMN_COUNT = 9
+    const columnCount = isAssignmentEnabled ? BASE_COLUMN_COUNT + 1 : BASE_COLUMN_COUNT
     const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
     const isViewingAllTeams = contextIsViewingAllTeams ?? (effectiveTeams.length === 0 && !hasNoTeamScope)
     type TicketDateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
@@ -393,10 +396,16 @@ export default function TicketsPage() {
                             <p className="text-sm mt-1">Unable to load ticket data. Please try refreshing the page.</p>
                         </div>
                     ) :
-                        <table className="min-w-full divide-y">
+                        <table className="min-w-full divide-y table-fixed">
                             <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                                <th
+                                    className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider"
+                                    style={{ width: SUMMARY_COLUMN_WIDTH }}
+                                >
+                                    Summary
+                                </th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Team</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Impact</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Tags</th>
@@ -452,15 +461,30 @@ export default function TicketsPage() {
                                         <td className="px-4 py-4 whitespace-nowrap text-sm"><span
                                             className={`px-2 py-1 rounded-full text-xs font-semibold ${statusColors[t.status] || 'bg-gray-100 text-gray-800'}`}>{t.status}</span>
                                         </td>
+                                        <td
+                                            className="px-4 py-4 text-sm text-gray-700 whitespace-normal break-words align-top"
+                                            style={{ width: SUMMARY_COLUMN_WIDTH, minWidth: SUMMARY_COLUMN_WIDTH }}
+                                        >
+                                            <div
+                                                className="overflow-hidden"
+                                                style={{
+                                                    display: '-webkit-box',
+                                                    WebkitLineClamp: 4,
+                                                    WebkitBoxOrient: 'vertical',
+                                                }}
+                                            >
+                                                {t.summary?.trim() ? t.summary : '—'}
+                                            </div>
+                                        </td>
                                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{t.team?.name || '-'}</td>
                                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{registryData?.impacts.find((i: TicketImpact) => i.code === t.impact)?.label || t.impact || '-'}</td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        <td className="px-4 py-4 text-sm text-gray-700">
                                             {(t.tags?.length ?? 0) > 0
                                                 ? t.tags
                                                     ?.map(getTagLabel)
                                                     .filter(Boolean)
                                                     .map((tag, idx) => (
-                                                        <span key={`${t.id}-tag-${idx}`} className="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2 py-0.5 rounded mr-1">
+                                                        <span key={`${t.id}-tag-${idx}`} className="block w-fit bg-indigo-100 text-indigo-800 text-xs font-semibold px-2 py-0.5 rounded mb-1 last:mb-0">
                                                             {tag}
                                                         </span>
                                                     ))
@@ -477,7 +501,7 @@ export default function TicketsPage() {
                                 )
                             })}
                             {filteredTickets.length === 0 && <tr>
-                                <td colSpan={isAssignmentEnabled ? 9 : 8} className="text-center py-4 text-gray-500">No tickets found</td>
+                                <td colSpan={columnCount} className="text-center py-4 text-gray-500">No tickets found</td>
                             </tr>}
                             </tbody>
                         </table>
