@@ -261,6 +261,18 @@ public class SupportBotClient {
                     .extract()
                     .as(PrTrackingRecordResponse.class);
         }
+
+        public PrTrackingRecordResponse getPrTrackingRecord(long id) {
+            return given().config(REST_ASSURED_CONFIG)
+                    .when()
+                    .get(baseUrl + "/test/prtracking/record/{id}", id)
+                    .then()
+                    .log()
+                    .ifValidationFails(LogDetail.ALL, true)
+                    .statusCode(200)
+                    .extract()
+                    .as(PrTrackingRecordResponse.class);
+        }
     }
 
     @Builder
@@ -338,6 +350,7 @@ public class SupportBotClient {
         private Instant prCreatedAt;
         private Instant slaDeadline;
         private String owningTeam;
+        @Nullable private Boolean canAutoCloseTicket;
     }
 
     @Builder

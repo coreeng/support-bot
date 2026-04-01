@@ -11,6 +11,8 @@ public interface PrTrackingRepository {
 
     @Nullable PrTrackingRecord insertIfAbsent(NewPrTracking newRecord);
 
+    @Nullable PrTrackingRecord findById(long id);
+
     List<PrTrackingRecord> findAllByStatus(PrTrackingStatus status);
 
     /** Returns all records with status OPEN, ESCALATED, CHANGES_REQUESTED, or APPROVED. */
