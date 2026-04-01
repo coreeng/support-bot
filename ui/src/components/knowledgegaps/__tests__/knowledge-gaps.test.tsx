@@ -54,8 +54,8 @@ const mockAnalysisData = {
             coveragePercentage: 90,
             queryCount: 28,
             queries: [
-                { text: 'Firewall rules for output traffic', timestamp: '2026-03-31T09:15:00Z', ticketId: 'T-101', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'DNS resolution issues', timestamp: '2026-03-30T14:20:00Z', ticketId: 'T-102', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Firewall rules for output traffic', timestamp: '1743426900.000001', ticketId: '101', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'DNS resolution issues', timestamp: '1743344400.000001', ticketId: '102', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -63,8 +63,8 @@ const mockAnalysisData = {
             coveragePercentage: 88,
             queryCount: 50,
             queries: [
-                { text: 'How to view application logs?', timestamp: '2026-03-29T10:00:00Z', ticketId: 'T-103', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'Setting up custom metrics', timestamp: '2026-03-28T08:45:00Z', ticketId: 'T-104', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'How to view application logs?', timestamp: '1743242400.000001', ticketId: '103', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'Setting up custom metrics', timestamp: '1743141900.000001', ticketId: '104', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -72,8 +72,8 @@ const mockAnalysisData = {
             coveragePercentage: 75,
             queryCount: 42,
             queries: [
-                { text: 'How do I fix the CI pipeline failure?', timestamp: '2026-03-27T11:30:00Z', ticketId: 'T-105', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'What is the correct configuration for the build step?', timestamp: '2026-03-26T16:10:00Z', ticketId: 'T-106', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'How do I fix the CI pipeline failure?', timestamp: '1743075000.000001', ticketId: '105', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'What is the correct configuration for the build step?', timestamp: '1743005400.000001', ticketId: '106', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -81,8 +81,8 @@ const mockAnalysisData = {
             coveragePercentage: 60,
             queryCount: 35,
             queries: [
-                { text: 'How to setup Kafka consumers?', timestamp: '2026-03-25T13:05:00Z', ticketId: 'T-107', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'Dial configuration for new tenant', timestamp: '2026-03-24T17:40:00Z', ticketId: 'T-108', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'How to setup Kafka consumers?', timestamp: '1742919000.000001', ticketId: '107', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'Dial configuration for new tenant', timestamp: '1742838000.000001', ticketId: '108', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -90,8 +90,8 @@ const mockAnalysisData = {
             coveragePercentage: 45,
             queryCount: 15,
             queries: [
-                { text: 'Deployment failed with timeout', timestamp: '2026-03-23T12:25:00Z', ticketId: 'T-109', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'Configuring environment variables', timestamp: '2026-03-22T09:55:00Z', ticketId: 'T-110', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Deployment failed with timeout', timestamp: '1742732700.000001', ticketId: '109', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'Configuring environment variables', timestamp: '1742680200.000001', ticketId: '110', link: 'https://slack.com/archives/CTEST/p' }
             ]
         }
     ],
@@ -101,8 +101,8 @@ const mockAnalysisData = {
             coveragePercentage: 56,
             queryCount: 2127,
             queries: [
-                { text: 'Documentation missing for new API', timestamp: '2026-03-31T12:34:56Z', ticketId: 'T-201', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'How to configure advanced settings?', timestamp: '2026-03-30T07:08:09Z', ticketId: null, link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Documentation missing for new API', timestamp: '1743424496.000001', ticketId: '201', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'How to configure advanced settings?', timestamp: '1743318489.000001', ticketId: null, link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -110,8 +110,8 @@ const mockAnalysisData = {
             coveragePercentage: 22,
             queryCount: 825,
             queries: [
-                { text: 'Service temporarily unavailable', timestamp: '2026-03-29T06:00:00Z', ticketId: 'T-202', link: 'https://slack.com/archives/CTEST/p' },
-                { text: '503 errors on login', timestamp: '2026-03-28T18:15:00Z', ticketId: 'T-203', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Service temporarily unavailable', timestamp: '1743228000.000001', ticketId: '202', link: 'https://slack.com/archives/CTEST/p' },
+                { text: '503 errors on login', timestamp: '1743185700.000001', ticketId: '203', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -119,8 +119,8 @@ const mockAnalysisData = {
             coveragePercentage: 13,
             queryCount: 493,
             queries: [
-                { text: 'Please reset my API key', timestamp: '2026-03-27T15:00:00Z', ticketId: 'T-204', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'Update billing address', timestamp: '2026-03-26T08:30:00Z', ticketId: 'T-205', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Please reset my API key', timestamp: '1743087600.000001', ticketId: '204', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'Update billing address', timestamp: '1742977800.000001', ticketId: '205', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -128,8 +128,8 @@ const mockAnalysisData = {
             coveragePercentage: 5,
             queryCount: 196,
             queries: [
-                { text: 'Cannot find the logout button', timestamp: '2026-03-25T11:11:00Z', ticketId: 'T-206', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'Dashboard is confusing', timestamp: '2026-03-24T14:22:00Z', ticketId: 'T-207', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Cannot find the logout button', timestamp: '1742901060.000001', ticketId: '206', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'Dashboard is confusing', timestamp: '1742826120.000001', ticketId: '207', link: 'https://slack.com/archives/CTEST/p' }
             ]
         },
         {
@@ -137,8 +137,8 @@ const mockAnalysisData = {
             coveragePercentage: 4,
             queryCount: 163,
             queries: [
-                { text: 'Add dark mode support', timestamp: '2026-03-23T19:45:00Z', ticketId: 'T-208', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'Export report to PDF', timestamp: '2026-03-22T21:10:00Z', ticketId: 'T-209', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Add dark mode support', timestamp: '1742759100.000001', ticketId: '208', link: 'https://slack.com/archives/CTEST/p' },
+                { text: 'Export report to PDF', timestamp: '1742677800.000001', ticketId: '209', link: 'https://slack.com/archives/CTEST/p' }
             ]
         }
     ]
@@ -285,8 +285,8 @@ describe('KnowledgeGapsPage', () => {
         expect(screen.getByText('Showing up to 5 most recent queries in this category')).toBeInTheDocument()
         expect(screen.getByText('Documentation missing for new API')).toBeInTheDocument()
         expect(screen.getByText('How to configure advanced settings?')).toBeInTheDocument()
-        expect(screen.getByText('Mar 31, 2026, 12:34 PM')).toBeInTheDocument()
-        expect(screen.getByText('Mar 30, 2026, 7:08 AM')).toBeInTheDocument()
+        expect(screen.getByText('Mar 31, 2025, 12:34 PM')).toBeInTheDocument()
+        expect(screen.getByText('Mar 30, 2025, 7:08 AM')).toBeInTheDocument()
 
         // Click again to collapse
         fireEvent.click(disclosure!)
@@ -304,7 +304,7 @@ describe('KnowledgeGapsPage', () => {
                     coveragePercentage: 56,
                     queryCount: 12,
                     queries: [
-                        { text: 'Support area query', timestamp: '2026-03-31T12:34:56Z', ticketId: 'T-401', link: 'https://slack.com/archives/CTEST/p401' }
+                        { text: 'Support area query', timestamp: '1743424496.000001', ticketId: '401', link: 'https://slack.com/archives/CTEST/p401' }
                     ]
                 }
             ],
@@ -314,7 +314,7 @@ describe('KnowledgeGapsPage', () => {
                     coveragePercentage: 44,
                     queryCount: 8,
                     queries: [
-                        { text: 'Knowledge gap query', timestamp: '2026-03-30T07:08:09Z', ticketId: 'T-402', link: 'https://slack.com/archives/CTEST/p402' }
+                        { text: 'Knowledge gap query', timestamp: '1743318489.000001', ticketId: '402', link: 'https://slack.com/archives/CTEST/p402' }
                     ]
                 }
             ]
@@ -351,10 +351,11 @@ describe('KnowledgeGapsPage', () => {
         // Expand the "Knowledge Gap" support area to reveal queries
         fireEvent.click(screen.getByText('Knowledge Gap'))
 
+        expect(screen.getByText('Mar 31, 2025, 12:34 PM')).toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: /documentation missing for new api/i }))
 
         await waitFor(() => {
-            expect(screen.getByTestId('edit-ticket-modal')).toHaveTextContent('Ticket modal for T-201')
+            expect(screen.getByTestId('edit-ticket-modal')).toHaveTextContent('Ticket modal for 201')
         })
     })
 
@@ -376,7 +377,7 @@ describe('KnowledgeGapsPage', () => {
 
         fireEvent.click(screen.getByRole('button', { name: /trigger modal success/i }))
 
-        expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['ticket', 'T-201'] })
+        expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['ticket', '201'] })
         expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['tickets'] })
         expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['analysis'] })
     })
@@ -390,8 +391,8 @@ describe('KnowledgeGapsPage', () => {
                     coveragePercentage: 50,
                     queryCount: 10,
                     queries: [
-                        { text: 'Query with ticket', timestamp: '2026-03-31T12:00:00Z', ticketId: 'T-301', link: 'https://slack.com/archives/CTEST/p123' },
-                        { text: 'Query without ticket', timestamp: '2026-03-31T12:01:00Z', ticketId: null, link: 'https://slack.com/archives/CTEST/p789' }
+                        { text: 'Query with ticket', timestamp: '1743422400.000001', ticketId: '301', link: 'https://slack.com/archives/CTEST/p123' },
+                        { text: 'Query without ticket', timestamp: '1743422460.000001', ticketId: null, link: 'https://slack.com/archives/CTEST/p789' }
                     ]
                 }
             ]

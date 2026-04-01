@@ -52,8 +52,13 @@ export default function KnowledgeGapsPage() {
     const settingsDescriptionId = useId()
     const settingsPanelId = 'analysis-settings-popover'
 
-    const formatQueryTimestamp = (timestamp: string) => (
-        new Intl.DateTimeFormat('en-US', {
+    const formatQueryTimestamp = (timestamp: string) => {
+        const slackTsMatch = /^(\d+)(?:\.(\d+))?$/.exec(timestamp)
+        const parsedTimestamp = slackTsMatch
+            ? new Date(Number(slackTsMatch[1]) * 1000)
+            : new Date(timestamp)
+
+        return new Intl.DateTimeFormat('en-US', {
             month: 'short',
             day: 'numeric',
             year: 'numeric',
@@ -61,8 +66,8 @@ export default function KnowledgeGapsPage() {
             minute: '2-digit',
             hour12: true,
             timeZone: 'UTC',
-        }).format(new Date(timestamp))
-    )
+        }).format(parsedTimestamp)
+    }
 
     const openTicketModal = (ticketId: string) => {
         setSelectedTicketId(ticketId)
