@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useTicket, useTenantTeams, useRegistry, useSupportMembers, useAssignmentEnabled } from '@/lib/hooks'
+import { useTicket, useTenantTeams, useTeamSuggestions, useRegistry, useSupportMembers, useAssignmentEnabled } from '@/lib/hooks'
 import { TicketWithLogs, TicketImpact, TicketTag, Escalation, SupportMember } from '@/lib/types'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Ticket, AlertCircle, Tag, User, Clock, Slack, X, MessageSquare } from 'lucide-react'
 import SlackMessageRenderer from '@/components/ui/SlackMessageRenderer'
+import TeamCombobox from './TeamCombobox'
 
 interface EditTicketModalProps {
     ticketId: string | null
@@ -32,6 +33,9 @@ export default function EditTicketModal({
     const { isSupportEngineer } = useAuth()
     const { data: ticketDetails, isLoading: isTicketLoading, error: ticketError } = useTicket(ticketId || undefined)
     const { data: teamsData } = useTenantTeams()
+    const { data: teamSuggestionsData, isError: isTeamSuggestionsError } = useTeamSuggestions(
+        ticketId ? Number(ticketId) : undefined
+    )
     const { data: registryData } = useRegistry()
     const { data: supportMembers } = useSupportMembers()
     const { data: isAssignmentEnabled } = useAssignmentEnabled()
@@ -439,43 +443,30 @@ export default function EditTicketModal({
                                 Select the Author&apos;s Team <span className="text-red-500">*</span>
                             </label>
                             {canEdit ? (
-                                <div className="space-y-1">
-                                    {(() => {
-                                        const options = Array.from(new Set([
-                                            displayTicket.team?.name,
-                                            ...(teamsData?.map((team: { name: string }) => team.name) ?? []),
-                                        ].filter(Boolean))) as string[]
-                                        return (
-                                            <select
-                                                id="team-select"
-                                                value={authorTeam}
-                                                onChange={(e) => {
-                                                    setAuthorTeam(e.target.value)
-                                                    if (validationErrors.authorTeam) {
-                                                        setValidationErrors(prev => {
-                                                            const next = { ...prev }
-                                                            delete next.authorTeam
-                                                            return next
-                                                        })
-                                                    }
-                                                }}
-                                                className={`w-full p-2.5 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:shadow-md transition-all ${
-                                                    validationErrors.authorTeam ? 'border-red-500' : 'border-gray-300'
-                                                }`}
-                                            >
-                                                <option value="">Select team...</option>
-                                                {options.map((name) => (
-                                                    <option key={name} value={name}>
-                                                        {name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        )
-                                    })()}
-                                    {validationErrors.authorTeam && (
-                                        <p className="text-sm text-red-600">{validationErrors.authorTeam}</p>
-                                    )}
-                                </div>
+                                <TeamCombobox
+                                    suggestedTeams={
+                                        isTeamSuggestionsError
+                                            ? []
+                                            : (teamSuggestionsData?.suggestedTeams ?? [])
+                                    }
+                                    otherTeams={
+                                        isTeamSuggestionsError
+                                            ? (teamsData?.map((t) => t.name) ?? [])
+                                            : (teamSuggestionsData?.otherTeams ?? [])
+                                    }
+                                    value={authorTeam}
+                                    onChange={(val) => {
+                                        setAuthorTeam(val)
+                                        if (validationErrors.authorTeam) {
+                                            setValidationErrors((prev) => {
+                                                const next = { ...prev }
+                                                delete next.authorTeam
+                                                return next
+                                            })
+                                        }
+                                    }}
+                                    error={validationErrors.authorTeam}
+                                />
                             ) : (
                                 <span className="font-medium text-gray-700 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-md inline-block">
                                     {displayTicket.team?.name || '-'}

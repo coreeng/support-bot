@@ -11,6 +11,7 @@ jest.mock('../../../hooks/useAuth');
 
 const mockUseTicket = hooks.useTicket as jest.MockedFunction<typeof hooks.useTicket>;
 const mockUseTenantTeams = hooks.useTenantTeams as jest.MockedFunction<typeof hooks.useTenantTeams>;
+const mockUseTeamSuggestions = hooks.useTeamSuggestions as jest.MockedFunction<typeof hooks.useTeamSuggestions>;
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>;
 const mockUseSupportMembers = hooks.useSupportMembers as jest.MockedFunction<typeof hooks.useSupportMembers>;
 const mockUseAssignmentEnabled = hooks.useAssignmentEnabled as jest.MockedFunction<typeof hooks.useAssignmentEnabled>;
@@ -40,6 +41,11 @@ const mockTeams = [
     { name: 'Support' },
     { name: 'Product' }
 ];
+
+const mockTeamSuggestions = {
+    suggestedTeams: ['Engineering'],
+    otherTeams: ['Support', 'Product'],
+};
 
 const mockRegistry = {
     impacts: [
@@ -77,6 +83,13 @@ describe('EditTicketModal', () => {
             isLoading: false,
             error: null
         } as unknown as ReturnType<typeof hooks.useTenantTeams>);
+
+        mockUseTeamSuggestions.mockReturnValue({
+            data: mockTeamSuggestions,
+            isLoading: false,
+            isError: false,
+            error: null
+        } as unknown as ReturnType<typeof hooks.useTeamSuggestions>);
 
         mockUseRegistry.mockReturnValue({
             data: mockRegistry,
@@ -276,10 +289,9 @@ describe('EditTicketModal', () => {
             expect(impactSelect).toBeInTheDocument();
             expect(impactSelect.tagName).toBe('SELECT');
 
-            // Team should be a select dropdown
-            const teamSelect = screen.getByLabelText(/Select the Author's Team/i);
-            expect(teamSelect).toBeInTheDocument();
-            expect(teamSelect.tagName).toBe('SELECT');
+            // Team should be a combobox trigger button
+            const teamButton = screen.getByText('Engineering');
+            expect(teamButton).toBeInTheDocument();
         });
 
         it('shows read-only fields for non-support engineers', () => {
@@ -360,8 +372,8 @@ describe('EditTicketModal', () => {
             const impactSelect = screen.getByLabelText(/Impact/i) as HTMLSelectElement;
             expect(impactSelect.value).toBe('high');
 
-            const teamSelect = screen.getByLabelText(/Select the Author's Team/i) as HTMLSelectElement;
-            expect(teamSelect.value).toBe('Engineering');
+            // Team combobox should show the current team value
+            expect(screen.getByText('Engineering')).toBeInTheDocument();
         });
 
         it('displays selected tags as chips', () => {
@@ -902,9 +914,10 @@ describe('EditTicketModal', () => {
             saveButton = screen.getByText('Save Changes');
             expect(saveButton).toBeDisabled();
 
-            // Fill in team
-            const teamSelect = screen.getByLabelText(/Select the Author's Team/i) as HTMLSelectElement;
-            fireEvent.change(teamSelect, { target: { value: 'Engineering' } });
+            // Fill in team via combobox
+            const teamTrigger = screen.getByText('Select team...');
+            fireEvent.click(teamTrigger);
+            fireEvent.click(screen.getByText('Engineering'));
 
             // Still disabled (tags missing)
             saveButton = screen.getByText('Save Changes');
