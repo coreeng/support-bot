@@ -4,8 +4,6 @@ This chart deploys the Support Bot (a Slack bot that manages support requests) t
 
 ## Install
 
-From the repository root (or any path where `k8s/service` is accessible):
-
 ```bash
 helm install support-bot oci://ghcr.io/coreeng/charts/support-bot \
   --set image.repository="ghcr.io/coreeng/support-bot" \
