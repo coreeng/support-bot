@@ -1349,7 +1349,7 @@ describe('KnowledgeGapsPage', () => {
             expect(screen.getByRole('dialog', { name: 'Analysis settings' })).toBeInTheDocument()
             expect(screen.getByLabelText('Query window')).toHaveFocus()
 
-            fireEvent.mouseDown(document.body)
+            fireEvent.pointerDown(document.body)
             expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
             expect(settingsTrigger).toHaveFocus()
         })
