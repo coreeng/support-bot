@@ -52,6 +52,14 @@ export default function EditTicketModal({
     const [originalStatus, setOriginalStatus] = useState<string>('')
     const [showEscalationWarning, setShowEscalationWarning] = useState(false)
 
+    const clearValidationError = (field: string) => {
+        setValidationErrors(prev => {
+            const next = { ...prev }
+            delete next[field]
+            return next
+        })
+    }
+
     // Initialize form when ticket data loads
     useEffect(() => {
         if (ticketDetails) {
@@ -101,23 +109,22 @@ export default function EditTicketModal({
         )
     }
 
-
     const validateForm = (): boolean => {
         const errors: Record<string, string> = {}
 
-        if (!status || status.trim() === '') {
+        if (!status.trim()) {
             errors.status = 'Status is required'
         }
 
-        if (!impact || impact.trim() === '') {
+        if (!impact.trim()) {
             errors.impact = 'Impact is required'
         }
 
-        if (!authorTeam || authorTeam.trim() === '') {
+        if (!authorTeam.trim()) {
             errors.authorTeam = 'Author\'s team is required'
         }
 
-        if (!selectedTags || selectedTags.length === 0) {
+        if (selectedTags.length === 0) {
             errors.tags = 'At least one tag is required'
         }
 
@@ -145,10 +152,10 @@ export default function EditTicketModal({
                 : null
 
             const updatePayload: Record<string, unknown> = {
-                status: status,
+                status,
                 authorsTeam: authorTeam,
                 tags: selectedTags,
-                impact: impact,
+                impact,
             }
             
             // Only include assignedTo if assignment feature is enabled
@@ -168,11 +175,8 @@ export default function EditTicketModal({
                 throw new Error(`Failed to update ticket: ${response.status}`)
             }
             
-            // Close modal and refresh
             onOpenChange(false)
-            if (onSuccess) {
-                onSuccess()
-            }
+            onSuccess?.()
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to update ticket')
             console.error('Error updating ticket:', err)
@@ -332,9 +336,9 @@ export default function EditTicketModal({
                                 Escalations
                             </label>
                             <div className="p-3 border border-gray-200 rounded-md bg-gray-50">
-                                {(displayTicket.escalations ?? []).length > 0 ? (
+                                {displayTicket.escalations?.length ? (
                                     <div className="space-y-2">
-                                        {(displayTicket.escalations ?? []).map((esc, idx) => (
+                                        {displayTicket.escalations.map((esc, idx) => (
                                             <div key={idx} className="text-sm text-gray-700">
                                                 <span className="font-medium">Escalated to:</span>{' '}
                                                 <span className="text-gray-800 font-semibold">{esc.team?.name || 'Unknown team'}</span>
@@ -362,11 +366,7 @@ export default function EditTicketModal({
                                         onChange={(e) => {
                                             setStatus(e.target.value)
                                             if (validationErrors.status) {
-                                                setValidationErrors(prev => {
-                                                    const next = { ...prev }
-                                                    delete next.status
-                                                    return next
-                                                })
+                                                clearValidationError('status')
                                             }
                                         }}
                                         className={`w-full p-2.5 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:shadow-md transition-all ${
@@ -444,6 +444,7 @@ export default function EditTicketModal({
                             </label>
                             {canEdit ? (
                                 <TeamCombobox
+                                    id="team-select"
                                     suggestedTeams={
                                         isTeamSuggestionsError
                                             ? []
@@ -458,11 +459,7 @@ export default function EditTicketModal({
                                     onChange={(val) => {
                                         setAuthorTeam(val)
                                         if (validationErrors.authorTeam) {
-                                            setValidationErrors((prev) => {
-                                                const next = { ...prev }
-                                                delete next.authorTeam
-                                                return next
-                                            })
+                                            clearValidationError('authorTeam')
                                         }
                                     }}
                                     error={validationErrors.authorTeam}
@@ -501,12 +498,7 @@ export default function EditTicketModal({
                                                             onClick={() => {
                                                                 handleTagToggle(tagCode)
                                                                 if (validationErrors.tags && selectedTags.length === 1) {
-                                                                    // If this was the last tag, clear the error when user adds another
-                                                                    setValidationErrors(prev => {
-                                                                        const next = { ...prev }
-                                                                        delete next.tags
-                                                                        return next
-                                                                    })
+                                                                    clearValidationError('tags')
                                                                 }
                                                             }}
                                                             className="hover:bg-gray-400/50 rounded-full p-0.5 transition-colors"
@@ -530,11 +522,7 @@ export default function EditTicketModal({
                                             if (e.target.value && !selectedTags.includes(e.target.value)) {
                                                 setSelectedTags([...selectedTags, e.target.value])
                                                 if (validationErrors.tags) {
-                                                    setValidationErrors(prev => {
-                                                        const next = { ...prev }
-                                                        delete next.tags
-                                                        return next
-                                                    })
+                                                    clearValidationError('tags')
                                                 }
                                             }
                                             e.target.value = '' // Reset dropdown
@@ -584,11 +572,7 @@ export default function EditTicketModal({
                                         onChange={(e) => {
                                             setImpact(e.target.value)
                                             if (validationErrors.impact) {
-                                                setValidationErrors(prev => {
-                                                    const next = { ...prev }
-                                                    delete next.impact
-                                                    return next
-                                                })
+                                                clearValidationError('impact')
                                             }
                                         }}
                                         className={`w-full p-2.5 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:shadow-md transition-all ${

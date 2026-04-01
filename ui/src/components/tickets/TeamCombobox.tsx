@@ -5,6 +5,7 @@ import * as Popover from "@radix-ui/react-popover";
 import { Search, ChevronDown, X } from "lucide-react";
 
 interface TeamComboboxProps {
+  id?: string;
   suggestedTeams: string[];
   otherTeams: string[];
   value: string;
@@ -14,6 +15,7 @@ interface TeamComboboxProps {
 }
 
 export default function TeamCombobox({
+  id,
   suggestedTeams,
   otherTeams,
   value,
@@ -39,6 +41,31 @@ export default function TeamCombobox({
 
   const hasResults = filteredSuggested.length > 0 || filteredOther.length > 0;
 
+  const renderTeamGroup = (teams: string[], label: string) => {
+    if (teams.length === 0) return null;
+    return (
+      <div>
+        <p className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50">
+          {label}
+        </p>
+        {teams.map((team) => (
+          <button
+            key={team}
+            type="button"
+            onClick={() => handleSelect(team)}
+            className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors ${
+              value === team
+                ? "bg-blue-50 text-blue-700 font-medium"
+                : "text-gray-700"
+            }`}
+          >
+            {team}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   const handleSelect = (team: string) => {
     onChange(team);
     setFilter("");
@@ -57,6 +84,8 @@ export default function TeamCombobox({
         <Popover.Trigger asChild disabled={disabled}>
           <button
             type="button"
+            id={id}
+            aria-label="Select team"
             className={`w-full flex items-center justify-between p-2.5 border rounded-md bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:shadow-md transition-all ${
               error ? "border-red-500" : "border-gray-300"
             } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
@@ -110,49 +139,8 @@ export default function TeamCombobox({
                 </p>
               )}
 
-              {filteredSuggested.length > 0 && (
-                <div>
-                  <p className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50">
-                    Suggested teams
-                  </p>
-                  {filteredSuggested.map((team) => (
-                    <button
-                      key={team}
-                      type="button"
-                      onClick={() => handleSelect(team)}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors ${
-                        value === team
-                          ? "bg-blue-50 text-blue-700 font-medium"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      {team}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {filteredOther.length > 0 && (
-                <div>
-                  <p className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50">
-                    Others
-                  </p>
-                  {filteredOther.map((team) => (
-                    <button
-                      key={team}
-                      type="button"
-                      onClick={() => handleSelect(team)}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors ${
-                        value === team
-                          ? "bg-blue-50 text-blue-700 font-medium"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      {team}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {renderTeamGroup(filteredSuggested, "Suggested teams")}
+              {renderTeamGroup(filteredOther, "Others")}
             </div>
           </Popover.Content>
         </Popover.Portal>
