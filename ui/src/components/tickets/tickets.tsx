@@ -10,7 +10,7 @@ import {useQueryClient} from '@tanstack/react-query'
 import {TEAM_SCOPE} from '@/lib/constants'
 import {normalizeTeamKey} from '@/lib/teamUtils'
 import {getDateRangeFromFilter, PRESET_DAYS} from '@/lib/dateRange'
-import { enumValidator, isoDateValidator, nonNegativeIntValidator, impactValidator, tagValidator, useUrlParams } from '@/lib/hooks/useUrlParams'
+import { enumValidator, isoDateValidator, nonNegativeIntValidator, useUrlParams } from '@/lib/hooks/useUrlParams'
 
 
 export default function TicketsPage() {
@@ -64,8 +64,10 @@ export default function TicketsPage() {
             sortBy: enumValidator(['openedAt', 'closedAt'] as const, 'openedAt'),
             sortDir: enumValidator(['asc', 'desc'] as const, 'desc'),
             page: nonNegativeIntValidator,
-            impact: impactValidator(registryData),
-            tag: tagValidator(registryData)
+            // impact and tag are intentionally unvalidated: their valid values come from
+            // registryData which loads asynchronously after mount.  useUrlParams captures
+            // validators once at mount time (via useState), so passing registry-dependent
+            // validators would always see undefined and immediately wipe any URL value.
         },
     )
 
