@@ -1,8 +1,7 @@
 package com.coreeng.supportbot.prtracking;
 
-import org.jspecify.annotations.Nullable;
-
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 
 public record InFlightPrResponse(
         String githubRepo,
@@ -21,9 +20,20 @@ public record InFlightPrResponse(
         @Nullable Instant escalatedAt) {
 
     public InFlightPrResponse(InFlightPr pr, String owningTeamLabel) {
-        this(pr.githubRepo(), pr.prNumber(), pr.prUrl(), pr.status(), pr.waitingOn(),
-                pr.prCreatedAt(), pr.slaDeadline(), pr.slaRemainingSeconds(), pr.lastReviewAt(),
-                pr.owningTeam(), owningTeamLabel, pr.ticketChannelId(), pr.ticketQueryTs(),
+        this(
+                pr.githubRepo(),
+                pr.prNumber(),
+                pr.prUrl(),
+                pr.status(),
+                pr.waitingOn(),
+                pr.prCreatedAt(),
+                pr.slaDeadline(),
+                pr.slaRemainingSeconds(),
+                pr.lastReviewAt(),
+                pr.owningTeam(),
+                owningTeamLabel,
+                pr.ticketChannelId(),
+                pr.ticketQueryTs(),
                 pr.escalatedAt());
     }
 }

@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.prtracking.*;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;

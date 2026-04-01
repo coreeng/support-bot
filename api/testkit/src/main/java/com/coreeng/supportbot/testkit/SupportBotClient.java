@@ -351,6 +351,7 @@ public class SupportBotClient {
         private Instant prCreatedAt;
         private Instant slaDeadline;
         private String owningTeam;
+
         @Nullable private Boolean canAutoCloseTicket;
     }
 
@@ -368,6 +369,7 @@ public class SupportBotClient {
         private String status;
         private Instant closedAt;
         private Long escalationId;
+
         @Nullable private Duration slaRemaining;
     }
 

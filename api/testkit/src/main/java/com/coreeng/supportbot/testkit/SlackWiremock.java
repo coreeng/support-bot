@@ -70,8 +70,7 @@ public class SlackWiremock extends WireMockServer {
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
-                        .withBody(
-                                "{\"login\":\"{{request.pathSegments.[1]}}\",\"id\":1,\"type\":\"User\"}")));
+                        .withBody("{\"login\":\"{{request.pathSegments.[1]}}\",\"id\":1,\"type\":\"User\"}")));
         // Catch-all for conversations.history (triggered by createTicket test API fetching query text)
         givenThat(post("/api/conversations.history")
                 .withName("conversations history catch-all")

@@ -49,9 +49,8 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     @Transactional(readOnly = true)
     @Override
     public @Nullable PrTrackingRecord findById(long id) {
-        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.selectFrom(PR_TRACKING)
-                .where(PR_TRACKING.ID.eq(id))
-                .fetchOne();
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row =
+                dsl.selectFrom(PR_TRACKING).where(PR_TRACKING.ID.eq(id)).fetchOne();
         return row == null ? null : toRecord(row);
     }
 
