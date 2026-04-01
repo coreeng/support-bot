@@ -1134,7 +1134,9 @@ describe('KnowledgeGapsPage', () => {
 
             expect(startButton).toHaveAttribute('aria-expanded', 'true')
             expect(screen.getByRole('dialog', { name: 'Analysis settings' })).toBeInTheDocument()
-            expect(screen.getByLabelText('Query window')).toBeInTheDocument()
+            const queryWindowSelect = screen.getByLabelText('Query window')
+            expect(queryWindowSelect).toBeInTheDocument()
+            expect(queryWindowSelect).toHaveFocus()
             expect(screen.getByText('Choose how far back to pull queries for this run.')).toBeInTheDocument()
 
             fireEvent.click(startButton)
@@ -1334,16 +1336,22 @@ describe('KnowledgeGapsPage', () => {
             const settingsTrigger = await screen.findByRole('button', { name: 'Run Analysis' })
             fireEvent.click(settingsTrigger)
 
+            const queryWindowSelect = screen.getByLabelText('Query window')
+
             expect(screen.getByRole('dialog', { name: 'Analysis settings' })).toBeInTheDocument()
+            expect(queryWindowSelect).toHaveFocus()
 
             fireEvent.keyDown(document, { key: 'Escape' })
             expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
+            expect(settingsTrigger).toHaveFocus()
 
             fireEvent.click(settingsTrigger)
             expect(screen.getByRole('dialog', { name: 'Analysis settings' })).toBeInTheDocument()
+            expect(screen.getByLabelText('Query window')).toHaveFocus()
 
             fireEvent.mouseDown(document.body)
             expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
+            expect(settingsTrigger).toHaveFocus()
         })
     })
 })

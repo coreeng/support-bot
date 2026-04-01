@@ -41,6 +41,10 @@ export default function KnowledgeGapsPage() {
     const [isAnalysisEnabled, setIsAnalysisEnabled] = useState(false)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const settingsContainerRef = useRef<HTMLDivElement>(null)
+    const settingsTriggerRef = useRef<HTMLButtonElement>(null)
+    const queryWindowSelectRef = useRef<HTMLSelectElement>(null)
+    const restoreFocusOnCloseRef = useRef(false)
+    const wasSettingsOpenRef = useRef(false)
     const settingsTitleId = useId()
     const settingsDescriptionId = useId()
     const settingsPanelId = 'analysis-settings-popover'
@@ -181,18 +185,31 @@ export default function KnowledgeGapsPage() {
     }, [analysisStatus?.running])
 
     useEffect(() => {
+        if (isSettingsOpen) {
+            queryWindowSelectRef.current?.focus()
+        } else if (wasSettingsOpenRef.current && restoreFocusOnCloseRef.current) {
+            settingsTriggerRef.current?.focus()
+            restoreFocusOnCloseRef.current = false
+        }
+
+        wasSettingsOpenRef.current = isSettingsOpen
+    }, [isSettingsOpen])
+
+    useEffect(() => {
         if (!isSettingsOpen) {
             return
         }
 
         const handlePointerDown = (event: MouseEvent) => {
             if (!settingsContainerRef.current?.contains(event.target as Node)) {
+                restoreFocusOnCloseRef.current = true
                 setIsSettingsOpen(false)
             }
         }
 
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
+                restoreFocusOnCloseRef.current = true
                 setIsSettingsOpen(false)
             }
         }
@@ -207,6 +224,7 @@ export default function KnowledgeGapsPage() {
     }, [isSettingsOpen])
 
     const handleStartAnalysis = async () => {
+        restoreFocusOnCloseRef.current = false
         setIsSettingsOpen(false)
         setIsStartingAnalysis(true)
         try {
@@ -564,8 +582,12 @@ export default function KnowledgeGapsPage() {
                                 />
                             )}
                             <button
+                                ref={settingsTriggerRef}
                                 type="button"
-                                onClick={() => setIsSettingsOpen(current => !current)}
+                                onClick={() => {
+                                    restoreFocusOnCloseRef.current = false
+                                    setIsSettingsOpen(current => !current)
+                                }}
                                 disabled={isAnalysisEnabled && (analysisStatus?.running || isStartingAnalysis || showCompletedStatus)}
                                 aria-haspopup="dialog"
                                 aria-expanded={isSettingsOpen}
@@ -596,6 +618,7 @@ export default function KnowledgeGapsPage() {
                                                 Query window
                                             </label>
                                             <select
+                                                ref={queryWindowSelectRef}
                                                 id="query-window"
                                                 aria-label="Query window"
                                                 value={selectedDays}
@@ -622,6 +645,7 @@ export default function KnowledgeGapsPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() => {
+                                                        restoreFocusOnCloseRef.current = false
                                                         setIsSettingsOpen(false)
                                                         handleExportDownload()
                                                     }}
@@ -634,6 +658,7 @@ export default function KnowledgeGapsPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() => {
+                                                        restoreFocusOnCloseRef.current = false
                                                         setIsSettingsOpen(false)
                                                         handleAnalysisBundleDownload()
                                                     }}
@@ -645,6 +670,7 @@ export default function KnowledgeGapsPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() => {
+                                                        restoreFocusOnCloseRef.current = false
                                                         setIsSettingsOpen(false)
                                                         handleImportClick()
                                                     }}
