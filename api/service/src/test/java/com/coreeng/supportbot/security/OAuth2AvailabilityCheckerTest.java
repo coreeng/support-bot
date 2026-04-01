@@ -11,9 +11,14 @@ import org.junit.jupiter.api.Test;
 class OAuth2AvailabilityCheckerTest {
 
     private static SecurityProperties createSecurityProperties(boolean testBypassEnabled) {
+        return createSecurityProperties(testBypassEnabled, List.of());
+    }
+
+    private static SecurityProperties createSecurityProperties(
+            boolean testBypassEnabled, List<String> loginProviders) {
         return new SecurityProperties(
                 new SecurityProperties.JwtProperties("test-secret", Duration.ofHours(24)),
-                new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
+                new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback", loginProviders),
                 new SecurityProperties.CorsProperties(null),
                 new SecurityProperties.TestBypassProperties(testBypassEnabled),
                 new SecurityProperties.AllowListProperties(List.of(), List.of()));
@@ -171,5 +176,56 @@ class OAuth2AvailabilityCheckerTest {
         // then
         assertFalse(checker.isOAuth2Available());
         assertEquals(List.of(), checker.getAvailableProviders());
+    }
+
+    @Test
+    void loginProvidersAllowlist_filtersToDex_whenGoogleAlsoConfigured() {
+        var checker = new OAuth2AvailabilityChecker(
+                createSecurityProperties(false, List.of("dex")),
+                "google-client-id",
+                "google-client-secret",
+                "",
+                "",
+                "",
+                "dex-client-id",
+                "dex-client-secret",
+                "https://dex.example.com");
+
+        assertTrue(checker.isOAuth2Available());
+        assertEquals(List.of("dex"), checker.getAvailableProviders());
+    }
+
+    @Test
+    void loginProvidersAllowlist_excludesDex_whenOnlyDexConfiguredButAllowlistGoogle() {
+        var checker = new OAuth2AvailabilityChecker(
+                createSecurityProperties(false, List.of("google")),
+                "",
+                "",
+                "",
+                "",
+                "",
+                "dex-client-id",
+                "dex-client-secret",
+                "https://dex.example.com");
+
+        assertFalse(checker.isOAuth2Available());
+        assertEquals(List.of(), checker.getAvailableProviders());
+    }
+
+    @Test
+    void loginProvidersAllowlist_isCaseInsensitive() {
+        var checker = new OAuth2AvailabilityChecker(
+                createSecurityProperties(false, List.of("DEX")),
+                "",
+                "",
+                "",
+                "",
+                "",
+                "dex-client-id",
+                "dex-client-secret",
+                "https://dex.example.com");
+
+        assertTrue(checker.isOAuth2Available());
+        assertEquals(List.of("dex"), checker.getAvailableProviders());
     }
 }

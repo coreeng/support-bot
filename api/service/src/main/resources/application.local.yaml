@@ -5,3 +5,7 @@ platform-integration:
     mappings:
       - claim-values: [developers]
         team-code: wow
+  security:
+    oauth2:
+      login-providers:
+        - dex      

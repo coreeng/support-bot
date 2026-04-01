@@ -23,9 +23,13 @@ Apply secrets first, then workloads that depend on them.
    - `dex-secrets` (`client-secret`, and `ldap-bind-password` when `dex.ldap.enabled`) — see [`api/k8s/dex/README.md`](../../api/k8s/dex/README.md).
 2. **LDAP** — `make ldap-deploy-integration` (or equivalent `helm upgrade` with your tenant values). Confirm the Service (e.g. `ldap:389`) is reachable from the namespace where Dex will run.
 3. **Dex** — `make dex-deploy-integration`. Set `dex.ldap.enabled: true` and matching host/DNs when Dex should use the cluster LDAP Service.
-4. **Support Bot API** — deploy or upgrade the main app chart with `DEX_CLIENT_ID`, `DEX_CLIENT_SECRET`, `DEX_ISSUER_URI`, and application config for `platform-integration.jwt-groups` if you map LDAP groups to tenant teams.
+4. **Support Bot API** — deploy or upgrade the main app chart with `DEX_CLIENT_ID`, `DEX_CLIENT_SECRET`, `DEX_ISSUER_URI`, and application config for `platform-integration.jwt-groups` if you map LDAP groups to tenant teams. Optional: `security.oauth2.login-providers: [dex]` so the UI only offers Dex even when `GOOGLE_*` / `AZURE_*` are set for other purposes.
 
 Exact namespaces and release names depend on your P2P / tenant layout; align Dex `ldap.host` with the in-cluster DNS name of the LDAP Service.
+
+### Google / Microsoft connectors on Dex (Kubernetes)
+
+When `dex.google.enabled` or `dex.microsoft.enabled` is true in [`api/k8s/dex/values.yaml`](../../api/k8s/dex/values.yaml), register **separate** OAuth apps with Google / Entra whose redirect URI is **`{dex.issuer}/callback`** (Dex’s callback), not the Support Bot API’s `/login/oauth2/code/...` URLs. Populate `dex-secrets` keys `google-client-id`, `google-client-secret`, `microsoft-client-id`, and `microsoft-client-secret` as documented in [`api/k8s/dex/README.md`](../../api/k8s/dex/README.md). Set `dex.microsoft.tenant` in Helm values for the Microsoft connector.
 
 ## Troubleshooting
 

@@ -14,6 +14,9 @@ import org.springframework.stereotype.Component;
  * - Google: client-id AND client-secret
  * - Azure: client-id AND client-secret AND tenant-id
  * - Dex: client-id AND client-secret AND issuer-uri
+ *
+ * <p>If {@code security.oauth2.login-providers} is non-empty, only those registration ids are returned
+ * (after credential checks), even when other provider credentials are set.
  */
 @Slf4j
 @Component
@@ -47,6 +50,11 @@ public class OAuth2AvailabilityChecker {
             providers.add("dex");
         }
 
+        var allowlist = securityProperties.oauth2().loginProviders();
+        if (!allowlist.isEmpty()) {
+            providers.removeIf(p -> !allowlist.contains(p));
+        }
+
         // Store immutable copy to prevent accidental modification
         this.availableProviders = List.copyOf(providers);
         this.oauth2Available = !this.availableProviders.isEmpty();
@@ -67,7 +75,7 @@ public class OAuth2AvailabilityChecker {
     @EventListener(ApplicationReadyEvent.class)
     public void checkOAuth2Configuration() {
         if (oauth2Available) {
-            log.info("OAuth2 authentication configured and available.");
+            log.info("OAuth2 authentication configured. Active login providers: {}", availableProviders);
         } else if (testBypassEnabled) {
             log.info("OAuth2 credentials not configured, but test-bypass is enabled. "
                     + "Authentication will use X-Test-User/X-Test-Role headers.");

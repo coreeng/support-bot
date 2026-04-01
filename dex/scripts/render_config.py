@@ -18,9 +18,17 @@ for line in env_file.read_text().splitlines():
     env[key] = value
 
 
-def build_ldap_connector(e: dict) -> str:
-    if e.get("DEX_LDAP_ENABLED", "").lower() not in ("1", "true", "yes"):
-        return ""
+def _truthy(key: str, e: dict) -> bool:
+    return e.get(key, "").lower() in ("1", "true", "yes")
+
+
+def _dex_callback_issuer(e: dict) -> str:
+    """Issuer URL without trailing slash; used for {issuer}/callback (matches Helm)."""
+    issuer = e.get("DEX_ISSUER", "http://127.0.0.1:5556").strip()
+    return issuer.rstrip("/")
+
+
+def _ldap_connector_item(e: dict) -> str:
     required = [
         "DEX_LDAP_HOST",
         "DEX_LDAP_BIND_DN",
@@ -34,8 +42,7 @@ def build_ldap_connector(e: dict) -> str:
             "DEX_LDAP_ENABLED is set but .env.local is missing: " + ", ".join(missing)
         )
     pw = json.dumps(e["DEX_LDAP_BIND_PW"])
-    return f"""connectors:
-  - type: ldap
+    return f"""  - type: ldap
     id: ldap
     name: LDAP
     config:
@@ -57,12 +64,62 @@ def build_ldap_connector(e: dict) -> str:
         userMatchers:
           - userAttr: DN
             groupAttr: uniqueMember
-        nameAttr: cn
-"""
+        nameAttr: cn"""
+
+
+def _google_connector_item(e: dict) -> str:
+    required = ["DEX_GOOGLE_CLIENT_ID", "DEX_GOOGLE_CLIENT_SECRET"]
+    missing = [k for k in required if not e.get(k)]
+    if missing:
+        raise SystemExit(
+            "DEX_GOOGLE_ENABLED is set but .env.local is missing: " + ", ".join(missing)
+        )
+    base = _dex_callback_issuer(e)
+    redirect = json.dumps(f"{base}/callback")
+    return f"""  - type: google
+    id: google
+    name: Google
+    config:
+      clientID: {json.dumps(e["DEX_GOOGLE_CLIENT_ID"])}
+      clientSecret: {json.dumps(e["DEX_GOOGLE_CLIENT_SECRET"])}
+      redirectURI: {redirect}"""
+
+
+def _microsoft_connector_item(e: dict) -> str:
+    required = ["DEX_MICROSOFT_CLIENT_ID", "DEX_MICROSOFT_CLIENT_SECRET"]
+    missing = [k for k in required if not e.get(k)]
+    if missing:
+        raise SystemExit(
+            "DEX_MICROSOFT_ENABLED is set but .env.local is missing: " + ", ".join(missing)
+        )
+    base = _dex_callback_issuer(e)
+    redirect = json.dumps(f"{base}/callback")
+    tenant = (e.get("DEX_MICROSOFT_TENANT") or "common").strip()
+    return f"""  - type: microsoft
+    id: microsoft
+    name: Microsoft
+    config:
+      clientID: {json.dumps(e["DEX_MICROSOFT_CLIENT_ID"])}
+      clientSecret: {json.dumps(e["DEX_MICROSOFT_CLIENT_SECRET"])}
+      redirectURI: {redirect}
+      tenant: {json.dumps(tenant)}"""
+
+
+def build_connectors(e: dict) -> str:
+    items = []
+    if _truthy("DEX_LDAP_ENABLED", e):
+        items.append(_ldap_connector_item(e))
+    if _truthy("DEX_GOOGLE_ENABLED", e):
+        items.append(_google_connector_item(e))
+    if _truthy("DEX_MICROSOFT_ENABLED", e):
+        items.append(_microsoft_connector_item(e))
+    if not items:
+        return ""
+    return "connectors:\n" + "\n".join(items) + "\n"
 
 
 template = template_file.read_text()
-template = template.replace("@LDAP_CONNECTOR@", build_ldap_connector(env))
+template = template.replace("@CONNECTORS@", build_connectors(env))
 
 
 def repl(match):

@@ -1,6 +1,8 @@
 package com.coreeng.supportbot.security;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -18,6 +20,7 @@ public class OAuth2ClientConfig {
 
     @Bean
     public ClientRegistrationRepository clientRegistrationRepository(
+            SecurityProperties securityProperties,
             @Value("${spring.security.oauth2.client.registration.google.client-id:}") String googleClientId,
             @Value("${spring.security.oauth2.client.registration.google.client-secret:}") String googleClientSecret,
             @Value("${spring.security.oauth2.client.registration.azure.client-id:}") String azureClientId,
@@ -26,18 +29,27 @@ public class OAuth2ClientConfig {
             @Value("${spring.security.oauth2.client.registration.dex.client-id:}") String dexClientId,
             @Value("${spring.security.oauth2.client.registration.dex.client-secret:}") String dexClientSecret,
             @Value("${spring.security.oauth2.client.provider.dex.issuer-uri:}") String dexIssuerUri) {
+        List<String> allowlist = securityProperties.oauth2().loginProviders();
         var registrations = new ArrayList<ClientRegistration>();
 
-        if (isNotBlank(googleClientId) && isNotBlank(googleClientSecret)) {
+        if (isNotBlank(googleClientId)
+                && isNotBlank(googleClientSecret)
+                && isLoginProviderAllowed(allowlist, "google")) {
             registrations.add(googleClientRegistration(googleClientId, googleClientSecret));
             log.info("Google OAuth2 client registered");
         }
 
-        if (isNotBlank(azureClientId) && isNotBlank(azureClientSecret) && isNotBlank(azureTenantId)) {
+        if (isNotBlank(azureClientId)
+                && isNotBlank(azureClientSecret)
+                && isNotBlank(azureTenantId)
+                && isLoginProviderAllowed(allowlist, "azure")) {
             registrations.add(azureClientRegistration(azureClientId, azureClientSecret, azureTenantId));
             log.info("Azure AD OAuth2 client registered");
         }
-        if (isNotBlank(dexClientId) && isNotBlank(dexClientSecret) && isNotBlank(dexIssuerUri)) {
+        if (isNotBlank(dexClientId)
+                && isNotBlank(dexClientSecret)
+                && isNotBlank(dexIssuerUri)
+                && isLoginProviderAllowed(allowlist, "dex")) {
             registrations.add(dexClientRegistration(dexClientId, dexClientSecret, dexIssuerUri));
             log.info("Dex OAuth2 client registered");
         }
@@ -107,5 +119,13 @@ public class OAuth2ClientConfig {
 
     private static boolean isNotBlank(String value) {
         return value != null && !value.isBlank();
+    }
+
+    /** Empty allowlist means all configured providers are allowed. */
+    private static boolean isLoginProviderAllowed(List<String> allowlist, String registrationId) {
+        if (allowlist == null || allowlist.isEmpty()) {
+            return true;
+        }
+        return allowlist.contains(registrationId.toLowerCase(Locale.ROOT));
     }
 }

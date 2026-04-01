@@ -311,6 +311,15 @@ Set these on the **API**:
 | `DEX_ISSUER_URI` | Dex OIDC issuer URI, for example `https://dex.example.com/dex`.                                                                         |
 | `DEX_SCOPES` | Optional comma-separated scopes used for Dex login. Defaults to `openid,email,profile,groups`.                                            |
 
+### Login provider allowlist (`security.oauth2.login-providers`)
+
+Optional YAML list under `security.oauth2.login-providers` (values: `google`, `azure`, `dex`, case-insensitive).
+
+- **Omitted or empty:** same as today — every provider with complete credentials is registered and shown on the login UI.
+- **Non-empty (e.g. `[dex]`):** only those OAuth2 registration ids are registered and advertised, even if `GOOGLE_*` / `AZURE_*` are set. Use this for **Dex-only login** while keeping direct Google/Azure client credentials in the environment (for example if secrets are shared with other tooling).
+
+Team membership still comes from `platform-integration` (static-user, Azure Graph, GCP, Slack, `jwt-groups` for Dex) — this setting only affects which OAuth flows the API exposes.
+
 > Note: The `AZURE_*` variables above are shared between SSO (user login) and
 > [Azure Cloud integration](#azure-cloud) (reading group memberships from Entra ID).
 > A single Azure AD app registration is used for both.
@@ -326,29 +335,39 @@ Set this on the **UI**:
 Console: https://console.cloud.google.com/apis/credentials
 
 1. Create Credentials > OAuth client ID > Web application
-2. Add redirect URIs:
+2. Add **authorized redirect URIs** that match what the **UI** sends (the Support Bot app starts OAuth from Next.js and passes this URI to Google). Use your UI origin from `NEXTAUTH_URL` (same scheme, host, and port — Google treats `localhost` and `127.0.0.1` as different):
+   - `http://localhost:3000/api/oauth/callback/google`
+   - `http://127.0.0.1:3000/api/oauth/callback/google` (if you open the app at `127.0.0.1`)
+   - `https://<your-ui-domain>/api/oauth/callback/google` for production
+3. Optionally also register the API’s Spring redirect if you use server-initiated OAuth without the UI path:
    - `http://localhost:8080/login/oauth2/code/google`
    - `https://<your-api-domain>/login/oauth2/code/google`
-3. Copy the Client ID into `GOOGLE_CLIENT_ID`
-4. Copy the Client Secret into `GOOGLE_CLIENT_SECRET`
+4. Copy the Client ID into `GOOGLE_CLIENT_ID`
+5. Copy the Client Secret into `GOOGLE_CLIENT_SECRET`
+
+If you see **Error 400: `redirect_uri_mismatch`**, the URI in Google Cloud Console does not **exactly** match the `redirect_uri` query parameter on the authorize request (including trailing slashes). Compare against the Network tab or add every host/port variant you use locally.
 
 ### Azure AD
 
 Portal: https://portal.azure.com > Microsoft Entra ID > App registrations
 
 1. New registration > name it > single tenant
-2. Authentication > Add platform > Web > add redirect URIs:
+2. Authentication > Add platform > Web > add redirect URIs (same pattern as Google — UI-driven login uses the Next.js callback):
+   - `http://localhost:3000/api/oauth/callback/azure`
+   - `http://127.0.0.1:3000/api/oauth/callback/azure` if needed
+   - `https://<your-ui-domain>/api/oauth/callback/azure`
+3. Optional API-only redirects:
    - `http://localhost:8080/login/oauth2/code/azure`
    - `https://<your-api-domain>/login/oauth2/code/azure`
-3. Overview > copy the Application (client) ID into `AZURE_CLIENT_ID`
-4. Overview > copy the Directory (tenant) ID into `AZURE_TENANT_ID`
-5. Certificates & secrets > New client secret > copy the value into `AZURE_CLIENT_SECRET`
-6. API permissions > Add > Microsoft Graph > Delegated:
+4. Overview > copy the Application (client) ID into `AZURE_CLIENT_ID`
+5. Overview > copy the Directory (tenant) ID into `AZURE_TENANT_ID`
+6. Certificates & secrets > New client secret > copy the value into `AZURE_CLIENT_SECRET`
+7. API permissions > Add > Microsoft Graph > Delegated:
    - `email`
    - `openid`
    - `profile`
 
-> Note: The redirect URIs registered in each provider must match the API's publicly accessible URL.
+> Note: For UI login, redirect URIs must match the **UI** origin (`NEXTAUTH_URL`) and path `/api/oauth/callback/{provider}`, not only the API’s `/login/oauth2/code/...` URLs.
 
 ### Dex (OIDC)
 
@@ -368,7 +387,7 @@ For Kubernetes deployment values (platform chart), see [`api/k8s/dex/README.md`]
 4. Ensure Dex is configured to return the claims Support Bot needs for login (`email` and `name`/`preferred_username`).
 5. For **LDAP → Dex → JWT groups → tenant teams**, enable `platform-integration.jwt-groups` and map claim values to `team-code` (see the `jwt-groups` block under `platform-integration` earlier in this document).
 
-> Note: Dex can be enabled alongside Google and Azure. The login screen only shows providers that are fully configured.
+> Note: Dex can be enabled alongside Google and Azure. The login screen shows providers that are both fully configured **and** allowed by `security.oauth2.login-providers` when that list is non-empty.
 
 #### Troubleshooting (Dex / OAuth / LDAP)
 

@@ -66,6 +66,10 @@ cd api && make run-local
 3. On the API, set `platform-integration.jwt-groups.enabled: true` and `mappings` so Dex `groups` claim values (e.g. LDAP `cn` of `groupOfUniqueNames`) map to your platform team codes — see `api/service/docs/configuration.md`.
 4. Allow LDAP test users if you use an allow-list, e.g. `ALLOWED_DOMAINS=supportbot.local`.
 
+### Google / Microsoft via Dex (optional)
+
+Set `DEX_GOOGLE_ENABLED=true` or `DEX_MICROSOFT_ENABLED=true` plus the client id/secret variables from `dex/.env.example`, then `make -C dex render-config`. Register OAuth apps whose **authorized redirect URI** is `{DEX_ISSUER}/callback` (e.g. `http://127.0.0.1:5556/callback` for local Dex), not the Support Bot API callback. Aligns with [`api/k8s/dex/README.md`](../api/k8s/dex/README.md) Helm connector settings.
+
 ## 5) Redirect URIs
 
 Ensure Dex `staticClients.redirectURIs` includes:

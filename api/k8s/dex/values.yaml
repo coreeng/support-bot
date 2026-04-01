@@ -80,6 +80,26 @@ envVarsArr:
       secretKeyRef:
         name: dex-secrets
         key: ldap-bind-password
+  - name: DEX_GOOGLE_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: dex-secrets
+        key: google-client-id
+  - name: DEX_GOOGLE_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: dex-secrets
+        key: google-client-secret
+  - name: DEX_MICROSOFT_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: dex-secrets
+        key: microsoft-client-id
+  - name: DEX_MICROSOFT_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: dex-secrets
+        key: microsoft-client-secret
 
 configMaps:
   - name: dex-config
@@ -110,8 +130,9 @@ configMaps:
         {{- range .Values.dex.redirectUris }}
               - {{ . | quote }}
         {{- end }}
-        {{- if .Values.dex.ldap.enabled }}
+        {{- if or .Values.dex.ldap.enabled .Values.dex.google.enabled .Values.dex.microsoft.enabled }}
         connectors:
+        {{- if .Values.dex.ldap.enabled }}
           - type: ldap
             id: ldap
             name: LDAP
@@ -136,6 +157,26 @@ configMaps:
                     groupAttr: uniqueMember
                 nameAttr: cn
         {{- end }}
+        {{- if .Values.dex.google.enabled }}
+          - type: google
+            id: google
+            name: Google
+            config:
+              clientID: ${DEX_GOOGLE_CLIENT_ID}
+              clientSecret: ${DEX_GOOGLE_CLIENT_SECRET}
+              redirectURI: {{ printf "%s/callback" (trimSuffix "/" .Values.dex.issuer) | quote }}
+        {{- end }}
+        {{- if .Values.dex.microsoft.enabled }}
+          - type: microsoft
+            id: microsoft
+            name: Microsoft
+            config:
+              clientID: ${DEX_MICROSOFT_CLIENT_ID}
+              clientSecret: ${DEX_MICROSOFT_CLIENT_SECRET}
+              redirectURI: {{ printf "%s/callback" (trimSuffix "/" .Values.dex.issuer) | quote }}
+              tenant: {{ .Values.dex.microsoft.tenant | quote }}
+        {{- end }}
+        {{- end }}
 
 volumes:
   - name: dex-config
@@ -157,6 +198,14 @@ dex:
   clientId: support-bot-dex
   redirectUris:
     - https://support-bot-api.example.com/login/oauth2/code/dex
+  # Dex connectors (users pick one at Dex login). Register OAuth apps with redirect URI = {issuer}/callback
+  # (see api/k8s/dex/README.md). Secrets: dex-secrets keys google-*, microsoft-*.
+  google:
+    enabled: false
+  microsoft:
+    enabled: false
+    # Entra tenant ID, or common / organizations / consumers
+    tenant: common
   ldap:
     enabled: false
     host: ldap:389
