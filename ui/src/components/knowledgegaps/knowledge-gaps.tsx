@@ -52,11 +52,15 @@ export default function KnowledgeGapsPage() {
     const settingsDescriptionId = useId()
     const settingsPanelId = 'analysis-settings-popover'
 
-    const formatQueryTimestamp = (timestamp: string) => {
-        const slackTsMatch = /^(\d+)(?:\.(\d+))?$/.exec(timestamp)
+    const formatQueryTimestamp = (timestamp: string): string => {
+        const slackTsMatch = /^(\d+)(?:\.\d+)?$/.exec(timestamp)
         const parsedTimestamp = slackTsMatch
             ? new Date(Number(slackTsMatch[1]) * 1000)
             : new Date(timestamp)
+
+        if (isNaN(parsedTimestamp.getTime())) {
+            return timestamp
+        }
 
         return new Intl.DateTimeFormat('en-US', {
             month: 'short',
@@ -72,6 +76,12 @@ export default function KnowledgeGapsPage() {
     const openTicketModal = (ticketId: string) => {
         setSelectedTicketId(ticketId)
         setIsTicketModalOpen(true)
+    }
+
+    const closeSettingsAndRun = (action: () => void) => {
+        restoreFocusOnCloseRef.current = false
+        setIsSettingsOpen(false)
+        action()
     }
 
     const handleTicketModalSuccess = () => {
@@ -245,9 +255,7 @@ export default function KnowledgeGapsPage() {
     }, [isSettingsOpen])
 
     const handleStartAnalysis = async () => {
-        restoreFocusOnCloseRef.current = false
-        setIsSettingsOpen(false)
-        setIsStartingAnalysis(true)
+        closeSettingsAndRun(() => setIsStartingAnalysis(true))
         try {
             const response = await apiFetch(`/api/analysis/run?days=${selectedDays}`, {
                 method: 'POST',
@@ -448,45 +456,23 @@ export default function KnowledgeGapsPage() {
         },
     }
 
-    const renderQueryRow = (query: QuerySummary, qIndex: number, colors: typeof themeClasses.blue) => {
-        const ticketId = query.ticketId
-        const content = (
-            <>
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 leading-relaxed">{query.text}</p>
-                    <p className="mt-1 text-xs text-gray-500">{formatQueryTimestamp(query.timestamp)}</p>
-                </div>
-                {ticketId ? (
-                    <span className={`shrink-0 ${colors.link} flex items-center gap-1.5 text-xs font-semibold opacity-60 group-hover:opacity-100 transition-opacity`}>
-                        <span className="hidden sm:inline">View</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                    </span>
-                ) : null}
-            </>
-        )
-
-        if (ticketId) {
-            return (
-                <button
-                    key={qIndex}
-                    type="button"
-                    onClick={() => openTicketModal(ticketId)}
-                    className={`flex items-start gap-3 p-3.5 rounded-lg border-l-4 ${colors.queryAccent} ${colors.queryBg} transition-all duration-150 group no-underline`}
-                >
-                    {content}
-                </button>
-            )
-        }
-
-        return (
-            <div
-                key={qIndex}
-                className={`flex items-start gap-3 p-3.5 rounded-lg border-l-4 ${colors.queryAccent} ${colors.queryBg}`}
-            >
-                {content}
+    const renderQueryRow = (query: QuerySummary, qIndex: number, colors: typeof themeClasses.blue) => (
+        <button
+            key={qIndex}
+            type="button"
+            onClick={() => openTicketModal(query.ticketId)}
+            className={`flex items-start gap-3 p-3.5 rounded-lg border-l-4 ${colors.queryAccent} ${colors.queryBg} transition-all duration-150 group no-underline`}
+        >
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 leading-relaxed">{query.text}</p>
+                <p className="mt-1 text-xs text-gray-500">{formatQueryTimestamp(query.timestamp)}</p>
             </div>
-        )
-    }
+            <span className={`shrink-0 ${colors.link} flex items-center gap-1.5 text-xs font-semibold opacity-60 group-hover:opacity-100 transition-opacity`}>
+                <span className="hidden sm:inline">View</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+            </span>
+        </button>
+    )
 
     const renderAreaItem = (
         item: DimensionSummary,
@@ -665,11 +651,7 @@ export default function KnowledgeGapsPage() {
                                             <div className="flex flex-col gap-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => {
-                                                        restoreFocusOnCloseRef.current = false
-                                                        setIsSettingsOpen(false)
-                                                        handleExportDownload()
-                                                    }}
+                                                    onClick={() => closeSettingsAndRun(handleExportDownload)}
                                                     disabled={isDownloading}
                                                     className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                                 >
@@ -678,11 +660,7 @@ export default function KnowledgeGapsPage() {
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => {
-                                                        restoreFocusOnCloseRef.current = false
-                                                        setIsSettingsOpen(false)
-                                                        handleAnalysisBundleDownload()
-                                                    }}
+                                                    onClick={() => closeSettingsAndRun(handleAnalysisBundleDownload)}
                                                     className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
                                                 >
                                                     <FileText className="w-4 h-4" />
@@ -690,11 +668,7 @@ export default function KnowledgeGapsPage() {
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => {
-                                                        restoreFocusOnCloseRef.current = false
-                                                        setIsSettingsOpen(false)
-                                                        handleImportClick()
-                                                    }}
+                                                    onClick={() => closeSettingsAndRun(handleImportClick)}
                                                     disabled={isUploading}
                                                     className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                                 >
