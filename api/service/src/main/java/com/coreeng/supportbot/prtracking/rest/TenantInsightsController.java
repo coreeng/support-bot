@@ -22,16 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class TenantInsightsController {
 
-    private static final FeatureStatus ENABLED = new FeatureStatus(true);
-
     private final PrTrackingRepository prTrackingRepository;
-
-    @GetMapping("/enabled")
-    public FeatureStatus enabled() {
-        return ENABLED;
-    }
-
-    public record FeatureStatus(boolean enabled) {}
 
     @GetMapping("/pr-stats")
     public List<RepoInsights> prStats(
