@@ -154,7 +154,7 @@ class TicketControllerTest {
     }
 
     @Test
-    void getTeamSuggestions_returnsGroupedTeams() {
+    void shouldReturnGroupedTeamSuggestions() {
         // given
         TicketTeamsSuggestion suggestion =
                 new TicketTeamsSuggestion(ImmutableList.of("AuthorTeam"), ImmutableList.of("OtherTeam"));
@@ -172,7 +172,7 @@ class TicketControllerTest {
     }
 
     @Test
-    void getTeamSuggestions_ticketNotFound_returns404() {
+    void shouldReturnNotFoundWhenTicketDoesNotExist() {
         // given
         when(teamSuggestionsService.getTeamSuggestionsForTicket(ticketId)).thenReturn(Optional.empty());
 
