@@ -126,7 +126,7 @@ export interface KnowledgeGapsStatus {
 export interface QuerySummary {
     text: string
     timestamp: string
-    ticketId: string | null
+    ticketId: string
     link: string | null
 }
 
