@@ -63,6 +63,7 @@ export type TicketWithLogs = {
         text?: string
         date?: string
     }
+    summary?: string | null
     impact: string
     tags?: string[]
     escalations?: Escalation[]

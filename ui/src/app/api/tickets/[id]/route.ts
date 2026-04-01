@@ -4,31 +4,7 @@ import {
   unauthorizedResponse,
   errorResponse,
 } from "../../_lib/backend-fetch";
-
-interface BackendTeam {
-  label?: string;
-  code?: string;
-  types?: string[];
-}
-
-function mapTicket(ticket: Record<string, unknown>) {
-  const team = ticket.team as BackendTeam | null;
-  const escalations = ticket.escalations as
-    | Array<{ team?: BackendTeam; [key: string]: unknown }>
-    | undefined;
-
-  return {
-    ...ticket,
-    id: String(ticket.id),
-    team: team ? { name: team.code || team.label || "" } : null,
-    escalations:
-      escalations?.map((esc) => ({
-        ...esc,
-        id: String(esc.id),
-        team: esc.team ? { name: esc.team.code || esc.team.label || "" } : null,
-      })) ?? [],
-  };
-}
+import { mapTicket } from "../_lib/map-ticket";
 
 export async function GET(
   _request: NextRequest,

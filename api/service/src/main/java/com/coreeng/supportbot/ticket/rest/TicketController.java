@@ -1,7 +1,5 @@
 package com.coreeng.supportbot.ticket.rest;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
-
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
@@ -46,9 +44,7 @@ public class TicketController {
                 .build();
 
         Page<DetailedTicket> detailedTicketsPage = queryService.findDetailedTicketByQuery(ticketQuery);
-
-        ImmutableList<TicketUI> ticketUIs =
-                detailedTicketsPage.content().stream().map(mapper::mapToUI).collect(toImmutableList());
+        ImmutableList<TicketUI> ticketUIs = mapper.mapToUIList(detailedTicketsPage.content());
 
         Page<TicketUI> ticketUIPage = new Page<>(
                 ticketUIs,

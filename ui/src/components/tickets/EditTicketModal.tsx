@@ -286,6 +286,20 @@ export default function EditTicketModal({
                             </div>
                         )}
 
+                        {displayTicket?.summary?.trim() && (
+                            <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-emerald-50/40 shadow-sm">
+                                <label className="text-base font-semibold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-200/60">
+                                    <MessageSquare className="w-5 h-5 text-gray-600" />
+                                    AI Summary
+                                </label>
+                                <div className="p-3 bg-white border border-gray-200 rounded-md">
+                                    <p className="text-sm leading-6 text-gray-700 whitespace-pre-wrap break-words">
+                                        {displayTicket.summary}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Status History (Logs Section) */}
                         <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-gray-50/50 shadow-sm">
                             <label className="text-base font-semibold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-200/60">
@@ -661,4 +675,3 @@ export default function EditTicketModal({
         </Dialog>
     )
 }
-

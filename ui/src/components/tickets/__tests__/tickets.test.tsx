@@ -206,6 +206,7 @@ describe('Tickets Component', () => {
             expect(screen.getByText('Team')).toBeInTheDocument();
             expect(screen.getByText('Impact')).toBeInTheDocument();
             expect(screen.getByText('Tags')).toBeInTheDocument();
+            expect(screen.getByText('Summary')).toBeInTheDocument();
             expect(screen.getByText('Escalated')).toBeInTheDocument();
             expect(screen.getAllByText('Escalated To').length).toBeGreaterThan(0);
         });
@@ -226,6 +227,74 @@ describe('Tickets Component', () => {
             // Check for team name
             const teamCells = screen.getAllByText('Team A');
             expect(teamCells.length).toBeGreaterThan(0);
+        });
+    });
+
+    describe('Summary Column', () => {
+        it('renders summary as the second column after status', () => {
+            mockUseTickets.mockReturnValue({
+                data: getMockPaginatedTickets([]),
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            const headers = screen.getAllByRole('columnheader').map((header) => header.textContent?.trim());
+            expect(headers[0]).toBe('Status');
+            expect(headers[1]).toBe('Summary');
+            expect(headers[2]).toBe('Team');
+        });
+
+        it('shows ticket summary text in the table', () => {
+            mockUseTickets.mockReturnValue({
+                data: getMockPaginatedTickets([
+                    {
+                        ...createMockTicket('1', 'closed', 'Team A', 'high'),
+                        summary: 'Cache invalidation fixed the production timeout for the tenant after deployment.'
+                    }
+                ]),
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            expect(screen.getByText(/Cache invalidation fixed the production timeout/i)).toBeInTheDocument();
+        });
+
+        it('renders em dash when no summary exists', () => {
+            mockUseTickets.mockReturnValue({
+                data: getMockPaginatedTickets([
+                    {
+                        ...createMockTicket('1', 'closed', 'Team A', 'high'),
+                        summary: null
+                    }
+                ]),
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            expect(screen.getByText('—')).toBeInTheDocument();
+        });
+
+        it('renders em dash when summary is whitespace-only', () => {
+            mockUseTickets.mockReturnValue({
+                data: getMockPaginatedTickets([
+                    {
+                        ...createMockTicket('1', 'closed', 'Team A', 'high'),
+                        summary: '   '
+                    }
+                ]),
+                isLoading: false,
+                error: null
+            } as unknown as ReturnType<typeof hooks.useTickets>);
+
+            render(<Tickets />, { wrapper: Wrapper });
+
+            expect(screen.getByText('—')).toBeInTheDocument();
         });
     });
 

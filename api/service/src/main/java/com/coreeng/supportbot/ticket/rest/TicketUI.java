@@ -29,6 +29,8 @@ public class TicketUI {
 
     @Nullable private String impact;
 
+    @Nullable private String summary;
+
     private ImmutableList<String> tags;
     private ImmutableList<Log> logs;
     private ImmutableList<EscalationUI> escalations;
