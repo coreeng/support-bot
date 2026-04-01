@@ -203,10 +203,8 @@ describe('KnowledgeGapsPage', () => {
         expect(screen.getByText('Support Area Summary')).toBeInTheDocument()
         expect(screen.getByText('Overview of support areas and knowledge gaps requiring attention')).toBeInTheDocument()
 
-        // Check for import, export, and prompt buttons
-        expect(screen.getByText('Import')).toBeInTheDocument()
-        expect(screen.getByText('Export')).toBeInTheDocument()
-        expect(screen.getByText('Analysis Bundle')).toBeInTheDocument()
+        // Check for analysis trigger
+        expect(screen.getByRole('button', { name: 'Run Analysis' })).toBeInTheDocument()
 
         // Check for collapsible section headers
         expect(screen.getByText('Top Support Areas')).toBeInTheDocument()
@@ -476,6 +474,8 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
+        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
         const exportButton = screen.getByText('Export')
         fireEvent.click(exportButton)
 
@@ -503,8 +503,10 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
+        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
         // Find the select dropdown - default is Week (7 days)
-        const select = await screen.findByDisplayValue('Week')
+        const select = await screen.findByLabelText('Query window')
         expect(select).toBeInTheDocument()
 
         // Verify all options are present
@@ -548,7 +550,9 @@ describe('KnowledgeGapsPage', () => {
         renderWithToast(<KnowledgeGapsPage />)
 
         // Change the time period to Month (31 days)
-        const select = await screen.findByDisplayValue('Week')
+        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
+        const select = await screen.findByLabelText('Query window')
         fireEvent.change(select, { target: { value: '31' } })
 
         // Click export button
@@ -595,7 +599,9 @@ describe('KnowledgeGapsPage', () => {
         renderWithToast(<KnowledgeGapsPage />)
 
         // Change the time period to Quarter (92 days)
-        const select = await screen.findByDisplayValue('Week')
+        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
+        const select = await screen.findByLabelText('Query window')
         fireEvent.change(select, { target: { value: '92' } })
 
         // Click export button
@@ -638,6 +644,8 @@ describe('KnowledgeGapsPage', () => {
         })
 
         renderWithToast(<KnowledgeGapsPage />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
         const importButton = screen.getByText('Import')
         expect(importButton).toBeInTheDocument()
@@ -706,6 +714,8 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
+        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
         const promptButton = screen.getByText('Analysis Bundle')
         fireEvent.click(promptButton)
 
@@ -744,9 +754,7 @@ describe('KnowledgeGapsPage', () => {
 
             renderWithToast(<KnowledgeGapsPage />)
 
-            expect(screen.getByText('Export')).toBeInTheDocument()
-            expect(screen.getByText('Analysis Bundle')).toBeInTheDocument()
-            expect(screen.getByText('Import')).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Run Analysis' })).toBeInTheDocument()
         })
 
         it('hides buttons when user does not have SUPPORT_ENGINEER role', () => {
@@ -859,7 +867,9 @@ describe('KnowledgeGapsPage', () => {
             // Wait for the initial status fetch
             await screen.findByText('Run Analysis')
 
-            expect(mockApiFetch).toHaveBeenCalledWith('/api/analysis/status')
+            await waitFor(() => {
+                expect(mockApiFetch).toHaveBeenCalledWith('/api/analysis/status')
+            })
         })
 
         it('starts analysis when Run Analysis button is clicked and shows progress immediately', async () => {
@@ -899,8 +909,8 @@ describe('KnowledgeGapsPage', () => {
 
             const startButton = await screen.findByText('Run Analysis')
 
-            // Click the button
             fireEvent.click(startButton)
+            fireEvent.click(screen.getAllByRole('button', { name: 'Run Analysis' })[1])
 
             // Wait for the fetch to be called
             await waitFor(() => {
@@ -946,6 +956,7 @@ describe('KnowledgeGapsPage', () => {
 
             const startButton = await screen.findByText('Run Analysis')
             fireEvent.click(startButton)
+            fireEvent.click(screen.getAllByRole('button', { name: 'Run Analysis' })[1])
 
             // Wait for error toast
             await screen.findByText('Analysis was just started by someone else')
@@ -1114,9 +1125,15 @@ describe('KnowledgeGapsPage', () => {
 
             renderWithToast(<KnowledgeGapsPage />)
 
-            // Wait for the button to appear
             const startButton = await screen.findByText('Run Analysis')
             expect(startButton).toBeInTheDocument()
+            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
+
+            fireEvent.click(startButton)
+
+            expect(screen.getByText('Analysis settings')).toBeInTheDocument()
+            expect(screen.getByLabelText('Query window')).toBeInTheDocument()
+            expect(screen.getByText('Choose how far back to pull queries for this run.')).toBeInTheDocument()
         })
 
         it('hides Run Analysis button when feature is disabled', async () => {
@@ -1156,9 +1173,8 @@ describe('KnowledgeGapsPage', () => {
             await screen.findByText('Support Area Summary')
 
             // Verify the button is not present
-            expect(screen.queryByText('Run Analysis')).not.toBeInTheDocument()
-            // The days selector should still be present (used for Export)
-            expect(screen.getByDisplayValue('Week')).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Run Analysis' })).toBeInTheDocument()
+            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
         })
 
         it('does not fetch analysis status when feature is disabled', async () => {
@@ -1281,7 +1297,13 @@ describe('KnowledgeGapsPage', () => {
             // Wait for the page to render
             await screen.findByText('Support Area Summary')
 
-            // Verify all three buttons are present and enabled
+            const settingsTrigger = screen.getByText('Run Analysis')
+            expect(settingsTrigger).toBeInTheDocument()
+
+            fireEvent.click(settingsTrigger)
+
+            expect(screen.getByText('Analysis settings')).toBeInTheDocument()
+
             const exportButton = screen.getByText('Export')
             const bundleButton = screen.getByText('Analysis Bundle')
             const importButton = screen.getByText('Import')

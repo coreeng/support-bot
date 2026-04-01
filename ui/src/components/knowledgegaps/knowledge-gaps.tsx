@@ -39,6 +39,7 @@ export default function KnowledgeGapsPage() {
     const [isCompletionError, setIsCompletionError] = useState(false)
     const isCompletedRef = useRef(false)
     const [isAnalysisEnabled, setIsAnalysisEnabled] = useState(false)
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
     const formatQueryTimestamp = (timestamp: string) => (
         new Intl.DateTimeFormat('en-US', {
@@ -521,60 +522,93 @@ export default function KnowledgeGapsPage() {
                         </p>
                     </div>
                     {isSupportEngineer && (
-                        <div className="flex items-center gap-2">
-                                <select
-                                    value={selectedDays}
-                                    onChange={(e) => setSelectedDays(Number(e.target.value))}
-                                    className="h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                >
-                                    <option value={7}>Week</option>
-                                    <option value={31}>Month</option>
-                                    <option value={92}>Quarter</option>
-                                </select>
-                                {isAnalysisEnabled && (
-                                    <button
-                                        onClick={handleStartAnalysis}
-                                        disabled={analysisStatus?.running || isStartingAnalysis || showCompletedStatus}
-                                        className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                    >
-                                        <Play className="w-4 h-4" />
-                                        {isStartingAnalysis ? 'Checking...' : 'Run Analysis'}
-                                    </button>
-                                )}
-                                {!isAnalysisEnabled && (
-                                    <>
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            accept=".jsonl"
-                                            onChange={handleFileChange}
-                                            className="hidden"
-                                        />
-                                        <button
-                                            onClick={handleExportDownload}
-                                            disabled={isDownloading}
-                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                        >
-                                            <Download className="w-4 h-4" />
-                                            {isDownloading ? 'Downloading...' : 'Export'}
-                                        </button>
-                                        <button
-                                            onClick={handleAnalysisBundleDownload}
-                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
-                                        >
-                                            <FileText className="w-4 h-4" />
-                                            Analysis Bundle
-                                        </button>
-                                        <button
-                                            onClick={handleImportClick}
-                                            disabled={isUploading}
-                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                        >
-                                            <Upload className="w-4 h-4" />
-                                            {isUploading ? 'Uploading...' : 'Import'}
-                                        </button>
-                                    </>
-                                )}
+                        <div className="relative">
+                            {!isAnalysisEnabled && (
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".jsonl"
+                                    onChange={handleFileChange}
+                                    className="hidden"
+                                />
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => setIsSettingsOpen(current => !current)}
+                                disabled={isAnalysisEnabled && (analysisStatus?.running || isStartingAnalysis || showCompletedStatus)}
+                                className="h-10 inline-flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                <Play className="w-4 h-4" />
+                                {isAnalysisEnabled && isStartingAnalysis ? 'Checking...' : 'Run Analysis'}
+                            </button>
+                            {isSettingsOpen && (
+                                <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-gray-200 bg-white p-4 shadow-xl z-10">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h2 className="text-sm font-semibold text-gray-900">Analysis settings</h2>
+                                            <p className="mt-1 text-sm text-gray-600">
+                                                Choose how far back to pull queries for this run.
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label htmlFor="query-window" className="text-sm font-medium text-gray-700">
+                                                Query window
+                                            </label>
+                                            <select
+                                                id="query-window"
+                                                aria-label="Query window"
+                                                value={selectedDays}
+                                                onChange={(e) => setSelectedDays(Number(e.target.value))}
+                                                className="w-full h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            >
+                                                <option value={7}>Week</option>
+                                                <option value={31}>Month</option>
+                                                <option value={92}>Quarter</option>
+                                            </select>
+                                        </div>
+                                        {isAnalysisEnabled ? (
+                                            <button
+                                                type="button"
+                                                onClick={handleStartAnalysis}
+                                                disabled={analysisStatus?.running || isStartingAnalysis || showCompletedStatus}
+                                                className="w-full h-10 flex items-center justify-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                            >
+                                                <Play className="w-4 h-4" />
+                                                {isStartingAnalysis ? 'Checking...' : 'Run Analysis'}
+                                            </button>
+                                        ) : (
+                                            <div className="flex flex-col gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleExportDownload}
+                                                    disabled={isDownloading}
+                                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                                >
+                                                    <Download className="w-4 h-4" />
+                                                    {isDownloading ? 'Downloading...' : 'Export'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAnalysisBundleDownload}
+                                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                                                >
+                                                    <FileText className="w-4 h-4" />
+                                                    Analysis Bundle
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleImportClick}
+                                                    disabled={isUploading}
+                                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                                >
+                                                    <Upload className="w-4 h-4" />
+                                                    {isUploading ? 'Uploading...' : 'Import'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
