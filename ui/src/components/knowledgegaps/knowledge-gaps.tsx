@@ -250,13 +250,15 @@ export default function KnowledgeGapsPage() {
         }
     }
 
-    const toggleItemExpansion = (itemName: string) => {
+    const getItemExpansionKey = (scope: 'support-area' | 'knowledge-gap', itemName: string) => `${scope}:${itemName}`
+
+    const toggleItemExpansion = (itemKey: string) => {
         setExpandedItems(prev => {
             const next = new Set(prev)
-            if (next.has(itemName)) {
-                next.delete(itemName)
+            if (next.has(itemKey)) {
+                next.delete(itemKey)
             } else {
-                next.add(itemName)
+                next.add(itemKey)
             }
             return next
         })
@@ -415,43 +417,59 @@ export default function KnowledgeGapsPage() {
         )
     }
 
-    const renderAreaItem = (item: DimensionSummary, index: number, theme: ColorTheme = 'blue', maxQueryCount: number = 1) => {
-        const isExpanded = expandedItems.has(item.name)
+    const renderAreaItem = (
+        item: DimensionSummary,
+        index: number,
+        scope: 'support-area' | 'knowledge-gap',
+        theme: ColorTheme = 'blue',
+        maxQueryCount: number = 1
+    ) => {
+        const itemKey = getItemExpansionKey(scope, item.name)
+        const isExpanded = expandedItems.has(itemKey)
         const colors = themeClasses[theme]
         const volumePercent = Math.round((item.queryCount / maxQueryCount) * 100)
+        const contentId = `${itemKey}-queries`
 
         return (
-            <div key={item.name} className="border border-gray-200 rounded-xl bg-white hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer" onClick={() => toggleItemExpansion(item.name)}>
+            <div key={itemKey} className="border border-gray-200 rounded-xl bg-white hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
                 <div className="p-5">
-                    <div className="flex items-center gap-4">
-                        <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${colors.badge} font-bold text-lg shrink-0`}>
-                            {index + 1}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-semibold text-gray-900 text-lg truncate">{item.name}</h3>
-                                <div className="flex items-center gap-3 shrink-0 ml-3">
-                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${colors.countPill}`}>
-                                        {item.queryCount.toLocaleString()} {item.queryCount === 1 ? 'total query' : 'total queries'}
-                                    </span>
-                                    {isExpanded ? (
-                                        <ChevronDown className="w-5 h-5 text-gray-400" />
-                                    ) : (
-                                        <ChevronRight className="w-5 h-5 text-gray-400" />
-                                    )}
+                    <button
+                        type="button"
+                        onClick={() => toggleItemExpansion(itemKey)}
+                        aria-expanded={isExpanded}
+                        aria-controls={contentId}
+                        className="w-full text-left"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${colors.badge} font-bold text-lg shrink-0`}>
+                                {index + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-semibold text-gray-900 text-lg truncate">{item.name}</h3>
+                                    <div className="flex items-center gap-3 shrink-0 ml-3">
+                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${colors.countPill}`}>
+                                            {item.queryCount.toLocaleString()} {item.queryCount === 1 ? 'total query' : 'total queries'}
+                                        </span>
+                                        {isExpanded ? (
+                                            <ChevronDown className="w-5 h-5 text-gray-400" />
+                                        ) : (
+                                            <ChevronRight className="w-5 h-5 text-gray-400" />
+                                        )}
+                                    </div>
+                                </div>
+                                <div className={`mt-2.5 h-2.5 rounded-full ${colors.volumeTrack} overflow-hidden`}>
+                                    <div
+                                        className={`h-full rounded-full ${colors.volumeBar} transition-all duration-700 ease-out`}
+                                        style={{ width: `${volumePercent}%` }}
+                                    />
                                 </div>
                             </div>
-                            <div className={`mt-2.5 h-2.5 rounded-full ${colors.volumeTrack} overflow-hidden`}>
-                                <div
-                                    className={`h-full rounded-full ${colors.volumeBar} transition-all duration-700 ease-out`}
-                                    style={{ width: `${volumePercent}%` }}
-                                />
-                            </div>
                         </div>
-                    </div>
+                    </button>
 
                     {isExpanded && (
-                        <div className={`mt-5 pt-5 border-t ${colors.border}`} onClick={(e) => e.stopPropagation()}>
+                        <div id={contentId} className={`mt-5 pt-5 border-t ${colors.border}`}>
                             <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Relevant Support Queries</h4>
                             <p className="mb-3 text-sm text-gray-500">Showing up to 5 most recent queries in this category</p>
                             <div className="space-y-2">
@@ -643,7 +661,7 @@ export default function KnowledgeGapsPage() {
                             {(() => {
                                 const items = showAllSupportAreas ? analysisData.supportAreas : analysisData.supportAreas.slice(0, 5)
                                 const maxCount = items[0]?.queryCount ?? 1
-                                return items.map((item, index) => renderAreaItem(item, index, 'blue', maxCount))
+                                return items.map((item, index) => renderAreaItem(item, index, 'support-area', 'blue', maxCount))
                             })()}
                             {analysisData.supportAreas.length > 5 && (
                                 <button
@@ -680,7 +698,7 @@ export default function KnowledgeGapsPage() {
                             {(() => {
                                 const items = showAllKnowledgeGaps ? analysisData.knowledgeGaps : analysisData.knowledgeGaps.slice(0, 5)
                                 const maxCount = items[0]?.queryCount ?? 1
-                                return items.map((item, index) => renderAreaItem(item, index, 'amber', maxCount))
+                                return items.map((item, index) => renderAreaItem(item, index, 'knowledge-gap', 'amber', maxCount))
                             })()}
                             {analysisData.knowledgeGaps.length > 5 && (
                                 <button

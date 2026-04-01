@@ -255,9 +255,15 @@ describe('KnowledgeGapsPage', () => {
         expect(screen.queryByText('Documentation missing for new API')).not.toBeInTheDocument()
 
         // Click on "Knowledge Gap" area card to expand it
-        fireEvent.click(screen.getByText('Knowledge Gap'))
+        const disclosure = screen.getAllByRole('button').find((button) =>
+            button.getAttribute('aria-controls') === 'support-area:Knowledge Gap-queries'
+        )
+        expect(disclosure).toBeDefined()
+        expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+        fireEvent.click(disclosure!)
 
         // Now queries should be visible
+        expect(disclosure).toHaveAttribute('aria-expanded', 'true')
         expect(screen.getByText('Showing up to 5 most recent queries in this category')).toBeInTheDocument()
         expect(screen.getByText('Documentation missing for new API')).toBeInTheDocument()
         expect(screen.getByText('How to configure advanced settings?')).toBeInTheDocument()
@@ -265,10 +271,54 @@ describe('KnowledgeGapsPage', () => {
         expect(screen.getByText('Mar 30, 2026, 7:08 AM')).toBeInTheDocument()
 
         // Click again to collapse
-        fireEvent.click(screen.getByText('Knowledge Gap'))
+        fireEvent.click(disclosure!)
 
         // Queries should be hidden
+        expect(disclosure).toHaveAttribute('aria-expanded', 'false')
         expect(screen.queryByText('Documentation missing for new API')).not.toBeInTheDocument()
+    })
+
+    it('keeps expansion state scoped to each section when item names match', () => {
+        const duplicatedNameData = {
+            supportAreas: [
+                {
+                    name: 'Shared Topic',
+                    coveragePercentage: 56,
+                    queryCount: 12,
+                    queries: [
+                        { text: 'Support area query', timestamp: '2026-03-31T12:34:56Z', ticketId: 'T-401', link: 'https://slack.com/archives/CTEST/p401' }
+                    ]
+                }
+            ],
+            knowledgeGaps: [
+                {
+                    name: 'Shared Topic',
+                    coveragePercentage: 44,
+                    queryCount: 8,
+                    queries: [
+                        { text: 'Knowledge gap query', timestamp: '2026-03-30T07:08:09Z', ticketId: 'T-402', link: 'https://slack.com/archives/CTEST/p402' }
+                    ]
+                }
+            ]
+        }
+
+        mockUseAnalysis.mockReturnValue({
+            data: duplicatedNameData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        const disclosures = screen.getAllByRole('button', { name: /Shared Topic/ })
+        expect(disclosures).toHaveLength(2)
+
+        fireEvent.click(disclosures[0])
+
+        expect(screen.getByText('Support area query')).toBeInTheDocument()
+        expect(screen.queryByText('Knowledge gap query')).not.toBeInTheDocument()
+        expect(disclosures[0]).toHaveAttribute('aria-expanded', 'true')
+        expect(disclosures[1]).toHaveAttribute('aria-expanded', 'false')
     })
 
     it('query links point to Slack permalinks', () => {
