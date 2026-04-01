@@ -1,0 +1,30 @@
+# Defaults for support-bot-openldap (Bitnami OpenLDAP image).
+# Override from api/k8s/ldap/values-bitnami.yaml and values-integration.yaml.
+
+fullnameOverride: ""
+
+image:
+  repository: bitnami/openldap
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 389
+
+# K8s Secret holding the directory admin password (plain LDAP, no TLS).
+existingSecret: ldap-secrets
+existingSecretPasswordKey: admin-password
+
+# LDAP_ROOT / base suffix (admin DN becomes cn=<adminUsername>,<root>).
+ldapRoot: dc=supportbot,dc=local
+adminUsername: admin
+
+resources: {}
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 8Gi

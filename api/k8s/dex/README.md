@@ -1,114 +1,73 @@
-# Dex deployment values (core-platform-app)
+# Dex deployment (dexidp Helm chart)
 
-This directory contains Dex values for deploying with the platform chart
-`core-platform-app`.
+Dex runs the upstream image [`ghcr.io/dexidp/dex`](https://github.com/dexidp/dex). Kubernetes installs use the official chart **`dex/dex`** from [charts.dexidp.io](https://charts.dexidp.io) (pin `DEX_CHART_VERSION` in `dex/Makefile`, default `0.24.0`).
 
-Dex runs on the upstream image `ghcr.io/dexidp/dex` and reads config from a
-mounted `config.yaml`.
+Configuration is the structured `config:` map in values; the chart renders it into a Secret as `config.yaml` (there is no `${ENV}` expansion in that file—put real strings in a private overlay or use `helm upgrade --set` for secrets).
 
 ## Files
 
-- `values.yaml` - baseline values.
-- `values-integration.yaml` - sample integration overrides.
+- `values-dexidp.yaml` — baseline: issuer, sqlite storage, web/telemetry ports, static client, optional empty `connectors: []`.
+- `values-integration.yaml` — sample integration overrides (ingress host, issuer, LDAP connector to `ldap:389`, resource bumps).
+- `values-legacy-core-platform-app.yaml` — archived `core-platform-app` + templated `config.yaml` with `${DEX_*}` placeholders.
 
-Set **`dex.enablePasswordDb: false`** in values to disable Dex’s static email/password screen and rely on connectors only (ensure LDAP and/or Google/Microsoft is enabled).
+Set **`enablePasswordDB: false`** under `config` to hide Dex’s static email/password screen and rely on connectors only (ensure LDAP and/or Google/Microsoft entries exist under `config.connectors`).
 
-## Required secret
+## Required secret (`dex-secrets`)
 
-Create a secret named `dex-secrets` with OAuth client secret used by Dex
-`staticClients`, plus optional connector credentials:
+The **dex/dex** chart does not wire `dex-secrets` into config automatically. For production, keep sensitive strings out of Git: use a private `-f` values file or automation that sets `config.staticClients[].secret`, `config.connectors[].config.bindPW`, and OAuth client IDs/secrets.
 
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: dex-secrets
-type: Opaque
-stringData:
-  client-secret: "<support-bot-dex-client-secret>"
-  # Required when dex.ldap.enabled is true (bind password for LDAP connector).
-  ldap-bind-password: ""
-  # When dex.google.enabled is true — Google OAuth client for Dex (not the API’s GOOGLE_* vars).
-  google-client-id: ""
-  google-client-secret: ""
-  # When dex.microsoft.enabled is true — Entra ID app for Dex (not the API’s AZURE_* SSO vars).
-  microsoft-client-id: ""
-  microsoft-client-secret: ""
-```
+For **optional** Git / template checks, `values-dexidp.yaml` uses obvious placeholders (`helm-template-placeholder-*`). Replace them in your cluster overlay.
 
-Set `dex.microsoft.tenant` in Helm values (e.g. `common` or your tenant UUID). Use non-empty client id/secret only for connectors you enable; empty keys keep the Deployment valid when a connector is off.
+Example keys you may mirror from a Secret into values (conceptually):
 
-Apply:
-
-```bash
-kubectl apply -f dex-secrets.yaml
-```
+- `client-secret` — same as `config.staticClients[].secret` for the Support Bot client.
+- `ldap-bind-password` — same as LDAP connector `bindPW` when LDAP is enabled.
+- `google-client-id` / `google-client-secret` — when adding a Google connector.
+- `microsoft-client-id` / `microsoft-client-secret` — when adding a Microsoft connector.
 
 ## Install / upgrade
 
-If you have the chart locally:
-
 ```bash
-helm upgrade --install support-bot-dex \
-  "/Users/tomaszbartosiewicz/projects/cecg/core-platform-assets/charts/core-platform-app" \
-  -f api/k8s/dex/values.yaml
-```
-
-With env overrides:
-
-```bash
-helm upgrade --install support-bot-dex \
-  "/Users/tomaszbartosiewicz/projects/cecg/core-platform-assets/charts/core-platform-app" \
-  -f api/k8s/dex/values.yaml \
+helm repo add dex https://charts.dexidp.io
+helm repo update dex
+helm upgrade --install support-bot-dex dex/dex --version 0.24.0 \
+  -f api/k8s/dex/values-dexidp.yaml \
   -f api/k8s/dex/values-integration.yaml
 ```
 
-## Connectors: LDAP, Google, Microsoft (Azure AD)
+Validate render only:
 
-`values.yaml` can enable any combination of:
+```bash
+make dex-template
+```
 
-- `**dex.ldap.enabled**` — LDAP with group search (JWT `groups` for Support Bot `jwt-groups`).
-- `**dex.google.enabled**` — [Dex Google connector](https://dexidp.io/docs/connectors/google/). Register a **Web application** OAuth client in Google Cloud whose **authorized redirect URI** is exactly:
-  `{dex.issuer}/callback`  
-  (example: `https://dex.example.com/callback` — no path on the Support Bot API.)
-- `**dex.microsoft.enabled`** — [Dex Microsoft connector](https://dexidp.io/docs/connectors/microsoft/). Register an app in Microsoft Entra ID; add the same `{dex.issuer}/callback` as a **Web** redirect URI. Set `dex.microsoft.tenant` in values to your tenant ID or `common` / `organizations` as appropriate.
+## Connectors: LDAP, Google, Microsoft
 
-Support Bot still uses only the **Dex** OIDC client (`DEX_CLIENT_ID` / `DEX_ISSUER_URI` on the API). End users authenticate via Dex; Dex routes them to LDAP, Google, or Microsoft. For **Dex-only login buttons** on the Support Bot UI while `GOOGLE_`* / `AZURE_*` remain set for other uses, configure `security.oauth2.login-providers: [dex]` on the API (see [configuration.md](../../service/docs/configuration.md)).
+- **LDAP** — `values-integration.yaml` shows a connector matching the Bitnami/OpenLDAP DIT (`ldap:389`, `cn=admin,dc=supportbot,dc=local`, group search for `groupOfUniqueNames`). JWT `groups` for Support Bot `jwt-groups` depends on this connector and Dex scopes.
+- **Google** — add a `connectors` entry with `type: google` per [Dex docs](https://dexidp.io/docs/connectors/google/). Register a **Web** OAuth client whose redirect URI is **`{issuer}/callback`** (e.g. `https://dex.example.com/callback`), not the API’s `/login/oauth2/code/...` URL.
+- **Microsoft** — add `type: microsoft` per [Dex docs](https://dexidp.io/docs/connectors/microsoft/) with the same `{issuer}/callback` redirect URI and `tenant` in `config`.
+
+Because `connectors` is a YAML list, merge carefully: the last values file that sets `config.connectors` **replaces** the whole list. Copy the LDAP block and add Google/Microsoft entries in the same file when combining.
+
+Support Bot still uses only the **Dex** OIDC client (`DEX_CLIENT_ID` / `DEX_ISSUER_URI` on the API). For **Dex-only** login buttons on the UI while `GOOGLE_*` / `AZURE_*` remain set for other uses, configure `security.oauth2.login-providers: [dex]` on the API (see [configuration.md](../../service/docs/configuration.md)).
 
 ## Integration deploy order (with LDAP)
 
-When both modules run in Kubernetes, apply **LDAP before Dex** so the LDAP Service exists, then point Dex at it (`dex.ldap.host`, e.g. `ldap:389` when colocated). Deploy or upgrade the **Support Bot API** after Dex with matching `DEX_`* env vars. See [docs/runbooks/auth-dex-ldap.md](../../../docs/runbooks/auth-dex-ldap.md).
+Deploy **LDAP** first so the Service exists, then Dex with LDAP `host` pointing at that Service (`ldap:389` when colocated). Deploy or upgrade the **Support Bot API** after Dex with matching `DEX_*` env vars. See [docs/runbooks/auth-dex-ldap.md](../../../docs/runbooks/auth-dex-ldap.md).
 
 ## Support Bot API wiring
 
-Set these on the Support Bot API deployment:
+- `DEX_CLIENT_ID` = `config.staticClients[].id` (e.g. `support-bot-dex`).
+- `DEX_CLIENT_SECRET` = same value as `config.staticClients[].secret`.
+- `DEX_ISSUER_URI` = `config.issuer`.
 
-- `DEX_CLIENT_ID` = `dex.clientId` from Dex values.
-- `DEX_CLIENT_SECRET` = the same secret as `dex-secrets/client-secret`.
-- `DEX_ISSUER_URI` = `dex.issuer` from Dex values.
-
-Ensure Dex redirect URI list includes:
-
-- `https://<your-api-domain>/login/oauth2/code/dex`
-
-The issuer URL must match ingress host/path exactly.
+Dex `staticClients.redirectURIs` must include `https://<api-host>/login/oauth2/code/dex` (and localhost variants for dev).
 
 ## Stage 1 lifecycle
 
-This module is operated through root `Makefile` commands:
-
 ```bash
-# Validate Dex values render against core-platform-app
 make dex-template
-
-# Deploy Dex module in integration
 make dex-deploy-integration
-
-# Deploy Dex module in production
-make dex-deploy-prod
 ```
 
-Automation workflows:
-
-- `.github/workflows/dex-fast-feedback.yaml`
-
+Workflow: `.github/workflows/dex-fast-feedback.yaml` (and optional `support-bot-dex-fast-feedback.yaml`) run P2P fast feedback in `dex/` (`make p2p-build` → `helm template`).

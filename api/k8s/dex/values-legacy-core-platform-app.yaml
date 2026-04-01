@@ -1,6 +1,5 @@
-# Dex deployment values for core-platform-app chart.
-# Usage (example):
-#   helm upgrade --install support-bot-dex <core-platform-app-chart> -f api/k8s/dex/values.yaml
+# Archived: Dex values for the former core-platform-app chart.
+# Active installs use values-dexidp.yaml with chart dex/dex.
 
 fullnameOverride: dex
 replicaCount: 1
@@ -199,18 +198,14 @@ volumeMounts:
 
 dex:
   issuer: https://dex.example.com
-  # When false, Dex shows only connectors (LDAP / Google / Microsoft), no static email/password.
   enablePasswordDb: true
   clientId: support-bot-dex
   redirectUris:
     - https://support-bot-api.example.com/login/oauth2/code/dex
-  # Dex connectors (users pick one at Dex login). Register OAuth apps with redirect URI = {issuer}/callback
-  # (see api/k8s/dex/README.md). Secrets: dex-secrets keys google-*, microsoft-*.
   google:
     enabled: false
   microsoft:
     enabled: false
-    # Entra tenant ID, or common / organizations / consumers
     tenant: common
   ldap:
     enabled: false
@@ -221,6 +216,5 @@ dex:
   localUser:
     email: admin@example.com
     username: admin
-    userId: "08a8684b-db88-4b73-90a9-3cd1661f5466"
-    # Example hash for password "admin". Override per environment.
+    userID: "08a8684b-db88-4b73-90a9-3cd1661f5466"
     passwordHash: "$2a$10$6c9QhS23zYk8xH5fQ2fN4eWw6X8vY6A7gYVYsv5nYeD1yfknhkX9u"

@@ -1,5 +1,5 @@
-# OpenLDAP deployment values for core-platform-app chart.
-# Bootstrap LDIF mirrors ldap/bootstrap/*.ldif (keep in sync when changing seeds).
+# Archived: OpenLDAP values for the former core-platform-app chart (osixia/openldap).
+# Active installs use api/k8s/ldap/chart + values-bitnami.yaml.
 
 fullnameOverride: ldap
 replicaCount: 1

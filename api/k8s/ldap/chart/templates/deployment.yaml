@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "support-bot-openldap.fullname" . }}
+  labels:
+    {{- include "support-bot-openldap.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "support-bot-openldap.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "support-bot-openldap.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: openldap
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: ldap
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: LDAP_ROOT
+              value: {{ .Values.ldapRoot | quote }}
+            - name: LDAP_ADMIN_USERNAME
+              value: {{ .Values.adminUsername | quote }}
+            - name: LDAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret | quote }}
+                  key: {{ .Values.existingSecretPasswordKey | quote }}
+            - name: LDAP_PORT_NUMBER
+              value: {{ .Values.service.port | toString | quote }}
+            - name: LDAP_CUSTOM_LDIF_DIR
+              value: /ldifs
+          volumeMounts:
+            - name: bootstrap-ldif
+              mountPath: /ldifs
+              readOnly: true
+            - name: data
+              mountPath: /bitnami/openldap
+          startupProbe:
+            tcpSocket:
+              port: ldap
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 36
+          livenessProbe:
+            tcpSocket:
+              port: ldap
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: ldap
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 5
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: bootstrap-ldif
+          configMap:
+            name: {{ include "support-bot-openldap.fullname" . }}-bootstrap
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "support-bot-openldap.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}

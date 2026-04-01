@@ -20,16 +20,16 @@ Apply secrets first, then workloads that depend on them.
 
 1. **Secrets**
    - `ldap-secrets` (`admin-password`) — see [`api/k8s/ldap/README.md`](../../api/k8s/ldap/README.md).
-   - `dex-secrets` (`client-secret`, and `ldap-bind-password` when `dex.ldap.enabled`) — see [`api/k8s/dex/README.md`](../../api/k8s/dex/README.md).
+   - Dex credentials (`config.staticClients[].secret`, LDAP connector `bindPW`, optional Google/Microsoft client IDs and secrets) — usually supplied via a private values overlay or pipeline; see [`api/k8s/dex/README.md`](../../api/k8s/dex/README.md).
 2. **LDAP** — `make ldap-deploy-integration` (or equivalent `helm upgrade` with your tenant values). Confirm the Service (e.g. `ldap:389`) is reachable from the namespace where Dex will run.
-3. **Dex** — `make dex-deploy-integration`. Set `dex.ldap.enabled: true` and matching host/DNs when Dex should use the cluster LDAP Service.
+3. **Dex** — `make dex-deploy-integration`. Ensure `config.connectors` in [`api/k8s/dex/values-integration.yaml`](../../api/k8s/dex/values-integration.yaml) (or your overlay) includes the LDAP connector with the correct `host` / DNs when Dex should use the cluster LDAP Service.
 4. **Support Bot API** — deploy or upgrade the main app chart with `DEX_CLIENT_ID`, `DEX_CLIENT_SECRET`, `DEX_ISSUER_URI`, and application config for `platform-integration.jwt-groups` if you map LDAP groups to tenant teams. Optional: `security.oauth2.login-providers: [dex]` so the UI only offers Dex even when `GOOGLE_*` / `AZURE_*` are set for other purposes.
 
 Exact namespaces and release names depend on your P2P / tenant layout; align Dex `ldap.host` with the in-cluster DNS name of the LDAP Service.
 
 ### Google / Microsoft connectors on Dex (Kubernetes)
 
-When `dex.google.enabled` or `dex.microsoft.enabled` is true in [`api/k8s/dex/values.yaml`](../../api/k8s/dex/values.yaml), register **separate** OAuth apps with Google / Entra whose redirect URI is **`{dex.issuer}/callback`** (Dex’s callback), not the Support Bot API’s `/login/oauth2/code/...` URLs. Populate `dex-secrets` keys `google-client-id`, `google-client-secret`, `microsoft-client-id`, and `microsoft-client-secret` as documented in [`api/k8s/dex/README.md`](../../api/k8s/dex/README.md). Set `dex.microsoft.tenant` in Helm values for the Microsoft connector.
+When you add **Google** or **Microsoft** entries under `config.connectors` in Dex values (see [`api/k8s/dex/README.md`](../../api/k8s/dex/README.md)), register **separate** OAuth apps with Google / Entra whose redirect URI is **`{issuer}/callback`** from `config.issuer` (Dex’s callback), not the Support Bot API’s `/login/oauth2/code/...` URLs. Store client IDs and secrets in a private values overlay or pipeline (the dex/dex chart does not substitute `${ENV}` inside `config.yaml`). For Microsoft, set the connector `tenant` field as in Dex’s documentation.
 
 ## Troubleshooting
 
@@ -75,13 +75,14 @@ When `dex.google.enabled` or `dex.microsoft.enabled` is true in [`api/k8s/dex/va
 - Use `make -C dex render-config` (Python renderer) so `$` in bcrypt hashes is not stripped by the shell.
 - LDAP: verify `DEX_LDAP_BIND_DN` / `DEX_LDAP_BIND_PW` against phpLDAPadmin or `ldapwhoami`.
 
-### Helm template failures (`core-platform-app` test hooks)
+### Helm template failures (LDAP / Dex charts)
 
-**Symptoms:** `helm template` fails on `templates/tests/*.yaml` when using `secretKeyRef` in `envVarsArr`.
+**Symptoms:** `helm template` fails after changing values or chart paths.
 
 **Checks:**
 
-- LDAP module: `ldap/scripts/helm_ldap.sh` strips chart test templates before render/deploy — use `make -C ldap template` / `make ldap-template`.
+- LDAP: `make -C ldap template` uses `api/k8s/ldap/chart` and `values-bitnami.yaml` — confirm bootstrap LDIF exists under `api/k8s/ldap/chart/files/bootstrap/` (run `make -C ldap sync-bootstrap-into-chart` after editing `ldap/bootstrap/`).
+- Dex: `make -C dex template` uses `dex/dex` from `charts.dexidp.io` — run `helm repo update dex` if the chart version pin fails to download.
 
 ## Automated checks (CI)
 

@@ -32,7 +32,7 @@ make -C ldap down-local
 
 ## Integration / Helm
 
-Values live under `api/k8s/ldap/` and deploy with `core-platform-app`, same pattern as Dex.
+Values and chart live under `api/k8s/ldap/` (`chart/` + `values-bitnami.yaml`). Deploy with `make ldap-deploy-integration` or `helm upgrade` as in [`api/k8s/ldap/README.md`](../api/k8s/ldap/README.md).
 
 Create secret `ldap-secrets` in the target namespace:
 
@@ -60,21 +60,23 @@ make -C ldap template
 make -C ldap deploy-integration
 ```
 
+### Keeping Helm bootstrap in sync
+
+Helm packages copies of the LDIF under `api/k8s/ldap/chart/files/bootstrap/`. After changing `ldap/bootstrap/*.ldif`, run:
+
+```bash
+make -C ldap sync-bootstrap-into-chart
+```
+
+Then commit any diffs under `api/k8s/ldap/chart/files/bootstrap/`.
+
 ### Service DNS (Kubernetes)
 
-With release name `support-bot-ldap` and `fullnameOverride: ldap`, the ClusterIP service is typically **`ldap`** in the app namespace (for example `support-bot-ldap-integration`). Dex (Stage 3) should use a host like `ldap:389` when colocated, or the full in-cluster DNS name for your tenant.
+With release name `support-bot-ldap` and `fullnameOverride: ldap`, the ClusterIP service is typically **`ldap`** in the app namespace. Dex should use `ldap:389` when colocated, or the full in-cluster DNS name for your tenant.
 
 ## CI
 
 - `.github/workflows/ldap-fast-feedback.yaml` — P2P fast feedback for the LDAP module (`make p2p-build` → Helm `template`).
-
-## Helm note (core-platform-app)
-
-Current `core-platform-app` chart test hooks under `templates/tests` produce invalid YAML when `envVarsArr` includes `valueFrom` (same pattern as Dex). The module script `ldap/scripts/helm_ldap.sh` pulls the chart and removes `templates/tests` before `helm template` / `helm upgrade`, so local and CI renders succeed. Remove this workaround when the platform chart fixes test templates.
-
-## Keeping seeds in sync
-
-Bootstrap LDIF is duplicated in `api/k8s/ldap/values.yaml` (`configMaps.ldap-bootstrap`). If you change files under `ldap/bootstrap/`, update the ConfigMap entries in `values.yaml` as well.
 
 ## Troubleshooting (quick)
 

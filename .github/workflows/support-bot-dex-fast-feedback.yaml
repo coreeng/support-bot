@@ -36,5 +36,6 @@ jobs:
       env_vars: ${{ secrets.env_vars }}
     with:
       app-name: dex
-      version: ${{ needs.version.outputs.version }}      
+      version: ${{ needs.version.outputs.version }}
+      command: template
       working-directory: dex

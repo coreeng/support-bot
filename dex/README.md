@@ -81,7 +81,7 @@ Ensure Dex `staticClients.redirectURIs` includes:
 
 ## 6) Stage 1 lifecycle commands
 
-Validate Dex module values against `core-platform-app`:
+Validate Dex module values against the **dex/dex** chart (`charts.dexidp.io`):
 
 ```bash
 make dex-template

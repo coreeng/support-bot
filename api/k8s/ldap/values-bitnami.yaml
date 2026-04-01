@@ -1,0 +1,31 @@
+# Support Bot overrides for api/k8s/ldap/chart (Bitnami OpenLDAP image).
+# Bootstrap LDIF is packaged under chart/files/bootstrap/ — keep in sync with ldap/bootstrap/.
+
+fullnameOverride: ldap
+
+image:
+  repository: bitnami/openldap
+  tag: latest
+  pullPolicy: IfNotPresent
+
+existingSecret: ldap-secrets
+existingSecretPasswordKey: admin-password
+
+ldapRoot: dc=supportbot,dc=local
+adminUsername: admin
+
+service:
+  type: ClusterIP
+  port: 389
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+persistence:
+  enabled: true
+  size: 8Gi

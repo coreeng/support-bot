@@ -346,7 +346,7 @@ monitoring-deploy: ## Deploy monitoring stack (Prometheus + Grafana) for support
 ##@ Dex module lifecycle (implemented in dex/Makefile)
 
 .PHONY: dex-template dex-deploy-integration dex-deploy-prod
-dex-template: ## Validate Dex values by rendering core-platform-app chart
+dex-template: ## Validate Dex values by rendering dex/dex chart
 	@$(MAKE) -C dex template
 
 dex-deploy-integration: ## Deploy Dex module to integration environment
@@ -358,7 +358,7 @@ dex-deploy-prod: ## Deploy Dex module to production environment
 ##@ LDAP module lifecycle (implemented in ldap/Makefile)
 
 .PHONY: ldap-template ldap-deploy-integration
-ldap-template: ## Validate LDAP values by rendering core-platform-app chart
+ldap-template: ## Validate LDAP chart (support-bot-openldap + values-bitnami)
 	@$(MAKE) -C ldap template
 
 ldap-deploy-integration: ## Deploy LDAP module to integration environment

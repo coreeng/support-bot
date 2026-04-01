@@ -1,4 +1,4 @@
-# Integration environment overrides for Dex.
+# Integration overrides (dex/dex chart). Merges with values-dexidp.yaml (maps merge; lists here replace).
 
 ingress:
   hosts:
@@ -7,7 +7,43 @@ ingress:
         - path: /
           pathType: Prefix
 
-dex:
+config:
   issuer: https://dex.integration.example.com
-  redirectUris:
-    - https://support-bot-api.integration.example.com/login/oauth2/code/dex
+  staticClients:
+    - id: support-bot-dex
+      name: Support Bot
+      secret: helm-template-placeholder-client-secret
+      redirectURIs:
+        - https://support-bot-api.integration.example.com/login/oauth2/code/dex
+  connectors:
+    - type: ldap
+      id: ldap
+      name: LDAP
+      config:
+        host: ldap:389
+        insecureNoSSL: true
+        bindDN: cn=admin,dc=supportbot,dc=local
+        bindPW: helm-template-placeholder-ldap-bind
+        usernamePrompt: Email Address
+        userSearch:
+          baseDN: ou=People,dc=supportbot,dc=local
+          filter: "(objectClass=posixAccount)"
+          username: mail
+          idAttr: uid
+          emailAttr: mail
+          nameAttr: cn
+        groupSearch:
+          baseDN: ou=Groups,dc=supportbot,dc=local
+          filter: "(objectClass=groupOfUniqueNames)"
+          userMatchers:
+            - userAttr: DN
+              groupAttr: uniqueMember
+          nameAttr: cn
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi

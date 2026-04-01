@@ -21,12 +21,17 @@ run-local: ## Start OpenLDAP + phpLDAPadmin (requires ldap/.env.local)
 down-local: ## Stop local LDAP stack
 	@docker compose down
 
-##@ LDAP module lifecycle (Helm / core-platform-app)
+##@ LDAP module lifecycle (Helm / Bitnami OpenLDAP image)
 
 .PHONY: template
-template: ## Validate LDAP values by rendering core-platform-app chart
+template: ## Validate LDAP chart (support-bot-openldap) with values-bitnami + integration overlay
 	@bash ./scripts/helm_ldap.sh template
 
 .PHONY: deploy-integration
 deploy-integration: ## Deploy LDAP module to integration environment
 	@DRY_RUN="$(DRY_RUN)" bash ./scripts/helm_ldap.sh deploy-integration
+
+.PHONY: sync-bootstrap-into-chart
+sync-bootstrap-into-chart: ## Copy ldap/bootstrap/*.ldif into api/k8s/ldap/chart/files/bootstrap/
+	@cp -f "$(CURDIR)/bootstrap/"*.ldif "$(CURDIR)/../api/k8s/ldap/chart/files/bootstrap/"
+	@echo "Synced LDIF into api/k8s/ldap/chart/files/bootstrap/ (commit if changed)."
