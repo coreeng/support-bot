@@ -30,6 +30,7 @@ import com.coreeng.supportbot.ticket.TicketSubmission;
 import com.coreeng.supportbot.ticket.TicketTeam;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -629,6 +630,61 @@ public class TicketProcessingServiceTests {
         StalenessTagTarget target = stalenessTagTargetCaptor.getValue();
         assertInstanceOf(StalenessTagTarget.Squad.class, target);
         assertEquals(SUPPORT_GROUP_ID, ((StalenessTagTarget.Squad) target).groupId());
+    }
+
+    @Test
+    public void shouldUseLastThreadMessageTimeAsClosedAtViaCloseForPrResolution() {
+        // given — ticket exists with a known last-message time
+        Ticket ticket = createTrackedTicket();
+        TicketId ticketId = requireNonNull(ticket.id());
+
+        Instant lastMessageTime = Instant.parse("2024-01-15T10:00:00Z");
+        ticketRepository.touchTicketById(ticketId, lastMessageTime);
+
+        // when
+        ticketProcessingService.closeForPrResolution(ticketId, ImmutableList.of("pr-review"), "low");
+
+        // then — the closed status log entry uses the last thread message time
+        Ticket closed = ticketRepository.findTicketById(ticketId);
+        assertNotNull(closed);
+        Instant closedAt = closed.statusLog().stream()
+                .filter(l -> l.status() == TicketStatus.closed)
+                .findFirst()
+                .map(Ticket.StatusLog::date)
+                .orElseThrow(() -> new AssertionError("No closed status log entry found"));
+        assertEquals(lastMessageTime, closedAt, "Closed-at must equal the last thread message time");
+    }
+
+    @Test
+    public void shouldUseLastThreadMessageTimeAsClosedAtViaSubmit() {
+        // given — ticket exists with a known last-message time
+        Ticket ticket = createTrackedTicket();
+        TicketId ticketId = requireNonNull(ticket.id());
+
+        Instant lastMessageTime = Instant.parse("2024-03-20T14:30:00Z");
+        ticketRepository.touchTicketById(ticketId, lastMessageTime);
+
+        TicketSubmission closeSubmission = TicketSubmission.builder()
+                .ticketId(ticketId)
+                .status(TicketStatus.closed)
+                .authorsTeam(new TicketTeam.KnownTeam("platform"))
+                .tags(ImmutableList.of("answered"))
+                .impact("low")
+                .confirmed(true)
+                .build();
+
+        // when
+        ticketProcessingService.submit(closeSubmission);
+
+        // then — the closed status log entry uses the last thread message time
+        Ticket closed = ticketRepository.findTicketById(ticketId);
+        assertNotNull(closed);
+        Instant closedAt = closed.statusLog().stream()
+                .filter(l -> l.status() == TicketStatus.closed)
+                .findFirst()
+                .map(Ticket.StatusLog::date)
+                .orElseThrow(() -> new AssertionError("No closed status log entry found"));
+        assertEquals(lastMessageTime, closedAt, "Closed-at must equal the last thread message time");
     }
 
     private TicketProcessingService serviceWithPrDetection() {
