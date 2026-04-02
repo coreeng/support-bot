@@ -18,7 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class Hub4jGitHubClient implements GitHubClient {
-    private static final Logger log = LoggerFactory.getLogger(Hub4jGitHubClient.class);
+    private static final Logger LOG = LoggerFactory.getLogger(Hub4jGitHubClient.class);
     private final GitHub github;
 
     public Hub4jGitHubClient(GitHub github) {
@@ -188,7 +188,7 @@ public final class Hub4jGitHubClient implements GitHubClient {
             try {
                 requestedTeamReviewerLogins = resolveRequestedTeamMembers(pr, repositoryName, pullNumber);
             } catch (GitHubApiException e) {
-                log.atWarn()
+                LOG.atWarn()
                         .setCause(e)
                         .addArgument(() -> repositoryName)
                         .addArgument(() -> pullNumber)
@@ -203,7 +203,7 @@ public final class Hub4jGitHubClient implements GitHubClient {
                         .map(review -> mapReview(review, repositoryName, pullNumber))
                         .toList();
             } catch (IOException e) {
-                log.atWarn()
+                LOG.atWarn()
                         .setCause(e)
                         .addArgument(() -> repositoryName)
                         .addArgument(() -> pullNumber)
