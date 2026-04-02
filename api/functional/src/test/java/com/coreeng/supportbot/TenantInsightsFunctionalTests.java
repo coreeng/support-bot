@@ -77,6 +77,31 @@ public class TenantInsightsFunctionalTests {
     }
 
     @Test
+    public void returnsPerRepoEscalationCounts() {
+        // given — two tickets: one with bot escalation, one with manual
+        long botTicket = createTicket();
+        long manualTicket = createTicket();
+        Instant fiveDaysAgo = Instant.now().minus(Duration.ofDays(5));
+
+        createPr(botTicket, "test-org/pr-insights-esc-counts", 901, fiveDaysAgo, "platform");
+        createPr(manualTicket, "test-org/pr-insights-esc-counts", 902, fiveDaysAgo, "platform");
+
+        escalateTicket(botTicket, "platform", "bot");
+        escalateTicket(manualTicket, "platform", "manual");
+
+        // when — querying all-time
+        List<RepoInsights> results = getAllTimeStats();
+
+        // then — per-repo counts reflect escalation sources
+        RepoInsights repo = results.stream()
+                .filter(r -> r.repo().equals("test-org/pr-insights-esc-counts"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(repo.botEscalatedCount()).isEqualTo(1);
+        assertThat(repo.manualEscalatedCount()).isEqualTo(1);
+    }
+
+    @Test
     public void returnsEmptyWhenNoDataInRange() {
         // given — a PR created 200 days ago
         long ticketId = createTicket();

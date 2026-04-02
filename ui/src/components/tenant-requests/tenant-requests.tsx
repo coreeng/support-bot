@@ -37,7 +37,7 @@ function durationStyle(seconds: number): string {
 }
 
 function repoInterventionRate(r: RepoInsights): number {
-    return r.prCount > 0 ? r.manualEscalatedCount / r.prCount : 0
+    return r.prCount > 0 ? (r.manualEscalatedCount ?? 0) / r.prCount : 0
 }
 
 function compareBySeverity(a: RepoInsights, b: RepoInsights): number {
@@ -483,11 +483,13 @@ function Badge({ value, accent }: { value: number; accent: 'amber' | 'red' }) {
 }
 
 function InterventionBadge({ repo }: { repo: RepoInsights }) {
-    const pct = repo.prCount > 0 ? Math.round((repo.manualEscalatedCount / repo.prCount) * 100) : 0
-    if (pct === 0) return <span className="text-slate-300 tabular-nums">0%</span>
+    const manual = repo.manualEscalatedCount ?? 0
+    if (manual === 0) return <span className="text-slate-300 tabular-nums">0%</span>
+    const percent = repo.prCount > 0 ? Math.round((manual / repo.prCount) * 100) : 0
+    const label = percent === 0 ? '<1%' : `${percent}%`
     return (
         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 ring-1 ring-violet-600/20">
-            {pct}%
+            {label}
         </span>
     )
 }

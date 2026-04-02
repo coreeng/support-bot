@@ -323,9 +323,9 @@ describe('TenantRequestsPage', () => {
 
     describe('Sorting', () => {
         const repos = [
-            makeRepo({ repo: 'org/zebra', prCount: 5, breachedCount: 0, escalatedCount: 0 }),
-            makeRepo({ repo: 'org/alpha', prCount: 20, breachedCount: 3, escalatedCount: 1 }),
-            makeRepo({ repo: 'org/middle', prCount: 10, breachedCount: 1, escalatedCount: 2 }),
+            makeRepo({ repo: 'org/zebra', prCount: 5, breachedCount: 0, escalatedCount: 0, manualEscalatedCount: 0 }),
+            makeRepo({ repo: 'org/alpha', prCount: 20, breachedCount: 3, escalatedCount: 1, manualEscalatedCount: 10 }),
+            makeRepo({ repo: 'org/middle', prCount: 10, breachedCount: 1, escalatedCount: 2, manualEscalatedCount: 1 }),
         ]
 
         beforeEach(() => {
@@ -388,6 +388,17 @@ describe('TenantRequestsPage', () => {
             fireEvent.click(screen.getByText('Repository'))
 
             expect(screen.getByText(/Page 1/)).toBeInTheDocument()
+        })
+
+        it('should sort by intervention rate descending when column clicked', () => {
+            render(<TenantRequestsPage />)
+
+            fireEvent.click(screen.getByText('Intervention %'))
+
+            const rows = screen.getAllByRole('row').slice(1)
+            expect(rows[0]).toHaveTextContent('org/alpha')   // 50% (10/20)
+            expect(rows[1]).toHaveTextContent('org/middle')  // 10% (1/10)
+            expect(rows[2]).toHaveTextContent('org/zebra')   // 0% (0/5)
         })
     })
 
@@ -489,6 +500,43 @@ describe('TenantRequestsPage', () => {
             const amberBadge = container.querySelector('.bg-amber-50')
             expect(amberBadge).toBeInTheDocument()
             expect(amberBadge!.textContent).toBe('3')
+        })
+
+        it('should show violet badge for intervention rate > 0', () => {
+            mockUseTenantInsightsStats.mockReturnValue({
+                data: [makeRepo({ prCount: 10, manualEscalatedCount: 3 })],
+                isLoading: false,
+            })
+
+            const { container } = render(<TenantRequestsPage />)
+
+            const violetBadge = container.querySelector('.bg-violet-50')
+            expect(violetBadge).toBeInTheDocument()
+            expect(violetBadge!.textContent).toBe('30%')
+        })
+
+        it('should show muted 0% for intervention rate when no manual escalations', () => {
+            mockUseTenantInsightsStats.mockReturnValue({
+                data: [makeRepo({ prCount: 10, manualEscalatedCount: 0 })],
+                isLoading: false,
+            })
+
+            render(<TenantRequestsPage />)
+
+            expect(screen.getByText('0%')).toBeInTheDocument()
+        })
+
+        it('should show <1% badge when rate rounds to zero but manual escalations exist', () => {
+            mockUseTenantInsightsStats.mockReturnValue({
+                data: [makeRepo({ prCount: 300, manualEscalatedCount: 1 })],
+                isLoading: false,
+            })
+
+            const { container } = render(<TenantRequestsPage />)
+
+            const violetBadge = container.querySelector('.bg-violet-50')
+            expect(violetBadge).toBeInTheDocument()
+            expect(violetBadge!.textContent).toBe('<1%')
         })
 
         it('should show red badge for breached > 0', () => {
