@@ -596,6 +596,7 @@ ui/.next/
 
 # Gas Town (added by gt)
 .runtime/
+# Claude Code — local agents/prompts under .claude/agents/ (not committed)
 .claude/
 .beads/
 .logs/

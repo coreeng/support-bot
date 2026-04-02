@@ -23,7 +23,7 @@ Apply secrets first, then workloads that depend on them.
    - Dex credentials (`config.staticClients[].secret`, LDAP connector `bindPW`, optional Google/Microsoft client IDs and secrets) — usually supplied via a private values overlay or pipeline; see [`api/k8s/dex/README.md`](../../api/k8s/dex/README.md).
 2. **LDAP** — `make ldap-deploy-integration` (or equivalent `helm upgrade` with your tenant values). Confirm the Service (e.g. `ldap:389`) is reachable from the namespace where Dex will run.
 3. **Dex** — `make dex-deploy-integration`. Ensure `config.connectors` in [`api/k8s/dex/values-integration.yaml`](../../api/k8s/dex/values-integration.yaml) (or your overlay) includes the LDAP connector with the correct `host` / DNs when Dex should use the cluster LDAP Service.
-4. **Support Bot API** — deploy or upgrade the main app chart with `DEX_CLIENT_ID`, `DEX_CLIENT_SECRET`, `DEX_ISSUER_URI`, and application config for `platform-integration.jwt-groups` if you map LDAP groups to tenant teams. Optional: `security.oauth2.login-providers: [dex]` so the UI only offers Dex even when `GOOGLE_*` / `AZURE_*` are set for other purposes.
+4. **Support Bot API** — deploy or upgrade the main app chart with `DEX_CLIENT_ID`, `DEX_CLIENT_SECRET`, `DEX_ISSUER_URI`, and application config for `platform-integration.jwt-groups` if you map LDAP groups to tenant teams. By default the API offers **every** fully configured IdP (Google, Azure, Dex). Optional: `security.oauth2.login-providers: [dex]` so the UI only offers Dex when `GOOGLE_*` / `AZURE_*` are still set for other purposes.
 
 Exact namespaces and release names depend on your P2P / tenant layout; align Dex `ldap.host` with the in-cluster DNS name of the LDAP Service.
 

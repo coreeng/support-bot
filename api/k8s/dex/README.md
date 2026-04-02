@@ -61,7 +61,7 @@ make dex-template
 
 Because `connectors` is a YAML list, merge carefully: the last values file that sets `config.connectors` **replaces** the whole list. Copy the LDAP block and add Google/Microsoft entries in the same file when combining.
 
-Support Bot still uses only the **Dex** OIDC client (`DEX_CLIENT_ID` / `DEX_ISSUER_URI` on the API). For **Dex-only** login buttons on the UI while `GOOGLE_*` / `AZURE_*` remain set for other uses, configure `security.oauth2.login-providers: [dex]` on the API (see [configuration.md](../../service/docs/configuration.md)).
+User-facing SSO against Dex uses the **Dex** OAuth2 registration on the API (`DEX_CLIENT_ID`, `DEX_CLIENT_SECRET`, `DEX_ISSUER_URI`). The API can also register **Google** and **Azure AD** directly; by default **all** fully configured IdPs are shown. To show **only Dex** on the login UI while `GOOGLE_*` / `AZURE_*` remain set (e.g. for Azure Cloud integration), set `security.oauth2.login-providers: [dex]` (see [configuration.md](../../service/docs/configuration.md)).
 
 ## Integration deploy order (with LDAP)
 

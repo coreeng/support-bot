@@ -297,6 +297,8 @@ SSO is supported via Google, Azure AD, and Dex (OIDC) using the OAuth2 Authorisa
 One or more providers can be enabled depending on what your organisation uses.
 At least one provider must be configured. A provider is enabled when both its client ID and client secret are set.
 
+**Default (product):** `security.oauth2.login-providers` is omitted or empty in `application.yaml`. The API then registers **every** fully configured IdP—Google, Azure AD, and/or Dex—and the login UI offers all of them. Use a non-empty `login-providers` list only when you intentionally want to hide some IdPs (see below).
+
 ### Environment variables
 
 Set these on the **API**:
@@ -319,8 +321,8 @@ Set these on the **API**:
 
 Optional YAML list under `security.oauth2.login-providers` (values: `google`, `azure`, `dex`, case-insensitive).
 
-- **Omitted or empty:** same as today — every provider with complete credentials is registered and shown on the login UI.
-- **Non-empty (e.g. `[dex]`):** only those OAuth2 registration ids are registered and advertised, even if `GOOGLE_*` / `AZURE_*` are set. Use this for **Dex-only login** while keeping direct Google/Azure client credentials in the environment (for example if secrets are shared with other tooling).
+- **Omitted or empty (default):** every provider with complete credentials is registered and shown on the login UI (multi-IdP).
+- **Non-empty (e.g. `[dex]`):** only those OAuth2 registration ids are registered and advertised, even if other IdP env vars are set. Use this to offer **Dex-only** (or any subset) while keeping `GOOGLE_*` / `AZURE_*` in the environment for other purposes (for example Azure Cloud integration or shared secrets).
 
 Team membership still comes from `platform-integration` (static-user, Azure Graph, GCP, Slack, `jwt-groups` for Dex) — this setting only affects which OAuth flows the API exposes.
 
@@ -391,7 +393,7 @@ For Kubernetes deployment values (platform chart), see [`api/k8s/dex/README.md`]
 4. Ensure Dex is configured to return the claims Support Bot needs for login (`email` and `name`/`preferred_username`).
 5. For **LDAP → Dex → JWT groups → tenant teams**, enable `platform-integration.jwt-groups` and map claim values to `team-code` (see the `jwt-groups` block under `platform-integration` earlier in this document).
 
-> Note: Dex can be enabled alongside Google and Azure. The login screen shows providers that are both fully configured **and** allowed by `security.oauth2.login-providers` when that list is non-empty.
+> Note: Dex can be enabled alongside Google and Azure. By default (`login-providers` omitted or empty), the login screen lists **every** fully configured provider. When `login-providers` is non-empty, only those registration ids are shown.
 
 #### Troubleshooting (Dex / OAuth / LDAP)
 
