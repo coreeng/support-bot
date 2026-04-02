@@ -22,13 +22,9 @@ def _truthy(key: str, e: dict) -> bool:
     return e.get(key, "").lower() in ("1", "true", "yes")
 
 
-def _falsy(key: str, e: dict) -> bool:
-    return e.get(key, "").lower() in ("0", "false", "no")
-
-
 def build_password_db(e: dict) -> str:
-    """Dex local email/password login. Off when DEX_ENABLE_PASSWORD_DB=false (connectors-only login)."""
-    if _falsy("DEX_ENABLE_PASSWORD_DB", e):
+    """Dex local email/password login. On only when DEX_ENABLE_PASSWORD_DB=true (default: off)."""
+    if not _truthy("DEX_ENABLE_PASSWORD_DB", e):
         return "enablePasswordDB: false\n"
     return """enablePasswordDB: true
 staticPasswords:

@@ -62,7 +62,7 @@ Log markers: `OK_TOKEN`, `OK_GROUPS`, `OK_API`, `OK_ALL`.
 3. **Support Bot API** deployed for integration tests with **OIDC** env and profiles, e.g. Helm values [`values-integrationtests-oidc.yaml`](../k8s/service/values-integrationtests-oidc.yaml) (`SPRING_PROFILES_ACTIVE=integrationtests,integrationtests-oidc`, `DEX_*`, test-bypass off). `DEX_ISSUER_URI` must match Dex `config.issuer` (e.g. `http://dex:5556`).
 4. **Secrets** in that namespace:
    - `dex-secrets` with keys **`client-id`** and **`client-secret`** (same as Dex `staticClients` for `support-bot-dex`).
-   - **`integration-ldap-test-user`** with key **`password`**: plaintext password for `alice@supportbot.local`, matching the hash in the LDAP bootstrap LDIF (see [`ldap/README.md`](../../ldap/README.md)); create when preparing the cluster, e.g. `kubectl create secret generic integration-ldap-test-user --from-literal=password='…' -n <namespace>`.
+   - **`integration-ldap-test-user`** with key **`password`**: plaintext password for `alice@supportbot.local`. It must **match** the password used when LDAP bootstrap **`20-users.ldif`** was rendered (`LDAP_BOOTSTRAP_USER_PASSWORD` — for integration, set from a **GitHub Actions secret** and use the same value for `kubectl create secret generic integration-ldap-test-user --from-literal=password="$SECRET" -n <namespace>`). See [`ldap/README.md`](../../ldap/README.md).
 
 The Job assumes cluster DNS names **`dex`**, **`ldap`**, and **`support-bot`** on port **8080**; adjust the Job manifest if your release names differ.
 

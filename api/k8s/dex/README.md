@@ -7,11 +7,11 @@ Configuration is the structured `config:` map in values; the chart renders it in
 ## Files
 
 - `values-dexidp.yaml` — baseline: issuer, sqlite storage, web/telemetry ports, static client, optional empty `connectors: []`.
-- `values-integration.yaml` — sample integration overrides (ingress host, issuer, LDAP connector to `ldap:389`, resource bumps).
+- `values-integration.yaml` — sample integration overrides (issuer, LDAP connector to `ldap:389`, resource bumps). Ingress is **off** by default; use in-cluster `http://dex:5556` or port-forward.
 - `values-dex-oidc-incluster.yaml` — optional Tier 2 overlay: `config.issuer: http://dex:5556`, static client redirect `http://127.0.0.1:8765/callback`, full LDAP connector (list replace-safe). Use when the API and integration Job talk to Dex only in-cluster and `DEX_ISSUER_URI` is `http://dex:5556`.
 - `values-legacy-core-platform-app.yaml` — archived `core-platform-app` + templated `config.yaml` with `${DEX_*}` placeholders.
 
-Set **`enablePasswordDB: false`** under `config` to hide Dex’s static email/password screen and rely on connectors only (ensure LDAP and/or Google/Microsoft entries exist under `config.connectors`).
+Baseline **`values-dexidp.yaml`** sets **`enablePasswordDB: false`** (connectors only). Add LDAP / Google / Microsoft under `config.connectors` via `values-integration.yaml` or another overlay, or set `enablePasswordDB: true` and `staticPasswords` in a private overlay if you need Dex’s built-in email login.
 
 ## Required secret (`dex-secrets`)
 

@@ -6,7 +6,7 @@ The vendor Helm package is also published as **`oci://registry-1.docker.io/bitna
 
 ## Files
 
-- `chart/` — Helm chart (Deployment, Service, ConfigMap from `chart/files/bootstrap/*.ldif`, optional PVC).
+- `chart/` — Helm chart (Deployment, Service, ConfigMap from `chart/files/bootstrap/*.ldif`, optional PVC). **`20-users.ldif` is not committed**; `make -C ldap template` / `deploy-integration` generate it from [`ldap/bootstrap/20-users.ldif.template`](../../../ldap/bootstrap/20-users.ldif.template) and copy bootstrap LDIF into `chart/files/bootstrap/` before Helm.
 - `values-bitnami.yaml` — Support Bot defaults (`fullnameOverride: ldap`, image, persistence, `ldap-secrets`).
 - `values-integration.yaml` — integration overrides (e.g. `persistence.enabled: false`, larger resources).
 - `values-legacy-core-platform-app.yaml` — archived values for the former `core-platform-app` / osixia layout.

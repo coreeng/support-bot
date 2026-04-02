@@ -1,11 +1,5 @@
 # Integration overrides (dex/dex chart). Merges with values-dexidp.yaml (maps merge; lists here replace).
-
-ingress:
-  hosts:
-    - host: dex.integration.example.com
-      paths:
-        - path: /
-          pathType: Prefix
+# Ingress stays off (see values-dexidp.yaml); reach Dex in-cluster as http://dex:5556 or port-forward.
 
 config:
   issuer: https://dex.integration.example.com

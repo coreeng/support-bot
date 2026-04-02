@@ -14,7 +14,7 @@ cp dex/.env.example dex/.env.local
 
 Update `dex/.env.local` values.
 
-Generate a password hash for Dex local user (replace `admin` with your password):
+Optional: if you set `DEX_ENABLE_PASSWORD_DB=true`, generate a bcrypt hash for the static Dex user (replace the password with yours):
 
 ```bash
 htpasswd -bnBC 10 "" "admin" | tr -d ':\n' | sed 's/$2y/$2a/'
@@ -23,7 +23,7 @@ htpasswd -bnBC 10 "" "admin" | tr -d ':\n' | sed 's/$2y/$2a/'
 Use the output as `DEX_LOCAL_USER_PASSWORD_HASH`.
 No quoting or escaping is required for the bcrypt hash in `.env.local`.
 
-To **turn off** Dex’s built-in “Log in with Email” (static users) and use **only** connectors (LDAP, Google, Microsoft), set `DEX_ENABLE_PASSWORD_DB=false` in `.env.local`, then `make -C dex render-config` and restart Dex. You must have at least one connector enabled or nobody can sign in.
+Static email/password login is **off by default** in `render_config.py` and in Helm `values-dexidp.yaml`. Use LDAP / Google / Microsoft connectors in `.env.local` (or Helm values). To re-enable static users locally, set `DEX_ENABLE_PASSWORD_DB=true` and the `DEX_LOCAL_USER_*` variables, then `make -C dex render-config` and restart Dex. You must have at least one way to sign in (connector or static DB).
 
 ## 2) Render Dex config from `.env.local`
 

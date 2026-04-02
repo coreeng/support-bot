@@ -6,7 +6,7 @@ Operational **order** and **troubleshooting**: [docs/runbooks/auth-dex-ldap.md](
 
 ## Local
 
-1. Copy `ldap/.env.example` to `ldap/.env.local` and set `LDAP_ADMIN_PASSWORD`.
+1. Copy `ldap/.env.example` to `ldap/.env.local` and set `LDAP_ADMIN_PASSWORD`. Optionally set `LDAP_BOOTSTRAP_USER_PASSWORD` for `alice` / `bob` (defaults to **`password123`** if unset — dev only).
 2. Start the stack:
 
 ```bash
@@ -24,10 +24,20 @@ make -C ldap down-local
 
 ### Seed data
 
-`ldap/bootstrap/*.ldif` creates:
+Tracked under `ldap/bootstrap/`: `10-ou.ldif`, `30-groups.ldif`, and **`20-users.ldif.template`** (no password hashes in git). User entries are generated as **`ldap/bootstrap/20-users.ldif`** by:
+
+```bash
+make -C ldap render-bootstrap-users
+```
+
+Set **`LDAP_BOOTSTRAP_USER_PASSWORD`** (plaintext) first. The Makefile / `helm_ldap.sh` default to **`password123`** only for local convenience and **`helm template`** on PRs; use a strong value (or a CI secret such as **`INTEGRATION_LDAP_USERS_PASSWORD`**) for integration clusters.
+
+Prerequisites: **`slappasswd`** (`apt install ldap-utils` on Linux) or **Docker** (script uses `osixia/openldap:1.5.0` as fallback).
+
+The DIT includes:
 
 - `ou=People`, `ou=Groups` under `dc=supportbot,dc=local`
-- Users `alice` / `bob` (password **`password123`** for both — dev only)
+- Users `alice` / `bob` (password = `LDAP_BOOTSTRAP_USER_PASSWORD` at render time)
 - Groups `developers`, `support-admins`, `ldap-leadership` (alice is in all three for local JWT-group testing)
 
 ## Integration / Helm
@@ -53,6 +63,8 @@ make ldap-template
 make ldap-deploy-integration
 ```
 
+(`template` / `deploy-integration` render `20-users.ldif` and copy all `ldap/bootstrap/*.ldif` into the chart before Helm.)
+
 Or from this directory:
 
 ```bash
@@ -60,15 +72,17 @@ make -C ldap template
 make -C ldap deploy-integration
 ```
 
+Set **`LDAP_BOOTSTRAP_USER_PASSWORD`** in the environment when deploying integration (e.g. from **GitHub Actions secrets**) so bootstrap user passwords are not the public default.
+
 ### Keeping Helm bootstrap in sync
 
-Helm packages copies of the LDIF under `api/k8s/ldap/chart/files/bootstrap/`. After changing `ldap/bootstrap/*.ldif`, run:
+Helm reads LDIF from `api/k8s/ldap/chart/files/bootstrap/`. After changing tracked files (`10-ou.ldif`, `30-groups.ldif`, or `20-users.ldif.template`), run:
 
 ```bash
 make -C ldap sync-bootstrap-into-chart
 ```
 
-Then commit any diffs under `api/k8s/ldap/chart/files/bootstrap/`.
+Commit only changes to **`10-ou.ldif`** / **`30-groups.ldif`** under the chart. **`20-users.ldif`** is generated and **gitignored** in both `ldap/bootstrap/` and the chart directory.
 
 ### Service DNS (Kubernetes)
 
@@ -76,7 +90,7 @@ With release name `support-bot-ldap` and `fullnameOverride: ldap`, the ClusterIP
 
 ## CI
 
-- `.github/workflows/ldap-fast-feedback.yaml` — P2P fast feedback for the LDAP module (`make p2p-build` → Helm `template`).
+- `.github/workflows/ldap-fast-feedback.yaml` — P2P fast feedback for the LDAP module (`make p2p-build` → Helm `template`). The default **`LDAP_BOOTSTRAP_USER_PASSWORD`** (`password123`) is used only to satisfy `helm template` on PRs; integration deploy pipelines should set **`LDAP_BOOTSTRAP_USER_PASSWORD`** from a secret (e.g. via org **`env_vars`**).
 
 ## Troubleshooting (quick)
 
@@ -86,3 +100,4 @@ With release name `support-bot-ldap` and `fullnameOverride: ldap`, the ClusterIP
 | **`sed: can't read ... replication-disable.ldif`** / container restart loop | Set `LDAP_REMOVE_CONFIG_AFTER_SETUP=false` (already in `docker-compose.yaml`). If the DB volume was created during a broken run, `docker compose down -v` and start again. |
 | Cannot connect from **Dex** container | Use `host.docker.internal:389` or attach Dex and LDAP to the same Docker network; see [runbook](../docs/runbooks/auth-dex-ldap.md). |
 | **Wrong members** after seed change | Remove OpenLDAP volumes and recreate the stack so bootstrap LDIF runs on a fresh database (`docker compose down -v`). |
+| **`render-bootstrap-users` fails** | Install `ldap-utils` or ensure Docker can run `osixia/openldap:1.5.0`. |

@@ -2,6 +2,10 @@
 # p2p makefile
 .p2p.mk
 
+# LDAP bootstrap user entries (generated from 20-users.ldif.template + LDAP_BOOTSTRAP_USER_PASSWORD)
+ldap/bootstrap/20-users.ldif
+api/k8s/ldap/chart/files/bootstrap/20-users.ldif
+
 ## Generated
 # Created by https://www.toptal.com/developers/gitignore/api/vim,intellij,intellij+all,intellij+iml,windows,macos,linux,emacs,visualstudiocode,webstorm,webstorm+all,webstorm+iml
 # Edit at https://www.toptal.com/developers/gitignore?templates=vim,intellij,intellij+all,intellij+iml,windows,macos,linux,emacs,visualstudiocode,webstorm,webstorm+all,webstorm+iml

@@ -81,7 +81,7 @@ When you add **Google** or **Microsoft** entries under `config.connectors` in De
 
 **Checks:**
 
-- LDAP: `make -C ldap template` uses `api/k8s/ldap/chart` and `values-bitnami.yaml` — confirm bootstrap LDIF exists under `api/k8s/ldap/chart/files/bootstrap/` (run `make -C ldap sync-bootstrap-into-chart` after editing `ldap/bootstrap/`).
+- LDAP: `make -C ldap template` uses `api/k8s/ldap/chart` and `values-bitnami.yaml` — it generates `20-users.ldif` and copies bootstrap files into `api/k8s/ldap/chart/files/bootstrap/` (after editing tracked `ldap/bootstrap/*.ldif` or the template, run `make -C ldap sync-bootstrap-into-chart` for `10-ou` / `30-groups` only; `20-users.ldif` stays gitignored).
 - Dex: `make -C dex template` uses `dex/dex` from `charts.dexidp.io` — run `helm repo update dex` if the chart version pin fails to download.
 
 ## Automated checks (CI)
