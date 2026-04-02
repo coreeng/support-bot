@@ -1046,7 +1046,7 @@ describe('Tickets Component', () => {
             const mockTickets = getMockPaginatedTickets([
                 createMockTicket('1', 'opened', 'Team A', 'high')
             ]);
-            
+
             mockUseTickets.mockReturnValue({
                 data: mockTickets,
                 isLoading: false,
@@ -1055,8 +1055,8 @@ describe('Tickets Component', () => {
 
             render(<Tickets />, { wrapper: Wrapper });
 
-            // Find the date filter dropdown
-            const dateFilterSelect = screen.getByDisplayValue('Last Week');
+            // Default is now "Any Date" (empty string) — the old default was "Last Week"
+            const dateFilterSelect = screen.getByDisplayValue('Any Date');
             expect(dateFilterSelect).toBeInTheDocument();
 
             // Switch to custom mode
@@ -1080,7 +1080,7 @@ describe('Tickets Component', () => {
             const mockTickets = getMockPaginatedTickets([
                 createMockTicket('1', 'opened', 'Team A', 'high')
             ]);
-            
+
             mockUseTickets.mockReturnValue({
                 data: mockTickets,
                 isLoading: false,
@@ -1090,7 +1090,7 @@ describe('Tickets Component', () => {
             render(<Tickets />, { wrapper: Wrapper });
 
             // Switch to custom mode
-            const dateFilterSelect = screen.getByDisplayValue('Last Week');
+            const dateFilterSelect = screen.getByDisplayValue('Any Date');
             fireEvent.change(dateFilterSelect, { target: { value: 'custom' } });
 
             // Set custom dates
@@ -1126,7 +1126,7 @@ describe('Tickets Component', () => {
 
             render(<Tickets />, { wrapper: Wrapper });
 
-            const dateFilterSelect = screen.getByDisplayValue('Last Week');
+            const dateFilterSelect = screen.getByDisplayValue('Any Date');
             fireEvent.change(dateFilterSelect, { target: { value: 'custom' } });
 
             // Check that the hook was called with valid dates, not undefined

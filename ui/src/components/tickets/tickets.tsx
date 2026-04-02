@@ -42,7 +42,7 @@ export default function TicketsPage() {
     const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS
     const [params, setParams] = useUrlParams(
         {
-            dateFilter: 'lastWeek',
+            dateFilter: '',
             dateFrom: '',
             dateTo: '',
             status: '',
@@ -56,7 +56,7 @@ export default function TicketsPage() {
             page: '0',
         },
         {
-            dateFilter: enumValidator(['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, 'lastWeek'),
+            dateFilter: enumValidator(['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, ''),
             dateFrom: isoDateValidator,
             dateTo: isoDateValidator,
             status: enumValidator(['', 'opened', 'closed', 'stale'] as const, ''),

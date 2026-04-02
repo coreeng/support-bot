@@ -417,10 +417,10 @@ describe('EscalationsPage', () => {
             expect(screen.getByTestId('escalations-date-filter')).toBeInTheDocument()
         })
 
-        it('defaults to last 7 days, showing only recent escalations', () => {
+        it('defaults to Any Date, showing all escalations without date filtering', () => {
             render(<EscalationsPage />, { wrapper: Wrapper })
             expect(screen.getByText('T-recent')).toBeInTheDocument()
-            expect(screen.queryByText('T-old')).not.toBeInTheDocument()
+            expect(screen.getByText('T-old')).toBeInTheDocument()
         })
 
         it('shows all escalations when date filter is cleared', () => {

@@ -53,7 +53,7 @@ export default function EscalationsPage() {
     // Validators guard against invalid URL values and auto-correct the URL.
     const [params, setParams] = useUrlParams(
         {
-            dateFilter: 'lastWeek',
+            dateFilter: '',
             dateFrom: '',
             dateTo: '',
             status: 'all',
@@ -65,7 +65,7 @@ export default function EscalationsPage() {
             page: '0',
         },
         {
-            dateFilter: enumValidator(['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, 'lastWeek'),
+            dateFilter: enumValidator(['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, ''),
             dateFrom: isoDateValidator,
             dateTo: isoDateValidator,
             status: enumValidator(['all', 'ongoing', 'resolved'] as const, 'all'),
