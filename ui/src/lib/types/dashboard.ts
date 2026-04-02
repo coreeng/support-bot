@@ -90,11 +90,18 @@ export interface RepoInsights {
     openCount: number
     escalatedCount: number
     breachedCount: number
-    botEscalatedCount: number
-    manualEscalatedCount: number
     p50Seconds: number
     p90Seconds: number
     p99Seconds: number
+}
+
+/**
+ * Escalation breakdown from /tenant-insights/escalation-breakdown
+ */
+export interface EscalationBreakdown {
+    totalPrTickets: number
+    botEscalatedTickets: number
+    manuallyEscalatedTickets: number
 }
 
 /**

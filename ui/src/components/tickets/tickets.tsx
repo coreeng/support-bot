@@ -27,7 +27,7 @@ export default function TicketsPage() {
     const columnCount = isAssignmentEnabled ? BASE_COLUMN_COUNT + 1 : BASE_COLUMN_COUNT
     const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
     const isViewingAllTeams = contextIsViewingAllTeams ?? (effectiveTeams.length === 0 && !hasNoTeamScope)
-    type TicketDateFilter = 'all' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
+    type TicketDateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
     type SortColumn = 'openedAt' | 'closedAt'
 
     // Selected ticket (UI-only — not persisted in the URL)
@@ -56,7 +56,7 @@ export default function TicketsPage() {
             page: '0',
         },
         {
-            dateFilter: enumValidator(['all', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, 'lastWeek'),
+            dateFilter: enumValidator(['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, 'lastWeek'),
             dateFrom: isoDateValidator,
             dateTo: isoDateValidator,
             status: enumValidator(['', 'opened', 'closed', 'stale'] as const, ''),
@@ -99,7 +99,6 @@ export default function TicketsPage() {
                 dateFilter,
                 customDateRange: { start: params.dateFrom || undefined, end: params.dateTo || undefined },
                 customValue: 'custom',
-                allValue: 'all',
                 fallbackValue: 'lastWeek',
                 presetDays: {
                     lastWeek: PRESET_DAYS.lastWeek,
@@ -327,7 +326,7 @@ export default function TicketsPage() {
                         ? { dateFilter: next, dateFrom: '', dateTo: '' }
                         : { dateFilter: next })
                 }} className="p-2 border rounded">
-                    <option value="all">Any Date</option>
+                    <option value="">Any Date</option>
                     <option value="lastWeek">Last Week</option>
                     <option value="last2Weeks">Last 2 Weeks</option>
                     <option value="lastMonth">Last Month</option>

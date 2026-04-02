@@ -264,23 +264,11 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                     COUNT(*) FILTER (WHERE status IN ('OPEN', 'ESCALATED', 'CHANGES_REQUESTED', 'APPROVED')) AS open_count,
                     COUNT(*) FILTER (WHERE status = 'ESCALATED') AS escalated_count,
                     COUNT(*) FILTER (WHERE sla_deadline < COALESCE(closed_at, now())) AS breached_count,
-                    COUNT(DISTINCT ticket_id) FILTER (
-                        WHERE EXISTS (
-                            SELECT 1 FROM escalation e
-                            WHERE e.ticket_id = sub.ticket_id AND e.source = ?
-                        )
-                    ) AS bot_escalated_count,
-                    COUNT(DISTINCT ticket_id) FILTER (
-                        WHERE EXISTS (
-                            SELECT 1 FROM escalation e
-                            WHERE e.ticket_id = sub.ticket_id AND e.source = ?
-                        )
-                    ) AS manual_escalated_count,
                     percentile_cont(0.5) WITHIN GROUP (ORDER BY lifetime) AS p50,
                     percentile_cont(0.9) WITHIN GROUP (ORDER BY lifetime) AS p90,
                     percentile_cont(0.99) WITHIN GROUP (ORDER BY lifetime) AS p99
                 FROM (
-                    SELECT github_repo, owning_team, status, sla_deadline, closed_at, ticket_id,
+                    SELECT github_repo, owning_team, status, sla_deadline, closed_at,
                         EXTRACT(EPOCH FROM
                             CASE WHEN closed_at IS NOT NULL THEN closed_at - pr_created_at
                                  ELSE now() - pr_created_at END
@@ -301,8 +289,6 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                         r.get("open_count", Long.class),
                         r.get("escalated_count", Long.class),
                         r.get("breached_count", Long.class),
-                        nullToZero(r.get("bot_escalated_count", Long.class)),
-                        nullToZero(r.get("manual_escalated_count", Long.class)),
                         nullToZero(r.get("p50", Double.class)),
                         nullToZero(r.get("p90", Double.class)),
                         nullToZero(r.get("p99", Double.class))));
