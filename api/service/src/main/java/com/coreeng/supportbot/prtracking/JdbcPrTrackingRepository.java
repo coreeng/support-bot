@@ -159,8 +159,8 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                         r.get("open_count", Long.class),
                         r.get("escalated_count", Long.class),
                         r.get("breached_count", Long.class),
-                        r.get("bot_escalated_count", Long.class),
-                        r.get("manual_escalated_count", Long.class),
+                        nullToZero(r.get("bot_escalated_count", Long.class)),
+                        nullToZero(r.get("manual_escalated_count", Long.class)),
                         nullToZero(r.get("p50", Double.class)),
                         nullToZero(r.get("p90", Double.class)),
                         nullToZero(r.get("p99", Double.class))));
