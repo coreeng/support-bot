@@ -27,13 +27,17 @@ function today(): string {
     return new Date().toISOString().split('T')[0]
 }
 
-type SortKey = 'severity' | 'repo' | 'team' | 'prCount' | 'openCount' | 'escalatedCount' | 'breachedCount' | 'p50' | 'p90' | 'p99'
+type SortKey = 'severity' | 'repo' | 'team' | 'prCount' | 'openCount' | 'escalatedCount' | 'breachedCount' | 'interventionRate' | 'p50' | 'p90' | 'p99'
 type SortDir = 'asc' | 'desc'
 
 function durationStyle(seconds: number): string {
     if (seconds < 14400) return 'text-emerald-700 bg-emerald-50 ring-emerald-200'
     if (seconds < 86400) return 'text-amber-700 bg-amber-50 ring-amber-200'
     return 'text-red-700 bg-red-50 ring-red-200'
+}
+
+function repoInterventionRate(r: RepoInsights): number {
+    return r.prCount > 0 ? (r.manualEscalatedCount ?? 0) / r.prCount : 0
 }
 
 function compareBySeverity(a: RepoInsights, b: RepoInsights): number {
@@ -52,6 +56,7 @@ function compareByKey(a: RepoInsights, b: RepoInsights, key: SortKey, dir: SortD
         case 'openCount': cmp = a.openCount - b.openCount; break
         case 'escalatedCount': cmp = a.escalatedCount - b.escalatedCount; break
         case 'breachedCount': cmp = a.breachedCount - b.breachedCount; break
+        case 'interventionRate': cmp = repoInterventionRate(a) - repoInterventionRate(b); break
         case 'p50': cmp = a.p50Seconds - b.p50Seconds; break
         case 'p90': cmp = a.p90Seconds - b.p90Seconds; break
         case 'p99': cmp = a.p99Seconds - b.p99Seconds; break
@@ -296,6 +301,7 @@ export default function TenantRequestsPage() {
                                     <SortHeader label="Open" sortKey="openCount" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                                     <SortHeader label="Escalated" sortKey="escalatedCount" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                                     <SortHeader label="Breached" sortKey="breachedCount" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                                    <SortHeader label="Intervention %" sortKey="interventionRate" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} tooltip="% of PRs requiring manual engineer escalation" />
                                     <SortHeader label="p50" sortKey="p50" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} tooltip="50% of PRs are resolved within this time" />
                                     <SortHeader label="p90" sortKey="p90" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} tooltip="90% of PRs are resolved within this time" />
                                     <SortHeader label="p99" sortKey="p99" last activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} tooltip="99% of PRs are resolved within this time" />
@@ -313,6 +319,9 @@ export default function TenantRequestsPage() {
                                         </td>
                                         <td className="px-3 py-3.5 text-right">
                                             <Badge value={repo.breachedCount} accent="red" />
+                                        </td>
+                                        <td className="px-3 py-3.5 text-right">
+                                            <InterventionBadge repo={repo} />
                                         </td>
                                         <td className="px-3 py-3.5 text-right">
                                             <DurationPill seconds={repo.p50Seconds} />
@@ -469,6 +478,18 @@ function Badge({ value, accent }: { value: number; accent: 'amber' | 'red' }) {
     return (
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${style}`}>
             {value}
+        </span>
+    )
+}
+
+function InterventionBadge({ repo }: { repo: RepoInsights }) {
+    const manual = repo.manualEscalatedCount ?? 0
+    if (manual === 0) return <span className="text-slate-300 tabular-nums">0%</span>
+    const percent = repo.prCount > 0 ? Math.round((manual / repo.prCount) * 100) : 0
+    const label = percent === 0 ? '<1%' : `${percent}%`
+    return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 ring-1 ring-violet-600/20">
+            {label}
         </span>
     )
 }

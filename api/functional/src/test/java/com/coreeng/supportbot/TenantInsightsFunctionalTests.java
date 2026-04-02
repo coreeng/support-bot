@@ -27,6 +27,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @ExtendWith(TestKitExtension.class)
 public class TenantInsightsFunctionalTests {
 
+    private static final String ESCALATION_SOURCE_BOT = "bot";
+    private static final String ESCALATION_SOURCE_MANUAL = "manual";
+
     private TestKit testKit;
     private Config config;
     private SupportBotClient supportBotClient;
@@ -74,6 +77,33 @@ public class TenantInsightsFunctionalTests {
         assertThat(results)
                 .extracting(RepoInsights::repo)
                 .contains("test-org/pr-insights-networking", "test-org/pr-insights-storage");
+    }
+
+    @Test
+    public void returnsPerRepoEscalationCounts() {
+        // given — two tickets: one with bot escalation, one with manual
+        String repoName = "test-org/pr-insights-esc-counts";
+        long botTicket = createTicket();
+        long manualTicket = createTicket();
+        Instant fiveDaysAgo = Instant.now().minus(Duration.ofDays(5));
+
+        createPr(botTicket, repoName, 901, fiveDaysAgo, "platform");
+        createPr(manualTicket, repoName, 902, fiveDaysAgo, "platform");
+
+        escalateTicket(botTicket, "platform", ESCALATION_SOURCE_BOT);
+        escalateTicket(manualTicket, "platform", ESCALATION_SOURCE_MANUAL);
+
+        // when — querying all-time
+        List<RepoInsights> results = getAllTimeStats();
+
+        // then — per-repo counts reflect escalation sources
+        assertThat(results).extracting(RepoInsights::repo).contains(repoName);
+        RepoInsights repo = results.stream()
+                .filter(r -> r.repo().equals(repoName))
+                .findFirst()
+                .orElseThrow();
+        assertThat(repo.botEscalatedCount()).isEqualTo(1);
+        assertThat(repo.manualEscalatedCount()).isEqualTo(1);
     }
 
     @Test
@@ -140,8 +170,8 @@ public class TenantInsightsFunctionalTests {
         createPr(manualTicket, "test-org/pr-insights-esc", 802, prCreatedAt, "wow");
         createPr(noEscTicket, "test-org/pr-insights-esc", 803, prCreatedAt, "wow");
 
-        escalateTicket(botTicket, "wow", "bot");
-        escalateTicket(manualTicket, "wow", "manual");
+        escalateTicket(botTicket, "wow", ESCALATION_SOURCE_BOT);
+        escalateTicket(manualTicket, "wow", ESCALATION_SOURCE_MANUAL);
 
         // when
         var response = getEscalationBreakdown(null, null);
@@ -157,7 +187,7 @@ public class TenantInsightsFunctionalTests {
         // given — a PR ticket with bot escalation created now
         long ticketId = createTicket();
         createPr(ticketId, "test-org/pr-insights-esc", 810, Instant.now().minus(Duration.ofHours(1)), "wow");
-        escalateTicket(ticketId, "wow", "bot");
+        escalateTicket(ticketId, "wow", ESCALATION_SOURCE_BOT);
 
         // when — querying a future date range
         var response = getEscalationBreakdown(LocalDate.of(2099, 1, 1), LocalDate.of(2099, 12, 31));
@@ -202,6 +232,8 @@ public class TenantInsightsFunctionalTests {
             long openCount,
             long escalatedCount,
             long breachedCount,
+            long botEscalatedCount,
+            long manualEscalatedCount,
             double p50Seconds,
             double p90Seconds,
             double p99Seconds) {}

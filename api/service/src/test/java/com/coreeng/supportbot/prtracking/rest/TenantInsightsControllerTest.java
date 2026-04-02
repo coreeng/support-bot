@@ -40,7 +40,7 @@ class TenantInsightsControllerTest {
         // given a repo with 10 PRs, 2 open, 1 escalated, 3 breached SLA
         LocalDate from = LocalDate.of(2026, 3, 1);
         List<RepoInsights> insights =
-                List.of(new RepoInsights("org/repo-a", "team-foo", 10, 2, 1, 3, 3600.0, 7200.0, 86400.0));
+                List.of(new RepoInsights("org/repo-a", "team-foo", 10, 2, 1, 3, 1, 1, 3600.0, 7200.0, 86400.0));
         when(prTrackingRepository.getInsightsByRepo(from, TO)).thenReturn(insights);
 
         // when requesting with a date range
@@ -58,8 +58,8 @@ class TenantInsightsControllerTest {
         // given two repos owned by different teams, with escalations and breaches
         LocalDate from = LocalDate.of(2026, 2, 1);
         List<RepoInsights> insights = List.of(
-                new RepoInsights("org/repo-a", "team-foo", 5, 1, 1, 2, 3600.0, 7200.0, 86400.0),
-                new RepoInsights("org/repo-b", "team-bar", 3, 0, 0, 0, 1800.0, 3600.0, 43200.0));
+                new RepoInsights("org/repo-a", "team-foo", 5, 1, 1, 2, 1, 0, 3600.0, 7200.0, 86400.0),
+                new RepoInsights("org/repo-b", "team-bar", 3, 0, 0, 0, 0, 0, 1800.0, 3600.0, 43200.0));
         when(prTrackingRepository.getInsightsByRepo(from, TO)).thenReturn(insights);
 
         // when requesting stats
