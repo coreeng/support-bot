@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, Info, BarChart3, Eye } from 'lucide-react'
 import * as Tooltip from '@radix-ui/react-tooltip'
-import { useTenantInsightsStats } from '@/lib/hooks'
+import { useTenantInsightsStats, useEscalationBreakdown } from '@/lib/hooks'
 import { useUrlParams, enumValidator, isoDateValidator } from '@/lib/hooks/useUrlParams'
 import { getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 import { formatDuration } from '@/lib/utils/format'
@@ -81,6 +81,8 @@ export default function TenantRequestsPage() {
             getDateRangeFromFilter({
                 dateFilter,
                 customDateRange: { start: params.dateFrom || undefined, end: params.dateTo || undefined },
+                customValue: 'custom',
+                fallbackValue: 'lastMonth',
                 presetDays: {
                     lastWeek: PRESET_DAYS.lastWeek,
                     last2Weeks: PRESET_DAYS.last2Weeks,
@@ -97,16 +99,16 @@ export default function TenantRequestsPage() {
     const [page, setPage] = useState(0)
     const pageSize = 20
 
-    const { data: realRepos, isLoading, error } = useTenantInsightsStats(
+    const { data: realRepos, isLoading: statsLoading, error: statsError } = useTenantInsightsStats(
         isDateRangeValid ? dateRange.from : undefined,
         isDateRangeValid ? dateRange.to : undefined,
         isDateRangeValid && activeTab === 'stats'
     )
 
     const { data: breakdown, isLoading: breakdownLoading, error: breakdownError } = useEscalationBreakdown(
-        isDateRangeValid ? dateFrom : undefined,
-        isDateRangeValid ? dateTo : undefined,
-        isDateRangeValid
+        isDateRangeValid ? dateRange.from : undefined,
+        isDateRangeValid ? dateRange.to : undefined,
+        isDateRangeValid && activeTab === 'stats'
     )
 
     const isLoading = statsLoading || breakdownLoading
@@ -160,7 +162,6 @@ export default function TenantRequestsPage() {
         setSearch(value)
         setPage(0)
     }
-
 
     const repoCount = repos.length
 
@@ -268,7 +269,7 @@ export default function TenantRequestsPage() {
                                     <p className="text-xs text-slate-400 mt-0.5">Pull request tracking across repositories</p>
                                 </div>
 
-                                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                                <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
                                     <StatCard
                                         label="Repositories"
                                         value={repoCount}
@@ -303,6 +304,15 @@ export default function TenantRequestsPage() {
                                         isLoading={isLoading}
                                         gradient={totals.breachedCount > 0 ? 'from-rose-500 to-red-600' : 'from-emerald-500 to-emerald-600'}
                                         iconBg={totals.breachedCount > 0 ? 'bg-rose-400/30' : 'bg-emerald-400/30'}
+                                    />
+                                    <StatCard
+                                        label="Intervention Rate"
+                                        value={interventionRate}
+                                        suffix="%"
+                                        isLoading={isLoading}
+                                        gradient={interventionRate !== null && interventionRate > 0 ? 'from-violet-500 to-purple-600' : 'from-emerald-500 to-emerald-600'}
+                                        iconBg={interventionRate !== null && interventionRate > 0 ? 'bg-violet-400/30' : 'bg-emerald-400/30'}
+                                        tooltip="% of PR tickets requiring manual engineer escalation"
                                     />
                                 </div>
 
