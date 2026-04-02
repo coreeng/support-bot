@@ -10,6 +10,7 @@ const mockUseEscalationBreakdown = jest.fn()
 jest.mock('../../../lib/hooks', () => ({
     useTenantInsightsStats: (...args: unknown[]) => mockUseTenantInsightsStats(...args),
     useEscalationBreakdown: (...args: unknown[]) => mockUseEscalationBreakdown(...args),
+    useInFlightPrs: () => ({ data: [], isLoading: false, error: null }),
 }))
 
 jest.mock('../../../lib/utils/format', () => ({
@@ -713,6 +714,32 @@ describe('TenantRequestsPage', () => {
 
             const purpleCard = container.querySelector('[class*="from-violet"]')
             expect(purpleCard).toBeInTheDocument()
+        })
+    })
+
+    describe('Tab Navigation', () => {
+        it('should show stats content by default', () => {
+            render(<TenantRequestsPage />)
+
+            expect(screen.getByRole('combobox')).toBeInTheDocument() // date filter only on stats tab
+            expect(screen.getByRole('heading', { name: 'PR Activity & SLA Health' })).toBeInTheDocument()
+        })
+
+        it('should call router.replace with tab=inflight when In-Flight PRs tab clicked', () => {
+            render(<TenantRequestsPage />)
+
+            fireEvent.click(screen.getByText('In-Flight PRs'))
+
+            expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('tab=inflight'))
+        })
+
+        it('should hide date filter and show In-Flight PRs content when inflight tab is active', () => {
+            mockUseSearchParams.mockReturnValue(new URLSearchParams('tab=inflight'))
+            render(<TenantRequestsPage />)
+
+            // date filter options (Last Month etc.) are hidden when inflight tab is active
+            expect(screen.queryByRole('option', { name: 'Last Month' })).not.toBeInTheDocument()
+            expect(screen.getByRole('heading', { name: 'In-Flight PRs' })).toBeInTheDocument()
         })
     })
 })

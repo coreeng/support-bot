@@ -3,6 +3,7 @@ package com.coreeng.supportbot.github;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -399,6 +400,23 @@ class Hub4jGitHubClientTest {
         // then
         assertThat(result.reviews()).hasSize(1);
         assertThat(result.reviews().get(0).state()).isEqualTo(GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED);
+    }
+
+    @Test
+    void getPullRequestThrowsOnRequestedTeamsIOException() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "open");
+        doThrow(new IOException("teams API failed")).when(pr).getRequestedTeams();
+
+        // when / then — IOException from team-member resolution propagates so callers can skip the PR
+        assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("my-org/my-repo#42");
     }
 
     @Test
