@@ -1,5 +1,6 @@
 import {NextRequest, NextResponse} from "next/server";
 import {publicFetch} from "../../../_lib/public-fetch";
+import {resolvePublicOrigin} from "@/lib/server/resolve-public-origin";
 import {sanitizeCallbackUrl} from "@/lib/utils/url";
 
 export async function GET(
@@ -9,10 +10,11 @@ export async function GET(
   const { provider } = await params;
 
   if (provider === "google" || provider === "azure" || provider === "dex") {
-    // Must match the URL Dex/Google/Azure redirect the browser to (same origin as this request).
+    // Public origin for redirect_uri (must match IdP / Dex client config). Prefer NEXTAUTH_URL and
+    // X-Forwarded-* behind ingress; request.nextUrl.origin is often wrong in-cluster (e.g. 0.0.0.0:3000).
     const redirectUri = new URL(
       `/api/oauth/callback/${provider}`,
-      request.nextUrl.origin
+      resolvePublicOrigin(request)
     ).toString();
 
     const urlParams = new URLSearchParams({provider, redirectUri});

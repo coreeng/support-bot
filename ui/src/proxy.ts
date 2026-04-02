@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { computePublicOrigin } from "@/lib/server/resolve-public-origin";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -13,9 +14,17 @@ const protectedProxy = auth((req) => {
   const isLoggedIn = !!session?.user;
   const { pathname } = nextUrl;
 
-  // Redirect unauthenticated users to login
+  // Redirect unauthenticated users to login (public origin: ingress / NEXTAUTH_URL, not pod bind 0.0.0.0)
   if (!isLoggedIn) {
-    const loginUrl = new URL("/login", nextUrl.origin);
+    const loginUrl = new URL(
+      "/login",
+      computePublicOrigin({
+        nextAuthUrl: process.env.NEXTAUTH_URL,
+        forwardedHost: req.headers.get("x-forwarded-host"),
+        forwardedProto: req.headers.get("x-forwarded-proto"),
+        fallbackOrigin: nextUrl.origin,
+      })
+    );
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
