@@ -66,7 +66,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, logout } = useAuth()
     const { hasFullAccess, selectedTeam } = useTeamFilter()
     const { data: isKnowledgeGapsEnabled, error: knowledgeGapsError } = useKnowledgeGapsEnabled()
-    const { data: isTenantInsightsEnabled, error: tenantInsightsError } = useTenantInsightsEnabled()
+    // const { data: isTenantInsightsEnabled, error: tenantInsightsError } = useTenantInsightsEnabled()
+  const isTenantInsightsEnabled = true   // or false
+  const tenantInsightsError = null
 
     if (knowledgeGapsError) console.warn('Failed to check knowledge-gaps feature flag:', knowledgeGapsError)
     if (tenantInsightsError) console.warn('Failed to check tenant-insights feature flag:', tenantInsightsError)

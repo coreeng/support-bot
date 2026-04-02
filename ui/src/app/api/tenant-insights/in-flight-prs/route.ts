@@ -6,16 +6,14 @@ import {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const dateFrom = searchParams.get("dateFrom");
-  const dateTo = searchParams.get("dateTo");
+  const team = searchParams.get("team");
 
   const params = new URLSearchParams();
-  if (dateFrom) params.append("dateFrom", dateFrom);
-  if (dateTo) params.append("dateTo", dateTo);
+  if (team) params.append("team", team);
   const query = params.toString();
 
   const response = await backendFetch(
-    `/tenant-insights/pr-stats${query ? `?${query}` : ""}`
+    `/tenant-insights/in-flight-prs${query ? `?${query}` : ""}`
   );
   if (!response) return unauthorizedResponse();
 

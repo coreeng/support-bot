@@ -90,8 +90,6 @@ export interface RepoInsights {
     openCount: number
     escalatedCount: number
     breachedCount: number
-    botEscalatedCount: number
-    manualEscalatedCount: number
     p50Seconds: number
     p90Seconds: number
     p99Seconds: number
@@ -104,6 +102,27 @@ export interface EscalationBreakdown {
     totalPrTickets: number
     botEscalatedTickets: number
     manuallyEscalatedTickets: number
+}
+
+/**
+ * A single in-flight (currently open) pull request returned by
+ * /tenant-insights/in-flight-prs
+ */
+export interface InFlightPr {
+    githubRepo: string
+    prNumber: number
+    prUrl: string
+    status: string
+    waitingOn: string
+    prCreatedAt: string
+    slaDeadline: string | null
+    slaRemainingSeconds: number | null
+    lastReviewAt: string | null
+    owningTeam: string
+    owningTeamLabel: string
+    ticketChannelId: string
+    ticketQueryTs: string
+    escalatedAt: string | null
 }
 
 /**

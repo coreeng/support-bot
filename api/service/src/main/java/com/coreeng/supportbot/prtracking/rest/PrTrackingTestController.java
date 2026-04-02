@@ -9,9 +9,12 @@ import com.coreeng.supportbot.prtracking.PrTrackingRepository;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,17 +38,28 @@ public class PrTrackingTestController {
 
     @PostMapping("/record")
     public PrTrackingRecord createRecord(@RequestBody PrTrackingToCreate request) {
+        boolean canAutoClose = request.canAutoCloseTicket() == null || request.canAutoCloseTicket();
         PrTrackingRecord created = prTrackingRepository.insertIfAbsent(new NewPrTracking(
                 request.ticketId(),
                 request.githubRepo(),
                 request.prNumber(),
                 request.prCreatedAt(),
                 request.slaDeadline(),
-                request.owningTeam()));
+                request.owningTeam(),
+                canAutoClose));
         if (created == null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "PR tracking record already exists");
         }
         return created;
+    }
+
+    @GetMapping("/record/{id}")
+    public PrTrackingRecord getRecord(@PathVariable long id) {
+        PrTrackingRecord record = prTrackingRepository.findById(id);
+        if (record == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "PR tracking record not found");
+        }
+        return record;
     }
 
     @PostMapping("/cleanup")
@@ -59,5 +73,6 @@ public class PrTrackingTestController {
             int prNumber,
             Instant prCreatedAt,
             Instant slaDeadline,
-            String owningTeam) {}
+            String owningTeam,
+            @Nullable Boolean canAutoCloseTicket) {}
 }

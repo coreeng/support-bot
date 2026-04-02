@@ -1,5 +1,6 @@
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import TenantRequestsPage from '../tenant-requests'
 import type { RepoInsights } from '../../../lib/types/dashboard'
 
@@ -9,6 +10,7 @@ const mockUseEscalationBreakdown = jest.fn()
 jest.mock('../../../lib/hooks', () => ({
     useTenantInsightsStats: (...args: unknown[]) => mockUseTenantInsightsStats(...args),
     useEscalationBreakdown: (...args: unknown[]) => mockUseEscalationBreakdown(...args),
+    useInFlightPrs: () => ({ data: [], isLoading: false, error: null }),
 }))
 
 jest.mock('../../../lib/utils/format', () => ({
@@ -19,6 +21,17 @@ jest.mock('../../../lib/utils/format', () => ({
     },
 }))
 
+jest.mock('next/navigation', () => ({
+    useRouter: jest.fn(),
+    useSearchParams: jest.fn(),
+    usePathname: jest.fn(),
+}))
+
+const mockUseRouter = useRouter as jest.Mock
+const mockUseSearchParams = useSearchParams as jest.Mock
+const mockUsePathname = usePathname as jest.Mock
+const mockReplace = jest.fn()
+
 function makeRepo(overrides: Partial<RepoInsights> = {}): RepoInsights {
     return {
         repo: 'org/service-a',
@@ -27,8 +40,6 @@ function makeRepo(overrides: Partial<RepoInsights> = {}): RepoInsights {
         openCount: 2,
         escalatedCount: 1,
         breachedCount: 0,
-        botEscalatedCount: 0,
-        manualEscalatedCount: 0,
         p50Seconds: 3600,
         p90Seconds: 14400,
         p99Seconds: 86400,
@@ -53,6 +64,9 @@ describe('TenantRequestsPage', () => {
         jest.clearAllMocks()
         mockUseTenantInsightsStats.mockReturnValue({ data: [], isLoading: false, error: null })
         mockUseEscalationBreakdown.mockReturnValue({ data: undefined })
+        mockUseRouter.mockReturnValue({ replace: mockReplace, push: jest.fn() })
+        mockUseSearchParams.mockReturnValue(new URLSearchParams())
+        mockUsePathname.mockReturnValue('/')
     })
 
     describe('Rendering', () => {
@@ -60,17 +74,17 @@ describe('TenantRequestsPage', () => {
             render(<TenantRequestsPage />)
 
             expect(screen.getByText('Tenant Requests')).toBeInTheDocument()
-            expect(screen.getByText('PR Activity & SLA Health')).toBeInTheDocument()
+            expect(screen.getByRole('heading', { name: 'PR Activity & SLA Health' })).toBeInTheDocument()
         })
 
-        it('should render all date preset buttons', () => {
+        it('should render date filter select', () => {
             render(<TenantRequestsPage />)
 
-            expect(screen.getByText('7 Days')).toBeInTheDocument()
-            expect(screen.getByText('30 Days')).toBeInTheDocument()
-            expect(screen.getByText('90 Days')).toBeInTheDocument()
-            expect(screen.getByText('1 Year')).toBeInTheDocument()
-            expect(screen.getByText('Custom')).toBeInTheDocument()
+            expect(screen.getByRole('combobox')).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Last Week' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Last Month' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Last Year' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Custom' })).toBeInTheDocument()
         })
 
         it('should render stat cards with aggregated totals', () => {
@@ -98,8 +112,8 @@ describe('TenantRequestsPage', () => {
             render(<TenantRequestsPage />)
 
             const headers = screen.getAllByRole('columnheader')
-            expect(headers).toHaveLength(10)
-            ;['Repository', 'Team', 'PRs', 'Open', 'Escalated', 'Breached', 'Intervention %', 'p50', 'p90', 'p99'].forEach(label => {
+            expect(headers).toHaveLength(9)
+            ;['Repository', 'Team', 'PRs', 'Open', 'Escalated', 'Breached', 'p50', 'p90', 'p99'].forEach(label => {
                 expect(screen.getAllByText(label).length).toBeGreaterThanOrEqual(1)
             })
         })
@@ -110,7 +124,7 @@ describe('TenantRequestsPage', () => {
             const { container } = render(<TenantRequestsPage />)
 
             const infoIcons = container.querySelectorAll('.lucide-info')
-            expect(infoIcons).toHaveLength(4) // intervention %, p50, p90, p99
+            expect(infoIcons).toHaveLength(3) // p50, p90, p99
         })
 
         it('should render repo row with formatted durations', () => {
@@ -193,26 +207,33 @@ describe('TenantRequestsPage', () => {
     })
 
     describe('Date Presets', () => {
-        it('should default to 30 Days preset', () => {
+        it('should render date filter select with expected options', () => {
             render(<TenantRequestsPage />)
 
-            const activeButton = screen.getByText('30 Days')
-            expect(activeButton.className).toContain('bg-white')
+            expect(screen.getByRole('combobox')).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Last Week' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Last Month' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Last Year' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Custom' })).toBeInTheDocument()
         })
 
-        it('should switch active preset on click', () => {
+        it('should default to last month in date filter', () => {
             render(<TenantRequestsPage />)
 
-            fireEvent.click(screen.getByText('7 Days'))
-
-            expect(screen.getByText('7 Days').className).toContain('bg-white')
-            expect(screen.getByText('30 Days').className).not.toContain('bg-white')
+            expect(screen.getByDisplayValue('Last Month')).toBeInTheDocument()
         })
 
-        it('should call hooks with updated dates when preset changes', () => {
+        it('should call router.replace when date filter changes', () => {
             render(<TenantRequestsPage />)
 
-            fireEvent.click(screen.getByText('90 Days'))
+            fireEvent.change(screen.getByRole('combobox'), { target: { value: 'lastWeek' } })
+
+            expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('dateFilter=lastWeek'))
+        })
+
+        it('should call hooks with dates matching the selected preset', () => {
+            mockUseSearchParams.mockReturnValue(new URLSearchParams('dateFilter=lastYear'))
+            render(<TenantRequestsPage />)
 
             const statsCall = mockUseTenantInsightsStats.mock.calls.at(-1)
             const breakdownCall = mockUseEscalationBreakdown.mock.calls.at(-1)
@@ -223,9 +244,8 @@ describe('TenantRequestsPage', () => {
         })
 
         it('should show date pickers when Custom is selected', () => {
+            mockUseSearchParams.mockReturnValue(new URLSearchParams('dateFilter=custom'))
             const { container } = render(<TenantRequestsPage />)
-
-            fireEvent.click(screen.getByText('Custom'))
 
             const dateInputs = container.querySelectorAll('input[type="date"]')
             expect(dateInputs).toHaveLength(2)
@@ -239,15 +259,12 @@ describe('TenantRequestsPage', () => {
         })
 
         it('should show invalid range message when dateFrom > dateTo', () => {
-            const { container } = render(<TenantRequestsPage />)
+            mockUseSearchParams.mockReturnValue(
+                new URLSearchParams('dateFilter=custom&dateFrom=2026-03-25&dateTo=2026-03-01')
+            )
+            render(<TenantRequestsPage />)
 
-            fireEvent.click(screen.getByText('Custom'))
-            const dateInputs = container.querySelectorAll('input[type="date"]')
-
-            fireEvent.change(dateInputs[0], { target: { value: '2026-03-25' } })
-            fireEvent.change(dateInputs[1], { target: { value: '2026-03-01' } })
-
-            expect(screen.getByText('Invalid range')).toBeInTheDocument()
+            expect(screen.getByText(/Invalid range/)).toBeInTheDocument()
         })
     })
 
@@ -323,9 +340,9 @@ describe('TenantRequestsPage', () => {
 
     describe('Sorting', () => {
         const repos = [
-            makeRepo({ repo: 'org/zebra', prCount: 5, breachedCount: 0, escalatedCount: 0, manualEscalatedCount: 0 }),
-            makeRepo({ repo: 'org/alpha', prCount: 20, breachedCount: 3, escalatedCount: 1, manualEscalatedCount: 10 }),
-            makeRepo({ repo: 'org/middle', prCount: 10, breachedCount: 1, escalatedCount: 2, manualEscalatedCount: 1 }),
+            makeRepo({ repo: 'org/zebra', prCount: 5, breachedCount: 0, escalatedCount: 0 }),
+            makeRepo({ repo: 'org/alpha', prCount: 20, breachedCount: 3, escalatedCount: 1 }),
+            makeRepo({ repo: 'org/middle', prCount: 10, breachedCount: 1, escalatedCount: 2 }),
         ]
 
         beforeEach(() => {
@@ -388,17 +405,6 @@ describe('TenantRequestsPage', () => {
             fireEvent.click(screen.getByText('Repository'))
 
             expect(screen.getByText(/Page 1/)).toBeInTheDocument()
-        })
-
-        it('should sort by intervention rate descending when column clicked', () => {
-            render(<TenantRequestsPage />)
-
-            fireEvent.click(screen.getByText('Intervention %'))
-
-            const rows = screen.getAllByRole('row').slice(1)
-            expect(rows[0]).toHaveTextContent('org/alpha')   // 50% (10/20)
-            expect(rows[1]).toHaveTextContent('org/middle')  // 10% (1/10)
-            expect(rows[2]).toHaveTextContent('org/zebra')   // 0% (0/5)
         })
     })
 
@@ -500,43 +506,6 @@ describe('TenantRequestsPage', () => {
             const amberBadge = container.querySelector('.bg-amber-50')
             expect(amberBadge).toBeInTheDocument()
             expect(amberBadge!.textContent).toBe('3')
-        })
-
-        it('should show violet badge for intervention rate > 0', () => {
-            mockUseTenantInsightsStats.mockReturnValue({
-                data: [makeRepo({ prCount: 10, manualEscalatedCount: 3 })],
-                isLoading: false,
-            })
-
-            const { container } = render(<TenantRequestsPage />)
-
-            const violetBadge = container.querySelector('.bg-violet-50')
-            expect(violetBadge).toBeInTheDocument()
-            expect(violetBadge!.textContent).toBe('30%')
-        })
-
-        it('should show muted 0% for intervention rate when no manual escalations', () => {
-            mockUseTenantInsightsStats.mockReturnValue({
-                data: [makeRepo({ prCount: 10, manualEscalatedCount: 0 })],
-                isLoading: false,
-            })
-
-            render(<TenantRequestsPage />)
-
-            expect(screen.getByText('0%')).toBeInTheDocument()
-        })
-
-        it('should show <1% badge when rate rounds to zero but manual escalations exist', () => {
-            mockUseTenantInsightsStats.mockReturnValue({
-                data: [makeRepo({ prCount: 300, manualEscalatedCount: 1 })],
-                isLoading: false,
-            })
-
-            const { container } = render(<TenantRequestsPage />)
-
-            const violetBadge = container.querySelector('.bg-violet-50')
-            expect(violetBadge).toBeInTheDocument()
-            expect(violetBadge!.textContent).toBe('<1%')
         })
 
         it('should show red badge for breached > 0', () => {
@@ -695,6 +664,32 @@ describe('TenantRequestsPage', () => {
 
             const purpleCard = container.querySelector('[class*="from-violet"]')
             expect(purpleCard).toBeInTheDocument()
+        })
+    })
+
+    describe('Tab Navigation', () => {
+        it('should show stats content by default', () => {
+            render(<TenantRequestsPage />)
+
+            expect(screen.getByRole('combobox')).toBeInTheDocument() // date filter only on stats tab
+            expect(screen.getByRole('heading', { name: 'PR Activity & SLA Health' })).toBeInTheDocument()
+        })
+
+        it('should call router.replace with tab=inflight when In-Flight PRs tab clicked', () => {
+            render(<TenantRequestsPage />)
+
+            fireEvent.click(screen.getByText('In-Flight PRs'))
+
+            expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('tab=inflight'))
+        })
+
+        it('should hide date filter and show In-Flight PRs content when inflight tab is active', () => {
+            mockUseSearchParams.mockReturnValue(new URLSearchParams('tab=inflight'))
+            render(<TenantRequestsPage />)
+
+            // date filter options (Last Month etc.) are hidden when inflight tab is active
+            expect(screen.queryByRole('option', { name: 'Last Month' })).not.toBeInTheDocument()
+            expect(screen.getByRole('heading', { name: 'In-Flight PRs' })).toBeInTheDocument()
         })
     })
 })
