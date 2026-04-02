@@ -548,8 +548,8 @@ class PrLifecyclePollerTest {
                     null);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
-                    .thenReturn(openPrWithReviews(
-                            record, List.of(review(GitHubPullRequestReview.ReviewState.APPROVED))));
+                    .thenReturn(
+                            openPrWithReviews(record, List.of(review(GitHubPullRequestReview.ReviewState.APPROVED))));
 
             // when
             poller.poll();
