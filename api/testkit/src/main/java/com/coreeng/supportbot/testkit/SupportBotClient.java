@@ -139,6 +139,27 @@ public class SupportBotClient {
                 .as(TicketResponse.class);
     }
 
+    public TeamSuggestionsResponse getTeamSuggestions(long ticketId) {
+        return given().config(REST_ASSURED_CONFIG)
+                .when()
+                .get(baseUrl + "/ticket/{id}/team-suggestions", ticketId)
+                .then()
+                .log()
+                .ifValidationFails(LogDetail.ALL, true)
+                .statusCode(200)
+                .extract()
+                .as(TeamSuggestionsResponse.class);
+    }
+
+    public int getTeamSuggestionsStatusCode(long ticketId) {
+        return given().config(REST_ASSURED_CONFIG)
+                .when()
+                .get(baseUrl + "/ticket/{id}/team-suggestions", ticketId)
+                .then()
+                .extract()
+                .statusCode();
+    }
+
     /**
      * Find the most recently created ticket by queryTs.
      * Uses the /ticket list endpoint and filters by queryTs.
@@ -275,6 +296,14 @@ public class SupportBotClient {
     public record TicketFormMessage(MessageTs ts) {}
 
     public record Team(String label, String code, ImmutableList<@NonNull String> types) {}
+
+    @Getter
+    @Jacksonized
+    @Builder
+    public static class TeamSuggestionsResponse {
+        private ImmutableList<@NonNull String> suggestedTeams;
+        private ImmutableList<@NonNull String> otherTeams;
+    }
 
     @Builder
     @Getter

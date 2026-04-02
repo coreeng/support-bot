@@ -17,6 +17,7 @@ public class TicketController {
     private final TicketQueryService queryService;
     private final TicketUpdateService ticketUpdateService;
     private final TicketUIMapper mapper;
+    private final TicketTeamSuggestionsService teamSuggestionsService;
 
     @GetMapping
     public ResponseEntity<Page<TicketUI>> list(
@@ -74,5 +75,13 @@ public class TicketController {
         } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    @GetMapping("/{id}/team-suggestions")
+    public ResponseEntity<TicketTeamSuggestionsUI> getTeamSuggestions(@PathVariable TicketId id) {
+        return teamSuggestionsService
+                .getTeamSuggestionsForTicket(id)
+                .map(s -> ResponseEntity.ok(TicketTeamSuggestionsUI.from(s)))
+                .orElse(ResponseEntity.notFound().build());
     }
 }

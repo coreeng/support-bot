@@ -81,6 +81,11 @@ const mockTeamsData = [
     { name: 'support', code: 'support', label: 'Support', types: ['tenant'] }
 ];
 
+const mockTeamSuggestionsData = {
+    suggestedTeams: ['engineering'],
+    otherTeams: ['support']
+};
+
 const mockTicketsWithSummaries = {
     content: [
         {
@@ -161,6 +166,10 @@ const mockTicketDetails = {
 Given("Tickets API endpoints are mocked", async function (this: CustomWorld) {
     await this.page.route("**/api/tickets**", (route) => {
         const url = route.request().url();
+        if (url.includes('/team-suggestions')) {
+            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamSuggestionsData) });
+            return;
+        }
         if (url.includes('/tickets/1')) {
             route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketDetails) });
         } else {
@@ -193,6 +202,11 @@ Given("Tickets API endpoints are mocked with sample data", async function (this:
                 tags: ['bug', 'urgent']
             };
             route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(updatedTicket) });
+            return;
+        }
+
+        if (url.includes('/team-suggestions')) {
+            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamSuggestionsData) });
             return;
         }
 
@@ -277,6 +291,10 @@ Given("Tickets API endpoints are mocked with escalations and varied dates", asyn
 Given("Tickets API endpoints are mocked with summaries", async function (this: CustomWorld) {
     await this.page.route("**/api/tickets**", (route) => {
         const url = route.request().url();
+        if (url.includes('/team-suggestions')) {
+            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamSuggestionsData) });
+            return;
+        }
         if (url.includes('/tickets/1')) {
             route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketDetailsWithSummary) });
         } else if (url.includes('/tickets/2')) {
@@ -674,16 +692,16 @@ When('User selects impact {string}', async function (this: CustomWorld, impact: 
 
 When('User selects team {string}', async function (this: CustomWorld, team: string) {
     const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    let teamSelect = modal.locator('#team-select');
-    if (await teamSelect.count() === 0) {
-        teamSelect = modal.locator('label:has-text("Author\'s Team")').locator('..').locator('select').first();
-    }
-    await expect(teamSelect).toBeVisible({ timeout: 5000 });
+    const teamTrigger = modal.locator('#team-select');
+    await expect(teamTrigger).toBeVisible({ timeout: 5000 });
 
-    // Wait a moment for options to populate, then select
-    await this.page.waitForTimeout(1000);
-    const teamValue = team.toLowerCase();
-    await teamSelect.selectOption(teamValue);
+    // Click the combobox trigger to open the popover
+    await teamTrigger.click();
+
+    // Wait for the popover to appear and click the matching team option (case-insensitive)
+    const teamOption = this.page.locator('[data-radix-popper-content-wrapper]').getByText(team, { exact: false });
+    await expect(teamOption.first()).toBeVisible({ timeout: 5000 });
+    await teamOption.first().click();
 });
 
 When('User adds tag {string}', async function (this: CustomWorld, tag: string) {

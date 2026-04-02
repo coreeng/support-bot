@@ -192,6 +192,19 @@ export function useTenantTeams() {
   });
 }
 
+export interface TeamSuggestions {
+  suggestedTeams: string[];
+  otherTeams: string[];
+}
+
+export function useTeamSuggestions(ticketId: number | undefined) {
+  return useQuery<TeamSuggestions>({
+    queryKey: ["team-suggestions", ticketId],
+    queryFn: () => apiGet(`/tickets/${ticketId}/team-suggestions`),
+    enabled: !!ticketId,
+  });
+}
+
 // ===== User Hooks =====
 
 export function useSupportMembers() {

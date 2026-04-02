@@ -7,6 +7,7 @@ import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.teams.PlatformTeam;
 import com.coreeng.supportbot.teams.PlatformTeamsService;
+import com.coreeng.supportbot.ticket.TicketRepository;
 import com.coreeng.supportbot.ticket.TicketSummaryView;
 import com.coreeng.supportbot.ticket.TicketSummaryViewMapper;
 import com.coreeng.supportbot.ticket.TicketTeamSuggestionsService;
@@ -36,6 +37,9 @@ class TicketTeamSuggestionHandlerTest {
     @Mock
     private PlatformTeamsService platformTeamsService;
 
+    @Mock
+    private TicketRepository ticketRepository;
+
     private TicketTeamSuggestionHandler handler;
     private JsonMapper jsonMapper;
 
@@ -43,7 +47,7 @@ class TicketTeamSuggestionHandlerTest {
     void setUp() {
         jsonMapper = new JsonMapper();
         handler = new TicketTeamSuggestionHandler(
-                new TicketTeamSuggestionsService(slackClient, platformTeamsService),
+                new TicketTeamSuggestionsService(slackClient, platformTeamsService, ticketRepository),
                 new TicketSummaryViewMapper(jsonMapper));
     }
 
