@@ -90,6 +90,8 @@ export interface RepoInsights {
     openCount: number
     escalatedCount: number
     breachedCount: number
+    botEscalatedCount: number
+    manualEscalatedCount: number
     p50Seconds: number
     p90Seconds: number
     p99Seconds: number
