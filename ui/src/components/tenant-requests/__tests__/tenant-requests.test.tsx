@@ -1,5 +1,6 @@
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import TenantRequestsPage from '../tenant-requests'
 import type { RepoInsights } from '../../../lib/types/dashboard'
 
@@ -18,6 +19,17 @@ jest.mock('../../../lib/utils/format', () => ({
         return `${Math.round(seconds)}s`
     },
 }))
+
+jest.mock('next/navigation', () => ({
+    useRouter: jest.fn(),
+    useSearchParams: jest.fn(),
+    usePathname: jest.fn(),
+}))
+
+const mockUseRouter = useRouter as jest.Mock
+const mockUseSearchParams = useSearchParams as jest.Mock
+const mockUsePathname = usePathname as jest.Mock
+const mockReplace = jest.fn()
 
 function makeRepo(overrides: Partial<RepoInsights> = {}): RepoInsights {
     return {
@@ -53,6 +65,9 @@ describe('TenantRequestsPage', () => {
         jest.clearAllMocks()
         mockUseTenantInsightsStats.mockReturnValue({ data: [], isLoading: false, error: null })
         mockUseEscalationBreakdown.mockReturnValue({ data: undefined })
+        mockUseRouter.mockReturnValue({ replace: mockReplace, push: jest.fn() })
+        mockUseSearchParams.mockReturnValue(new URLSearchParams())
+        mockUsePathname.mockReturnValue('/')
     })
 
     describe('Rendering', () => {
@@ -60,17 +75,17 @@ describe('TenantRequestsPage', () => {
             render(<TenantRequestsPage />)
 
             expect(screen.getByText('Tenant Requests')).toBeInTheDocument()
-            expect(screen.getByText('PR Activity & SLA Health')).toBeInTheDocument()
+            expect(screen.getByRole('heading', { name: 'PR Activity & SLA Health' })).toBeInTheDocument()
         })
 
-        it('should render all date preset buttons', () => {
+        it('should render date filter select', () => {
             render(<TenantRequestsPage />)
 
-            expect(screen.getByText('7 Days')).toBeInTheDocument()
-            expect(screen.getByText('30 Days')).toBeInTheDocument()
-            expect(screen.getByText('90 Days')).toBeInTheDocument()
-            expect(screen.getByText('1 Year')).toBeInTheDocument()
-            expect(screen.getByText('Custom')).toBeInTheDocument()
+            expect(screen.getByRole('combobox')).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Last Week' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Last Month' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Last Year' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Custom' })).toBeInTheDocument()
         })
 
         it('should render stat cards with aggregated totals', () => {
@@ -193,26 +208,33 @@ describe('TenantRequestsPage', () => {
     })
 
     describe('Date Presets', () => {
-        it('should default to 30 Days preset', () => {
+        it('should render date filter select with expected options', () => {
             render(<TenantRequestsPage />)
 
-            const activeButton = screen.getByText('30 Days')
-            expect(activeButton.className).toContain('bg-white')
+            expect(screen.getByRole('combobox')).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Last Week' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Last Month' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Last Year' })).toBeInTheDocument()
+            expect(screen.getByRole('option', { name: 'Custom' })).toBeInTheDocument()
         })
 
-        it('should switch active preset on click', () => {
+        it('should default to last month in date filter', () => {
             render(<TenantRequestsPage />)
 
-            fireEvent.click(screen.getByText('7 Days'))
-
-            expect(screen.getByText('7 Days').className).toContain('bg-white')
-            expect(screen.getByText('30 Days').className).not.toContain('bg-white')
+            expect(screen.getByDisplayValue('Last Month')).toBeInTheDocument()
         })
 
-        it('should call hooks with updated dates when preset changes', () => {
+        it('should call router.replace when date filter changes', () => {
             render(<TenantRequestsPage />)
 
-            fireEvent.click(screen.getByText('90 Days'))
+            fireEvent.change(screen.getByRole('combobox'), { target: { value: 'lastWeek' } })
+
+            expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('dateFilter=lastWeek'))
+        })
+
+        it('should call hooks with dates matching the selected preset', () => {
+            mockUseSearchParams.mockReturnValue(new URLSearchParams('dateFilter=lastYear'))
+            render(<TenantRequestsPage />)
 
             const statsCall = mockUseTenantInsightsStats.mock.calls.at(-1)
             const breakdownCall = mockUseEscalationBreakdown.mock.calls.at(-1)
@@ -223,9 +245,8 @@ describe('TenantRequestsPage', () => {
         })
 
         it('should show date pickers when Custom is selected', () => {
+            mockUseSearchParams.mockReturnValue(new URLSearchParams('dateFilter=custom'))
             const { container } = render(<TenantRequestsPage />)
-
-            fireEvent.click(screen.getByText('Custom'))
 
             const dateInputs = container.querySelectorAll('input[type="date"]')
             expect(dateInputs).toHaveLength(2)
@@ -239,15 +260,12 @@ describe('TenantRequestsPage', () => {
         })
 
         it('should show invalid range message when dateFrom > dateTo', () => {
-            const { container } = render(<TenantRequestsPage />)
+            mockUseSearchParams.mockReturnValue(
+                new URLSearchParams('dateFilter=custom&dateFrom=2026-03-25&dateTo=2026-03-01')
+            )
+            render(<TenantRequestsPage />)
 
-            fireEvent.click(screen.getByText('Custom'))
-            const dateInputs = container.querySelectorAll('input[type="date"]')
-
-            fireEvent.change(dateInputs[0], { target: { value: '2026-03-25' } })
-            fireEvent.change(dateInputs[1], { target: { value: '2026-03-01' } })
-
-            expect(screen.getByText('Invalid range')).toBeInTheDocument()
+            expect(screen.getByText(/Invalid range/)).toBeInTheDocument()
         })
     })
 
