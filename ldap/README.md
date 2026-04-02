@@ -6,7 +6,7 @@ Operational **order** and **troubleshooting**: [docs/runbooks/auth-dex-ldap.md](
 
 ## Local
 
-1. Copy `ldap/.env.example` to `ldap/.env.local` and set **`LDAP_ADMIN_PASSWORD`** and **`LDAP_BOOTSTRAP_USER_PASSWORD`** (plaintext for bootstrap users `alice` / `bob`).
+1. Copy `ldap/.env.example` to `ldap/.env.local` and set **`LDAP_ADMIN_PASSWORD`**. Set **`LDAP_BOOTSTRAP_USER_PASSWORD`** too unless you are fine with the example default: `make run-local` loads `.env.example` first, then `.env.local`, so a password for `alice` / `bob` is always defined when the example file is present.
 2. Start the stack:
 
 ```bash

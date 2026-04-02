@@ -38,8 +38,9 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             HttpServletRequest request, HttpServletResponse response, Authentication authentication)
             throws IOException {
         var oauth2User = (OAuth2User) authentication.getPrincipal();
-        var registrationId =
-                authentication instanceof OAuth2AuthenticationToken token ? token.getAuthorizedClientRegistrationId() : "";
+        var registrationId = authentication instanceof OAuth2AuthenticationToken token
+                ? token.getAuthorizedClientRegistrationId()
+                : "";
         var email = extractEmail(oauth2User);
         if (!allowListService.isAllowed(email)) {
             log.warn("Allow-list rejected user during OAuth2 redirect login");

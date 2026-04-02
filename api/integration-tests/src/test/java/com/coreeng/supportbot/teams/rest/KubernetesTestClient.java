@@ -202,15 +202,15 @@ public class KubernetesTestClient implements AutoCloseable {
                         }
                         Integer failed = job.getStatus().getFailed();
                         if (failed != null && failed > 0) {
-                            throw new IllegalStateException("Job " + jobName + " failed (status.failed=" + failed + ")");
+                            throw new IllegalStateException(
+                                    "Job " + jobName + " failed (status.failed=" + failed + ")");
                         }
                         Integer succeeded = job.getStatus().getSucceeded();
                         return succeeded != null && succeeded > 0;
                     });
             LOGGER.info("Job {} completed successfully.", jobName);
         } catch (org.awaitility.core.ConditionTimeoutException e) {
-            throw new IllegalStateException(
-                    "Job " + jobName + " did not succeed within " + timeout, e);
+            throw new IllegalStateException("Job " + jobName + " did not succeed within " + timeout, e);
         }
     }
 

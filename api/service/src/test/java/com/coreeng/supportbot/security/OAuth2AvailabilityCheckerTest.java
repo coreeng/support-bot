@@ -14,8 +14,7 @@ class OAuth2AvailabilityCheckerTest {
         return createSecurityProperties(testBypassEnabled, List.of());
     }
 
-    private static SecurityProperties createSecurityProperties(
-            boolean testBypassEnabled, List<String> loginProviders) {
+    private static SecurityProperties createSecurityProperties(boolean testBypassEnabled, List<String> loginProviders) {
         return new SecurityProperties(
                 new SecurityProperties.JwtProperties("test-secret", Duration.ofHours(24)),
                 new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback", loginProviders),

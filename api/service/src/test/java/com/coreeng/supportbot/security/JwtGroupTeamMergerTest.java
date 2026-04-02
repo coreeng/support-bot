@@ -33,7 +33,8 @@ class JwtGroupTeamMergerTest {
 
     @Test
     void merge_nonDex_returnsEmailTeams() {
-        var props = new JwtGroupsProperties(true, "groups", List.of(new JwtGroupsProperties.Mapping(List.of("g"), "wow")));
+        var props =
+                new JwtGroupsProperties(true, "groups", List.of(new JwtGroupsProperties.Mapping(List.of("g"), "wow")));
         var merger = new JwtGroupTeamMerger(props, teamService);
         var emailTeams = ImmutableList.<Team>of();
 
@@ -45,14 +46,11 @@ class JwtGroupTeamMergerTest {
     @Test
     void merge_dex_addsMappedTeam() {
         var props = new JwtGroupsProperties(
-                true,
-                "groups",
-                List.of(new JwtGroupsProperties.Mapping(List.of("developers", "Developers"), "wow")));
+                true, "groups", List.of(new JwtGroupsProperties.Mapping(List.of("developers", "Developers"), "wow")));
         var merger = new JwtGroupTeamMerger(props, teamService);
         when(teamService.findTeamByCode("wow")).thenReturn(tenant("wow"));
 
-        var out = merger.mergeForProvider(
-                "dex", Map.of("groups", List.of("Developers")), ImmutableList.<Team>of());
+        var out = merger.mergeForProvider("dex", Map.of("groups", List.of("Developers")), ImmutableList.<Team>of());
 
         assertEquals(1, out.size());
         assertEquals("wow", out.get(0).code());
@@ -61,9 +59,7 @@ class JwtGroupTeamMergerTest {
     @Test
     void merge_preservesExistingTeams_dedupes() {
         var props = new JwtGroupsProperties(
-                true,
-                "groups",
-                List.of(new JwtGroupsProperties.Mapping(List.of("developers"), "wow")));
+                true, "groups", List.of(new JwtGroupsProperties.Mapping(List.of("developers"), "wow")));
         var merger = new JwtGroupTeamMerger(props, teamService);
         var existing = ImmutableList.of(tenant("wow"));
         when(teamService.findTeamByCode("wow")).thenReturn(tenant("wow"));

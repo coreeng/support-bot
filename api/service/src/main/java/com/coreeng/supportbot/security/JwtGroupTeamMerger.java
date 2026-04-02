@@ -28,7 +28,9 @@ public class JwtGroupTeamMerger {
 
     public ImmutableList<Team> mergeForProvider(
             String oauthRegistrationId, java.util.Map<String, Object> claims, ImmutableList<Team> emailTeams) {
-        if (!properties.enabled() || oauthRegistrationId == null || !DEX_REGISTRATION.equalsIgnoreCase(oauthRegistrationId)) {
+        if (!properties.enabled()
+                || oauthRegistrationId == null
+                || !DEX_REGISTRATION.equalsIgnoreCase(oauthRegistrationId)) {
             return emailTeams;
         }
         var rawGroups = extractGroupStrings(claims.get(properties.claimName()));

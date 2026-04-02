@@ -22,10 +22,10 @@ apply-bootstrap-users-ldif: ## Require LDAP_BOOTSTRAP_USER_PASSWORD and write bo
 		bash scripts/render_bootstrap_users_ldif.sh'
 
 .PHONY: run-local
-run-local: ## Start OpenLDAP + phpLDAPadmin (requires ldap/.env.local); renders 20-users.ldif first (loads .env.local for LDAP_BOOTSTRAP_USER_PASSWORD)
-	@test -f .env.local || (echo "Missing ldap/.env.local (copy from ldap/.env.example)" && exit 1)
-	@bash -c 'set -euo pipefail; cd "$(CURDIR)"; set -a; . ./.env.local; set +a; exec $(MAKE) apply-bootstrap-users-ldif'
-	@docker compose up -d
+run-local: ## Start OpenLDAP + phpLDAPadmin (requires ldap/.env.local); loads .env.example then .env.local so LDAP_BOOTSTRAP_USER_PASSWORD has a default
+	@test -f .env.local || (echo "Missing ldap/.env.local — copy from ldap/.env.example (see ldap/README.md)." >&2 && exit 1)
+	@cd "$(CURDIR)" && set -euo pipefail && set -a && if [[ -f .env.example ]]; then . ./.env.example; fi && . ./.env.local && set +a && $(MAKE) apply-bootstrap-users-ldif
+	@cd "$(CURDIR)" && docker compose up -d
 
 .PHONY: down-local
 down-local: ## Stop local LDAP stack
