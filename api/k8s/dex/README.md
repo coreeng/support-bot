@@ -8,6 +8,7 @@ Configuration is the structured `config:` map in values; the chart renders it in
 
 - `values-dexidp.yaml` — baseline: issuer, sqlite storage, web/telemetry ports, static client, optional empty `connectors: []`.
 - `values-integration.yaml` — sample integration overrides (ingress host, issuer, LDAP connector to `ldap:389`, resource bumps).
+- `values-dex-oidc-incluster.yaml` — optional Tier 2 overlay: `config.issuer: http://dex:5556`, static client redirect `http://127.0.0.1:8765/callback`, full LDAP connector (list replace-safe). Use when the API and integration Job talk to Dex only in-cluster and `DEX_ISSUER_URI` is `http://dex:5556`.
 - `values-legacy-core-platform-app.yaml` — archived `core-platform-app` + templated `config.yaml` with `${DEX_*}` placeholders.
 
 Set **`enablePasswordDB: false`** under `config` to hide Dex’s static email/password screen and rely on connectors only (ensure LDAP and/or Google/Microsoft entries exist under `config.connectors`).
@@ -21,6 +22,8 @@ For **optional** Git / template checks, `values-dexidp.yaml` uses obvious placeh
 Example keys you may mirror from a Secret into values (conceptually):
 
 - `client-secret` — same as `config.staticClients[].secret` for the Support Bot client.
+
+For **Tier 2** integration tests, Kubernetes Secret `dex-secrets` is expected with **`client-id`** and **`client-secret`** (see [`api/integration-tests/README.md`](../../integration-tests/README.md)).
 - `ldap-bind-password` — same as LDAP connector `bindPW` when LDAP is enabled.
 - `google-client-id` / `google-client-secret` — when adding a Google connector.
 - `microsoft-client-id` / `microsoft-client-secret` — when adding a Microsoft connector.
@@ -33,6 +36,15 @@ helm repo update dex
 helm upgrade --install support-bot-dex dex/dex --version 0.24.0 \
   -f api/k8s/dex/values-dexidp.yaml \
   -f api/k8s/dex/values-integration.yaml
+```
+
+**Tier 2 OIDC Job** (in-cluster issuer aligned with `DEX_ISSUER_URI=http://dex:5556`):
+
+```bash
+helm upgrade --install support-bot-dex dex/dex --version 0.24.0 \
+  -f api/k8s/dex/values-dexidp.yaml \
+  -f api/k8s/dex/values-integration.yaml \
+  -f api/k8s/dex/values-dex-oidc-incluster.yaml
 ```
 
 Validate render only:

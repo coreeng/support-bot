@@ -1,0 +1,58 @@
+# Template: replace PLACEHOLDER_JOB_NAME, PLACEHOLDER_NAMESPACE, PLACEHOLDER_CONFIGMAP_NAME.
+# ConfigMap PLACEHOLDER_CONFIGMAP_NAME must contain key oidc.py (script from dex-ldap-oidc-flow.py), created by the test.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: PLACEHOLDER_JOB_NAME
+  namespace: PLACEHOLDER_NAMESPACE
+  labels:
+    app.kubernetes.io/component: integration-oidc
+    app.kubernetes.io/name: support-bot-dex-ldap-oidc
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: oidc-flow
+          image: alpine:3.20
+          env:
+            - name: DEX_ISSUER_URI
+              value: "http://dex:5556"
+            - name: REDIRECT_URI
+              value: "http://127.0.0.1:8765/callback"
+            - name: CALLBACK_PORT
+              value: "8765"
+            - name: API_BASE_URL
+              value: "http://support-bot:8080"
+            - name: LDAP_USER_EMAIL
+              value: "alice@supportbot.local"
+            - name: EXPECTED_TEAM_CODE
+              value: "core"
+            - name: DEX_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: dex-secrets
+                  key: client-id
+            - name: LDAP_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: integration-ldap-test-user
+                  key: password
+          volumeMounts:
+            - name: oidc-script
+              mountPath: /scripts
+              readOnly: true
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              apk add --no-cache python3 py3-requests >/dev/null
+              cp /scripts/oidc.py /tmp/oidc.py
+              exec python3 /tmp/oidc.py
+      volumes:
+        - name: oidc-script
+          configMap:
+            name: PLACEHOLDER_CONFIGMAP_NAME
+            defaultMode: 0444

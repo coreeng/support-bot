@@ -17,6 +17,10 @@ template)
 	helm template support-bot-dex "${CHART_REPO_NAME}/${CHART_NAME}" --version "${CHART_VERSION}" \
 		-f "${DEX_K8S}/values-dexidp.yaml" \
 		-f "${DEX_K8S}/values-integration.yaml" >/dev/null
+	helm template support-bot-dex "${CHART_REPO_NAME}/${CHART_NAME}" --version "${CHART_VERSION}" \
+		-f "${DEX_K8S}/values-dexidp.yaml" \
+		-f "${DEX_K8S}/values-integration.yaml" \
+		-f "${DEX_K8S}/values-dex-oidc-incluster.yaml" >/dev/null
 	;;
 deploy-integration)
 	extra=()

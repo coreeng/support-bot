@@ -44,6 +44,37 @@ cd api && ./gradlew :integration-tests:test --tests 'com.coreeng.supportbot.team
 
 JUnit tags: `integration`, `ldap-infra` (for selective CI filters).
 
+## Tier 2: Dex LDAP OAuth code + API exchange + jwt-groups (`oidc`)
+
+[`DexOidcInClusterIT`](src/test/java/com/coreeng/supportbot/teams/rest/DexOidcInClusterIT.java) applies a **ConfigMap** (Python script from [`dex-ldap-oidc-flow.py`](src/test/resources/k8s/dex-ldap-oidc-flow.py)) and a **Job** ([`dex-ldap-oidc-job.yaml`](src/test/resources/k8s/dex-ldap-oidc-job.yaml)) that:
+
+1. Listens on `http://127.0.0.1:8765/callback` and drives Dex’s LDAP login for bootstrap user `alice@supportbot.local` (password from a Secret, not from Git).
+2. Sends the authorization **code** once to Support Bot **`POST /auth/oauth/exchange`** with `provider=dex` and the same `redirectUri` (codes are single-use; the Job does not call Dex’s token endpoint itself).
+3. Decodes the **API-issued JWT** and asserts team code `core` is present (from `platform-integration.jwt-groups` mapping `developers` → `core` under profile `integrationtests-oidc`).
+4. Calls **`GET /auth/me`** with `Authorization: Bearer` and asserts the same team.
+
+Log markers: `OK_TOKEN`, `OK_GROUPS`, `OK_API`, `OK_ALL`.
+
+### Prerequisites
+
+1. Same namespace and kube context as Tier 1 ([`integration-test-local.yaml`](src/test/resources/integration-test-local.yaml)).
+2. **Dex** installed with issuer **identical** to the API’s `DEX_ISSUER_URI`. For in-cluster Jobs and Services, use the optional overlay [`values-dex-oidc-incluster.yaml`](../k8s/dex/values-dex-oidc-incluster.yaml) so `config.issuer` is `http://dex:5556` and apply after [`values-integration.yaml`](../k8s/dex/values-integration.yaml) (see [`api/k8s/dex/README.md`](../k8s/dex/README.md)). [`values-integration.yaml`](../k8s/dex/values-integration.yaml) also registers `http://127.0.0.1:8765/callback` on the static client.
+3. **Support Bot API** deployed for integration tests with **OIDC** env and profiles, e.g. Helm values [`values-integrationtests-oidc.yaml`](../k8s/service/values-integrationtests-oidc.yaml) (`SPRING_PROFILES_ACTIVE=integrationtests,integrationtests-oidc`, `DEX_*`, test-bypass off). `DEX_ISSUER_URI` must match Dex `config.issuer` (e.g. `http://dex:5556`).
+4. **Secrets** in that namespace:
+   - `dex-secrets` with keys **`client-id`** and **`client-secret`** (same as Dex `staticClients` for `support-bot-dex`).
+   - **`integration-ldap-test-user`** with key **`password`**: plaintext password for `alice@supportbot.local`, matching the hash in the LDAP bootstrap LDIF (see [`ldap/README.md`](../../ldap/README.md)); create when preparing the cluster, e.g. `kubectl create secret generic integration-ldap-test-user --from-literal=password='…' -n <namespace>`.
+
+The Job assumes cluster DNS names **`dex`**, **`ldap`**, and **`support-bot`** on port **8080**; adjust the Job manifest if your release names differ.
+
+### How to run
+
+```bash
+export INTEGRATION_LDAP_DEX_OIDC=true
+cd api && ./gradlew :integration-tests:test --tests 'com.coreeng.supportbot.teams.rest.DexOidcInClusterIT'
+```
+
+JUnit tags: `integration`, `oidc`.
+
 # Steps to run (existing service tests)
 
 Open the `integration-test-local.yaml` file under `src/test/resources` folder and change

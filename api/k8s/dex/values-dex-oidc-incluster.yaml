@@ -1,14 +1,12 @@
-# Integration overrides (dex/dex chart). Merges with values-dexidp.yaml (maps merge; lists here replace).
-
-ingress:
-  hosts:
-    - host: dex.integration.example.com
-      paths:
-        - path: /
-          pathType: Prefix
+# Optional overlay for Tier 2 OIDC integration Job (and any in-cluster-only traffic).
+# Apply after values-integration.yaml so config.* maps merge; this replaces config.staticClients
+# and config.connectors lists (Helm merges maps; lists replace — include full connector block).
+#
+# Align Support Bot API: DEX_ISSUER_URI must equal config.issuer (iss claim in Dex tokens).
+# Dex static client must list http://127.0.0.1:8765/callback for the in-cluster Job listener.
 
 config:
-  issuer: https://dex.integration.example.com
+  issuer: http://dex:5556
   staticClients:
     - id: support-bot-dex
       name: Support Bot
@@ -40,11 +38,3 @@ config:
             - userAttr: DN
               groupAttr: uniqueMember
           nameAttr: cn
-
-resources:
-  requests:
-    cpu: 200m
-    memory: 256Mi
-  limits:
-    cpu: "1"
-    memory: 768Mi

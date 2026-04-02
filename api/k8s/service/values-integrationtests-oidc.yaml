@@ -1,0 +1,71 @@
+# Tier 2: API accepts Dex OAuth exchange and Bearer JWT; jwt-groups merge for LDAP "developers" -> core.
+# Deploy with the same base chart as integration tests, e.g.:
+#   helm upgrade --install ... -f values.yaml -f values-integrationtests.yaml -f values-integrationtests-oidc.yaml
+# Requires Dex values with issuer matching DEX_ISSUER_URI (use values-dex-oidc-incluster.yaml for http://dex:5556).
+
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: integrationtests,integrationtests-oidc
+  - name: DB_URL
+    value: "jdbc:postgresql://support-bot-db-postgresql:5432/supportbot"
+  - name: DB_USERNAME
+    value: "supportbot"
+  - name: DB_PASSWORD
+    value: "supportbotpassword"
+  - name: JWT_SECRET
+    value: "integration-test-jwt-secret-min-256-bits"
+  - name: SLACK_TICKET_CHANNEL_ID
+    value: "C08CC3MCBKN"
+  - name: SLACK_ESCALATION_CHANNEL_ID
+    value: "C08CC3MCBKN"
+  - name: SLACK_SUPPORT_GROUP_ID
+    value: "S08948NBMED"
+  - name: SLACK_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: support-bot
+        key: SLACK_TOKEN
+  - name: SLACK_SOCKET_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: support-bot
+        key: SLACK_SOCKET_TOKEN
+  - name: SLACK_SIGNING_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: support-bot
+        key: SLACK_SIGNING_SECRET
+  - name: AZURE_TENANT_ID
+    valueFrom:
+      secretKeyRef:
+        name: azure
+        key: AZURE_TENANT_ID
+  - name: AZURE_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: azure
+        key: AZURE_CLIENT_ID
+  - name: AZURE_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: azure
+        key: AZURE_CLIENT_SECRET
+  - name: DEX_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: dex-secrets
+        key: client-id
+  - name: DEX_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: dex-secrets
+        key: client-secret
+  - name: DEX_ISSUER_URI
+    value: "http://dex:5556"
+  - name: DEX_SCOPES
+    value: "openid,email,profile,groups"
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true

@@ -147,6 +147,24 @@ public class KubernetesTestClient implements AutoCloseable {
         }
     }
 
+    /** Creates or replaces a ConfigMap with a single data entry (e.g. script for an integration Job). */
+    public void createOrReplaceConfigMapData(String name, String namespace, String key, String data) {
+        LOGGER.info("Creating ConfigMap {} in namespace {} (key={})...", name, namespace, key);
+        try {
+            ConfigMap configMap = new ConfigMapBuilder()
+                    .withNewMetadata()
+                    .withName(name)
+                    .withNamespace(namespace)
+                    .endMetadata()
+                    .addToData(key, data)
+                    .build();
+            client.configMaps().inNamespace(namespace).resource(configMap).createOr(NonDeletingOperation::update);
+            LOGGER.info("ConfigMap {} applied.", name);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create ConfigMap " + name + " in namespace " + namespace, e);
+        }
+    }
+
     /**
      * Applies a single-document YAML manifest (e.g. Job) in the given namespace.
      * Placeholders in the YAML should already be replaced by the caller.
