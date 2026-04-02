@@ -12,10 +12,19 @@ p2p-prod:
 
 ##@ Local LDAP (Docker)
 
+.PHONY: apply-bootstrap-users-ldif
+apply-bootstrap-users-ldif: ## Require LDAP_BOOTSTRAP_USER_PASSWORD and write bootstrap/20-users.ldif
+	@bash -c 'set -euo pipefail; cd "$(CURDIR)"; \
+		if [[ -z "$${LDAP_BOOTSTRAP_USER_PASSWORD:-}" ]]; then \
+			echo "error: LDAP_BOOTSTRAP_USER_PASSWORD is required (local: ldap/.env.local; CI: secret LDAP_BOOTSTRAP_USER_PASSWORD / P2P env_vars — see ldap/README.md)." >&2; \
+			exit 1; \
+		fi; \
+		bash scripts/render_bootstrap_users_ldif.sh'
+
 .PHONY: run-local
 run-local: ## Start OpenLDAP + phpLDAPadmin (requires ldap/.env.local); renders 20-users.ldif first (loads .env.local for LDAP_BOOTSTRAP_USER_PASSWORD)
 	@test -f .env.local || (echo "Missing ldap/.env.local (copy from ldap/.env.example)" && exit 1)
-	@bash -c 'set -euo pipefail; cd "$$PWD"; set -a; . ./.env.local; set +a; export LDAP_BOOTSTRAP_USER_PASSWORD="$${LDAP_BOOTSTRAP_USER_PASSWORD:-password123}"; bash scripts/render_bootstrap_users_ldif.sh'
+	@bash -c 'set -euo pipefail; cd "$(CURDIR)"; set -a; . ./.env.local; set +a; exec $(MAKE) apply-bootstrap-users-ldif'
 	@docker compose up -d
 
 .PHONY: down-local
@@ -25,8 +34,7 @@ down-local: ## Stop local LDAP stack
 ##@ LDAP module lifecycle (Helm / Bitnami OpenLDAP image)
 
 .PHONY: render-bootstrap-users
-render-bootstrap-users: ## Generate bootstrap/20-users.ldif from template (LDAP_BOOTSTRAP_USER_PASSWORD; default password123 for template-only)
-	@LDAP_BOOTSTRAP_USER_PASSWORD="$${LDAP_BOOTSTRAP_USER_PASSWORD:-password123}" bash "$(CURDIR)/scripts/render_bootstrap_users_ldif.sh"
+render-bootstrap-users: apply-bootstrap-users-ldif ## Generate bootstrap/20-users.ldif (requires LDAP_BOOTSTRAP_USER_PASSWORD in environment)
 
 .PHONY: template
 template: ## Validate LDAP chart (support-bot-openldap) with values-bitnami + integration overlay
@@ -38,6 +46,6 @@ deploy-integration: ## Deploy LDAP module to integration environment
 
 .PHONY: sync-bootstrap-into-chart
 sync-bootstrap-into-chart: ## Render 20-users.ldif then copy ldap/bootstrap/*.ldif into api/k8s/ldap/chart/files/bootstrap/
-	@LDAP_BOOTSTRAP_USER_PASSWORD="$${LDAP_BOOTSTRAP_USER_PASSWORD:-password123}" $(MAKE) render-bootstrap-users
+	@$(MAKE) render-bootstrap-users
 	@cp -f "$(CURDIR)/bootstrap/"*.ldif "$(CURDIR)/../api/k8s/ldap/chart/files/bootstrap/"
 	@echo "Synced LDIF into api/k8s/ldap/chart/files/bootstrap/ (commit 10-ou / 30-groups changes only; 20-users.ldif is gitignored)."

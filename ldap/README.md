@@ -6,7 +6,7 @@ Operational **order** and **troubleshooting**: [docs/runbooks/auth-dex-ldap.md](
 
 ## Local
 
-1. Copy `ldap/.env.example` to `ldap/.env.local` and set `LDAP_ADMIN_PASSWORD`. Optionally set `LDAP_BOOTSTRAP_USER_PASSWORD` for `alice` / `bob` (defaults to **`password123`** if unset — dev only).
+1. Copy `ldap/.env.example` to `ldap/.env.local` and set **`LDAP_ADMIN_PASSWORD`** and **`LDAP_BOOTSTRAP_USER_PASSWORD`** (plaintext for bootstrap users `alice` / `bob`).
 2. Start the stack:
 
 ```bash
@@ -30,7 +30,7 @@ Tracked under `ldap/bootstrap/`: `10-ou.ldif`, `30-groups.ldif`, and **`20-users
 make -C ldap render-bootstrap-users
 ```
 
-Set **`LDAP_BOOTSTRAP_USER_PASSWORD`** (plaintext) first. The Makefile / `helm_ldap.sh` default to **`password123`** only for local convenience and **`helm template`** on PRs; use a strong value (or a CI secret such as **`INTEGRATION_LDAP_USERS_PASSWORD`**) for integration clusters.
+Export **`LDAP_BOOTSTRAP_USER_PASSWORD`** in the shell before **`make render-bootstrap-users`**, or rely on **`.env.local`** when using **`make run-local`** (which loads it). **Integration** and **CI** should set the same variable from a secret (e.g. **`INTEGRATION_LDAP_USERS_PASSWORD`** or repository secret **`LDAP_BOOTSTRAP_USER_PASSWORD`**).
 
 Prerequisites: **`slappasswd`** (`apt install ldap-utils` on Linux) or **Docker** (script uses `osixia/openldap:1.5.0` as fallback).
 
@@ -72,7 +72,7 @@ make -C ldap template
 make -C ldap deploy-integration
 ```
 
-Set **`LDAP_BOOTSTRAP_USER_PASSWORD`** in the environment when deploying integration (e.g. from **GitHub Actions secrets**) so bootstrap user passwords are not the public default.
+Set **`LDAP_BOOTSTRAP_USER_PASSWORD`** in the environment when deploying integration (e.g. from **GitHub Actions secrets**).
 
 ### Keeping Helm bootstrap in sync
 
@@ -90,7 +90,7 @@ With release name `support-bot-ldap` and `fullnameOverride: ldap`, the ClusterIP
 
 ## CI
 
-- `.github/workflows/ldap-fast-feedback.yaml` — P2P fast feedback for the LDAP module (`make p2p-build` → Helm `template`). The default **`LDAP_BOOTSTRAP_USER_PASSWORD`** (`password123`) is used only to satisfy `helm template` on PRs; integration deploy pipelines should set **`LDAP_BOOTSTRAP_USER_PASSWORD`** from a secret (e.g. via org **`env_vars`**).
+- [`.github/workflows/ldap-fast-feedback.yaml`](../.github/workflows/ldap-fast-feedback.yaml) uses **`coreeng/p2p`** fast feedback (`make p2p-build` in **`ldap/`** → **`template`**). Create repository secret **`LDAP_BOOTSTRAP_USER_PASSWORD`** (plaintext for bootstrap users in rendered LDIF). The workflow merges it with **`secrets.env_vars`** so you do not need to edit the monolithic `env_vars` secret for LDAP. **Fork PRs** do not receive upstream secrets; CI may fail until a maintainer runs checks.
 
 ## Troubleshooting (quick)
 
@@ -101,3 +101,4 @@ With release name `support-bot-ldap` and `fullnameOverride: ldap`, the ClusterIP
 | Cannot connect from **Dex** container | Use `host.docker.internal:389` or attach Dex and LDAP to the same Docker network; see [runbook](../docs/runbooks/auth-dex-ldap.md). |
 | **Wrong members** after seed change | Remove OpenLDAP volumes and recreate the stack so bootstrap LDIF runs on a fresh database (`docker compose down -v`). |
 | **`render-bootstrap-users` fails** | Install `ldap-utils` or ensure Docker can run `osixia/openldap:1.5.0`. |
+| **`LDAP_BOOTSTRAP_USER_PASSWORD is required`** | Export it, add it to **`.env.local`** for `run-local`, or configure the **GitHub Actions** secret / deploy env (see CI section above). |

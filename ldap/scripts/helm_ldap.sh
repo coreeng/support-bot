@@ -6,8 +6,10 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 LDAP_K8S="${ROOT}/../api/k8s/ldap"
 CHART="${LDAP_K8S}/chart"
 
-# Default password is for helm template / local dev only; integration should set LDAP_BOOTSTRAP_USER_PASSWORD (e.g. from GitHub Actions secrets).
-export LDAP_BOOTSTRAP_USER_PASSWORD="${LDAP_BOOTSTRAP_USER_PASSWORD:-password123}"
+if [[ -z "${LDAP_BOOTSTRAP_USER_PASSWORD:-}" ]]; then
+	echo "error: LDAP_BOOTSTRAP_USER_PASSWORD is required (local: ldap/.env.local; CI: secret LDAP_BOOTSTRAP_USER_PASSWORD / P2P env_vars — see ldap/README.md)." >&2
+	exit 1
+fi
 bash "${ROOT}/scripts/render_bootstrap_users_ldif.sh"
 cp -f "${ROOT}/bootstrap/"*.ldif "${CHART}/files/bootstrap/"
 

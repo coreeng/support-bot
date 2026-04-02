@@ -117,7 +117,7 @@ def main() -> int:
             timeout=120,
         )
         if ex.status_code != 200:
-            log(f"oauth/exchange failed: {ex.status_code} {ex.text[:400]}")
+            log(f"oauth/exchange failed: HTTP {ex.status_code}")
             return 1
         body = ex.json()
         api_jwt = body.get("token")
