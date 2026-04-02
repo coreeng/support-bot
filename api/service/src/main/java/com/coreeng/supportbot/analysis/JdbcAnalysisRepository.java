@@ -5,6 +5,7 @@ import static org.jooq.impl.DSL.currentLocalDateTime;
 import static org.jooq.impl.DSL.excluded;
 import static org.jooq.impl.DSL.row;
 
+import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -54,7 +55,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         a.category,
                         tc.query_count,
                         a.summary,
-                        q.channel_id,
+                        a.ticket_id,
                         q.ts as query_ts,
                         ROW_NUMBER() OVER (PARTITION BY a.category ORDER BY a.created_at DESC) as rn
                     FROM analysis a
@@ -67,7 +68,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                     category as dimension,
                     query_count,
                     summary,
-                    channel_id,
+                    ticket_id,
                     query_ts
                 FROM ranked_summaries
                 WHERE rn <= 5
@@ -79,8 +80,8 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("dimension", String.class),
                         r.get("query_count", Long.class),
                         r.get("summary", String.class),
-                        r.get("channel_id", String.class),
-                        r.get("query_ts", String.class)));
+                        new TicketId(r.get("ticket_id", Integer.class).longValue()),
+                        MessageTs.of(r.get("query_ts", String.class))));
     }
 
     /**
@@ -104,7 +105,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         a.driver,
                         td.query_count,
                         a.summary,
-                        q.channel_id,
+                        a.ticket_id,
                         q.ts as query_ts,
                         ROW_NUMBER() OVER (PARTITION BY a.driver ORDER BY a.created_at DESC) as rn
                     FROM analysis a
@@ -116,7 +117,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                     driver as dimension,
                     query_count,
                     summary,
-                    channel_id,
+                    ticket_id,
                     query_ts
                 FROM ranked_summaries
                 WHERE rn <= 5
@@ -128,8 +129,8 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("dimension", String.class),
                         r.get("query_count", Long.class),
                         r.get("summary", String.class),
-                        r.get("channel_id", String.class),
-                        r.get("query_ts", String.class)));
+                        new TicketId(r.get("ticket_id", Integer.class).longValue()),
+                        MessageTs.of(r.get("query_ts", String.class))));
     }
 
     @Override

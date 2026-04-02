@@ -1,7 +1,7 @@
 package com.coreeng.supportbot.analysis.rest;
 
+import java.time.Instant;
 import java.util.List;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Response model for dimension summaries (categories, drivers, etc.) with example queries.
@@ -16,7 +16,8 @@ public record DimensionSummaryUI(String name, int coveragePercentage, long query
      * Individual query summary.
      *
      * @param text The summary text
-     * @param link Slack permalink for the related query
+     * @param timestamp The query timestamp (serialized as ISO-8601 by Jackson)
+     * @param ticketId The related ticket ID (string to match the UI convention for safe JSON number handling)
      */
-    public record QuerySummary(String text, @Nullable String link) {}
+    public record QuerySummary(String text, Instant timestamp, String ticketId) {}
 }
