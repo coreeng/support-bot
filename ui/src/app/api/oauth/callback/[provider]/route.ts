@@ -10,7 +10,9 @@ export async function GET(
   const code = searchParams.get("code");
   const error = searchParams.get("error");
 
-  const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
+  // Same host Dex redirected to (localhost vs 127.0.0.1 must match). NEXTAUTH_URL alone can break redirects if mis-set.
+  const appOrigin = request.nextUrl.origin;
+  const loginUrl = new URL("/login", appOrigin);
   // Extract from cookie the user's last visited page to redirect to after login
   const rawCallbackUrl = request.cookies.get("oauth-callback-url")?.value || "/";
   loginUrl.searchParams.set("callbackUrl", sanitizeCallbackUrl(rawCallbackUrl));

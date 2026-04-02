@@ -9,9 +9,10 @@ export async function GET(
   const { provider } = await params;
 
   if (provider === "google" || provider === "azure" || provider === "dex") {
+    // Must match the URL Dex/Google/Azure redirect the browser to (same origin as this request).
     const redirectUri = new URL(
       `/api/oauth/callback/${provider}`,
-      process.env.NEXTAUTH_URL
+      request.nextUrl.origin
     ).toString();
 
     const urlParams = new URLSearchParams({provider, redirectUri});

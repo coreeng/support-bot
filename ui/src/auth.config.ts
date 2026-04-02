@@ -4,6 +4,36 @@ import {publicFetch} from "@/app/api/_lib/public-fetch";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 
+/** redirect_uri sent to IdP must match token exchange exactly (path is /api/oauth/callback/{provider}). */
+function oauthCallbackRedirectUri(
+  provider: string,
+  clientRedirectUri: string | undefined
+): string | null {
+  const path = `/api/oauth/callback/${provider}`;
+  if (clientRedirectUri) {
+    try {
+      const u = new URL(clientRedirectUri);
+      if (
+        u.pathname === path &&
+        (u.protocol === "http:" || u.protocol === "https:")
+      ) {
+        return u.toString();
+      }
+    } catch {
+      /* use env fallback */
+    }
+  }
+  const base = process.env.NEXTAUTH_URL?.trim();
+  if (!base) {
+    return null;
+  }
+  try {
+    return new URL(path, base).toString();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Exchange auth code for token (public endpoint, no auth required).
  */
@@ -138,20 +168,25 @@ export const authConfig: NextAuthConfig = {
       credentials: {
         code: { label: "Auth Code", type: "text" },
         provider: { label: "Oauth2 Provider", type: "text" },
+        redirectUri: { label: "OAuth redirect URI", type: "text" },
       },
       async authorize(credentials) {
         const code = credentials?.code as string;
         const provider = credentials?.provider as string;
+        const clientRedirectUri = credentials?.redirectUri as string | undefined;
 
         if (
           code &&
           (provider === "google" || provider === "azure" || provider === "dex")
         ) {
           try {
-            const redirectUri = new URL(
-              `/api/oauth/callback/${provider}`,
-              process.env.NEXTAUTH_URL
-            ).toString();
+            const redirectUri = oauthCallbackRedirectUri(provider, clientRedirectUri);
+            if (!redirectUri) {
+              console.error(
+                "OAuth exchange: missing redirect URI (set NEXTAUTH_URL or pass redirectUri from client)"
+              );
+              return null;
+            }
 
             const response = await publicFetch("/auth/oauth/exchange", {
               method: "POST",
