@@ -1055,8 +1055,7 @@ describe('Tickets Component', () => {
 
             render(<Tickets />, { wrapper: Wrapper });
 
-            // Default is now "Any Date" (empty string) — the old default was "Last Week"
-            const dateFilterSelect = screen.getByDisplayValue('Any Date');
+            const dateFilterSelect = screen.getByDisplayValue('Last Week');
             expect(dateFilterSelect).toBeInTheDocument();
 
             // Switch to custom mode
@@ -1090,7 +1089,7 @@ describe('Tickets Component', () => {
             render(<Tickets />, { wrapper: Wrapper });
 
             // Switch to custom mode
-            const dateFilterSelect = screen.getByDisplayValue('Any Date');
+            const dateFilterSelect = screen.getByDisplayValue('Last Week');
             fireEvent.change(dateFilterSelect, { target: { value: 'custom' } });
 
             // Set custom dates
@@ -1126,7 +1125,7 @@ describe('Tickets Component', () => {
 
             render(<Tickets />, { wrapper: Wrapper });
 
-            const dateFilterSelect = screen.getByDisplayValue('Any Date');
+            const dateFilterSelect = screen.getByDisplayValue('Last Week');
             fireEvent.change(dateFilterSelect, { target: { value: 'custom' } });
 
             // Check that the hook was called with valid dates, not undefined
