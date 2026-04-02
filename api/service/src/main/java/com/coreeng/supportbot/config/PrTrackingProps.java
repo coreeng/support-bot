@@ -46,7 +46,10 @@ public record PrTrackingProps(
                 ? List.of()
                 : repositories.stream()
                         .map(repository -> new Repository(
-                                normalizeRepositoryName(repository.name()), repository.owningTeam(), repository.sla()))
+                                normalizeRepositoryName(repository.name()),
+                                repository.owningTeam(),
+                                repository.githubTeamSlug(),
+                                repository.sla()))
                         .toList();
         this.slaDiscovery = slaDiscovery == null ? new SlaDiscovery(null) : slaDiscovery;
         this.github = github == null ? GitHub.defaultTokenModeConfig() : github;
@@ -160,10 +163,14 @@ public record PrTrackingProps(
         APP
     }
 
-    public record Repository(String name, String owningTeam, Sla sla) {
+    public record Repository(
+            String name, String owningTeam, @Nullable String githubTeamSlug, Sla sla) {
         public Repository {
             requireNonNull(name, "name must not be null");
             requireNonNull(owningTeam, "owningTeam must not be null");
+            if (githubTeamSlug != null && githubTeamSlug.isBlank()) {
+                throw new IllegalArgumentException("githubTeamSlug must not be blank when provided");
+            }
             requireNonNull(sla, "sla must not be null");
         }
     }

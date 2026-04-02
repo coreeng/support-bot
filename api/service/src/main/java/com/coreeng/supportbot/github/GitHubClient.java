@@ -13,4 +13,11 @@ public interface GitHubClient {
     @Nullable String getFileContent(String repositoryName, String path);
 
     List<String> listPullRequestFiles(String repositoryName, int pullNumber);
+
+    /**
+     * Resolves the members of a GitHub team for review validation.
+     *
+     * @throws GitHubApiException on any GitHub API failure (not found, auth, server errors, network)
+     */
+    List<String> resolveTeamReviewers(String org, String teamSlug);
 }

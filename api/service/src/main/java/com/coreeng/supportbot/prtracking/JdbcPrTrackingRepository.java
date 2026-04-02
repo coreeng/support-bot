@@ -6,12 +6,17 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import com.coreeng.supportbot.escalation.EscalationSource;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jooq.DSLContext;
+import org.jooq.types.DayToSecond;
+import org.jooq.types.YearToMonth;
+import org.jooq.types.YearToSecond;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class JdbcPrTrackingRepository implements PrTrackingRepository {
 
     private final DSLContext dsl;
@@ -42,6 +48,14 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
 
     @Transactional(readOnly = true)
     @Override
+    public @Nullable PrTrackingRecord findById(long id) {
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row =
+                dsl.selectFrom(PR_TRACKING).where(PR_TRACKING.ID.eq(id)).fetchOne();
+        return row == null ? null : toRecord(row);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
     public List<PrTrackingRecord> findAllByStatus(PrTrackingStatus status) {
         return dsl.selectFrom(PR_TRACKING)
                 .where(PR_TRACKING.STATUS.eq(status))
@@ -53,7 +67,11 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     @Override
     public List<PrTrackingRecord> findAllActive() {
         return dsl.selectFrom(PR_TRACKING)
-                .where(PR_TRACKING.STATUS.in(PrTrackingStatus.OPEN, PrTrackingStatus.ESCALATED))
+                .where(PR_TRACKING.STATUS.in(
+                        PrTrackingStatus.OPEN,
+                        PrTrackingStatus.ESCALATED,
+                        PrTrackingStatus.CHANGES_REQUESTED,
+                        PrTrackingStatus.APPROVED))
                 .fetch()
                 .map(JdbcPrTrackingRepository::toRecord);
     }
@@ -61,10 +79,30 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     @Override
     public PrTrackingRecord updateStatus(
             long id, PrTrackingStatus newStatus, @Nullable Instant closedAt, @Nullable Long escalationId) {
-        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.update(PR_TRACKING)
+        var query = dsl.update(PR_TRACKING)
                 .set(PR_TRACKING.STATUS, newStatus)
                 .set(PR_TRACKING.CLOSED_AT, closedAt)
-                .set(PR_TRACKING.ESCALATION_ID, escalationId)
+                .set(PR_TRACKING.ESCALATION_ID, escalationId);
+        if (newStatus == PrTrackingStatus.CLOSED) {
+            query = query.setNull(PR_TRACKING.SLA_DEADLINE).setNull(PR_TRACKING.SLA_REMAINING);
+        }
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = query.where(PR_TRACKING.ID.eq(id))
+                .returning()
+                .fetchOptional()
+                .orElseThrow(() -> new IllegalStateException("PR tracking record not found for id " + id));
+        return toRecord(row);
+    }
+
+    @Override
+    public PrTrackingRecord pauseSla(long id, PrTrackingStatus newStatus, Duration remaining) {
+        if (newStatus != PrTrackingStatus.CHANGES_REQUESTED && newStatus != PrTrackingStatus.APPROVED) {
+            throw new IllegalArgumentException(
+                    "pauseSla only supports CHANGES_REQUESTED or APPROVED, got: " + newStatus);
+        }
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.update(PR_TRACKING)
+                .set(PR_TRACKING.STATUS, newStatus)
+                .set(PR_TRACKING.SLA_REMAINING, toInterval(remaining))
+                .setNull(PR_TRACKING.SLA_DEADLINE)
                 .where(PR_TRACKING.ID.eq(id))
                 .returning()
                 .fetchOptional()
@@ -72,15 +110,17 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
         return toRecord(row);
     }
 
-    @Transactional(readOnly = true)
     @Override
-    public boolean hasAnyActiveForTicket(long ticketId) {
-        return dsl.fetchExists(
-                PR_TRACKING,
-                PR_TRACKING
-                        .TICKET_ID
-                        .eq(ticketId)
-                        .and(PR_TRACKING.STATUS.in(PrTrackingStatus.OPEN, PrTrackingStatus.ESCALATED)));
+    public PrTrackingRecord resumeSla(long id, Instant newDeadline) {
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.update(PR_TRACKING)
+                .set(PR_TRACKING.STATUS, PrTrackingStatus.OPEN)
+                .set(PR_TRACKING.SLA_DEADLINE, newDeadline)
+                .setNull(PR_TRACKING.SLA_REMAINING)
+                .where(PR_TRACKING.ID.eq(id))
+                .returning()
+                .fetchOptional()
+                .orElseThrow(() -> new IllegalStateException("PR tracking record not found for id " + id));
+        return toRecord(row);
     }
 
     @Transactional(readOnly = true)
@@ -92,7 +132,24 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                         .TICKET_ID
                         .eq(ticketId)
                         .and(PR_TRACKING.CAN_AUTO_CLOSE_TICKET.isTrue())
-                        .and(PR_TRACKING.STATUS.in(PrTrackingStatus.OPEN, PrTrackingStatus.ESCALATED)));
+                        .and(PR_TRACKING.STATUS.in(
+                                PrTrackingStatus.OPEN,
+                                PrTrackingStatus.ESCALATED,
+                                PrTrackingStatus.CHANGES_REQUESTED,
+                                PrTrackingStatus.APPROVED)));
+    }
+
+    @Override
+    public void updateActivityTimestamps(
+            long id, @Nullable Instant lastReviewAt, @Nullable Instant lastAuthorActivityAt) {
+        int updated = dsl.update(PR_TRACKING)
+                .set(PR_TRACKING.LAST_REVIEW_AT, lastReviewAt)
+                .set(PR_TRACKING.LAST_AUTHOR_ACTIVITY_AT, lastAuthorActivityAt)
+                .where(PR_TRACKING.ID.eq(id))
+                .execute();
+        if (updated == 0) {
+            log.atWarn().addArgument(id).log("updateActivityTimestamps affected 0 rows for record {}");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -109,15 +166,102 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
 
     @Transactional(readOnly = true)
     @Override
+    public List<InFlightPr> findAllInFlight(@Nullable String owningTeam) {
+        List<Object> binds = new ArrayList<>();
+        String teamFilter = "";
+        if (owningTeam != null && !owningTeam.isBlank()) {
+            teamFilter = "AND pt.owning_team = ? ";
+            binds.add(owningTeam);
+        }
+        String sql = """
+                SELECT github_repo, pr_number, status, pr_created_at,
+                       sla_deadline, sla_remaining, last_review_at, owning_team,
+                       ticket_channel_id, ticket_query_ts, escalated_at
+                FROM (
+                    SELECT DISTINCT ON (pt.github_repo, pt.pr_number)
+                           pt.github_repo, pt.pr_number, pt.status, pt.pr_created_at,
+                           pt.sla_deadline, pt.sla_remaining, pt.last_review_at, pt.owning_team,
+                           q.channel_id AS ticket_channel_id, q.ts AS ticket_query_ts,
+                           (SELECT el.date FROM escalation_log el
+                            WHERE el.escalation_id = pt.escalation_id AND el.event = 'opened'
+                            LIMIT 1) AS escalated_at
+                    FROM pr_tracking pt
+                    JOIN ticket t ON t.id = pt.ticket_id
+                    JOIN query q ON q.id = t.query_id
+                    WHERE pt.status IN ('OPEN', 'ESCALATED', 'CHANGES_REQUESTED', 'APPROVED')
+                      %s
+                    ORDER BY
+                        pt.github_repo,
+                        pt.pr_number,
+                        CASE pt.status
+                            WHEN 'ESCALATED' THEN 1
+                            WHEN 'OPEN' THEN 2
+                            WHEN 'CHANGES_REQUESTED' THEN 3
+                            WHEN 'APPROVED' THEN 4
+                        END,
+                        pt.sla_deadline ASC NULLS LAST
+                ) deduped
+                ORDER BY
+                    CASE status
+                        WHEN 'ESCALATED' THEN 1
+                        WHEN 'OPEN' THEN 2
+                        WHEN 'CHANGES_REQUESTED' THEN 3
+                        WHEN 'APPROVED' THEN 4
+                    END,
+                    sla_deadline ASC NULLS LAST
+                """.formatted(teamFilter);
+
+        return dsl.resultQuery(sql, binds.toArray()).fetch(r -> {
+            String repo = checkNotNull(r.get("github_repo", String.class), "github_repo was null");
+            int prNumber = checkNotNull(r.get("pr_number", Integer.class), "pr_number was null for repo %s", repo);
+            String status = checkNotNull(r.get("status", String.class), "status was null for %s#%s", repo, prNumber);
+            String waitingOn =
+                    switch (status) {
+                        case "OPEN", "ESCALATED" -> "TEAM";
+                        case "CHANGES_REQUESTED" -> "TENANT";
+                        case "APPROVED" -> "MERGE";
+                        default -> "UNKNOWN";
+                    };
+            org.jooq.types.YearToSecond slaRemainingRaw = r.get("sla_remaining", org.jooq.types.YearToSecond.class);
+            Long slaRemainingSeconds =
+                    slaRemainingRaw != null ? slaRemainingRaw.toDuration().toSeconds() : null;
+            return new InFlightPr(
+                    repo,
+                    prNumber,
+                    "https://github.com/%s/pull/%d".formatted(repo, prNumber),
+                    status,
+                    waitingOn,
+                    checkNotNull(
+                            r.get("pr_created_at", Instant.class), "pr_created_at was null for %s#%s", repo, prNumber),
+                    r.get("sla_deadline", Instant.class),
+                    slaRemainingSeconds,
+                    r.get("last_review_at", Instant.class),
+                    checkNotNull(r.get("owning_team", String.class), "owning_team was null for %s#%s", repo, prNumber),
+                    checkNotNull(
+                            r.get("ticket_channel_id", String.class),
+                            "ticket_channel_id was null for %s#%s",
+                            repo,
+                            prNumber),
+                    checkNotNull(
+                            r.get("ticket_query_ts", String.class),
+                            "ticket_query_ts was null for %s#%s",
+                            repo,
+                            prNumber),
+                    r.get("escalated_at", Instant.class));
+        });
+    }
+
+    @Transactional(readOnly = true)
+    @Override
     public List<RepoInsights> getInsightsByRepo(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
         List<Object> binds = new ArrayList<>();
-        String dateFilter = buildDateFilter(dateFrom, dateTo, "pr_created_at", binds);
+        String dateFilter = buildDateFilter(dateFrom, dateTo, binds);
         String sql = """
                 SELECT
                     github_repo,
                     COALESCE(MIN(owning_team), 'unknown') AS owning_team,
                     COUNT(*) AS pr_count,
-                    COUNT(*) FILTER (WHERE status = 'OPEN' OR status = 'ESCALATED') AS open_count,
+                    COUNT(*) FILTER (WHERE status IN ('OPEN', 'ESCALATED', 'CHANGES_REQUESTED', 'APPROVED')) AS open_count,
                     COUNT(*) FILTER (WHERE status = 'ESCALATED') AS escalated_count,
                     COUNT(*) FILTER (WHERE sla_deadline < COALESCE(closed_at, now())) AS breached_count,
                     percentile_cont(0.5) WITHIN GROUP (ORDER BY lifetime) AS p50,
@@ -156,7 +300,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
         List<Object> binds = new ArrayList<>();
         binds.add(EscalationSource.bot.name());
         binds.add(EscalationSource.manual.name());
-        String dateFilter = buildDateFilter(dateFrom, dateTo, "pr_created_at", binds);
+        String dateFilter = buildDateFilter(dateFrom, dateTo, binds);
         String sql = """
                 SELECT
                     COUNT(DISTINCT ticket_id) AS total_pr_tickets,
@@ -185,31 +329,45 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     }
 
     private static String buildDateFilter(
-            @Nullable LocalDate dateFrom, @Nullable LocalDate dateTo, String column, List<Object> binds) {
+            @Nullable LocalDate dateFrom, @Nullable LocalDate dateTo, List<Object> binds) {
         StringBuilder sb = new StringBuilder();
         if (dateFrom != null) {
-            sb.append("AND ").append(column).append("::date >= ?::date ");
+            sb.append("AND pr_created_at::date >= ?::date ");
             binds.add(dateFrom);
         }
         if (dateTo != null) {
-            sb.append("AND ").append(column).append("::date <= ?::date ");
+            sb.append("AND pr_created_at::date <= ?::date ");
             binds.add(dateTo);
         }
         return sb.toString();
     }
 
+    private static YearToSecond toInterval(Duration duration) {
+        long totalSeconds = duration.getSeconds();
+        int days = (int) (totalSeconds / 86400);
+        int hours = (int) ((totalSeconds % 86400) / 3600);
+        int minutes = (int) ((totalSeconds % 3600) / 60);
+        int seconds = (int) (totalSeconds % 60);
+        return new YearToSecond(new YearToMonth(0), new DayToSecond(days, hours, minutes, seconds, duration.getNano()));
+    }
+
     private static PrTrackingRecord toRecord(com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row) {
+        YearToSecond slaRemainingRaw = row.getSlaRemaining();
+        Duration slaRemaining = slaRemainingRaw != null ? slaRemainingRaw.toDuration() : null;
         return new PrTrackingRecord(
                 checkNotNull(row.getId()),
                 checkNotNull(row.getTicketId()),
                 checkNotNull(row.getGithubRepo()),
                 checkNotNull(row.getPrNumber()),
                 checkNotNull(row.getPrCreatedAt()),
-                checkNotNull(row.getSlaDeadline()),
+                row.getSlaDeadline(),
                 checkNotNull(row.getOwningTeam()),
                 checkNotNull(row.getCanAutoCloseTicket()),
                 checkNotNull(row.getStatus()),
                 row.getEscalationId(),
-                row.getClosedAt());
+                row.getClosedAt(),
+                slaRemaining,
+                row.getLastReviewAt(),
+                row.getLastAuthorActivityAt());
     }
 }

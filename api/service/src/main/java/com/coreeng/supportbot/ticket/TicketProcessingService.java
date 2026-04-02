@@ -263,13 +263,14 @@ public class TicketProcessingService {
             }
         }
 
+        boolean isClosing = submission.status() == TicketStatus.closed;
         Ticket updatedTicket = repository.updateTicket(ticket.toBuilder()
                 .status(submission.status())
                 .team(submission.authorsTeam())
                 .tags(submission.tags())
                 .impact(submission.impact())
                 .assignedTo(submission.assignedTo() != null ? SlackId.user(submission.assignedTo()) : null)
-                .lastInteractedAt(Instant.now())
+                .lastInteractedAt(isClosing ? ticket.lastInteractedAt() : Instant.now())
                 .build());
 
         log.atInfo()
@@ -312,7 +313,6 @@ public class TicketProcessingService {
                 .status(TicketStatus.closed)
                 .tags(tags)
                 .impact(impact)
-                .lastInteractedAt(Instant.now())
                 .build());
         onStatusUpdate(updated);
         log.atInfo()
@@ -391,7 +391,8 @@ public class TicketProcessingService {
     }
 
     @NonNull private Ticket onStatusUpdate(Ticket ticket) {
-        Ticket updatedTicket = repository.insertStatusLog(ticket, Instant.now());
+        Instant statusLogTime = ticket.status() == TicketStatus.closed ? ticket.lastInteractedAt() : Instant.now();
+        Ticket updatedTicket = repository.insertStatusLog(ticket, statusLogTime);
         log.atInfo()
                 .addKeyValue("ticketId", checkNotNull(updatedTicket.id()).id())
                 .log("Ticket status changed");

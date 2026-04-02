@@ -15,6 +15,7 @@ import io.restassured.config.ObjectMapperConfig;
 import io.restassured.config.RestAssuredConfig;
 import io.restassured.filter.log.LogDetail;
 import io.restassured.http.ContentType;
+import java.time.Duration;
 import java.time.Instant;
 import lombok.Builder;
 import lombok.Getter;
@@ -261,6 +262,18 @@ public class SupportBotClient {
                     .extract()
                     .as(PrTrackingRecordResponse.class);
         }
+
+        public PrTrackingRecordResponse getPrTrackingRecord(long id) {
+            return given().config(REST_ASSURED_CONFIG)
+                    .when()
+                    .get(baseUrl + "/test/prtracking/record/{id}", id)
+                    .then()
+                    .log()
+                    .ifValidationFails(LogDetail.ALL, true)
+                    .statusCode(200)
+                    .extract()
+                    .as(PrTrackingRecordResponse.class);
+        }
     }
 
     @Builder
@@ -338,6 +351,8 @@ public class SupportBotClient {
         private Instant prCreatedAt;
         private Instant slaDeadline;
         private String owningTeam;
+
+        @Nullable private Boolean canAutoCloseTicket;
     }
 
     @Builder
@@ -354,6 +369,8 @@ public class SupportBotClient {
         private String status;
         private Instant closedAt;
         private Long escalationId;
+
+        @Nullable private Duration slaRemaining;
     }
 
     @Builder

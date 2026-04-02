@@ -6,9 +6,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.coreeng.supportbot.prtracking.EscalationBreakdown;
-import com.coreeng.supportbot.prtracking.PrTrackingRepository;
-import com.coreeng.supportbot.prtracking.RepoInsights;
+import com.coreeng.supportbot.enums.EscalationTeam;
+import com.coreeng.supportbot.prtracking.*;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,13 +26,16 @@ class TenantInsightsControllerTest {
     @Mock
     private PrTrackingRepository prTrackingRepository;
 
+    @Mock
+    private com.coreeng.supportbot.enums.EscalationTeamsRegistry escalationTeamsRegistry;
+
     private TenantInsightsController controller;
 
     private static final LocalDate TO = LocalDate.of(2026, 3, 25);
 
     @BeforeEach
     void setUp() {
-        controller = new TenantInsightsController(prTrackingRepository);
+        controller = new TenantInsightsController(prTrackingRepository, escalationTeamsRegistry);
     }
 
     @Test
@@ -179,5 +182,105 @@ class TenantInsightsControllerTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("dateFrom must not be after dateTo");
         verifyNoInteractions(prTrackingRepository);
+    }
+
+    @Test
+    void inFlightPrs_delegatesToRepository() {
+        // given
+        Instant now = Instant.parse("2026-03-25T12:00:00Z");
+        InFlightPr pr = new InFlightPr(
+                "org/repo-a",
+                101,
+                "https://github.com/org/repo-a/pull/101",
+                "OPEN",
+                "reviewer",
+                now.minusSeconds(7200),
+                now.plusSeconds(86400),
+                86400L,
+                null,
+                "team-foo",
+                "C_CHAN",
+                "1700000000.000001",
+                null);
+        when(prTrackingRepository.findAllInFlight(null)).thenReturn(List.of(pr));
+
+        // when
+        List<InFlightPrResponse> result = controller.inFlightPrs(null);
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).githubRepo()).isEqualTo("org/repo-a");
+        assertThat(result.get(0).prNumber()).isEqualTo(101);
+        verify(prTrackingRepository).findAllInFlight(null);
+    }
+
+    @Test
+    void inFlightPrs_resolvesTeamLabel() {
+        // given — registry knows about team-foo
+        Instant now = Instant.parse("2026-03-25T12:00:00Z");
+        InFlightPr pr = new InFlightPr(
+                "org/repo-a",
+                102,
+                "https://github.com/org/repo-a/pull/102",
+                "OPEN",
+                "reviewer",
+                now.minusSeconds(3600),
+                now.plusSeconds(86400),
+                86400L,
+                null,
+                "team-foo",
+                "C_CHAN",
+                "1700000000.000002",
+                null);
+        when(prTrackingRepository.findAllInFlight(null)).thenReturn(List.of(pr));
+        when(escalationTeamsRegistry.findEscalationTeamByCode("team-foo"))
+                .thenReturn(new EscalationTeam("Foo Team", "team-foo", "SG001"));
+
+        // when
+        List<InFlightPrResponse> result = controller.inFlightPrs(null);
+
+        // then — owningTeamLabel is the team's label from the registry
+        assertThat(result.get(0).owningTeamLabel()).isEqualTo("Foo Team");
+    }
+
+    @Test
+    void inFlightPrs_fallsBackToCodeWhenTeamNotFound() {
+        // given — registry does not know about unknown-team
+        Instant now = Instant.parse("2026-03-25T12:00:00Z");
+        InFlightPr pr = new InFlightPr(
+                "org/repo-b",
+                103,
+                "https://github.com/org/repo-b/pull/103",
+                "OPEN",
+                "reviewer",
+                now.minusSeconds(1800),
+                now.plusSeconds(43200),
+                43200L,
+                null,
+                "unknown-team",
+                "C_CHAN",
+                "1700000000.000003",
+                null);
+        when(prTrackingRepository.findAllInFlight(null)).thenReturn(List.of(pr));
+        when(escalationTeamsRegistry.findEscalationTeamByCode("unknown-team")).thenReturn(null);
+
+        // when
+        List<InFlightPrResponse> result = controller.inFlightPrs(null);
+
+        // then — owningTeamLabel falls back to the raw team code
+        assertThat(result.get(0).owningTeamLabel()).isEqualTo("unknown-team");
+    }
+
+    @Test
+    void inFlightPrs_passesTeamFilterToRepository() {
+        // given
+        when(prTrackingRepository.findAllInFlight("team-bar")).thenReturn(List.of());
+
+        // when
+        List<InFlightPrResponse> result = controller.inFlightPrs("team-bar");
+
+        // then
+        assertThat(result).isEmpty();
+        verify(prTrackingRepository).findAllInFlight("team-bar");
     }
 }

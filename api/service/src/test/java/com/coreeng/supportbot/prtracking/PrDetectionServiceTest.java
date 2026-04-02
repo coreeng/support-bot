@@ -9,13 +9,13 @@ import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
-import com.coreeng.supportbot.escalation.CreateEscalationRequest;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
 import com.coreeng.supportbot.github.GitHubApiException;
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.github.GitHubPullRequest;
+import com.coreeng.supportbot.github.GitHubPullRequestReview;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackException;
@@ -28,6 +28,7 @@ import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -98,6 +99,7 @@ class PrDetectionServiceTest {
         service = new PrDetectionService(
                 prUrlParser,
                 gitHubClient,
+                new TeamReviewFilter(gitHubClient),
                 prTrackingRepository,
                 prTrackingProps,
                 escalationTeamsRegistry,
@@ -184,7 +186,7 @@ class PrDetectionServiceTest {
         void setUpHappyPathStubs() {
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
         }
@@ -254,7 +256,7 @@ class PrDetectionServiceTest {
             // then
             verify(slackClient).postMessage(postMessageCaptor.capture());
             String text = postMessageCaptor.getValue().message().getText();
-            assertThat(text).contains("24 hours");
+            assertThat(text).contains("1 day");
         }
 
         @Test
@@ -369,7 +371,15 @@ class PrDetectionServiceTest {
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, prCreatedAt, GitHubPullRequest.PrState.OPEN));
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
         }
@@ -412,7 +422,7 @@ class PrDetectionServiceTest {
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
                     .thenThrow(new GitHubApiException(404, "PR not found: " + REPO + "#" + PR_NUMBER));
 
@@ -435,9 +445,17 @@ class PrDetectionServiceTest {
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, prCreatedAt, GitHubPullRequest.PrState.CLOSED));
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.CLOSED,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
 
             // when
             PrDetectionOutcome outcome = service.handleMessagePosted(messagePostedWith("msg"), ticket);
@@ -459,9 +477,17 @@ class PrDetectionServiceTest {
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, prCreatedAt, GitHubPullRequest.PrState.MERGED));
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.MERGED,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
 
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(2L));
@@ -481,9 +507,17 @@ class PrDetectionServiceTest {
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, prCreatedAt, GitHubPullRequest.PrState.OPEN));
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
             when(slaLookup.getSla(any(), eq(REPO), eq(PR_NUMBER))).thenReturn(null);
 
             // when
@@ -504,9 +538,17 @@ class PrDetectionServiceTest {
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, prCreatedAt, GitHubPullRequest.PrState.OPEN));
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
             when(slaLookup.getSla(any(), eq(REPO), eq(PR_NUMBER)))
                     .thenThrow(new GitHubApiException(500, "server error"));
 
@@ -525,12 +567,20 @@ class PrDetectionServiceTest {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, prCreatedAt, GitHubPullRequest.PrState.OPEN));
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
             when(prTrackingRepository.insertIfAbsent(any())).thenReturn(null);
 
             // when
@@ -548,27 +598,14 @@ class PrDetectionServiceTest {
     // -------------------------------------------------------------------------
 
     @Nested
-    class HandleMessagePostedImmediateEscalation {
+    class HandleMessagePostedReviewAwareDetection {
 
         @Test
-        void escalatesImmediatelyWhenSlaAlreadyBreachedAtDetectionTime() {
-            // given — PR created 2 days ago, SLA is 24 hours, already breached
+        void escalatesWhenSlaBreachedAndNoReviews() {
+            // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
-            Instant slaDeadline = prCreatedAt.plus(SLA_24H);
             Ticket ticket = ticketWithId(5L);
-
-            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
-            when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
-            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
-                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
-            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
-                    .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, prCreatedAt, GitHubPullRequest.PrState.OPEN));
-            PrTrackingRecord insertedRecord = stubTrackingRecord(prCreatedAt, slaDeadline);
-            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(insertedRecord);
+            stubBreachedPrDetection(prCreatedAt, ticket);
             when(escalationProcessingService.createEscalation(any()))
                     .thenReturn(Escalation.builder()
                             .id(new EscalationId(77L))
@@ -579,50 +616,131 @@ class PrDetectionServiceTest {
             service.handleMessagePosted(messagePostedWith("msg"), ticket);
 
             // then
-            verify(slackClient).postMessage(postMessageCaptor.capture());
-            String postedText = postMessageCaptor.getValue().message().getText();
-            assertThat(postedText)
-                    .contains(REPO)
-                    .contains("24 hours")
-                    .contains("#" + PR_NUMBER)
-                    .contains("exceeded that timeframe");
-            verify(escalationProcessingService)
-                    .createEscalation(argThat(
-                            (CreateEscalationRequest req) -> TEAM_CODE.equals(req.team()) && req.ticket() == ticket));
+            verify(escalationProcessingService).createEscalation(any());
+            verify(prTrackingRepository).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), eq(null), eq(77L));
+        }
+
+        @Test
+        void doesNotEscalateWhenSlaBreachedButChangesRequested() {
+            // given
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
+            stubBreachedPrDetection(prCreatedAt, ticketWithId(5L));
+            // Override PR stub to include reviews
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of(new GitHubPullRequestReview(
+                                    "reviewer",
+                                    GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                                    Instant.now().minusSeconds(3600)))));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(5L));
+
+            // then — SLA paused with zero remaining (already breached), no escalation
+            verify(prTrackingRepository).pauseSla(anyLong(), eq(PrTrackingStatus.CHANGES_REQUESTED), eq(Duration.ZERO));
+            verifyNoInteractions(escalationProcessingService);
+        }
+
+        @Test
+        void setsApprovedWhenSlaBreachedButApproved() {
+            // given
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
+            stubBreachedPrDetection(prCreatedAt, ticketWithId(5L));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of(new GitHubPullRequestReview(
+                                    "reviewer",
+                                    GitHubPullRequestReview.ReviewState.APPROVED,
+                                    Instant.now().minusSeconds(3600)))));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(5L));
+
+            // then
+            verify(prTrackingRepository).pauseSla(anyLong(), eq(PrTrackingStatus.APPROVED), eq(Duration.ZERO));
+            verifyNoInteractions(escalationProcessingService);
+        }
+
+        @Test
+        void pausesSlaWhenNotBreachedButChangesRequested() {
+            // given
+            Instant prCreatedAt = Instant.now().minusSeconds(3600);
+            stubNonBreachedPrDetection(prCreatedAt);
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of(new GitHubPullRequestReview(
+                                    "reviewer",
+                                    GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                                    Instant.now().minusSeconds(1800)))));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(5L));
+
+            // then
             verify(prTrackingRepository)
-                    .updateStatus(eq(insertedRecord.id()), eq(PrTrackingStatus.ESCALATED), eq(null), eq(77L));
-            verify(ticketSlackService).markTicketEscalated(ticket.queryRef());
+                    .pauseSla(anyLong(), eq(PrTrackingStatus.CHANGES_REQUESTED), any(Duration.class));
+        }
+
+        @Test
+        void pausesSlaWhenNotBreachedButApproved() {
+            // given
+            Instant prCreatedAt = Instant.now().minusSeconds(3600);
+            stubNonBreachedPrDetection(prCreatedAt);
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of(new GitHubPullRequestReview(
+                                    "reviewer",
+                                    GitHubPullRequestReview.ReviewState.APPROVED,
+                                    Instant.now().minusSeconds(1800)))));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(5L));
+
+            // then
+            verify(prTrackingRepository).pauseSla(anyLong(), eq(PrTrackingStatus.APPROVED), any(Duration.class));
         }
 
         @Test
         void marksTrackingEscalatedWhenCreateEscalationReturnsNull() {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
-
-            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
-            when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
-            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
-                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
-            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
-                    .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, prCreatedAt, GitHubPullRequest.PrState.OPEN));
-            PrTrackingRecord insertedRecord = stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H));
-            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(insertedRecord);
+            Ticket ticket = ticketWithId(5L);
+            stubBreachedPrDetection(prCreatedAt, ticket);
             when(escalationProcessingService.createEscalation(any())).thenReturn(null);
 
             // when
-            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(5L));
+            service.handleMessagePosted(messagePostedWith("msg"), ticket);
 
             // then — record must be moved to ESCALATED to prevent infinite poller loop
-            verify(prTrackingRepository)
-                    .updateStatus(
-                            eq(insertedRecord.id()),
-                            eq(com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.ESCALATED),
-                            isNull(),
-                            isNull());
+            verify(prTrackingRepository).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), isNull(), isNull());
             verify(ticketSlackService, never()).markTicketEscalated(any());
         }
 
@@ -631,35 +749,145 @@ class PrDetectionServiceTest {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
             Ticket ticket = ticketWithId(5L);
+            stubBreachedPrDetection(prCreatedAt, ticket);
+            when(escalationProcessingService.createEscalation(any()))
+                    .thenReturn(Escalation.builder()
+                            .id(new EscalationId(77L))
+                            .channelId(CHANNEL_ID)
+                            .build());
+            doThrow(new RuntimeException("slack down")).when(slackClient).postMessage(any());
 
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticket);
+
+            // then — escalation still proceeds despite Slack failure
+            verify(escalationProcessingService).createEscalation(any());
+            verify(prTrackingRepository).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), eq(null), eq(77L));
+        }
+
+        @Test
+        void usesLatestReviewWhenMixed() {
+            // given — older APPROVED, newer CHANGES_REQUESTED
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
+            stubBreachedPrDetection(prCreatedAt, ticketWithId(5L));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of(
+                                    new GitHubPullRequestReview(
+                                            "reviewer",
+                                            GitHubPullRequestReview.ReviewState.APPROVED,
+                                            Instant.now().minusSeconds(3600)),
+                                    new GitHubPullRequestReview(
+                                            "reviewer",
+                                            GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                                            Instant.now().minusSeconds(60)))));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(5L));
+
+            // then — CHANGES_REQUESTED is latest
+            verify(prTrackingRepository).pauseSla(anyLong(), eq(PrTrackingStatus.CHANGES_REQUESTED), eq(Duration.ZERO));
+            verifyNoInteractions(escalationProcessingService);
+        }
+
+        @Test
+        void filtersReviewsToOwningTeamAtDetectionTime() {
+            // given — repo configured with explicit team slug
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
+            Instant slaDeadline = prCreatedAt.plus(SLA_24H);
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
+                    .thenReturn(
+                            List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, "platform-team", sla(SLA_24H))));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
+                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+
+            // stub team resolver — "team-member" is in the owning team, "outsider" is not
+            when(gitHubClient.resolveTeamReviewers("my-org", "platform-team")).thenReturn(List.of("team-member"));
+
+            // PR has two reviews: outsider APPROVED + team-member CHANGES_REQUESTED
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of(
+                                    new GitHubPullRequestReview(
+                                            "outsider",
+                                            GitHubPullRequestReview.ReviewState.APPROVED,
+                                            Instant.now().minusSeconds(7200)),
+                                    new GitHubPullRequestReview(
+                                            "team-member",
+                                            GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                                            Instant.now().minusSeconds(3600)))));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, slaDeadline));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(5L));
+
+            // then — outsider's approval is ignored; team-member's CHANGES_REQUESTED wins
+            verify(prTrackingRepository).pauseSla(anyLong(), eq(PrTrackingStatus.CHANGES_REQUESTED), eq(Duration.ZERO));
+            verifyNoInteractions(escalationProcessingService);
+        }
+
+        private void stubBreachedPrDetection(Instant prCreatedAt, Ticket ticket) {
+            Instant slaDeadline = prCreatedAt.plus(SLA_24H);
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, prCreatedAt, GitHubPullRequest.PrState.OPEN));
-            PrTrackingRecord insertedRecord = stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H));
-            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(insertedRecord);
-            when(escalationProcessingService.createEscalation(any()))
-                    .thenReturn(Escalation.builder()
-                            .id(new EscalationId(77L))
-                            .channelId(CHANNEL_ID)
-                            .build());
-            RuntimeException slackDown = new RuntimeException("slack down");
-            doThrow(slackDown).when(slackClient).postMessage(any());
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, slaDeadline));
+        }
 
-            // when
-            PrDetectionOutcome outcome = service.handleMessagePosted(messagePostedWith("msg"), ticket);
-
-            // then
-            assertThat(outcome.shouldCloseTicket()).isFalse();
-            verify(escalationProcessingService).createEscalation(any());
-            verify(prTrackingRepository)
-                    .updateStatus(eq(insertedRecord.id()), eq(PrTrackingStatus.ESCALATED), eq(null), eq(77L));
+        private void stubNonBreachedPrDetection(Instant prCreatedAt) {
+            Instant slaDeadline = prCreatedAt.plus(SLA_24H);
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
+                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, slaDeadline));
         }
     }
 
@@ -680,8 +908,8 @@ class PrDetectionServiceTest {
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(
-                            new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H)),
-                            new PrTrackingProps.Repository(repoB, TEAM_CODE, sla(SLA_24H))));
+                            new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H)),
+                            new PrTrackingProps.Repository(repoB, TEAM_CODE, null, sla(SLA_24H))));
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
             when(prUrlParser.parse(any()))
@@ -689,9 +917,18 @@ class PrDetectionServiceTest {
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, createdAt, GitHubPullRequest.PrState.OPEN));
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
             when(gitHubClient.getPullRequest(repoB, prB))
-                    .thenReturn(new GitHubPullRequest(repoB, prB, createdAt, GitHubPullRequest.PrState.OPEN));
+                    .thenReturn(new GitHubPullRequest(
+                            repoB, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(1L, createdAt, createdAt.plus(SLA_24H)))
                     .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
@@ -718,8 +955,8 @@ class PrDetectionServiceTest {
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(
-                            new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H)),
-                            new PrTrackingProps.Repository(repoB, TEAM_CODE, sla(SLA_24H))));
+                            new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H)),
+                            new PrTrackingProps.Repository(repoB, TEAM_CODE, null, sla(SLA_24H))));
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
             when(prUrlParser.parse(any()))
@@ -729,7 +966,8 @@ class PrDetectionServiceTest {
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(10L, repoB, prB))
                     .thenReturn(false);
             when(gitHubClient.getPullRequest(repoB, prB))
-                    .thenReturn(new GitHubPullRequest(repoB, prB, createdAt, GitHubPullRequest.PrState.OPEN));
+                    .thenReturn(new GitHubPullRequest(
+                            repoB, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
 
@@ -751,8 +989,8 @@ class PrDetectionServiceTest {
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(
-                            new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H)),
-                            new PrTrackingProps.Repository(repoB, TEAM_CODE, sla(SLA_24H))));
+                            new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H)),
+                            new PrTrackingProps.Repository(repoB, TEAM_CODE, null, sla(SLA_24H))));
 
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
@@ -761,9 +999,18 @@ class PrDetectionServiceTest {
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, createdAt, GitHubPullRequest.PrState.CLOSED));
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            createdAt,
+                            GitHubPullRequest.PrState.CLOSED,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
             when(gitHubClient.getPullRequest(repoB, prB))
-                    .thenReturn(new GitHubPullRequest(repoB, prB, createdAt, GitHubPullRequest.PrState.OPEN));
+                    .thenReturn(new GitHubPullRequest(
+                            repoB, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
 
@@ -778,6 +1025,161 @@ class PrDetectionServiceTest {
     }
 
     // -------------------------------------------------------------------------
+    // Message grouping — same repo
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class HandleMessagePostedGrouping {
+
+        @Test
+        void groupsTrackedPrsFromSameRepoIntoOneMessage() {
+            // given — two PRs from the same repo, both within SLA, no reviews
+            int prB = 99;
+            Instant createdAt = Instant.now().minus(Duration.ofHours(1));
+
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
+                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
+            when(prUrlParser.parse(any()))
+                    .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(REPO, prB)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.getPullRequest(REPO, prB))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(1L, createdAt, createdAt.plus(SLA_24H)))
+                    .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("two PRs"), ticketWithId(10L));
+
+            // then — one grouped message instead of two
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("#" + PR_NUMBER).contains("#" + prB).contains("I'm tracking PRs");
+        }
+
+        @Test
+        void groupsChangesRequestedPrsFromSameRepo() {
+            // given — two PRs from same repo, both with changes requested
+            int prB = 99;
+            Instant createdAt = Instant.now().minus(Duration.ofHours(1));
+
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
+                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
+            when(prUrlParser.parse(any()))
+                    .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(REPO, prB)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            List<GitHubPullRequestReview> changesRequestedReviews = List.of(new GitHubPullRequestReview(
+                    "reviewer",
+                    GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                    Instant.now().minusSeconds(60)));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            changesRequestedReviews));
+            when(gitHubClient.getPullRequest(REPO, prB))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            prB,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            changesRequestedReviews));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(1L, createdAt, createdAt.plus(SLA_24H)))
+                    .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("two PRs"), ticketWithId(10L));
+
+            // then — one grouped changes-requested message
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text)
+                    .contains("PRs")
+                    .contains("#" + PR_NUMBER)
+                    .contains("#" + prB)
+                    .contains("changes have been requested");
+        }
+
+        @Test
+        void postsSeparateMessagesForMixedStatesInSameRepo() {
+            // given — two PRs from same repo: one tracked, one with changes requested
+            int prB = 99;
+            Instant createdAt = Instant.now().minus(Duration.ofHours(1));
+
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
+                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
+            when(prUrlParser.parse(any()))
+                    .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(REPO, prB)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            // PR_NUMBER has no reviews (tracked), prB has changes requested
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.getPullRequest(REPO, prB))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            prB,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of(new GitHubPullRequestReview(
+                                    "reviewer",
+                                    GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                                    Instant.now().minusSeconds(60)))));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(1L, createdAt, createdAt.plus(SLA_24H)))
+                    .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("two PRs"), ticketWithId(10L));
+
+            // then — two messages: one per type
+            verify(slackClient, times(2)).postMessage(any());
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Slack reaction error handling
     // -------------------------------------------------------------------------
 
@@ -788,7 +1190,7 @@ class PrDetectionServiceTest {
         void setUpStubs() {
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
 
@@ -797,7 +1199,15 @@ class PrDetectionServiceTest {
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, createdAt, GitHubPullRequest.PrState.OPEN));
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(createdAt, createdAt.plus(SLA_24H)));
         }
@@ -859,7 +1269,7 @@ class PrDetectionServiceTest {
 
         @Test
         void formatsPluralHours() {
-            assertSlaReplyContains(Duration.ofHours(36), "36 hours");
+            assertSlaReplyContains(Duration.ofHours(36), "1 day 12 hours");
         }
 
         @Test
@@ -882,12 +1292,27 @@ class PrDetectionServiceTest {
             assertSlaReplyContains(Duration.ofSeconds(1), "1 second");
         }
 
+        @Test
+        void formatsPluralDays() {
+            assertThat(PrDetectionService.formatDuration(Duration.ofDays(3))).isEqualTo("3 days");
+        }
+
+        @Test
+        void formatsSingularDay() {
+            assertThat(PrDetectionService.formatDuration(Duration.ofDays(1))).isEqualTo("1 day");
+        }
+
+        @Test
+        void formatsDaysAndHours() {
+            assertThat(PrDetectionService.formatDuration(Duration.ofHours(50))).isEqualTo("2 days 2 hours");
+        }
+
         private void assertSlaReplyContains(Duration sla, String expectedDurationText) {
             // given
             Instant createdAt = Instant.now().minus(Duration.ofHours(1));
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(sla))));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(sla))));
             when(slaLookup.getSla(any(), eq(REPO), eq(PR_NUMBER))).thenReturn(sla);
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
@@ -895,7 +1320,15 @@ class PrDetectionServiceTest {
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, createdAt, GitHubPullRequest.PrState.OPEN));
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(createdAt, createdAt.plus(sla)));
 
@@ -921,14 +1354,22 @@ class PrDetectionServiceTest {
             Instant createdAt = Instant.now().minus(Duration.ofHours(1));
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, sla(SLA_24H))));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam("Infra Integration", TEAM_CODE, "SG123"));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, createdAt, GitHubPullRequest.PrState.OPEN));
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(createdAt, createdAt.plus(SLA_24H)));
 
@@ -946,14 +1387,22 @@ class PrDetectionServiceTest {
             Instant createdAt = Instant.now().minus(Duration.ofHours(1));
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, "unknown-team", sla(SLA_24H))));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, "unknown-team", null, sla(SLA_24H))));
             when(escalationTeamsRegistry.findEscalationTeamByCode("unknown-team"))
                     .thenReturn(null);
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(REPO, PR_NUMBER, createdAt, GitHubPullRequest.PrState.OPEN));
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(createdAt, createdAt.plus(SLA_24H)));
 
@@ -963,6 +1412,177 @@ class PrDetectionServiceTest {
             // then
             verify(slackClient).postMessage(postMessageCaptor.capture());
             assertThat(postMessageCaptor.getValue().message().getText()).contains("unknown-team");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // handleQueryMessagePosted — lazy ticket creation
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class HandleQueryMessagePosted {
+
+        @BeforeEach
+        void setUpStubs() {
+            lenient().when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            lenient()
+                    .when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H))));
+            lenient()
+                    .when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
+                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void tracksOpenPrAndCreatesTicketViaSupplier() {
+            // given
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+
+            Supplier<Ticket> supplier = mock(Supplier.class);
+            when(supplier.get()).thenReturn(ticketWithId(100L));
+
+            // when
+            PrDetectionOutcome outcome = service.handleQueryMessagePosted(messagePostedWith("msg"), supplier);
+
+            // then
+            verify(supplier).get();
+            verify(prTrackingRepository).insertIfAbsent(any());
+            verify(slackClient).postMessage(any());
+            assertThat(outcome.shouldCloseTicket()).isFalse();
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void doesNotCreateTicketWhenAllPrsClosed() {
+            // given
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(5));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.MERGED,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+
+            Supplier<Ticket> supplier = mock(Supplier.class);
+
+            // when
+            service.handleQueryMessagePosted(messagePostedWith("msg"), supplier);
+
+            // then
+            verify(supplier, never()).get();
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void doesNotCreateTicketWhenPrFetchFails() {
+            // given
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenThrow(new GitHubApiException(404, "PR not found: " + REPO + "#" + PR_NUMBER));
+
+            Supplier<Ticket> supplier = mock(Supplier.class);
+
+            // when
+            service.handleQueryMessagePosted(messagePostedWith("msg"), supplier);
+
+            // then
+            verify(supplier, never()).get();
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void skipsAlreadyTrackedPr() {
+            // given
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(100L, REPO, PR_NUMBER))
+                    .thenReturn(true);
+
+            Supplier<Ticket> supplier = mock(Supplier.class);
+            when(supplier.get()).thenReturn(ticketWithId(100L));
+
+            // when
+            service.handleQueryMessagePosted(messagePostedWith("msg"), supplier);
+
+            // then
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).postMessage(any());
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void supplierCalledOnlyOnce() {
+            // given — two open PRs, supplier should be called exactly once
+            String repoB = "my-org/other-repo";
+            int prB = 99;
+            Instant createdAt = Instant.now().minus(Duration.ofHours(1));
+
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(
+                            new PrTrackingProps.Repository(REPO, TEAM_CODE, null, sla(SLA_24H)),
+                            new PrTrackingProps.Repository(repoB, TEAM_CODE, null, sla(SLA_24H))));
+            when(prUrlParser.parse(any()))
+                    .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(repoB, prB)));
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.getPullRequest(repoB, prB))
+                    .thenReturn(new GitHubPullRequest(
+                            repoB, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(1L, createdAt, createdAt.plus(SLA_24H)))
+                    .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
+
+            Supplier<Ticket> supplier = mock(Supplier.class);
+            when(supplier.get()).thenReturn(ticketWithId(100L));
+
+            // when
+            service.handleQueryMessagePosted(messagePostedWith("two PRs"), supplier);
+
+            // then
+            verify(supplier, times(1)).get();
         }
     }
 
@@ -1001,6 +1621,19 @@ class PrDetectionServiceTest {
 
     private static PrTrackingRecord stubTrackingRecord(long id, Instant prCreatedAt, Instant slaDeadline) {
         return new PrTrackingRecord(
-                id, 1L, REPO, PR_NUMBER, prCreatedAt, slaDeadline, TEAM_CODE, true, PrTrackingStatus.OPEN, null, null);
+                id,
+                1L,
+                REPO,
+                PR_NUMBER,
+                prCreatedAt,
+                slaDeadline,
+                TEAM_CODE,
+                true,
+                PrTrackingStatus.OPEN,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 }
