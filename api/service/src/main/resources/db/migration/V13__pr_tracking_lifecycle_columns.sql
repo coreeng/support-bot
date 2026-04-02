@@ -1,5 +1,5 @@
-alter type pr_tracking_status add value 'CHANGES_REQUESTED';
-alter type pr_tracking_status add value 'APPROVED';
+alter type pr_tracking_status add value if not exists 'CHANGES_REQUESTED';
+alter type pr_tracking_status add value if not exists 'APPROVED';
 
 alter table pr_tracking
     add column sla_remaining           interval,

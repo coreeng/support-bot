@@ -28,6 +28,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,7 +58,7 @@ public class PrLifecyclePoller {
         List<PrTrackingRecord> active = prTrackingRepository.findAllActive();
         log.atInfo().addArgument(active::size).log("PR lifecycle poll: {} active records");
 
-        Map<String, @Nullable Set<String>> teamMemberCache = new HashMap<>();
+        Map<String, Optional<Set<String>>> teamMemberCache = new HashMap<>();
 
         for (PrTrackingRecord record : active) {
             try {
@@ -72,7 +73,7 @@ public class PrLifecyclePoller {
         }
     }
 
-    private void processRecord(PrTrackingRecord record, Map<String, @Nullable Set<String>> teamMemberCache) {
+    private void processRecord(PrTrackingRecord record, Map<String, Optional<Set<String>>> teamMemberCache) {
         GitHubPullRequest pr;
         try {
             pr = gitHubClient.getPullRequest(record.githubRepo(), record.prNumber());
@@ -120,6 +121,11 @@ public class PrLifecyclePoller {
             if (remaining != null) {
                 prTrackingRepository.pauseSla(record.id(), PrTrackingStatus.CHANGES_REQUESTED, remaining);
                 notifyChangesRequested(record);
+            } else {
+                log.atWarn()
+                        .addArgument(record::githubRepo)
+                        .addArgument(record::prNumber)
+                        .log("Skipping CHANGES_REQUESTED transition for {}#{} — no SLA deadline available");
             }
         } else if (latestVerdict != null && latestVerdict.isApproved()) {
             handleApproval(record, pr);
@@ -181,6 +187,10 @@ public class PrLifecyclePoller {
         } else if (record.status() == PrTrackingStatus.OPEN) {
             Duration remaining = computeRemainingDuration(record);
             if (remaining == null) {
+                log.atWarn()
+                        .addArgument(record::githubRepo)
+                        .addArgument(record::prNumber)
+                        .log("Skipping APPROVED transition for {}#{} — no SLA deadline available");
                 return;
             }
             prTrackingRepository.pauseSla(record.id(), PrTrackingStatus.APPROVED, remaining);

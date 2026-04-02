@@ -495,6 +495,72 @@ class PrLifecyclePollerTest {
         }
 
         @Test
+        void skipsChangesRequestedTransitionWhenSlaDeadlineIsNull() {
+            // given — OPEN record with null slaDeadline but a CHANGES_REQUESTED review present
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = new PrTrackingRecord(
+                    1L,
+                    100L,
+                    "my-org/repo-a",
+                    11,
+                    Instant.now().minusSeconds(3600),
+                    null,
+                    "wow",
+                    true,
+                    PrTrackingStatus.OPEN,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
+                    .thenReturn(openPrWithReviews(
+                            record, List.of(review(GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED))));
+
+            // when
+            poller.poll();
+
+            // then — transition is skipped; no state change, no Slack notification
+            verify(prTrackingRepository, never()).pauseSla(anyLong(), any(), any());
+            verify(prTrackingRepository, never()).updateStatus(anyLong(), any(), any(), any());
+            verify(slackClient, never()).postMessage(any());
+        }
+
+        @Test
+        void skipsApprovedTransitionWhenSlaDeadlineIsNull() {
+            // given — OPEN record with null slaDeadline but an APPROVED review present
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = new PrTrackingRecord(
+                    1L,
+                    100L,
+                    "my-org/repo-a",
+                    11,
+                    Instant.now().minusSeconds(3600),
+                    null,
+                    "wow",
+                    true,
+                    PrTrackingStatus.OPEN,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
+                    .thenReturn(openPrWithReviews(
+                            record, List.of(review(GitHubPullRequestReview.ReviewState.APPROVED))));
+
+            // when
+            poller.poll();
+
+            // then — transition is skipped; no state change, no Slack notification
+            verify(prTrackingRepository, never()).pauseSla(anyLong(), any(), any());
+            verify(prTrackingRepository, never()).updateStatus(anyLong(), any(), any(), any());
+            verify(slackClient, never()).postMessage(any());
+        }
+
+        @Test
         void ignoresCommentedReviewsForStateTransition() {
             // given
             PrLifecyclePoller poller = createPoller();

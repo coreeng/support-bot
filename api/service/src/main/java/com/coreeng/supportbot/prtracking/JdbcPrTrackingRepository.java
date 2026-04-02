@@ -212,7 +212,9 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 """.formatted(teamFilter);
 
         return dsl.resultQuery(sql, binds.toArray()).fetch(r -> {
-            String status = checkNotNull(r.get("status", String.class));
+            String repo = checkNotNull(r.get("github_repo", String.class), "github_repo was null");
+            int prNumber = checkNotNull(r.get("pr_number", Integer.class), "pr_number was null for repo %s", repo);
+            String status = checkNotNull(r.get("status", String.class), "status was null for %s#%s", repo, prNumber);
             String waitingOn =
                     switch (status) {
                         case "OPEN", "ESCALATED" -> "TEAM";
@@ -220,8 +222,6 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                         case "APPROVED" -> "MERGE";
                         default -> "UNKNOWN";
                     };
-            String repo = checkNotNull(r.get("github_repo", String.class));
-            int prNumber = checkNotNull(r.get("pr_number", Integer.class));
             org.jooq.types.YearToSecond slaRemainingRaw = r.get("sla_remaining", org.jooq.types.YearToSecond.class);
             Long slaRemainingSeconds =
                     slaRemainingRaw != null ? slaRemainingRaw.toDuration().toSeconds() : null;
@@ -231,13 +231,22 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                     "https://github.com/%s/pull/%d".formatted(repo, prNumber),
                     status,
                     waitingOn,
-                    checkNotNull(r.get("pr_created_at", Instant.class)),
+                    checkNotNull(
+                            r.get("pr_created_at", Instant.class), "pr_created_at was null for %s#%s", repo, prNumber),
                     r.get("sla_deadline", Instant.class),
                     slaRemainingSeconds,
                     r.get("last_review_at", Instant.class),
-                    checkNotNull(r.get("owning_team", String.class)),
-                    checkNotNull(r.get("ticket_channel_id", String.class)),
-                    checkNotNull(r.get("ticket_query_ts", String.class)),
+                    checkNotNull(r.get("owning_team", String.class), "owning_team was null for %s#%s", repo, prNumber),
+                    checkNotNull(
+                            r.get("ticket_channel_id", String.class),
+                            "ticket_channel_id was null for %s#%s",
+                            repo,
+                            prNumber),
+                    checkNotNull(
+                            r.get("ticket_query_ts", String.class),
+                            "ticket_query_ts was null for %s#%s",
+                            repo,
+                            prNumber),
                     r.get("escalated_at", Instant.class));
         });
     }

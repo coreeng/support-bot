@@ -402,7 +402,7 @@ class Hub4jGitHubClientTest {
     }
 
     @Test
-    void getPullRequestReturnsEmptyReviewsOnIOException() throws IOException {
+    void getPullRequestThrowsOnReviewsIOException() throws IOException {
         // given
         GHRepository repo = mock(GHRepository.class);
         GHPullRequest pr = spy(new GHPullRequest());
@@ -417,12 +417,10 @@ class Hub4jGitHubClientTest {
         doReturn(iterable).when(pr).listReviews();
         when(iterable.toList()).thenThrow(new IOException("Connection refused"));
 
-        // when
-        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
-
-        // then
-        assertThat(result.reviews()).isNotNull().isEmpty();
-        assertThat(result.repositoryName()).isEqualTo("my-org/my-repo");
+        // when / then — IOException propagates as GitHubApiException so callers can skip the PR
+        assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("my-org/my-repo");
     }
 
     @Test

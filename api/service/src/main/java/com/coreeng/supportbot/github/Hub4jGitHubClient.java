@@ -184,32 +184,11 @@ public final class Hub4jGitHubClient implements GitHubClient {
             }
             Boolean mergeable = pr.getMergeable();
             String mergeableState = pr.getMergeableState();
-            List<String> requestedTeamReviewerLogins;
-            try {
-                requestedTeamReviewerLogins = resolveRequestedTeamMembers(pr, repositoryName, pullNumber);
-            } catch (GitHubApiException e) {
-                LOG.atWarn()
-                        .setCause(e)
-                        .addArgument(() -> repositoryName)
-                        .addArgument(() -> pullNumber)
-                        .log(
-                                "Failed to resolve requested team members for {}#{} — team filtering disabled for this PR");
-                requestedTeamReviewerLogins = List.of();
-            }
-            List<GitHubPullRequestReview> reviews;
-            try {
-                reviews = pr.listReviews().toList().stream()
-                        .filter(review -> review.getState() != GHPullRequestReviewState.PENDING)
-                        .map(review -> mapReview(review, repositoryName, pullNumber))
-                        .toList();
-            } catch (IOException e) {
-                LOG.atWarn()
-                        .setCause(e)
-                        .addArgument(() -> repositoryName)
-                        .addArgument(() -> pullNumber)
-                        .log("Failed to fetch reviews for {}#{} — proceeding without review data");
-                reviews = List.of();
-            }
+            List<String> requestedTeamReviewerLogins = resolveRequestedTeamMembers(pr, repositoryName, pullNumber);
+            List<GitHubPullRequestReview> reviews = pr.listReviews().toList().stream()
+                    .filter(review -> review.getState() != GHPullRequestReviewState.PENDING)
+                    .map(review -> mapReview(review, repositoryName, pullNumber))
+                    .toList();
             return new GitHubPullRequest(
                     repositoryName,
                     pullNumber,

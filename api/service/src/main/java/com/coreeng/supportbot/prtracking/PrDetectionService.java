@@ -41,6 +41,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -87,7 +88,7 @@ public class PrDetectionService {
         boolean anyOpenTracked = false;
         boolean metadataInitialized = false;
         boolean baseReactionsAdded = false;
-        Map<String, @Nullable Set<String>> teamReviewerCache = new HashMap<>();
+        Map<String, Optional<Set<String>>> teamReviewerCache = new HashMap<>();
         List<PendingNotification> notifications = new ArrayList<>();
         List<PendingEscalation> pendingEscalations = new ArrayList<>();
 
@@ -150,7 +151,7 @@ public class PrDetectionService {
         boolean anyOpenTracked = false;
         boolean metadataInitialized = false;
         boolean baseReactionsAdded = false;
-        Map<String, @Nullable Set<String>> teamReviewerCache = new HashMap<>();
+        Map<String, Optional<Set<String>>> teamReviewerCache = new HashMap<>();
         List<PendingNotification> notifications = new ArrayList<>();
         List<PendingEscalation> pendingEscalations = new ArrayList<>();
 
@@ -272,7 +273,7 @@ public class PrDetectionService {
             DetectedPr detectedPr,
             Ticket ticket,
             boolean canAutoCloseTicket,
-            Map<String, @Nullable Set<String>> teamReviewerCache,
+            Map<String, Optional<Set<String>>> teamReviewerCache,
             List<PendingNotification> notifications,
             List<PendingEscalation> pendingEscalations) {
         PrTrackingProps.Repository repoConfig = prTrackingProps.repositories().stream()
@@ -319,7 +320,7 @@ public class PrDetectionService {
             boolean canAutoCloseTicket,
             PrTrackingProps.Repository repoConfig,
             GitHubPullRequest prMetadata,
-            Map<String, @Nullable Set<String>> teamReviewerCache,
+            Map<String, Optional<Set<String>>> teamReviewerCache,
             List<PendingNotification> notifications,
             List<PendingEscalation> pendingEscalations) {
 
@@ -511,15 +512,24 @@ public class PrDetectionService {
                 } else if (repoNotifs.size() > 1) {
                     postGroupedNotifications(repoNotifs, queryTs, channelId);
                 }
-
-                for (PendingEscalation e : escalationsByRepo.getOrDefault(repo, List.of())) {
-                    escalateImmediately(e.tracking(), e.ticket(), e.tracking().owningTeam());
-                }
             } catch (Exception e) {
                 log.atError()
                         .setCause(e)
                         .addArgument(() -> repo)
                         .log("Failed to post notifications for repo {}, continuing with next repo");
+            }
+
+            for (PendingEscalation esc : escalationsByRepo.getOrDefault(repo, List.of())) {
+                try {
+                    escalateImmediately(
+                            esc.tracking(), esc.ticket(), esc.tracking().owningTeam());
+                } catch (Exception e) {
+                    log.atError()
+                            .setCause(e)
+                            .addArgument(esc.tracking()::githubRepo)
+                            .addArgument(esc.tracking()::prNumber)
+                            .log("Failed to escalate PR {}#{}, continuing");
+                }
             }
         }
     }
