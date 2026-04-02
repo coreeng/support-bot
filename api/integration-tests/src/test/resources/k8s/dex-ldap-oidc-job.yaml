@@ -13,10 +13,23 @@ spec:
   backoffLimit: 2
   template:
     spec:
+      automountServiceAccountToken: false
       restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: oidc-flow
-          image: alpine:3.20
+          image: python:3.12-slim-bookworm
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: DEX_ISSUER_URI
               value: "http://dex:5556"
@@ -44,14 +57,20 @@ spec:
             - name: oidc-script
               mountPath: /scripts
               readOnly: true
-          command: ["/bin/sh", "-c"]
+            - name: tmp
+              mountPath: /tmp
+          command: ["/bin/bash", "-c"]
           args:
             - |
               set -euo pipefail
-              apk add --no-cache python3 py3-requests >/dev/null
+              export HOME=/tmp
+              python3 -m pip install --break-system-packages --no-cache-dir --target /tmp/pydeps requests
               cp /scripts/oidc.py /tmp/oidc.py
+              export PYTHONPATH=/tmp/pydeps
               exec python3 /tmp/oidc.py
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: oidc-script
           configMap:
             name: PLACEHOLDER_CONFIGMAP_NAME

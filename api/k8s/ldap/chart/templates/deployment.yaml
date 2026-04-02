@@ -16,10 +16,22 @@ spec:
         app.kubernetes.io/name: {{ include "support-bot-openldap.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: openldap
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: ldap
               containerPort: {{ .Values.service.port }}
@@ -44,6 +56,8 @@ spec:
               readOnly: true
             - name: data
               mountPath: /bitnami/openldap
+            - name: tmp
+              mountPath: /tmp
           startupProbe:
             tcpSocket:
               port: ldap
@@ -70,6 +84,8 @@ spec:
         - name: bootstrap-ldif
           configMap:
             name: {{ include "support-bot-openldap.fullname" . }}-bootstrap
+        - name: tmp
+          emptyDir: {}
         - name: data
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:

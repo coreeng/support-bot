@@ -12,10 +12,27 @@ spec:
   backoffLimit: 2
   template:
     spec:
+      automountServiceAccountToken: false
       restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: smoke
-          image: alpine:3.20
+          # curl + ldapsearch preinstalled (no runtime apk); satisfies readOnlyRootFilesystem policies
+          image: nicolaka/netshoot:v0.13
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           env:
             - name: DEX_HOST
               value: "dex"
@@ -32,11 +49,10 @@ spec:
                 secretKeyRef:
                   name: ldap-secrets
                   key: admin-password
-          command: ["/bin/sh", "-c"]
+          command: ["/bin/bash", "-c"]
           args:
             - |
               set -euo pipefail
-              apk add --no-cache curl openldap-clients >/dev/null
               echo "Checking Dex telemetry health at http://${DEX_HOST}:${DEX_TELEMETRY_PORT}/healthz/live ..."
               curl -sfS "http://${DEX_HOST}:${DEX_TELEMETRY_PORT}/healthz/live" >/dev/null
               echo "OK_DEX"
@@ -46,3 +62,6 @@ spec:
                 -b "dc=supportbot,dc=local" "(uid=alice)" | grep -q "^dn: uid=alice"
               echo "OK_LDAP"
               echo "OK_ALL"
+      volumes:
+        - name: tmp
+          emptyDir: {}

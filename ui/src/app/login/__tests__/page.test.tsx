@@ -198,6 +198,7 @@ describe('LoginPage', () => {
         expect(mockSignIn).toHaveBeenCalledWith('backend-code', {
           code: 'mycode',
           provider: 'google',
+          redirectUri: `${window.location.origin}/api/oauth/callback/google`,
           redirect: false,
         })
       })
@@ -299,6 +300,7 @@ describe('LoginPage', () => {
         expect(mockSignIn).toHaveBeenCalledWith('backend-code', {
           code: 'mycode',
           provider: 'azure',
+          redirectUri: `${window.location.origin}/api/oauth/callback/azure`,
           redirect: false,
         })
       })
