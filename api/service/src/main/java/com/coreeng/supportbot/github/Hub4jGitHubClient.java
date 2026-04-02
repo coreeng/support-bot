@@ -184,11 +184,18 @@ public final class Hub4jGitHubClient implements GitHubClient {
             }
             Boolean mergeable = pr.getMergeable();
             String mergeableState = pr.getMergeableState();
-            List<String> requestedTeamReviewerLogins = resolveRequestedTeamMembers(pr, repositoryName, pullNumber);
-            List<GitHubPullRequestReview> reviews = pr.listReviews().toList().stream()
-                    .filter(review -> review.getState() != GHPullRequestReviewState.PENDING)
-                    .map(review -> mapReview(review, repositoryName, pullNumber))
-                    .toList();
+            List<String> requestedTeamReviewerLogins;
+            List<GitHubPullRequestReview> reviews;
+            if (prState == GitHubPullRequest.PrState.OPEN) {
+                requestedTeamReviewerLogins = resolveRequestedTeamMembers(pr, repositoryName, pullNumber);
+                reviews = pr.listReviews().toList().stream()
+                        .filter(review -> review.getState() != GHPullRequestReviewState.PENDING)
+                        .map(review -> mapReview(review, repositoryName, pullNumber))
+                        .toList();
+            } else {
+                requestedTeamReviewerLogins = List.of();
+                reviews = List.of();
+            }
             return new GitHubPullRequest(
                     repositoryName,
                     pullNumber,

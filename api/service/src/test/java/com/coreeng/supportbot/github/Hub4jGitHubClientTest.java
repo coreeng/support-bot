@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -400,6 +402,47 @@ class Hub4jGitHubClientTest {
         // then
         assertThat(result.reviews()).hasSize(1);
         assertThat(result.reviews().get(0).state()).isEqualTo(GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED);
+    }
+
+    @Test
+    void getPullRequestSkipsReviewsForClosedPr() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "closed");
+        // no stubEmptyReviews — listReviews must not be called for closed PRs
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then — no GitHub API call to /reviews is made
+        verify(pr, never()).listReviews();
+        assertThat(result.reviews()).isEmpty();
+        assertThat(result.requestedTeamReviewerLogins()).isEmpty();
+    }
+
+    @Test
+    void getPullRequestSkipsReviewsForMergedPr() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "closed");
+        setMergedAtRaw(pr, "2026-01-15T10:00:00Z");
+        // no stubEmptyReviews — listReviews must not be called for merged PRs
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then — no GitHub API call to /reviews is made
+        verify(pr, never()).listReviews();
+        assertThat(result.reviews()).isEmpty();
+        assertThat(result.requestedTeamReviewerLogins()).isEmpty();
     }
 
     @Test

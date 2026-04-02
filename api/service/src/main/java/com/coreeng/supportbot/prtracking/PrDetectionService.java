@@ -401,14 +401,18 @@ public class PrDetectionService {
                         slaDeadline,
                         teamLabel));
             } else {
-                notifications.add(new PendingNotification(
+                // Post the notification synchronously before escalating. The tracking record is
+                // now visible to the poller (status=OPEN, SLA already breached), so if we deferred
+                // both steps the poller could fire between the insert and postNotificationsAndEscalations,
+                // posting the escalation card before our notification arrives in the thread.
+                postText(
+                        formatEscalatedText(detectedPr.repositoryName(), detectedPr.pullNumber(), sla),
                         detectedPr.repositoryName(),
                         detectedPr.pullNumber(),
                         NotificationType.ESCALATED,
-                        sla,
-                        slaDeadline,
-                        teamLabel));
-                pendingEscalations.add(new PendingEscalation(tracking, ticket));
+                        ticket.queryTs(),
+                        ticket.channelId());
+                escalateImmediately(tracking, ticket, repoConfig.owningTeam());
             }
         } else if (latestVerdict != null && latestVerdict.requestsChanges()) {
             Duration remaining = clampNonNegative(Duration.between(Instant.now(), slaDeadline));
@@ -552,10 +556,7 @@ public class PrDetectionService {
                     case APPROVED ->
                         "<%s|PR #%d> for `%s` has been approved and is ready to merge. :white_check_mark:"
                                 .formatted(prUrl(n.repo(), n.prNumber()), n.prNumber(), n.repo());
-                    case ESCALATED ->
-                        "Pull requests submitted to `%s` are expected to be reviewed within %s. It looks like <%s|PR #%d> has exceeded that timeframe."
-                                .formatted(
-                                        n.repo(), formatDuration(n.sla()), prUrl(n.repo(), n.prNumber()), n.prNumber());
+                    case ESCALATED -> formatEscalatedText(n.repo(), n.prNumber(), n.sla());
                 };
         postText(text, n.repo(), n.prNumber(), n.type(), queryTs, channelId);
     }
@@ -628,6 +629,11 @@ public class PrDetectionService {
 
     private static String prUrl(String repo, int prNumber) {
         return "https://github.com/%s/pull/%d".formatted(repo, prNumber);
+    }
+
+    private static String formatEscalatedText(String repo, int prNumber, Duration sla) {
+        return "Pull requests submitted to `%s` are expected to be reviewed within %s. It looks like <%s|PR #%d> has exceeded that timeframe."
+                .formatted(repo, formatDuration(sla), prUrl(repo, prNumber), prNumber);
     }
 
     private void postText(
