@@ -22,6 +22,18 @@ def _truthy(key: str, e: dict) -> bool:
     return e.get(key, "").lower() in ("1", "true", "yes")
 
 
+def build_redirect_uris(e: dict) -> str:
+    """staticClients.redirectURIs from DEX_REDIRECT_URIS (comma-separated; no commas inside a URI)."""
+    combined = (e.get("DEX_REDIRECT_URIS") or "").strip()
+    uris = [u.strip() for u in combined.split(",") if u.strip()]
+    if not uris:
+        raise SystemExit("Set DEX_REDIRECT_URIS in .env.local (comma-separated OAuth redirect URIs).")
+    lines = ["    redirectURIs:"]
+    for u in uris:
+        lines.append(f"      - {json.dumps(u)}")
+    return "\n".join(lines) + "\n"
+
+
 def build_password_db(e: dict) -> str:
     """Dex local email/password login. On only when DEX_ENABLE_PASSWORD_DB=true (default: off)."""
     if not _truthy("DEX_ENABLE_PASSWORD_DB", e):
@@ -133,6 +145,7 @@ def build_connectors(e: dict) -> str:
 
 template = template_file.read_text()
 template = template.replace("@PASSWORD_DB@", build_password_db(env))
+template = template.replace("@REDIRECT_URIS@", build_redirect_uris(env))
 template = template.replace("@CONNECTORS@", build_connectors(env))
 
 

@@ -38,3 +38,4 @@ To automatically fix formatting:
 | Check naming conventions | `./gradlew checkstyleMain` |
 | Compile with ErrorProne | `./gradlew compileJava` |
 | Full build | `./gradlew build` |
+| Tests (no Testcontainers) | From `api/`: `make test` (runs `db-up` + `-Ddocker=true`), or `make db-up` then `./gradlew test -Ddocker=true` / `SUPPORTBOT_USE_LOCAL_DB=true ./gradlew test` |

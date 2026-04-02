@@ -221,13 +221,20 @@ val postgresService =
     project.gradle.sharedServices.registerIfAbsent("postgresContainer", PostgresService::class.java) {}
 
 /**
- * When `-Ddocker=true`, Flyway/jOOQ use a Postgres on the host (not Testcontainers).
+ * When true, Flyway/jOOQ use Postgres on the host (not Testcontainers / Ryuk).
+ * Enable with `-Ddocker=true` or environment variable `SUPPORTBOT_USE_LOCAL_DB=true`
+ * (after `make db-up` or equivalent).
+ *
  * Defaults match [service/docker-compose.yaml] (`make db-up`).
  *
  * Override order: `-Dsupportbot.localDb.*` system properties, then env
  * `SUPPORTBOT_LOCAL_DB_URL` / `SUPPORTBOT_LOCAL_DB_USER` / `SUPPORTBOT_LOCAL_DB_PASSWORD`,
  * then defaults. API Dockerfile passes `-Dsupportbot.localDb.*` for its embedded Postgres.
  */
+fun useHostPostgresForFlywayAndJooq(): Boolean =
+    (System.getProperty("docker") ?: "false") == "true"
+        || System.getenv("SUPPORTBOT_USE_LOCAL_DB") == "true"
+
 fun localPostgresJdbcUrl(): String =
     System.getProperty("supportbot.localDb.url")
         ?: System.getenv("SUPPORTBOT_LOCAL_DB_URL")
@@ -247,13 +254,12 @@ flyway {
     locations = arrayOf("filesystem:./src/main/resources/db/migration")
 }
 tasks.withType<AbstractFlywayTask> {
-    val dockerBuild = System.getProperty("docker") ?: "false"
-    if (dockerBuild != "true") {
+    if (!useHostPostgresForFlywayAndJooq()) {
         usesService(postgresService)
     }
     inputs.dir("src/main/resources/db/migration")
     doFirst {
-        val container = if (dockerBuild != "true") {
+        val container = if (!useHostPostgresForFlywayAndJooq()) {
             postgresService.get().container
         } else null
         url = container?.jdbcUrl ?: localPostgresJdbcUrl()
@@ -290,13 +296,12 @@ jooq {
     }
 }
 tasks.withType<CodegenTask> {
-    val dockerBuild = System.getProperty("docker") ?: "false"
-    if (dockerBuild != "true") {
+    if (!useHostPostgresForFlywayAndJooq()) {
         usesService(postgresService)
     }
     dependsOn("flywayMigrate")
     doFirst {
-        val container = if (dockerBuild != "true") {
+        val container = if (!useHostPostgresForFlywayAndJooq()) {
             postgresService.get().container
         } else null
         jooq {

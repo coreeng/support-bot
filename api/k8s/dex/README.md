@@ -4,9 +4,15 @@ Dex runs the upstream image [`ghcr.io/dexidp/dex`](https://github.com/dexidp/dex
 
 Configuration is the structured `config:` map in values; the chart renders it into a Secret as `config.yaml` (there is no `${ENV}` expansion in that file—put real strings in a private overlay or use `helm upgrade --set` for secrets).
 
+## RBAC (GKE / restricted clusters)
+
+The **dex/dex** chart creates **namespace** `Role` + `RoleBinding` for `dex.coreos.com` when `rbac.create` is true. With the default `rbac.createClusterScoped: true`, it also creates **ClusterRole** + **ClusterRoleBinding** so Dex can manage CRDs — that requires cluster-level IAM (e.g. `container.clusterRoles.create`) and is unnecessary for this repo’s setup (**sqlite** storage and config in a **Secret**).
+
+`values-dexidp.yaml` sets **`rbac.createClusterScoped: false`** so Helm only applies namespaced RBAC. If you switch Dex to **Kubernetes storage** or an operator flow that must create CRDs, you may need cluster RBAC or a platform team to install those resources.
+
 ## Files
 
-- `values-dexidp.yaml` — baseline: issuer, sqlite storage, web/telemetry ports, static client, optional empty `connectors: []`.
+- `values-dexidp.yaml` — baseline: issuer, sqlite storage, web/telemetry ports, static client, optional empty `connectors: []`, namespaced RBAC only (`rbac.createClusterScoped: false`).
 - `values-integration.yaml` — sample integration overrides (issuer, LDAP connector to `ldap:389`, resource bumps). Ingress is **off** by default; use in-cluster `http://dex:5556` or port-forward.
 - `values-dex-oidc-incluster.yaml` — optional Tier 2 overlay: `config.issuer: http://dex:5556`, static client redirect `http://127.0.0.1:8765/callback`, full LDAP connector (list replace-safe). Use when the API and integration Job talk to Dex only in-cluster and `DEX_ISSUER_URI` is `http://dex:5556`.
 - `values-legacy-core-platform-app.yaml` — archived `core-platform-app` + templated `config.yaml` with `${DEX_*}` placeholders.

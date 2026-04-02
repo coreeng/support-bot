@@ -8,6 +8,13 @@
 fullnameOverride: dex
 replicaCount: 1
 
+# Chart default rbac.createClusterScoped: true installs ClusterRole/ClusterRoleBinding for CRD
+# management (apiextensions.k8s.io). That fails on tenant-scoped deployers (e.g. GKE SA without
+# container.clusterRoles.create). Sqlite + config Secret does not need cluster RBAC.
+rbac:
+  create: true
+  createClusterScoped: false
+
 image:
   repository: ghcr.io/dexidp/dex
   pullPolicy: IfNotPresent

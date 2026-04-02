@@ -75,6 +75,14 @@ When you add **Google** or **Microsoft** entries under `config.connectors` in De
 - Use `make -C dex render-config` (Python renderer) so `$` in bcrypt hashes is not stripped by the shell.
 - LDAP: verify `DEX_LDAP_BIND_DN` / `DEX_LDAP_BIND_PW` against phpLDAPadmin or `ldapwhoami`.
 
+### Dex Helm: `clusterroles` / `clusterrolebindings` forbidden
+
+**Symptoms:** `helm upgrade --install support-bot-dex` fails with the deployer SA unable to create `ClusterRole` or `ClusterRoleBinding` (e.g. GKE: `container.clusterRoles.create`).
+
+**Cause:** The upstream **dex/dex** chart used to default `rbac.createClusterScoped: true`, which adds cluster-scoped RBAC for CRD management. Our Dex install uses **sqlite** and a **config Secret** — that cluster RBAC is not required.
+
+**Fix:** `api/k8s/dex/values-dexidp.yaml` sets `rbac.createClusterScoped: false` (namespaced `Role` / `RoleBinding` only). Re-deploy with current values; see [Dex Helm README](../../api/k8s/dex/README.md#rbac-gke--restricted-clusters).
+
 ### Helm template failures (LDAP / Dex charts)
 
 **Symptoms:** `helm template` fails after changing values or chart paths.

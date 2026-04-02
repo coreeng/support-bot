@@ -1,6 +1,6 @@
 .PHONY: test
-test: # Runs tests and expects a running application
-	../gradlew :functional:test
+test: # Requires API at SERVICE_ENDPOINT; opt-in env avoids accidental runs from root ./gradlew test
+	RUN_FUNCTIONAL_TESTS=true ../gradlew :functional:test
 
 .PHONY: test-integrated
 test-integrated: # Start the service and run tests in the same command

@@ -20,6 +20,12 @@ java {
 
 val serviceLifecycle = ServiceLifecycle(project, "functional", logger)
 
+/** True when the build runs :functional:testIntegrated (starts API before :functional:test). */
+var functionalTestsFromIntegrated = false
+gradle.taskGraph.whenReady {
+    functionalTestsFromIntegrated = allTasks.any { task -> task.path.contains("testIntegrated", ignoreCase = true) }
+}
+
 repositories {
     mavenCentral()
 }
@@ -47,11 +53,32 @@ dependencies {
     testImplementation("org.jspecify:jspecify:1.0.0")
 }
 
-// Test will be called from make target stubbed-functional
-// You can also run it manually if you have the app started
+// Standalone :functional:test expects a running API. Root ./gradlew test must NOT run these by default:
+// a TCP probe on :8080 is unreliable (other processes listen there but are not Support Bot → ConnectException).
+// Opt in with RUN_FUNCTIONAL_TESTS=true, -PrunFunctionalTests, or :functional:testIntegrated.
 
 // Print test summary details and configure test task
 tasks.test {
+    onlyIf(":functional:testIntegrated, RUN_FUNCTIONAL_TESTS=true, or -PrunFunctionalTests") {
+        val runByEnv = System.getenv("RUN_FUNCTIONAL_TESTS") == "true"
+        when {
+            functionalTestsFromIntegrated -> true
+            project.hasProperty("runFunctionalTests") -> true
+            runByEnv -> true
+            else -> {
+                logger.lifecycle(
+                    ":functional:test skipped — black-box tests need the API. " +
+                        "Use :functional:testIntegrated, or with the service already up: " +
+                        "RUN_FUNCTIONAL_TESTS=true ./gradlew :functional:test (or -PrunFunctionalTests). " +
+                        "See api/functional/README.md."
+                )
+                false
+            }
+        }
+    }
+
+    finalizedBy("stopService")
+
     useJUnitPlatform()
 
     // Support test filtering via -Dtests="pattern" (e.g., -Dtests="*SomeTest*")
@@ -137,11 +164,7 @@ tasks.register("testIntegrated") {
     }
 }
 
-// Chain: testIntegrated -> test -> stopService
-// This guarantees stopService runs after test completes
-tasks.test {
-    finalizedBy("stopService")
-}
+// Chain: testIntegrated -> test -> stopService (finalizedBy on test task above)
 
 tasks.register("stopService") {
     doLast {

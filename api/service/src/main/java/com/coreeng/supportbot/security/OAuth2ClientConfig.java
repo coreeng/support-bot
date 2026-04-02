@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.security;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,8 @@ public class OAuth2ClientConfig {
             @Value("${spring.security.oauth2.client.provider.azure.tenant-id:}") String azureTenantId,
             @Value("${spring.security.oauth2.client.registration.dex.client-id:}") String dexClientId,
             @Value("${spring.security.oauth2.client.registration.dex.client-secret:}") String dexClientSecret,
+            @Value("${spring.security.oauth2.client.registration.dex.scope:openid,email,profile,groups}")
+                    String dexScope,
             @Value("${spring.security.oauth2.client.provider.dex.issuer-uri:}") String dexIssuerUri) {
         List<String> allowlist = securityProperties.oauth2().loginProviders();
         var registrations = new ArrayList<ClientRegistration>();
@@ -50,7 +53,7 @@ public class OAuth2ClientConfig {
                 && isNotBlank(dexClientSecret)
                 && isNotBlank(dexIssuerUri)
                 && isLoginProviderAllowed(allowlist, "dex")) {
-            registrations.add(dexClientRegistration(dexClientId, dexClientSecret, dexIssuerUri));
+            registrations.add(dexClientRegistration(dexClientId, dexClientSecret, dexIssuerUri, dexScope));
             log.info("Dex OAuth2 client registered");
         }
 
@@ -98,7 +101,8 @@ public class OAuth2ClientConfig {
                 .build();
     }
 
-    private ClientRegistration dexClientRegistration(String clientId, String clientSecret, String issuerUri) {
+    private ClientRegistration dexClientRegistration(
+            String clientId, String clientSecret, String issuerUri, String scopeProperty) {
         String normalizedIssuerUri =
                 issuerUri.endsWith("/") ? issuerUri.substring(0, issuerUri.length() - 1) : issuerUri;
         return ClientRegistration.withRegistrationId("dex")
@@ -107,7 +111,7 @@ public class OAuth2ClientConfig {
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
-                .scope("openid", "email", "profile", "groups")
+                .scope(dexScopesFromProperty(scopeProperty))
                 .authorizationUri(normalizedIssuerUri + "/auth")
                 .tokenUri(normalizedIssuerUri + "/token")
                 .jwkSetUri(normalizedIssuerUri + "/keys")
@@ -115,6 +119,21 @@ public class OAuth2ClientConfig {
                 .userNameAttributeName(IdTokenClaimNames.SUB)
                 .clientName("Dex")
                 .build();
+    }
+
+    /**
+     * Same comma-separated format as {@code spring.security.oauth2.client.registration.dex.scope} /
+     * {@code DEX_SCOPES}.
+     */
+    private static String[] dexScopesFromProperty(String scopeProperty) {
+        if (scopeProperty == null || scopeProperty.isBlank()) {
+            return new String[] {"openid", "email", "profile", "groups"};
+        }
+        String[] parsed = Arrays.stream(scopeProperty.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toArray(String[]::new);
+        return parsed.length > 0 ? parsed : new String[] {"openid", "email", "profile", "groups"};
     }
 
     private static boolean isNotBlank(String value) {

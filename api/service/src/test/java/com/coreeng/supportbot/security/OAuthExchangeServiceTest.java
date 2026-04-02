@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.teams.SupportTeamService;
@@ -54,7 +55,8 @@ class OAuthExchangeServiceTest {
                 new SecurityProperties.AllowListProperties(allowedEmails, allowedDomains));
         var jwtService = new JwtService(props);
         var allowListService = new AllowListService(props);
-        when(jwtGroupTeamMerger.mergeForProvider(
+        lenient()
+                .when(jwtGroupTeamMerger.mergeForProvider(
                         org.mockito.ArgumentMatchers.anyString(),
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any()))

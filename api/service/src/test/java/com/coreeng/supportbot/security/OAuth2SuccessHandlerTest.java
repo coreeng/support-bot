@@ -3,6 +3,7 @@ package com.coreeng.supportbot.security;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -56,7 +57,8 @@ class OAuth2SuccessHandlerTest {
         var jwtService = new JwtService(props);
         var authCodeStore = new AuthCodeStore();
         var allowListService = new AllowListService(props);
-        when(jwtGroupTeamMerger.mergeForProvider(
+        lenient()
+                .when(jwtGroupTeamMerger.mergeForProvider(
                         org.mockito.ArgumentMatchers.anyString(),
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any()))
@@ -82,7 +84,7 @@ class OAuth2SuccessHandlerTest {
     private Authentication mockAuth(String registrationId, Map<String, Object> attributes) {
         var oauth2User = mock(OAuth2User.class);
         when(oauth2User.getAttribute(anyString())).thenAnswer(inv -> attributes.get(inv.getArgument(0, String.class)));
-        when(oauth2User.getAttributes()).thenReturn(attributes);
+        lenient().when(oauth2User.getAttributes()).thenReturn(attributes);
         var authentication = mock(OAuth2AuthenticationToken.class);
         when(authentication.getPrincipal()).thenReturn(oauth2User);
         when(authentication.getAuthorizedClientRegistrationId()).thenReturn(registrationId);

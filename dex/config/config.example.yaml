@@ -20,12 +20,6 @@ staticClients:
   - id: ${DEX_CLIENT_ID}
     name: Support Bot
     secret: ${DEX_CLIENT_SECRET}
-    redirectURIs:
-      - ${DEX_REDIRECT_URI_1}
-      - ${DEX_REDIRECT_URI_2}
-      - ${DEX_REDIRECT_URI_3}
-      - ${DEX_REDIRECT_URI_4}
-      - ${DEX_REDIRECT_URI_5}
-      - ${DEX_REDIRECT_URI_6}
+@REDIRECT_URIS@
 
 @CONNECTORS@
