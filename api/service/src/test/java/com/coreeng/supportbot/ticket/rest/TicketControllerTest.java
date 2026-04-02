@@ -11,6 +11,7 @@ import com.google.common.collect.ImmutableList;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,13 +32,16 @@ class TicketControllerTest {
     @Mock
     private TicketUIMapper mapper;
 
+    @Mock
+    private TicketTeamSuggestionsService teamSuggestionsService;
+
     private TicketController controller;
 
     private TicketId ticketId;
 
     @BeforeEach
     void setUp() {
-        controller = new TicketController(queryService, ticketUpdateService, mapper);
+        controller = new TicketController(queryService, ticketUpdateService, mapper, teamSuggestionsService);
         ticketId = new TicketId(123L);
     }
 
@@ -147,6 +151,36 @@ class TicketControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(mappedTicketUI);
         verify(mapper).mapToUI(detailedTicket, "Original message");
+    }
+
+    @Test
+    void shouldReturnGroupedTeamSuggestions() {
+        // given
+        TicketTeamsSuggestion suggestion =
+                new TicketTeamsSuggestion(ImmutableList.of("AuthorTeam"), ImmutableList.of("OtherTeam"));
+        when(teamSuggestionsService.getTeamSuggestionsForTicket(ticketId)).thenReturn(Optional.of(suggestion));
+
+        // when
+        ResponseEntity<TicketTeamSuggestionsUI> response = controller.getTeamSuggestions(ticketId);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        TicketTeamSuggestionsUI body = response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.suggestedTeams()).containsExactly("AuthorTeam");
+        assertThat(body.otherTeams()).containsExactly("OtherTeam");
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenTicketDoesNotExist() {
+        // given
+        when(teamSuggestionsService.getTeamSuggestionsForTicket(ticketId)).thenReturn(Optional.empty());
+
+        // when
+        ResponseEntity<TicketTeamSuggestionsUI> response = controller.getTeamSuggestions(ticketId);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     private static DetailedTicket detailedTicket(TicketId id) {
