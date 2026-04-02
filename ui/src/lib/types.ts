@@ -125,7 +125,8 @@ export interface KnowledgeGapsStatus {
 
 export interface QuerySummary {
     text: string
-    link: string | null
+    timestamp: string
+    ticketId: string
 }
 
 export interface DimensionSummary {

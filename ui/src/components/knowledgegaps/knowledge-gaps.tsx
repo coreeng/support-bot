@@ -1,11 +1,13 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
-import { ChevronDown, ChevronRight, ExternalLink, BarChart3, Download, Upload, FileText, Play, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react'
+import React, { useState, useRef, useEffect, useId } from 'react'
+import { ChevronDown, ChevronRight, BarChart3, Download, Upload, FileText, Play, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAnalysis, apiFetch } from '@/lib/hooks'
 import { useToast } from '@/components/ui/toast'
 import { useAuth } from '@/hooks/useAuth'
+import type { DimensionSummary, QuerySummary } from '@/lib/types'
+import EditTicketModal from '@/components/tickets/EditTicketModal'
 
 interface AnalysisStatus {
     jobId: string | null
@@ -36,8 +38,56 @@ export default function KnowledgeGapsPage() {
     const [showCompletedStatus, setShowCompletedStatus] = useState(false)
     const [completedMessage, setCompletedMessage] = useState<string>('')
     const [isCompletionError, setIsCompletionError] = useState(false)
+    const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
+    const [isTicketModalOpen, setIsTicketModalOpen] = useState(false)
     const isCompletedRef = useRef(false)
     const [isAnalysisEnabled, setIsAnalysisEnabled] = useState(false)
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const settingsContainerRef = useRef<HTMLDivElement>(null)
+    const settingsTriggerRef = useRef<HTMLButtonElement>(null)
+    const queryWindowSelectRef = useRef<HTMLSelectElement>(null)
+    const restoreFocusOnCloseRef = useRef(false)
+    const wasSettingsOpenRef = useRef(false)
+    const settingsTitleId = useId()
+    const settingsDescriptionId = useId()
+    const settingsPanelId = 'analysis-settings-popover'
+
+    const formatQueryTimestamp = (timestamp: string): string => {
+        const parsed = new Date(timestamp)
+
+        if (isNaN(parsed.getTime())) {
+            return timestamp
+        }
+
+        return new Intl.DateTimeFormat('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+            timeZone: 'UTC',
+        }).format(parsed)
+    }
+
+    const openTicketModal = (ticketId: string) => {
+        setSelectedTicketId(ticketId)
+        setIsTicketModalOpen(true)
+    }
+
+    const closeSettingsAndRun = (action: () => void) => {
+        restoreFocusOnCloseRef.current = false
+        setIsSettingsOpen(false)
+        action()
+    }
+
+    const handleTicketModalSuccess = () => {
+        if (selectedTicketId) {
+            queryClient.invalidateQueries({ queryKey: ['ticket', selectedTicketId] })
+        }
+        queryClient.invalidateQueries({ queryKey: ['tickets'] })
+        queryClient.invalidateQueries({ queryKey: ['analysis'] })
+    }
 
     // Stop polling
     const stopPolling = () => {
@@ -162,8 +212,47 @@ export default function KnowledgeGapsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [analysisStatus?.running])
 
+    useEffect(() => {
+        if (isSettingsOpen) {
+            queryWindowSelectRef.current?.focus()
+        } else if (wasSettingsOpenRef.current && restoreFocusOnCloseRef.current) {
+            settingsTriggerRef.current?.focus()
+            restoreFocusOnCloseRef.current = false
+        }
+
+        wasSettingsOpenRef.current = isSettingsOpen
+    }, [isSettingsOpen])
+
+    useEffect(() => {
+        if (!isSettingsOpen) {
+            return
+        }
+
+        const handlePointerDown = (event: MouseEvent) => {
+            if (!settingsContainerRef.current?.contains(event.target as Node)) {
+                restoreFocusOnCloseRef.current = true
+                setIsSettingsOpen(false)
+            }
+        }
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                restoreFocusOnCloseRef.current = true
+                setIsSettingsOpen(false)
+            }
+        }
+
+        document.addEventListener('pointerdown', handlePointerDown)
+        document.addEventListener('keydown', handleKeyDown)
+
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDown)
+            document.removeEventListener('keydown', handleKeyDown)
+        }
+    }, [isSettingsOpen])
+
     const handleStartAnalysis = async () => {
-        setIsStartingAnalysis(true)
+        closeSettingsAndRun(() => setIsStartingAnalysis(true))
         try {
             const response = await apiFetch(`/api/analysis/run?days=${selectedDays}`, {
                 method: 'POST',
@@ -237,13 +326,15 @@ export default function KnowledgeGapsPage() {
         }
     }
 
-    const toggleItemExpansion = (itemName: string) => {
+    const getItemExpansionKey = (scope: 'support-area' | 'knowledge-gap', itemName: string) => `${scope}:${itemName}`
+
+    const toggleItemExpansion = (itemKey: string) => {
         setExpandedItems(prev => {
             const next = new Set(prev)
-            if (next.has(itemName)) {
-                next.delete(itemName)
+            if (next.has(itemKey)) {
+                next.delete(itemKey)
             } else {
-                next.add(itemName)
+                next.add(itemKey)
             }
             return next
         })
@@ -345,7 +436,6 @@ export default function KnowledgeGapsPage() {
             countPill: 'bg-blue-100 text-blue-700',
             queryBg: 'bg-blue-50 hover:bg-blue-100',
             queryAccent: 'border-l-blue-400',
-            link: 'text-blue-600 hover:text-blue-700',
             border: 'border-blue-100',
             volumeBar: 'bg-blue-400',
             volumeTrack: 'bg-blue-100',
@@ -355,76 +445,81 @@ export default function KnowledgeGapsPage() {
             countPill: 'bg-amber-100 text-amber-700',
             queryBg: 'bg-amber-50 hover:bg-amber-100',
             queryAccent: 'border-l-amber-400',
-            link: 'text-amber-600 hover:text-amber-700',
             border: 'border-amber-100',
             volumeBar: 'bg-amber-400',
             volumeTrack: 'bg-amber-100',
         },
     }
 
-    const renderAreaItem = (item: { name: string; coveragePercentage: number; queryCount: number; queries: { text: string; link: string | null }[] }, index: number, theme: ColorTheme = 'blue', maxQueryCount: number = 1) => {
-        const isExpanded = expandedItems.has(item.name)
+    const renderQueryRow = (query: QuerySummary, qIndex: number, colors: typeof themeClasses.blue) => (
+        <button
+            key={qIndex}
+            type="button"
+            aria-label={`View ticket ${query.ticketId}`}
+            onClick={() => openTicketModal(query.ticketId)}
+            className={`flex items-center justify-between gap-3 p-3.5 rounded-lg border-l-4 ${colors.queryAccent} ${colors.queryBg} transition-all duration-150 cursor-pointer hover:brightness-95 text-left`}
+        >
+            <p className="flex-1 min-w-0 text-sm font-medium text-gray-800 leading-relaxed">{query.text}</p>
+            <span className="shrink-0 text-xs text-gray-400 whitespace-nowrap">{formatQueryTimestamp(query.timestamp)}</span>
+        </button>
+    )
+
+    const renderAreaItem = (
+        item: DimensionSummary,
+        index: number,
+        scope: 'support-area' | 'knowledge-gap',
+        theme: ColorTheme = 'blue',
+        maxQueryCount: number = 1
+    ) => {
+        const itemKey = getItemExpansionKey(scope, item.name)
+        const isExpanded = expandedItems.has(itemKey)
         const colors = themeClasses[theme]
         const volumePercent = Math.round((item.queryCount / maxQueryCount) * 100)
+        const contentId = `${itemKey}-queries`
 
         return (
-            <div key={item.name} className="border border-gray-200 rounded-xl bg-white hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer" onClick={() => toggleItemExpansion(item.name)}>
+            <div key={itemKey} className="border border-gray-200 rounded-xl bg-white hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
                 <div className="p-5">
-                    <div className="flex items-center gap-4">
-                        <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${colors.badge} font-bold text-lg shrink-0`}>
-                            {index + 1}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-semibold text-gray-900 text-lg truncate">{item.name}</h3>
-                                <div className="flex items-center gap-3 shrink-0 ml-3">
-                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${colors.countPill}`}>
-                                        {item.queryCount.toLocaleString()} {item.queryCount === 1 ? 'query' : 'queries'}
-                                    </span>
-                                    {isExpanded ? (
-                                        <ChevronDown className="w-5 h-5 text-gray-400" />
-                                    ) : (
-                                        <ChevronRight className="w-5 h-5 text-gray-400" />
-                                    )}
+                    <button
+                        type="button"
+                        onClick={() => toggleItemExpansion(itemKey)}
+                        aria-expanded={isExpanded}
+                        aria-controls={contentId}
+                        className="w-full text-left"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${colors.badge} font-bold text-lg shrink-0`}>
+                                {index + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-semibold text-gray-900 text-lg truncate">{item.name}</h3>
+                                    <div className="flex items-center gap-3 shrink-0 ml-3">
+                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${colors.countPill}`}>
+                                            {item.queryCount.toLocaleString()} {item.queryCount === 1 ? 'total query' : 'total queries'}
+                                        </span>
+                                        {isExpanded ? (
+                                            <ChevronDown className="w-5 h-5 text-gray-400" />
+                                        ) : (
+                                            <ChevronRight className="w-5 h-5 text-gray-400" />
+                                        )}
+                                    </div>
+                                </div>
+                                <div className={`mt-2.5 h-2.5 rounded-full ${colors.volumeTrack} overflow-hidden`}>
+                                    <div
+                                        className={`h-full rounded-full ${colors.volumeBar} transition-all duration-700 ease-out`}
+                                        style={{ width: `${volumePercent}%` }}
+                                    />
                                 </div>
                             </div>
-                            <div className={`mt-2.5 h-2.5 rounded-full ${colors.volumeTrack} overflow-hidden`}>
-                                <div
-                                    className={`h-full rounded-full ${colors.volumeBar} transition-all duration-700 ease-out`}
-                                    style={{ width: `${volumePercent}%` }}
-                                />
-                            </div>
                         </div>
-                    </div>
+                    </button>
 
                     {isExpanded && (
-                        <div className={`mt-5 pt-5 border-t ${colors.border}`} onClick={(e) => e.stopPropagation()}>
-                            <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Relevant Support Queries</h4>
+                        <div id={contentId} className={`mt-5 pt-5 border-t ${colors.border}`}>
+                            <p className="mb-3 text-xs text-gray-400">Up to 5 most recent queries</p>
                             <div className="space-y-2">
-                                {item.queries.map((query, qIndex) => (
-                                    query.link ? (
-                                        <a
-                                            key={qIndex}
-                                            href={query.link}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className={`flex items-start gap-3 p-3.5 rounded-lg border-l-4 ${colors.queryAccent} ${colors.queryBg} transition-all duration-150 group no-underline`}
-                                        >
-                                            <span className="text-sm font-medium text-gray-800 flex-1 leading-relaxed">{query.text}</span>
-                                            <span className={`shrink-0 ${colors.link} flex items-center gap-1.5 text-xs font-semibold opacity-60 group-hover:opacity-100 transition-opacity`}>
-                                                <span className="hidden sm:inline">View</span>
-                                                <ExternalLink className="w-3.5 h-3.5" />
-                                            </span>
-                                        </a>
-                                    ) : (
-                                        <div
-                                            key={qIndex}
-                                            className={`flex items-start gap-3 p-3.5 rounded-lg border-l-4 ${colors.queryAccent} ${colors.queryBg}`}
-                                        >
-                                            <span className="text-sm font-medium text-gray-800 flex-1 leading-relaxed">{query.text}</span>
-                                        </div>
-                                    )
-                                ))}
+                                {item.queries.map((query, qIndex) => renderQueryRow(query, qIndex, colors))}
                             </div>
                         </div>
                     )}
@@ -472,60 +567,108 @@ export default function KnowledgeGapsPage() {
                         </p>
                     </div>
                     {isSupportEngineer && (
-                        <div className="flex items-center gap-2">
-                                <select
-                                    value={selectedDays}
-                                    onChange={(e) => setSelectedDays(Number(e.target.value))}
-                                    className="h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        <div ref={settingsContainerRef} className="relative">
+                            {!isAnalysisEnabled && (
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".jsonl"
+                                    onChange={handleFileChange}
+                                    className="hidden"
+                                />
+                            )}
+                            <button
+                                ref={settingsTriggerRef}
+                                type="button"
+                                onClick={() => {
+                                    restoreFocusOnCloseRef.current = false
+                                    setIsSettingsOpen(current => !current)
+                                }}
+                                disabled={isAnalysisEnabled && (analysisStatus?.running || isStartingAnalysis || showCompletedStatus)}
+                                aria-haspopup="dialog"
+                                aria-expanded={isSettingsOpen}
+                                aria-controls={settingsPanelId}
+                                className="h-10 inline-flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            >
+                                <Play className="w-4 h-4" />
+                                {isAnalysisEnabled && isStartingAnalysis ? 'Checking...' : 'Run Analysis'}
+                            </button>
+                            {isSettingsOpen && (
+                                <div
+                                    id={settingsPanelId}
+                                    role="dialog"
+                                    aria-modal="false"
+                                    aria-labelledby={settingsTitleId}
+                                    aria-describedby={settingsDescriptionId}
+                                    className="absolute right-0 mt-2 w-64 rounded-2xl border border-gray-200 bg-white p-4 shadow-xl z-10"
                                 >
-                                    <option value={7}>Week</option>
-                                    <option value={31}>Month</option>
-                                    <option value={92}>Quarter</option>
-                                </select>
-                                {isAnalysisEnabled && (
-                                    <button
-                                        onClick={handleStartAnalysis}
-                                        disabled={analysisStatus?.running || isStartingAnalysis || showCompletedStatus}
-                                        className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                    >
-                                        <Play className="w-4 h-4" />
-                                        {isStartingAnalysis ? 'Checking...' : 'Run Analysis'}
-                                    </button>
-                                )}
-                                {!isAnalysisEnabled && (
-                                    <>
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            accept=".jsonl"
-                                            onChange={handleFileChange}
-                                            className="hidden"
-                                        />
-                                        <button
-                                            onClick={handleExportDownload}
-                                            disabled={isDownloading}
-                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                        >
-                                            <Download className="w-4 h-4" />
-                                            {isDownloading ? 'Downloading...' : 'Export'}
-                                        </button>
-                                        <button
-                                            onClick={handleAnalysisBundleDownload}
-                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
-                                        >
-                                            <FileText className="w-4 h-4" />
-                                            Analysis Bundle
-                                        </button>
-                                        <button
-                                            onClick={handleImportClick}
-                                            disabled={isUploading}
-                                            className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                        >
-                                            <Upload className="w-4 h-4" />
-                                            {isUploading ? 'Uploading...' : 'Import'}
-                                        </button>
-                                    </>
-                                )}
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h2 id={settingsTitleId} className="text-sm font-semibold text-gray-900">Analysis settings</h2>
+                                            <p id={settingsDescriptionId} className="mt-1 text-sm text-gray-600">
+                                                Choose how far back to pull queries for this run.
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label htmlFor="query-window" className="text-sm font-medium text-gray-700">
+                                                Query window
+                                            </label>
+                                            <select
+                                                ref={queryWindowSelectRef}
+                                                id="query-window"
+                                                aria-label="Query window"
+                                                value={selectedDays}
+                                                onChange={(e) => setSelectedDays(Number(e.target.value))}
+                                                className="w-full h-10 px-3 border border-gray-200 rounded-xl bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            >
+                                                <option value={7}>Week</option>
+                                                <option value={31}>Month</option>
+                                                <option value={92}>Quarter</option>
+                                            </select>
+                                        </div>
+                                        {isAnalysisEnabled ? (
+                                            <button
+                                                type="button"
+                                                onClick={handleStartAnalysis}
+                                                disabled={analysisStatus?.running || isStartingAnalysis || showCompletedStatus}
+                                                className="w-full h-10 flex items-center justify-center gap-2 px-4 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                            >
+                                                <Play className="w-4 h-4" />
+                                                {isStartingAnalysis ? 'Checking...' : 'Run Analysis'}
+                                            </button>
+                                        ) : (
+                                            <div className="flex flex-col gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => closeSettingsAndRun(handleExportDownload)}
+                                                    disabled={isDownloading}
+                                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                                >
+                                                    <Download className="w-4 h-4" />
+                                                    {isDownloading ? 'Downloading...' : 'Export'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => closeSettingsAndRun(handleAnalysisBundleDownload)}
+                                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                                                >
+                                                    <FileText className="w-4 h-4" />
+                                                    Analysis Bundle
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => closeSettingsAndRun(handleImportClick)}
+                                                    disabled={isUploading}
+                                                    className="h-10 flex items-center gap-2 px-4 text-sm font-medium rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                                >
+                                                    <Upload className="w-4 h-4" />
+                                                    {isUploading ? 'Uploading...' : 'Import'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -593,6 +736,8 @@ export default function KnowledgeGapsPage() {
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                     <button
                         onClick={() => setSupportAreasExpanded(!supportAreasExpanded)}
+                        aria-expanded={supportAreasExpanded}
+                        aria-controls="support-areas-section"
                         className="w-full px-6 py-5 flex items-center justify-between bg-gradient-to-r from-blue-50 to-white hover:from-blue-100 hover:to-blue-50 transition-colors"
                     >
                         <div className="flex items-center gap-4">
@@ -608,11 +753,11 @@ export default function KnowledgeGapsPage() {
                     </button>
 
                     {supportAreasExpanded && (
-                        <div className="px-6 pb-6 pt-2 space-y-3">
+                        <div id="support-areas-section" className="px-6 pb-6 pt-2 space-y-3">
                             {(() => {
                                 const items = showAllSupportAreas ? analysisData.supportAreas : analysisData.supportAreas.slice(0, 5)
                                 const maxCount = items[0]?.queryCount ?? 1
-                                return items.map((item, index) => renderAreaItem(item, index, 'blue', maxCount))
+                                return items.map((item, index) => renderAreaItem(item, index, 'support-area', 'blue', maxCount))
                             })()}
                             {analysisData.supportAreas.length > 5 && (
                                 <button
@@ -630,6 +775,8 @@ export default function KnowledgeGapsPage() {
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                     <button
                         onClick={() => setKnowledgeGapsExpanded(!knowledgeGapsExpanded)}
+                        aria-expanded={knowledgeGapsExpanded}
+                        aria-controls="knowledge-gaps-section"
                         className="w-full px-6 py-5 flex items-center justify-between bg-gradient-to-r from-amber-50 to-white hover:from-amber-100 hover:to-amber-50 transition-colors"
                     >
                         <div className="flex items-center gap-4">
@@ -645,11 +792,11 @@ export default function KnowledgeGapsPage() {
                     </button>
 
                     {knowledgeGapsExpanded && (
-                        <div className="px-6 pb-6 pt-2 space-y-3">
+                        <div id="knowledge-gaps-section" className="px-6 pb-6 pt-2 space-y-3">
                             {(() => {
                                 const items = showAllKnowledgeGaps ? analysisData.knowledgeGaps : analysisData.knowledgeGaps.slice(0, 5)
                                 const maxCount = items[0]?.queryCount ?? 1
-                                return items.map((item, index) => renderAreaItem(item, index, 'amber', maxCount))
+                                return items.map((item, index) => renderAreaItem(item, index, 'knowledge-gap', 'amber', maxCount))
                             })()}
                             {analysisData.knowledgeGaps.length > 5 && (
                                 <button
@@ -662,6 +809,18 @@ export default function KnowledgeGapsPage() {
                         </div>
                     )}
                 </div>
+
+                <EditTicketModal
+                    ticketId={selectedTicketId}
+                    open={isTicketModalOpen}
+                    onOpenChange={(open) => {
+                        setIsTicketModalOpen(open)
+                        if (!open) {
+                            setSelectedTicketId(null)
+                        }
+                    }}
+                    onSuccess={handleTicketModalSuccess}
+                />
             </div>
         </div>
     )

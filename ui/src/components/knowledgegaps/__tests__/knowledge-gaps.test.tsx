@@ -5,12 +5,25 @@ import * as hooks from '../../../lib/hooks'
 import {ToastProvider} from '@/components/ui/toast'
 import * as useAuthHook from '../../../hooks/useAuth'
 
+const mockInvalidateQueries = jest.fn()
+
 // Mock the hooks
 jest.mock('../../../lib/hooks', () => ({
     useAnalysis: jest.fn(),
     apiFetch: jest.fn(),
 }))
 jest.mock('../../../hooks/useAuth')
+jest.mock('../../tickets/EditTicketModal', () => ({
+    __esModule: true,
+    default: ({ ticketId, open, onSuccess }: { ticketId: string | null; open: boolean; onSuccess?: () => void }) => (
+        open ? (
+            <div data-testid="edit-ticket-modal">
+                <span>Ticket modal for {ticketId}</span>
+                <button type="button" onClick={onSuccess}>Trigger modal success</button>
+            </div>
+        ) : null
+    )
+}))
 
 // Mock next-auth
 jest.mock('next-auth/react', () => ({
@@ -21,7 +34,7 @@ jest.mock('next-auth/react', () => ({
 jest.mock('@tanstack/react-query', () => ({
     ...jest.requireActual('@tanstack/react-query'),
     useQueryClient: jest.fn(() => ({
-        invalidateQueries: jest.fn()
+        invalidateQueries: mockInvalidateQueries
     }))
 }))
 
@@ -41,8 +54,8 @@ const mockAnalysisData = {
             coveragePercentage: 90,
             queryCount: 28,
             queries: [
-                { text: 'Firewall rules for output traffic', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'DNS resolution issues', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Firewall rules for output traffic', timestamp: '2025-03-31T13:15:00Z', ticketId: '101' },
+                { text: 'DNS resolution issues', timestamp: '2025-03-30T14:20:00Z', ticketId: '102' }
             ]
         },
         {
@@ -50,8 +63,8 @@ const mockAnalysisData = {
             coveragePercentage: 88,
             queryCount: 50,
             queries: [
-                { text: 'How to view application logs?', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'Setting up custom metrics', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'How to view application logs?', timestamp: '2025-03-29T10:00:00Z', ticketId: '103' },
+                { text: 'Setting up custom metrics', timestamp: '2025-03-28T06:05:00Z', ticketId: '104' }
             ]
         },
         {
@@ -59,8 +72,8 @@ const mockAnalysisData = {
             coveragePercentage: 75,
             queryCount: 42,
             queries: [
-                { text: 'How do I fix the CI pipeline failure?', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'What is the correct configuration for the build step?', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'How do I fix the CI pipeline failure?', timestamp: '2025-03-27T11:30:00Z', ticketId: '105' },
+                { text: 'What is the correct configuration for the build step?', timestamp: '2025-03-26T16:10:00Z', ticketId: '106' }
             ]
         },
         {
@@ -68,8 +81,8 @@ const mockAnalysisData = {
             coveragePercentage: 60,
             queryCount: 35,
             queries: [
-                { text: 'How to setup Kafka consumers?', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'Dial configuration for new tenant', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'How to setup Kafka consumers?', timestamp: '2025-03-25T16:10:00Z', ticketId: '107' },
+                { text: 'Dial configuration for new tenant', timestamp: '2025-03-24T17:40:00Z', ticketId: '108' }
             ]
         },
         {
@@ -77,8 +90,8 @@ const mockAnalysisData = {
             coveragePercentage: 45,
             queryCount: 15,
             queries: [
-                { text: 'Deployment failed with timeout', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'Configuring environment variables', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Deployment failed with timeout', timestamp: '2025-03-23T12:25:00Z', ticketId: '109' },
+                { text: 'Configuring environment variables', timestamp: '2025-03-22T21:50:00Z', ticketId: '110' }
             ]
         }
     ],
@@ -88,8 +101,8 @@ const mockAnalysisData = {
             coveragePercentage: 56,
             queryCount: 2127,
             queries: [
-                { text: 'Documentation missing for new API', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'How to configure advanced settings?', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Documentation missing for new API', timestamp: '2025-03-31T12:34:56Z', ticketId: '201' },
+                { text: 'How to configure advanced settings?', timestamp: '2025-03-30T07:08:09Z', ticketId: '210' }
             ]
         },
         {
@@ -97,8 +110,8 @@ const mockAnalysisData = {
             coveragePercentage: 22,
             queryCount: 825,
             queries: [
-                { text: 'Service temporarily unavailable', link: 'https://slack.com/archives/CTEST/p' },
-                { text: '503 errors on login', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Service temporarily unavailable', timestamp: '2025-03-29T06:00:00Z', ticketId: '202' },
+                { text: '503 errors on login', timestamp: '2025-03-28T18:15:00Z', ticketId: '203' }
             ]
         },
         {
@@ -106,8 +119,8 @@ const mockAnalysisData = {
             coveragePercentage: 13,
             queryCount: 493,
             queries: [
-                { text: 'Please reset my API key', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'Update billing address', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Please reset my API key', timestamp: '2025-03-27T15:00:00Z', ticketId: '204' },
+                { text: 'Update billing address', timestamp: '2025-03-26T08:30:00Z', ticketId: '205' }
             ]
         },
         {
@@ -115,8 +128,8 @@ const mockAnalysisData = {
             coveragePercentage: 5,
             queryCount: 196,
             queries: [
-                { text: 'Cannot find the logout button', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'Dashboard is confusing', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Cannot find the logout button', timestamp: '2025-03-25T11:11:00Z', ticketId: '206' },
+                { text: 'Dashboard is confusing', timestamp: '2025-03-24T14:22:00Z', ticketId: '207' }
             ]
         },
         {
@@ -124,8 +137,8 @@ const mockAnalysisData = {
             coveragePercentage: 4,
             queryCount: 163,
             queries: [
-                { text: 'Add dark mode support', link: 'https://slack.com/archives/CTEST/p' },
-                { text: 'Export report to PDF', link: 'https://slack.com/archives/CTEST/p' }
+                { text: 'Add dark mode support', timestamp: '2025-03-23T19:45:00Z', ticketId: '208' },
+                { text: 'Export report to PDF', timestamp: '2025-03-22T21:10:00Z', ticketId: '209' }
             ]
         }
     ]
@@ -134,6 +147,7 @@ const mockAnalysisData = {
 describe('KnowledgeGapsPage', () => {
     beforeEach(() => {
         jest.clearAllMocks()
+        mockInvalidateQueries.mockClear()
         // Default mock for useAuth - SUPPORT_ENGINEER role
         mockUseAuth.mockReturnValue({
             user: { id: '1', email: 'test@example.com', name: 'Test User', teams: [], roles: ['SUPPORT_ENGINEER'] },
@@ -203,10 +217,8 @@ describe('KnowledgeGapsPage', () => {
         expect(screen.getByText('Support Area Summary')).toBeInTheDocument()
         expect(screen.getByText('Overview of support areas and knowledge gaps requiring attention')).toBeInTheDocument()
 
-        // Check for import, export, and prompt buttons
-        expect(screen.getByText('Import')).toBeInTheDocument()
-        expect(screen.getByText('Export')).toBeInTheDocument()
-        expect(screen.getByText('Analysis Bundle')).toBeInTheDocument()
+        // Check for analysis trigger
+        expect(screen.getByRole('button', { name: 'Run Analysis' })).toBeInTheDocument()
 
         // Check for collapsible section headers
         expect(screen.getByText('Top Support Areas')).toBeInTheDocument()
@@ -224,21 +236,27 @@ describe('KnowledgeGapsPage', () => {
 
         // Sections expanded by default - items should be visible
         expect(screen.getByText('Knowledge Gap')).toBeInTheDocument()
-        expect(screen.getByText('2,127 queries')).toBeInTheDocument()
+        expect(screen.getByText('2,127 total queries')).toBeInTheDocument()
         expect(screen.getByText('CI')).toBeInTheDocument()
-        expect(screen.getByText('42 queries')).toBeInTheDocument()
+        expect(screen.getByText('42 total queries')).toBeInTheDocument()
 
         // Collapse support areas
         const supportAreasButton = screen.getByRole('button', { name: /Top Support Areas/i })
+        expect(supportAreasButton).toHaveAttribute('aria-expanded', 'true')
+        expect(supportAreasButton).toHaveAttribute('aria-controls', 'support-areas-section')
         fireEvent.click(supportAreasButton)
 
         // List item hidden
+        expect(supportAreasButton).toHaveAttribute('aria-expanded', 'false')
         expect(screen.queryByText('Knowledge Gap')).not.toBeInTheDocument()
 
         // Collapse knowledge gaps
         const knowledgeGapsButton = screen.getByRole('button', { name: /Top Knowledge Gaps/i })
+        expect(knowledgeGapsButton).toHaveAttribute('aria-expanded', 'true')
+        expect(knowledgeGapsButton).toHaveAttribute('aria-controls', 'knowledge-gaps-section')
         fireEvent.click(knowledgeGapsButton)
 
+        expect(knowledgeGapsButton).toHaveAttribute('aria-expanded', 'false')
         expect(screen.queryByText('CI')).not.toBeInTheDocument()
     })
 
@@ -255,20 +273,73 @@ describe('KnowledgeGapsPage', () => {
         expect(screen.queryByText('Documentation missing for new API')).not.toBeInTheDocument()
 
         // Click on "Knowledge Gap" area card to expand it
-        fireEvent.click(screen.getByText('Knowledge Gap'))
+        const disclosure = screen.getAllByRole('button').find((button) =>
+            button.getAttribute('aria-controls') === 'support-area:Knowledge Gap-queries'
+        )
+        expect(disclosure).toBeDefined()
+        expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+        fireEvent.click(disclosure!)
 
         // Now queries should be visible
+        expect(disclosure).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByText('Up to 5 most recent queries')).toBeInTheDocument()
         expect(screen.getByText('Documentation missing for new API')).toBeInTheDocument()
         expect(screen.getByText('How to configure advanced settings?')).toBeInTheDocument()
+        expect(screen.getByText('Mar 31, 2025, 12:34 PM')).toBeInTheDocument()
+        expect(screen.getByText('Mar 30, 2025, 7:08 AM')).toBeInTheDocument()
 
         // Click again to collapse
-        fireEvent.click(screen.getByText('Knowledge Gap'))
+        fireEvent.click(disclosure!)
 
         // Queries should be hidden
+        expect(disclosure).toHaveAttribute('aria-expanded', 'false')
         expect(screen.queryByText('Documentation missing for new API')).not.toBeInTheDocument()
     })
 
-    it('query links point to Slack permalinks', () => {
+    it('keeps expansion state scoped to each section when item names match', () => {
+        const duplicatedNameData = {
+            supportAreas: [
+                {
+                    name: 'Shared Topic',
+                    coveragePercentage: 56,
+                    queryCount: 12,
+                    queries: [
+                        { text: 'Support area query', timestamp: '2025-03-31T12:34:56Z', ticketId: '401' }
+                    ]
+                }
+            ],
+            knowledgeGaps: [
+                {
+                    name: 'Shared Topic',
+                    coveragePercentage: 44,
+                    queryCount: 8,
+                    queries: [
+                        { text: 'Knowledge gap query', timestamp: '2025-03-30T07:08:09Z', ticketId: '402' }
+                    ]
+                }
+            ]
+        }
+
+        mockUseAnalysis.mockReturnValue({
+            data: duplicatedNameData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        const disclosures = screen.getAllByRole('button', { name: /Shared Topic/ })
+        expect(disclosures).toHaveLength(2)
+
+        fireEvent.click(disclosures[0])
+
+        expect(screen.getByText('Support area query')).toBeInTheDocument()
+        expect(screen.queryByText('Knowledge gap query')).not.toBeInTheDocument()
+        expect(disclosures[0]).toHaveAttribute('aria-expanded', 'true')
+        expect(disclosures[1]).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('opens the ticket modal when a summarized query with a ticket id is clicked', async () => {
         mockUseAnalysis.mockReturnValue({
             data: mockAnalysisData,
             isLoading: false,
@@ -280,16 +351,39 @@ describe('KnowledgeGapsPage', () => {
         // Expand the "Knowledge Gap" support area to reveal queries
         fireEvent.click(screen.getByText('Knowledge Gap'))
 
-        // Query links should point to Slack permalinks and open in a new tab
-        const links = screen.getAllByRole('link', { name: /view/i })
-        expect(links[0]).toHaveAttribute('href', 'https://slack.com/archives/CTEST/p')
-        expect(links[1]).toHaveAttribute('href', 'https://slack.com/archives/CTEST/p')
-        expect(links[0]).toHaveAttribute('target', '_blank')
-        expect(links[0]).toHaveAttribute('rel', 'noopener noreferrer')
+        expect(screen.getByText('Mar 31, 2025, 12:34 PM')).toBeInTheDocument()
+        fireEvent.click(screen.getByRole('button', { name: /view ticket 201/i }))
+
+        await waitFor(() => {
+            expect(screen.getByTestId('edit-ticket-modal')).toHaveTextContent('Ticket modal for 201')
+        })
     })
 
-    it('renders queries with null links as plain text without anchor tags', () => {
-        const dataWithNullLinks = {
+    it('invalidates ticket and analysis queries when the ticket modal succeeds from this page', async () => {
+        mockUseAnalysis.mockReturnValue({
+            data: mockAnalysisData,
+            isLoading: false,
+            error: null
+        } as any)
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        fireEvent.click(screen.getByText('Knowledge Gap'))
+        fireEvent.click(screen.getByRole('button', { name: /view ticket 201/i }))
+
+        await waitFor(() => {
+            expect(screen.getByTestId('edit-ticket-modal')).toBeInTheDocument()
+        })
+
+        fireEvent.click(screen.getByRole('button', { name: /trigger modal success/i }))
+
+        expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['ticket', '201'] })
+        expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['tickets'] })
+        expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['analysis'] })
+    })
+
+    it('renders all query rows as clickable buttons', () => {
+        const dataWithQueries = {
             ...mockAnalysisData,
             supportAreas: [
                 {
@@ -297,15 +391,15 @@ describe('KnowledgeGapsPage', () => {
                     coveragePercentage: 50,
                     queryCount: 10,
                     queries: [
-                        { text: 'Query with link', link: 'https://slack.com/archives/CTEST/p123' },
-                        { text: 'Query without link', link: null }
+                        { text: 'Query with ticket', timestamp: '2025-03-31T12:00:00Z', ticketId: '301' },
+                        { text: 'Another query', timestamp: '2025-03-31T12:01:00Z', ticketId: '302' }
                     ]
                 }
             ]
         }
 
         mockUseAnalysis.mockReturnValue({
-            data: dataWithNullLinks,
+            data: dataWithQueries,
             isLoading: false,
             error: null
         } as any)
@@ -315,15 +409,38 @@ describe('KnowledgeGapsPage', () => {
         // Expand the item to reveal queries
         fireEvent.click(screen.getByText('Mixed Links'))
 
-        // Both query texts should be visible
-        expect(screen.getByText('Query with link')).toBeInTheDocument()
-        expect(screen.getByText('Query without link')).toBeInTheDocument()
-
-        // Only the non-null query has a clickable link
-        const links = screen.getAllByRole('link', { name: /view/i })
-        expect(links).toHaveLength(1)
-        expect(links[0]).toHaveAttribute('href', 'https://slack.com/archives/CTEST/p123')
+        expect(screen.getByRole('button', { name: /view ticket 301/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /view ticket 302/i })).toBeInTheDocument()
     })
+
+    it('renders invalid timestamps as raw strings instead of crashing', () => {
+        const dataWithBadTimestamp = {
+            ...mockAnalysisData,
+            supportAreas: [
+                {
+                    name: 'Bad Timestamps',
+                    coveragePercentage: 100,
+                    queryCount: 1,
+                    queries: [
+                        { text: 'Query with bad timestamp', timestamp: 'not-a-date', ticketId: '999' }
+                    ]
+                }
+            ]
+        }
+
+        mockUseAnalysis.mockReturnValue({
+            data: dataWithBadTimestamp,
+            isLoading: false,
+            error: null
+        } as any)
+
+        renderWithToast(<KnowledgeGapsPage />)
+
+        fireEvent.click(screen.getByText('Bad Timestamps'))
+
+        expect(screen.getByText('not-a-date')).toBeInTheDocument()
+    })
+
 
     it('displays all 5 items in each section', () => {
         mockUseAnalysis.mockReturnValue({
@@ -383,17 +500,16 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
+        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
         const exportButton = screen.getByText('Export')
         fireEvent.click(exportButton)
 
-        // Wait for async operations
-        await screen.findByText('Downloading...')
-
         // Verify apiFetch was called with default value of 7 days (Week)
-        expect(mockApiFetch).toHaveBeenCalledWith('/api/summary-data/export?days=7')
-
-        // Wait for button to return to normal state
-        await screen.findByText('Export')
+        await waitFor(() => {
+            expect(mockApiFetch).toHaveBeenCalledWith('/api/summary-data/export?days=7')
+        })
+        expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
 
         // Verify download was triggered
         expect(mockClick).toHaveBeenCalled()
@@ -410,8 +526,10 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
+        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
         // Find the select dropdown - default is Week (7 days)
-        const select = await screen.findByDisplayValue('Week')
+        const select = await screen.findByLabelText('Query window')
         expect(select).toBeInTheDocument()
 
         // Verify all options are present
@@ -455,7 +573,9 @@ describe('KnowledgeGapsPage', () => {
         renderWithToast(<KnowledgeGapsPage />)
 
         // Change the time period to Month (31 days)
-        const select = await screen.findByDisplayValue('Week')
+        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
+        const select = await screen.findByLabelText('Query window')
         fireEvent.change(select, { target: { value: '31' } })
 
         // Click export button
@@ -502,7 +622,9 @@ describe('KnowledgeGapsPage', () => {
         renderWithToast(<KnowledgeGapsPage />)
 
         // Change the time period to Quarter (92 days)
-        const select = await screen.findByDisplayValue('Week')
+        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
+        const select = await screen.findByLabelText('Query window')
         fireEvent.change(select, { target: { value: '92' } })
 
         // Click export button
@@ -545,6 +667,8 @@ describe('KnowledgeGapsPage', () => {
         })
 
         renderWithToast(<KnowledgeGapsPage />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
 
         const importButton = screen.getByText('Import')
         expect(importButton).toBeInTheDocument()
@@ -613,6 +737,8 @@ describe('KnowledgeGapsPage', () => {
 
         renderWithToast(<KnowledgeGapsPage />)
 
+        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
+
         const promptButton = screen.getByText('Analysis Bundle')
         fireEvent.click(promptButton)
 
@@ -651,9 +777,7 @@ describe('KnowledgeGapsPage', () => {
 
             renderWithToast(<KnowledgeGapsPage />)
 
-            expect(screen.getByText('Export')).toBeInTheDocument()
-            expect(screen.getByText('Analysis Bundle')).toBeInTheDocument()
-            expect(screen.getByText('Import')).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Run Analysis' })).toBeInTheDocument()
         })
 
         it('hides buttons when user does not have SUPPORT_ENGINEER role', () => {
@@ -766,7 +890,9 @@ describe('KnowledgeGapsPage', () => {
             // Wait for the initial status fetch
             await screen.findByText('Run Analysis')
 
-            expect(mockApiFetch).toHaveBeenCalledWith('/api/analysis/status')
+            await waitFor(() => {
+                expect(mockApiFetch).toHaveBeenCalledWith('/api/analysis/status')
+            })
         })
 
         it('starts analysis when Run Analysis button is clicked and shows progress immediately', async () => {
@@ -806,8 +932,8 @@ describe('KnowledgeGapsPage', () => {
 
             const startButton = await screen.findByText('Run Analysis')
 
-            // Click the button
             fireEvent.click(startButton)
+            fireEvent.click(screen.getAllByRole('button', { name: 'Run Analysis' })[1])
 
             // Wait for the fetch to be called
             await waitFor(() => {
@@ -818,6 +944,7 @@ describe('KnowledgeGapsPage', () => {
 
             // Progress panel should appear
             await screen.findByText(/Checking for new threads|Analysing threads/)
+            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
         })
 
         it('shows error toast when analysis start returns 409 Conflict', async () => {
@@ -853,6 +980,7 @@ describe('KnowledgeGapsPage', () => {
 
             const startButton = await screen.findByText('Run Analysis')
             fireEvent.click(startButton)
+            fireEvent.click(screen.getAllByRole('button', { name: 'Run Analysis' })[1])
 
             // Wait for error toast
             await screen.findByText('Analysis was just started by someone else')
@@ -1021,12 +1149,29 @@ describe('KnowledgeGapsPage', () => {
 
             renderWithToast(<KnowledgeGapsPage />)
 
-            // Wait for the button to appear
             const startButton = await screen.findByText('Run Analysis')
             expect(startButton).toBeInTheDocument()
+            expect(startButton).toHaveAttribute('aria-haspopup', 'dialog')
+            expect(startButton).toHaveAttribute('aria-expanded', 'false')
+            expect(startButton).toHaveAttribute('aria-controls', 'analysis-settings-popover')
+            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
+
+            fireEvent.click(startButton)
+
+            expect(startButton).toHaveAttribute('aria-expanded', 'true')
+            expect(screen.getByRole('dialog', { name: 'Analysis settings' })).toBeInTheDocument()
+            const queryWindowSelect = screen.getByLabelText('Query window')
+            expect(queryWindowSelect).toBeInTheDocument()
+            expect(queryWindowSelect).toHaveFocus()
+            expect(screen.getByText('Choose how far back to pull queries for this run.')).toBeInTheDocument()
+
+            fireEvent.click(startButton)
+
+            expect(startButton).toHaveAttribute('aria-expanded', 'false')
+            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
         })
 
-        it('hides Run Analysis button when feature is disabled', async () => {
+        it('keeps the settings trigger available when feature is disabled', async () => {
             mockUseAnalysis.mockReturnValue({
                 data: mockAnalysisData,
                 isLoading: false,
@@ -1062,10 +1207,8 @@ describe('KnowledgeGapsPage', () => {
             // Wait for the page to render
             await screen.findByText('Support Area Summary')
 
-            // Verify the button is not present
-            expect(screen.queryByText('Run Analysis')).not.toBeInTheDocument()
-            // The days selector should still be present (used for Export)
-            expect(screen.getByDisplayValue('Week')).toBeInTheDocument()
+            expect(screen.getByRole('button', { name: 'Run Analysis' })).toBeInTheDocument()
+            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
         })
 
         it('does not fetch analysis status when feature is disabled', async () => {
@@ -1188,7 +1331,13 @@ describe('KnowledgeGapsPage', () => {
             // Wait for the page to render
             await screen.findByText('Support Area Summary')
 
-            // Verify all three buttons are present and enabled
+            const settingsTrigger = screen.getByText('Run Analysis')
+            expect(settingsTrigger).toBeInTheDocument()
+
+            fireEvent.click(settingsTrigger)
+
+            expect(screen.getByText('Analysis settings')).toBeInTheDocument()
+
             const exportButton = screen.getByText('Export')
             const bundleButton = screen.getByText('Analysis Bundle')
             const importButton = screen.getByText('Import')
@@ -1199,6 +1348,36 @@ describe('KnowledgeGapsPage', () => {
             expect(bundleButton).not.toBeDisabled()
             expect(importButton).toBeInTheDocument()
             expect(importButton).not.toBeDisabled()
+        })
+
+        it('closes the settings panel on Escape and outside click', async () => {
+            mockUseAnalysis.mockReturnValue({
+                data: mockAnalysisData,
+                isLoading: false,
+                error: null
+            } as any)
+
+            renderWithToast(<KnowledgeGapsPage />)
+
+            const settingsTrigger = await screen.findByRole('button', { name: 'Run Analysis' })
+            fireEvent.click(settingsTrigger)
+
+            const queryWindowSelect = screen.getByLabelText('Query window')
+
+            expect(screen.getByRole('dialog', { name: 'Analysis settings' })).toBeInTheDocument()
+            expect(queryWindowSelect).toHaveFocus()
+
+            fireEvent.keyDown(document, { key: 'Escape' })
+            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
+            expect(settingsTrigger).toHaveFocus()
+
+            fireEvent.click(settingsTrigger)
+            expect(screen.getByRole('dialog', { name: 'Analysis settings' })).toBeInTheDocument()
+            expect(screen.getByLabelText('Query window')).toHaveFocus()
+
+            fireEvent.pointerDown(document.body)
+            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
+            expect(settingsTrigger).toHaveFocus()
         })
     })
 })

@@ -10,10 +10,14 @@ import com.coreeng.supportbot.testkit.SlackWiremock;
 import com.coreeng.supportbot.testkit.TestKitExtension;
 import java.time.Duration;
 import org.awaitility.Awaitility;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(TestKitExtension.class)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class AnalysisApiTests {
 
     private Config config;
@@ -24,6 +28,7 @@ public class AnalysisApiTests {
     }
 
     @Test
+    @Order(1)
     void analysisEnabled_returnsTrue() {
         // when
         var response = given().when()
@@ -39,6 +44,7 @@ public class AnalysisApiTests {
     }
 
     @Test
+    @Order(2)
     void analysisRun_startsAndCompletes() {
         // given - analysis fetches threads from Slack for all tickets in the DB
         slackWiremock.stubFor(post("/api/conversations.replies")
@@ -79,7 +85,25 @@ public class AnalysisApiTests {
     }
 
     @Test
+    @Order(3)
     void analysisRun_returns400_forInvalidDays() {
         given().when().post(baseUrl() + "/analysis/run?days=0").then().statusCode(400);
+    }
+
+    @Test
+    @Order(4)
+    void analysisResults_includeQueryTimestampAndTicketId() {
+        var response = given().when()
+                .get(baseUrl() + "/summary-data/results")
+                .then()
+                .statusCode(200)
+                .extract()
+                .body()
+                .jsonPath();
+
+        assertThat(response.getList("supportAreas")).isNotEmpty();
+        assertThat(response.getString("supportAreas[0].queries[0].text")).isNotBlank();
+        assertThat(response.getString("supportAreas[0].queries[0].timestamp")).isNotBlank();
+        assertThat(response.getString("supportAreas[0].queries[0].ticketId")).isNotBlank();
     }
 }
