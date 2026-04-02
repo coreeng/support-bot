@@ -202,6 +202,8 @@ public class TenantInsightsFunctionalTests {
             long openCount,
             long escalatedCount,
             long breachedCount,
+            long botEscalatedCount,
+            long manualEscalatedCount,
             double p50Seconds,
             double p90Seconds,
             double p99Seconds) {}

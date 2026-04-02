@@ -27,6 +27,8 @@ function makeRepo(overrides: Partial<RepoInsights> = {}): RepoInsights {
         openCount: 2,
         escalatedCount: 1,
         breachedCount: 0,
+        botEscalatedCount: 0,
+        manualEscalatedCount: 0,
         p50Seconds: 3600,
         p90Seconds: 14400,
         p99Seconds: 86400,
@@ -96,8 +98,8 @@ describe('TenantRequestsPage', () => {
             render(<TenantRequestsPage />)
 
             const headers = screen.getAllByRole('columnheader')
-            expect(headers).toHaveLength(9)
-            ;['Repository', 'Team', 'PRs', 'Open', 'Escalated', 'Breached', 'p50', 'p90', 'p99'].forEach(label => {
+            expect(headers).toHaveLength(10)
+            ;['Repository', 'Team', 'PRs', 'Open', 'Escalated', 'Breached', 'Intervention %', 'p50', 'p90', 'p99'].forEach(label => {
                 expect(screen.getAllByText(label).length).toBeGreaterThanOrEqual(1)
             })
         })
@@ -108,7 +110,7 @@ describe('TenantRequestsPage', () => {
             const { container } = render(<TenantRequestsPage />)
 
             const infoIcons = container.querySelectorAll('.lucide-info')
-            expect(infoIcons).toHaveLength(3) // p50, p90, p99
+            expect(infoIcons).toHaveLength(4) // intervention %, p50, p90, p99
         })
 
         it('should render repo row with formatted durations', () => {
