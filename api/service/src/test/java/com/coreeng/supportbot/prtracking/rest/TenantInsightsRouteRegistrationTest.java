@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
+import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.prtracking.EscalationBreakdown;
 import com.coreeng.supportbot.prtracking.PrTrackingRepository;
 import java.util.List;
@@ -70,6 +71,7 @@ class TenantInsightsRouteRegistrationTest {
                     PrTrackingRepository repository = context.getBean(PrTrackingRepository.class);
                     when(repository.getInsightsByRepo(null, null)).thenReturn(List.of());
                     when(repository.getEscalationBreakdown(null, null)).thenReturn(new EscalationBreakdown(0, 0, 0));
+                    when(repository.findAllInFlight(null)).thenReturn(List.of());
 
                     MockMvc mockMvc =
                             MockMvcBuilders.webAppContextSetup(context).build();
@@ -82,6 +84,9 @@ class TenantInsightsRouteRegistrationTest {
                             .andExpect(content().json("[]"));
                     mockMvc.perform(get("/tenant-insights/escalation-breakdown"))
                             .andExpect(status().isOk());
+                    mockMvc.perform(get("/tenant-insights/in-flight-prs"))
+                            .andExpect(status().isOk())
+                            .andExpect(content().json("[]"));
                 });
     }
 
@@ -93,6 +98,11 @@ class TenantInsightsRouteRegistrationTest {
         @Bean
         PrTrackingRepository prTrackingRepository() {
             return mock(PrTrackingRepository.class);
+        }
+
+        @Bean
+        EscalationTeamsRegistry escalationTeamsRegistry() {
+            return mock(EscalationTeamsRegistry.class);
         }
     }
 }

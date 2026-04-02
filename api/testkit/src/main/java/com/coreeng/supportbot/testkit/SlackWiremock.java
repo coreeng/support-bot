@@ -7,6 +7,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
@@ -63,6 +64,17 @@ public class SlackWiremock extends WireMockServer {
         LOGGER.info("Setting up initial Slack API stubs");
         stubAuthTest("initial mock");
         stubUsersInfoDefault("initial users.info mock");
+        // Catch-all for hub4j user profile lookups triggered by review processing
+        givenThat(get(urlMatching("/users/.*"))
+                .withName("GitHub user lookup catch-all")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"login\":\"{{request.pathSegments.[1]}}\",\"id\":1,\"type\":\"User\"}")));
+        // Catch-all for conversations.history (triggered by createTicket test API fetching query text)
+        givenThat(post("/api/conversations.history")
+                .withName("conversations history catch-all")
+                .willReturn(okJson("{\"ok\":true,\"messages\":[],\"has_more\":false}")));
     }
 
     private void capturePermanentStubs() {
@@ -221,21 +233,38 @@ public class SlackWiremock extends WireMockServer {
 
     public Stub stubGitHubGetPullRequest(
             String description, String repositoryName, int pullNumber, String state, String createdAtIso) {
+        return stubGitHubGetPullRequest(description, repositoryName, pullNumber, state, createdAtIso, false, "[]");
+    }
+
+    public Stub stubGitHubGetPullRequest(
+            String description,
+            String repositoryName,
+            int pullNumber,
+            String state,
+            String createdAtIso,
+            boolean mergeable,
+            String reviewsJson) {
         StubMapping repoStub = stubRepoMetadata(description, repositoryName);
 
         String prPath = "/repos/" + repositoryName + "/pulls/" + pullNumber;
         String prBody = """
-                {"state":"%s","created_at":"%s","title":"PR title","user":{"login":"test"},"number":%d}
-                """.formatted(state, createdAtIso, pullNumber);
+                {"state":"%s","created_at":"%s","title":"PR title","user":{"login":"test"},"number":%d,"requested_teams":[],"mergeable":%b,"mergeable_state":"unknown"}
+                """.formatted(state, createdAtIso, pullNumber, mergeable);
         StubMapping prStub = givenThat(get(prPath)
                 .withName(description)
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(prBody)));
+        StubMapping reviewsStub = givenThat(get(prPath + "/reviews")
+                .withName(description + " reviews")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(reviewsJson)));
         return Stub.builder()
                 .mapping(prStub)
-                .extraMappings(List.of(repoStub))
+                .extraMappings(List.of(repoStub, reviewsStub))
                 .wireMockServer(this)
                 .description(description)
                 .build();

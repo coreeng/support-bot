@@ -1046,7 +1046,7 @@ describe('Tickets Component', () => {
             const mockTickets = getMockPaginatedTickets([
                 createMockTicket('1', 'opened', 'Team A', 'high')
             ]);
-
+            
             mockUseTickets.mockReturnValue({
                 data: mockTickets,
                 isLoading: false,
@@ -1055,6 +1055,7 @@ describe('Tickets Component', () => {
 
             render(<Tickets />, { wrapper: Wrapper });
 
+            // Find the date filter dropdown
             const dateFilterSelect = screen.getByDisplayValue('Last Week');
             expect(dateFilterSelect).toBeInTheDocument();
 
@@ -1079,7 +1080,7 @@ describe('Tickets Component', () => {
             const mockTickets = getMockPaginatedTickets([
                 createMockTicket('1', 'opened', 'Team A', 'high')
             ]);
-
+            
             mockUseTickets.mockReturnValue({
                 data: mockTickets,
                 isLoading: false,

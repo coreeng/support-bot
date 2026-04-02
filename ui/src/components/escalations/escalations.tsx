@@ -47,7 +47,7 @@ export default function EscalationsPage() {
     const { data: tenantTeamsData } = useTenantTeams()
     const { data: registryData } = useRegistry()
     const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS
-    type EscalationDateFilter = 'all' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
+    type EscalationDateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
 
     // Persist all filter / sort / page controls in the URL.
     // Validators guard against invalid URL values and auto-correct the URL.
@@ -65,7 +65,7 @@ export default function EscalationsPage() {
             page: '0',
         },
         {
-            dateFilter: enumValidator(['all', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, 'lastWeek'),
+            dateFilter: enumValidator(['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, 'lastWeek'),
             dateFrom: isoDateValidator,
             dateTo: isoDateValidator,
             status: enumValidator(['all', 'ongoing', 'resolved'] as const, 'all'),
@@ -135,13 +135,14 @@ export default function EscalationsPage() {
     const getDurationColor = (minutes: number) => minutes < 30 ? 'text-green-700' : minutes < 120 ? 'text-yellow-700' : 'text-indigo-700 font-semibold'
 
     // --- Date range for date filter ---
+    // Empty string dateFilter (= "Any Date") is not in presetDays so falls through to
+    // { from: undefined, to: undefined } inside getDateRangeFromFilter, which is correct.
     const dateRange = useMemo(
         () =>
             getDateRangeFromFilter({
                 dateFilter,
                 customDateRange: { start: params.dateFrom || undefined, end: params.dateTo || undefined },
                 customValue: 'custom',
-                allValue: 'all',
                 fallbackValue: 'lastWeek',
                 presetDays: {
                     lastWeek: PRESET_DAYS.lastWeek,
@@ -358,7 +359,7 @@ export default function EscalationsPage() {
                         }}
                         className="p-2 border rounded"
                     >
-                        <option value="all">Any Date</option>
+                        <option value="">Any Date</option>
                         <option value="lastWeek">Last Week</option>
                         <option value="last2Weeks">Last 2 Weeks</option>
                         <option value="lastMonth">Last Month</option>

@@ -23,11 +23,6 @@ export async function GET(request: Request) {
     return errorResponse(`Backend error: ${response.status}`, response.status);
   }
 
-  try {
-    const data = await response.json();
-    return Response.json(data);
-  } catch (e) {
-    console.error('[stats] Failed to parse backend response:', e);
-    return errorResponse('Backend returned invalid response', 502);
-  }
+  const data = await response.json();
+  return Response.json(data);
 }

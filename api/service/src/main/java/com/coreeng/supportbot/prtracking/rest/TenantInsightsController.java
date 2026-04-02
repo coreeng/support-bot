@@ -1,8 +1,8 @@
 package com.coreeng.supportbot.prtracking.rest;
 
-import com.coreeng.supportbot.prtracking.EscalationBreakdown;
-import com.coreeng.supportbot.prtracking.PrTrackingRepository;
-import com.coreeng.supportbot.prtracking.RepoInsights;
+import com.coreeng.supportbot.enums.EscalationTeam;
+import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
+import com.coreeng.supportbot.prtracking.*;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class TenantInsightsController {
 
     private final PrTrackingRepository prTrackingRepository;
+    private final EscalationTeamsRegistry escalationTeamsRegistry;
 
     @GetMapping("/pr-stats")
     public List<RepoInsights> prStats(
@@ -42,5 +43,17 @@ public class TenantInsightsController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateFrom must not be after dateTo");
         }
         return prTrackingRepository.getEscalationBreakdown(dateFrom, dateTo);
+    }
+
+    @GetMapping("/in-flight-prs")
+    public List<InFlightPrResponse> inFlightPrs(@RequestParam(required = false) @Nullable String team) {
+        return prTrackingRepository.findAllInFlight(team).stream()
+                .map(pr -> new InFlightPrResponse(pr, resolveTeamLabel(pr.owningTeam())))
+                .toList();
+    }
+
+    private String resolveTeamLabel(String teamCode) {
+        EscalationTeam team = escalationTeamsRegistry.findEscalationTeamByCode(teamCode);
+        return team != null ? team.label() : teamCode;
     }
 }

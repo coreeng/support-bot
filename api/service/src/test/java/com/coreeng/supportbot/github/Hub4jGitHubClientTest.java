@@ -2,12 +2,18 @@ package com.coreeng.supportbot.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -22,12 +28,16 @@ class Hub4jGitHubClientTest {
     void returnsPullRequestOnHappyPath() throws IOException {
         // given
         GHRepository repo = mock(GHRepository.class);
-        GHPullRequest pr = new GHPullRequest();
+        GHPullRequest pr = spy(new GHPullRequest());
         Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");
         when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
         when(repo.getPullRequest(42)).thenReturn(pr);
         setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
         setStateRaw(pr, "open");
+        setMergeableRaw(pr, true);
+        setMergeableStateRaw(pr, "clean");
+        setRequestedTeamsRaw(pr);
+        stubEmptyReviews(pr);
 
         // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
@@ -37,6 +47,48 @@ class Hub4jGitHubClientTest {
         assertThat(result.pullRequestNumber()).isEqualTo(42);
         assertThat(result.createdAt()).isEqualTo(createdAt);
         assertThat(result.state()).isEqualTo(GitHubPullRequest.PrState.OPEN);
+        assertThat(result.mergeable()).isTrue();
+        assertThat(result.mergeableState()).isEqualTo("clean");
+    }
+
+    @Test
+    void returnsMergedStateWhenMergedAtIsNonNull() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "closed");
+        setMergedAtRaw(pr, "2026-01-15T10:00:00Z");
+        setRequestedTeamsRaw(pr);
+        stubEmptyReviews(pr);
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.state()).isEqualTo(GitHubPullRequest.PrState.MERGED);
+    }
+
+    @Test
+    void returnsPullRequestWithNullMergeableWhenNotYetComputed() throws IOException {
+        // given - mergeable/mergeableState not set, GitHub returns null when not yet computed
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "open");
+        setRequestedTeamsRaw(pr);
+        stubEmptyReviews(pr);
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.mergeable()).isNull();
+        assertThat(result.mergeableState()).isNull();
     }
 
     @Test
@@ -247,12 +299,352 @@ class Hub4jGitHubClientTest {
                 .hasMessageContaining("my-org/my-repo#42");
     }
 
+    @Test
+    void getPullRequestFiltersOutPendingReviews() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "open");
+        setRequestedTeamsRaw(pr);
+
+        GHUser approvedUser = mock(GHUser.class);
+        GHPullRequestReview approvedReview =
+                spyReview(approvedUser, "alice", GHPullRequestReviewState.APPROVED, "2026-01-02T10:00:00Z");
+        GHUser pendingUser = mock(GHUser.class);
+        GHPullRequestReview pendingReview =
+                spyReview(pendingUser, "bob", GHPullRequestReviewState.PENDING, "2026-01-02T11:00:00Z");
+
+        stubReviews(pr, List.of(approvedReview, pendingReview));
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.reviews()).hasSize(1);
+        assertThat(result.reviews().get(0).userLogin()).isEqualTo("alice");
+        assertThat(result.reviews().get(0).state()).isEqualTo(GitHubPullRequestReview.ReviewState.APPROVED);
+    }
+
+    @Test
+    void getPullRequestMapsApprovedReviewCorrectly() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "open");
+        setRequestedTeamsRaw(pr);
+
+        GHUser user = mock(GHUser.class);
+        GHPullRequestReview review =
+                spyReview(user, "alice", GHPullRequestReviewState.APPROVED, "2026-01-15T14:30:00Z");
+        stubReviews(pr, List.of(review));
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.reviews()).hasSize(1);
+        GitHubPullRequestReview mapped = result.reviews().get(0);
+        assertThat(mapped.userLogin()).isEqualTo("alice");
+        assertThat(mapped.state()).isEqualTo(GitHubPullRequestReview.ReviewState.APPROVED);
+        assertThat(mapped.submittedAt()).isEqualTo(Instant.parse("2026-01-15T14:30:00Z"));
+    }
+
+    @Test
+    void getPullRequestMapsDismissedReviewState() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "open");
+        setRequestedTeamsRaw(pr);
+
+        GHUser user = mock(GHUser.class);
+        GHPullRequestReview review = spyReview(user, "bob", GHPullRequestReviewState.DISMISSED, "2026-01-10T08:00:00Z");
+        stubReviews(pr, List.of(review));
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.reviews()).hasSize(1);
+        assertThat(result.reviews().get(0).state()).isEqualTo(GitHubPullRequestReview.ReviewState.DISMISSED);
+    }
+
+    @Test
+    void getPullRequestMapsDeprecatedRequestChangesAlias() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "open");
+        setRequestedTeamsRaw(pr);
+
+        GHUser user = mock(GHUser.class);
+        @SuppressWarnings("deprecation")
+        GHPullRequestReviewState requestChanges = GHPullRequestReviewState.REQUEST_CHANGES;
+        GHPullRequestReview review = spyReview(user, "carol", requestChanges, "2026-01-12T09:00:00Z");
+        stubReviews(pr, List.of(review));
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.reviews()).hasSize(1);
+        assertThat(result.reviews().get(0).state()).isEqualTo(GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED);
+    }
+
+    @Test
+    void getPullRequestSkipsReviewsForClosedPr() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "closed");
+        // no stubEmptyReviews — listReviews must not be called for closed PRs
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then — no GitHub API call to /reviews is made
+        verify(pr, never()).listReviews();
+        assertThat(result.reviews()).isEmpty();
+        assertThat(result.requestedTeamReviewerLogins()).isEmpty();
+    }
+
+    @Test
+    void getPullRequestSkipsReviewsForMergedPr() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "closed");
+        setMergedAtRaw(pr, "2026-01-15T10:00:00Z");
+        // no stubEmptyReviews — listReviews must not be called for merged PRs
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then — no GitHub API call to /reviews is made
+        verify(pr, never()).listReviews();
+        assertThat(result.reviews()).isEmpty();
+        assertThat(result.requestedTeamReviewerLogins()).isEmpty();
+    }
+
+    @Test
+    void getPullRequestThrowsOnRequestedTeamsIOException() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "open");
+        doThrow(new IOException("teams API failed")).when(pr).getRequestedTeams();
+
+        // when / then — IOException from team-member resolution propagates so callers can skip the PR
+        assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("my-org/my-repo#42");
+    }
+
+    @Test
+    void getPullRequestThrowsOnReviewsIOException() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "open");
+        setRequestedTeamsRaw(pr);
+
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHPullRequestReview> iterable = mock(PagedIterable.class);
+        doReturn(iterable).when(pr).listReviews();
+        when(iterable.toList()).thenThrow(new IOException("Connection refused"));
+
+        // when / then — IOException propagates as GitHubApiException so callers can skip the PR
+        assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("my-org/my-repo");
+    }
+
+    @Test
+    void getPullRequestThrowsOnNullReviewUser() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "open");
+        setRequestedTeamsRaw(pr);
+
+        GHPullRequestReview review = spy(new GHPullRequestReview());
+        when(review.getUser()).thenReturn(null);
+        when(review.getState()).thenReturn(GHPullRequestReviewState.APPROVED);
+        when(review.getSubmittedAt()).thenReturn(Date.from(Instant.parse("2026-01-10T08:00:00Z")));
+        stubReviews(pr, List.of(review));
+
+        // when / then
+        assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("null user");
+    }
+
+    @Test
+    void getPullRequestThrowsOnNullReviewSubmittedAt() throws IOException {
+        // given
+        GHRepository repo = mock(GHRepository.class);
+        GHPullRequest pr = spy(new GHPullRequest());
+        when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
+        when(repo.getPullRequest(42)).thenReturn(pr);
+        setCreatedAtRaw(pr, "2026-01-01T00:00:00Z");
+        setStateRaw(pr, "open");
+        setRequestedTeamsRaw(pr);
+
+        GHUser user = mock(GHUser.class);
+        GHPullRequestReview review = spy(new GHPullRequestReview());
+        when(review.getUser()).thenReturn(user);
+        when(user.getLogin()).thenReturn("alice");
+        when(review.getState()).thenReturn(GHPullRequestReviewState.APPROVED);
+        when(review.getSubmittedAt()).thenReturn(null);
+        stubReviews(pr, List.of(review));
+
+        // when / then
+        assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
+                .isInstanceOf(GitHubApiException.class)
+                .hasMessageContaining("null submitted_at");
+    }
+
+    @Test
+    void resolveTeamReviewersReturnsLogins() throws IOException {
+        // given
+        GHOrganization org = mock(GHOrganization.class);
+        GHTeam team = mock(GHTeam.class);
+        when(gitHub.getOrganization("my-org")).thenReturn(org);
+        when(org.getTeamBySlug("platform-team")).thenReturn(team);
+
+        GHUser alice = mock(GHUser.class);
+        GHUser bob = mock(GHUser.class);
+        when(alice.getLogin()).thenReturn("alice");
+        when(bob.getLogin()).thenReturn("bob");
+
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHUser> iterable = mock(PagedIterable.class);
+        when(team.listMembers()).thenReturn(iterable);
+        when(iterable.toList()).thenReturn(List.of(alice, bob));
+
+        // when
+        List<String> result = client.resolveTeamReviewers("my-org", "platform-team");
+
+        // then
+        assertThat(result).containsExactly("alice", "bob");
+    }
+
+    @Test
+    void resolveTeamReviewersWraps404() throws IOException {
+        // given
+        when(gitHub.getOrganization("my-org")).thenThrow(new GHFileNotFoundException("Not Found"));
+
+        // when / then
+        assertThatThrownBy(() -> client.resolveTeamReviewers("my-org", "platform-team"))
+                .isInstanceOf(GitHubApiException.class)
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(404));
+    }
+
+    @Test
+    void resolveTeamReviewersWrapsHttpException() throws IOException {
+        // given
+        when(gitHub.getOrganization("my-org")).thenThrow(new HttpException(403, "Forbidden", (String) null, null));
+
+        // when / then
+        assertThatThrownBy(() -> client.resolveTeamReviewers("my-org", "platform-team"))
+                .isInstanceOf(GitHubApiException.class)
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(403));
+    }
+
+    @Test
+    void resolveTeamReviewersWrapsIOException() throws IOException {
+        // given
+        when(gitHub.getOrganization("my-org")).thenThrow(new IOException("Connection refused"));
+
+        // when / then
+        assertThatThrownBy(() -> client.resolveTeamReviewers("my-org", "platform-team"))
+                .isInstanceOf(GitHubApiException.class)
+                .satisfies(
+                        ex -> assertThat(((GitHubApiException) ex).statusCode()).isEqualTo(0))
+                .hasMessageContaining("my-org/platform-team");
+    }
+
+    /**
+     * Creates a spy on a real GHPullRequestReview and stubs the methods we need.
+     * We use spy instead of mock because GHObject.getId() has @WithBridgeMethods
+     * which generates bridge methods that are incompatible with Mockito mock stubbing.
+     */
+    private static GHPullRequestReview spyReview(
+            GHUser user, String login, GHPullRequestReviewState state, String submittedAtIso) throws IOException {
+        GHPullRequestReview review = spy(new GHPullRequestReview());
+        when(review.getUser()).thenReturn(user);
+        when(user.getLogin()).thenReturn(login);
+        when(review.getState()).thenReturn(state);
+        when(review.getSubmittedAt()).thenReturn(Date.from(Instant.parse(submittedAtIso)));
+        return review;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void stubEmptyReviews(GHPullRequest pr) throws IOException {
+        PagedIterable<GHPullRequestReview> iterable = mock(PagedIterable.class);
+        doReturn(iterable).when(pr).listReviews();
+        when(iterable.toList()).thenReturn(List.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void stubReviews(GHPullRequest pr, List<GHPullRequestReview> reviews) throws IOException {
+        PagedIterable<GHPullRequestReview> iterable = mock(PagedIterable.class);
+        doReturn(iterable).when(pr).listReviews();
+        when(iterable.toList()).thenReturn(reviews);
+    }
+
     private static void setCreatedAtRaw(GHPullRequest pr, String createdAtRaw) {
         setFieldOnClassHierarchy(pr, "createdAt", createdAtRaw);
     }
 
     private static void setStateRaw(GHPullRequest pr, @Nullable String stateRaw) {
         setFieldOnClassHierarchy(pr, "state", stateRaw);
+    }
+
+    private static void setMergedAtRaw(GHPullRequest pr, @Nullable String mergedAtRaw) {
+        setFieldOnClassHierarchy(pr, "merged_at", mergedAtRaw);
+    }
+
+    private static void setMergeableRaw(GHPullRequest pr, @Nullable Boolean mergeable) {
+        setFieldOnClassHierarchy(pr, "mergeable", mergeable);
+    }
+
+    private static void setMergeableStateRaw(GHPullRequest pr, @Nullable String mergeableState) {
+        setFieldOnClassHierarchy(pr, "mergeable_state", mergeableState);
+    }
+
+    private static void setRequestedTeamsRaw(GHPullRequest pr) {
+        setFieldOnClassHierarchy(pr, "requested_teams", new GHTeam[0]);
     }
 
     private static void setFieldOnClassHierarchy(Object target, String fieldName, @Nullable Object value) {

@@ -423,9 +423,9 @@ describe('EscalationsPage', () => {
             expect(screen.queryByText('T-old')).not.toBeInTheDocument()
         })
 
-        it('shows all escalations when Any Date is selected', () => {
+        it('shows all escalations when date filter is cleared', () => {
             render(<EscalationsPage />, { wrapper: Wrapper })
-            fireEvent.change(screen.getByTestId('escalations-date-filter'), { target: { value: 'all' } })
+            fireEvent.change(screen.getByTestId('escalations-date-filter'), { target: { value: '' } })
             expect(screen.getByText('T-recent')).toBeInTheDocument()
             expect(screen.getByText('T-old')).toBeInTheDocument()
         })
