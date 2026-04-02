@@ -1,6 +1,7 @@
 # Set tenant and app name
 P2P_TENANT_NAME ?= support-bot
 P2P_APP_NAME ?= support-bot
+HELM_CHART_PATH ?= helm-chart
 
 P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui $(P2P_APP_NAME)-ui-functional $(P2P_APP_NAME)-ui-nft
 
@@ -149,7 +150,7 @@ build-nft: build-api-nft build-ui-nft ## Build nft test docker images
 
 .PHONY: build-integration
 build-integration:
-	docker buildx build --platform linux/amd64 "$(p2p_image_cache)" --tag "$(p2p_image_tag)" --file api/integration-tests/Dockerfile api --load
+	docker buildx build --platform linux/amd64 $(p2p_image_cache) --tag "$(p2p_image_tag)" --file api/integration-tests/Dockerfile . --load
 
 .PHONY: build-extended-test
 build-extended-test:
@@ -212,7 +213,7 @@ deploy-api-nft: ## Deploy service and DB for nft tests
 	DB_RELEASE="$(p2p_app_name)-db" \
 	SERVICE_RELEASE="$(p2p_app_name)" \
 	ACTION=deploy \
-	VALUES_FILE=api/k8s/service/values-nft.yaml \
+	VALUES_FILE=$(HELM_CHART_PATH)/values-nft.yaml \
 	./api/scripts/deploy-service.sh
 
 .PHONY: deploy-api-extended-test
@@ -223,7 +224,7 @@ deploy-api-extended-test: ## Deploy service and DB for extended test environment
 	DB_RELEASE="$(p2p_app_name)-db" \
 	SERVICE_RELEASE="$(p2p_app_name)" \
 	ACTION=deploy \
-	VALUES_FILE=api/k8s/service/values-extended-test.yaml \
+	VALUES_FILE=$(HELM_CHART_PATH)/values-extended-test.yaml \
 	./api/scripts/deploy-service.sh
 
 .PHONY: deploy-api-functional
@@ -234,13 +235,13 @@ deploy-api-functional: ## Deploy service and DB for functional tests, then run t
 	DB_RELEASE="$(p2p_app_name)-db" \
 	SERVICE_RELEASE="$(p2p_app_name)" \
 	ACTION=deploy \
-	VALUES_FILE=api/k8s/service/values-functional.yaml \
+	VALUES_FILE=$(HELM_CHART_PATH)/values-functional.yaml \
 	./api/scripts/deploy-service.sh
 
 .PHONY: deploy-ui-%
 deploy-ui-%: ## Add UI to existing API deployment
-	helm upgrade --install "$(p2p_app_name)" ./api/k8s/service -n "$(p2p_namespace)" \
-		-f api/k8s/service/values-$*.yaml \
+	helm upgrade --install "$(p2p_app_name)" ./$(HELM_CHART_PATH) -n "$(p2p_namespace)" \
+		-f $(HELM_CHART_PATH)/values-$*.yaml \
 		-f ui/p2p/config/common.yaml \
 		-f ui/p2p/config/$*.yaml \
 		--set image.repository="$(p2p_registry)/$(p2p_app_name)" \
@@ -346,7 +347,7 @@ publish-prod: publish-api-prod publish-ui-prod ## Publish all container images
 publish-chart: ## Package and publish Helm chart (version aligned to image)
 	@echo "Packaging Helm chart with version $(p2p_version)..."
 	@mkdir -p dist/charts
-	helm package api/k8s/service \
+	helm package $(HELM_CHART_PATH) \
 	  --version "$(p2p_version)" \
 	  --app-version "$(p2p_version)" \
 	  --destination dist/charts

@@ -5,9 +5,14 @@ import static org.jooq.impl.DSL.currentLocalDateTime;
 import static org.jooq.impl.DSL.excluded;
 import static org.jooq.impl.DSL.row;
 
+import com.coreeng.supportbot.slack.MessageTs;
+import com.coreeng.supportbot.ticket.TicketId;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,7 +55,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         a.category,
                         tc.query_count,
                         a.summary,
-                        q.channel_id,
+                        a.ticket_id,
                         q.ts as query_ts,
                         ROW_NUMBER() OVER (PARTITION BY a.category ORDER BY a.created_at DESC) as rn
                     FROM analysis a
@@ -63,7 +68,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                     category as dimension,
                     query_count,
                     summary,
-                    channel_id,
+                    ticket_id,
                     query_ts
                 FROM ranked_summaries
                 WHERE rn <= 5
@@ -75,8 +80,8 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("dimension", String.class),
                         r.get("query_count", Long.class),
                         r.get("summary", String.class),
-                        r.get("channel_id", String.class),
-                        r.get("query_ts", String.class)));
+                        new TicketId(r.get("ticket_id", Integer.class).longValue()),
+                        MessageTs.of(r.get("query_ts", String.class))));
     }
 
     /**
@@ -100,7 +105,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         a.driver,
                         td.query_count,
                         a.summary,
-                        q.channel_id,
+                        a.ticket_id,
                         q.ts as query_ts,
                         ROW_NUMBER() OVER (PARTITION BY a.driver ORDER BY a.created_at DESC) as rn
                     FROM analysis a
@@ -112,7 +117,7 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                     driver as dimension,
                     query_count,
                     summary,
-                    channel_id,
+                    ticket_id,
                     query_ts
                 FROM ranked_summaries
                 WHERE rn <= 5
@@ -124,8 +129,42 @@ public class JdbcAnalysisRepository implements AnalysisRepository {
                         r.get("dimension", String.class),
                         r.get("query_count", Long.class),
                         r.get("summary", String.class),
-                        r.get("channel_id", String.class),
-                        r.get("query_ts", String.class)));
+                        new TicketId(r.get("ticket_id", Integer.class).longValue()),
+                        MessageTs.of(r.get("query_ts", String.class))));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public @Nullable String findSummaryByTicketId(TicketId ticketId) {
+        return dsl.select(ANALYSIS.SUMMARY)
+                .from(ANALYSIS)
+                .where(ANALYSIS.TICKET_ID.eq(Math.toIntExact(ticketId.id())))
+                .fetchOne(ANALYSIS.SUMMARY);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ImmutableMap<TicketId, String> findSummariesByTicketIds(ImmutableList<TicketId> ticketIds) {
+        if (ticketIds.isEmpty()) {
+            return ImmutableMap.of();
+        }
+
+        ImmutableMap.Builder<TicketId, String> summaries = ImmutableMap.builder();
+        dsl.select(ANALYSIS.TICKET_ID, ANALYSIS.SUMMARY)
+                .from(ANALYSIS)
+                .where(ANALYSIS.TICKET_ID.in(ticketIds.stream()
+                        .map(ticketId -> Math.toIntExact(ticketId.id()))
+                        .toList()))
+                .and(ANALYSIS.SUMMARY.isNotNull())
+                .fetch()
+                .forEach(row -> {
+                    Integer rowTicketId = row.get(ANALYSIS.TICKET_ID);
+                    String summary = row.get(ANALYSIS.SUMMARY);
+                    if (rowTicketId != null && summary != null) {
+                        summaries.put(new TicketId(rowTicketId.longValue()), summary);
+                    }
+                });
+        return summaries.buildOrThrow();
     }
 
     /**

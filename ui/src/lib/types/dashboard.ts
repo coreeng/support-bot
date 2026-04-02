@@ -81,6 +81,30 @@ export interface ResolutionTimeByTag {
 }
 
 /**
+ * Per-repository PR insights from /tenant-insights/pr-stats
+ */
+export interface RepoInsights {
+    repo: string
+    owningTeam: string
+    prCount: number
+    openCount: number
+    escalatedCount: number
+    breachedCount: number
+    p50Seconds: number
+    p90Seconds: number
+    p99Seconds: number
+}
+
+/**
+ * Escalation breakdown from /tenant-insights/escalation-breakdown
+ */
+export interface EscalationBreakdown {
+    totalPrTickets: number
+    botEscalatedTickets: number
+    manuallyEscalatedTickets: number
+}
+
+/**
  * Histogram data point for distribution charts
  */
 export interface HistogramBin {

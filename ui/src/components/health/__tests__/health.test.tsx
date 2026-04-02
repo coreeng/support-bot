@@ -30,6 +30,20 @@ jest.mock('recharts', () => ({
 
 jest.mock('../../../lib/hooks');
 
+// Mock useUrlParams with a useState-based implementation so tab and filter
+// changes re-render the component correctly, keeping all existing interactions intact.
+jest.mock('../../../lib/hooks/useUrlParams', () => ({
+    ...jest.requireActual('../../../lib/hooks/useUrlParams'),
+    useUrlParams: (defaults: Record<string, string>) => {
+        const { useState } = require('react') as typeof import('react')
+        const [params, setParamsState] = useState<Record<string, string>>(defaults)
+        const setParams = (updates: Record<string, string>) => {
+            setParamsState((prev: Record<string, string>) => ({ ...prev, ...updates }))
+        }
+        return [params, setParams]
+    },
+}))
+
 const mockUseTickets = hooks.useTickets as jest.MockedFunction<typeof hooks.useTickets>;
 const mockUseRatings = hooks.useRatings as jest.MockedFunction<typeof hooks.useRatings>;
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>;
@@ -150,8 +164,8 @@ describe('HealthPage', () => {
         it('defaults to Activity Trends tab', () => {
             render(<HealthPage />, { wrapper: Wrapper });
 
-            // Should show activity trends tab content (has date filter buttons like "Last 7 Days")
-            expect(screen.getByText(/Last 7 Days/i)).toBeInTheDocument();
+            // Should show activity trends tab content (has date filter picklist with "Last Week")
+            expect(screen.getByText(/Last Week/i)).toBeInTheDocument();
         });
 
         it('switches to Ticket Workbench tab when clicked', () => {
@@ -851,12 +865,9 @@ describe('HealthPage', () => {
         it('should preserve date range when switching to custom mode without valid dates', () => {
             render(<HealthPage />, { wrapper: Wrapper });
 
-            // Find the Custom button in date filter
-            const customButton = screen.getByText('Custom');
-            expect(customButton).toBeInTheDocument();
-
-            // Click custom button
-            fireEvent.click(customButton);
+            // Switch to custom mode via the date filter picklist
+            const dateSelect = screen.getByTestId('health-date-filter');
+            fireEvent.change(dateSelect, { target: { value: 'custom' } });
 
             // Verify useTickets was called with valid dates (not undefined)
             const calls = mockUseTickets.mock.calls;
@@ -874,9 +885,9 @@ describe('HealthPage', () => {
         it('should use custom dates when both start and end dates are set', () => {
             const { container } = render(<HealthPage />, { wrapper: Wrapper });
 
-            // Switch to custom mode
-            const customButton = screen.getByText('Custom');
-            fireEvent.click(customButton);
+            // Switch to custom mode via the date filter picklist
+            const dateSelect = screen.getByTestId('health-date-filter');
+            fireEvent.change(dateSelect, { target: { value: 'custom' } });
 
             // Find date inputs by type
             const dateInputs = container.querySelectorAll('input[type="date"]');
@@ -900,8 +911,8 @@ describe('HealthPage', () => {
         it('should not fetch all tickets when custom mode is selected with invalid dates', () => {
             render(<HealthPage />, { wrapper: Wrapper });
 
-            const customButton = screen.getByText('Custom');
-            fireEvent.click(customButton);
+            const dateSelect = screen.getByTestId('health-date-filter');
+            fireEvent.change(dateSelect, { target: { value: 'custom' } });
 
             // Even with invalid dates, should preserve a valid range
             const calls = mockUseTickets.mock.calls;

@@ -63,6 +63,7 @@ export type TicketWithLogs = {
         text?: string
         date?: string
     }
+    summary?: string | null
     impact: string
     tags?: string[]
     escalations?: Escalation[]
@@ -124,7 +125,8 @@ export interface KnowledgeGapsStatus {
 
 export interface QuerySummary {
     text: string
-    link: string | null
+    timestamp: string
+    ticketId: string
 }
 
 export interface DimensionSummary {

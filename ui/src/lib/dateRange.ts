@@ -1,5 +1,19 @@
 export type CustomDateRange = { start?: string; end?: string }
 
+/** All canonical date-filter presets shared across the application. */
+export type DateFilter = 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'lastYear' | 'custom' | 'all'
+
+/**
+ * Standard day offsets for every named preset.
+ * Pages that expose only a subset can pick the keys they need.
+ */
+export const PRESET_DAYS: Record<Exclude<DateFilter, 'custom' | 'all'>, number> = {
+    lastWeek: 7,
+    last2Weeks: 14,
+    lastMonth: 30,
+    lastYear: 365,
+}
+
 type DateRangeOptions<T extends string> = {
     dateFilter: T
     customDateRange: CustomDateRange

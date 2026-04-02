@@ -13,6 +13,7 @@ import type {
   KnowledgeGapsStatus,
   AnalysisData,
 } from "@/lib/types";
+import type { RepoInsights, EscalationBreakdown } from "@/lib/types/dashboard";
 
 // ===== Shared API Helper =====
 
@@ -188,6 +189,19 @@ export function useTenantTeams() {
   return useQuery<Team[]>({
     queryKey: ["team", "TENANT"],
     queryFn: () => apiGet("/teams?type=TENANT"),
+  });
+}
+
+export interface TeamSuggestions {
+  suggestedTeams: string[];
+  otherTeams: string[];
+}
+
+export function useTeamSuggestions(ticketId: number | undefined) {
+  return useQuery<TeamSuggestions>({
+    queryKey: ["team-suggestions", ticketId],
+    queryFn: () => apiGet(`/tickets/${ticketId}/team-suggestions`),
+    enabled: !!ticketId,
   });
 }
 
@@ -528,5 +542,38 @@ export function useAnalysis() {
     queryKey: ["analysis"],
     queryFn: () => apiGet("/summary-data/results"),
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useTenantInsightsEnabled() {
+  return useQuery<boolean>({
+    queryKey: ["tenant-insights", "enabled"],
+    queryFn: async () => {
+      const response = await apiGet<{ enabled: boolean }>(
+        "/tenant-insights/enabled"
+      );
+      return response.enabled;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useTenantInsightsStats(dateFrom?: string, dateTo?: string, enabled = true) {
+  return useQuery<RepoInsights[]>({
+    queryKey: ["tenant-insights", "stats", dateFrom, dateTo],
+    queryFn: () =>
+      apiGet(`/tenant-insights/stats${buildParams(dateFrom, dateTo)}`),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useEscalationBreakdown(dateFrom?: string, dateTo?: string, enabled = true) {
+  return useQuery<EscalationBreakdown>({
+    queryKey: ["tenant-insights", "escalation-breakdown", dateFrom, dateTo],
+    queryFn: () =>
+      apiGet(`/tenant-insights/escalation-breakdown${buildParams(dateFrom, dateTo)}`),
+    enabled,
+    staleTime: 5 * 60 * 1000,
   });
 }

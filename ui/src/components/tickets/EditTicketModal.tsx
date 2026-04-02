@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useTicket, useTenantTeams, useRegistry, useSupportMembers, useAssignmentEnabled } from '@/lib/hooks'
+import { useTicket, useTenantTeams, useTeamSuggestions, useRegistry, useSupportMembers, useAssignmentEnabled } from '@/lib/hooks'
 import { TicketWithLogs, TicketImpact, TicketTag, Escalation, SupportMember } from '@/lib/types'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Ticket, AlertCircle, Tag, User, Clock, Slack, X, MessageSquare } from 'lucide-react'
 import SlackMessageRenderer from '@/components/ui/SlackMessageRenderer'
+import TeamCombobox from './TeamCombobox'
 
 interface EditTicketModalProps {
     ticketId: string | null
@@ -32,6 +33,9 @@ export default function EditTicketModal({
     const { isSupportEngineer } = useAuth()
     const { data: ticketDetails, isLoading: isTicketLoading, error: ticketError } = useTicket(ticketId || undefined)
     const { data: teamsData } = useTenantTeams()
+    const { data: teamSuggestionsData, isError: isTeamSuggestionsError } = useTeamSuggestions(
+        ticketId ? Number(ticketId) : undefined
+    )
     const { data: registryData } = useRegistry()
     const { data: supportMembers } = useSupportMembers()
     const { data: isAssignmentEnabled } = useAssignmentEnabled()
@@ -47,6 +51,14 @@ export default function EditTicketModal({
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
     const [originalStatus, setOriginalStatus] = useState<string>('')
     const [showEscalationWarning, setShowEscalationWarning] = useState(false)
+
+    const clearValidationError = (field: string) => {
+        setValidationErrors(prev => {
+            const next = { ...prev }
+            delete next[field]
+            return next
+        })
+    }
 
     // Initialize form when ticket data loads
     useEffect(() => {
@@ -97,23 +109,22 @@ export default function EditTicketModal({
         )
     }
 
-
     const validateForm = (): boolean => {
         const errors: Record<string, string> = {}
 
-        if (!status || status.trim() === '') {
+        if (!status.trim()) {
             errors.status = 'Status is required'
         }
 
-        if (!impact || impact.trim() === '') {
+        if (!impact.trim()) {
             errors.impact = 'Impact is required'
         }
 
-        if (!authorTeam || authorTeam.trim() === '') {
+        if (!authorTeam.trim()) {
             errors.authorTeam = 'Author\'s team is required'
         }
 
-        if (!selectedTags || selectedTags.length === 0) {
+        if (selectedTags.length === 0) {
             errors.tags = 'At least one tag is required'
         }
 
@@ -141,10 +152,10 @@ export default function EditTicketModal({
                 : null
 
             const updatePayload: Record<string, unknown> = {
-                status: status,
+                status,
                 authorsTeam: authorTeam,
                 tags: selectedTags,
-                impact: impact,
+                impact,
             }
             
             // Only include assignedTo if assignment feature is enabled
@@ -164,11 +175,8 @@ export default function EditTicketModal({
                 throw new Error(`Failed to update ticket: ${response.status}`)
             }
             
-            // Close modal and refresh
             onOpenChange(false)
-            if (onSuccess) {
-                onSuccess()
-            }
+            onSuccess?.()
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to update ticket')
             console.error('Error updating ticket:', err)
@@ -286,6 +294,20 @@ export default function EditTicketModal({
                             </div>
                         )}
 
+                        {displayTicket?.summary?.trim() && (
+                            <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-emerald-50/40 shadow-sm">
+                                <label className="text-base font-semibold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-200/60">
+                                    <MessageSquare className="w-5 h-5 text-gray-600" />
+                                    AI Summary
+                                </label>
+                                <div className="p-3 bg-white border border-gray-200 rounded-md">
+                                    <p className="text-sm leading-6 text-gray-700 whitespace-pre-wrap break-words">
+                                        {displayTicket.summary}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Status History (Logs Section) */}
                         <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-gray-50/50 shadow-sm">
                             <label className="text-base font-semibold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-200/60">
@@ -314,9 +336,9 @@ export default function EditTicketModal({
                                 Escalations
                             </label>
                             <div className="p-3 border border-gray-200 rounded-md bg-gray-50">
-                                {(displayTicket.escalations ?? []).length > 0 ? (
+                                {displayTicket.escalations?.length ? (
                                     <div className="space-y-2">
-                                        {(displayTicket.escalations ?? []).map((esc, idx) => (
+                                        {displayTicket.escalations.map((esc, idx) => (
                                             <div key={idx} className="text-sm text-gray-700">
                                                 <span className="font-medium">Escalated to:</span>{' '}
                                                 <span className="text-gray-800 font-semibold">{esc.team?.name || 'Unknown team'}</span>
@@ -344,11 +366,7 @@ export default function EditTicketModal({
                                         onChange={(e) => {
                                             setStatus(e.target.value)
                                             if (validationErrors.status) {
-                                                setValidationErrors(prev => {
-                                                    const next = { ...prev }
-                                                    delete next.status
-                                                    return next
-                                                })
+                                                clearValidationError('status')
                                             }
                                         }}
                                         className={`w-full p-2.5 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:shadow-md transition-all ${
@@ -425,43 +443,27 @@ export default function EditTicketModal({
                                 Select the Author&apos;s Team <span className="text-red-500">*</span>
                             </label>
                             {canEdit ? (
-                                <div className="space-y-1">
-                                    {(() => {
-                                        const options = Array.from(new Set([
-                                            displayTicket.team?.name,
-                                            ...(teamsData?.map((team: { name: string }) => team.name) ?? []),
-                                        ].filter(Boolean))) as string[]
-                                        return (
-                                            <select
-                                                id="team-select"
-                                                value={authorTeam}
-                                                onChange={(e) => {
-                                                    setAuthorTeam(e.target.value)
-                                                    if (validationErrors.authorTeam) {
-                                                        setValidationErrors(prev => {
-                                                            const next = { ...prev }
-                                                            delete next.authorTeam
-                                                            return next
-                                                        })
-                                                    }
-                                                }}
-                                                className={`w-full p-2.5 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:shadow-md transition-all ${
-                                                    validationErrors.authorTeam ? 'border-red-500' : 'border-gray-300'
-                                                }`}
-                                            >
-                                                <option value="">Select team...</option>
-                                                {options.map((name) => (
-                                                    <option key={name} value={name}>
-                                                        {name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        )
-                                    })()}
-                                    {validationErrors.authorTeam && (
-                                        <p className="text-sm text-red-600">{validationErrors.authorTeam}</p>
-                                    )}
-                                </div>
+                                <TeamCombobox
+                                    id="team-select"
+                                    suggestedTeams={
+                                        isTeamSuggestionsError
+                                            ? []
+                                            : (teamSuggestionsData?.suggestedTeams ?? [])
+                                    }
+                                    otherTeams={
+                                        isTeamSuggestionsError
+                                            ? (teamsData?.map((t) => t.name) ?? [])
+                                            : (teamSuggestionsData?.otherTeams ?? [])
+                                    }
+                                    value={authorTeam}
+                                    onChange={(val) => {
+                                        setAuthorTeam(val)
+                                        if (validationErrors.authorTeam) {
+                                            clearValidationError('authorTeam')
+                                        }
+                                    }}
+                                    error={validationErrors.authorTeam}
+                                />
                             ) : (
                                 <span className="font-medium text-gray-700 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-md inline-block">
                                     {displayTicket.team?.name || '-'}
@@ -496,12 +498,7 @@ export default function EditTicketModal({
                                                             onClick={() => {
                                                                 handleTagToggle(tagCode)
                                                                 if (validationErrors.tags && selectedTags.length === 1) {
-                                                                    // If this was the last tag, clear the error when user adds another
-                                                                    setValidationErrors(prev => {
-                                                                        const next = { ...prev }
-                                                                        delete next.tags
-                                                                        return next
-                                                                    })
+                                                                    clearValidationError('tags')
                                                                 }
                                                             }}
                                                             className="hover:bg-gray-400/50 rounded-full p-0.5 transition-colors"
@@ -525,11 +522,7 @@ export default function EditTicketModal({
                                             if (e.target.value && !selectedTags.includes(e.target.value)) {
                                                 setSelectedTags([...selectedTags, e.target.value])
                                                 if (validationErrors.tags) {
-                                                    setValidationErrors(prev => {
-                                                        const next = { ...prev }
-                                                        delete next.tags
-                                                        return next
-                                                    })
+                                                    clearValidationError('tags')
                                                 }
                                             }
                                             e.target.value = '' // Reset dropdown
@@ -579,11 +572,7 @@ export default function EditTicketModal({
                                         onChange={(e) => {
                                             setImpact(e.target.value)
                                             if (validationErrors.impact) {
-                                                setValidationErrors(prev => {
-                                                    const next = { ...prev }
-                                                    delete next.impact
-                                                    return next
-                                                })
+                                                clearValidationError('impact')
                                             }
                                         }}
                                         className={`w-full p-2.5 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:shadow-md transition-all ${
@@ -661,4 +650,3 @@ export default function EditTicketModal({
         </Dialog>
     )
 }
-

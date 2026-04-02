@@ -5,10 +5,12 @@ import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.testkit.Config;
+import com.coreeng.supportbot.testkit.MessageTs;
 import com.coreeng.supportbot.testkit.SupportBotClient;
 import com.coreeng.supportbot.testkit.TestKit;
 import com.coreeng.supportbot.testkit.TestKitExtension;
 import com.coreeng.supportbot.testkit.Ticket;
+import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -126,6 +128,73 @@ public class TenantInsightsFunctionalTests {
                         .build());
     }
 
+    @Test
+    public void escalationBreakdown_countsBotAndManualSources() {
+        // given — three PR tickets: one with bot escalation, one with manual, one with none
+        long botTicket = createTicket();
+        long manualTicket = createTicket();
+        long noEscTicket = createTicket();
+
+        Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+        createPr(botTicket, "test-org/pr-insights-esc", 801, prCreatedAt, "wow");
+        createPr(manualTicket, "test-org/pr-insights-esc", 802, prCreatedAt, "wow");
+        createPr(noEscTicket, "test-org/pr-insights-esc", 803, prCreatedAt, "wow");
+
+        escalateTicket(botTicket, "wow", "bot");
+        escalateTicket(manualTicket, "wow", "manual");
+
+        // when
+        var response = getEscalationBreakdown(null, null);
+
+        // then — at least our seeded data is counted correctly
+        assertThat(response.totalPrTickets()).isGreaterThanOrEqualTo(3);
+        assertThat(response.botEscalatedTickets()).isGreaterThanOrEqualTo(1);
+        assertThat(response.manuallyEscalatedTickets()).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    public void escalationBreakdown_returnsZerosWhenNoDataInRange() {
+        // given — a PR ticket with bot escalation created now
+        long ticketId = createTicket();
+        createPr(ticketId, "test-org/pr-insights-esc", 810, Instant.now().minus(Duration.ofHours(1)), "wow");
+        escalateTicket(ticketId, "wow", "bot");
+
+        // when — querying a future date range
+        var response = getEscalationBreakdown(LocalDate.of(2099, 1, 1), LocalDate.of(2099, 12, 31));
+
+        // then — nothing matches
+        assertThat(response.totalPrTickets()).isEqualTo(0);
+        assertThat(response.botEscalatedTickets()).isEqualTo(0);
+        assertThat(response.manuallyEscalatedTickets()).isEqualTo(0);
+    }
+
+    private EscalationBreakdown getEscalationBreakdown(LocalDate dateFrom, LocalDate dateTo) {
+        var request = given();
+        if (dateFrom != null) {
+            request = request.queryParam("dateFrom", dateFrom.toString());
+        }
+        if (dateTo != null) {
+            request = request.queryParam("dateTo", dateTo.toString());
+        }
+        return request.get(config.supportBot().baseUrl() + "/tenant-insights/escalation-breakdown")
+                .then()
+                .statusCode(200)
+                .extract()
+                .as(EscalationBreakdown.class);
+    }
+
+    private void escalateTicket(long ticketId, String team, String source) {
+        supportBotClient
+                .test()
+                .escalateTicket(SupportBotClient.EscalationToCreate.builder()
+                        .ticketId(ticketId)
+                        .team(team)
+                        .createdMessageTs(MessageTs.now())
+                        .tags(ImmutableList.of())
+                        .source(source)
+                        .build());
+    }
+
     public record RepoInsights(
             String repo,
             String owningTeam,
@@ -136,4 +205,6 @@ public class TenantInsightsFunctionalTests {
             double p50Seconds,
             double p90Seconds,
             double p99Seconds) {}
+
+    public record EscalationBreakdown(long totalPrTickets, long botEscalatedTickets, long manuallyEscalatedTickets) {}
 }

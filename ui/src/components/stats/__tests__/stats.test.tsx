@@ -21,6 +21,21 @@ jest.mock('../../../lib/hooks');
 jest.mock('../../../hooks/useAuth');
 jest.mock('../../../contexts/TeamFilterContext');
 
+// Mock useUrlParams with a useState-based implementation so the component
+// re-renders correctly when setParams is called, preserving all existing
+// test interactions that fire events and then inspect API call arguments.
+jest.mock('../../../lib/hooks/useUrlParams', () => ({
+    ...jest.requireActual('../../../lib/hooks/useUrlParams'),
+    useUrlParams: (defaults: Record<string, string>) => {
+        const { useState } = require('react') as typeof import('react')
+        const [params, setParamsState] = useState<Record<string, string>>(defaults)
+        const setParams = (updates: Record<string, string>) => {
+            setParamsState((prev: Record<string, string>) => ({ ...prev, ...updates }))
+        }
+        return [params, setParams]
+    },
+}))
+
 // Mock Recharts
 jest.mock('recharts', () => ({
     PieChart: ({ children }: { children: React.ReactNode }) => <div data-testid="pie-chart">{children}</div>,
@@ -42,6 +57,29 @@ const mockUseAllTickets = hooks.useAllTickets as jest.MockedFunction<typeof hook
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>;
 const mockUseAuth = AuthHook.useAuth as jest.MockedFunction<typeof AuthHook.useAuth>;
 const mockUseTeamFilter = TeamFilterContext.useTeamFilter as jest.MockedFunction<typeof TeamFilterContext.useTeamFilter>;
+
+/**
+ * Builds a complete TeamFilterContext return value.
+ * Every field required by TeamFilterContextType is provided as a sensible default
+ * so individual tests only need to state what differs.
+ */
+function makeTeamFilter(
+    overrides: Partial<ReturnType<typeof TeamFilterContext.useTeamFilter>> = {}
+): ReturnType<typeof TeamFilterContext.useTeamFilter> {
+    return {
+        selectedTeam: null,
+        setSelectedTeam: jest.fn(),
+        teamScope: { mode: 'uninitialized' },
+        effectiveTeams: [],
+        hasNoTeamScope: false,
+        isViewingAllTeams: false,
+        isViewingAsEscalationTeam: false,
+        hasFullAccess: false,
+        allTeams: [],
+        initialized: false,
+        ...overrides,
+    } as ReturnType<typeof TeamFilterContext.useTeamFilter>;
+}
 
 // Test data
 const mockTickets = [
@@ -130,13 +168,13 @@ describe('StatsPage (Home Dashboard)', () => {
             logout: jest.fn()
         });
 
-        mockUseTeamFilter.mockReturnValue({
+        mockUseTeamFilter.mockReturnValue(makeTeamFilter({
             selectedTeam: 'Team A',
-            setSelectedTeam: jest.fn(),
-            hasFullAccess: false,
+            teamScope: { mode: 'selected_teams', teams: ['Team A'] },
             effectiveTeams: ['Team A'],
             allTeams: ['Team A', 'Team B'],
-            initialized: true,        });
+            initialized: true,
+        }));
 
         mockUseAllTickets.mockReturnValue({
             data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 5 },
@@ -189,13 +227,14 @@ describe('StatsPage (Home Dashboard)', () => {
         });
 
         it('shows explicit no-team-access banner when user has no effective teams', () => {
-            mockUseTeamFilter.mockReturnValue({
+            mockUseTeamFilter.mockReturnValue(makeTeamFilter({
                 selectedTeam: null,
-                setSelectedTeam: jest.fn(),
-                hasFullAccess: false,
+                teamScope: { mode: 'no_teams' },
                 effectiveTeams: ['__no_teams__'],
-            allTeams: ['Team A', 'Team B'],
-            initialized: true,            });
+                hasNoTeamScope: true,
+                allTeams: ['Team A', 'Team B'],
+                initialized: true,
+            }));
             mockUseAuth.mockReturnValue({
                 user: {
                     id: 'user-1',
@@ -237,13 +276,14 @@ describe('StatsPage (Home Dashboard)', () => {
                 logout: jest.fn()
             });
 
-            mockUseTeamFilter.mockReturnValue({
+            mockUseTeamFilter.mockReturnValue(makeTeamFilter({
                 selectedTeam: 'Core-platform',
-                setSelectedTeam: jest.fn(),
-                hasFullAccess: false,
+                teamScope: { mode: 'selected_teams', teams: ['Core-platform'] },
                 effectiveTeams: ['Core-platform'],
-            allTeams: ['Team A', 'Team B'],
-            initialized: true,            });
+                isViewingAsEscalationTeam: true,
+                allTeams: ['Team A', 'Team B'],
+                initialized: true,
+            }));
 
             render(<StatsPage />, { wrapper: Wrapper });
 
@@ -276,13 +316,13 @@ describe('StatsPage (Home Dashboard)', () => {
                 logout: jest.fn()
             });
 
-            mockUseTeamFilter.mockReturnValue({
+            mockUseTeamFilter.mockReturnValue(makeTeamFilter({
                 selectedTeam: 'Team A', // Not an escalation team
-                setSelectedTeam: jest.fn(),
-                hasFullAccess: false,
+                teamScope: { mode: 'selected_teams', teams: ['Team A'] },
                 effectiveTeams: ['Team A'],
-            allTeams: ['Team A', 'Team B'],
-            initialized: true,            });
+                allTeams: ['Team A', 'Team B'],
+                initialized: true,
+            }));
 
             render(<StatsPage />, { wrapper: Wrapper });
 
@@ -294,13 +334,15 @@ describe('StatsPage (Home Dashboard)', () => {
 
     describe('Team Filtering', () => {
         it('should render dashboard when hasFullAccess is true', () => {
-            mockUseTeamFilter.mockReturnValue({
+            mockUseTeamFilter.mockReturnValue(makeTeamFilter({
                 selectedTeam: 'Leadership',
-                setSelectedTeam: jest.fn(),
-                hasFullAccess: true,
+                teamScope: { mode: 'all_teams' },
                 effectiveTeams: ['Team A', 'Team B'],
-            allTeams: ['Team A', 'Team B'],
-            initialized: true,            });
+                isViewingAllTeams: true,
+                hasFullAccess: true,
+                allTeams: ['Team A', 'Team B'],
+                initialized: true,
+            }));
 
             render(<StatsPage />, { wrapper: Wrapper });
 
@@ -310,13 +352,13 @@ describe('StatsPage (Home Dashboard)', () => {
         });
 
         it('should render dashboard with team filtering when restricted', () => {
-            mockUseTeamFilter.mockReturnValue({
+            mockUseTeamFilter.mockReturnValue(makeTeamFilter({
                 selectedTeam: 'Team A',
-                setSelectedTeam: jest.fn(),
-                hasFullAccess: false,
+                teamScope: { mode: 'selected_teams', teams: ['Team A'] },
                 effectiveTeams: ['Team A'],
-            allTeams: ['Team A', 'Team B'],
-            initialized: true,            });
+                allTeams: ['Team A', 'Team B'],
+                initialized: true,
+            }));
 
             render(<StatsPage />, { wrapper: Wrapper });
 
@@ -325,13 +367,13 @@ describe('StatsPage (Home Dashboard)', () => {
         });
 
         it('should handle empty effectiveTeams gracefully', () => {
-            mockUseTeamFilter.mockReturnValue({
+            mockUseTeamFilter.mockReturnValue(makeTeamFilter({
                 selectedTeam: null,
-                setSelectedTeam: jest.fn(),
-                hasFullAccess: false,
+                teamScope: { mode: 'uninitialized' },
                 effectiveTeams: [],
-            allTeams: ['Team A', 'Team B'],
-            initialized: true,            });
+                allTeams: ['Team A', 'Team B'],
+                initialized: true,
+            }));
 
             render(<StatsPage />, { wrapper: Wrapper });
 
@@ -379,13 +421,13 @@ describe('StatsPage (Home Dashboard)', () => {
 
         it('should correctly filter tickets by team when restricted', () => {
             // Set up so we can verify filtering is working
-            mockUseTeamFilter.mockReturnValue({
+            mockUseTeamFilter.mockReturnValue(makeTeamFilter({
                 selectedTeam: 'Team B',
-                setSelectedTeam: jest.fn(),
-                hasFullAccess: false,
+                teamScope: { mode: 'selected_teams', teams: ['Team B'] },
                 effectiveTeams: ['Team B'],
-            allTeams: ['Team A', 'Team B'],
-            initialized: true,            });
+                allTeams: ['Team A', 'Team B'],
+                initialized: true,
+            }));
 
             render(<StatsPage />, { wrapper: Wrapper });
 
@@ -434,13 +476,14 @@ describe('StatsPage (Home Dashboard)', () => {
                 logout: jest.fn()
             });
 
-            mockUseTeamFilter.mockReturnValue({
+            mockUseTeamFilter.mockReturnValue(makeTeamFilter({
                 selectedTeam: 'Core-platform',
-                setSelectedTeam: jest.fn(),
-                hasFullAccess: false,
+                teamScope: { mode: 'selected_teams', teams: ['Core-platform'] },
                 effectiveTeams: ['Core-platform'],
-            allTeams: ['Team A', 'Team B'],
-            initialized: true,            });
+                isViewingAsEscalationTeam: true,
+                allTeams: ['Team A', 'Team B'],
+                initialized: true,
+            }));
 
             render(<StatsPage />, { wrapper: Wrapper });
 
@@ -511,6 +554,35 @@ describe('StatsPage (Home Dashboard)', () => {
             // Should have valid dates (preserved from previous filter)
             expect(from).toBeDefined();
             expect(to).toBeDefined();
+        });
+
+        it('hides date pickers when switching from custom back to a preset', () => {
+            render(<StatsPage />, { wrapper: Wrapper });
+
+            const select = screen.getByDisplayValue('Last Week');
+
+            // Switch to custom — date pickers should appear
+            fireEvent.change(select, { target: { value: 'custom' } });
+            expect(screen.getAllByDisplayValue('')).toBeDefined(); // date inputs present
+
+            // Switch back to a preset — date pickers should disappear
+            fireEvent.change(screen.getByDisplayValue('Custom Range'), { target: { value: 'lastMonth' } });
+            expect(screen.queryByDisplayValue('')).toBeNull();
+        });
+
+        it('passes custom dateFrom and dateTo directly to the data hook', () => {
+            const { container } = render(<StatsPage />, { wrapper: Wrapper });
+
+            // Switch to custom mode then set both dates
+            fireEvent.change(screen.getByDisplayValue('Last Week'), { target: { value: 'custom' } });
+            const [startInput, endInput] = container.querySelectorAll('input[type="date"]');
+            fireEvent.change(startInput, { target: { value: '2024-06-01' } });
+            fireEvent.change(endInput, { target: { value: '2024-06-30' } });
+
+            const lastCall = mockUseAllTickets.mock.calls[mockUseAllTickets.mock.calls.length - 1];
+            const [, from, to] = lastCall;
+            expect(from).toBe('2024-06-01');
+            expect(to).toBe('2024-06-30');
         });
     });
 });

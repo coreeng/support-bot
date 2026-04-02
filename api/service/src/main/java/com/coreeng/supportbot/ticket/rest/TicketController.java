@@ -1,7 +1,5 @@
 package com.coreeng.supportbot.ticket.rest;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
-
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
@@ -19,6 +17,7 @@ public class TicketController {
     private final TicketQueryService queryService;
     private final TicketUpdateService ticketUpdateService;
     private final TicketUIMapper mapper;
+    private final TicketTeamSuggestionsService teamSuggestionsService;
 
     @GetMapping
     public ResponseEntity<Page<TicketUI>> list(
@@ -46,9 +45,7 @@ public class TicketController {
                 .build();
 
         Page<DetailedTicket> detailedTicketsPage = queryService.findDetailedTicketByQuery(ticketQuery);
-
-        ImmutableList<TicketUI> ticketUIs =
-                detailedTicketsPage.content().stream().map(mapper::mapToUI).collect(toImmutableList());
+        ImmutableList<TicketUI> ticketUIs = mapper.mapToUIList(detailedTicketsPage.content());
 
         Page<TicketUI> ticketUIPage = new Page<>(
                 ticketUIs,
@@ -78,5 +75,13 @@ public class TicketController {
         } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    @GetMapping("/{id}/team-suggestions")
+    public ResponseEntity<TicketTeamSuggestionsUI> getTeamSuggestions(@PathVariable TicketId id) {
+        return teamSuggestionsService
+                .getTeamSuggestionsForTicket(id)
+                .map(s -> ResponseEntity.ok(TicketTeamSuggestionsUI.from(s)))
+                .orElse(ResponseEntity.notFound().build());
     }
 }

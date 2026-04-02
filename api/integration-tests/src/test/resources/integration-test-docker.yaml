@@ -2,8 +2,8 @@ namespace: support-bot-integration
 service:
   deploymentScript:
     releaseName: support-bot
-    chartPath: /app/k8s/service
-    valuesFilePath: /app/k8s/service/values-integrationtests.yaml
+    chartPath: /app/helm-chart
+    valuesFilePath: /app/helm-chart/values-integrationtests.yaml
     scriptPath: /app/scripts/deploy-service.sh
   deployment:
     name: support-bot
@@ -14,4 +14,3 @@ portForwarding:
   enabled: true
   localPort: 8080
   remotePort: 8080
-

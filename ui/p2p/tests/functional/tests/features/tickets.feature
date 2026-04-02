@@ -76,3 +76,25 @@ Feature: Tickets Dashboard
     And Modal should show read-only view
     And "Save Changes" button should not be visible
     And "Close" button should be visible
+
+  Scenario: Summary column is visible in tickets table
+    Given Tickets API endpoints are mocked with summaries
+    When User navigates to the tickets page
+    Then Tickets table should have a Summary header
+    And Tickets with a summary should display the summary text
+    And Tickets without a summary should display an em dash
+
+  Scenario: Ticket modal shows AI Summary when present
+    Given Tickets API endpoints are mocked with summaries
+    When User navigates to the tickets page
+    And User clicks on a ticket that has a summary
+    Then Ticket details panel should appear
+    And Modal should show AI Summary section
+    And AI Summary should contain the summary text
+
+  Scenario: Ticket modal hides AI Summary when not present
+    Given Tickets API endpoints are mocked with summaries
+    When User navigates to the tickets page
+    And User clicks on a ticket without a summary
+    Then Ticket details panel should appear
+    And Modal should not show AI Summary section

@@ -100,4 +100,56 @@ public class TicketApiTests {
         openDmStub.assertIsCalled();
         notifyStub.assertIsCalled();
     }
+
+    @Test
+    public void whenTeamSuggestionsAreFetched_groupedTeamsAreReturned() {
+        // given
+        TestKit.RoledTestKit asSupport = testKit.as(support);
+        Ticket ticket = asSupport.ticket().create(builder -> builder.message("Team suggestions test"));
+
+        // Stub the Slack message fetch that the team-suggestions endpoint will make
+        Stub getMessageStub = slackWiremock.stubGetMessage(MessageToGet.builder()
+                .description("team-suggestions: get message")
+                .channelId(ticket.channelId())
+                .ts(ticket.queryTs())
+                .threadTs(ticket.queryTs())
+                .text(ticket.queryText())
+                .blocksJson(ticket.queryBlocksJson())
+                .userId(asSupport.user().slackUserId())
+                .build());
+
+        // Stub users.info to return an email that maps to a known team
+        Stub userProfileStub = slackWiremock.stubGetUserProfileById(UserProfileToGet.builder()
+                .description("team-suggestions: get user profile")
+                .userId(asSupport.user().slackUserId())
+                .email(asSupport.user().email())
+                .build());
+
+        // when
+        var suggestions = supportBotClient.getTeamSuggestions(ticket.id());
+
+        // then
+        assertThat(suggestions.suggestedTeams()).isNotNull();
+        assertThat(suggestions.otherTeams()).isNotNull();
+        // The author's email (coby.ivona@company.com) is in group-ref-wow → team wow
+        assertThat(suggestions.suggestedTeams()).contains("wow");
+        // Other teams should include the remaining static teams
+        assertThat(suggestions.otherTeams()).containsAnyOf("infra-integration", "connected-app");
+        // Suggested + others should cover all teams
+        int totalTeams =
+                suggestions.suggestedTeams().size() + suggestions.otherTeams().size();
+        assertThat(totalTeams).isGreaterThanOrEqualTo(3);
+
+        getMessageStub.assertIsCalled();
+        userProfileStub.assertIsCalled();
+    }
+
+    @Test
+    public void whenTeamSuggestionsAreFetchedForNonExistentTicket_returns404() {
+        // when
+        int statusCode = supportBotClient.getTeamSuggestionsStatusCode(999999L);
+
+        // then
+        assertThat(statusCode).isEqualTo(404);
+    }
 }

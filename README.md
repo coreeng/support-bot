@@ -81,8 +81,8 @@ Postgres instance and that the Support Bot can connect to it.
 We recommend mounting your custom configuration as a Kubernetes `ConfigMap`.
 
 * The default config can be found [here](https://github.com/coreeng/support-bot/blob/main/api/service/src/main/resources/application.yaml)
-* An example of custom config definition can be found [here](https://github.com/coreeng/support-bot/blob/main/api/k8s/service/values.yaml#L118)
-* An example of how the config is mounted can be found [here](https://github.com/coreeng/support-bot/blob/main/api/k8s/service/templates/deployment.yaml#L58)
+* An example of custom config definition can be found [here](https://github.com/coreeng/support-bot/blob/main/helm-chart/values.yaml#L118)
+* An example of how the config is mounted can be found [here](https://github.com/coreeng/support-bot/blob/main/helm-chart/templates/deployment.yaml#L58)
 
 For example, to override the enums configuration, replace the enums block in your custom config.
 
@@ -91,7 +91,7 @@ For a more detailed explanation of all configuration options see the [Configurat
 ### Helm Chart
 
 We've built a helm chart that you can use to make the deployment easier.
-Find the documentation for it [here](https://github.com/coreeng/support-bot/blob/main/api/k8s/service/README.md).
+Find the documentation for it [here](https://github.com/coreeng/support-bot/blob/main/helm-chart/README.md).
 Dex and LDAP deploy as separate platform-chart modules; see [api/k8s/dex/README.md](api/k8s/dex/README.md) and [api/k8s/ldap/README.md](api/k8s/ldap/README.md). For apply order and ops notes, use [docs/runbooks/auth-dex-ldap.md](docs/runbooks/auth-dex-ldap.md).
 
 How to use the helm chart:

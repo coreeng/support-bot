@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.prtracking.rest;
 
+import com.coreeng.supportbot.prtracking.EscalationBreakdown;
 import com.coreeng.supportbot.prtracking.PrTrackingRepository;
 import com.coreeng.supportbot.prtracking.RepoInsights;
 import java.time.LocalDate;
@@ -21,16 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class TenantInsightsController {
 
-    private static final FeatureStatus ENABLED = new FeatureStatus(true);
-
     private final PrTrackingRepository prTrackingRepository;
-
-    @GetMapping("/enabled")
-    public FeatureStatus enabled() {
-        return ENABLED;
-    }
-
-    public record FeatureStatus(boolean enabled) {}
 
     @GetMapping("/pr-stats")
     public List<RepoInsights> prStats(
@@ -40,5 +32,15 @@ public class TenantInsightsController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateFrom must not be after dateTo");
         }
         return prTrackingRepository.getInsightsByRepo(dateFrom, dateTo);
+    }
+
+    @GetMapping("/escalation-breakdown")
+    public EscalationBreakdown escalationBreakdown(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate dateTo) {
+        if (dateFrom != null && dateTo != null && dateFrom.isAfter(dateTo)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateFrom must not be after dateTo");
+        }
+        return prTrackingRepository.getEscalationBreakdown(dateFrom, dateTo);
     }
 }

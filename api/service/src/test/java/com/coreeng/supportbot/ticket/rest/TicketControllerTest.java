@@ -1,10 +1,17 @@
 package com.coreeng.supportbot.ticket.rest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.*;
+import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,13 +32,16 @@ class TicketControllerTest {
     @Mock
     private TicketUIMapper mapper;
 
+    @Mock
+    private TicketTeamSuggestionsService teamSuggestionsService;
+
     private TicketController controller;
 
     private TicketId ticketId;
 
     @BeforeEach
     void setUp() {
-        controller = new TicketController(queryService, ticketUpdateService, mapper);
+        controller = new TicketController(queryService, ticketUpdateService, mapper, teamSuggestionsService);
         ticketId = new TicketId(123L);
     }
 
@@ -88,5 +98,104 @@ class TicketControllerTest {
         assertThat(response.getBody()).isInstanceOf(String.class);
         assertThat((String) response.getBody()).contains("Update failed");
         verify(ticketUpdateService).update(ticketId, request);
+    }
+
+    @Test
+    void listDelegatesToMapperForBatchMapping() {
+        // given
+        DetailedTicket firstDetailedTicket = detailedTicket(new TicketId(1L));
+        DetailedTicket secondDetailedTicket = detailedTicket(new TicketId(2L));
+        ImmutableList<DetailedTicket> detailedTickets = ImmutableList.of(firstDetailedTicket, secondDetailedTicket);
+        Page<DetailedTicket> detailedTicketsPage = new Page<>(detailedTickets, 0, 1, 2);
+        TicketUI firstTicketUi = mock(TicketUI.class);
+        TicketUI secondTicketUi = mock(TicketUI.class);
+        ImmutableList<TicketUI> mappedTickets = ImmutableList.of(firstTicketUi, secondTicketUi);
+
+        when(queryService.findDetailedTicketByQuery(any())).thenReturn(detailedTicketsPage);
+        when(mapper.mapToUIList(detailedTickets)).thenReturn(mappedTickets);
+
+        // when
+        ResponseEntity<Page<TicketUI>> response = controller.list(
+                0,
+                10,
+                List.of(),
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 1, 31),
+                TicketStatus.opened,
+                false,
+                List.of(),
+                List.of(),
+                "");
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().content()).containsExactly(firstTicketUi, secondTicketUi);
+        verify(mapper).mapToUIList(detailedTickets);
+    }
+
+    @Test
+    void findByIdDelegatesToMapper() {
+        // given
+        DetailedTicket detailedTicket = detailedTicket(ticketId);
+        TicketUI mappedTicketUI = mock(TicketUI.class);
+
+        when(queryService.findDetailedById(ticketId)).thenReturn(detailedTicket);
+        when(queryService.fetchQueryText(detailedTicket.ticket())).thenReturn("Original message");
+        when(mapper.mapToUI(detailedTicket, "Original message")).thenReturn(mappedTicketUI);
+
+        // when
+        ResponseEntity<TicketUI> response = controller.findById(ticketId);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(mappedTicketUI);
+        verify(mapper).mapToUI(detailedTicket, "Original message");
+    }
+
+    @Test
+    void shouldReturnGroupedTeamSuggestions() {
+        // given
+        TicketTeamsSuggestion suggestion =
+                new TicketTeamsSuggestion(ImmutableList.of("AuthorTeam"), ImmutableList.of("OtherTeam"));
+        when(teamSuggestionsService.getTeamSuggestionsForTicket(ticketId)).thenReturn(Optional.of(suggestion));
+
+        // when
+        ResponseEntity<TicketTeamSuggestionsUI> response = controller.getTeamSuggestions(ticketId);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        TicketTeamSuggestionsUI body = response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.suggestedTeams()).containsExactly("AuthorTeam");
+        assertThat(body.otherTeams()).containsExactly("OtherTeam");
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenTicketDoesNotExist() {
+        // given
+        when(teamSuggestionsService.getTeamSuggestionsForTicket(ticketId)).thenReturn(Optional.empty());
+
+        // when
+        ResponseEntity<TicketTeamSuggestionsUI> response = controller.getTeamSuggestions(ticketId);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    private static DetailedTicket detailedTicket(TicketId id) {
+        Ticket ticket = Ticket.builder()
+                .id(id)
+                .channelId("C123")
+                .queryTs(MessageTs.of("123.456"))
+                .createdMessageTs(MessageTs.of("123.457"))
+                .status(TicketStatus.opened)
+                .team(null)
+                .impact("production-blocking")
+                .tags(ImmutableList.of())
+                .lastInteractedAt(Instant.now())
+                .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, Instant.now())))
+                .build();
+        return new DetailedTicket(ticket, ImmutableList.of());
     }
 }
