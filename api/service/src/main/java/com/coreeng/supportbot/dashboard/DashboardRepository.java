@@ -25,7 +25,7 @@ public interface DashboardRepository {
 
     UnresolvedTicketAges getUnresolvedTicketAges(LocalDate dateFrom, LocalDate dateTo);
 
-    List<IncomingVsResolved> getIncomingVsResolvedRate(LocalDate dateFrom, LocalDate dateTo);
+    IncomingVsResolvedRate getIncomingVsResolvedRate(IncomingVsResolvedQuery query);
 
     // Escalation SLAs
     List<TagDuration> getAvgEscalationDurationByTag(LocalDate dateFrom, LocalDate dateTo);
@@ -59,6 +59,13 @@ public interface DashboardRepository {
     record UnresolvedTicketAges(String p50, String p90) {}
 
     record IncomingVsResolved(String time, long incoming, long resolved) {}
+
+    record IncomingVsResolvedRate(IncomingVsResolvedQuery.Granularity granularity, List<IncomingVsResolved> data) {
+
+        public IncomingVsResolvedRate {
+            data = List.copyOf(data);
+        }
+    }
 
     record TagDuration(String tag, double avgDuration) {}
 

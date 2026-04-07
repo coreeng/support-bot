@@ -5,6 +5,8 @@ import {
   errorResponse,
 } from "../../_lib/backend-fetch";
 
+const FORWARDED_QUERY_PARAMS = ["dateFrom", "dateTo", "allTime", "granularity"] as const;
+
 // All valid dashboard endpoints that map to /dashboard/* on the backend
 const VALID_ENDPOINTS = new Set([
   "first-response-distribution",
@@ -37,13 +39,21 @@ export async function GET(
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const dateFrom = searchParams.get("dateFrom");
-  const dateTo = searchParams.get("dateTo");
 
   // Build query params for backend
   const backendParams = new URLSearchParams();
-  if (dateFrom) backendParams.append("dateFrom", dateFrom);
-  if (dateTo) backendParams.append("dateTo", dateTo);
+
+  for (const key of FORWARDED_QUERY_PARAMS) {
+    const value = searchParams.get(key);
+    if (value) {
+      backendParams.append(key, value);
+    }
+  }
+
+  for (const team of searchParams.getAll("teams")) {
+    backendParams.append("teams", team);
+  }
+
   const queryString = backendParams.toString();
   const backendPath = `/dashboard/${endpoint}${queryString ? `?${queryString}` : ""}`;
 

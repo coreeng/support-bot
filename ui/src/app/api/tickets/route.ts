@@ -8,6 +8,7 @@ import { mapTicket } from "./_lib/map-ticket";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
+
   const page = searchParams.get("page") ?? "0";
   const pageSize = searchParams.get("pageSize") ?? "50";
   const dateFrom = searchParams.get("dateFrom");

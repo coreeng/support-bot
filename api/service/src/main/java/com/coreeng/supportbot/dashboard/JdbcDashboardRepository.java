@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
     private final DSLContext dsl;
     private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final long DEFAULT_INCOMING_VS_RESOLVED_LOOKBACK_DAYS = 7;
 
     // ===== Response SLAs =====
 
@@ -289,32 +291,75 @@ public class JdbcDashboardRepository implements DashboardRepository {
     }
 
     @Override
-    public List<IncomingVsResolved> getIncomingVsResolvedRate(LocalDate dateFrom, LocalDate dateTo) {
-        // Default to last 7 days if no date range
-        LocalDate start = dateFrom != null
-                ? dateFrom
-                : LocalDate.now(ZoneId.systemDefault()).minusDays(7);
-        LocalDate end = dateTo != null ? dateTo : LocalDate.now(ZoneId.systemDefault());
+    public IncomingVsResolvedRate getIncomingVsResolvedRate(IncomingVsResolvedQuery query) {
+        LocalDate end = query.dateTo() != null ? query.dateTo() : LocalDate.now(ZoneId.systemDefault());
+        List<String> filteredTeams = normalizeTeams(query.teams());
+        LocalDate start = resolveIncomingVsResolvedStart(query.dateFrom(), end, query.allTime(), filteredTeams);
+        IncomingVsResolvedBucketing bucketing = start == null || start.isAfter(end)
+                ? IncomingVsResolvedBucketing.forEmptyResult(query.granularity())
+                : IncomingVsResolvedBucketing.forDateRange(start, end, query.granularity());
 
-        long diffDays = java.time.temporal.ChronoUnit.DAYS.between(start, end);
-        boolean useDailyInterval = diffDays > 60;
+        if (start == null || start.isAfter(end)) {
+            return new IncomingVsResolvedRate(bucketing.granularity(), List.of());
+        }
 
-        String truncFunc = useDailyInterval
-                ? "date_trunc('day', query_posted_ts::timestamptz)"
-                : "date_trunc('hour', query_posted_ts::timestamptz)";
-        String truncFuncResolved = useDailyInterval
-                ? "date_trunc('day', last_closed_ts::timestamptz)"
-                : "date_trunc('hour', last_closed_ts::timestamptz)";
-        String interval = useDailyInterval ? "'1 day'::interval" : "'1 hour'::interval";
+        IncomingVsResolvedSqlQuery sqlQuery = buildIncomingVsResolvedSeriesQuery(start, end, filteredTeams, bucketing);
 
-        String startStr = start.format(ISO_DATE);
-        String endStr = end.format(ISO_DATE);
+        List<IncomingVsResolved> data = dsl.resultQuery(
+                        sqlQuery.sql(), sqlQuery.bindings().toArray())
+                .fetch(r -> new IncomingVsResolved(
+                        r.get("time_bucket", java.sql.Timestamp.class)
+                                .toInstant()
+                                .toString(),
+                        nullToZero(r.get("incoming", Long.class)),
+                        nullToZero(r.get("resolved", Long.class))));
+        return new IncomingVsResolvedRate(bucketing.granularity(), data);
+    }
+
+    private @Nullable LocalDate resolveIncomingVsResolvedStart(
+            @Nullable LocalDate dateFrom, LocalDate end, boolean allTime, List<String> teams) {
+        if (!allTime) {
+            return dateFrom != null
+                    ? dateFrom
+                    : LocalDate.now(ZoneId.systemDefault()).minusDays(DEFAULT_INCOMING_VS_RESOLVED_LOOKBACK_DAYS);
+        }
+        if (dateFrom != null) {
+            return dateFrom;
+        }
+        return findEarliestIncomingVsResolvedActivity(end, teams);
+    }
+
+    private List<String> normalizeTeams(@Nullable List<String> teams) {
+        if (teams == null) {
+            return List.of();
+        }
+        return teams.stream().filter(team -> team != null && !team.isBlank()).toList();
+    }
+
+    private @Nullable LocalDate findEarliestIncomingVsResolvedActivity(LocalDate end, List<String> teams) {
+        IncomingVsResolvedSqlQuery sqlQuery = buildEarliestIncomingVsResolvedActivityQuery(end, teams);
+        var result =
+                dsl.resultQuery(sqlQuery.sql(), sqlQuery.bindings().toArray()).fetchOne();
+        return result == null ? null : result.get("activity_date", LocalDate.class);
+    }
+
+    static IncomingVsResolvedSqlQuery buildIncomingVsResolvedSeriesQuery(
+            LocalDate start, LocalDate end, List<String> teams, IncomingVsResolvedBucketing bucketing) {
+        List<Object> bindings = new ArrayList<>();
+        String startDate = start.format(ISO_DATE);
+        String endDate = end.format(ISO_DATE);
+
+        addDateRangeBindings(bindings, startDate, endDate);
+        addDateRangeBindings(bindings, startDate, endDate);
+        String incomingTeamFilter = buildTeamFilterClause(bindings, teams);
+        addDateRangeBindings(bindings, startDate, endDate);
+        String resolvedTeamFilter = buildTeamFilterClause(bindings, teams);
 
         String sql = """
             WITH time_series AS (
                 SELECT generate_series(
-                    '%s'::timestamptz,
-                    '%s'::timestamptz + INTERVAL '1 day',
+                    %s,
+                    %s,
                     %s
                 ) AS time_bucket
             ),
@@ -324,8 +369,9 @@ public class JdbcDashboardRepository implements DashboardRepository {
                     COUNT(DISTINCT query_id) AS count
                 FROM aggregated_ticket_data
                 WHERE query_posted_ts IS NOT NULL
-                  AND query_posted_ts::date >= '%s'::date
-                  AND query_posted_ts::date <= '%s'::date
+                  AND query_posted_ts::date >= ?::date
+                  AND query_posted_ts::date <= ?::date
+                  %s
                 GROUP BY %s
             ),
             resolved_counts AS (
@@ -334,8 +380,9 @@ public class JdbcDashboardRepository implements DashboardRepository {
                     COUNT(*) AS count
                 FROM aggregated_ticket_data
                 WHERE last_closed_ts IS NOT NULL
-                  AND last_closed_ts::date >= '%s'::date
-                  AND last_closed_ts::date <= '%s'::date
+                  AND last_closed_ts::date >= ?::date
+                  AND last_closed_ts::date <= ?::date
+                  %s
                 GROUP BY %s
             )
             SELECT
@@ -345,31 +392,153 @@ public class JdbcDashboardRepository implements DashboardRepository {
             FROM time_series ts
             LEFT JOIN incoming_counts ic ON ts.time_bucket = ic.time_bucket
             LEFT JOIN resolved_counts rc ON ts.time_bucket = rc.time_bucket
-            WHERE ts.time_bucket >= '%s'::timestamptz
-              AND ts.time_bucket <= '%s'::timestamptz + INTERVAL '1 day'
             ORDER BY ts.time_bucket
             """.formatted(
-                        startStr,
-                        endStr,
-                        interval,
-                        truncFunc,
-                        startStr,
-                        endStr,
-                        truncFunc,
-                        truncFuncResolved,
-                        startStr,
-                        endStr,
-                        truncFuncResolved,
-                        startStr,
-                        endStr);
+                        bucketing.seriesStartExpression("?::date"),
+                        bucketing.seriesEndExpression("?::date"),
+                        bucketing.interval(),
+                        bucketing.incomingTrunc(),
+                        incomingTeamFilter,
+                        bucketing.incomingTrunc(),
+                        bucketing.resolvedTrunc(),
+                        resolvedTeamFilter,
+                        bucketing.resolvedTrunc());
+        return new IncomingVsResolvedSqlQuery(sql, bindings);
+    }
 
-        return dsl.resultQuery(sql)
-                .fetch(r -> new IncomingVsResolved(
-                        r.get("time_bucket", java.sql.Timestamp.class)
-                                .toInstant()
-                                .toString(),
-                        nullToZero(r.get("incoming", Long.class)),
-                        nullToZero(r.get("resolved", Long.class))));
+    static IncomingVsResolvedSqlQuery buildEarliestIncomingVsResolvedActivityQuery(LocalDate end, List<String> teams) {
+        List<Object> bindings = new ArrayList<>();
+        String endDate = end.format(ISO_DATE);
+        bindings.add(endDate);
+        String incomingTeamFilter = buildTeamFilterClause(bindings, teams);
+        bindings.add(endDate);
+        String resolvedTeamFilter = buildTeamFilterClause(bindings, teams);
+
+        String sql = """
+            SELECT MIN(activity_date) AS activity_date
+            FROM (
+                SELECT query_posted_ts::date AS activity_date
+                FROM aggregated_ticket_data
+                WHERE query_posted_ts IS NOT NULL
+                  AND query_posted_ts::date <= ?::date
+                  %s
+                UNION ALL
+                SELECT last_closed_ts::date AS activity_date
+                FROM aggregated_ticket_data
+                WHERE last_closed_ts IS NOT NULL
+                  AND last_closed_ts::date <= ?::date
+                  %s
+            ) activity
+            """.formatted(incomingTeamFilter, resolvedTeamFilter);
+        return new IncomingVsResolvedSqlQuery(sql, bindings);
+    }
+
+    private static void addDateRangeBindings(List<Object> bindings, String startDate, String endDate) {
+        bindings.add(startDate);
+        bindings.add(endDate);
+    }
+
+    private static String buildTeamFilterClause(List<Object> bindings, List<String> teams) {
+        if (teams.isEmpty()) {
+            return "";
+        }
+        String placeholders = String.join(", ", teams.stream().map(team -> "?").toList());
+        bindings.addAll(teams);
+        return " AND team_id IN (" + placeholders + ")";
+    }
+
+    record IncomingVsResolvedSqlQuery(String sql, List<Object> bindings) {
+
+        IncomingVsResolvedSqlQuery {
+            bindings = List.copyOf(bindings);
+        }
+    }
+
+    record IncomingVsResolvedBucketing(
+            IncomingVsResolvedQuery.Granularity granularity, String truncUnit, String interval) {
+
+        private static final int LEGACY_DAILY_BUCKET_THRESHOLD_DAYS = 60;
+        private static final int MAX_HOURLY_RANGE_DAYS = 4;
+        private static final int MAX_DAILY_RANGE_MONTHS = 2;
+
+        static IncomingVsResolvedBucketing forEmptyResult(IncomingVsResolvedQuery.@Nullable Granularity granularity) {
+            if (granularity == null || granularity == IncomingVsResolvedQuery.Granularity.AUTO) {
+                return daily();
+            }
+            return switch (granularity) {
+                case HOUR -> hourly();
+                case DAY -> daily();
+                case WEEK -> weekly();
+                case AUTO ->
+                    throw new IllegalStateException(
+                            "AUTO should have been handled before selecting an empty-result bucket");
+            };
+        }
+
+        static IncomingVsResolvedBucketing forDateRange(LocalDate start, LocalDate end) {
+            return start.plusDays(LEGACY_DAILY_BUCKET_THRESHOLD_DAYS).isBefore(end) ? daily() : hourly();
+        }
+
+        static IncomingVsResolvedBucketing forDateRange(
+                LocalDate start, LocalDate end, IncomingVsResolvedQuery.@Nullable Granularity granularity) {
+            if (granularity == null) {
+                return forDateRange(start, end);
+            }
+            return switch (resolveGranularity(start, end, granularity)) {
+                case HOUR -> hourly();
+                case DAY -> daily();
+                case WEEK -> weekly();
+                case AUTO -> throw new IllegalStateException("AUTO granularity must be resolved before bucketing");
+            };
+        }
+
+        private static IncomingVsResolvedBucketing hourly() {
+            return new IncomingVsResolvedBucketing(
+                    IncomingVsResolvedQuery.Granularity.HOUR, "hour", "'1 hour'::interval");
+        }
+
+        private static IncomingVsResolvedBucketing daily() {
+            return new IncomingVsResolvedBucketing(IncomingVsResolvedQuery.Granularity.DAY, "day", "'1 day'::interval");
+        }
+
+        private static IncomingVsResolvedBucketing weekly() {
+            return new IncomingVsResolvedBucketing(
+                    IncomingVsResolvedQuery.Granularity.WEEK, "week", "'1 week'::interval");
+        }
+
+        private static IncomingVsResolvedQuery.Granularity resolveGranularity(
+                LocalDate start, LocalDate end, IncomingVsResolvedQuery.Granularity granularity) {
+            if (granularity != IncomingVsResolvedQuery.Granularity.AUTO) {
+                return granularity;
+            }
+            if (!end.isAfter(start.plusDays(MAX_HOURLY_RANGE_DAYS))) {
+                return IncomingVsResolvedQuery.Granularity.HOUR;
+            }
+            if (!end.isAfter(start.plusMonths(MAX_DAILY_RANGE_MONTHS))) {
+                return IncomingVsResolvedQuery.Granularity.DAY;
+            }
+            return IncomingVsResolvedQuery.Granularity.WEEK;
+        }
+
+        String incomingTrunc() {
+            return truncate("query_posted_ts");
+        }
+
+        String resolvedTrunc() {
+            return truncate("last_closed_ts");
+        }
+
+        String seriesStartExpression(String expression) {
+            return truncate(expression);
+        }
+
+        String seriesEndExpression(String expression) {
+            return truncate("(" + expression + " + interval '1 day' - interval '1 second')");
+        }
+
+        private String truncate(String expression) {
+            return "date_trunc('" + truncUnit + "', " + expression + "::timestamptz)";
+        }
     }
 
     // ===== Escalation SLAs =====

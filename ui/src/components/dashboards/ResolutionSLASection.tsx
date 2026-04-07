@@ -3,6 +3,8 @@ import { ResolutionPercentileChart } from './ResolutionPercentileChart'
 import { TimeBucketChart } from './TimeBucketChart'
 import { TimeSeriesChart } from './TimeSeriesChart'
 import { RefreshButton } from './RefreshButton'
+import { formatIncomingVsResolvedSeries } from '@/lib/incomingVsResolved'
+import type { IncomingVsResolvedRate } from '@/lib/types/dashboard'
 import { formatHoursToDHMS, formatInterval, TimeBucket } from '@/lib/utils'
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts'
 
@@ -12,7 +14,7 @@ interface ResolutionSLASectionProps {
     resolutionTimesByWeek: { week: string; p50: number; p75: number; p90: number }[] | undefined
     resolutionTimeByTagInHours: { tag: string; p50: number; p90: number }[] | undefined
     unresolvedTicketAges: { p50: string; p90: string } | undefined
-    incomingVsResolvedRate: { time: string; incoming: number; resolved: number }[] | undefined
+    incomingVsResolvedRate: IncomingVsResolvedRate | undefined
     isResolutionDistributionLoading: boolean
     isRefreshing: boolean
     onRefresh: () => void
@@ -44,6 +46,10 @@ export function ResolutionSLASection({
         minMinutes: b.minMinutes,
         maxMinutes: b.maxMinutes,
     }))
+    const formattedIncomingVsResolvedRate = formatIncomingVsResolvedSeries(
+        incomingVsResolvedRate?.data ?? [],
+        incomingVsResolvedRate?.granularity
+    )
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
@@ -138,24 +144,10 @@ export function ResolutionSLASection({
             
             {/* Incoming vs Resolved Rate */}
             <div className="grid grid-cols-1 gap-6">
-                {incomingVsResolvedRate && incomingVsResolvedRate.length > 0 ? (
+                {formattedIncomingVsResolvedRate.length > 0 ? (
                     <TimeSeriesChart
                         title="Incoming vs Resolved Rate - Performance SLA"
-                        data={incomingVsResolvedRate.map(item => {
-                            const date = new Date(item.time)
-                            // Always show hourly labels for detailed tracking
-                            const timeLabel = date.toLocaleString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric',
-                                year: 'numeric',
-                                hour: 'numeric'
-                            })
-                            return {
-                                time: timeLabel,
-                                incoming: item.incoming,
-                                resolved: item.resolved
-                            }
-                        })}
+                        data={formattedIncomingVsResolvedRate}
                         lines={[
                             { dataKey: 'incoming', name: 'Incoming Queries', color: '#ef4444' },
                             { dataKey: 'resolved', name: 'Resolved Tickets', color: '#22c55e' }

@@ -1,4 +1,9 @@
-import { getDateRangeFromFilter, PRESET_DAYS, DateFilter } from '../dateRange'
+import {
+    formatTimeBucketLabel,
+    getDateRangeFromFilter,
+    PRESET_DAYS,
+    DateFilter,
+} from '../dateRange'
 
 // Fix "now" so date arithmetic produces deterministic, human-verifiable results.
 // 2024-01-15 is chosen because it yields clean boundaries:
@@ -130,6 +135,16 @@ describe('getDateRangeFromFilter', () => {
                 dateFilter: 'lastYear' as DateFilter,
             })).toEqual({ from: undefined, to: undefined })
         })
+    })
+})
+
+describe('formatTimeBucketLabel', () => {
+    it('includes the hour for hourly buckets', () => {
+        expect(formatTimeBucketLabel('2024-01-01T10:00:00Z', 'hour')).toContain('10')
+    })
+
+    it('uses month and year for monthly buckets', () => {
+        expect(formatTimeBucketLabel('2024-01-01T00:00:00Z', 'month')).toBe('Jan 2024')
     })
 })
 

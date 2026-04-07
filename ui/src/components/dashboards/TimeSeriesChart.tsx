@@ -1,7 +1,8 @@
 // src/components/dashboards/TimeSeriesChart.tsx
 import { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from 'recharts'
+import type { Props as TooltipContentProps, ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent'
 
-interface TimeSeriesChartProps {
+interface TimeSeriesChartProps<V extends ValueType = ValueType, N extends NameType = NameType> {
     title: string
     data: Record<string, unknown>[]
     lines: {
@@ -11,12 +12,13 @@ interface TimeSeriesChartProps {
     }[]
     yAxisLabel?: string
     xAxisDataKey?: string
-    tooltipFormatter?: (value: number) => [string, string]
+    tooltipFormatter?: TooltipContentProps<V, N>['formatter']
     height?: number
     showLegend?: boolean
+    emptyMessage?: string
 }
 
-export function TimeSeriesChart({
+export function TimeSeriesChart<V extends ValueType = ValueType, N extends NameType = NameType>({
     title,
     data,
     lines,
@@ -24,8 +26,9 @@ export function TimeSeriesChart({
     xAxisDataKey = 'week',
     tooltipFormatter,
     height = 350,
-    showLegend = true
-}: TimeSeriesChartProps) {
+    showLegend = true,
+    emptyMessage = 'No data available'
+}: TimeSeriesChartProps<V, N>) {
     return (
         <div className="bg-white shadow-lg rounded-xl p-6 border border-gray-200">
             <h2 className="text-xl font-semibold text-gray-700 mb-4">
@@ -61,7 +64,7 @@ export function TimeSeriesChart({
                     </LineChart>
                 </ResponsiveContainer>
             ) : (
-                <p className="text-gray-500">No data available</p>
+                <p className="text-gray-500">{emptyMessage}</p>
             )}
         </div>
     )
