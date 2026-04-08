@@ -2,6 +2,7 @@ package com.coreeng.supportbot.dashboard;
 
 import static com.coreeng.supportbot.util.JooqUtils.nullToZero;
 
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -253,7 +254,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
         return dsl.resultQuery(sql)
                 .fetch(r -> new WeeklyResolutionTimes(
-                        r.get("week", java.sql.Timestamp.class)
+                        r.get("week", Timestamp.class)
                                 .toLocalDateTime()
                                 .toLocalDate()
                                 .format(ISO_DATE),
@@ -292,41 +293,52 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
     @Override
     public IncomingVsResolvedRate getIncomingVsResolvedRate(IncomingVsResolvedQuery query) {
-        LocalDate end = query.dateTo() != null ? query.dateTo() : LocalDate.now(ZoneId.systemDefault());
+        LocalDate today = LocalDate.now(ZoneId.systemDefault());
+        LocalDate end = query.dateTo() != null ? query.dateTo() : today;
         List<String> filteredTeams = normalizeTeams(query.teams());
-        LocalDate start = resolveIncomingVsResolvedStart(query.dateFrom(), end, query.allTime(), filteredTeams);
-        IncomingVsResolvedBucketing bucketing = start == null || start.isAfter(end)
-                ? IncomingVsResolvedBucketing.forEmptyResult(query.granularity())
-                : IncomingVsResolvedBucketing.forDateRange(start, end, query.granularity());
+        LocalDate earliestActivity = query.allTime() && query.dateFrom() == null
+                ? findEarliestIncomingVsResolvedActivity(end, filteredTeams)
+                : null;
+        LocalDate start = resolveIncomingVsResolvedStart(query.dateFrom(), query.allTime(), today, earliestActivity);
 
         if (start == null || start.isAfter(end)) {
-            return new IncomingVsResolvedRate(bucketing.granularity(), List.of());
+            return new IncomingVsResolvedRate(resolveEmptyResultGranularity(query.granularity()), List.of());
         }
+
+        IncomingVsResolvedBucketing bucketing =
+                IncomingVsResolvedBucketing.forDateRange(start, end, query.granularity());
 
         IncomingVsResolvedSqlQuery sqlQuery = buildIncomingVsResolvedSeriesQuery(start, end, filteredTeams, bucketing);
 
         List<IncomingVsResolved> data = dsl.resultQuery(
                         sqlQuery.sql(), sqlQuery.bindings().toArray())
                 .fetch(r -> new IncomingVsResolved(
-                        r.get("time_bucket", java.sql.Timestamp.class)
-                                .toInstant()
-                                .toString(),
+                        r.get("time_bucket", Timestamp.class).toInstant().toString(),
                         nullToZero(r.get("incoming", Long.class)),
                         nullToZero(r.get("resolved", Long.class))));
         return new IncomingVsResolvedRate(bucketing.granularity(), data);
     }
 
-    private @Nullable LocalDate resolveIncomingVsResolvedStart(
-            @Nullable LocalDate dateFrom, LocalDate end, boolean allTime, List<String> teams) {
+    static @Nullable LocalDate resolveIncomingVsResolvedStart(
+            @Nullable LocalDate dateFrom, boolean allTime, LocalDate today, @Nullable LocalDate earliestActivity) {
         if (!allTime) {
-            return dateFrom != null
-                    ? dateFrom
-                    : LocalDate.now(ZoneId.systemDefault()).minusDays(DEFAULT_INCOMING_VS_RESOLVED_LOOKBACK_DAYS);
+            return dateFrom != null ? dateFrom : today.minusDays(DEFAULT_INCOMING_VS_RESOLVED_LOOKBACK_DAYS);
         }
         if (dateFrom != null) {
             return dateFrom;
         }
-        return findEarliestIncomingVsResolvedActivity(end, teams);
+        return earliestActivity;
+    }
+
+    static DashboardRepository.IncomingVsResolvedGranularity resolveEmptyResultGranularity(
+            IncomingVsResolvedQuery.@Nullable Granularity granularity) {
+        if (granularity == IncomingVsResolvedQuery.Granularity.HOUR) {
+            return DashboardRepository.IncomingVsResolvedGranularity.HOUR;
+        }
+        if (granularity == IncomingVsResolvedQuery.Granularity.WEEK) {
+            return DashboardRepository.IncomingVsResolvedGranularity.WEEK;
+        }
+        return DashboardRepository.IncomingVsResolvedGranularity.DAY;
     }
 
     private List<String> normalizeTeams(@Nullable List<String> teams) {
@@ -455,25 +467,11 @@ public class JdbcDashboardRepository implements DashboardRepository {
     }
 
     record IncomingVsResolvedBucketing(
-            IncomingVsResolvedQuery.Granularity granularity, String truncUnit, String interval) {
+            DashboardRepository.IncomingVsResolvedGranularity granularity, String truncUnit, String interval) {
 
         private static final int LEGACY_DAILY_BUCKET_THRESHOLD_DAYS = 60;
         private static final int MAX_HOURLY_RANGE_DAYS = 4;
         private static final int MAX_DAILY_RANGE_MONTHS = 2;
-
-        static IncomingVsResolvedBucketing forEmptyResult(IncomingVsResolvedQuery.@Nullable Granularity granularity) {
-            if (granularity == null || granularity == IncomingVsResolvedQuery.Granularity.AUTO) {
-                return daily();
-            }
-            return switch (granularity) {
-                case HOUR -> hourly();
-                case DAY -> daily();
-                case WEEK -> weekly();
-                case AUTO ->
-                    throw new IllegalStateException(
-                            "AUTO should have been handled before selecting an empty-result bucket");
-            };
-        }
 
         static IncomingVsResolvedBucketing forDateRange(LocalDate start, LocalDate end) {
             return start.plusDays(LEGACY_DAILY_BUCKET_THRESHOLD_DAYS).isBefore(end) ? daily() : hourly();
@@ -494,16 +492,17 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
         private static IncomingVsResolvedBucketing hourly() {
             return new IncomingVsResolvedBucketing(
-                    IncomingVsResolvedQuery.Granularity.HOUR, "hour", "'1 hour'::interval");
+                    DashboardRepository.IncomingVsResolvedGranularity.HOUR, "hour", "'1 hour'::interval");
         }
 
         private static IncomingVsResolvedBucketing daily() {
-            return new IncomingVsResolvedBucketing(IncomingVsResolvedQuery.Granularity.DAY, "day", "'1 day'::interval");
+            return new IncomingVsResolvedBucketing(
+                    DashboardRepository.IncomingVsResolvedGranularity.DAY, "day", "'1 day'::interval");
         }
 
         private static IncomingVsResolvedBucketing weekly() {
             return new IncomingVsResolvedBucketing(
-                    IncomingVsResolvedQuery.Granularity.WEEK, "week", "'1 week'::interval");
+                    DashboardRepository.IncomingVsResolvedGranularity.WEEK, "week", "'1 week'::interval");
         }
 
         private static IncomingVsResolvedQuery.Granularity resolveGranularity(
@@ -618,7 +617,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
 
         return dsl.resultQuery(sql)
                 .fetch(r -> new DateEscalations(
-                        r.get("escalation_date", java.sql.Timestamp.class)
+                        r.get("escalation_date", Timestamp.class)
                                 .toLocalDateTime()
                                 .toLocalDate()
                                 .format(ISO_DATE),
@@ -701,7 +700,7 @@ public class JdbcDashboardRepository implements DashboardRepository {
             ORDER BY w.week
             """)
                 .fetch(r -> new WeeklyTicketCounts(
-                        r.get("week", java.sql.Timestamp.class)
+                        r.get("week", Timestamp.class)
                                 .toLocalDateTime()
                                 .toLocalDate()
                                 .format(ISO_DATE),

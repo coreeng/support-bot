@@ -146,5 +146,14 @@ describe('formatTimeBucketLabel', () => {
     it('uses month and year for monthly buckets', () => {
         expect(formatTimeBucketLabel('2024-01-01T00:00:00Z', 'month')).toBe('Jan 2024')
     })
+
+    it('warns and falls back to the raw value for invalid dates', () => {
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+        expect(formatTimeBucketLabel('not-a-date', 'day')).toBe('not-a-date')
+        expect(warn).toHaveBeenCalledWith('formatTimeBucketLabel: unable to parse date value: not-a-date')
+
+        warn.mockRestore()
+    })
 })
 

@@ -9,6 +9,15 @@ describe('timeBucketResolutionForIncomingVsResolvedGranularity', () => {
         expect(timeBucketResolutionForIncomingVsResolvedGranularity('DAY')).toBe('day')
         expect(timeBucketResolutionForIncomingVsResolvedGranularity('WEEK')).toBe('week')
     })
+
+    it('warns and defaults to day for unknown backend granularity values', () => {
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+        expect(timeBucketResolutionForIncomingVsResolvedGranularity('MONTH' as never)).toBe('day')
+        expect(warn).toHaveBeenCalledWith('Unknown IncomingVsResolvedGranularity: MONTH, defaulting to day')
+
+        warn.mockRestore()
+    })
 })
 
 describe('formatIncomingVsResolvedSeries', () => {

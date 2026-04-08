@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.coreeng.supportbot.dashboard.DashboardRepository;
 import com.coreeng.supportbot.dashboard.DashboardRepository.IncomingVsResolved;
+import com.coreeng.supportbot.dashboard.DashboardRepository.IncomingVsResolvedGranularity;
 import com.coreeng.supportbot.dashboard.DashboardRepository.IncomingVsResolvedRate;
 import com.coreeng.supportbot.dashboard.IncomingVsResolvedQuery;
 import java.time.LocalDate;
@@ -44,7 +45,7 @@ class DashboardControllerTest {
         IncomingVsResolvedQuery query =
                 new IncomingVsResolvedQuery(from, to, true, teams, IncomingVsResolvedQuery.Granularity.AUTO);
         when(dashboardRepository.getIncomingVsResolvedRate(query))
-                .thenReturn(new IncomingVsResolvedRate(IncomingVsResolvedQuery.Granularity.DAY, List.of()));
+                .thenReturn(new IncomingVsResolvedRate(IncomingVsResolvedGranularity.DAY, List.of()));
 
         controller.getIncomingVsResolvedRate(teams, true, IncomingVsResolvedQuery.Granularity.AUTO, from, to);
 
@@ -56,7 +57,7 @@ class DashboardControllerTest {
         IncomingVsResolvedQuery query =
                 new IncomingVsResolvedQuery(null, null, false, null, IncomingVsResolvedQuery.Granularity.AUTO);
         when(dashboardRepository.getIncomingVsResolvedRate(query))
-                .thenReturn(new IncomingVsResolvedRate(IncomingVsResolvedQuery.Granularity.DAY, List.of()));
+                .thenReturn(new IncomingVsResolvedRate(IncomingVsResolvedGranularity.DAY, List.of()));
 
         controller.getIncomingVsResolvedRate(null, null, IncomingVsResolvedQuery.Granularity.AUTO, null, null);
 
@@ -67,7 +68,7 @@ class DashboardControllerTest {
     void incomingVsResolvedRate_acceptsUppercaseGranularityBinding() throws Exception {
         when(dashboardRepository.getIncomingVsResolvedRate(any()))
                 .thenReturn(new IncomingVsResolvedRate(
-                        IncomingVsResolvedQuery.Granularity.HOUR,
+                        IncomingVsResolvedGranularity.HOUR,
                         List.of(new IncomingVsResolved("2026-01-01T00:00:00Z", 2, 1))));
 
         mockMvc.perform(get("/dashboard/incoming-vs-resolved-rate")

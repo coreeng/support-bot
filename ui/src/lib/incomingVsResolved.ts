@@ -11,6 +11,9 @@ export function timeBucketResolutionForIncomingVsResolvedGranularity(
             return 'week'
         case 'DAY':
         default:
+            if (granularity !== undefined && granularity !== 'DAY') {
+                console.warn(`Unknown IncomingVsResolvedGranularity: ${granularity}, defaulting to day`)
+            }
             return 'day'
     }
 }

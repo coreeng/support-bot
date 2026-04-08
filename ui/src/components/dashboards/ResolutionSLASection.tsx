@@ -38,8 +38,7 @@ export function ResolutionSLASection({
         p75: week.p75 / 3600,
         p90: week.p90 / 3600
     }))
-    // Create time-based buckets for better visualization
-    // Already bucketed by backend; just pass through (fallback to empty)
+    // Backend provides pre-bucketed data; just map it to the TimeBucket shape.
     const timeBuckets: TimeBucket[] = (resolutionDurationDistribution || []).map(b => ({
         label: b.label,
         count: b.count,

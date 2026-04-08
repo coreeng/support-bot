@@ -2,6 +2,7 @@ package com.coreeng.supportbot.dashboard;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.coreeng.supportbot.dashboard.DashboardRepository.IncomingVsResolvedGranularity;
 import com.coreeng.supportbot.dashboard.JdbcDashboardRepository.IncomingVsResolvedBucketing;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,7 @@ class IncomingVsResolvedBucketingTest {
 
         IncomingVsResolvedBucketing bucketing = IncomingVsResolvedBucketing.forDateRange(start, start.plusDays(60));
 
-        assertBucketing(bucketing, IncomingVsResolvedQuery.Granularity.HOUR, "'1 hour'::interval", "hour");
+        assertBucketing(bucketing, IncomingVsResolvedGranularity.HOUR, "'1 hour'::interval", "hour");
     }
 
     @Test
@@ -23,7 +24,7 @@ class IncomingVsResolvedBucketingTest {
 
         IncomingVsResolvedBucketing bucketing = IncomingVsResolvedBucketing.forDateRange(start, start.plusDays(61));
 
-        assertBucketing(bucketing, IncomingVsResolvedQuery.Granularity.DAY, "'1 day'::interval", "day");
+        assertBucketing(bucketing, IncomingVsResolvedGranularity.DAY, "'1 day'::interval", "day");
     }
 
     @Test
@@ -33,7 +34,7 @@ class IncomingVsResolvedBucketingTest {
         IncomingVsResolvedBucketing bucketing = IncomingVsResolvedBucketing.forDateRange(
                 start, start.plusDays(4), IncomingVsResolvedQuery.Granularity.AUTO);
 
-        assertBucketing(bucketing, IncomingVsResolvedQuery.Granularity.HOUR, "'1 hour'::interval", "hour");
+        assertBucketing(bucketing, IncomingVsResolvedGranularity.HOUR, "'1 hour'::interval", "hour");
     }
 
     @Test
@@ -43,7 +44,7 @@ class IncomingVsResolvedBucketingTest {
         IncomingVsResolvedBucketing bucketing = IncomingVsResolvedBucketing.forDateRange(
                 start, start.plusMonths(2), IncomingVsResolvedQuery.Granularity.AUTO);
 
-        assertBucketing(bucketing, IncomingVsResolvedQuery.Granularity.DAY, "'1 day'::interval", "day");
+        assertBucketing(bucketing, IncomingVsResolvedGranularity.DAY, "'1 day'::interval", "day");
     }
 
     @Test
@@ -53,7 +54,7 @@ class IncomingVsResolvedBucketingTest {
         IncomingVsResolvedBucketing bucketing = IncomingVsResolvedBucketing.forDateRange(
                 start, start.plusMonths(2).plusDays(1), IncomingVsResolvedQuery.Granularity.AUTO);
 
-        assertBucketing(bucketing, IncomingVsResolvedQuery.Granularity.WEEK, "'1 week'::interval", "week");
+        assertBucketing(bucketing, IncomingVsResolvedGranularity.WEEK, "'1 week'::interval", "week");
     }
 
     @Test
@@ -63,12 +64,36 @@ class IncomingVsResolvedBucketingTest {
         IncomingVsResolvedBucketing bucketing = IncomingVsResolvedBucketing.forDateRange(
                 start, start.plusMonths(3), IncomingVsResolvedQuery.Granularity.DAY);
 
-        assertBucketing(bucketing, IncomingVsResolvedQuery.Granularity.DAY, "'1 day'::interval", "day");
+        assertBucketing(bucketing, IncomingVsResolvedGranularity.DAY, "'1 day'::interval", "day");
+    }
+
+    @Test
+    void defaultsEmptyResultsToDailyWhenGranularityIsNull() {
+        assertThat(JdbcDashboardRepository.resolveEmptyResultGranularity(null))
+                .isEqualTo(IncomingVsResolvedGranularity.DAY);
+    }
+
+    @Test
+    void defaultsEmptyResultsToDailyWhenGranularityIsAuto() {
+        assertThat(JdbcDashboardRepository.resolveEmptyResultGranularity(IncomingVsResolvedQuery.Granularity.AUTO))
+                .isEqualTo(IncomingVsResolvedGranularity.DAY);
+    }
+
+    @Test
+    void preservesExplicitEmptyResultHourlyGranularity() {
+        assertThat(JdbcDashboardRepository.resolveEmptyResultGranularity(IncomingVsResolvedQuery.Granularity.HOUR))
+                .isEqualTo(IncomingVsResolvedGranularity.HOUR);
+    }
+
+    @Test
+    void preservesExplicitEmptyResultWeeklyGranularity() {
+        assertThat(JdbcDashboardRepository.resolveEmptyResultGranularity(IncomingVsResolvedQuery.Granularity.WEEK))
+                .isEqualTo(IncomingVsResolvedGranularity.WEEK);
     }
 
     private static void assertBucketing(
             IncomingVsResolvedBucketing bucketing,
-            IncomingVsResolvedQuery.Granularity granularity,
+            IncomingVsResolvedGranularity granularity,
             String interval,
             String truncUnit) {
         assertThat(bucketing.granularity()).isEqualTo(granularity);

@@ -58,7 +58,13 @@ function getIncomingResolvedTeamCodes(
 
     return effectiveTeams
         .filter(team => team !== TEAM_SCOPE.NO_TEAMS)
-        .map(team => teamCodeByScopeKey.get(normalizeTeamKey(team)))
+        .map(team => {
+            const code = teamCodeByScopeKey.get(normalizeTeamKey(team))
+            if (!code) {
+                console.warn(`getIncomingResolvedTeamCodes: could not resolve team "${team}" to a code`)
+            }
+            return code
+        })
         .filter((team): team is string => !!team)
 }
 
@@ -73,25 +79,6 @@ function renderIncomingResolvedChart({
     error: Error | null
     data: IncomingVsResolvedRatePoint[]
 }): JSX.Element {
-    const emptyMessage = hasNoTeamScope
-        ? 'Incoming and resolved ticket activity cannot be shown without team access.'
-        : 'No incoming or resolved ticket activity for the selected date range.'
-    if (hasNoTeamScope) {
-        return (
-            <TimeSeriesChart
-                title="Incoming vs Resolved"
-                data={[]}
-                lines={INCOMING_RESOLVED_LINES}
-                xAxisDataKey="time"
-                yAxisLabel="Tickets"
-                tooltipFormatter={(value, name) => [`${value} ${value === 1 ? 'ticket' : 'tickets'}`, name]}
-                height={280}
-                showLegend={true}
-                emptyMessage={emptyMessage}
-            />
-        )
-    }
-
     if (error) {
         return (
             <div className="bg-white rounded-xl p-6 shadow-sm border border-red-200">
@@ -110,10 +97,13 @@ function renderIncomingResolvedChart({
         )
     }
 
+    const emptyMessage = hasNoTeamScope
+        ? 'Incoming and resolved ticket activity cannot be shown without team access.'
+        : 'No incoming or resolved ticket activity for the selected date range.'
     return (
         <TimeSeriesChart
             title="Incoming vs Resolved"
-            data={data}
+            data={hasNoTeamScope ? [] : data}
             lines={INCOMING_RESOLVED_LINES}
             xAxisDataKey="time"
             yAxisLabel="Tickets"

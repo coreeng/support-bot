@@ -39,7 +39,8 @@ function toValidDate(value?: string | Date): Date | undefined {
 export function formatTimeBucketLabel(value: string | Date, resolution: TimeBucketResolution): string {
     const date = toValidDate(value)
     if (!date) {
-        return ''
+        console.warn(`formatTimeBucketLabel: unable to parse date value: ${String(value)}`)
+        return String(value)
     }
 
     const timeZone = 'UTC'

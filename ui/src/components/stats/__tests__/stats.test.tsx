@@ -537,6 +537,81 @@ describe('StatsPage (Home Dashboard)', () => {
                 granularity: 'AUTO',
             });
         });
+
+        it('resolves team codes case-insensitively before calling the shared hook', () => {
+            mockUseTeamFilter.mockReturnValue(makeTeamFilter({
+                selectedTeam: 'team a',
+                teamScope: { mode: 'selected_teams', teams: ['team a'] },
+                effectiveTeams: ['team a'],
+                allTeams: ['Team A', 'Team B'],
+                initialized: true,
+            }));
+            mockUseAuth.mockReturnValue({
+                user: {
+                    id: 'user-1',
+                    email: 'user@example.com',
+                    name: 'Test User',
+                    teams: [
+                        { label: 'TEAM A', code: 'team-a', types: [], name: 'Team A' },
+                        { label: 'Team A', code: 'team-a', types: [], name: 'Team A' },
+                    ],
+                    roles: []
+                },
+                isLeadership: false,
+                isSupportEngineer: false,
+                isEscalationTeam: false,
+                actualEscalationTeams: [],
+                isLoading: false,
+                isAuthenticated: true,
+                logout: jest.fn()
+            });
+
+            render(<StatsPage />, { wrapper: Wrapper });
+
+            expect(mockUseIncomingVsResolvedRate).toHaveBeenLastCalledWith(true, '2024-12-26', '2025-01-02', {
+                teams: ['team-a'],
+                allTime: false,
+                granularity: 'AUTO',
+            });
+        });
+
+        it('warns and drops unresolved teams when the user has no matching team metadata', () => {
+            const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
+            mockUseTeamFilter.mockReturnValue(makeTeamFilter({
+                selectedTeam: 'Unknown Team',
+                teamScope: { mode: 'selected_teams', teams: ['Unknown Team'] },
+                effectiveTeams: ['Unknown Team'],
+                allTeams: ['Unknown Team'],
+                initialized: true,
+            }));
+            mockUseAuth.mockReturnValue({
+                user: {
+                    id: 'user-1',
+                    email: 'user@example.com',
+                    name: 'Test User',
+                    teams: [],
+                    roles: []
+                },
+                isLeadership: false,
+                isSupportEngineer: false,
+                isEscalationTeam: false,
+                actualEscalationTeams: [],
+                isLoading: false,
+                isAuthenticated: true,
+                logout: jest.fn()
+            });
+
+            render(<StatsPage />, { wrapper: Wrapper });
+
+            expect(warn).toHaveBeenCalledWith('getIncomingResolvedTeamCodes: could not resolve team "Unknown Team" to a code')
+            expect(mockUseIncomingVsResolvedRate).toHaveBeenLastCalledWith(true, '2024-12-26', '2025-01-02', {
+                teams: [],
+                allTime: false,
+                granularity: 'AUTO',
+            });
+
+            warn.mockRestore()
+        });
     });
 
     describe('Dashboard Title', () => {

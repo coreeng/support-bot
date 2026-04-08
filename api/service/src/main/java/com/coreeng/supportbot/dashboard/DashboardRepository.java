@@ -60,7 +60,13 @@ public interface DashboardRepository {
 
     record IncomingVsResolved(String time, long incoming, long resolved) {}
 
-    record IncomingVsResolvedRate(IncomingVsResolvedQuery.Granularity granularity, List<IncomingVsResolved> data) {
+    enum IncomingVsResolvedGranularity {
+        HOUR,
+        DAY,
+        WEEK
+    }
+
+    record IncomingVsResolvedRate(IncomingVsResolvedGranularity granularity, List<IncomingVsResolved> data) {
 
         public IncomingVsResolvedRate {
             data = List.copyOf(data);
