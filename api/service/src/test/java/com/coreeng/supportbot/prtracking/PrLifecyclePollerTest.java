@@ -946,6 +946,7 @@ class PrLifecyclePollerTest {
                             "my-org/repo-a",
                             "wow",
                             "platform-team",
+                            List.of(),
                             new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
             when(gitHubClient.resolveTeamReviewers("my-org", "platform-team")).thenReturn(List.of("team-member"));
 
@@ -974,7 +975,11 @@ class PrLifecyclePollerTest {
                             openPrWithReviews(record, List.of(review(GitHubPullRequestReview.ReviewState.APPROVED))));
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(new PrTrackingProps.Repository(
-                            "my-org/repo-a", "wow", null, new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
+                            "my-org/repo-a",
+                            "wow",
+                            null,
+                            List.of(),
+                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
 
             // when
             poller.poll();
@@ -1004,6 +1009,7 @@ class PrLifecyclePollerTest {
                             "my-org/repo-a",
                             "wow",
                             "platform-team",
+                            List.of(),
                             new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
             when(gitHubClient.resolveTeamReviewers("my-org", "platform-team"))
                     .thenThrow(new GitHubApiException(403, "forbidden"));
@@ -1041,6 +1047,7 @@ class PrLifecyclePollerTest {
                             "my-org/repo-a",
                             "wow",
                             "platform-team",
+                            List.of(),
                             new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
             when(gitHubClient.resolveTeamReviewers("my-org", "platform-team")).thenReturn(List.of("team-member"));
 

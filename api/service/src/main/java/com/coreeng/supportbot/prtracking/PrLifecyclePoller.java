@@ -186,18 +186,13 @@ public class PrLifecyclePoller {
             handleApprovalClosure(record);
         } else if (record.status() == PrTrackingStatus.OPEN) {
             Duration remaining = computeRemainingDuration(record);
-            if (remaining == null) {
-                log.atWarn()
+            if (remaining != null) {
+                prTrackingRepository.pauseSla(record.id(), PrTrackingStatus.APPROVED, remaining);
+                log.atInfo()
                         .addArgument(record::githubRepo)
                         .addArgument(record::prNumber)
-                        .log("Skipping APPROVED transition for {}#{} — no SLA deadline available");
-                return;
+                        .log("PR {}#{} approved — SLA paused, awaiting merge");
             }
-            prTrackingRepository.pauseSla(record.id(), PrTrackingStatus.APPROVED, remaining);
-            log.atInfo()
-                    .addArgument(record::githubRepo)
-                    .addArgument(record::prNumber)
-                    .log("PR {}#{} approved — SLA paused, awaiting merge");
         } else {
             prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.APPROVED, null, record.escalationId());
             log.atInfo()

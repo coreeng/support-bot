@@ -49,6 +49,7 @@ public record PrTrackingProps(
                                 normalizeRepositoryName(repository.name()),
                                 repository.owningTeam(),
                                 repository.githubTeamSlug(),
+                                repository.paths(),
                                 repository.sla()))
                         .toList();
         this.slaDiscovery = slaDiscovery == null ? new SlaDiscovery(null) : slaDiscovery;
@@ -93,28 +94,40 @@ public record PrTrackingProps(
             if (isBlank(repository.owningTeam())) {
                 throw new IllegalArgumentException("pr-review-tracking.repositories[].owning-team must not be blank");
             }
+
             if (repository.sla() == null) {
-                throw new IllegalArgumentException("pr-review-tracking.repositories[].sla must not be null");
-            }
-            Duration defaultSla = repository.sla().defaultSla();
-            boolean hasFile = !isBlank(repository.sla().file());
-            if (!hasFile && defaultSla == null) {
-                throw new IllegalArgumentException(
-                        "pr-review-tracking.repositories[].sla.default must be set when sla.file is not configured");
-            }
-            if (defaultSla != null && (defaultSla.isZero() || defaultSla.isNegative())) {
-                throw new IllegalArgumentException(
-                        "pr-review-tracking.repositories[].sla.default must be a positive duration");
-            }
-            List<SlaOverride> overrides = repository.sla().overrides();
-            for (SlaOverride override : overrides != null ? overrides : List.<SlaOverride>of()) {
-                if (isBlank(override.path())) {
+                // No-SLA repository: paths are required for selective tracking
+                if (repository.paths().isEmpty()) {
                     throw new IllegalArgumentException(
-                            "pr-review-tracking.repositories[].sla.overrides[].path must not be blank");
+                            "pr-review-tracking.repositories[].paths must not be empty when sla is not configured");
                 }
-                if (override.sla().isZero() || override.sla().isNegative()) {
+                for (String path : repository.paths()) {
+                    if (isBlank(path)) {
+                        throw new IllegalArgumentException(
+                                "pr-review-tracking.repositories[].paths[] must not be blank");
+                    }
+                }
+            } else {
+                Duration defaultSla = repository.sla().defaultSla();
+                boolean hasFile = !isBlank(repository.sla().file());
+                if (!hasFile && defaultSla == null) {
                     throw new IllegalArgumentException(
-                            "pr-review-tracking.repositories[].sla.overrides[].sla must be a positive duration");
+                            "pr-review-tracking.repositories[].sla.default must be set when sla.file is not configured");
+                }
+                if (defaultSla != null && (defaultSla.isZero() || defaultSla.isNegative())) {
+                    throw new IllegalArgumentException(
+                            "pr-review-tracking.repositories[].sla.default must be a positive duration");
+                }
+                List<SlaOverride> overrides = repository.sla().overrides();
+                for (SlaOverride override : overrides != null ? overrides : List.<SlaOverride>of()) {
+                    if (isBlank(override.path())) {
+                        throw new IllegalArgumentException(
+                                "pr-review-tracking.repositories[].sla.overrides[].path must not be blank");
+                    }
+                    if (override.sla().isZero() || override.sla().isNegative()) {
+                        throw new IllegalArgumentException(
+                                "pr-review-tracking.repositories[].sla.overrides[].sla must be a positive duration");
+                    }
                 }
             }
 
@@ -164,14 +177,23 @@ public record PrTrackingProps(
     }
 
     public record Repository(
-            String name, String owningTeam, @Nullable String githubTeamSlug, Sla sla) {
+            String name,
+            String owningTeam,
+            @Nullable String githubTeamSlug,
+            List<String> paths,
+            @Nullable Sla sla) {
         public Repository {
             requireNonNull(name, "name must not be null");
             requireNonNull(owningTeam, "owningTeam must not be null");
             if (githubTeamSlug != null && githubTeamSlug.isBlank()) {
                 throw new IllegalArgumentException("githubTeamSlug must not be blank when provided");
             }
-            requireNonNull(sla, "sla must not be null");
+            paths = paths == null ? List.of() : List.copyOf(paths);
+        }
+
+        /** Returns true when this repository has no SLA configured (no-SLA tracking mode). */
+        public boolean hasNoSla() {
+            return sla == null;
         }
     }
 

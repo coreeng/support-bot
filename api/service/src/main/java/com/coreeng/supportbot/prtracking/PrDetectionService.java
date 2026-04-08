@@ -50,6 +50,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.util.AntPathMatcher;
 
 @Service
 @ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
@@ -59,6 +60,8 @@ public class PrDetectionService {
 
     private static final DateTimeFormatter DEADLINE_FMT =
             DateTimeFormatter.ofPattern("EEE dd MMM 'at' HH:mm 'UTC'").withZone(ZoneOffset.UTC);
+
+    private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
     private final GitHubPrUrlParser prUrlParser;
     private final GitHubClient gitHubClient;
@@ -246,19 +249,22 @@ public class PrDetectionService {
 
     private enum NotificationType {
         TRACKED,
+        NO_SLA_TRACKED,
         CHANGES_REQUESTED,
         APPROVED,
         ESCALATED
     }
 
     private record PendingNotification(
-            String repo, int prNumber, NotificationType type, Duration sla, Instant slaDeadline, String teamLabel) {
+            String repo,
+            int prNumber,
+            NotificationType type,
+            @Nullable Duration sla,
+            @Nullable Instant slaDeadline,
+            @Nullable String teamLabel) {
         PendingNotification {
             checkNotNull(repo);
             checkNotNull(type);
-            checkNotNull(sla);
-            checkNotNull(slaDeadline);
-            checkNotNull(teamLabel);
         }
     }
 
@@ -276,42 +282,45 @@ public class PrDetectionService {
             Map<String, Optional<Set<String>>> teamReviewerCache,
             List<PendingNotification> notifications,
             List<PendingEscalation> pendingEscalations) {
-        PrTrackingProps.Repository repoConfig = prTrackingProps.repositories().stream()
-                .filter(r -> r.name().equals(detectedPr.repositoryName()))
-                .findFirst()
-                .orElseThrow(
-                        () -> new IllegalStateException("Repo config not found for " + detectedPr.repositoryName()));
 
-        GitHubPullRequest prMetadata;
         try {
-            prMetadata = gitHubClient.getPullRequest(detectedPr.repositoryName(), detectedPr.pullNumber());
+            Optional<PrTrackingProps.Repository> repoConfig = prTrackingProps.repositories().stream()
+                    .filter(r -> r.name().equals(detectedPr.repositoryName()))
+                    .findFirst();
+
+            if (repoConfig.isPresent()) {
+                // Repo is configured for RR tracking with or without SLA
+                GitHubPullRequest prMetadata = gitHubClient.getPullRequest(detectedPr.repositoryName(), detectedPr.pullNumber());
+
+                if (prMetadata.isOpen()) {
+                    if (repoConfig.get().hasNoSla()) {
+                        // No-SLA tracking: track by path filter without a deadline or escalation.
+                        return processNoSlaOpenPr(detectedPr, ticket, canAutoCloseTicket, repoConfig.get(), prMetadata, notifications);
+                    } else {
+                        return processOpenPr(detectedPr, ticket, canAutoCloseTicket, repoConfig.get(), prMetadata,
+                                teamReviewerCache, notifications, pendingEscalations);
+                    }
+                } else {
+                    log.atInfo()
+                            .addArgument(detectedPr::repositoryName)
+                            .addArgument(detectedPr::pullNumber)
+                            .addArgument(prMetadata::state)
+                            .log("PR {}#{} is {} — skipping tracking");
+                }
+            } else {
+                log.atInfo()
+                        .addArgument(detectedPr::repositoryName)
+                        .log("Repo {} is not configured for PR tracking, skipping");
+            }
         } catch (GitHubApiException e) {
             log.atWarn()
                     .addArgument(detectedPr::repositoryName)
                     .addArgument(detectedPr::pullNumber)
                     .addArgument(e::getMessage)
                     .log("Could not fetch PR metadata for {}#{}, skipping: {}");
-            return PerPrResult.SKIPPED;
         }
 
-        if (!prMetadata.isOpen()) {
-            log.atInfo()
-                    .addArgument(detectedPr::repositoryName)
-                    .addArgument(detectedPr::pullNumber)
-                    .addArgument(prMetadata::state)
-                    .log("PR {}#{} is {} — skipping tracking");
-            return PerPrResult.SKIPPED;
-        }
-
-        return processOpenPr(
-                detectedPr,
-                ticket,
-                canAutoCloseTicket,
-                repoConfig,
-                prMetadata,
-                teamReviewerCache,
-                notifications,
-                pendingEscalations);
+        return PerPrResult.SKIPPED;
     }
 
     private PerPrResult processOpenPr(
@@ -446,6 +455,85 @@ public class PrDetectionService {
         return PerPrResult.TRACKED;
     }
 
+    private PerPrResult processNoSlaOpenPr(
+            DetectedPr detectedPr,
+            Ticket ticket,
+            boolean canAutoCloseTicket,
+            PrTrackingProps.Repository repoConfig,
+            GitHubPullRequest prMetadata,
+            List<PendingNotification> notifications) {
+
+        if (matchesPathFilter(repoConfig.paths(), detectedPr.repositoryName(), detectedPr.pullNumber())) {
+            TicketId ticketId = checkNotNull(ticket.id());
+            if (prTrackingRepository.insertIfAbsent(new NewPrTracking(
+                    ticketId.id(),
+                    detectedPr.repositoryName(),
+                    detectedPr.pullNumber(),
+                    prMetadata.createdAt(),
+                    null,
+                    repoConfig.owningTeam(),
+                    canAutoCloseTicket)) != null) {
+
+                log.atInfo()
+                        .addArgument(detectedPr::repositoryName)
+                        .addArgument(detectedPr::pullNumber)
+                        .addArgument(ticketId::id)
+                        .log("PR {}#{} tracking record created for ticket {} (no-SLA repo)");
+
+                addReaction(prTrackingProps.prEmoji(), ticket.queryTs(), ticket.channelId());
+                String teamLabel = resolveTeamLabel(repoConfig.owningTeam());
+                notifications.add(new PendingNotification(
+                        detectedPr.repositoryName(),
+                        detectedPr.pullNumber(),
+                        NotificationType.NO_SLA_TRACKED,
+                        null,
+                        null,
+                        teamLabel));
+
+                return PerPrResult.TRACKED;
+            } else {
+                log.atInfo()
+                        .addArgument(detectedPr::repositoryName)
+                        .addArgument(detectedPr::pullNumber)
+                        .addArgument(ticketId::id)
+                        .log("PR {}#{} was already tracked for ticket {}, skipping");
+            }
+        } else {
+            log.atDebug()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .log("PR {}#{} does not match configured paths for no-SLA repo, skipping");
+        }
+
+        return PerPrResult.SKIPPED;
+    }
+
+    private boolean matchesPathFilter(List<String> paths, String repositoryName, int pullNumber) {
+
+        if (paths.isEmpty()) {
+            return true;
+        }
+
+        try {
+            List<String> prFiles = gitHubClient.listPullRequestFiles(repositoryName, pullNumber);
+
+            for (String pattern : paths) {
+                for (String prFile : prFiles) {
+                    if (PATH_MATCHER.match(pattern, prFile)) {
+                        return true;
+                    }
+                }
+            }
+        } catch (GitHubApiException e) {
+            log.atWarn()
+                    .addArgument(repositoryName)
+                    .addArgument(pullNumber)
+                    .addArgument(e::getMessage)
+                    .log("Could not list files for {}#{} during path filter check, skipping: {}");
+        }
+        return false;
+    }
+
     private Ticket initializePrMetadataIfNeeded(Ticket ticket, MessagePosted event) {
         TicketTeam resolvedTeam = ticket.team() != null ? ticket.team() : resolveFirstSuggestedTeam(event.userId());
         ImmutableList<String> resolvedTags =
@@ -545,18 +633,21 @@ public class PrDetectionService {
                         "Pull requests submitted to `%s` are expected to be reviewed within %s. You don't have to ping us for reviews, but I'll keep an eye on this one. If <%s|PR #%d> hasn't been reviewed by %s, I'll automatically escalate it to the owning team (%s)."
                                 .formatted(
                                         n.repo(),
-                                        formatDuration(n.sla()),
+                                        formatDuration(checkNotNull(n.sla())),
                                         prUrl(n.repo(), n.prNumber()),
                                         n.prNumber(),
-                                        DEADLINE_FMT.format(n.slaDeadline()),
-                                        n.teamLabel());
+                                        DEADLINE_FMT.format(checkNotNull(n.slaDeadline())),
+                                        checkNotNull(n.teamLabel()));
+                    case NO_SLA_TRACKED ->
+                        "PRs to %s have no automated SLAs, they are monitored by %s team."
+                                .formatted(n.repo(), checkNotNull(n.teamLabel()));
                     case CHANGES_REQUESTED ->
                         "<%s|PR #%d> for `%s` has been reviewed and changes have been requested. :eyes:"
                                 .formatted(prUrl(n.repo(), n.prNumber()), n.prNumber(), n.repo());
                     case APPROVED ->
                         "<%s|PR #%d> for `%s` has been approved and is ready to merge. :white_check_mark:"
                                 .formatted(prUrl(n.repo(), n.prNumber()), n.prNumber(), n.repo());
-                    case ESCALATED -> formatEscalatedText(n.repo(), n.prNumber(), n.sla());
+                    case ESCALATED -> formatEscalatedText(n.repo(), n.prNumber(), checkNotNull(n.sla()));
                 };
         postText(text, n.repo(), n.prNumber(), n.type(), queryTs, channelId);
     }
@@ -585,6 +676,9 @@ public class PrDetectionService {
             String text =
                     switch (type) {
                         case TRACKED -> formatTrackedGroup(repo, group, prList);
+                        case NO_SLA_TRACKED ->
+                                "PRs %s have no automated SLAs, they are monitored by %s team(s)."
+                                        .formatted(prList, teams(group));
                         case CHANGES_REQUESTED ->
                             "PRs %s for `%s` have been reviewed and changes have been requested. :eyes:"
                                     .formatted(prList, repo);
@@ -596,10 +690,17 @@ public class PrDetectionService {
                                     .formatted(
                                             prList,
                                             repo,
-                                            formatDuration(group.getFirst().sla()));
+                                            formatDuration(checkNotNull(
+                                                    group.getFirst().sla())));
                     };
             postText(text, repo, 0, type, queryTs, channelId);
         }
+    }
+
+    private static String teams(List<PendingNotification> group) {
+        return group.stream()
+                .map(n -> "%s".formatted(n.teamLabel()))
+                .collect(Collectors.joining(", "));
     }
 
     private String formatTrackedGroup(String repo, List<PendingNotification> group, String prList) {
@@ -608,8 +709,8 @@ public class PrDetectionService {
                 group.stream().map(PendingNotification::slaDeadline).distinct().count() == 1;
 
         if (sameSla) {
-            Instant deadline = group.getFirst().slaDeadline();
-            Duration sla = group.getFirst().sla();
+            Instant deadline = checkNotNull(group.getFirst().slaDeadline());
+            Duration sla = checkNotNull(group.getFirst().sla());
             return ("I'm tracking PRs %s for `%s`. Pull requests are expected to be reviewed within %s. "
                             + "You don't have to ping for reviews — I'll keep an eye on these. "
                             + "If not reviewed by %s, I'll automatically escalate to the owning team (%s).")
