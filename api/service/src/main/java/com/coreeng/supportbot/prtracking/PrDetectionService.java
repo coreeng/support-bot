@@ -290,15 +290,24 @@ public class PrDetectionService {
 
             if (repoConfig.isPresent()) {
                 // Repo is configured for RR tracking with or without SLA
-                GitHubPullRequest prMetadata = gitHubClient.getPullRequest(detectedPr.repositoryName(), detectedPr.pullNumber());
+                GitHubPullRequest prMetadata =
+                        gitHubClient.getPullRequest(detectedPr.repositoryName(), detectedPr.pullNumber());
 
                 if (prMetadata.isOpen()) {
                     if (repoConfig.get().hasNoSla()) {
                         // No-SLA tracking: track by path filter without a deadline or escalation.
-                        return processNoSlaOpenPr(detectedPr, ticket, canAutoCloseTicket, repoConfig.get(), prMetadata, notifications);
+                        return processNoSlaOpenPr(
+                                detectedPr, ticket, canAutoCloseTicket, repoConfig.get(), prMetadata, notifications);
                     } else {
-                        return processOpenPr(detectedPr, ticket, canAutoCloseTicket, repoConfig.get(), prMetadata,
-                                teamReviewerCache, notifications, pendingEscalations);
+                        return processOpenPr(
+                                detectedPr,
+                                ticket,
+                                canAutoCloseTicket,
+                                repoConfig.get(),
+                                prMetadata,
+                                teamReviewerCache,
+                                notifications,
+                                pendingEscalations);
                     }
                 } else {
                     log.atInfo()
@@ -466,13 +475,14 @@ public class PrDetectionService {
         if (matchesPathFilter(repoConfig.paths(), detectedPr.repositoryName(), detectedPr.pullNumber())) {
             TicketId ticketId = checkNotNull(ticket.id());
             if (prTrackingRepository.insertIfAbsent(new NewPrTracking(
-                    ticketId.id(),
-                    detectedPr.repositoryName(),
-                    detectedPr.pullNumber(),
-                    prMetadata.createdAt(),
-                    null,
-                    repoConfig.owningTeam(),
-                    canAutoCloseTicket)) != null) {
+                            ticketId.id(),
+                            detectedPr.repositoryName(),
+                            detectedPr.pullNumber(),
+                            prMetadata.createdAt(),
+                            null,
+                            repoConfig.owningTeam(),
+                            canAutoCloseTicket))
+                    != null) {
 
                 log.atInfo()
                         .addArgument(detectedPr::repositoryName)
@@ -677,8 +687,8 @@ public class PrDetectionService {
                     switch (type) {
                         case TRACKED -> formatTrackedGroup(repo, group, prList);
                         case NO_SLA_TRACKED ->
-                                "PRs %s have no automated SLAs, they are monitored by %s team(s)."
-                                        .formatted(prList, teams(group));
+                            "PRs %s have no automated SLAs, they are monitored by %s team(s)."
+                                    .formatted(prList, teams(group));
                         case CHANGES_REQUESTED ->
                             "PRs %s for `%s` have been reviewed and changes have been requested. :eyes:"
                                     .formatted(prList, repo);
@@ -698,9 +708,7 @@ public class PrDetectionService {
     }
 
     private static String teams(List<PendingNotification> group) {
-        return group.stream()
-                .map(n -> "%s".formatted(n.teamLabel()))
-                .collect(Collectors.joining(", "));
+        return group.stream().map(n -> "%s".formatted(n.teamLabel())).collect(Collectors.joining(", "));
     }
 
     private String formatTrackedGroup(String repo, List<PendingNotification> group, String prList) {

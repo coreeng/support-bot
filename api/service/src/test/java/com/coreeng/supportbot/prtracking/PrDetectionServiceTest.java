@@ -645,7 +645,8 @@ class PrDetectionServiceTest {
             verify(slackClient, times(2)).addReaction(any());
             verify(slackClient).postMessage(postMessageCaptor.capture());
             assertThat(postMessageCaptor.getValue().message().getText())
-                    .contains("PRs to %s have no automated SLAs, they are monitored by %s team.".formatted(NO_SLA_REPO, TEAM_CODE));
+                    .contains("PRs to %s have no automated SLAs, they are monitored by %s team."
+                            .formatted(NO_SLA_REPO, TEAM_CODE));
             // no escalation
             verifyNoInteractions(escalationProcessingService);
         }
