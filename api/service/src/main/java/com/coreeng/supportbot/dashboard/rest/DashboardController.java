@@ -2,9 +2,11 @@ package com.coreeng.supportbot.dashboard.rest;
 
 import com.coreeng.supportbot.dashboard.DashboardRepository;
 import com.coreeng.supportbot.dashboard.DashboardRepository.*;
+import com.coreeng.supportbot.dashboard.IncomingVsResolvedQuery;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -76,10 +78,15 @@ public class DashboardController {
     }
 
     @GetMapping("/incoming-vs-resolved-rate")
-    public List<IncomingVsResolved> getIncomingVsResolvedRate(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
-        return dashboardRepository.getIncomingVsResolvedRate(dateFrom, dateTo);
+    public IncomingVsResolvedRate getIncomingVsResolvedRate(
+            @RequestParam(required = false) @Nullable List<String> teams,
+            @RequestParam(required = false) @Nullable Boolean allTime,
+            @RequestParam(required = false) IncomingVsResolvedQuery.@Nullable Granularity granularity,
+            @RequestParam(required = false) @Nullable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false) @Nullable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
+        IncomingVsResolvedQuery query =
+                new IncomingVsResolvedQuery(dateFrom, dateTo, Boolean.TRUE.equals(allTime), teams, granularity);
+        return dashboardRepository.getIncomingVsResolvedRate(query);
     }
 
     // ===== Escalation SLA Endpoints =====

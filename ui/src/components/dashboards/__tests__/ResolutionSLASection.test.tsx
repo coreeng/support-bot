@@ -2,6 +2,14 @@
 import { render, screen } from '@testing-library/react'
 import { ResolutionSLASection } from '../ResolutionSLASection'
 
+const mockTimeSeriesChart = jest.fn(({ title, data, lines }: any) => (
+    <div data-testid="time-series-chart">
+        <h3>{title}</h3>
+        <div>Data points: {data?.length || 0}</div>
+        <div>Lines: {lines?.length || 0}</div>
+    </div>
+))
+
 // Mock child components
 jest.mock('../ResolutionPercentileChart', () => ({
     ResolutionPercentileChart: ({ p50, p75, p90 }: any) => (
@@ -23,13 +31,7 @@ jest.mock('../TimeBucketChart', () => ({
 }))
 
 jest.mock('../TimeSeriesChart', () => ({
-    TimeSeriesChart: ({ title, data, lines }: any) => (
-        <div data-testid="time-series-chart">
-            <h3>{title}</h3>
-            <div>Data points: {data?.length || 0}</div>
-            <div>Lines: {lines?.length || 0}</div>
-        </div>
-    )
+    TimeSeriesChart: (props: any) => mockTimeSeriesChart(props)
 }))
 
 jest.mock('../RefreshButton', () => ({
@@ -73,10 +75,13 @@ describe('ResolutionSLASection', () => {
         { tag: 'feature', p50: 8.3, p90: 22.1 },
     ]
     const mockUnresolvedTicketAges = { p50: '12h 30m', p90: '2 days 5h 15m' }
-    const mockIncomingVsResolvedRate = [
-        { time: '2024-01-01 10:00', incoming: 10, resolved: 8 },
-        { time: '2024-01-01 11:00', incoming: 15, resolved: 12 },
-    ]
+    const mockIncomingVsResolvedRate = {
+        granularity: 'HOUR' as const,
+        data: [
+            { time: '2024-01-01T10:00:00Z', incoming: 10, resolved: 8 },
+            { time: '2024-01-01T11:00:00Z', incoming: 15, resolved: 12 },
+        ],
+    }
     const mockOnRefresh = jest.fn()
 
     beforeEach(() => {
@@ -230,6 +235,11 @@ describe('ResolutionSLASection', () => {
             )
 
             expect(screen.getByText('Incoming vs Resolved Rate - Performance SLA')).toBeInTheDocument()
+
+            const incomingChartCall = mockTimeSeriesChart.mock.calls.find(
+                ([props]) => props.title === 'Incoming vs Resolved Rate - Performance SLA'
+            )
+            expect(incomingChartCall?.[0].data[0].time).toContain('10')
         })
     })
 
@@ -319,7 +329,7 @@ describe('ResolutionSLASection', () => {
                     resolutionTimesByWeek={mockResolutionTimesByWeek}
                     resolutionTimeByTagInHours={mockResolutionTimeByTagInHours}
                     unresolvedTicketAges={mockUnresolvedTicketAges}
-                    incomingVsResolvedRate={[]}
+                    incomingVsResolvedRate={{ granularity: 'DAY', data: [] }}
                     isResolutionDistributionLoading={false}
                     isRefreshing={false}
                     onRefresh={mockOnRefresh}

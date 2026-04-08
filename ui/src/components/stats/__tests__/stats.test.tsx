@@ -16,6 +16,9 @@ import * as hooks from '../../../lib/hooks';
 import * as AuthHook from '../../../hooks/useAuth';
 import * as TeamFilterContext from '../../../contexts/TeamFilterContext';
 
+const mockTimeSeriesChart = jest.fn(({ title }: { title: string }) => <div data-testid="time-series-chart">{title}</div>);
+const mockHorizontalBarChart = jest.fn(({ title }: { title: string }) => <div data-testid="horizontal-bar-chart">{title}</div>);
+
 // Mock hooks
 jest.mock('../../../lib/hooks');
 jest.mock('../../../hooks/useAuth');
@@ -36,16 +39,6 @@ jest.mock('../../../lib/hooks/useUrlParams', () => ({
     },
 }))
 
-// Mock Recharts
-jest.mock('recharts', () => ({
-    PieChart: ({ children }: { children: React.ReactNode }) => <div data-testid="pie-chart">{children}</div>,
-    Pie: () => <div data-testid="pie" />,
-    Cell: () => <div data-testid="cell" />,
-    Tooltip: () => <div data-testid="tooltip" />,
-    Legend: () => <div data-testid="legend" />,
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="responsive-container">{children}</div>
-}));
-
 // Mock EscalatedToMyTeamWidget
 jest.mock('../../escalations/EscalatedToMyTeamWidget', () => {
     return function MockEscalatedToMyTeamWidget() {
@@ -53,7 +46,17 @@ jest.mock('../../escalations/EscalatedToMyTeamWidget', () => {
     };
 });
 
+// Mock chart components
+jest.mock('../../dashboards/TimeSeriesChart', () => ({
+    TimeSeriesChart: (props: { title: string }) => mockTimeSeriesChart(props),
+}));
+
+jest.mock('../../dashboards/HorizontalBarChart', () => ({
+    HorizontalBarChart: (props: { title: string }) => mockHorizontalBarChart(props),
+}));
+
 const mockUseAllTickets = hooks.useAllTickets as jest.MockedFunction<typeof hooks.useAllTickets>;
+const mockUseIncomingVsResolvedRate = hooks.useIncomingVsResolvedRate as jest.MockedFunction<typeof hooks.useIncomingVsResolvedRate>;
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>;
 const mockUseAuth = AuthHook.useAuth as jest.MockedFunction<typeof AuthHook.useAuth>;
 const mockUseTeamFilter = TeamFilterContext.useTeamFilter as jest.MockedFunction<typeof TeamFilterContext.useTeamFilter>;
@@ -88,37 +91,58 @@ const mockTickets = [
         status: 'opened',
         team: { name: 'Team A' },
         impact: 'high',
-        escalations: []
+        escalations: [],
+        query: { date: '2025-01-01T10:00:00Z' },
+        logs: [{ event: 'opened', date: '2025-01-01T10:00:00Z' }],
     },
     {
         id: '2',
         status: 'opened',
         team: { name: 'Team A' },
         impact: 'medium',
-        escalations: []
+        escalations: [],
+        query: { date: '2025-01-01T12:00:00Z' },
+        logs: [{ event: 'opened', date: '2025-01-01T12:00:00Z' }],
     },
     {
         id: '3',
         status: 'closed',
         team: { name: 'Team A' },
         impact: 'low',
-        escalations: []
+        escalations: [],
+        query: { date: '2025-01-01T15:00:00Z' },
+        logs: [
+            { event: 'opened', date: '2025-01-01T15:00:00Z' },
+            { event: 'closed', date: '2025-01-02T09:00:00Z' },
+        ],
     },
     {
         id: '4',
         status: 'opened',
         team: { name: 'Team A' },
         impact: 'high',
-        escalations: [{ id: 'esc-1' }]
+        escalations: [{ id: 'esc-1' }],
+        query: { date: '2025-01-02T10:00:00Z' },
+        logs: [{ event: 'opened', date: '2025-01-02T10:00:00Z' }],
     },
     {
         id: '5',
         status: 'opened',
         team: { name: 'Team B' },
         impact: 'medium',
-        escalations: []
+        escalations: [],
+        query: { date: '2025-01-03T10:00:00Z' },
+        logs: [{ event: 'opened', date: '2025-01-03T10:00:00Z' }],
     }
 ];
+
+const mockIncomingVsResolvedRate = {
+    granularity: 'DAY' as const,
+    data: [
+        { time: '2025-01-01T00:00:00Z', incoming: 3, resolved: 0 },
+        { time: '2025-01-02T00:00:00Z', incoming: 1, resolved: 2 },
+    ],
+};
 
 const mockRegistry = {
     impacts: [
@@ -143,6 +167,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => {
 describe('StatsPage (Home Dashboard)', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        jest.useFakeTimers().setSystemTime(new Date('2025-01-02T12:00:00Z'));
 
         // Default mocks
         mockUseRegistry.mockReturnValue({
@@ -177,10 +202,26 @@ describe('StatsPage (Home Dashboard)', () => {
         }));
 
         mockUseAllTickets.mockReturnValue({
-            data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 5 },
+            data: {
+                content: mockTickets,
+                page: 0,
+                totalPages: 1,
+                totalElements: mockTickets.length,
+            },
             isLoading: false,
-            error: null
+            error: null,
         } as unknown as ReturnType<typeof hooks.useAllTickets>);
+
+        mockUseIncomingVsResolvedRate.mockReturnValue({
+            data: mockIncomingVsResolvedRate,
+            isLoading: false,
+            error: null,
+        } as unknown as ReturnType<typeof hooks.useIncomingVsResolvedRate>);
+
+    });
+
+    afterEach(() => {
+        jest.useRealTimers();
     });
 
     describe('Loading and Error States', () => {
@@ -207,6 +248,19 @@ describe('StatsPage (Home Dashboard)', () => {
             render(<StatsPage />, { wrapper: Wrapper });
 
             expect(screen.getByText(/Error loading dashboard/i)).toBeInTheDocument();
+        });
+
+        it('shows an explicit chart error when incoming/resolved data fails to load', () => {
+            mockUseIncomingVsResolvedRate.mockReturnValue({
+                data: undefined,
+                isLoading: false,
+                error: new Error('Chart failed'),
+            } as unknown as ReturnType<typeof hooks.useIncomingVsResolvedRate>);
+
+            render(<StatsPage />, { wrapper: Wrapper });
+
+            expect(screen.getByText(/Unable to load incoming and resolved ticket activity/i)).toBeInTheDocument();
+            expect(screen.getByText(/Total Tickets/i)).toBeInTheDocument();
         });
     });
 
@@ -256,6 +310,17 @@ describe('StatsPage (Home Dashboard)', () => {
 
             expect(screen.getByText(/No Team Access/i)).toBeInTheDocument();
             expect(screen.getByText(/dashboard data cannot be displayed/i)).toBeInTheDocument();
+
+            const incomingChartCall = mockTimeSeriesChart.mock.calls.find(([props]) => props.title === 'Incoming vs Resolved');
+            expect(incomingChartCall?.[0]).toMatchObject({
+                data: [],
+                emptyMessage: 'Incoming and resolved ticket activity cannot be shown without team access.'
+            });
+            expect(mockUseIncomingVsResolvedRate).toHaveBeenLastCalledWith(false, '2024-12-26', '2025-01-02', {
+                teams: [],
+                allTime: false,
+                granularity: 'AUTO',
+            });
         });
 
         it('should show split view for escalation teams', () => {
@@ -437,17 +502,115 @@ describe('StatsPage (Home Dashboard)', () => {
     });
 
     describe('Charts Rendering', () => {
-        it('should render Tickets by Status chart', () => {
+        it('should render Incoming vs Resolved chart', () => {
             render(<StatsPage />, { wrapper: Wrapper });
 
-            expect(screen.getByText(/Tickets by Status/i)).toBeInTheDocument();
-            expect(screen.getAllByTestId('pie-chart')).toHaveLength(2); // Status and Impact
+            expect(screen.getByText(/Incoming vs Resolved/i)).toBeInTheDocument();
+            expect(screen.getByTestId('time-series-chart')).toBeInTheDocument();
         });
 
         it('should render Tickets by Impact chart', () => {
             render(<StatsPage />, { wrapper: Wrapper });
 
             expect(screen.getByText(/Tickets by Impact/i)).toBeInTheDocument();
+            expect(screen.getByTestId('horizontal-bar-chart')).toBeInTheDocument();
+        });
+
+        it('renders incoming vs resolved chart data from the shared hook', () => {
+            render(<StatsPage />, { wrapper: Wrapper });
+
+            const incomingChartCall = mockTimeSeriesChart.mock.calls.find(([props]) => props.title === 'Incoming vs Resolved');
+            expect(incomingChartCall?.[0].data).toEqual([
+                { time: 'Jan 1', incoming: 3, resolved: 0 },
+                { time: 'Jan 2', incoming: 1, resolved: 2 },
+            ]);
+        });
+
+        it('uses allTime mode for the shared hook when all time is selected', () => {
+            render(<StatsPage />, { wrapper: Wrapper });
+
+            fireEvent.change(screen.getByDisplayValue('Last Week'), { target: { value: 'all' } });
+
+            expect(mockUseIncomingVsResolvedRate).toHaveBeenLastCalledWith(true, undefined, undefined, {
+                teams: ['team-a'],
+                allTime: true,
+                granularity: 'AUTO',
+            });
+        });
+
+        it('resolves team codes case-insensitively before calling the shared hook', () => {
+            mockUseTeamFilter.mockReturnValue(makeTeamFilter({
+                selectedTeam: 'team a',
+                teamScope: { mode: 'selected_teams', teams: ['team a'] },
+                effectiveTeams: ['team a'],
+                allTeams: ['Team A', 'Team B'],
+                initialized: true,
+            }));
+            mockUseAuth.mockReturnValue({
+                user: {
+                    id: 'user-1',
+                    email: 'user@example.com',
+                    name: 'Test User',
+                    teams: [
+                        { label: 'TEAM A', code: 'team-a', types: [], name: 'Team A' },
+                        { label: 'Team A', code: 'team-a', types: [], name: 'Team A' },
+                    ],
+                    roles: []
+                },
+                isLeadership: false,
+                isSupportEngineer: false,
+                isEscalationTeam: false,
+                actualEscalationTeams: [],
+                isLoading: false,
+                isAuthenticated: true,
+                logout: jest.fn()
+            });
+
+            render(<StatsPage />, { wrapper: Wrapper });
+
+            expect(mockUseIncomingVsResolvedRate).toHaveBeenLastCalledWith(true, '2024-12-26', '2025-01-02', {
+                teams: ['team-a'],
+                allTime: false,
+                granularity: 'AUTO',
+            });
+        });
+
+        it('warns and drops unresolved teams when the user has no matching team metadata', () => {
+            const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
+            mockUseTeamFilter.mockReturnValue(makeTeamFilter({
+                selectedTeam: 'Unknown Team',
+                teamScope: { mode: 'selected_teams', teams: ['Unknown Team'] },
+                effectiveTeams: ['Unknown Team'],
+                allTeams: ['Unknown Team'],
+                initialized: true,
+            }));
+            mockUseAuth.mockReturnValue({
+                user: {
+                    id: 'user-1',
+                    email: 'user@example.com',
+                    name: 'Test User',
+                    teams: [],
+                    roles: []
+                },
+                isLeadership: false,
+                isSupportEngineer: false,
+                isEscalationTeam: false,
+                actualEscalationTeams: [],
+                isLoading: false,
+                isAuthenticated: true,
+                logout: jest.fn()
+            });
+
+            render(<StatsPage />, { wrapper: Wrapper });
+
+            expect(warn).toHaveBeenCalledWith('getIncomingResolvedTeamCodes: could not resolve team "Unknown Team" to a code')
+            expect(mockUseIncomingVsResolvedRate).toHaveBeenLastCalledWith(true, '2024-12-26', '2025-01-02', {
+                teams: [],
+                allTime: false,
+                granularity: 'AUTO',
+            });
+
+            warn.mockRestore()
         });
     });
 
@@ -503,9 +666,9 @@ describe('StatsPage (Home Dashboard)', () => {
             fireEvent.change(dateFilterSelect, { target: { value: 'custom' } });
 
             // Verify useAllTickets was called with last week range (not undefined)
-            const lastCall = mockUseAllTickets.mock.calls[mockUseAllTickets.mock.calls.length - 1];
-            expect(lastCall).toBeDefined();
-            const [pageSize, from, to] = lastCall;
+            const rangeCall = [...mockUseAllTickets.mock.calls].reverse().find(([, from]) => from !== undefined);
+            expect(rangeCall).toBeDefined();
+            const [pageSize, from, to] = rangeCall!;
             expect(pageSize).toBe(200);
             // Should have valid dates (last week), not undefined
             expect(from).toBeDefined();
@@ -530,9 +693,9 @@ describe('StatsPage (Home Dashboard)', () => {
             fireEvent.change(dateInputs[1], { target: { value: '2024-01-31' } });
 
             // Verify useAllTickets was called with custom dates
-            const lastCall = mockUseAllTickets.mock.calls[mockUseAllTickets.mock.calls.length - 1];
-            expect(lastCall).toBeDefined();
-            const [, from, to] = lastCall;
+            const rangeCall = [...mockUseAllTickets.mock.calls].reverse().find(([, from]) => from !== undefined);
+            expect(rangeCall).toBeDefined();
+            const [, from, to] = rangeCall!;
             // Should eventually use the custom dates (may need to wait for re-render)
             expect(from).toBeDefined();
             expect(to).toBeDefined();
@@ -547,10 +710,9 @@ describe('StatsPage (Home Dashboard)', () => {
             fireEvent.change(dateFilterSelect, { target: { value: 'custom' } });
 
             // Check that the hook was called with valid dates, not undefined
-            const calls = mockUseAllTickets.mock.calls;
-            const lastCall = calls[calls.length - 1];
-            expect(lastCall).toBeDefined();
-            const [, from, to] = lastCall;
+            const rangeCall = [...mockUseAllTickets.mock.calls].reverse().find(([, from]) => from !== undefined);
+            expect(rangeCall).toBeDefined();
+            const [, from, to] = rangeCall!;
             // Should have valid dates (preserved from previous filter)
             expect(from).toBeDefined();
             expect(to).toBeDefined();
@@ -579,10 +741,15 @@ describe('StatsPage (Home Dashboard)', () => {
             fireEvent.change(startInput, { target: { value: '2024-06-01' } });
             fireEvent.change(endInput, { target: { value: '2024-06-30' } });
 
-            const lastCall = mockUseAllTickets.mock.calls[mockUseAllTickets.mock.calls.length - 1];
-            const [, from, to] = lastCall;
+            const rangeCall = [...mockUseAllTickets.mock.calls].reverse().find(([, from]) => from !== undefined);
+            const [, from, to] = rangeCall!;
             expect(from).toBe('2024-06-01');
             expect(to).toBe('2024-06-30');
+            expect(mockUseIncomingVsResolvedRate).toHaveBeenLastCalledWith(true, '2024-06-01', '2024-06-30', {
+                teams: ['team-a'],
+                allTime: false,
+                granularity: 'AUTO',
+            });
         });
     });
 });

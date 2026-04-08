@@ -135,7 +135,8 @@ export default function DashboardsPage() {
     const { data: incomingVsResolvedRate, refetch: refetchIncomingVsResolved, isFetching: isFetchingIncomingVsResolved } = useIncomingVsResolvedRate(
         activeSection === 'resolution' && isDateRangeValid,
         dateRange.from,
-        dateRange.to
+        dateRange.to,
+        { granularity: 'AUTO' }
     )
 
     const { data: avgEscalationDurationByTag, refetch: refetchAvgEscDuration, isFetching: isFetchingAvgEsc } = useAvgEscalationDurationByTag(

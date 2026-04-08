@@ -27,8 +27,47 @@ const mockDashboardData = {
   ],
   unattendedQueries: { count: 5 },
   resolutionPercentiles: { p50: 3600, p75: 7200, p90: 10800 },
+  incomingVsResolvedRate: {
+    granularity: 'DAY',
+    data: [
+      { time: '2025-01-01T00:00:00Z', incoming: 3, resolved: 2 },
+      { time: '2025-01-02T00:00:00Z', incoming: 4, resolved: 5 },
+    ],
+  },
+  emptyIncomingVsResolvedRate: {
+    granularity: 'DAY',
+    data: [],
+  },
   emptyData: []
 };
+
+function getEmptyDashboardResponse(url: string): unknown {
+  if (url.includes('incoming-vs-resolved-rate')) {
+    return mockDashboardData.emptyIncomingVsResolvedRate;
+  }
+
+  return [];
+}
+
+function getDelayedDashboardResponse(url: string): unknown {
+  if (url.includes('distribution')) {
+    return mockDashboardData.durationDistribution;
+  }
+
+  if (url.includes('percentile')) {
+    return mockDashboardData.firstResponsePercentiles;
+  }
+
+  if (url.includes('count')) {
+    return mockDashboardData.unattendedQueries;
+  }
+
+  if (url.includes('incoming-vs-resolved-rate')) {
+    return mockDashboardData.incomingVsResolvedRate;
+  }
+
+  return [];
+}
 
 // Setup mocks using Playwright's native routing
 Given("Dashboard API endpoints are mocked", async function (this: CustomWorld) {
@@ -98,15 +137,18 @@ Given("Dashboard API endpoints are mocked", async function (this: CustomWorld) {
   );
 
   await this.page.route("**/api/dashboard/incoming-vs-resolved-rate*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify([]) })
+    route.fulfill({ status: 200, body: JSON.stringify(mockDashboardData.incomingVsResolvedRate) })
   );
 });
 
 Given("Dashboard API returns empty data", async function (this: CustomWorld) {
   // Mock all dashboard endpoints to return empty arrays
-  await this.page.route("**/api/dashboard/**", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify([]) })
-  );
+  await this.page.route("**/api/dashboard/**", (route) => {
+    const url = route.request().url();
+    const body = getEmptyDashboardResponse(url);
+
+    return route.fulfill({ status: 200, body: JSON.stringify(body) });
+  });
 });
 
 Given("Dashboard API has delayed responses", async function (this: CustomWorld) {
@@ -114,18 +156,7 @@ Given("Dashboard API has delayed responses", async function (this: CustomWorld) 
   await this.page.route("**/api/dashboard/**", async (route) => {
     const url = route.request().url();
     await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Return appropriate data format based on endpoint
-    let responseData;
-    if (url.includes('distribution')) {
-      responseData = mockDashboardData.durationDistribution; // bucketed distribution
-    } else if (url.includes('percentile')) {
-      responseData = mockDashboardData.firstResponsePercentiles; // Object for percentiles
-    } else if (url.includes('count')) {
-      responseData = mockDashboardData.unattendedQueries; // Object with count
-    } else {
-      responseData = []; // Default to empty array
-    }
+    const responseData = getDelayedDashboardResponse(url);
 
     await route.fulfill({
       status: 200,
@@ -415,7 +446,6 @@ Then('Only {} content should be visible', async function (this: CustomWorld, sec
   }
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 Then("{} section should be collapsed", async function (this: CustomWorld, _sectionName: string) {
   // After clicking again, section should collapse
   await this.page.waitForTimeout(500);

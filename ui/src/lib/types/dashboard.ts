@@ -29,6 +29,22 @@ export interface UnresolvedTicketAges {
     p90: string
 }
 
+export type IncomingVsResolvedGranularity = 'HOUR' | 'DAY' | 'WEEK'
+
+export type IncomingVsResolvedRequestGranularity = 'AUTO' | IncomingVsResolvedGranularity
+
+export interface IncomingVsResolvedRatePoint {
+    [key: string]: string | number
+    time: string
+    incoming: number
+    resolved: number
+}
+
+export interface IncomingVsResolvedRate {
+    granularity: IncomingVsResolvedGranularity
+    data: IncomingVsResolvedRatePoint[]
+}
+
 export interface EscalationDurationByTag {
     tag: string
     avgDuration: number

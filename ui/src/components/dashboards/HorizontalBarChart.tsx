@@ -1,25 +1,30 @@
 // src/components/dashboards/HorizontalBarChart.tsx
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts'
+import type { Props as TooltipContentProps, ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent'
 
-interface HorizontalBarChartProps {
+interface HorizontalBarChartProps<V extends ValueType = ValueType, N extends NameType = NameType> {
     title: string
     data: Record<string, unknown>[]
     dataKey: string
     yAxisDataKey: string
     color: string
-    tooltipFormatter?: (value: number) => [string, string]
+    tooltipFormatter?: TooltipContentProps<V, N>['formatter']
+    tooltipLabelFormatter?: TooltipContentProps<V, N>['labelFormatter']
+    tooltipSeparator?: TooltipContentProps<V, N>['separator']
     height?: number
 }
 
-export function HorizontalBarChart({
+export function HorizontalBarChart<V extends ValueType = ValueType, N extends NameType = NameType>({
     title,
     data,
     dataKey,
     yAxisDataKey,
     color,
     tooltipFormatter,
+    tooltipLabelFormatter,
+    tooltipSeparator,
     height = 350
-}: HorizontalBarChartProps) {
+}: HorizontalBarChartProps<V, N>) {
     return (
         <div className="bg-white shadow-lg rounded-xl p-6 border border-gray-200">
             <h2 className="text-xl font-semibold text-gray-700 mb-4">
@@ -36,7 +41,7 @@ export function HorizontalBarChart({
                             width={150}
                             style={{ fontSize: '12px' }}
                         />
-                        <Tooltip formatter={tooltipFormatter} />
+                        <Tooltip formatter={tooltipFormatter} labelFormatter={tooltipLabelFormatter} separator={tooltipSeparator} />
                         <Bar dataKey={dataKey} fill={color} />
                     </BarChart>
                 </ResponsiveContainer>

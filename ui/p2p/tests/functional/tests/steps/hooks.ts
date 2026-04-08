@@ -4,6 +4,17 @@ import { CustomWorld } from "./custom-world";
 // Set default timeout to 15 seconds for all steps
 setDefaultTimeout(15000);
 
+const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
+
+const defaultIncomingVsResolvedRate = {
+  granularity: 'DAY',
+  data: [
+    { time: '2025-01-01T00:00:00Z', incoming: 3, resolved: 2 },
+    { time: '2025-01-02T00:00:00Z', incoming: 4, resolved: 5 },
+    { time: '2025-01-03T00:00:00Z', incoming: 2, resolved: 3 },
+  ],
+};
+
 Before(async function (this: CustomWorld) {
   // Launch browser if not already launched (reuses within worker)
   await this.launchBrowser();
@@ -33,15 +44,13 @@ Before(async function (this: CustomWorld) {
     expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   };
 
-  const baseUrl = process.env.SERVICE_ENDPOINT || 'http://localhost:3000';
-
   // Bypass the server-side JWE validation in middleware so Playwright's
   // browser-level /api/auth/session mock can take effect.
   await this.context.addCookies([
     {
       name: '__e2e_auth_bypass',
       value: 'functional-test',
-      url: baseUrl,
+      url: BASE_URL,
       httpOnly: false,
       secure: false,
       sameSite: 'Lax' as const
@@ -138,6 +147,14 @@ Before(async function (this: CustomWorld) {
     });
   });
 
+  await this.page.route('**/api/dashboard/incoming-vs-resolved-rate**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(defaultIncomingVsResolvedRate)
+    });
+  });
+
   await this.page.route('**/api/escalations**', async (route) => {
     await route.fulfill({
       status: 200,
@@ -152,33 +169,58 @@ Before(async function (this: CustomWorld) {
   });
 
   await this.page.route('**/api/tickets**', async (route) => {
+    const url = new URL(route.request().url());
+    const dateFrom = url.searchParams.get('dateFrom');
+    const dateTo = url.searchParams.get('dateTo');
+    const now = new Date();
+    const toIso = (daysAgo: number) => {
+      const date = new Date(now);
+      date.setUTCDate(date.getUTCDate() - daysAgo);
+      return date.toISOString();
+    };
+    const toDateString = (iso: string) => iso.split('T')[0];
+
+    const tickets = [
+      {
+        id: 1,
+        ticketId: 'ticket-1',
+        team: { name: 'Core-platform' },
+        status: 'opened',
+        impact: 'high',
+        escalations: [],
+        assignedTo: 'support-engineer-1@example.com',
+        query: { date: toIso(2) },
+        logs: [{ event: 'opened', date: toIso(2) }],
+      },
+      {
+        id: 2,
+        ticketId: 'ticket-2',
+        team: { name: 'Team A' },
+        status: 'closed',
+        impact: 'medium',
+        escalations: [],
+        assignedTo: null,
+        query: { date: toIso(10) },
+        logs: [
+          { event: 'opened', date: toIso(10) },
+          { event: 'closed', date: toIso(1) },
+        ],
+      },
+    ];
+
+    const filteredTickets = tickets.filter(ticket => {
+      const queryDate = toDateString(ticket.query.date);
+      return (!dateFrom || queryDate >= dateFrom) && (!dateTo || queryDate <= dateTo);
+    });
+
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        content: [
-          {
-            id: 1,
-            ticketId: 'ticket-1',
-            team: { name: 'Core-platform' },
-            status: 'opened',
-            impact: 'high',
-            escalations: [],
-            assignedTo: 'support-engineer-1@example.com'
-          },
-          {
-            id: 2,
-            ticketId: 'ticket-2',
-            team: { name: 'Team A' },
-            status: 'closed',
-            impact: 'medium',
-            escalations: [],
-            assignedTo: null
-          }
-        ],
+        content: filteredTickets,
         page: 0,
         totalPages: 1,
-        totalElements: 2
+        totalElements: filteredTickets.length
       })
     });
   });
