@@ -13,7 +13,13 @@ import type {
   KnowledgeGapsStatus,
   AnalysisData,
 } from "@/lib/types";
-import type { RepoInsights, EscalationBreakdown, InFlightPr } from "@/lib/types/dashboard";
+import type {
+  EscalationBreakdown,
+  InFlightPr,
+  IncomingVsResolvedRate,
+  IncomingVsResolvedRequestGranularity,
+  RepoInsights,
+} from "@/lib/types/dashboard";
 
 // ===== Shared API Helper =====
 
@@ -88,6 +94,40 @@ function buildParams(dateFrom?: string, dateTo?: string): string {
   const params = new URLSearchParams();
   if (dateFrom) params.append("dateFrom", dateFrom);
   if (dateTo) params.append("dateTo", dateTo);
+  const queryString = params.toString();
+  return queryString ? `?${queryString}` : "";
+}
+
+type IncomingVsResolvedRateOptions = {
+  teams?: string[];
+  allTime?: boolean;
+  granularity?: IncomingVsResolvedRequestGranularity;
+};
+
+type NormalizedIncomingVsResolvedRateOptions = IncomingVsResolvedRateOptions & {
+  teams: string[];
+};
+
+function normalizeIncomingVsResolvedOptions(
+  options: IncomingVsResolvedRateOptions = {}
+): NormalizedIncomingVsResolvedRateOptions {
+  return {
+    ...options,
+    teams: options.teams?.filter(Boolean) ?? [],
+  };
+}
+
+function buildIncomingVsResolvedParams(
+  dateFrom?: string,
+  dateTo?: string,
+  options: IncomingVsResolvedRateOptions = {}
+): string {
+  const params = new URLSearchParams();
+  if (dateFrom) params.append("dateFrom", dateFrom);
+  if (dateTo) params.append("dateTo", dateTo);
+  if (options.allTime) params.append("allTime", "true");
+  if (options.granularity) params.append("granularity", options.granularity);
+  options.teams?.filter(Boolean).forEach((team) => params.append("teams", team));
   const queryString = params.toString();
   return queryString ? `?${queryString}` : "";
 }
@@ -406,12 +446,21 @@ export function useUnresolvedTicketAges(
 export function useIncomingVsResolvedRate(
   enabled = true,
   dateFrom?: string,
-  dateTo?: string
+  dateTo?: string,
+  options: IncomingVsResolvedRateOptions = {}
 ) {
-  return useQuery<{ time: string; incoming: number; resolved: number }[]>({
-    queryKey: ["incomingVsResolvedRate", dateFrom, dateTo],
+  const normalizedOptions = normalizeIncomingVsResolvedOptions(options);
+
+  return useQuery<IncomingVsResolvedRate>({
+    queryKey: ["incomingVsResolvedRate", dateFrom, dateTo, normalizedOptions],
     queryFn: () =>
-      apiGet(`/dashboard/incoming-vs-resolved-rate${buildParams(dateFrom, dateTo)}`),
+      apiGet(
+        `/dashboard/incoming-vs-resolved-rate${buildIncomingVsResolvedParams(
+          dateFrom,
+          dateTo,
+          normalizedOptions
+        )}`
+      ),
     enabled,
   });
 }
