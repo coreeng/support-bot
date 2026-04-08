@@ -105,11 +105,39 @@ public class PrDetectionService {
                         .log("PR {}#{} already tracked for ticket {}, skipping");
                 continue;
             }
+
+            GitHubPullRequest prMetadata;
+            try {
+                prMetadata = gitHubClient.getPullRequest(pr.repositoryName(), pr.pullNumber());
+            } catch (GitHubApiException e) {
+                log.atWarn()
+                        .addArgument(pr::repositoryName)
+                        .addArgument(pr::pullNumber)
+                        .addArgument(e::getMessage)
+                        .log("Could not fetch PR metadata for {}#{}, skipping: {}");
+                continue;
+            }
+
+            if (!prMetadata.isOpen()) {
+                log.atInfo()
+                        .addArgument(pr::repositoryName)
+                        .addArgument(pr::pullNumber)
+                        .addArgument(prMetadata::state)
+                        .log("PR {}#{} is {} — skipping tracking");
+                continue;
+            }
+
             boolean canAutoCloseTicket = !event.messageRef().isReply();
             PerPrResult result;
             try {
-                result =
-                        processPr(pr, ticket, canAutoCloseTicket, teamReviewerCache, notifications, pendingEscalations);
+                result = processPr(
+                        pr,
+                        ticket,
+                        canAutoCloseTicket,
+                        prMetadata,
+                        teamReviewerCache,
+                        notifications,
+                        pendingEscalations);
             } catch (Exception e) {
                 log.atError()
                         .setCause(e)
@@ -161,6 +189,27 @@ public class PrDetectionService {
         for (DetectedPr pr : detectedPrs) {
             try {
 
+                GitHubPullRequest prMetadata;
+                try {
+                    prMetadata = gitHubClient.getPullRequest(pr.repositoryName(), pr.pullNumber());
+                } catch (GitHubApiException e) {
+                    log.atWarn()
+                            .addArgument(pr::repositoryName)
+                            .addArgument(pr::pullNumber)
+                            .addArgument(e::getMessage)
+                            .log("Could not fetch PR metadata for {}#{}, skipping: {}");
+                    continue;
+                }
+
+                if (!prMetadata.isOpen()) {
+                    log.atInfo()
+                            .addArgument(pr::repositoryName)
+                            .addArgument(pr::pullNumber)
+                            .addArgument(prMetadata::state)
+                            .log("PR {}#{} is {} — skipping tracking");
+                    continue;
+                }
+
                 if (ticket == null) {
                     ticket = ticketSupplier.get();
                     ticketId = checkNotNull(ticket.id());
@@ -176,7 +225,8 @@ public class PrDetectionService {
                     continue;
                 }
 
-                PerPrResult result = processPr(pr, ticket, true, teamReviewerCache, notifications, pendingEscalations);
+                PerPrResult result =
+                        processPr(pr, ticket, true, prMetadata, teamReviewerCache, notifications, pendingEscalations);
 
                 if (result == PerPrResult.TRACKED) {
                     if (!baseReactionsAdded) {
@@ -246,57 +296,38 @@ public class PrDetectionService {
             DetectedPr detectedPr,
             Ticket ticket,
             boolean canAutoCloseTicket,
+            GitHubPullRequest prMetadata,
             Map<String, Optional<Set<String>>> teamReviewerCache,
             List<PendingNotification> notifications,
             List<PendingEscalation> pendingEscalations) {
 
-        try {
-            Optional<PrTrackingProps.Repository> repoConfig = prTrackingProps.repositories().stream()
-                    .filter(r -> r.name().equals(detectedPr.repositoryName()))
-                    .findFirst();
+        Optional<PrTrackingProps.Repository> repoConfig = prTrackingProps.repositories().stream()
+                .filter(r -> r.name().equals(detectedPr.repositoryName()))
+                .findFirst();
 
-            if (repoConfig.isPresent()) {
-                // Repo is configured for RR tracking with or without SLA
-                GitHubPullRequest prMetadata =
-                        gitHubClient.getPullRequest(detectedPr.repositoryName(), detectedPr.pullNumber());
-
-                if (prMetadata.isOpen()) {
-                    if (repoConfig.get().hasNoSla()) {
-                        // No-SLA tracking: track by path filter without a deadline or escalation.
-                        return processNoSlaOpenPr(
-                                detectedPr, ticket, canAutoCloseTicket, repoConfig.get(), prMetadata, notifications);
-                    } else {
-                        return processOpenPr(
-                                detectedPr,
-                                ticket,
-                                canAutoCloseTicket,
-                                repoConfig.get(),
-                                prMetadata,
-                                teamReviewerCache,
-                                notifications,
-                                pendingEscalations);
-                    }
-                } else {
-                    log.atInfo()
-                            .addArgument(detectedPr::repositoryName)
-                            .addArgument(detectedPr::pullNumber)
-                            .addArgument(prMetadata::state)
-                            .log("PR {}#{} is {} — skipping tracking");
-                }
+        if (repoConfig.isPresent()) {
+            // Repo is configured for RR tracking with or without SLA
+            if (repoConfig.get().hasNoSla()) {
+                // No-SLA tracking: track by path filter without a deadline or escalation.
+                return processNoSlaOpenPr(
+                        detectedPr, ticket, canAutoCloseTicket, repoConfig.get(), prMetadata, notifications);
             } else {
-                log.atInfo()
-                        .addArgument(detectedPr::repositoryName)
-                        .log("Repo {} is not configured for PR tracking, skipping");
+                return processOpenPr(
+                        detectedPr,
+                        ticket,
+                        canAutoCloseTicket,
+                        repoConfig.get(),
+                        prMetadata,
+                        teamReviewerCache,
+                        notifications,
+                        pendingEscalations);
             }
-        } catch (GitHubApiException e) {
-            log.atWarn()
+        } else {
+            log.atInfo()
                     .addArgument(detectedPr::repositoryName)
-                    .addArgument(detectedPr::pullNumber)
-                    .addArgument(e::getMessage)
-                    .log("Could not fetch PR metadata for {}#{}, skipping: {}");
+                    .log("Repo {} is not configured for PR tracking, skipping");
+            return PerPrResult.SKIPPED;
         }
-
-        return PerPrResult.SKIPPED;
     }
 
     private PerPrResult processOpenPr(
