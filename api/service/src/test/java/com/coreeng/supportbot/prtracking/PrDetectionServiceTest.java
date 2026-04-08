@@ -423,9 +423,6 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(prTrackingProps.repositories())
-                    .thenReturn(
-                            List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), sla(SLA_24H))));
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
                     .thenThrow(new GitHubApiException(404, "PR not found: " + REPO + "#" + PR_NUMBER));
 
@@ -447,9 +444,6 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(prTrackingProps.repositories())
-                    .thenReturn(
-                            List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), sla(SLA_24H))));
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
                     .thenReturn(new GitHubPullRequest(
                             REPO,
@@ -480,9 +474,6 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(prTrackingProps.repositories())
-                    .thenReturn(
-                            List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), sla(SLA_24H))));
             when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
                     .thenReturn(new GitHubPullRequest(
                             REPO,

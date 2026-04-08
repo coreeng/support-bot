@@ -556,7 +556,7 @@ class PrLifecyclePollerTest {
 
             // then — transition is skipped; no state change, no Slack notification
             verify(prTrackingRepository, never()).pauseSla(anyLong(), any(), any());
-            verify(prTrackingRepository, never()).updateStatus(anyLong(), any(), any(), any());
+            verify(prTrackingRepository).updateStatus(eq(1L), eq(PrTrackingStatus.APPROVED), any(), any());
             verify(slackClient, never()).postMessage(any());
         }
 
