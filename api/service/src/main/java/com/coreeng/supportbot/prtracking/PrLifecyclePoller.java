@@ -192,6 +192,12 @@ public class PrLifecyclePoller {
                         .addArgument(record::githubRepo)
                         .addArgument(record::prNumber)
                         .log("PR {}#{} approved — SLA paused, awaiting merge");
+            } else {
+                prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.APPROVED, null, record.escalationId());
+                log.atInfo()
+                        .addArgument(record::githubRepo)
+                        .addArgument(record::prNumber)
+                        .log("PR {}#{} approved — awaiting merge");
             }
         } else {
             prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.APPROVED, null, record.escalationId());

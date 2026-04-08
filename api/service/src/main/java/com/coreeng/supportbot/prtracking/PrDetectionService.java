@@ -160,32 +160,6 @@ public class PrDetectionService {
 
         for (DetectedPr pr : detectedPrs) {
             try {
-                PrTrackingProps.Repository repoConfig = prTrackingProps.repositories().stream()
-                        .filter(r -> r.name().equals(pr.repositoryName()))
-                        .findFirst()
-                        .orElseThrow(
-                                () -> new IllegalStateException("Repo config not found for " + pr.repositoryName()));
-
-                GitHubPullRequest prMetadata;
-                try {
-                    prMetadata = gitHubClient.getPullRequest(pr.repositoryName(), pr.pullNumber());
-                } catch (GitHubApiException e) {
-                    log.atWarn()
-                            .addArgument(pr::repositoryName)
-                            .addArgument(pr::pullNumber)
-                            .addArgument(e::getMessage)
-                            .log("Could not fetch PR metadata for {}#{}, skipping: {}");
-                    continue;
-                }
-
-                if (!prMetadata.isOpen()) {
-                    log.atInfo()
-                            .addArgument(pr::repositoryName)
-                            .addArgument(pr::pullNumber)
-                            .addArgument(prMetadata::state)
-                            .log("PR {}#{} is {} — skipping tracking");
-                    continue;
-                }
 
                 if (ticket == null) {
                     ticket = ticketSupplier.get();
@@ -202,15 +176,8 @@ public class PrDetectionService {
                     continue;
                 }
 
-                PerPrResult result = processOpenPr(
-                        pr,
-                        checkNotNull(ticket),
-                        true,
-                        repoConfig,
-                        prMetadata,
-                        teamReviewerCache,
-                        notifications,
-                        pendingEscalations);
+                PerPrResult result = processPr(pr, ticket, true, teamReviewerCache, notifications, pendingEscalations);
+
                 if (result == PerPrResult.TRACKED) {
                     if (!baseReactionsAdded) {
                         addReaction(slackTicketsProps.expectedInitialReaction(), ticket.queryTs(), ticket.channelId());
