@@ -1,12 +1,14 @@
 package com.coreeng.supportbot.ticket.handler;
 
 import static com.slack.api.model.view.Views.view;
+import static java.util.Objects.requireNonNull;
 
 import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.SlackViewSubmitHandler;
 import com.coreeng.supportbot.ticket.EscalateViewMapper;
 import com.coreeng.supportbot.ticket.TicketConfirmSubmissionMapper;
+import com.coreeng.supportbot.ticket.TicketEscalationValidator;
 import com.coreeng.supportbot.ticket.TicketProcessingService;
 import com.coreeng.supportbot.ticket.TicketSubmission;
 import com.coreeng.supportbot.ticket.TicketSubmitResult;
@@ -29,6 +31,7 @@ public class TicketViewsSubmissionHandler implements SlackViewSubmitHandler {
     private final TicketProcessingService ticketProcessingService;
     private final TicketSummaryViewMapper ticketSummaryViewMapper;
     private final EscalateViewMapper escalateViewMapper;
+    private final TicketEscalationValidator ticketEscalationValidator;
     private final TicketConfirmSubmissionMapper confirmSubmissionMapper;
     private final ExecutorService executor;
     private final RbacService rbacService;
@@ -83,11 +86,15 @@ public class TicketViewsSubmissionHandler implements SlackViewSubmitHandler {
             case escalate -> {
                 var escalateRequest = escalateViewMapper.extractSubmittedValues(
                         request.getPayload().getView());
-                Map<String, String> errors = escalateViewMapper.validate(escalateRequest);
-                if (!errors.isEmpty()) {
+                TicketEscalationValidator.ValidationResult validationResult =
+                        ticketEscalationValidator.validate(escalateRequest);
+                if (!validationResult.isValid()) {
+                    TicketEscalationValidator.Field field = requireNonNull(validationResult.field());
                     return ViewSubmissionResponse.builder()
                             .responseAction("errors")
-                            .errors(errors)
+                            .errors(Map.of(
+                                    escalateViewMapper.toActionId(field),
+                                    requireNonNull(validationResult.errorMessage())))
                             .build();
                 }
                 executor.submit(() -> ticketProcessingService.escalate(escalateRequest));

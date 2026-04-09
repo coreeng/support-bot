@@ -5,6 +5,7 @@ import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 public class TicketController {
     private final TicketQueryService queryService;
     private final TicketUpdateService ticketUpdateService;
+    private final TicketProcessingService ticketProcessingService;
+    private final TicketEscalationValidator ticketEscalationValidator;
     private final TicketUIMapper mapper;
     private final TicketTeamSuggestionsService teamSuggestionsService;
 
@@ -72,6 +75,32 @@ public class TicketController {
         try {
             TicketUI ticket = ticketUpdateService.update(id, request);
             return ResponseEntity.ok(ticket);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/escalation")
+    public ResponseEntity<?> escalateTicket(
+            @PathVariable TicketId id, @RequestBody TicketEscalationCreateRequest request) {
+        if (queryService.findById(id) == null) {
+            return ResponseEntity.notFound().build();
+        }
+        TicketEscalationValidator.ValidationResult validationResult =
+                ticketEscalationValidator.validate(request.team(), request.tags());
+        if (!validationResult.isValid()) {
+            return ResponseEntity.badRequest().body(validationResult.errorMessage());
+        }
+        String team = Objects.requireNonNull(request.team());
+
+        try {
+            List<String> tags = Objects.requireNonNullElse(request.tags(), List.of());
+            ticketProcessingService.escalate(EscalateRequest.builder()
+                    .ticketId(id)
+                    .team(team)
+                    .tags(ImmutableList.copyOf(tags))
+                    .build());
+            return ResponseEntity.ok().build();
         } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
