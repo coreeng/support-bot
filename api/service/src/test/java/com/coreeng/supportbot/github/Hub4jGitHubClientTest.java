@@ -36,14 +36,17 @@ class Hub4jGitHubClientTest {
 
     @Test
     void returnsPullRequestOnHappyPath() throws IOException {
+        // given
         GHPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.OPEN);
         when(pr.getMergeable()).thenReturn(true);
         when(pr.getMergeableState()).thenReturn("clean");
         when(pr.getRequestedTeams()).thenReturn(List.of());
         stubReviews(pr, List.of());
 
+        // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
 
+        // then
         assertThat(result.repositoryName()).isEqualTo("my-org/my-repo");
         assertThat(result.pullRequestNumber()).isEqualTo(42);
         assertThat(result.createdAt()).isEqualTo(instant("2026-01-01T00:00:00Z"));
@@ -54,13 +57,16 @@ class Hub4jGitHubClientTest {
 
     @Test
     void returnsMergedStateWhenMergedAtIsNonNull() throws IOException {
+        // given
         GHPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
         when(pr.getMergedAt()).thenReturn(date("2026-01-15T10:00:00Z"));
         when(pr.getMergeable()).thenReturn(true);
         when(pr.getMergeableState()).thenReturn("clean");
 
+        // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
 
+        // then
         assertThat(result.state()).isEqualTo(GitHubPullRequest.PrState.MERGED);
         verify(pr, never()).getRequestedTeams();
         verify(pr, never()).listReviews();
@@ -68,22 +74,27 @@ class Hub4jGitHubClientTest {
 
     @Test
     void returnsPullRequestWithNullMergeableWhenNotYetComputed() throws IOException {
+        // given
         GHPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.OPEN);
         when(pr.getMergeable()).thenReturn(null);
         when(pr.getMergeableState()).thenReturn(null);
         when(pr.getRequestedTeams()).thenReturn(List.of());
         stubReviews(pr, List.of());
 
+        // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
 
+        // then
         assertThat(result.mergeable()).isNull();
         assertThat(result.mergeableState()).isNull();
     }
 
     @Test
     void wrapsNullCreatedAtAsGitHubApiException() throws IOException {
+        // given
         stubPullRequest("my-org/my-repo", 42, null, GHIssueState.OPEN);
 
+        // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
                 .isInstanceOf(GitHubApiException.class)
                 .satisfies(
@@ -93,9 +104,11 @@ class Hub4jGitHubClientTest {
 
     @Test
     void wrapsNullStateAsGitHubApiException() throws IOException {
+        // given
         GHPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.OPEN);
         when(pr.getState()).thenReturn(null);
 
+        // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
                 .isInstanceOf(GitHubApiException.class)
                 .satisfies(
@@ -105,8 +118,10 @@ class Hub4jGitHubClientTest {
 
     @Test
     void wrapsNotFoundAsGitHubApiException() throws IOException {
+        // given
         when(gitHub.getRepository("my-org/my-repo")).thenThrow(new GHFileNotFoundException("Not Found"));
 
+        // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 999))
                 .isInstanceOf(GitHubApiException.class)
                 .satisfies(
@@ -116,9 +131,11 @@ class Hub4jGitHubClientTest {
 
     @Test
     void wrapsHttpErrorAsGitHubApiException() throws IOException {
+        // given
         when(gitHub.getRepository("my-org/my-repo"))
                 .thenThrow(new HttpException(401, "Unauthorized", (String) null, null));
 
+        // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 1))
                 .isInstanceOf(GitHubApiException.class)
                 .satisfies(
@@ -128,8 +145,10 @@ class Hub4jGitHubClientTest {
 
     @Test
     void wrapsIOExceptionAsGitHubApiException() throws IOException {
+        // given
         when(gitHub.getRepository("my-org/my-repo")).thenThrow(new IOException("Connection refused"));
 
+        // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 1))
                 .isInstanceOf(GitHubApiException.class)
                 .satisfies(
@@ -139,36 +158,44 @@ class Hub4jGitHubClientTest {
 
     @Test
     void getFileContentReturnsDecodedContent() throws IOException {
+        // given
         GHRepository repo = mock(GHRepository.class);
         GHContent ghContent = mock(GHContent.class);
         when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
         when(repo.getFileContent(".pr-sla.yaml")).thenReturn(ghContent);
         when(ghContent.getContent()).thenReturn("default: 48h");
 
+        // when
         String result = client.getFileContent("my-org/my-repo", ".pr-sla.yaml");
 
+        // then
         assertThat(result).isEqualTo("default: 48h");
     }
 
     @Test
     void getFileContentReturnsNullOn404() throws IOException {
+        // given
         GHRepository repo = mock(GHRepository.class);
         when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
         when(repo.getFileContent(".pr-sla.yaml")).thenThrow(new GHFileNotFoundException("Not Found"));
 
+        // when
         String result = client.getFileContent("my-org/my-repo", ".pr-sla.yaml");
 
+        // then
         assertThat(result).isNull();
     }
 
     @Test
     void getFileContentThrowsOnNullContent() throws IOException {
+        // given
         GHRepository repo = mock(GHRepository.class);
         GHContent ghContent = mock(GHContent.class);
         when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
         when(repo.getFileContent(".pr-sla.yaml")).thenReturn(ghContent);
         when(ghContent.getContent()).thenReturn(null);
 
+        // when / then
         assertThatThrownBy(() -> client.getFileContent("my-org/my-repo", ".pr-sla.yaml"))
                 .isInstanceOf(GitHubApiException.class)
                 .hasMessageContaining("null content")
@@ -177,10 +204,12 @@ class Hub4jGitHubClientTest {
 
     @Test
     void getFileContentWrapsHttpException() throws IOException {
+        // given
         GHRepository repo = mock(GHRepository.class);
         when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
         when(repo.getFileContent(".pr-sla.yaml")).thenThrow(new HttpException(403, "Forbidden", (String) null, null));
 
+        // when / then
         assertThatThrownBy(() -> client.getFileContent("my-org/my-repo", ".pr-sla.yaml"))
                 .isInstanceOf(GitHubApiException.class)
                 .satisfies(
@@ -189,10 +218,12 @@ class Hub4jGitHubClientTest {
 
     @Test
     void getFileContentWrapsIOException() throws IOException {
+        // given
         GHRepository repo = mock(GHRepository.class);
         when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
         when(repo.getFileContent(".pr-sla.yaml")).thenThrow(new IOException("Connection refused"));
 
+        // when / then
         assertThatThrownBy(() -> client.getFileContent("my-org/my-repo", ".pr-sla.yaml"))
                 .isInstanceOf(GitHubApiException.class)
                 .hasMessageContaining(".pr-sla.yaml");
@@ -200,6 +231,7 @@ class Hub4jGitHubClientTest {
 
     @Test
     void listPullRequestFilesReturnsFileNames() throws IOException {
+        // given
         GHRepository repo = mock(GHRepository.class);
         GHPullRequest pr = mock(GHPullRequest.class);
         when(gitHub.getRepository("my-org/my-repo")).thenReturn(repo);
@@ -215,15 +247,19 @@ class Hub4jGitHubClientTest {
         when(pr.listFiles()).thenReturn(iterable);
         when(iterable.toList()).thenReturn(List.of(file1, file2));
 
+        // when
         List<String> result = client.listPullRequestFiles("my-org/my-repo", 42);
 
+        // then
         assertThat(result).containsExactly("src/Main.java", "docs/README.md");
     }
 
     @Test
     void listPullRequestFilesWraps404() throws IOException {
+        // given
         when(gitHub.getRepository("my-org/my-repo")).thenThrow(new GHFileNotFoundException("Not Found"));
 
+        // when / then
         assertThatThrownBy(() -> client.listPullRequestFiles("my-org/my-repo", 42))
                 .isInstanceOf(GitHubApiException.class)
                 .satisfies(
@@ -232,9 +268,11 @@ class Hub4jGitHubClientTest {
 
     @Test
     void listPullRequestFilesWrapsHttpException() throws IOException {
+        // given
         when(gitHub.getRepository("my-org/my-repo"))
                 .thenThrow(new HttpException(500, "Internal Server Error", (String) null, null));
 
+        // when / then
         assertThatThrownBy(() -> client.listPullRequestFiles("my-org/my-repo", 42))
                 .isInstanceOf(GitHubApiException.class)
                 .satisfies(
@@ -243,8 +281,10 @@ class Hub4jGitHubClientTest {
 
     @Test
     void listPullRequestFilesWrapsIOException() throws IOException {
+        // given
         when(gitHub.getRepository("my-org/my-repo")).thenThrow(new IOException("Connection refused"));
 
+        // when / then
         assertThatThrownBy(() -> client.listPullRequestFiles("my-org/my-repo", 42))
                 .isInstanceOf(GitHubApiException.class)
                 .hasMessageContaining("my-org/my-repo#42");
@@ -252,13 +292,16 @@ class Hub4jGitHubClientTest {
 
     @Test
     void getPullRequestFiltersOutPendingReviews() throws IOException {
+        // given
         GHPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
         GHPullRequestReview approvedReview = review("alice", GHPullRequestReviewState.APPROVED, "2026-01-02T10:00:00Z");
         GHPullRequestReview pendingReview = review("bob", GHPullRequestReviewState.PENDING, "2026-01-02T11:00:00Z");
         stubReviews(pr, List.of(approvedReview, pendingReview));
 
+        // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
 
+        // then
         assertThat(result.reviews()).hasSize(1);
         assertThat(result.reviews().get(0).userLogin()).isEqualTo("alice");
         assertThat(result.reviews().get(0).state()).isEqualTo(GitHubPullRequestReview.ReviewState.APPROVED);
@@ -266,11 +309,14 @@ class Hub4jGitHubClientTest {
 
     @Test
     void getPullRequestMapsApprovedReviewCorrectly() throws IOException {
+        // given
         GHPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
         stubReviews(pr, List.of(review("alice", GHPullRequestReviewState.APPROVED, "2026-01-15T14:30:00Z")));
 
+        // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
 
+        // then
         assertThat(result.reviews()).hasSize(1);
         GitHubPullRequestReview mapped = result.reviews().get(0);
         assertThat(mapped.userLogin()).isEqualTo("alice");
@@ -280,36 +326,45 @@ class Hub4jGitHubClientTest {
 
     @Test
     void getPullRequestMapsDismissedReviewState() throws IOException {
+        // given
         GHPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
         stubReviews(pr, List.of(review("bob", GHPullRequestReviewState.DISMISSED, "2026-01-10T08:00:00Z")));
 
+        // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
 
+        // then
         assertThat(result.reviews()).hasSize(1);
         assertThat(result.reviews().get(0).state()).isEqualTo(GitHubPullRequestReview.ReviewState.DISMISSED);
     }
 
     @Test
     void getPullRequestMapsDeprecatedRequestChangesAlias() throws IOException {
+        // given
         GHPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
         @SuppressWarnings("deprecation")
         GHPullRequestReviewState requestChanges = GHPullRequestReviewState.REQUEST_CHANGES;
         stubReviews(pr, List.of(review("carol", requestChanges, "2026-01-12T09:00:00Z")));
 
+        // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
 
+        // then
         assertThat(result.reviews()).hasSize(1);
         assertThat(result.reviews().get(0).state()).isEqualTo(GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED);
     }
 
     @Test
     void getPullRequestSkipsReviewsForClosedPr() throws IOException {
+        // given
         GHPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
         when(pr.getMergeable()).thenReturn(false);
         when(pr.getMergeableState()).thenReturn("dirty");
 
+        // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
 
+        // then
         verify(pr, never()).getRequestedTeams();
         verify(pr, never()).listReviews();
         assertThat(result.reviews()).isEmpty();
@@ -318,13 +373,16 @@ class Hub4jGitHubClientTest {
 
     @Test
     void getPullRequestSkipsReviewsForMergedPr() throws IOException {
+        // given
         GHPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
         when(pr.getMergedAt()).thenReturn(date("2026-01-15T10:00:00Z"));
         when(pr.getMergeable()).thenReturn(true);
         when(pr.getMergeableState()).thenReturn("clean");
 
+        // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
 
+        // then
         verify(pr, never()).getRequestedTeams();
         verify(pr, never()).listReviews();
         assertThat(result.reviews()).isEmpty();
@@ -333,9 +391,11 @@ class Hub4jGitHubClientTest {
 
     @Test
     void getPullRequestThrowsOnRequestedTeamsIOException() throws IOException {
+        // given
         GHPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
         when(pr.getRequestedTeams()).thenThrow(new IOException("teams API failed"));
 
+        // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
                 .isInstanceOf(GitHubApiException.class)
                 .hasMessageContaining("my-org/my-repo#42");
@@ -343,6 +403,7 @@ class Hub4jGitHubClientTest {
 
     @Test
     void getPullRequestThrowsOnReviewsIOException() throws IOException {
+        // given
         GHPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
 
         @SuppressWarnings("unchecked")
@@ -350,6 +411,7 @@ class Hub4jGitHubClientTest {
         when(pr.listReviews()).thenReturn(iterable);
         when(iterable.toList()).thenThrow(new IOException("Connection refused"));
 
+        // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
                 .isInstanceOf(GitHubApiException.class)
                 .hasMessageContaining("my-org/my-repo");
@@ -357,6 +419,7 @@ class Hub4jGitHubClientTest {
 
     @Test
     void getPullRequestThrowsOnNullReviewUser() throws IOException {
+        // given
         GHPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
         GHPullRequestReview review = mock(GHPullRequestReview.class);
         when(review.getUser()).thenReturn(null);
@@ -364,6 +427,7 @@ class Hub4jGitHubClientTest {
         doReturn(date("2026-01-10T08:00:00Z")).when(review).getSubmittedAt();
         stubReviews(pr, List.of(review));
 
+        // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
                 .isInstanceOf(GitHubApiException.class)
                 .hasMessageContaining("null user");
@@ -371,11 +435,13 @@ class Hub4jGitHubClientTest {
 
     @Test
     void getPullRequestThrowsOnNullReviewSubmittedAt() throws IOException {
+        // given
         GHPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
         GHPullRequestReview review = review("alice", GHPullRequestReviewState.APPROVED, "2026-01-10T08:00:00Z");
         doReturn(null).when(review).getSubmittedAt();
         stubReviews(pr, List.of(review));
 
+        // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
                 .isInstanceOf(GitHubApiException.class)
                 .hasMessageContaining("null submitted_at");
@@ -383,6 +449,7 @@ class Hub4jGitHubClientTest {
 
     @Test
     void resolveTeamReviewersReturnsLogins() throws IOException {
+        // given
         GHOrganization org = mock(GHOrganization.class);
         GHTeam team = mock(GHTeam.class);
         when(gitHub.getOrganization("my-org")).thenReturn(org);
@@ -398,15 +465,19 @@ class Hub4jGitHubClientTest {
         when(team.listMembers()).thenReturn(iterable);
         when(iterable.toList()).thenReturn(List.of(alice, bob));
 
+        // when
         List<String> result = client.resolveTeamReviewers("my-org", "platform-team");
 
+        // then
         assertThat(result).containsExactly("alice", "bob");
     }
 
     @Test
     void resolveTeamReviewersWraps404() throws IOException {
+        // given
         when(gitHub.getOrganization("my-org")).thenThrow(new GHFileNotFoundException("Not Found"));
 
+        // when / then
         assertThatThrownBy(() -> client.resolveTeamReviewers("my-org", "platform-team"))
                 .isInstanceOf(GitHubApiException.class)
                 .satisfies(
@@ -415,8 +486,10 @@ class Hub4jGitHubClientTest {
 
     @Test
     void resolveTeamReviewersWrapsHttpException() throws IOException {
+        // given
         when(gitHub.getOrganization("my-org")).thenThrow(new HttpException(403, "Forbidden", (String) null, null));
 
+        // when / then
         assertThatThrownBy(() -> client.resolveTeamReviewers("my-org", "platform-team"))
                 .isInstanceOf(GitHubApiException.class)
                 .satisfies(
@@ -425,8 +498,10 @@ class Hub4jGitHubClientTest {
 
     @Test
     void resolveTeamReviewersWrapsIOException() throws IOException {
+        // given
         when(gitHub.getOrganization("my-org")).thenThrow(new IOException("Connection refused"));
 
+        // when / then
         assertThatThrownBy(() -> client.resolveTeamReviewers("my-org", "platform-team"))
                 .isInstanceOf(GitHubApiException.class)
                 .satisfies(
