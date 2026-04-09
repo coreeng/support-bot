@@ -5,7 +5,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
-import com.coreeng.supportbot.escalation.EscalationValidator;
 import com.coreeng.supportbot.util.JsonMapper;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.view.View;
@@ -25,16 +24,13 @@ class EscalateViewMapperTest {
     private final JsonMapper jsonMapper = new JsonMapper();
 
     @Mock
-    private EscalationValidator escalationValidator;
-
-    @Mock
     private EscalationTeamsRegistry escalationTeamsRegistry;
 
     private EscalateViewMapper mapper;
 
     @BeforeEach
     void setUp() {
-        mapper = new EscalateViewMapper(jsonMapper, escalationValidator, escalationTeamsRegistry);
+        mapper = new EscalateViewMapper(jsonMapper, escalationTeamsRegistry);
     }
 
     @Test
@@ -80,6 +76,12 @@ class EscalateViewMapperTest {
         EscalateRequest result = mapper.extractSubmittedValues(view);
 
         assertThat(result.tags()).containsExactly("networking");
+    }
+
+    @Test
+    void toActionId_returnsExpectedFieldIds() {
+        assertThat(mapper.toActionId(TicketEscalationValidator.Field.team)).isEqualTo("escalation-team");
+        assertThat(mapper.toActionId(TicketEscalationValidator.Field.tags)).isEqualTo("escalation-tags");
     }
 
     private View buildView(String privateMetadata, Map<String, ViewState.Value> actionValues) {
