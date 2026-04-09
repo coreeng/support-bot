@@ -9,7 +9,6 @@ import static com.slack.api.model.block.element.BlockElements.*;
 import static com.slack.api.model.view.Views.*;
 
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
-import com.coreeng.supportbot.escalation.EscalationValidator;
 import com.coreeng.supportbot.slack.RenderingUtils;
 import com.coreeng.supportbot.util.JsonMapper;
 import com.google.common.collect.ImmutableList;
@@ -22,7 +21,6 @@ import java.util.Map;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -30,7 +28,6 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class EscalateViewMapper {
     private final JsonMapper jsonMapper;
-    private final EscalationValidator escalationValidator;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
 
     public View.ViewBuilder render(TicketEscalateInput input, View.ViewBuilder view) {
@@ -92,31 +89,25 @@ public class EscalateViewMapper {
         String team = checkNotNull(teamValue.getSelectedOption(), "team selection is null in escalation view state")
                 .getValue();
 
-        ViewState.Value threadPermalinkValue = passedValues.get(Fields.threadPermalink.actionId());
-        String threadPermalink = threadPermalinkValue != null ? threadPermalinkValue.getValue() : null;
-
         return EscalateRequest.builder()
                 .tags(tags)
                 .ticketId(input.ticketId())
                 .team(team)
-                .threadPermalink(threadPermalink)
                 .build();
     }
 
-    public Map<String, String> validate(EscalateRequest request) {
-        @Nullable String threadPermalinkError = escalationValidator.validateThreadPermalinkForCreation(request.threadPermalink());
-        if (threadPermalinkError != null) {
-            return Map.of(Fields.threadPermalink.actionId(), threadPermalinkError);
-        }
-        return Map.of();
+    public String toActionId(TicketEscalationValidator.Field field) {
+        return switch (field) {
+            case team -> Fields.team.actionId();
+            case tags -> Fields.tags.actionId();
+        };
     }
 
     @Getter
     @RequiredArgsConstructor
     private enum Fields {
         tags("escalation-tags"),
-        team("escalation-team"),
-        threadPermalink("escalation-thread-permalink");
+        team("escalation-team");
 
         private final String actionId;
     }
