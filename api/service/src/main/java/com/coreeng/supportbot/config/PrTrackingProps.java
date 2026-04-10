@@ -96,7 +96,7 @@ public record PrTrackingProps(
             }
 
             if (repository.sla() == null) {
-                // No-SLA repository: paths are required for selective tracking
+                // No-SLA repository: paths are required to filter which PRs are tracked (by changed-file matching)
                 if (repository.paths().isEmpty()) {
                     throw new IllegalArgumentException(
                             "pr-review-tracking.repositories[].paths must not be empty when sla is not configured");

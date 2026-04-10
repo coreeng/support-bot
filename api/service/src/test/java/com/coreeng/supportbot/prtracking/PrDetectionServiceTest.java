@@ -590,6 +590,38 @@ class PrDetectionServiceTest {
             verify(slackClient, never()).postMessage(any());
             verifyNoInteractions(escalationProcessingService);
         }
+
+        @Test
+        void skipsSideEffectsForNoSlaPrWhenInsertCollidesWithConcurrentTracker() {
+            // given
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            // No-SLA Repo
+            when(prTrackingProps.repositories())
+                    .thenReturn(
+                            List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), null)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(null);
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then
+            verify(slackClient, never()).addReaction(any());
+            verify(slackClient, never()).postMessage(any());
+            verifyNoInteractions(escalationProcessingService);
+        }
     }
 
     // -------------------------------------------------------------------------

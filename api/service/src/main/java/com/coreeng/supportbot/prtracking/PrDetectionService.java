@@ -282,8 +282,12 @@ public class PrDetectionService {
         PendingNotification {
             checkNotNull(repo);
             checkNotNull(type);
-        }
-    }
+            if (type != NotificationType.NO_SLA_TRACKED) {
+                checkNotNull(sla, "sla required for %s", type);
+                checkNotNull(slaDeadline, "slaDeadline required for %s", type);
+            }
+            checkNotNull(teamLabel, "teamLabel required for all notification types");
+        }    }
 
     private record PendingEscalation(PrTrackingRecord tracking, Ticket ticket) {
         PendingEscalation {
@@ -306,7 +310,7 @@ public class PrDetectionService {
                 .findFirst();
 
         if (repoConfig.isPresent()) {
-            // Repo is configured for RR tracking with or without SLA
+            // Repo is configured for PR tracking with or without SLA
             if (repoConfig.get().hasNoSla()) {
                 // No-SLA tracking: track by path filter without a deadline or escalation.
                 return processNoSlaOpenPr(
@@ -470,50 +474,48 @@ public class PrDetectionService {
             GitHubPullRequest prMetadata,
             List<PendingNotification> notifications) {
 
-        if (matchesPathFilter(repoConfig.paths(), detectedPr.repositoryName(), detectedPr.pullNumber())) {
-            TicketId ticketId = checkNotNull(ticket.id());
-            if (prTrackingRepository.insertIfAbsent(new NewPrTracking(
-                            ticketId.id(),
-                            detectedPr.repositoryName(),
-                            detectedPr.pullNumber(),
-                            prMetadata.createdAt(),
-                            null,
-                            repoConfig.owningTeam(),
-                            canAutoCloseTicket))
-                    != null) {
-
-                log.atInfo()
-                        .addArgument(detectedPr::repositoryName)
-                        .addArgument(detectedPr::pullNumber)
-                        .addArgument(ticketId::id)
-                        .log("PR {}#{} tracking record created for ticket {} (no-SLA repo)");
-
-                addReaction(prTrackingProps.prEmoji(), ticket.queryTs(), ticket.channelId());
-                String teamLabel = resolveTeamLabel(repoConfig.owningTeam());
-                notifications.add(new PendingNotification(
-                        detectedPr.repositoryName(),
-                        detectedPr.pullNumber(),
-                        NotificationType.NO_SLA_TRACKED,
-                        null,
-                        null,
-                        teamLabel));
-
-                return PerPrResult.TRACKED;
-            } else {
-                log.atInfo()
-                        .addArgument(detectedPr::repositoryName)
-                        .addArgument(detectedPr::pullNumber)
-                        .addArgument(ticketId::id)
-                        .log("PR {}#{} was already tracked for ticket {}, skipping");
-            }
-        } else {
+        if (!matchesPathFilter(repoConfig.paths(), detectedPr.repositoryName(), detectedPr.pullNumber())) {
             log.atDebug()
                     .addArgument(detectedPr::repositoryName)
                     .addArgument(detectedPr::pullNumber)
                     .log("PR {}#{} does not match configured paths for no-SLA repo, skipping");
+            return PerPrResult.SKIPPED;
         }
 
-        return PerPrResult.SKIPPED;
+        TicketId ticketId = checkNotNull(ticket.id());
+        if (prTrackingRepository.insertIfAbsent(new NewPrTracking(
+                        ticketId.id(),
+                        detectedPr.repositoryName(),
+                        detectedPr.pullNumber(),
+                        prMetadata.createdAt(),
+                        null,
+                        repoConfig.owningTeam(),
+                        canAutoCloseTicket)) == null) {
+            log.atInfo()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .addArgument(ticketId::id)
+                    .log("PR {}#{} was already tracked for ticket {}, skipping");
+            return PerPrResult.SKIPPED;
+        }
+
+        log.atInfo()
+                .addArgument(detectedPr::repositoryName)
+                .addArgument(detectedPr::pullNumber)
+                .addArgument(ticketId::id)
+                .log("PR {}#{} tracking record created for ticket {} (no-SLA repo)");
+
+        addReaction(prTrackingProps.prEmoji(), ticket.queryTs(), ticket.channelId());
+        String teamLabel = resolveTeamLabel(repoConfig.owningTeam());
+        notifications.add(new PendingNotification(
+                detectedPr.repositoryName(),
+                detectedPr.pullNumber(),
+                NotificationType.NO_SLA_TRACKED,
+                null,
+                null,
+                teamLabel));
+
+        return PerPrResult.TRACKED;
     }
 
     private boolean matchesPathFilter(List<String> paths, String repositoryName, int pullNumber) {
@@ -533,7 +535,7 @@ public class PrDetectionService {
                 }
             }
         } catch (GitHubApiException e) {
-            log.atWarn()
+            log.atError()
                     .addArgument(repositoryName)
                     .addArgument(pullNumber)
                     .addArgument(e::getMessage)
@@ -706,7 +708,7 @@ public class PrDetectionService {
     }
 
     private static String teams(List<PendingNotification> group) {
-        return group.stream().map(n -> "%s".formatted(n.teamLabel())).collect(Collectors.joining(", "));
+        return group.stream().map(PendingNotification::teamLabel).collect(Collectors.joining(", "));
     }
 
     private String formatTrackedGroup(String repo, List<PendingNotification> group, String prList) {
@@ -727,7 +729,7 @@ public class PrDetectionService {
                     .formatted(repo));
             for (PendingNotification n : group) {
                 sb.append("- <%s|#%d> — review by %s\n"
-                        .formatted(prUrl(n.repo(), n.prNumber()), n.prNumber(), DEADLINE_FMT.format(n.slaDeadline())));
+                        .formatted(prUrl(n.repo(), n.prNumber()), n.prNumber(), DEADLINE_FMT.format(checkNotNull(n.slaDeadline()))));
             }
             sb.append("If not reviewed by their deadline, I'll escalate to the owning team (%s).".formatted(teamLabel));
             return sb.toString();

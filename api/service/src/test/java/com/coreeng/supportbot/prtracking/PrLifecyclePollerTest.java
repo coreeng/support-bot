@@ -495,7 +495,7 @@ class PrLifecyclePollerTest {
         }
 
         @Test
-        void skipsChangesRequestedTransitionWhenSlaDeadlineIsNull() {
+        void changesRequestedTransitionForNoSlaPr() {
             // given — OPEN record with null slaDeadline but a CHANGES_REQUESTED review present
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record = new PrTrackingRecord(
@@ -517,14 +517,19 @@ class PrLifecyclePollerTest {
             when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
                     .thenReturn(openPrWithReviews(
                             record, List.of(review(GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED))));
+            when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
+                    .thenReturn(ticket(100L));
 
             // when
             poller.poll();
 
-            // then — transition is skipped; no state change, no Slack notification
-            verify(prTrackingRepository, never()).pauseSla(anyLong(), any(), any());
-            verify(prTrackingRepository, never()).updateStatus(anyLong(), any(), any(), any());
-            verify(slackClient, never()).postMessage(any());
+            // then
+            verify(prTrackingRepository).updateStatus(eq(record.id()), eq(PrTrackingStatus.CHANGES_REQUESTED), isNull(), eq(record.escalationId()));
+            ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
+            verify(slackClient).postMessage(captor.capture());
+            assertThat(captor.getValue().message().getText()).contains(
+                    "PR `%s#%d` has been reviewed and changes have been requested."
+                    .formatted(record.githubRepo(), record.prNumber()));
         }
 
         @Test
