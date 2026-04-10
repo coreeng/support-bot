@@ -524,12 +524,17 @@ class PrLifecyclePollerTest {
             poller.poll();
 
             // then
-            verify(prTrackingRepository).updateStatus(eq(record.id()), eq(PrTrackingStatus.CHANGES_REQUESTED), isNull(), eq(record.escalationId()));
+            verify(prTrackingRepository)
+                    .updateStatus(
+                            eq(record.id()),
+                            eq(PrTrackingStatus.CHANGES_REQUESTED),
+                            isNull(),
+                            eq(record.escalationId()));
             ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
             verify(slackClient).postMessage(captor.capture());
-            assertThat(captor.getValue().message().getText()).contains(
-                    "PR `%s#%d` has been reviewed and changes have been requested."
-                    .formatted(record.githubRepo(), record.prNumber()));
+            assertThat(captor.getValue().message().getText())
+                    .contains("PR `%s#%d` has been reviewed and changes have been requested."
+                            .formatted(record.githubRepo(), record.prNumber()));
         }
 
         @Test

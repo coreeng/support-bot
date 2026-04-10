@@ -597,8 +597,7 @@ class PrDetectionServiceTest {
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
             // No-SLA Repo
             when(prTrackingProps.repositories())
-                    .thenReturn(
-                            List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), null)));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), null)));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);

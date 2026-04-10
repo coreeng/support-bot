@@ -287,7 +287,8 @@ public class PrDetectionService {
                 checkNotNull(slaDeadline, "slaDeadline required for %s", type);
             }
             checkNotNull(teamLabel, "teamLabel required for all notification types");
-        }    }
+        }
+    }
 
     private record PendingEscalation(PrTrackingRecord tracking, Ticket ticket) {
         PendingEscalation {
@@ -490,7 +491,8 @@ public class PrDetectionService {
                         prMetadata.createdAt(),
                         null,
                         repoConfig.owningTeam(),
-                        canAutoCloseTicket)) == null) {
+                        canAutoCloseTicket))
+                == null) {
             log.atInfo()
                     .addArgument(detectedPr::repositoryName)
                     .addArgument(detectedPr::pullNumber)
@@ -729,7 +731,10 @@ public class PrDetectionService {
                     .formatted(repo));
             for (PendingNotification n : group) {
                 sb.append("- <%s|#%d> — review by %s\n"
-                        .formatted(prUrl(n.repo(), n.prNumber()), n.prNumber(), DEADLINE_FMT.format(checkNotNull(n.slaDeadline()))));
+                        .formatted(
+                                prUrl(n.repo(), n.prNumber()),
+                                n.prNumber(),
+                                DEADLINE_FMT.format(checkNotNull(n.slaDeadline()))));
             }
             sb.append("If not reviewed by their deadline, I'll escalate to the owning team (%s).".formatted(teamLabel));
             return sb.toString();
