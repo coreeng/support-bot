@@ -687,6 +687,25 @@ public class TicketProcessingServiceTests {
         assertEquals(lastMessageTime, closedAt, "Closed-at must equal the last thread message time");
     }
 
+    @Test
+    public void shouldTouchTicketOnBotThreadReply() {
+        // given — ticket exists
+        Ticket ticket = createTrackedTicket();
+        TicketId ticketId = requireNonNull(ticket.id());
+        Instant initialLastInteracted = ticket.lastInteractedAt();
+
+        // when — a bot message is posted as a thread reply (same shape as a normal message)
+        MessageRef replyRef = new MessageRef(MessageTs.of("bot-reply-ts"), MESSAGE_TS, slackTicketsProps.channelId());
+        ticketProcessingService.handleMessagePosted(new MessagePosted("bot reply", "B_BOT_ID", replyRef));
+
+        // then — lastInteractedAt is updated beyond the initial value
+        Ticket updated = ticketRepository.findTicketById(ticketId);
+        assertNotNull(updated);
+        assertTrue(
+                !updated.lastInteractedAt().isBefore(initialLastInteracted),
+                "lastInteractedAt should be updated after bot thread reply");
+    }
+
     private TicketProcessingService serviceWithPrDetection() {
         return new TicketProcessingService(
                 ticketRepository,
