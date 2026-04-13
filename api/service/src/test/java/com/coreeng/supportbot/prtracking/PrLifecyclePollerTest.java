@@ -495,7 +495,7 @@ class PrLifecyclePollerTest {
         }
 
         @Test
-        void skipsChangesRequestedTransitionWhenSlaDeadlineIsNull() {
+        void changesRequestedTransitionForNoSlaPr() {
             // given — OPEN record with null slaDeadline but a CHANGES_REQUESTED review present
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record = new PrTrackingRecord(
@@ -517,14 +517,24 @@ class PrLifecyclePollerTest {
             when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
                     .thenReturn(openPrWithReviews(
                             record, List.of(review(GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED))));
+            when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
+                    .thenReturn(ticket(100L));
 
             // when
             poller.poll();
 
-            // then — transition is skipped; no state change, no Slack notification
-            verify(prTrackingRepository, never()).pauseSla(anyLong(), any(), any());
-            verify(prTrackingRepository, never()).updateStatus(anyLong(), any(), any(), any());
-            verify(slackClient, never()).postMessage(any());
+            // then
+            verify(prTrackingRepository)
+                    .updateStatus(
+                            eq(record.id()),
+                            eq(PrTrackingStatus.CHANGES_REQUESTED),
+                            isNull(),
+                            eq(record.escalationId()));
+            ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
+            verify(slackClient).postMessage(captor.capture());
+            assertThat(captor.getValue().message().getText())
+                    .contains("PR `%s#%d` has been reviewed and changes have been requested."
+                            .formatted(record.githubRepo(), record.prNumber()));
         }
 
         @Test
@@ -556,7 +566,7 @@ class PrLifecyclePollerTest {
 
             // then — transition is skipped; no state change, no Slack notification
             verify(prTrackingRepository, never()).pauseSla(anyLong(), any(), any());
-            verify(prTrackingRepository, never()).updateStatus(anyLong(), any(), any(), any());
+            verify(prTrackingRepository).updateStatus(eq(1L), eq(PrTrackingStatus.APPROVED), any(), any());
             verify(slackClient, never()).postMessage(any());
         }
 
@@ -946,6 +956,7 @@ class PrLifecyclePollerTest {
                             "my-org/repo-a",
                             "wow",
                             "platform-team",
+                            List.of(),
                             new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
             when(gitHubClient.resolveTeamReviewers("my-org", "platform-team")).thenReturn(List.of("team-member"));
 
@@ -974,7 +985,11 @@ class PrLifecyclePollerTest {
                             openPrWithReviews(record, List.of(review(GitHubPullRequestReview.ReviewState.APPROVED))));
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(new PrTrackingProps.Repository(
-                            "my-org/repo-a", "wow", null, new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
+                            "my-org/repo-a",
+                            "wow",
+                            null,
+                            List.of(),
+                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
 
             // when
             poller.poll();
@@ -1004,6 +1019,7 @@ class PrLifecyclePollerTest {
                             "my-org/repo-a",
                             "wow",
                             "platform-team",
+                            List.of(),
                             new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
             when(gitHubClient.resolveTeamReviewers("my-org", "platform-team"))
                     .thenThrow(new GitHubApiException(403, "forbidden"));
@@ -1041,6 +1057,7 @@ class PrLifecyclePollerTest {
                             "my-org/repo-a",
                             "wow",
                             "platform-team",
+                            List.of(),
                             new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
             when(gitHubClient.resolveTeamReviewers("my-org", "platform-team")).thenReturn(List.of("team-member"));
 
