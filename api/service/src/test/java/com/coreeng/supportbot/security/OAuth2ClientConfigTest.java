@@ -34,7 +34,8 @@ class OAuth2ClientConfigTest {
                 "dex-client-id",
                 "dex-client-secret",
                 "openid,email,profile,groups",
-                "https://dex.example.com");
+                "https://dex.example.com",
+                "");
 
         var dex = repository.findByRegistrationId("dex");
         assertNotNull(dex);
@@ -54,7 +55,8 @@ class OAuth2ClientConfigTest {
                 "dex-client-id",
                 "dex-client-secret",
                 "openid, profile , custom-scope",
-                "https://dex.example.com");
+                "https://dex.example.com",
+                "");
 
         var dex = repository.findByRegistrationId("dex");
         assertNotNull(dex);
@@ -76,6 +78,7 @@ class OAuth2ClientConfigTest {
                 "dex-client-id",
                 "dex-client-secret",
                 "openid,email,profile,groups",
+                "",
                 "");
 
         assertNull(repository.findByRegistrationId("dex"));
