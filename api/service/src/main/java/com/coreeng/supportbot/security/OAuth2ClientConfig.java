@@ -31,7 +31,8 @@ public class OAuth2ClientConfig {
             @Value("${spring.security.oauth2.client.registration.dex.client-secret:}") String dexClientSecret,
             @Value("${spring.security.oauth2.client.registration.dex.scope:openid,email,profile,groups}")
                     String dexScope,
-            @Value("${spring.security.oauth2.client.provider.dex.issuer-uri:}") String dexIssuerUri) {
+            @Value("${spring.security.oauth2.client.provider.dex.issuer-uri:}") String dexIssuerUri,
+            @Value("${spring.security.oauth2.client.provider.dex.internal-base-url:}") String dexInternalBaseUrl) {
         List<String> allowlist = securityProperties.oauth2().loginProviders();
         var registrations = new ArrayList<ClientRegistration>();
 
@@ -53,7 +54,8 @@ public class OAuth2ClientConfig {
                 && isNotBlank(dexClientSecret)
                 && isNotBlank(dexIssuerUri)
                 && isLoginProviderAllowed(allowlist, "dex")) {
-            registrations.add(dexClientRegistration(dexClientId, dexClientSecret, dexIssuerUri, dexScope));
+            registrations.add(
+                    dexClientRegistration(dexClientId, dexClientSecret, dexIssuerUri, dexScope, dexInternalBaseUrl));
             log.info("Dex OAuth2 client registered");
         }
 
@@ -102,20 +104,34 @@ public class OAuth2ClientConfig {
     }
 
     private ClientRegistration dexClientRegistration(
-            String clientId, String clientSecret, String issuerUri, String scopeProperty) {
+            String clientId,
+            String clientSecret,
+            String issuerUri,
+            String scopeProperty,
+            String internalBaseUrl) {
         String normalizedIssuerUri =
                 issuerUri.endsWith("/") ? issuerUri.substring(0, issuerUri.length() - 1) : issuerUri;
+        // Browser redirects use the external ingress URL; server-to-server calls
+        // (/token, /userinfo, /keys) use the in-cluster URL when provided to bypass IAP.
+        String serverBaseUrl = isNotBlank(internalBaseUrl)
+                ? (internalBaseUrl.endsWith("/")
+                        ? internalBaseUrl.substring(0, internalBaseUrl.length() - 1)
+                        : internalBaseUrl)
+                : normalizedIssuerUri;
+        if (!serverBaseUrl.equals(normalizedIssuerUri)) {
+            log.info("Dex server-to-server calls will use internal URL: {}", serverBaseUrl);
+        }
         return ClientRegistration.withRegistrationId("dex")
                 .clientId(clientId)
                 .clientSecret(clientSecret)
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
                 .scope(dexScopesFromProperty(scopeProperty))
                 .authorizationUri(normalizedIssuerUri + "/auth")
-                .tokenUri(normalizedIssuerUri + "/token")
-                .jwkSetUri(normalizedIssuerUri + "/keys")
-                .userInfoUri(normalizedIssuerUri + "/userinfo")
+                .tokenUri(serverBaseUrl + "/token")
+                .jwkSetUri(serverBaseUrl + "/keys")
+                .userInfoUri(serverBaseUrl + "/userinfo")
                 .userNameAttributeName(IdTokenClaimNames.SUB)
                 .clientName("Dex")
                 .build();

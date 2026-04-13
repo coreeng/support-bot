@@ -66,6 +66,32 @@ When you add **Google** or **Microsoft** entries under `config.connectors` in De
 - `team-code` in each mapping must match a platform team from `platform-integration.teams-scraping` (and enums where relevant).
 - **Google / Azure via Dex** do not rely on JWT groups for tenant membership; those paths still use static-user / Azure / GCP fetchers. Only the **`dex`** OAuth client triggers `jwt-groups` merging.
 
+### LDAP Result Code 49 — `Invalid Credentials` for `cn=admin,...` (cluster)
+
+**Symptoms:** Login with “LDAP” / Dex password flow fails; Dex (or browser) shows an error like:  
+`initial bind for user "cn=admin,dc=supportbot,dc=local" failed: LDAP Result Code 49 "Invalid Credentials"`.
+
+**What it means:** This is **Dex’s service bind** to search the directory — **not** the end-user’s password. Dex must bind as the directory admin (or a dedicated read-only DN) before it can look up the user who typed their credentials.
+
+**Cause (most common in Kubernetes):** Dex `config.connectors[].config.bindPW` does **not** match the OpenLDAP admin password. The repo’s [`values-integration.yaml`](../../api/k8s/dex/values-integration.yaml) ships a **template placeholder** (`helm-template-placeholder-ldap-bind`). If you deploy Dex without replacing it, LDAP returns 49 while **Google/Microsoft connectors on the same Dex** still work.
+
+**Fix:**
+
+1. Use the **same** password as Kubernetes Secret **`ldap-secrets`**, key **`admin-password`** (see [`api/k8s/ldap/README.md`](../../api/k8s/ldap/README.md)).
+2. Set it in a **private** values overlay or CI, e.g.  
+   `helm upgrade ... --set-string config.connectors[0].config.bindPW="$LDAP_ADMIN_PASSWORD"`  
+   (adjust index if LDAP is not the first connector), or duplicate the connector block with the real `bindPW`.
+3. Redeploy Dex so the generated `config` Secret updates; restart Dex pods if needed.
+
+Verify OpenLDAP accepts the admin bind (adjust `-n` and deployment name if yours differ; with `fullnameOverride: ldap` the Deployment is usually `ldap`):
+
+```bash
+kubectl exec -n <namespace> deploy/ldap -- sh -c \
+  'ldapwhoami -x -H ldap://127.0.0.1:389 -D "cn=admin,dc=supportbot,dc=local" -w "$LDAP_ADMIN_PASSWORD"'
+```
+
+The container already has `LDAP_ADMIN_PASSWORD` from `ldap-secrets`. If this fails, fix LDAP/secret first; Dex `bindPW` must match that same password.
+
 ### Bcrypt / config render (local Dex)
 
 **Symptoms:** Dex fails to parse password hash or LDAP bind fails.

@@ -68,6 +68,7 @@ spring:
             issuer-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID:common}/v2.0
           dex:
             issuer-uri: ${DEX_ISSUER_URI:}
+            internal-base-url: ${DEX_INTERNAL_BASE_URL:}
   cloud:
 # Uncomment in case you require Azure integration
 #    azure:
