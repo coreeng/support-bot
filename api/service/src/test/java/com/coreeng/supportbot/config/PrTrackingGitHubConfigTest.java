@@ -74,7 +74,11 @@ class PrTrackingGitHubConfigTest {
                 "low",
                 "days",
                 List.of(new PrTrackingProps.Repository(
-                        "my-org/my-repo", "wow", null, new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
+                        "my-org/my-repo",
+                        "wow",
+                        null,
+                        List.of(),
+                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
                 appGithub,
                 DEFAULT_SLA_DISCOVERY);
 
@@ -102,7 +106,11 @@ class PrTrackingGitHubConfigTest {
                 "low",
                 "days",
                 List.of(new PrTrackingProps.Repository(
-                        "my-org/my-repo", "wow", null, new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
+                        "my-org/my-repo",
+                        "wow",
+                        null,
+                        List.of(),
+                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
                 appGithub,
                 DEFAULT_SLA_DISCOVERY);
 
@@ -133,7 +141,11 @@ class PrTrackingGitHubConfigTest {
                 "low",
                 "days",
                 List.of(new PrTrackingProps.Repository(
-                        "my-org/my-repo", "wow", null, new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
+                        "my-org/my-repo",
+                        "wow",
+                        null,
+                        List.of(),
+                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
                 appGithub,
                 DEFAULT_SLA_DISCOVERY);
 

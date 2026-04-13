@@ -71,6 +71,9 @@ public class SlaLookup {
      * @return the SLA, or null if none could be determined
      */
     @Nullable public Duration getSla(PrTrackingProps.Repository repoConfig, String repositoryName, int pullNumber) {
+        if (repoConfig.sla() == null) {
+            return null;
+        }
         PrTrackingProps.Sla configSla = repoConfig.sla();
         Duration defaultSla = configSla.defaultSla();
         List<PrTrackingProps.SlaOverride> overrides = configSla.overrides() != null ? configSla.overrides() : List.of();

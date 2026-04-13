@@ -160,7 +160,7 @@ class PrTrackingConfigValidationTest {
     void rejectsRepoNameWithExtraSlashes() {
         // given
         PrTrackingProps.Repository badName =
-                new PrTrackingProps.Repository("my-org/sub/repo", "wow", null, sla(Duration.ofDays(2)));
+                new PrTrackingProps.Repository("my-org/sub/repo", "wow", null, List.of(), sla(Duration.ofDays(2)));
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
@@ -181,7 +181,7 @@ class PrTrackingConfigValidationTest {
     void rejectsZeroSlaWhenEnabled() {
         // given
         PrTrackingProps.Repository zeroSla =
-                new PrTrackingProps.Repository("my-org/repo", "wow", null, sla(Duration.ZERO));
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), sla(Duration.ZERO));
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
@@ -202,7 +202,7 @@ class PrTrackingConfigValidationTest {
     void rejectsNegativeSlaWhenEnabled() {
         // given
         PrTrackingProps.Repository negativeSla =
-                new PrTrackingProps.Repository("my-org/repo", "wow", null, sla(Duration.ofHours(-1)));
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), sla(Duration.ofHours(-1)));
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
@@ -224,7 +224,7 @@ class PrTrackingConfigValidationTest {
         // given
         PrTrackingProps.Sla slaWithNullDefault = new PrTrackingProps.Sla(null, null, null);
         PrTrackingProps.Repository repo =
-                new PrTrackingProps.Repository("my-org/repo", "wow", null, slaWithNullDefault);
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), slaWithNullDefault);
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
@@ -247,7 +247,7 @@ class PrTrackingConfigValidationTest {
         PrTrackingProps.Sla slaWithBadOverride = new PrTrackingProps.Sla(
                 null, Duration.ofDays(2), List.of(new PrTrackingProps.SlaOverride("infra/**", Duration.ZERO)));
         PrTrackingProps.Repository repo =
-                new PrTrackingProps.Repository("my-org/repo", "wow", null, slaWithBadOverride);
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), slaWithBadOverride);
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
@@ -269,7 +269,8 @@ class PrTrackingConfigValidationTest {
         // given
         PrTrackingProps.Sla slaWithBlankPath = new PrTrackingProps.Sla(
                 null, Duration.ofDays(2), List.of(new PrTrackingProps.SlaOverride("  ", Duration.ofDays(7))));
-        PrTrackingProps.Repository repo = new PrTrackingProps.Repository("my-org/repo", "wow", null, slaWithBlankPath);
+        PrTrackingProps.Repository repo =
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), slaWithBlankPath);
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
@@ -293,7 +294,8 @@ class PrTrackingConfigValidationTest {
                 ".pr-sla.yaml",
                 Duration.ofDays(2),
                 List.of(new PrTrackingProps.SlaOverride("infra/**", Duration.ofDays(7))));
-        PrTrackingProps.Repository repo = new PrTrackingProps.Repository("my-org/repo", "wow", null, fullSla);
+        PrTrackingProps.Repository repo =
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), fullSla);
 
         // when / then
         assertThatCode(() -> new PrTrackingProps(
@@ -313,7 +315,8 @@ class PrTrackingConfigValidationTest {
     void acceptsFileOnlyRepoWithNoDefaultSla() {
         // given (file set, no default, no overrides)
         PrTrackingProps.Sla fileOnlySla = new PrTrackingProps.Sla(".pr-sla.yaml", null, null);
-        PrTrackingProps.Repository repo = new PrTrackingProps.Repository("my-org/repo", "wow", null, fileOnlySla);
+        PrTrackingProps.Repository repo =
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), fileOnlySla);
 
         // when / then
         assertThatCode(() -> new PrTrackingProps(
@@ -383,7 +386,8 @@ class PrTrackingConfigValidationTest {
     @Test
     void skipsAllValidationWhenDisabled() {
         // given
-        PrTrackingProps.Repository badRepo = new PrTrackingProps.Repository("", "", null, sla(Duration.ZERO));
+        PrTrackingProps.Repository badRepo =
+                new PrTrackingProps.Repository("", "", null, List.of(), sla(Duration.ZERO));
 
         // when / then
         assertThatCode(() -> new PrTrackingProps(
@@ -403,7 +407,7 @@ class PrTrackingConfigValidationTest {
     void normalizesRepositoryNamesToLowerCase() {
         // given
         PrTrackingProps.Repository mixedCase =
-                new PrTrackingProps.Repository("My-Org/My-Repo", "wow", null, sla(Duration.ofDays(2)));
+                new PrTrackingProps.Repository("My-Org/My-Repo", "wow", null, List.of(), sla(Duration.ofDays(2)));
 
         // when
         PrTrackingProps props = new PrTrackingProps(
@@ -489,22 +493,86 @@ class PrTrackingConfigValidationTest {
 
     @Test
     void rejectsBlankGithubTeamSlug() {
-        assertThatThrownBy(() -> new PrTrackingProps.Repository("my-org/repo", "wow", "", sla(Duration.ofDays(2))))
+        assertThatThrownBy(() ->
+                        new PrTrackingProps.Repository("my-org/repo", "wow", "", List.of(), sla(Duration.ofDays(2))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("githubTeamSlug must not be blank");
     }
 
     @Test
     void acceptsNullGithubTeamSlug() {
-        assertThatCode(() -> new PrTrackingProps.Repository("my-org/repo", "wow", null, sla(Duration.ofDays(2))))
+        assertThatCode(() ->
+                        new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), sla(Duration.ofDays(2))))
                 .doesNotThrowAnyException();
     }
 
     @Test
     void acceptsValidGithubTeamSlug() {
-        assertThatCode(() ->
-                        new PrTrackingProps.Repository("my-org/repo", "wow", "platform-team", sla(Duration.ofDays(2))))
+        assertThatCode(() -> new PrTrackingProps.Repository(
+                        "my-org/repo", "wow", "platform-team", List.of(), sla(Duration.ofDays(2))))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsNoSlaRepoWithPaths() {
+        // given
+        PrTrackingProps.Repository noSlaRepo =
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of("infra/**"), null);
+
+        // when / then
+        assertThatCode(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(noSlaRepo),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsNoSlaRepoWithoutPaths() {
+        // given
+        PrTrackingProps.Repository noSlaNoPathsRepo =
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), null);
+
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(noSlaNoPathsRepo),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("paths must not be empty when sla is not configured");
+    }
+
+    @Test
+    void rejectsNoSlaRepoWithBlankPath() {
+        // given
+        PrTrackingProps.Repository blankPathRepo =
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of("infra/**", "  "), null);
+
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(blankPathRepo),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("paths[] must not be blank");
     }
 
     private static PrTrackingProps.Repository validRepo() {
@@ -512,7 +580,7 @@ class PrTrackingConfigValidationTest {
     }
 
     private static PrTrackingProps.Repository validRepoWithName(String name) {
-        return new PrTrackingProps.Repository(name, "wow", null, sla(Duration.ofDays(2)));
+        return new PrTrackingProps.Repository(name, "wow", null, List.of(), sla(Duration.ofDays(2)));
     }
 
     private static PrTrackingProps.Sla sla(Duration defaultSla) {
