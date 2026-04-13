@@ -182,10 +182,10 @@ describe('StatsPage (Home Dashboard)', () => {
                 email: 'user@example.com',
                 name: 'Test User',
                 teams: [{ label: 'Team A', code: 'team-a', types: [], name: 'Team A' }],
-                roles: []
+                roles: ['SUPPORT_ENGINEER']
             },
             isLeadership: false,
-            isSupportEngineer: false,
+            isSupportEngineer: true,
             isEscalationTeam: false,
             actualEscalationTeams: [],
             isLoading: false,
@@ -278,6 +278,31 @@ describe('StatsPage (Home Dashboard)', () => {
             // Should show summary cards
             expect(screen.getByText(/Total Tickets/i)).toBeInTheDocument();
             expect(screen.getByText(/Open Tickets/i)).toBeInTheDocument();
+        });
+
+        it('should show restricted chart message for users without dashboard access', () => {
+            mockUseAuth.mockReturnValue({
+                user: {
+                    id: 'user-1',
+                    email: 'restricted@example.com',
+                    name: 'Restricted User',
+                    teams: [{ label: 'Team A', code: 'team-a', types: [], name: 'Team A' }],
+                    roles: ['ESCALATION']
+                },
+                isLeadership: false,
+                isSupportEngineer: false,
+                isEscalationTeam: true,
+                actualEscalationTeams: [],
+                isLoading: false,
+                isAuthenticated: true,
+                logout: jest.fn()
+            });
+
+            render(<StatsPage />, { wrapper: Wrapper });
+
+            expect(screen.getByText(/This chart requires Support Engineer or Leadership access/i)).toBeInTheDocument();
+            expect(screen.getByText(/Total Tickets/i)).toBeInTheDocument();
+            expect(mockUseIncomingVsResolvedRate).toHaveBeenLastCalledWith(false, '2024-12-26', '2025-01-02', expect.any(Object));
         });
 
         it('shows explicit no-team-access banner when user has no effective teams', () => {
