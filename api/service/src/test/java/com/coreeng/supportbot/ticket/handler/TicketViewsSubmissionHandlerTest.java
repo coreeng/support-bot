@@ -3,6 +3,7 @@ package com.coreeng.supportbot.ticket.handler;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -10,10 +11,14 @@ import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.rbac.RbacService;
 import com.coreeng.supportbot.slack.SlackId;
+import com.coreeng.supportbot.ticket.EscalateRequest;
 import com.coreeng.supportbot.ticket.EscalateViewMapper;
 import com.coreeng.supportbot.ticket.TicketConfirmSubmissionMapper;
+import com.coreeng.supportbot.ticket.TicketEscalationValidator;
 import com.coreeng.supportbot.ticket.TicketProcessingService;
 import com.coreeng.supportbot.ticket.TicketSummaryViewMapper;
+import com.coreeng.supportbot.ticket.TicketViewType;
+import com.google.common.collect.ImmutableList;
 import com.slack.api.app_backend.views.payload.ViewSubmissionPayload;
 import com.slack.api.app_backend.views.response.ViewSubmissionResponse;
 import com.slack.api.bolt.context.builtin.ViewSubmissionContext;
@@ -38,6 +43,9 @@ class TicketViewsSubmissionHandlerTest {
     private EscalateViewMapper escalateViewMapper;
 
     @Mock
+    private TicketEscalationValidator ticketEscalationValidator;
+
+    @Mock
     private TicketConfirmSubmissionMapper confirmSubmissionMapper;
 
     @Mock
@@ -54,6 +62,7 @@ class TicketViewsSubmissionHandlerTest {
                 ticketProcessingService,
                 ticketSummaryViewMapper,
                 escalateViewMapper,
+                ticketEscalationValidator,
                 confirmSubmissionMapper,
                 executor,
                 rbacService);
@@ -101,5 +110,38 @@ class TicketViewsSubmissionHandlerTest {
         verify(rbacService).isSupportBySlackId(SlackId.user(userId));
         assertFalse(response.getErrors().isEmpty());
         assertNull(response.getView());
+    }
+
+    @Test
+    void whenEscalationValidationFails_returnsSlackFieldErrors() {
+        String userId = "U123456";
+        ViewSubmissionContext context = mock(ViewSubmissionContext.class);
+        ViewSubmissionRequest request = mock(ViewSubmissionRequest.class);
+        View view =
+                View.builder().callbackId(TicketViewType.escalate.callbackId()).build();
+        ViewSubmissionPayload payload =
+                ViewSubmissionPayload.builder().view(view).build();
+        EscalateRequest escalateRequest = EscalateRequest.builder()
+                .ticketId(new com.coreeng.supportbot.ticket.TicketId(42))
+                .team("unknown")
+                .tags(ImmutableList.of())
+                .build();
+
+        when(context.getRequestUserId()).thenReturn(userId);
+        when(rbacService.isSupportBySlackId(SlackId.user(userId))).thenReturn(true);
+        when(request.getPayload()).thenReturn(payload);
+        when(escalateViewMapper.extractSubmittedValues(view)).thenReturn(escalateRequest);
+        when(ticketEscalationValidator.validate(escalateRequest))
+                .thenReturn(TicketEscalationValidator.ValidationResult.invalid(
+                        TicketEscalationValidator.Field.team, "team must be a valid escalation team"));
+        when(escalateViewMapper.toActionId(TicketEscalationValidator.Field.team))
+                .thenReturn("escalation-team");
+
+        ViewSubmissionResponse response = handler.apply(request, context);
+
+        assertEquals("errors", response.getResponseAction());
+        assertEquals(
+                "team must be a valid escalation team", response.getErrors().get("escalation-team"));
+        verify(ticketProcessingService, org.mockito.Mockito.never()).escalate(any());
     }
 }

@@ -1,5 +1,7 @@
 export type CustomDateRange = { start?: string; end?: string }
 
+export type TimeBucketResolution = 'hour' | 'day' | 'week' | 'month'
+
 /** All canonical date-filter presets shared across the application. */
 export type DateFilter = 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'lastYear' | 'custom' | 'all'
 
@@ -24,6 +26,40 @@ type DateRangeOptions<T extends string> = {
 }
 
 const toDateString = (date: Date): string => date.toISOString().split('T')[0]
+
+function toValidDate(value?: string | Date): Date | undefined {
+    if (!value) {
+        return undefined
+    }
+
+    const date = value instanceof Date ? value : new Date(value)
+    return Number.isNaN(date.getTime()) ? undefined : date
+}
+
+export function formatTimeBucketLabel(value: string | Date, resolution: TimeBucketResolution): string {
+    const date = toValidDate(value)
+    if (!date) {
+        console.warn(`formatTimeBucketLabel: unable to parse date value: ${String(value)}`)
+        return String(value)
+    }
+
+    const timeZone = 'UTC'
+    switch (resolution) {
+        case 'hour':
+            return date.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                timeZone,
+            })
+        case 'day':
+        case 'week':
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone })
+        case 'month':
+            return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone })
+    }
+}
 
 export function getDateRangeFromFilter<T extends string>({
     dateFilter,

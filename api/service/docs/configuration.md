@@ -242,6 +242,7 @@ oauth_config:
       # User scopes are used for mapping users to teams
       - usergroups:read
       - users:read
+      - users:read.email
 settings:
   event_subscriptions:
     bot_events:

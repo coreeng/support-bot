@@ -118,15 +118,16 @@ public class PrLifecyclePoller {
             PrTrackingRecord record, GitHubPullRequest pr, @Nullable GitHubPullRequestReview latestVerdict) {
         if (latestVerdict != null && latestVerdict.requestsChanges()) {
             Duration remaining = computeRemainingDuration(record);
+
             if (remaining != null) {
                 prTrackingRepository.pauseSla(record.id(), PrTrackingStatus.CHANGES_REQUESTED, remaining);
-                notifyChangesRequested(record);
-            } else {
-                log.atWarn()
-                        .addArgument(record::githubRepo)
-                        .addArgument(record::prNumber)
-                        .log("Skipping CHANGES_REQUESTED transition for {}#{} — no SLA deadline available");
+            } else if (record.slaRemaining() == null) {
+                // No-SLA PR tracking record (slaDeadline and slaRemaining are not set)
+                prTrackingRepository.updateStatus(
+                        record.id(), PrTrackingStatus.CHANGES_REQUESTED, null, record.escalationId());
             }
+            notifyChangesRequested(record);
+
         } else if (latestVerdict != null && latestVerdict.isApproved()) {
             handleApproval(record, pr);
         } else if (record.slaDeadline() != null && Instant.now().isAfter(record.slaDeadline())) {
@@ -184,26 +185,21 @@ public class PrLifecyclePoller {
     private void handleApproval(PrTrackingRecord record, GitHubPullRequest pr) {
         if (pr.isMergeable()) {
             handleApprovalClosure(record);
-        } else if (record.status() == PrTrackingStatus.OPEN) {
+        } else {
             Duration remaining = computeRemainingDuration(record);
-            if (remaining == null) {
-                log.atWarn()
+            if (record.status() == PrTrackingStatus.OPEN && remaining != null) {
+                prTrackingRepository.pauseSla(record.id(), PrTrackingStatus.APPROVED, remaining);
+                log.atInfo()
                         .addArgument(record::githubRepo)
                         .addArgument(record::prNumber)
-                        .log("Skipping APPROVED transition for {}#{} — no SLA deadline available");
-                return;
+                        .log("PR {}#{} approved — SLA paused, awaiting merge");
+            } else {
+                prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.APPROVED, null, record.escalationId());
+                log.atInfo()
+                        .addArgument(record::githubRepo)
+                        .addArgument(record::prNumber)
+                        .log("PR {}#{} approved — awaiting merge");
             }
-            prTrackingRepository.pauseSla(record.id(), PrTrackingStatus.APPROVED, remaining);
-            log.atInfo()
-                    .addArgument(record::githubRepo)
-                    .addArgument(record::prNumber)
-                    .log("PR {}#{} approved — SLA paused, awaiting merge");
-        } else {
-            prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.APPROVED, null, record.escalationId());
-            log.atInfo()
-                    .addArgument(record::githubRepo)
-                    .addArgument(record::prNumber)
-                    .log("PR {}#{} approved — awaiting merge");
         }
     }
 
@@ -336,9 +332,6 @@ public class PrLifecyclePoller {
 
     private @Nullable Duration computeRemainingDuration(PrTrackingRecord record) {
         if (record.slaDeadline() == null) {
-            log.atWarn()
-                    .addArgument(record::id)
-                    .log("Record {} has no SLA deadline — cannot compute remaining duration");
             return null;
         }
         Duration remaining = Duration.between(Instant.now(), record.slaDeadline());

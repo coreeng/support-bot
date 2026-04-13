@@ -10,6 +10,7 @@ import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,14 +36,30 @@ class TicketControllerTest {
     @Mock
     private TicketTeamSuggestionsService teamSuggestionsService;
 
+    @Mock
+    private TicketProcessingService ticketProcessingService;
+
+    @Mock
+    private TicketEscalationValidator ticketEscalationValidator;
+
     private TicketController controller;
 
     private TicketId ticketId;
 
     @BeforeEach
     void setUp() {
-        controller = new TicketController(queryService, ticketUpdateService, mapper, teamSuggestionsService);
+        controller = new TicketController(
+                queryService,
+                ticketUpdateService,
+                ticketProcessingService,
+                ticketEscalationValidator,
+                mapper,
+                teamSuggestionsService);
         ticketId = new TicketId(123L);
+        lenient().when(queryService.findById(ticketId)).thenReturn(mock(Ticket.class));
+        lenient()
+                .when(ticketEscalationValidator.validate(any(), any()))
+                .thenReturn(TicketEscalationValidator.ValidationResult.valid());
     }
 
     @Test
@@ -98,6 +115,112 @@ class TicketControllerTest {
         assertThat(response.getBody()).isInstanceOf(String.class);
         assertThat((String) response.getBody()).contains("Update failed");
         verify(ticketUpdateService).update(ticketId, request);
+    }
+
+    @Test
+    void shouldEscalateTicketViaProcessingService() {
+        // given
+        TicketEscalationCreateRequest request =
+                new TicketEscalationCreateRequest("core-support", List.of("bug", "urgent"));
+
+        // when
+        ResponseEntity<?> response = controller.escalateTicket(ticketId, request);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(ticketProcessingService)
+                .escalate(argThat(escalateRequest -> ticketId.equals(escalateRequest.ticketId())
+                        && "core-support".equals(escalateRequest.team())
+                        && ImmutableList.of("bug", "urgent").equals(escalateRequest.tags())
+                        && escalateRequest.threadPermalink() == null));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenEscalationTicketDoesNotExist() {
+        // given
+        when(queryService.findById(ticketId)).thenReturn(null);
+
+        // when
+        ResponseEntity<?> response =
+                controller.escalateTicket(ticketId, new TicketEscalationCreateRequest("core-support", List.of()));
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        verifyNoInteractions(ticketEscalationValidator);
+        verify(ticketProcessingService, never()).escalate(any());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenEscalationTeamIsMissing() {
+        // given
+        TicketEscalationCreateRequest request = new TicketEscalationCreateRequest(null, List.of("bug"));
+        when(ticketEscalationValidator.validate(request.team(), request.tags()))
+                .thenReturn(TicketEscalationValidator.ValidationResult.invalid(
+                        TicketEscalationValidator.Field.team, "team is required"));
+
+        // when
+        ResponseEntity<?> response = controller.escalateTicket(ticketId, request);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isEqualTo("team is required");
+        verify(ticketProcessingService, never()).escalate(any());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenEscalationTeamIsUnknown() {
+        // given
+        TicketEscalationCreateRequest request = new TicketEscalationCreateRequest("unknown-team", List.of("bug"));
+        when(ticketEscalationValidator.validate(request.team(), request.tags()))
+                .thenReturn(TicketEscalationValidator.ValidationResult.invalid(
+                        TicketEscalationValidator.Field.team, "team must be a valid escalation team"));
+
+        // when
+        ResponseEntity<?> response = controller.escalateTicket(ticketId, request);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isEqualTo("team must be a valid escalation team");
+        verify(ticketProcessingService, never()).escalate(any());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenEscalationTagsContainNull() {
+        // given
+        TicketEscalationCreateRequest request =
+                new TicketEscalationCreateRequest("core-support", Arrays.asList("bug", null));
+        when(ticketEscalationValidator.validate(request.team(), request.tags()))
+                .thenReturn(TicketEscalationValidator.ValidationResult.invalid(
+                        TicketEscalationValidator.Field.tags, "tags must not contain null"));
+
+        // when
+        ResponseEntity<?> response = controller.escalateTicket(ticketId, request);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isEqualTo("tags must not contain null");
+        verify(ticketProcessingService, never()).escalate(any());
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenEscalationFails() {
+        // given
+        TicketEscalationCreateRequest request = new TicketEscalationCreateRequest("core-support", List.of());
+        doThrow(new IllegalArgumentException("Ticket is closed"))
+                .when(ticketProcessingService)
+                .escalate(any());
+
+        // when
+        ResponseEntity<?> response = controller.escalateTicket(ticketId, request);
+
+        // then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isEqualTo("Ticket is closed");
+        verify(ticketProcessingService)
+                .escalate(argThat(escalateRequest -> ticketId.equals(escalateRequest.ticketId())
+                        && "core-support".equals(escalateRequest.team())
+                        && ImmutableList.of().equals(escalateRequest.tags())
+                        && escalateRequest.threadPermalink() == null));
     }
 
     @Test

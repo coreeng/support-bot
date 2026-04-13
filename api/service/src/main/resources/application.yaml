@@ -136,6 +136,12 @@ pr-review-tracking:
   #       overrides:            # optional: path-specific SLA overrides
   #         - path: infra/**
   #           sla: 7d
+  #   - name: my-org/no-sla-repo
+  #     owning-team: <team-code from enums.escalation-teams>
+  #     github-team-slug: <slug>  # optional: GitHub team slug for review validation; when absent, falls back to PR requested teams
+  #     paths:
+  #     - infra/**
+  #     - rbac/**
   sla-discovery:
     cache: PT24H                           # How long to cache SLA files fetched from repositories
   github:
