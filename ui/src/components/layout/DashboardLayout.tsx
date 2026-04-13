@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { AlertCircle, BarChart2, Home, Ticket, Headphones, ChevronDown, ChevronRight, ChevronLeft, LogOut, BookOpen } from 'lucide-react'
+import { AlertCircle, BarChart2, Home, Ticket, Headphones, ChevronDown, ChevronRight, ChevronLeft, LogOut, BookOpen, ShieldX } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { buildHref } from '@/lib/utils'
@@ -62,8 +62,48 @@ const supportTabs: SupportTab[] = [
     }
 ]
 
+function AccessDenied({ userEmail, onLogout }: { userEmail?: string; onLogout: () => void }) {
+    return (
+        <div className="flex items-center justify-center h-full bg-gray-50">
+            <div className="max-w-md w-full mx-4 text-center">
+                <div className="bg-white rounded-2xl shadow-lg p-8 space-y-6">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-100">
+                        <ShieldX className="w-8 h-8 text-amber-600" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-semibold text-gray-900">Access Restricted</h1>
+                        <p className="mt-2 text-gray-600">
+                            Your account does not have the required role to access the dashboard.
+                            A <span className="font-medium">Support Engineer</span> or{' '}
+                            <span className="font-medium">Leadership</span> role is required.
+                        </p>
+                    </div>
+                    {userEmail && (
+                        <p className="text-sm text-gray-500">
+                            Signed in as <span className="font-medium text-gray-700">{userEmail}</span>
+                        </p>
+                    )}
+                    <div className="pt-2 space-y-3">
+                        <p className="text-sm text-gray-500">
+                            Contact your administrator to request the appropriate role.
+                        </p>
+                        <button
+                            onClick={onLogout}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm font-medium"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            Sign in with a different account
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
-    const { user, logout } = useAuth()
+    const { user, logout, isLeadership, isSupportEngineer, isLoading } = useAuth()
+    const hasDashboardAccess = isLeadership || isSupportEngineer
     const { hasFullAccess, selectedTeam } = useTeamFilter()
     const { data: isKnowledgeGapsEnabled, error: knowledgeGapsError } = useKnowledgeGapsEnabled()
     // const { data: isTenantInsightsEnabled, error: tenantInsightsError } = useTenantInsightsEnabled()
@@ -268,7 +308,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 {/* Main Content Area */}
                 <div className="flex-1 overflow-auto">
                     <div className="h-full">
-                        {children}
+                        {!isLoading && !hasDashboardAccess ? (
+                            <AccessDenied userEmail={user?.email} onLogout={logout} />
+                        ) : (
+                            children
+                        )}
                     </div>
                 </div>
             </div>
