@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
@@ -30,6 +31,29 @@ import org.kohsuke.github.HttpException;
 import org.kohsuke.github.PagedIterable;
 
 class Hub4jGitHubClientTest {
+
+    /** hub4j 1.3xx uses {@link Date}; newer releases use {@link Instant} for the same getters. */
+    private static final boolean CREATED_AT_IS_INSTANT = returnTypeIsInstant(GHPullRequest.class, "getCreatedAt");
+
+    private static final boolean MERGED_AT_IS_INSTANT = returnTypeIsInstant(GHPullRequest.class, "getMergedAt");
+    private static final boolean SUBMITTED_AT_IS_INSTANT =
+            returnTypeIsInstant(GHPullRequestReview.class, "getSubmittedAt");
+
+    private static boolean returnTypeIsInstant(Class<?> clazz, String methodName) {
+        try {
+            Method m = clazz.getMethod(methodName);
+            return Instant.class.equals(m.getReturnType());
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static @Nullable Object hub4jTimestamp(@Nullable Instant value, boolean apiUsesInstant) {
+        if (value == null) {
+            return null;
+        }
+        return apiUsesInstant ? value : Date.from(value);
+    }
 
     private final GitHub gitHub = mock(GitHub.class);
     private final Hub4jGitHubClient client = new Hub4jGitHubClient(gitHub);
@@ -59,7 +83,9 @@ class Hub4jGitHubClientTest {
     void returnsMergedStateWhenMergedAtIsNonNull() throws IOException {
         // given
         GHPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
-        when(pr.getMergedAt()).thenReturn(date("2026-01-15T10:00:00Z"));
+        doReturn(hub4jTimestamp(instant("2026-01-15T10:00:00Z"), MERGED_AT_IS_INSTANT))
+                .when(pr)
+                .getMergedAt();
         when(pr.getMergeable()).thenReturn(true);
         when(pr.getMergeableState()).thenReturn("clean");
 
@@ -375,7 +401,9 @@ class Hub4jGitHubClientTest {
     void getPullRequestSkipsReviewsForMergedPr() throws IOException {
         // given
         GHPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
-        when(pr.getMergedAt()).thenReturn(date("2026-01-15T10:00:00Z"));
+        doReturn(hub4jTimestamp(instant("2026-01-15T10:00:00Z"), MERGED_AT_IS_INSTANT))
+                .when(pr)
+                .getMergedAt();
         when(pr.getMergeable()).thenReturn(true);
         when(pr.getMergeableState()).thenReturn("clean");
 
@@ -424,7 +452,9 @@ class Hub4jGitHubClientTest {
         GHPullRequestReview review = mock(GHPullRequestReview.class);
         when(review.getUser()).thenReturn(null);
         when(review.getState()).thenReturn(GHPullRequestReviewState.APPROVED);
-        doReturn(date("2026-01-10T08:00:00Z")).when(review).getSubmittedAt();
+        doReturn(hub4jTimestamp(instant("2026-01-10T08:00:00Z"), SUBMITTED_AT_IS_INSTANT))
+                .when(review)
+                .getSubmittedAt();
         stubReviews(pr, List.of(review));
 
         // when / then
@@ -524,7 +554,7 @@ class Hub4jGitHubClientTest {
         GHPullRequest pr = mock(GHPullRequest.class);
         when(gitHub.getRepository(repositoryName)).thenReturn(repo);
         when(repo.getPullRequest(pullNumber)).thenReturn(pr);
-        doReturn(createdAt == null ? null : Date.from(createdAt)).when(pr).getCreatedAt();
+        doReturn(hub4jTimestamp(createdAt, CREATED_AT_IS_INSTANT)).when(pr).getCreatedAt();
         when(pr.getState()).thenReturn(state);
         when(pr.getMergedAt()).thenReturn(null);
         return pr;
@@ -537,7 +567,9 @@ class Hub4jGitHubClientTest {
         when(review.getUser()).thenReturn(user);
         when(user.getLogin()).thenReturn(login);
         when(review.getState()).thenReturn(state);
-        doReturn(date(submittedAtIso)).when(review).getSubmittedAt();
+        doReturn(hub4jTimestamp(instant(submittedAtIso), SUBMITTED_AT_IS_INSTANT))
+                .when(review)
+                .getSubmittedAt();
         return review;
     }
 
@@ -550,9 +582,5 @@ class Hub4jGitHubClientTest {
 
     private static Instant instant(String iso) {
         return Instant.parse(iso);
-    }
-
-    private static Date date(String iso) {
-        return Date.from(instant(iso));
     }
 }
