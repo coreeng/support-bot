@@ -104,11 +104,7 @@ public class OAuth2ClientConfig {
     }
 
     private ClientRegistration dexClientRegistration(
-            String clientId,
-            String clientSecret,
-            String issuerUri,
-            String scopeProperty,
-            String internalBaseUrl) {
+            String clientId, String clientSecret, String issuerUri, String scopeProperty, String internalBaseUrl) {
         String normalizedIssuerUri =
                 issuerUri.endsWith("/") ? issuerUri.substring(0, issuerUri.length() - 1) : issuerUri;
         // Browser redirects use the external ingress URL; server-to-server calls
