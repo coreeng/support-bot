@@ -580,10 +580,10 @@ describe('StatsPage (Home Dashboard)', () => {
                         { label: 'TEAM A', code: 'team-a', types: [], name: 'Team A' },
                         { label: 'Team A', code: 'team-a', types: [], name: 'Team A' },
                     ],
-                    roles: []
+                    roles: ['SUPPORT_ENGINEER']
                 },
                 isLeadership: false,
-                isSupportEngineer: false,
+                isSupportEngineer: true,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
                 isLoading: false,
@@ -615,10 +615,10 @@ describe('StatsPage (Home Dashboard)', () => {
                     email: 'user@example.com',
                     name: 'Test User',
                     teams: [],
-                    roles: []
+                    roles: ['SUPPORT_ENGINEER']
                 },
                 isLeadership: false,
-                isSupportEngineer: false,
+                isSupportEngineer: true,
                 isEscalationTeam: false,
                 actualEscalationTeams: [],
                 isLoading: false,

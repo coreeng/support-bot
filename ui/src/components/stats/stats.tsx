@@ -81,7 +81,9 @@ function renderIncomingResolvedChart({
     error: Error | null
     data: IncomingVsResolvedRatePoint[]
 }): JSX.Element {
-    if (!hasDashboardAccess) {
+    // No-team scope: show the chart empty state (not the role-restricted panel), which matches the
+    // dashboard banner that already explains missing team access.
+    if (!hasDashboardAccess && !hasNoTeamScope) {
         return (
             <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
                 <h2 className="text-lg font-semibold text-slate-900 mb-2">Incoming vs Resolved</h2>
