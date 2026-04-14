@@ -11,7 +11,6 @@ import com.nimbusds.jose.jwk.source.JWKSourceBuilder;
 import com.nimbusds.jose.proc.JWSVerificationKeySelector;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import java.net.URI;
@@ -112,7 +111,11 @@ public class OAuthExchangeService {
                         userInfo.put("groups", claims.get("groups"));
                     }
                 } catch (Exception e) {
-                    log.warn("Failed to verify/parse id_token claims — ignoring id_token", e);
+                    log.error(
+                            "ID token verification failed for provider {} — skipping id_token claims. "
+                                    + "If this provider relies on id_token for group claims, login may be degraded.",
+                            registration.getRegistrationId(),
+                            e);
                 }
             }
 
@@ -205,26 +208,28 @@ public class OAuthExchangeService {
     /**
      * Verifies the ID token signature against the provider's JWKS and validates {@code iss} and
      * {@code aud} claims per the OIDC spec.
+     *
+     * @return verified claims, or empty map if JWKS URI is not configured (claims are never trusted
+     *     without verification)
      */
     private Map<String, Object> verifyAndExtractClaims(String idToken, ClientRegistration registration)
             throws Exception {
         String jwksUri = registration.getProviderDetails().getJwkSetUri();
         if (jwksUri == null || jwksUri.isBlank()) {
-            log.debug(
-                    "No JWKS URI for provider {} — falling back to unverified parse", registration.getRegistrationId());
-            return SignedJWT.parse(idToken).getJWTClaimsSet().getClaims();
+            log.warn(
+                    "No JWKS URI for provider {} — skipping ID token claims (unverified tokens are never trusted)",
+                    registration.getRegistrationId());
+            return Map.of();
         }
 
         JWKSource<SecurityContext> jwkSource =
                 JWKSourceBuilder.create(URI.create(jwksUri).toURL()).build();
         var jwtProcessor = new DefaultJWTProcessor<SecurityContext>();
 
-        // Accept common signing algorithms — the JWKS key selector picks the right one
         var keySelector = new JWSVerificationKeySelector<>(
                 Set.of(JWSAlgorithm.RS256, JWSAlgorithm.RS384, JWSAlgorithm.RS512, JWSAlgorithm.ES256), jwkSource);
         jwtProcessor.setJWSKeySelector(keySelector);
 
-        // Require iss and aud; verify aud matches client_id
         var claimsVerifier = new DefaultJWTClaimsVerifier<SecurityContext>(
                 new JWTClaimsSet.Builder().audience(registration.getClientId()).build(),
                 new HashSet<>(Set.of("iss", "sub", "iat", "exp")));

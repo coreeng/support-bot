@@ -70,8 +70,7 @@ public class RedirectUriValidator {
             }
             return originOf(uri);
         } catch (IllegalArgumentException e) {
-            throw new IllegalStateException(
-                    "security.oauth2.redirect-uri is not a valid URI: " + uriString, e);
+            throw new IllegalStateException("security.oauth2.redirect-uri is not a valid URI: " + uriString, e);
         }
     }
 

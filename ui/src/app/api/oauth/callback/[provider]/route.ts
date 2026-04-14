@@ -10,12 +10,24 @@ export async function GET(
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
   const error = searchParams.get("error");
+  const returnedState = searchParams.get("state");
 
   // Same origin logic as oauth/start redirect_uri (ingress / 0.0.0.0 bind).
   const loginUrl = new URL("/login", resolvePublicOrigin(request));
   // Extract from cookie the user's last visited page to redirect to after login
   const rawCallbackUrl = request.cookies.get("oauth-callback-url")?.value || "/";
   loginUrl.searchParams.set("callbackUrl", sanitizeCallbackUrl(rawCallbackUrl));
+
+  // Verify OAuth state to prevent CSRF
+  const expectedState = request.cookies.get("oauth-state")?.value;
+  if (!expectedState || !returnedState || expectedState !== returnedState) {
+    console.error("OAuth state mismatch — possible CSRF attempt");
+    loginUrl.searchParams.set("error", "authentication_failed");
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
+    redirectResponse.cookies.set("oauth-state", "", { path: "/", maxAge: 0 });
+    return redirectResponse;
+  }
 
   // Add provider and code/error parameters BEFORE creating the redirect response
   if (provider === "google" || provider === "azure" || provider === "dex") {
@@ -33,8 +45,9 @@ export async function GET(
 
   // Create redirect response with the complete URL including all parameters
   const redirectResponse = NextResponse.redirect(loginUrl);
-  // Clear the cookie after successful use (must specify path to match the cookie that was set)
+  // Clear cookies after use (must specify path to match the cookie that was set)
   redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });
+  redirectResponse.cookies.set("oauth-state", "", { path: "/", maxAge: 0 });
 
   return redirectResponse;
 }

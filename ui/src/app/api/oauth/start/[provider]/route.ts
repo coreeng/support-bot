@@ -22,7 +22,7 @@ export async function GET(
 
     if (oauthUrl.ok) {
       try {
-        const {url} = await oauthUrl.json();
+        const {url, state} = await oauthUrl.json();
         if (url) {
           const providerRedirect = NextResponse.redirect(url);
 
@@ -34,9 +34,19 @@ export async function GET(
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
-            maxAge: 600, // 10 minutes - enough time to complete OAuth
+            maxAge: 600,
             path: "/",
           });
+
+          if (state) {
+            providerRedirect.cookies.set("oauth-state", state, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === "production",
+              sameSite: "lax",
+              maxAge: 600,
+              path: "/",
+            });
+          }
 
           return providerRedirect;
         } else {

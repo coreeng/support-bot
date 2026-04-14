@@ -95,8 +95,6 @@ class RedirectUriValidatorTest {
     @Test
     void rejectsSchemeRelativeUri() {
         var v = validator("http://localhost:3000/login");
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> v.validate("//attacker.example/api/oauth/callback/dex"));
+        assertThrows(IllegalArgumentException.class, () -> v.validate("//attacker.example/api/oauth/callback/dex"));
     }
 }

@@ -67,7 +67,8 @@ public class AuthController {
             log.warn("Invalid OAuth provider: {}", provider);
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(new OAuthUrlResponse(authUrlOpt.get()));
+        var result = authUrlOpt.get();
+        return ResponseEntity.ok(new OAuthUrlResponse(result.url(), result.state()));
     }
 
     @PostMapping("/oauth/exchange")
@@ -104,7 +105,7 @@ public class AuthController {
 
     public record TeamResponse(String label, String code, List<String> types) {}
 
-    public record OAuthUrlResponse(String url) {}
+    public record OAuthUrlResponse(String url, String state) {}
 
     public record OAuthExchangeRequest(String provider, String code, String redirectUri) {}
 

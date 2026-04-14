@@ -15,7 +15,9 @@ public class OAuthUrlService {
     private final ClientRegistrationRepository clientRegistrationRepository;
     private final RedirectUriValidator redirectUriValidator;
 
-    public Optional<String> getAuthorizationUrl(String provider, String redirectUri) {
+    public record AuthorizationUrlResult(String url, String state) {}
+
+    public Optional<AuthorizationUrlResult> getAuthorizationUrl(String provider, String redirectUri) {
         try {
             redirectUriValidator.validate(redirectUri);
         } catch (IllegalArgumentException e) {
@@ -42,6 +44,6 @@ public class OAuthUrlService {
                 .build()
                 .toUriString();
 
-        return Optional.of(url);
+        return Optional.of(new AuthorizationUrlResult(url, state));
     }
 }
