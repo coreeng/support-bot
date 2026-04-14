@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class RedirectUriValidatorTest {
@@ -82,5 +83,20 @@ class RedirectUriValidatorTest {
     void rejectsMalformedUri() {
         var v = validator("http://localhost:3000/login");
         assertThrows(IllegalArgumentException.class, () -> v.validate("not a uri"));
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   ", "not-a-uri", "//missing-scheme.example.com/path"})
+    void failsAtConstructionWithInvalidConfig(String configuredUri) {
+        assertThrows(IllegalStateException.class, () -> validator(configuredUri));
+    }
+
+    @Test
+    void rejectsSchemeRelativeUri() {
+        var v = validator("http://localhost:3000/login");
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> v.validate("//attacker.example/api/oauth/callback/dex"));
     }
 }

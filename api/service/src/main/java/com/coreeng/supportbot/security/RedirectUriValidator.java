@@ -32,9 +32,13 @@ public class RedirectUriValidator {
     public void validate(String redirectUri) {
         URI uri;
         try {
-            uri = URI.create(redirectUri);
+            uri = URI.create(redirectUri).normalize();
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Malformed redirect_uri", e);
+        }
+
+        if (uri.getScheme() == null || uri.getHost() == null) {
+            throw new IllegalArgumentException("redirect_uri must have an absolute scheme and host");
         }
 
         String origin = originOf(uri);
@@ -55,13 +59,19 @@ public class RedirectUriValidator {
 
     private static String extractOrigin(String uriString) {
         if (uriString == null || uriString.isBlank()) {
-            return "";
+            throw new IllegalStateException(
+                    "security.oauth2.redirect-uri must be configured with a valid absolute URI");
         }
         try {
-            return originOf(URI.create(uriString));
+            URI uri = URI.create(uriString);
+            if (uri.getScheme() == null || uri.getHost() == null) {
+                throw new IllegalStateException(
+                        "security.oauth2.redirect-uri must have a scheme and host, got: " + uriString);
+            }
+            return originOf(uri);
         } catch (IllegalArgumentException e) {
-            log.warn("Could not parse security.oauth2.redirect-uri for origin extraction: {}", uriString);
-            return "";
+            throw new IllegalStateException(
+                    "security.oauth2.redirect-uri is not a valid URI: " + uriString, e);
         }
     }
 
@@ -69,9 +79,6 @@ public class RedirectUriValidator {
         String scheme = uri.getScheme();
         String host = uri.getHost();
         int port = uri.getPort();
-        if (scheme == null || host == null) {
-            return "";
-        }
         boolean defaultPort =
                 (port == -1) || ("http".equals(scheme) && port == 80) || ("https".equals(scheme) && port == 443);
         return defaultPort ? scheme + "://" + host : scheme + "://" + host + ":" + port;

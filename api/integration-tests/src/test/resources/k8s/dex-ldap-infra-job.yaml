@@ -56,8 +56,9 @@ spec:
               curl -sfS "http://${DEX_HOST}:${DEX_TELEMETRY_PORT}/healthz/live" >/dev/null
               echo "OK_DEX"
               echo "Checking LDAP uid=alice at ldap://${LDAP_HOST}:${LDAP_PORT} ..."
-              curl -sfS "ldap://${LDAP_HOST}:${LDAP_PORT}/ou=People,dc=supportbot,dc=local?uid?sub?(uid=alice)" \
-                --user "${LDAP_BIND_DN}:${LDAP_BIND_PW}" | grep -q "alice"
+              ldapsearch -x -H "ldap://${LDAP_HOST}:${LDAP_PORT}" \
+                -D "${LDAP_BIND_DN}" -w "${LDAP_BIND_PW}" \
+                -b "ou=People,dc=supportbot,dc=local" "(uid=alice)" uid | grep -q "uid: alice"
               echo "OK_LDAP"
               echo "OK_ALL"
       volumes:

@@ -74,4 +74,4 @@ spec:
         - name: oidc-script
           configMap:
             name: PLACEHOLDER_CONFIGMAP_NAME
-            defaultMode: 0444
+            defaultMode: 292
