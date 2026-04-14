@@ -14,11 +14,19 @@ spec:
     spec:
       automountServiceAccountToken: false
       restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: smoke
           image: nicolaka/netshoot:v0.13
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           volumeMounts:
@@ -44,14 +52,12 @@ spec:
           args:
             - |
               set -euo pipefail
-              apk add --no-cache openldap-clients >/dev/null 2>&1
               echo "Checking Dex telemetry health at http://${DEX_HOST}:${DEX_TELEMETRY_PORT}/healthz/live ..."
               curl -sfS "http://${DEX_HOST}:${DEX_TELEMETRY_PORT}/healthz/live" >/dev/null
               echo "OK_DEX"
               echo "Checking LDAP uid=alice at ldap://${LDAP_HOST}:${LDAP_PORT} ..."
-              ldapsearch -x -o ldif-wrap=no -H "ldap://${LDAP_HOST}:${LDAP_PORT}" \
-                -D "${LDAP_BIND_DN}" -w "${LDAP_BIND_PW}" \
-                -b "dc=supportbot,dc=local" "(uid=alice)" | grep -q "^dn: uid=alice"
+              curl -sfS "ldap://${LDAP_HOST}:${LDAP_PORT}/ou=People,dc=supportbot,dc=local?uid?sub?(uid=alice)" \
+                --user "${LDAP_BIND_DN}:${LDAP_BIND_PW}" | grep -q "alice"
               echo "OK_LDAP"
               echo "OK_ALL"
       volumes:
