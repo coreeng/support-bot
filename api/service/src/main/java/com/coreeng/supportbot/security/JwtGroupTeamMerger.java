@@ -57,7 +57,7 @@ public class JwtGroupTeamMerger {
                 Team team = teamService.findTeamByCode(mapping.teamCode());
                 if (team == null) {
                     log.warn("jwt-groups mapping references unknown team-code {}", mapping.teamCode());
-                    break;
+                    continue;
                 }
                 if (seenCodes.add(team.code())) {
                     out.add(team);

@@ -9,7 +9,7 @@ fullnameOverride: ldap
 
 image:
   repository: bitnami/openldap
-  tag: latest
+  tag: "2.6"
   pullPolicy: IfNotPresent
 
 existingSecret: ldap-secrets

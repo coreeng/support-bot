@@ -69,6 +69,24 @@ class JwtGroupTeamMergerTest {
         assertEquals(1, out.size());
     }
 
+    @Test
+    void merge_unknownTeamCode_continuesWithRemainingMappings() {
+        var props = new JwtGroupsProperties(
+                true,
+                "groups",
+                List.of(
+                        new JwtGroupsProperties.Mapping(List.of("developers"), "unknown-team"),
+                        new JwtGroupsProperties.Mapping(List.of("developers"), "core")));
+        var merger = new JwtGroupTeamMerger(props, teamService);
+        when(teamService.findTeamByCode("unknown-team")).thenReturn(null);
+        when(teamService.findTeamByCode("core")).thenReturn(tenant("core"));
+
+        var out = merger.mergeForProvider("dex", Map.of("groups", List.of("developers")), ImmutableList.of());
+
+        assertEquals(1, out.size());
+        assertEquals("core", out.get(0).code());
+    }
+
     private static Team tenant(String code) {
         return new Team(code, code, ImmutableList.of(TeamType.TENANT));
     }
