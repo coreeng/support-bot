@@ -11,7 +11,7 @@ services:
     environment:
       LDAP_ORGANISATION: Support Bot
       LDAP_DOMAIN: supportbot.local
-      LDAP_TLS: "false"
+      LDAP_TLS: "false"              # local-dev only — credentials travel in plaintext
       # Osixia deletes bootstrap assets after first start by default; restarts then fail (missing
       # replication-disable.ldif / root-password-change.ldif under /container/service/...).
       LDAP_REMOVE_CONFIG_AFTER_SETUP: "false"

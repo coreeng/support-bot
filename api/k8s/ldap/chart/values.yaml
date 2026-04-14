@@ -10,9 +10,26 @@ image:
 
 service:
   type: ClusterIP
+  # Plain LDAP port. Set to 0 and enable tls.port to go LDAPS-only.
   port: 389
 
-# K8s Secret holding the directory admin password (plain LDAP, no TLS).
+# TLS / LDAPS (disabled by default — plaintext LDAP for local-dev only).
+# For integration / production, enable TLS and supply a cert Secret.
+# See docs/runbooks/auth-dex-ldap.md § "Enabling LDAPS / StartTLS".
+tls:
+  enabled: false
+  # Additional LDAPS port exposed on the Service (636 by convention).
+  port: 636
+  # K8s TLS Secret with tls.crt, tls.key, and optionally ca.crt.
+  certSecret: ""
+  # Mount paths inside the container (Bitnami defaults).
+  certFilename: tls.crt
+  keyFilename: tls.key
+  caFilename: ca.crt
+
+# K8s Secret holding the directory admin password.
+# WARNING: without TLS the admin password travels in plaintext — acceptable for
+# local dev / ephemeral integration clusters only.
 existingSecret: ldap-secrets
 existingSecretPasswordKey: admin-password
 

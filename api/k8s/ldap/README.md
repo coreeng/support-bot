@@ -45,9 +45,22 @@ make ldap-template
 
 After logging in to `registry-1.docker.io`, pin a version with `helm show chart oci://registry-1.docker.io/bitnamicharts/openldap` and install that chart instead, mapping the same domain, admin secret, and custom LDIF. The bundled chart’s `values-bitnami.yaml` is a useful reference for ports and env.
 
+## TLS / LDAPS
+
+The default values expose **plain LDAP on port 389** (no TLS). This is intentional for local development and ephemeral integration clusters. For production clusters, layer [`values-tls.yaml`](./values-tls.yaml) to enable LDAPS on port 636:
+
+```bash
+helm upgrade --install support-bot-ldap ./api/k8s/ldap/chart \
+  -f api/k8s/ldap/values-bitnami.yaml \
+  -f api/k8s/ldap/values-tls.yaml \
+  [-f api/k8s/ldap/values-integration.yaml]
+```
+
+This requires a TLS Secret (`kubectl create secret tls ldap-tls --cert=... --key=...`). The Dex LDAP connector must also switch to StartTLS or LDAPS — see [`api/k8s/dex/values-tls.yaml`](../dex/values-tls.yaml) and [docs/runbooks/auth-dex-ldap.md](../../../docs/runbooks/auth-dex-ldap.md).
+
 ## Integration deploy order (with Dex)
 
-Deploy **LDAP** before Dex when Dex uses the LDAP connector, so the Service is available. With `fullnameOverride: ldap`, colocated Dex should use **`ldap:389`**. Then deploy Dex and the Support Bot API. See [docs/runbooks/auth-dex-ldap.md](../../../docs/runbooks/auth-dex-ldap.md).
+Deploy **LDAP** before Dex when Dex uses the LDAP connector, so the Service is available. With `fullnameOverride: ldap`, colocated Dex should use **`ldap:389`** (or `ldap:636` with TLS). Then deploy Dex and the Support Bot API. See [docs/runbooks/auth-dex-ldap.md](../../../docs/runbooks/auth-dex-ldap.md).
 
 ## Module docs
 

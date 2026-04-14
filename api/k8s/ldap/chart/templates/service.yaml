@@ -10,7 +10,15 @@ spec:
     app.kubernetes.io/name: {{ include "support-bot-openldap.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
   ports:
+    {{- if .Values.service.port }}
     - name: ldap
       port: {{ .Values.service.port }}
       targetPort: ldap
       protocol: TCP
+    {{- end }}
+    {{- if and .Values.tls.enabled .Values.tls.port }}
+    - name: ldaps
+      port: {{ .Values.tls.port }}
+      targetPort: ldaps
+      protocol: TCP
+    {{- end }}

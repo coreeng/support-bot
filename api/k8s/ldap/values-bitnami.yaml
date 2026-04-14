@@ -1,5 +1,9 @@
 # Support Bot overrides for api/k8s/ldap/chart (Bitnami OpenLDAP image).
 # Bootstrap LDIF is packaged under chart/files/bootstrap/ — keep in sync with ldap/bootstrap/.
+#
+# ⚠ SECURITY: port 389 is plain LDAP (no TLS). Acceptable for local dev and
+# ephemeral integration clusters. For production, also apply values-tls.yaml
+# (enables LDAPS on 636). See docs/runbooks/auth-dex-ldap.md § "Enabling LDAPS / StartTLS".
 
 fullnameOverride: ldap
 

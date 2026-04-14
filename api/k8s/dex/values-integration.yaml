@@ -5,6 +5,10 @@
 # Secret ldap-secrets key admin-password (same as Bitnami OpenLDAP admin). If you leave the placeholder,
 # Dex will fail with LDAP 49 Invalid Credentials on the cn=admin bind; Google/Azure connectors can
 # still work. Override via private -f values, --set-string, or your pipeline. See docs/runbooks/auth-dex-ldap.md.
+#
+# ⚠ SECURITY: insecureNoSSL sends credentials in plaintext — acceptable for ephemeral integration
+# clusters only. For production, layer values-tls.yaml on top to enable StartTLS or LDAPS.
+# See docs/runbooks/auth-dex-ldap.md § "Enabling LDAPS / StartTLS".
 
 config:
   issuer: https://dex.integration.example.com
@@ -21,7 +25,7 @@ config:
       name: LDAP
       config:
         host: ldap:389
-        insecureNoSSL: true
+        insecureNoSSL: true          # plaintext — see values-tls.yaml for production
         bindDN: cn=admin,dc=supportbot,dc=local
         bindPW: helm-template-placeholder-ldap-bind
         usernamePrompt: Email Address

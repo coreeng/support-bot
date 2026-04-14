@@ -59,9 +59,13 @@ Validate render only:
 make dex-template
 ```
 
+## TLS for the LDAP connector
+
+The default `values-integration.yaml` uses **`insecureNoSSL: true`** (plaintext on port 389). For production, layer [`values-tls.yaml`](./values-tls.yaml) to switch to **StartTLS** (port 389) or **LDAPS** (port 636). If the LDAP cert is signed by a private CA, set `rootCAData` or mount the CA into the Dex pod. See [docs/runbooks/auth-dex-ldap.md](../../../docs/runbooks/auth-dex-ldap.md) § "Enabling LDAPS / StartTLS".
+
 ## Connectors: LDAP, Google, Microsoft
 
-- **LDAP** — `values-integration.yaml` shows a connector matching the Bitnami/OpenLDAP DIT (`ldap:389`, `cn=admin,dc=supportbot,dc=local`, group search for `groupOfUniqueNames`). JWT `groups` for Support Bot `jwt-groups` depends on this connector and Dex scopes.
+- **LDAP** — `values-integration.yaml` shows a connector matching the Bitnami/OpenLDAP DIT (`ldap:389`, `cn=admin,dc=supportbot,dc=local`, group search for `groupOfUniqueNames`). For TLS, see the section above. JWT `groups` for Support Bot `jwt-groups` depends on this connector and Dex scopes.
 - **Google** — add a `connectors` entry with `type: google` per [Dex docs](https://dexidp.io/docs/connectors/google/). Register a **Web** OAuth client whose redirect URI is **`{issuer}/callback`** (e.g. `https://dex.example.com/callback`), not the API’s `/login/oauth2/code/...` URL.
 - **Microsoft** — add `type: microsoft` per [Dex docs](https://dexidp.io/docs/connectors/microsoft/) with the same `{issuer}/callback` redirect URI and `tenant` in `config`.
 

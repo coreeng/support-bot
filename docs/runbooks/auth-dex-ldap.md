@@ -31,6 +31,50 @@ Exact namespaces and release names depend on your P2P / tenant layout; align Dex
 
 When you add **Google** or **Microsoft** entries under `config.connectors` in Dex values (see [`api/k8s/dex/README.md`](../../api/k8s/dex/README.md)), register **separate** OAuth apps with Google / Entra whose redirect URI is **`{issuer}/callback`** from `config.issuer` (Dex’s callback), not the Support Bot API’s `/login/oauth2/code/...` URLs. Store client IDs and secrets in a private values overlay or pipeline (the dex/dex chart does not substitute `${ENV}` inside `config.yaml`). For Microsoft, set the connector `tenant` field as in Dex’s documentation.
 
+## Enabling LDAPS / StartTLS
+
+By default, all LDAP configurations use **plaintext** on port 389 (`insecureNoSSL: true`, `LDAP_TLS: "false"`). This is acceptable for **local development** and **ephemeral integration** clusters but **must not** be used in production — the LDAP admin `bindPW` and user passwords travel unencrypted.
+
+### Prerequisites
+
+1. A TLS certificate and key for the LDAP server (issued by an internal CA or cert-manager).
+2. A Kubernetes TLS Secret, e.g.:
+   ```bash
+   kubectl create secret tls ldap-tls \
+     --cert=ldap.crt --key=ldap.key -n <namespace>
+   ```
+3. If the CA is private, Dex must trust it (see step 3 below).
+
+### Steps
+
+1. **LDAP chart** — add the TLS overlay when deploying:
+   ```bash
+   helm upgrade --install ldap ./api/k8s/ldap/chart \
+     -f api/k8s/ldap/values-bitnami.yaml \
+     -f api/k8s/ldap/values-tls.yaml \
+     [-f api/k8s/ldap/values-integration.yaml]
+   ```
+   This sets `LDAP_ENABLE_TLS=yes`, exposes LDAPS on **636**, and mounts the cert Secret. See [`api/k8s/ldap/values-tls.yaml`](../../api/k8s/ldap/values-tls.yaml) for all options.
+
+2. **Dex** — layer the TLS overlay so the LDAP connector uses StartTLS (or LDAPS):
+   ```bash
+   helm upgrade --install dex dex/dex \
+     -f api/k8s/dex/values-dexidp.yaml \
+     -f api/k8s/dex/values-integration.yaml \
+     -f api/k8s/dex/values-tls.yaml
+   ```
+   Edit [`api/k8s/dex/values-tls.yaml`](../../api/k8s/dex/values-tls.yaml) to choose between StartTLS (port 389) and LDAPS (port 636), and to set `rootCAData` or `rootCA` if needed.
+
+3. **CA trust for Dex** — if the LDAP cert is signed by a private CA, either:
+   - Set `rootCAData` (base64 PEM) in the Dex connector config, **or**
+   - Mount the CA file into the Dex pod via the chart's `extraVolumes` / `extraVolumeMounts` and set `rootCA: /path/to/ca.crt`.
+
+4. **Verify** — after deploying, check Dex logs for `TLS handshake` success and run a login flow.
+
+### Local development
+
+The Docker Compose setup (`ldap/docker-compose.yaml`) intentionally stays **plaintext** — TLS would require generating certs on every `docker compose up`. This is documented in the compose file and in `dex/config/config.yaml`.
+
 ## Troubleshooting
 
 ### `redirect_uri` / `Unregistered redirect_uri` (Dex)
