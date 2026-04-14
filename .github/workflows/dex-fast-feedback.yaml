@@ -33,7 +33,11 @@ jobs:
     needs: [version]
     uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@v1
     secrets:
-      env_vars: ${{ secrets.env_vars }}
+      env_vars: |
+        ${{ secrets.env_vars }}
+        DEX_CLIENT_ID=${{ secrets.DEX_CLIENT_ID }}
+        DEX_CLIENT_SECRET=${{ secrets.DEX_CLIENT_SECRET }}
+        LDAP_BOOTSTRAP_USER_PASSWORD=${{ secrets.LDAP_BOOTSTRAP_USER_PASSWORD }}
     with:
       app-name: dex
       version: ${{ needs.version.outputs.version }}      
