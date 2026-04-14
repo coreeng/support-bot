@@ -4,6 +4,7 @@ import com.coreeng.supportbot.rating.Rating;
 import com.coreeng.supportbot.rating.RatingButtonInput;
 import com.coreeng.supportbot.rating.RatingRequestMessageMapper;
 import com.coreeng.supportbot.rating.RatingService;
+import com.coreeng.supportbot.rating.RatingTicketNotFoundException;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.SlackBlockActionHandler;
 import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
@@ -51,9 +52,11 @@ public class RatingActionHandler implements SlackBlockActionHandler {
 
     private void handleRatingSubmission(BlockActionPayload.Action action, BlockActionPayload payload) {
         RatingButtonInput input = mapper.parseButtonInput(action.getValue());
-        Rating rating = service.save(input.ticketId(), input.rating());
-        if (rating != null) {
+        try {
+            Rating rating = service.save(input.ticketId(), input.rating());
             sendConfirmationReply(rating, MessageRef.from(payload));
+        } catch (IllegalArgumentException | RatingTicketNotFoundException e) {
+            log.warn("Ignoring invalid rating submission for ticket {}: {}", input.ticketId(), e.getMessage());
         }
     }
 

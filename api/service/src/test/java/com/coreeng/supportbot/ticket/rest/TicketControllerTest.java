@@ -3,7 +3,12 @@ package com.coreeng.supportbot.ticket.rest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.coreeng.supportbot.rating.RatingService;
+import com.coreeng.supportbot.rating.RatingTicketNotFoundException;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
@@ -18,8 +23,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.format.support.DefaultFormattingConversionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @ExtendWith(MockitoExtension.class)
 class TicketControllerTest {
@@ -42,7 +50,11 @@ class TicketControllerTest {
     @Mock
     private TicketEscalationValidator ticketEscalationValidator;
 
+    @Mock
+    private RatingService ratingService;
+
     private TicketController controller;
+    private MockMvc mockMvc;
 
     private TicketId ticketId;
 
@@ -53,13 +65,111 @@ class TicketControllerTest {
                 ticketUpdateService,
                 ticketProcessingService,
                 ticketEscalationValidator,
+                ratingService,
                 mapper,
                 teamSuggestionsService);
+        DefaultFormattingConversionService conversionService = new DefaultFormattingConversionService();
+        conversionService.addFormatter(new TicketIdFormatter());
+        mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setConversionService(conversionService)
+                .build();
         ticketId = new TicketId(123L);
         lenient().when(queryService.findById(ticketId)).thenReturn(mock(Ticket.class));
         lenient()
                 .when(ticketEscalationValidator.validate(any(), any()))
                 .thenReturn(TicketEscalationValidator.ValidationResult.valid());
+    }
+
+    @Test
+    void shouldReturnOkWithEmptyBodyWhenRatingSucceeds() throws Exception {
+        mockMvc.perform(post("/ticket/{id}/rating", ticketId.id())
+                        .contentType("application/json")
+                        .content("""
+                                {"rating":4}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(content().string(""));
+
+        verify(ratingService).save(ticketId, 4);
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenRatingTicketDoesNotExist() throws Exception {
+        doThrow(new RatingTicketNotFoundException(ticketId)).when(ratingService).save(ticketId, 4);
+
+        mockMvc.perform(post("/ticket/{id}/rating", ticketId.id())
+                        .contentType("application/json")
+                        .content("""
+                                {"rating":4}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string(""));
+
+        verify(ratingService).save(ticketId, 4);
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenRatingTicketIsOpened() throws Exception {
+        doThrow(new IllegalArgumentException("Ticket must be closed before rating can be submitted"))
+                .when(ratingService)
+                .save(ticketId, 4);
+
+        mockMvc.perform(post("/ticket/{id}/rating", ticketId.id())
+                        .contentType("application/json")
+                        .content("""
+                                {"rating":4}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Ticket must be closed before rating can be submitted"));
+
+        verify(ratingService).save(ticketId, 4);
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenRatingAlreadyExists() throws Exception {
+        doThrow(new IllegalArgumentException("Ticket has already been rated"))
+                .when(ratingService)
+                .save(ticketId, 4);
+
+        mockMvc.perform(post("/ticket/{id}/rating", ticketId.id())
+                        .contentType("application/json")
+                        .content("""
+                                {"rating":4}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Ticket has already been rated"));
+
+        verify(ratingService).save(ticketId, 4);
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenRatingIsInvalid() throws Exception {
+        doThrow(new IllegalArgumentException("rating must be between 1 and 5"))
+                .when(ratingService)
+                .save(ticketId, 0);
+
+        mockMvc.perform(post("/ticket/{id}/rating", ticketId.id())
+                        .contentType("application/json")
+                        .content("""
+                                {"rating":0}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("rating must be between 1 and 5"));
+
+        verify(ratingService).save(ticketId, 0);
+    }
+
+    @Test
+    void shouldReturnBadRequestWhenRatingIsMissing() throws Exception {
+        mockMvc.perform(post("/ticket/{id}/rating", ticketId.id())
+                        .contentType("application/json")
+                        .content("""
+                                {}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("rating is required"));
+
+        verifyNoInteractions(ratingService);
     }
 
     @Test

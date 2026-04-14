@@ -32,9 +32,7 @@ public interface TicketRepository {
 
     ImmutableList<TicketId> listStaleTicketIdsToRemindOf(Instant checkAt, Duration reminderInterval);
 
-    boolean isTicketRated(TicketId ticketId);
-
-    void markTicketAsRated(TicketId ticketId);
+    boolean tryMarkTicketAsRated(TicketId ticketId);
 
     boolean assign(TicketId ticketId, String slackUserId);
 }
