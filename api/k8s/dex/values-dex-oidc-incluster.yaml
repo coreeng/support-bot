@@ -2,11 +2,13 @@
 # Apply after values-integration.yaml so config.* maps merge; this replaces config.staticClients
 # and config.connectors lists (Helm merges maps; lists replace — include full connector block).
 #
-# Align Support Bot API: DEX_ISSUER_URI must equal config.issuer (iss claim in Dex tokens).
+# Align Support Bot API: DEX_ISSUER_URI and DEX_INTERNAL_BASE_URL must equal config.issuer
+# (iss claim in Dex tokens). Use the full svc FQDN (<svc>.<ns>.svc.cluster.local) so the
+# API's internal-base-url validation does not warn about bare service names.
 # Dex static client must list http://127.0.0.1:8765/callback for the in-cluster Job listener.
 
 config:
-  issuer: http://dex:5556
+  issuer: http://dex.support-bot-integration.svc.cluster.local:5556
   staticClients:
     - id: support-bot-dex
       name: Support Bot
@@ -19,7 +21,7 @@ config:
       id: ldap
       name: LDAP
       config:
-        host: ldap:389
+        host: ldap.support-bot-integration.svc.cluster.local:389
         insecureNoSSL: true
         bindDN: cn=admin,dc=supportbot,dc=local
         bindPW: helm-template-placeholder-ldap-bind

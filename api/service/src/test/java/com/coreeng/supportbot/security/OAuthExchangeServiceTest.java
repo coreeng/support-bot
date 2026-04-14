@@ -134,7 +134,8 @@ class OAuthExchangeServiceTest {
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> service.exchangeCodeForToken("google", "auth-code", "https://evil.example/api/oauth/callback/google"));
+                () -> service.exchangeCodeForToken(
+                        "google", "auth-code", "https://evil.example/api/oauth/callback/google"));
     }
 
     @Test

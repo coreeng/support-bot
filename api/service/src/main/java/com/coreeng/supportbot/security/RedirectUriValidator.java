@@ -72,9 +72,8 @@ public class RedirectUriValidator {
         if (scheme == null || host == null) {
             return "";
         }
-        boolean defaultPort = (port == -1)
-                || ("http".equals(scheme) && port == 80)
-                || ("https".equals(scheme) && port == 443);
+        boolean defaultPort =
+                (port == -1) || ("http".equals(scheme) && port == 80) || ("https".equals(scheme) && port == 443);
         return defaultPort ? scheme + "://" + host : scheme + "://" + host + ":" + port;
     }
 }

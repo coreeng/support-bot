@@ -10,12 +10,15 @@ function oauthCallbackRedirectUri(
   clientRedirectUri: string | undefined
 ): string | null {
   const path = `/api/oauth/callback/${provider}`;
+  const allowedOrigin = getAllowedOrigin();
+
   if (clientRedirectUri) {
     try {
       const u = new URL(clientRedirectUri);
       if (
         u.pathname === path &&
-        (u.protocol === "http:" || u.protocol === "https:")
+        (u.protocol === "http:" || u.protocol === "https:") &&
+        (!allowedOrigin || u.origin === allowedOrigin)
       ) {
         return u.toString();
       }
@@ -23,12 +26,21 @@ function oauthCallbackRedirectUri(
       /* use env fallback */
     }
   }
-  const base = process.env.NEXTAUTH_URL?.trim();
-  if (!base) {
+  if (!allowedOrigin) {
     return null;
   }
   try {
-    return new URL(path, base).toString();
+    return new URL(path, allowedOrigin).toString();
+  } catch {
+    return null;
+  }
+}
+
+function getAllowedOrigin(): string | null {
+  const base = process.env.NEXTAUTH_URL?.trim();
+  if (!base) return null;
+  try {
+    return new URL(base).origin;
   } catch {
     return null;
   }

@@ -1,5 +1,5 @@
 # Integration overrides (dex/dex chart). Merges with values-dexidp.yaml (maps merge; lists here replace).
-# Ingress stays off (see values-dexidp.yaml); reach Dex in-cluster as http://dex:5556 or port-forward.
+# Ingress stays off (see values-dexidp.yaml); reach Dex in-cluster via full svc FQDN or port-forward.
 #
 # IMPORTANT — LDAP connector bindPW below is a TEMPLATE PLACEHOLDER. For a real cluster it MUST equal
 # Secret ldap-secrets key admin-password (same as Bitnami OpenLDAP admin). If you leave the placeholder,
@@ -24,7 +24,7 @@ config:
       id: ldap
       name: LDAP
       config:
-        host: ldap:389
+        host: ldap.support-bot-integration.svc.cluster.local:389
         insecureNoSSL: true          # plaintext — see values-tls.yaml for production
         bindDN: cn=admin,dc=supportbot,dc=local
         bindPW: helm-template-placeholder-ldap-bind

@@ -35,11 +35,11 @@ spec:
               mountPath: /tmp
           env:
             - name: DEX_HOST
-              value: "dex"
+              value: "dex.support-bot-integration.svc.cluster.local"
             - name: DEX_TELEMETRY_PORT
               value: "5558"
             - name: LDAP_HOST
-              value: "ldap"
+              value: "ldap.support-bot-integration.svc.cluster.local"
             - name: LDAP_PORT
               value: "389"
             - name: LDAP_BIND_DN

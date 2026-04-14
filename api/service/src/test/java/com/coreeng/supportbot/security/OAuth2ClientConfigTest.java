@@ -1,8 +1,10 @@
 package com.coreeng.supportbot.security;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
@@ -82,5 +84,66 @@ class OAuth2ClientConfigTest {
                 "");
 
         assertNull(repository.findByRegistrationId("dex"));
+    }
+
+    @Test
+    void dexRegistrationUsesInternalBaseUrl_whenValid() {
+        var repository = config.clientRegistrationRepository(
+                testSecurity(),
+                "",
+                "",
+                "",
+                "",
+                "",
+                "dex-client-id",
+                "dex-client-secret",
+                "openid,email,profile,groups",
+                "https://dex.example.com",
+                "http://dex:5556");
+
+        var dex = repository.findByRegistrationId("dex");
+        assertNotNull(dex);
+        assertEquals("http://dex:5556/token", dex.getProviderDetails().getTokenUri());
+        assertEquals("http://dex:5556/keys", dex.getProviderDetails().getJwkSetUri());
+    }
+
+    @Test
+    void dexRegistrationRejectsInternalBaseUrl_withBadScheme() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> config.clientRegistrationRepository(
+                        testSecurity(),
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "dex-client-id",
+                        "dex-client-secret",
+                        "openid,email,profile,groups",
+                        "https://dex.example.com",
+                        "ftp://dex:5556"));
+    }
+
+    @Test
+    void dexRegistrationAcceptsClusterLocalInternalUrl() {
+        var repository = config.clientRegistrationRepository(
+                testSecurity(),
+                "",
+                "",
+                "",
+                "",
+                "",
+                "dex-client-id",
+                "dex-client-secret",
+                "openid,email,profile,groups",
+                "https://dex.example.com",
+                "http://dex.my-namespace.svc.cluster.local:5556");
+
+        var dex = repository.findByRegistrationId("dex");
+        assertNotNull(dex);
+        assertEquals(
+                "http://dex.my-namespace.svc.cluster.local:5556/token",
+                dex.getProviderDetails().getTokenUri());
     }
 }

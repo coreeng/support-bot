@@ -13,8 +13,8 @@ The **dex/dex** chart creates **namespace** `Role` + `RoleBinding` for `dex.core
 ## Files
 
 - `values-dexidp.yaml` — baseline: issuer, sqlite storage, web/telemetry ports, static client, optional empty `connectors: []`, namespaced RBAC only (`rbac.createClusterScoped: false`).
-- `values-integration.yaml` — sample integration overrides (issuer, LDAP connector to `ldap:389`, resource bumps). Ingress is **off** by default; use in-cluster `http://dex:5556` or port-forward.
-- `values-dex-oidc-incluster.yaml` — optional Tier 2 overlay: `config.issuer: http://dex:5556`, static client redirect `http://127.0.0.1:8765/callback`, full LDAP connector (list replace-safe). Use when the API and integration Job talk to Dex only in-cluster and `DEX_ISSUER_URI` is `http://dex:5556`.
+- `values-integration.yaml` — sample integration overrides (issuer, LDAP connector using full svc FQDN, resource bumps). Ingress is **off** by default; reach Dex via full svc FQDN or port-forward.
+- `values-dex-oidc-incluster.yaml` — optional Tier 2 overlay: in-cluster issuer with full svc FQDN, static client redirect `http://127.0.0.1:8765/callback`, full LDAP connector (list replace-safe). Use when the API and integration Job talk to Dex only in-cluster; set `DEX_ISSUER_URI` and `DEX_INTERNAL_BASE_URL` to the same FQDN.
 - `values-legacy-core-platform-app.yaml` — archived `core-platform-app` + templated `config.yaml` with `${DEX_*}` placeholders.
 
 Baseline **`values-dexidp.yaml`** sets **`enablePasswordDB: false`** (connectors only). Add LDAP / Google / Microsoft under `config.connectors` via `values-integration.yaml` or another overlay, or set `enablePasswordDB: true` and `staticPasswords` in a private overlay if you need Dex’s built-in email login.
@@ -44,7 +44,7 @@ helm upgrade --install support-bot-dex dex/dex --version 0.24.0 \
   -f api/k8s/dex/values-integration.yaml
 ```
 
-**Tier 2 OIDC Job** (in-cluster issuer aligned with `DEX_ISSUER_URI=http://dex:5556`):
+**Tier 2 OIDC Job** (in-cluster issuer aligned with `DEX_ISSUER_URI` and `DEX_INTERNAL_BASE_URL` using full svc FQDN):
 
 ```bash
 helm upgrade --install support-bot-dex dex/dex --version 0.24.0 \
@@ -65,7 +65,7 @@ The default `values-integration.yaml` uses **`insecureNoSSL: true`** (plaintext 
 
 ## Connectors: LDAP, Google, Microsoft
 
-- **LDAP** — `values-integration.yaml` shows a connector matching the Bitnami/OpenLDAP DIT (`ldap:389`, `cn=admin,dc=supportbot,dc=local`, group search for `groupOfUniqueNames`). For TLS, see the section above. JWT `groups` for Support Bot `jwt-groups` depends on this connector and Dex scopes.
+- **LDAP** — `values-integration.yaml` shows a connector matching the Bitnami/OpenLDAP DIT (full svc FQDN on port 389, `cn=admin,dc=supportbot,dc=local`, group search for `groupOfUniqueNames`). For TLS, see the section above. JWT `groups` for Support Bot `jwt-groups` depends on this connector and Dex scopes.
 - **Google** — add a `connectors` entry with `type: google` per [Dex docs](https://dexidp.io/docs/connectors/google/). Register a **Web** OAuth client whose redirect URI is **`{issuer}/callback`** (e.g. `https://dex.example.com/callback`), not the API’s `/login/oauth2/code/...` URL.
 - **Microsoft** — add `type: microsoft` per [Dex docs](https://dexidp.io/docs/connectors/microsoft/) with the same `{issuer}/callback` redirect URI and `tenant` in `config`.
 
@@ -75,13 +75,14 @@ User-facing SSO against Dex uses the **Dex** OAuth2 registration on the API (`DE
 
 ## Integration deploy order (with LDAP)
 
-Deploy **LDAP** first so the Service exists, then Dex with LDAP `host` pointing at that Service (`ldap:389` when colocated). Deploy or upgrade the **Support Bot API** after Dex with matching `DEX_*` env vars. See [docs/runbooks/auth-dex-ldap.md](../../../docs/runbooks/auth-dex-ldap.md).
+Deploy **LDAP** first so the Service exists, then Dex with LDAP `host` pointing at that Service (full svc FQDN on port 389 when colocated). Deploy or upgrade the **Support Bot API** after Dex with matching `DEX_*` env vars. See [docs/runbooks/auth-dex-ldap.md](../../../docs/runbooks/auth-dex-ldap.md).
 
 ## Support Bot API wiring
 
 - `DEX_CLIENT_ID` = `config.staticClients[].id` (e.g. `support-bot-dex`).
 - `DEX_CLIENT_SECRET` = same value as `config.staticClients[].secret`.
 - `DEX_ISSUER_URI` = `config.issuer`.
+- `DEX_INTERNAL_BASE_URL` (optional) = in-cluster base URL for token/keys/userinfo. Use the full svc FQDN (e.g. `http://dex.<namespace>.svc.cluster.local:5556`) so the API startup validation accepts it without warnings. If unset, `DEX_ISSUER_URI` is used.
 
 Dex `staticClients.redirectURIs` must include `https://<api-host>/login/oauth2/code/dex` (and localhost variants for dev).
 

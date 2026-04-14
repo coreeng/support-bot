@@ -58,13 +58,13 @@ Log markers: `OK_TOKEN`, `OK_GROUPS`, `OK_API`, `OK_ALL`.
 ### Prerequisites
 
 1. Same namespace and kube context as Tier 1 ([`integration-test-local.yaml`](src/test/resources/integration-test-local.yaml)).
-2. **Dex** installed with issuer **identical** to the API’s `DEX_ISSUER_URI`. For in-cluster Jobs and Services, use the optional overlay [`values-dex-oidc-incluster.yaml`](../k8s/dex/values-dex-oidc-incluster.yaml) so `config.issuer` is `http://dex:5556` and apply after [`values-integration.yaml`](../k8s/dex/values-integration.yaml) (see [`api/k8s/dex/README.md`](../k8s/dex/README.md)). [`values-integration.yaml`](../k8s/dex/values-integration.yaml) also registers `http://127.0.0.1:8765/callback` on the static client.
-3. **Support Bot API** deployed for integration tests with **OIDC** env and profiles, e.g. Helm values [`values-integrationtests-oidc.yaml`](../k8s/service/values-integrationtests-oidc.yaml) (`SPRING_PROFILES_ACTIVE=integrationtests,integrationtests-oidc`, `DEX_*`, test-bypass off). `DEX_ISSUER_URI` must match Dex `config.issuer` (e.g. `http://dex:5556`).
+2. **Dex** installed with issuer **identical** to the API’s `DEX_ISSUER_URI`. For in-cluster Jobs and Services, use the optional overlay [`values-dex-oidc-incluster.yaml`](../k8s/dex/values-dex-oidc-incluster.yaml) so `config.issuer` uses the full svc FQDN (e.g. `http://dex.support-bot-integration.svc.cluster.local:5556`) and apply after [`values-integration.yaml`](../k8s/dex/values-integration.yaml) (see [`api/k8s/dex/README.md`](../k8s/dex/README.md)). [`values-integration.yaml`](../k8s/dex/values-integration.yaml) also registers `http://127.0.0.1:8765/callback` on the static client.
+3. **Support Bot API** deployed for integration tests with **OIDC** env and profiles, e.g. Helm values [`values-integrationtests-oidc.yaml`](../k8s/service/values-integrationtests-oidc.yaml) (`SPRING_PROFILES_ACTIVE=integrationtests,integrationtests-oidc`, `DEX_*`, test-bypass off). `DEX_ISSUER_URI` and `DEX_INTERNAL_BASE_URL` must match Dex `config.issuer`.
 4. **Secrets** in that namespace:
    - `dex-secrets` with keys **`client-id`** and **`client-secret`** (same as Dex `staticClients` for `support-bot-dex`).
    - **`integration-ldap-test-user`** with key **`password`**: plaintext password for `alice@supportbot.local`. It must **match** the password used when LDAP bootstrap **`20-users.ldif`** was rendered (`LDAP_BOOTSTRAP_USER_PASSWORD` — for integration, set from a **GitHub Actions secret** and use the same value for `kubectl create secret generic integration-ldap-test-user --from-literal=password="$SECRET" -n <namespace>`). See [`ldap/README.md`](../../ldap/README.md).
 
-The Job assumes cluster DNS names **`dex`**, **`ldap`**, and **`support-bot`** on port **8080**; adjust the Job manifest if your release names differ.
+The Job uses full svc FQDNs for **`dex`**, **`ldap`**, and **`support-bot`** in the `support-bot-integration` namespace; adjust the Job manifest if your release names or namespace differ.
 
 ### How to run
 

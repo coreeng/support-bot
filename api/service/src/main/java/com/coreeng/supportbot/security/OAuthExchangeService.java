@@ -210,17 +210,18 @@ public class OAuthExchangeService {
             throws Exception {
         String jwksUri = registration.getProviderDetails().getJwkSetUri();
         if (jwksUri == null || jwksUri.isBlank()) {
-            log.debug("No JWKS URI for provider {} — falling back to unverified parse", registration.getRegistrationId());
+            log.debug(
+                    "No JWKS URI for provider {} — falling back to unverified parse", registration.getRegistrationId());
             return SignedJWT.parse(idToken).getJWTClaimsSet().getClaims();
         }
 
-        JWKSource<SecurityContext> jwkSource = JWKSourceBuilder.create(URI.create(jwksUri).toURL()).build();
+        JWKSource<SecurityContext> jwkSource =
+                JWKSourceBuilder.create(URI.create(jwksUri).toURL()).build();
         var jwtProcessor = new DefaultJWTProcessor<SecurityContext>();
 
         // Accept common signing algorithms — the JWKS key selector picks the right one
         var keySelector = new JWSVerificationKeySelector<>(
-                Set.of(JWSAlgorithm.RS256, JWSAlgorithm.RS384, JWSAlgorithm.RS512, JWSAlgorithm.ES256),
-                jwkSource);
+                Set.of(JWSAlgorithm.RS256, JWSAlgorithm.RS384, JWSAlgorithm.RS512, JWSAlgorithm.ES256), jwkSource);
         jwtProcessor.setJWSKeySelector(keySelector);
 
         // Require iss and aud; verify aud matches client_id

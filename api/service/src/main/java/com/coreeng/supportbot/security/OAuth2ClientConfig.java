@@ -1,9 +1,11 @@
 package com.coreeng.supportbot.security;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -109,13 +111,10 @@ public class OAuth2ClientConfig {
                 issuerUri.endsWith("/") ? issuerUri.substring(0, issuerUri.length() - 1) : issuerUri;
         // Browser redirects use the external ingress URL; server-to-server calls
         // (/token, /userinfo, /keys) use the in-cluster URL when provided to bypass IAP.
-        String serverBaseUrl = isNotBlank(internalBaseUrl)
-                ? (internalBaseUrl.endsWith("/")
-                        ? internalBaseUrl.substring(0, internalBaseUrl.length() - 1)
-                        : internalBaseUrl)
-                : normalizedIssuerUri;
+        String validatedInternalUrl = validateInternalBaseUrl(internalBaseUrl);
+        String serverBaseUrl = validatedInternalUrl != null ? validatedInternalUrl : normalizedIssuerUri;
         if (!serverBaseUrl.equals(normalizedIssuerUri)) {
-            log.info("Dex server-to-server calls will use internal URL: {}", serverBaseUrl);
+            log.debug("Dex server-to-server calls will use internal URL: {}", serverBaseUrl);
         }
         return ClientRegistration.withRegistrationId("dex")
                 .clientId(clientId)
@@ -131,6 +130,51 @@ public class OAuth2ClientConfig {
                 .userNameAttributeName(IdTokenClaimNames.SUB)
                 .clientName("Dex")
                 .build();
+    }
+
+    private static final Set<String> ALLOWED_INTERNAL_SCHEMES = Set.of("http", "https");
+
+    /**
+     * Validates dexInternalBaseUrl: the client_secret is sent to this URL, so a misconfigured value
+     * (typo, attacker-controlled) would exfiltrate it. We enforce scheme and warn on non-cluster hosts.
+     *
+     * @return the normalized URL (no trailing slash), or {@code null} if blank/invalid
+     */
+    @org.jspecify.annotations.Nullable private static String validateInternalBaseUrl(String internalBaseUrl) {
+        if (!isNotBlank(internalBaseUrl)) {
+            return null;
+        }
+        String normalized = internalBaseUrl.endsWith("/")
+                ? internalBaseUrl.substring(0, internalBaseUrl.length() - 1)
+                : internalBaseUrl;
+        try {
+            URI uri = URI.create(normalized);
+            if (uri.getScheme() == null || !ALLOWED_INTERNAL_SCHEMES.contains(uri.getScheme())) {
+                throw new IllegalArgumentException(
+                        "dex internal-base-url must use http or https scheme, got: " + uri.getScheme());
+            }
+            if (uri.getHost() == null || uri.getHost().isBlank()) {
+                throw new IllegalArgumentException("dex internal-base-url has no host: " + normalized);
+            }
+            String host = uri.getHost();
+            if (!host.equals("localhost")
+                    && !host.equals("127.0.0.1")
+                    && !host.endsWith(".svc.cluster.local")
+                    && !host.matches("^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$")) {
+                log.warn(
+                        "dex internal-base-url host '{}' does not look like a Kubernetes service name or"
+                                + " cluster-local address — verify this is intentional to avoid leaking"
+                                + " the client secret to an external host",
+                        host);
+            }
+            return normalized;
+        } catch (IllegalArgumentException e) {
+            String msg = e.getMessage();
+            if (msg != null && msg.startsWith("dex internal-base-url")) {
+                throw e;
+            }
+            throw new IllegalArgumentException("dex internal-base-url is not a valid URI: " + normalized, e);
+        }
     }
 
     /**

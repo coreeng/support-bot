@@ -316,6 +316,7 @@ Set these on the **API**:
 | `DEX_CLIENT_ID` | Dex OAuth2 client ID. Leave empty to disable Dex SSO.                                                                                     |
 | `DEX_CLIENT_SECRET` | Dex OAuth2 client secret.                                                                                                              |
 | `DEX_ISSUER_URI` | Dex OIDC issuer URI, for example `https://dex.example.com/dex`.                                                                         |
+| `DEX_INTERNAL_BASE_URL` | Optional in-cluster base URL for server-to-server calls (`/token`, `/keys`, `/userinfo`). The `client_secret` is sent here, so use a trusted address — preferably the full svc FQDN, e.g. `http://dex.<namespace>.svc.cluster.local:5556`. If unset, `DEX_ISSUER_URI` is used for both browser and server-to-server. |
 | `DEX_SCOPES` | Optional comma-separated scopes used for Dex login. Defaults to `openid,email,profile,groups`.                                            |
 
 ### Login provider allowlist (`security.oauth2.login-providers`)
@@ -388,6 +389,7 @@ For Kubernetes deployment values (platform chart), see [`api/k8s/dex/README.md`]
    - `DEX_CLIENT_ID`
    - `DEX_CLIENT_SECRET`
    - `DEX_ISSUER_URI`
+   - `DEX_INTERNAL_BASE_URL` (optional) — in-cluster URL for token/keys/userinfo. Use the full svc FQDN (`http://dex.<ns>.svc.cluster.local:5556`). If omitted, `DEX_ISSUER_URI` is used for server-to-server calls too.
 3. Configure redirect URIs in Dex:
    - `http://localhost:8080/login/oauth2/code/dex`
    - `https://<your-api-domain>/login/oauth2/code/dex`

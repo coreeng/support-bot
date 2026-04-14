@@ -19,12 +19,13 @@ config:
       name: LDAP
       config:
         # --- Option A: StartTLS (upgrades plain 389 → TLS after STARTTLS handshake) ---
-        host: ldap:389
+        # Use full svc FQDN: ldap.<namespace>.svc.cluster.local
+        host: ldap.support-bot-integration.svc.cluster.local:389
         insecureNoSSL: false
         startTLS: true
 
         # --- Option B: LDAPS (direct TLS on port 636) ---
-        # host: ldap:636
+        # host: ldap.support-bot-integration.svc.cluster.local:636
         # insecureNoSSL: false
         # startTLS: false
 
