@@ -375,12 +375,15 @@ monitoring-deploy: ## Deploy monitoring stack (Prometheus + Grafana) for support
 
 ##@ Dex module lifecycle (implemented in dex/Makefile)
 
-.PHONY: dex-template dex-deploy-integration dex-deploy-prod
+.PHONY: dex-template dex-deploy-integration dex-deploy-integration-oidc dex-deploy-prod
 dex-template: ## Validate Dex values by rendering dex/dex chart
 	@$(MAKE) -C dex template
 
 dex-deploy-integration: ## Deploy Dex module to integration environment
 	@$(MAKE) -C dex deploy-integration
+
+dex-deploy-integration-oidc: ## Deploy Dex with OIDC in-cluster overlay (Tier 2 tests)
+	@$(MAKE) -C dex deploy-integration-oidc
 
 dex-deploy-prod: ## Deploy Dex module to production environment
 	@$(MAKE) -C dex deploy-prod

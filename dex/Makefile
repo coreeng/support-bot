@@ -38,6 +38,10 @@ template: ## Validate Dex values by rendering dex/dex chart (charts.dexidp.io)
 deploy-integration: ## Deploy Dex module to integration environment
 	@DEX_CHART_VERSION="$(DEX_CHART_VERSION)" DRY_RUN="$(DRY_RUN)" bash ./scripts/helm_dex.sh deploy-integration
 
+.PHONY: deploy-integration-oidc
+deploy-integration-oidc: ## Deploy Dex with OIDC in-cluster overlay (Tier 2 integration tests)
+	@DEX_CHART_VERSION="$(DEX_CHART_VERSION)" DRY_RUN="$(DRY_RUN)" bash ./scripts/helm_dex.sh deploy-integration-oidc
+
 # .PHONY: deploy-prod
 # deploy-prod: ## Deploy Dex module to production environment
 # 	@DEX_CHART_VERSION="$(DEX_CHART_VERSION)" bash ./scripts/helm_dex.sh deploy-prod
