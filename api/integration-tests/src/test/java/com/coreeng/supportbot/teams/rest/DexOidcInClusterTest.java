@@ -31,9 +31,9 @@ import org.slf4j.LoggerFactory;
 @Tag("oidc")
 @Order(3)
 @DisabledIfEnvironmentVariable(named = "DISABLE_INTEGRATION_LDAP_DEX_TESTS", matches = "true")
-public class DexOidcInClusterIT {
+public class DexOidcInClusterTest {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(DexOidcInClusterIT.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(DexOidcInClusterTest.class);
 
     private static final String JOB_TEMPLATE_RESOURCE = "k8s/dex-ldap-oidc-job.yaml";
     private static final String OIDC_SCRIPT_RESOURCE = "k8s/dex-ldap-oidc-flow.py";
@@ -86,7 +86,7 @@ public class DexOidcInClusterIT {
     }
 
     private static String loadClasspathResource(String resourcePath) throws IOException {
-        try (InputStream in = DexOidcInClusterIT.class.getClassLoader().getResourceAsStream(resourcePath)) {
+        try (InputStream in = DexOidcInClusterTest.class.getClassLoader().getResourceAsStream(resourcePath)) {
             if (in == null) {
                 throw new IllegalStateException("Classpath resource not found: " + resourcePath);
             }
@@ -95,7 +95,7 @@ public class DexOidcInClusterIT {
     }
 
     private static String loadJobTemplate(String name, String namespace, String cmName) throws IOException {
-        try (InputStream in = DexOidcInClusterIT.class.getClassLoader().getResourceAsStream(JOB_TEMPLATE_RESOURCE)) {
+        try (InputStream in = DexOidcInClusterTest.class.getClassLoader().getResourceAsStream(JOB_TEMPLATE_RESOURCE)) {
             if (in == null) {
                 throw new IllegalStateException("Classpath resource not found: " + JOB_TEMPLATE_RESOURCE);
             }

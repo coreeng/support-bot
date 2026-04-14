@@ -27,9 +27,9 @@ import org.slf4j.LoggerFactory;
 @Tag("ldap-infra")
 @Order(1)
 @DisabledIfEnvironmentVariable(named = "DISABLE_INTEGRATION_LDAP_DEX_TESTS", matches = "true")
-public class DexLdapInfraIT {
+public class DexLdapInfraTest {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(DexLdapInfraIT.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(DexLdapInfraTest.class);
 
     private static final String JOB_TEMPLATE_RESOURCE = "k8s/dex-ldap-infra-job.yaml";
 
@@ -74,7 +74,7 @@ public class DexLdapInfraIT {
     }
 
     private static String loadJobTemplate(String name, String namespace) throws IOException {
-        try (InputStream in = DexLdapInfraIT.class.getClassLoader().getResourceAsStream(JOB_TEMPLATE_RESOURCE)) {
+        try (InputStream in = DexLdapInfraTest.class.getClassLoader().getResourceAsStream(JOB_TEMPLATE_RESOURCE)) {
             if (in == null) {
                 throw new IllegalStateException("Classpath resource not found: " + JOB_TEMPLATE_RESOURCE);
             }
