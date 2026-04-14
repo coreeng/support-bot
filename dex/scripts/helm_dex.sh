@@ -18,25 +18,35 @@ template)
 		-f "${DEX_K8S}/values-dexidp.yaml" \
 		-f "${DEX_K8S}/values-integration.yaml" >/dev/null
 	;;
-deploy-integration)
+deploy-integration|deploy-integration-oidc)
+	NAMESPACE="${NAMESPACE:?Set NAMESPACE}"
+
+	echo "Ensuring K8s secret dex-secrets (client-id, client-secret)..."
+	kubectl create secret generic dex-secrets \
+		--from-literal=client-id="${DEX_CLIENT_ID:?Set DEX_CLIENT_ID}" \
+		--from-literal=client-secret="${DEX_CLIENT_SECRET:?Set DEX_CLIENT_SECRET}" \
+		-n "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+
 	extra=()
 	if [[ -n "${DRY_RUN:-}" ]]; then
 		extra+=(--dry-run=client --debug)
 	fi
-	helm upgrade --install support-bot-dex "${CHART_REPO_NAME}/${CHART_NAME}" --version "${CHART_VERSION}" \
-		-f "${DEX_K8S}/values-dexidp.yaml" \
-		-f "${DEX_K8S}/values-integration.yaml" \
-		"${extra[@]}"
-	;;
-deploy-integration-oidc)
-	extra=()
-	if [[ -n "${DRY_RUN:-}" ]]; then
-		extra+=(--dry-run=client --debug)
+
+	values_files=(
+		-f "${DEX_K8S}/values-dexidp.yaml"
+		-f "${DEX_K8S}/values-integration.yaml"
+	)
+	if [[ "${OP}" == "deploy-integration-oidc" ]]; then
+		values_files+=(-f "${DEX_K8S}/values-dex-oidc-incluster.yaml")
 	fi
+
+	LDAP_BIND_PW="${LDAP_BOOTSTRAP_USER_PASSWORD:?Set LDAP_BOOTSTRAP_USER_PASSWORD}"
+
 	helm upgrade --install support-bot-dex "${CHART_REPO_NAME}/${CHART_NAME}" --version "${CHART_VERSION}" \
-		-f "${DEX_K8S}/values-dexidp.yaml" \
-		-f "${DEX_K8S}/values-integration.yaml" \
-		-f "${DEX_K8S}/values-dex-oidc-incluster.yaml" \
+		-n "${NAMESPACE}" \
+		"${values_files[@]}" \
+		--set-string "config.staticClients[0].secret=${DEX_CLIENT_SECRET}" \
+		--set-string "config.connectors[0].config.bindPW=${LDAP_BIND_PW}" \
 		"${extra[@]}"
 	;;
 *)

@@ -66,6 +66,8 @@ env:
     value: "http://dex.support-bot-integration.svc.cluster.local:5556"
   - name: DEX_SCOPES
     value: "openid,email,profile,groups"
+  - name: UI_ORIGIN
+    value: "http://127.0.0.1:8765"
 
 monitoring:
   enabled: true

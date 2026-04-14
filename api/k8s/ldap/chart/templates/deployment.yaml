@@ -16,26 +16,14 @@ spec:
         app.kubernetes.io/name: {{ include "support-bot-openldap.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1001
-        runAsGroup: 1001
-        fsGroup: 1001
-        seccompProfile:
-          type: RuntimeDefault
       containers:
         - name: openldap
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: ["ALL"]
           ports:
             {{- if .Values.service.port }}
             - name: ldap
-              containerPort: {{ .Values.service.port }}
+              containerPort: {{ .Values.service.containerPort | default 1389 }}
               protocol: TCP
             {{- end }}
             {{- if and .Values.tls.enabled .Values.tls.port }}
@@ -44,6 +32,8 @@ spec:
               protocol: TCP
             {{- end }}
           env:
+            - name: BITNAMI_DEBUG
+              value: "true"
             - name: LDAP_ROOT
               value: {{ .Values.ldapRoot | quote }}
             - name: LDAP_ADMIN_USERNAME
@@ -54,7 +44,7 @@ spec:
                   name: {{ .Values.existingSecret | quote }}
                   key: {{ .Values.existingSecretPasswordKey | quote }}
             - name: LDAP_PORT_NUMBER
-              value: {{ .Values.service.port | toString | quote }}
+              value: {{ .Values.service.containerPort | default 1389 | toString | quote }}
             - name: LDAP_CUSTOM_LDIF_DIR
               value: /ldifs
             {{- if .Values.tls.enabled }}

@@ -5,13 +5,16 @@ fullnameOverride: ""
 
 image:
   repository: bitnami/openldap
-  tag: "2.6"
+  tag: "2.6.10"
   pullPolicy: IfNotPresent
 
 service:
   type: ClusterIP
-  # Plain LDAP port. Set to 0 and enable tls.port to go LDAPS-only.
+  # External Service port exposed to consumers.
   port: 389
+  # Container/slapd port. Bitnami default for non-root is 1389.
+  # K8s Service maps service.port → service.containerPort.
+  containerPort: 1389
 
 # TLS / LDAPS (disabled by default — plaintext LDAP for local-dev only).
 # For integration / production, enable TLS and supply a cert Secret.

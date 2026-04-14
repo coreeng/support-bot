@@ -29,18 +29,24 @@ down-local: ## Stop local Dex
 ##@ Dex module lifecycle (Helm / dexidp dex chart)
 
 DEX_CHART_VERSION ?= 0.24.0
+NAMESPACE ?= support-bot-integration
+DRY_RUN ?=
 
 .PHONY: template
 template: ## Validate Dex values by rendering dex/dex chart (charts.dexidp.io)
 	@DEX_CHART_VERSION="$(DEX_CHART_VERSION)" bash ./scripts/helm_dex.sh template
 
 .PHONY: deploy-integration
-deploy-integration: ## Deploy Dex module to integration environment
-	@DEX_CHART_VERSION="$(DEX_CHART_VERSION)" DRY_RUN="$(DRY_RUN)" bash ./scripts/helm_dex.sh deploy-integration
+deploy-integration: ## Deploy Dex module to integration environment (sources .env.local if present)
+	@bash -c 'set -eo pipefail; cd "$(CURDIR)"; \
+	if [[ -f .env.local ]]; then set -a; source .env.local; set +a; fi; \
+	NAMESPACE="$(NAMESPACE)" DEX_CHART_VERSION="$(DEX_CHART_VERSION)" DRY_RUN="$(DRY_RUN)" bash ./scripts/helm_dex.sh deploy-integration'
 
 .PHONY: deploy-integration-oidc
-deploy-integration-oidc: ## Deploy Dex with OIDC in-cluster overlay (Tier 2 integration tests)
-	@DEX_CHART_VERSION="$(DEX_CHART_VERSION)" DRY_RUN="$(DRY_RUN)" bash ./scripts/helm_dex.sh deploy-integration-oidc
+deploy-integration-oidc: ## Deploy Dex with OIDC in-cluster overlay (sources .env.local if present)
+	@bash -c 'set -eo pipefail; cd "$(CURDIR)"; \
+	if [[ -f .env.local ]]; then set -a; source .env.local; set +a; fi; \
+	NAMESPACE="$(NAMESPACE)" DEX_CHART_VERSION="$(DEX_CHART_VERSION)" DRY_RUN="$(DRY_RUN)" bash ./scripts/helm_dex.sh deploy-integration-oidc'
 
 # .PHONY: deploy-prod
 # deploy-prod: ## Deploy Dex module to production environment

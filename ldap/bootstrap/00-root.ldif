@@ -1,0 +1,6 @@
+dn: dc=supportbot,dc=local
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+dc: supportbot
+o: Support Bot

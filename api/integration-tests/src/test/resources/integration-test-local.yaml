@@ -8,8 +8,8 @@ service:
   deployment:
     name: support-bot
   image:
-    repository: support-bot
-    tag: latest
+    repository: europe-west2-docker.pkg.dev/core-platform-efb3c84c/tenant/support-bot/fast-feedback/support-bot
+    tag: 0.0.156-9aba3de0a2a101e6a98d4142caee5ee7b20d66b3
 portForwarding:
   enabled: true
   localPort: 8080

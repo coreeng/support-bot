@@ -40,9 +40,14 @@ render-bootstrap-users: apply-bootstrap-users-ldif ## Generate bootstrap/20-user
 template: ## Validate LDAP chart (support-bot-openldap) with values-bitnami + integration overlay
 	@bash ./scripts/helm_ldap.sh template
 
+NAMESPACE ?= support-bot-integration
+DRY_RUN ?=
+
 .PHONY: deploy-integration
-deploy-integration: ## Deploy LDAP module to integration environment
-	@DRY_RUN="$(DRY_RUN)" bash ./scripts/helm_ldap.sh deploy-integration
+deploy-integration: ## Deploy LDAP module to integration environment (sources .env.local if present)
+	@bash -c 'set -eo pipefail; cd "$(CURDIR)"; \
+		if [[ -f .env.local ]]; then set -a; source .env.local; set +a; fi; \
+		NAMESPACE="$(NAMESPACE)" DRY_RUN="$(DRY_RUN)" bash ./scripts/helm_ldap.sh deploy-integration'
 
 .PHONY: sync-bootstrap-into-chart
 sync-bootstrap-into-chart: ## Render 20-users.ldif then copy ldap/bootstrap/*.ldif into api/k8s/ldap/chart/files/bootstrap/

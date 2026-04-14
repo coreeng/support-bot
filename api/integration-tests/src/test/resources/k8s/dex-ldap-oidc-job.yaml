@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/component: integration-oidc
     app.kubernetes.io/name: support-bot-dex-ldap-oidc
 spec:
-  ttlSecondsAfterFinished: 300
+  ttlSecondsAfterFinished: 120
   backoffLimit: 2
   template:
     spec:
@@ -34,7 +34,7 @@ spec:
             - name: DEX_ISSUER_URI
               value: "http://dex.support-bot-integration.svc.cluster.local:5556"
             - name: REDIRECT_URI
-              value: "http://127.0.0.1:8765/callback"
+              value: "http://127.0.0.1:8765/api/oauth/callback/dex"
             - name: CALLBACK_PORT
               value: "8765"
             - name: API_BASE_URL

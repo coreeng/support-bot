@@ -14,7 +14,7 @@ config:
       name: Support Bot
       secret: helm-template-placeholder-client-secret
       redirectURIs:
-        - http://127.0.0.1:8765/callback
+        - http://127.0.0.1:8765/api/oauth/callback/dex
         - https://support-bot-api.integration.example.com/login/oauth2/code/dex
   connectors:
     - type: ldap
@@ -28,7 +28,7 @@ config:
         usernamePrompt: Email Address
         userSearch:
           baseDN: ou=People,dc=supportbot,dc=local
-          filter: "(objectClass=posixAccount)"
+          filter: "(objectClass=inetOrgPerson)"
           username: mail
           idAttr: uid
           emailAttr: mail

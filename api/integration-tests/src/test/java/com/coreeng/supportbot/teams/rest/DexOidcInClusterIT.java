@@ -53,13 +53,7 @@ public class DexOidcInClusterIT {
     @AfterAll
     static void cleanup() {
         try {
-            if (kubernetesClient != null && config != null) {
-                if (jobName != null) {
-                    kubernetesClient.deleteJob(jobName, config.namespace());
-                }
-                if (configMapName != null) {
-                    kubernetesClient.deleteConfigMap(configMapName, config.namespace());
-                }
+            if (kubernetesClient != null) {
                 kubernetesClient.close();
             }
         } catch (Exception e) {
@@ -74,9 +68,14 @@ public class DexOidcInClusterIT {
 
         String yaml = loadJobTemplate(jobName, config.namespace(), configMapName);
         kubernetesClient.applyYamlManifest(yaml, config.namespace());
-        kubernetesClient.waitUntilJobComplete(jobName, config.namespace());
-        String logs = kubernetesClient.getJobPodLogs(jobName, config.namespace());
-        LOGGER.info("Dex LDAP OIDC Job logs:\n{}", logs);
+
+        String logs;
+        try {
+            kubernetesClient.waitUntilJobComplete(jobName, config.namespace());
+        } finally {
+            logs = kubernetesClient.getJobPodLogs(jobName, config.namespace());
+            LOGGER.info("Dex LDAP OIDC Job logs:\n{}", logs);
+        }
 
         assertThat(logs).contains("OK_TOKEN");
         assertThat(logs).contains("OK_GROUPS");
