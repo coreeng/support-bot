@@ -5,17 +5,28 @@ import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
 import com.google.common.collect.ImmutableList;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.jwk.source.JWKSourceBuilder;
+import com.nimbusds.jose.proc.JWSVerificationKeySelector;
+import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import java.text.ParseException;
+import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
+import com.nimbusds.jwt.proc.DefaultJWTProcessor;
+import java.net.URI;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -38,8 +49,11 @@ public class OAuthExchangeService {
     private final SupportTeamService supportTeamService;
     private final AllowListService allowListService;
     private final JwtGroupTeamMerger jwtGroupTeamMerger;
+    private final RedirectUriValidator redirectUriValidator;
 
     public String exchangeCodeForToken(String provider, String code, String redirectUri) {
+        redirectUriValidator.validate(redirectUri);
+
         var registration = clientRegistrationRepository.findByRegistrationId(provider);
         if (registration == null) {
             throw new IllegalArgumentException("Unknown OAuth provider: " + provider);
@@ -85,19 +99,20 @@ public class OAuthExchangeService {
 
             var userInfo = new HashMap<>(userInfoResponse.getBody());
 
-            // Merge ID token claims (Azure's userinfo endpoint often omits email/preferred_username)
+            // Merge ID token claims (Azure's userinfo endpoint often omits email/preferred_username).
+            // The token is verified against the provider's JWKS and iss/aud claims are checked.
             var idToken = (String) response.get("id_token");
             if (idToken != null) {
                 try {
-                    var claims = SignedJWT.parse(idToken).getJWTClaimsSet().getClaims();
+                    var claims = verifyAndExtractClaims(idToken, registration);
                     claims.forEach(userInfo::putIfAbsent);
                     // Dex (and some IdPs) return an empty "groups" on userinfo while LDAP groups live only
                     // on the ID token — putIfAbsent would keep the empty list and break jwt-groups.
                     if (claims.containsKey("groups")) {
                         userInfo.put("groups", claims.get("groups"));
                     }
-                } catch (ParseException e) {
-                    log.warn("Failed to parse id_token claims", e);
+                } catch (Exception e) {
+                    log.warn("Failed to verify/parse id_token claims — ignoring id_token", e);
                 }
             }
 
@@ -185,5 +200,36 @@ public class OAuthExchangeService {
                 .flatMap(t -> t.types().stream())
                 .map(TeamType::name)
                 .anyMatch(type -> pattern.matcher(type).find());
+    }
+
+    /**
+     * Verifies the ID token signature against the provider's JWKS and validates {@code iss} and
+     * {@code aud} claims per the OIDC spec.
+     */
+    private Map<String, Object> verifyAndExtractClaims(String idToken, ClientRegistration registration)
+            throws Exception {
+        String jwksUri = registration.getProviderDetails().getJwkSetUri();
+        if (jwksUri == null || jwksUri.isBlank()) {
+            log.debug("No JWKS URI for provider {} — falling back to unverified parse", registration.getRegistrationId());
+            return SignedJWT.parse(idToken).getJWTClaimsSet().getClaims();
+        }
+
+        JWKSource<SecurityContext> jwkSource = JWKSourceBuilder.create(URI.create(jwksUri).toURL()).build();
+        var jwtProcessor = new DefaultJWTProcessor<SecurityContext>();
+
+        // Accept common signing algorithms — the JWKS key selector picks the right one
+        var keySelector = new JWSVerificationKeySelector<>(
+                Set.of(JWSAlgorithm.RS256, JWSAlgorithm.RS384, JWSAlgorithm.RS512, JWSAlgorithm.ES256),
+                jwkSource);
+        jwtProcessor.setJWSKeySelector(keySelector);
+
+        // Require iss and aud; verify aud matches client_id
+        var claimsVerifier = new DefaultJWTClaimsVerifier<SecurityContext>(
+                new JWTClaimsSet.Builder().audience(registration.getClientId()).build(),
+                new HashSet<>(Set.of("iss", "sub", "iat", "exp")));
+        jwtProcessor.setJWTClaimsSetVerifier(claimsVerifier);
+
+        JWTClaimsSet verified = jwtProcessor.process(idToken, null);
+        return verified.getClaims();
     }
 }

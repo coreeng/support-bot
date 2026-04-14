@@ -13,8 +13,15 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class OAuthUrlService {
     private final ClientRegistrationRepository clientRegistrationRepository;
+    private final RedirectUriValidator redirectUriValidator;
 
     public Optional<String> getAuthorizationUrl(String provider, String redirectUri) {
+        try {
+            redirectUriValidator.validate(redirectUri);
+        } catch (IllegalArgumentException e) {
+            log.warn("Rejected redirect_uri for provider {}: {}", provider, e.getMessage());
+            return Optional.empty();
+        }
         var registration = clientRegistrationRepository.findByRegistrationId(provider);
         if (registration == null) {
             log.warn("Unknown OAuth provider: {}", provider);

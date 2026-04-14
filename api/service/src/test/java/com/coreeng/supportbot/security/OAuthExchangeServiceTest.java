@@ -30,6 +30,8 @@ import org.springframework.web.client.RestTemplate;
 @ExtendWith(MockitoExtension.class)
 class OAuthExchangeServiceTest {
 
+    private static final String VALID_REDIRECT_URI = "http://localhost:3000/api/oauth/callback/google";
+
     @Mock
     private ClientRegistrationRepository clientRegistrationRepository;
 
@@ -55,6 +57,7 @@ class OAuthExchangeServiceTest {
                 new SecurityProperties.AllowListProperties(allowedEmails, allowedDomains));
         var jwtService = new JwtService(props);
         var allowListService = new AllowListService(props);
+        var redirectUriValidator = new RedirectUriValidator(props);
         lenient()
                 .when(jwtGroupTeamMerger.mergeForProvider(
                         org.mockito.ArgumentMatchers.anyString(),
@@ -68,7 +71,8 @@ class OAuthExchangeServiceTest {
                 teamService,
                 supportTeamService,
                 allowListService,
-                jwtGroupTeamMerger);
+                jwtGroupTeamMerger,
+                redirectUriValidator);
     }
 
     private void mockGoogleOAuth(String email) {
@@ -83,7 +87,7 @@ class OAuthExchangeServiceTest {
                 .build();
         when(clientRegistrationRepository.findByRegistrationId("google")).thenReturn(registration);
 
-        // Mock token exchange
+        // Mock token exchange — no id_token so signature verification is not triggered
         when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(Map.class)))
                 .thenReturn(Map.of("access_token", "mock-access-token"));
 
@@ -94,41 +98,51 @@ class OAuthExchangeServiceTest {
 
     @Test
     void exchangeCodeForToken_userNotInAllowList_throws() {
-        // given — only allowed.com domain
         var service = createService(List.of(), List.of("allowed.com"));
         mockGoogleOAuth("user@blocked.com");
 
-        // when/then
         assertThrows(
                 UserNotAllowedException.class,
-                () -> service.exchangeCodeForToken("google", "auth-code", "http://localhost:3000/callback"));
+                () -> service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI));
     }
 
     @Test
     void exchangeCodeForToken_userInAllowList_succeeds() {
-        // given — allowed.com domain
         var service = createService(List.of(), List.of("allowed.com"));
         mockGoogleOAuth("user@allowed.com");
         when(teamService.listTeamsByUserEmail("user@allowed.com")).thenReturn(ImmutableList.of());
 
-        // when — should not throw
-        var token = service.exchangeCodeForToken("google", "auth-code", "http://localhost:3000/callback");
+        var token = service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI);
 
-        // then
         assertFalse(token == null || token.isBlank());
     }
 
     @Test
     void exchangeCodeForToken_emptyAllowList_allowsAll() {
-        // given — no restrictions
         var service = createService(List.of(), List.of());
         mockGoogleOAuth("anyone@anywhere.com");
         when(teamService.listTeamsByUserEmail("anyone@anywhere.com")).thenReturn(ImmutableList.of());
 
-        // when — should not throw
-        var token = service.exchangeCodeForToken("google", "auth-code", "http://localhost:3000/callback");
+        var token = service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI);
 
-        // then
         assertFalse(token == null || token.isBlank());
+    }
+
+    @Test
+    void exchangeCodeForToken_rejectsRedirectUriWithWrongOrigin() {
+        var service = createService(List.of(), List.of());
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.exchangeCodeForToken("google", "auth-code", "https://evil.example/api/oauth/callback/google"));
+    }
+
+    @Test
+    void exchangeCodeForToken_rejectsRedirectUriWithWrongPath() {
+        var service = createService(List.of(), List.of());
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.exchangeCodeForToken("google", "auth-code", "http://localhost:3000/some/other/path"));
     }
 }
