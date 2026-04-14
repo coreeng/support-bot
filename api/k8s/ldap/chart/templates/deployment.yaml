@@ -23,12 +23,26 @@ spec:
         fsGroup: 1001
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+        - name: copy-openldap
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          command: ["sh", "-c", "cp -a /opt/bitnami/openldap/. /target/openldap/"]
+          volumeMounts:
+            - name: openldap-home
+              mountPath: /target/openldap
       containers:
         - name: openldap
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           ports:
@@ -76,6 +90,8 @@ spec:
               readOnly: true
             - name: data
               mountPath: /bitnami/openldap
+            - name: openldap-home
+              mountPath: /opt/bitnami/openldap
             - name: tmp
               mountPath: /tmp
             {{- if and .Values.tls.enabled .Values.tls.certSecret }}
@@ -109,6 +125,8 @@ spec:
         - name: bootstrap-ldif
           configMap:
             name: {{ include "support-bot-openldap.fullname" . }}-bootstrap
+        - name: openldap-home
+          emptyDir: {}
         - name: tmp
           emptyDir: {}
         - name: data

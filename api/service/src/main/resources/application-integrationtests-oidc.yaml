@@ -6,10 +6,6 @@ spring:
     activate:
       on-profile: integrationtests-oidc
 
-security:
-  test-bypass:
-    enabled: false
-
 platform-integration:
   fetch:
     ignore-unknown-teams: true
