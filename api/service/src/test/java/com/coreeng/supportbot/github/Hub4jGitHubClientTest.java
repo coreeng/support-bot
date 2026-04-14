@@ -57,7 +57,8 @@ class Hub4jGitHubClientTest {
     @Test
     void returnsMergedStateWhenMergedAtIsNonNull() throws IOException {
         // given
-        TestPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
+        TestPullRequest pr =
+                stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
         pr.testMergedAt = date("2026-01-15T10:00:00Z");
         pr.testMergeable = true;
         pr.testMergeableState = "clean";
@@ -356,7 +357,8 @@ class Hub4jGitHubClientTest {
     @Test
     void getPullRequestSkipsReviewsForClosedPr() throws IOException {
         // given
-        TestPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
+        TestPullRequest pr =
+                stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
         pr.testMergeable = false;
         pr.testMergeableState = "dirty";
 
@@ -373,7 +375,8 @@ class Hub4jGitHubClientTest {
     @Test
     void getPullRequestSkipsReviewsForMergedPr() throws IOException {
         // given
-        TestPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
+        TestPullRequest pr =
+                stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
         pr.testMergedAt = date("2026-01-15T10:00:00Z");
         pr.testMergeable = true;
         pr.testMergeableState = "clean";
