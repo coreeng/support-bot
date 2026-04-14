@@ -33,12 +33,15 @@ Service DNS names **`ldap`** and **`dex`** must match the Job env defaults; over
 
 ### How to run
 
-The test class is **disabled by default** so normal `./gradlew test` does not require LDAP/Dex.
-
-Enable it and point `kubectl` at your cluster:
+The test class runs by default. Disable all LDAP/Dex tests with:
 
 ```bash
-export INTEGRATION_LDAP_DEX_SMOKE=true
+export DISABLE_INTEGRATION_LDAP_DEX_TESTS=true
+```
+
+Run it (point `kubectl` at your cluster first):
+
+```bash
 cd api && ./gradlew :integration-tests:test --tests 'com.coreeng.supportbot.teams.rest.DexLdapInfraIT'
 ```
 
@@ -69,9 +72,10 @@ The Job uses full svc FQDNs for **`dex`**, **`ldap`**, and **`support-bot`** in 
 ### How to run
 
 ```bash
-export INTEGRATION_LDAP_DEX_OIDC=true
 cd api && ./gradlew :integration-tests:test --tests 'com.coreeng.supportbot.teams.rest.DexOidcInClusterIT'
 ```
+
+To disable, set `DISABLE_INTEGRATION_LDAP_DEX_TESTS=true` (same flag as Tier 1).
 
 JUnit tags: `integration`, `oidc`.
 

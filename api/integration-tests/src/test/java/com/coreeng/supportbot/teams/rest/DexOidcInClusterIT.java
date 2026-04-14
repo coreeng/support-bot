@@ -10,7 +10,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,11 +25,12 @@ import org.slf4j.LoggerFactory;
  * client-id}, {@code client-secret}), {@code integration-ldap-test-user} ({@code password} for
  * bootstrap user {@code alice@supportbot.local}).
  *
- * <p>Enable with {@code INTEGRATION_LDAP_DEX_OIDC=true}. Tags: {@code integration}, {@code oidc}.
+ * <p>Runs by default. Disable with {@code DISABLE_INTEGRATION_LDAP_DEX_TESTS=true}.
  */
 @Tag("integration")
 @Tag("oidc")
-@EnabledIfEnvironmentVariable(named = "INTEGRATION_LDAP_DEX_OIDC", matches = "true")
+@Order(3)
+@DisabledIfEnvironmentVariable(named = "DISABLE_INTEGRATION_LDAP_DEX_TESTS", matches = "true")
 public class DexOidcInClusterIT {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DexOidcInClusterIT.class);

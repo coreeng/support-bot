@@ -201,9 +201,42 @@ push-extended-test: ## Uses promoted image (no push needed)
 
 ##@ Deploy targets
 
+INTEGRATION_NAMESPACE ?= support-bot-integration
+INTEGRATION_DB_RELEASE ?= support-bot-db
+
 .PHONY: deploy-integration
-deploy-integration:
-	echo "Service deployment is managed by tests"
+deploy-integration: deploy-db-integration ## Deploy DB + LDAP + Dex infrastructure for integration tests
+	@$(MAKE) ldap-deploy-integration
+	@$(MAKE) dex-deploy-integration
+
+.PHONY: deploy-db-integration
+deploy-db-integration: ## Deploy PostgreSQL to integration namespace
+	@helm repo add bitnami https://charts.bitnami.com/bitnami 2>/dev/null || true
+	@helm repo update bitnami >/dev/null
+	helm upgrade --install $(INTEGRATION_DB_RELEASE) bitnami/postgresql \
+	  -n $(INTEGRATION_NAMESPACE) \
+	  --set image.repository=bitnamilegacy/postgresql \
+	  --set global.postgresql.auth.postgresPassword=rootpassword \
+	  --set global.postgresql.auth.username=supportbot \
+	  --set global.postgresql.auth.password=supportbotpassword \
+	  --set global.postgresql.auth.database=supportbot \
+	  --set primary.pdb.create=false \
+	  --set primary.networkPolicy.enabled=false \
+	  --set serviceAccount.create=false \
+	  --wait --atomic --timeout=3m
+
+.PHONY: integration-test-local
+integration-test-local: deploy-integration ## Deploy infra and run integration tests locally
+	@api/gradlew -p api :integration-tests:test; rc=$$?; \
+	$(MAKE) undeploy-integration; \
+	exit $$rc
+
+.PHONY: undeploy-integration
+undeploy-integration: ## Uninstall DB + LDAP + Dex from integration namespace
+	-helm uninstall support-bot     -n $(INTEGRATION_NAMESPACE) --ignore-not-found
+	-helm uninstall support-bot-dex -n $(INTEGRATION_NAMESPACE) --ignore-not-found
+	-helm uninstall support-bot-ldap -n $(INTEGRATION_NAMESPACE) --ignore-not-found
+	-helm uninstall $(INTEGRATION_DB_RELEASE) -n $(INTEGRATION_NAMESPACE) --ignore-not-found
 
 .PHONY: deploy-api-nft
 deploy-api-nft: ## Deploy service and DB for nft tests
@@ -375,15 +408,12 @@ monitoring-deploy: ## Deploy monitoring stack (Prometheus + Grafana) for support
 
 ##@ Dex module lifecycle (implemented in dex/Makefile)
 
-.PHONY: dex-template dex-deploy-integration dex-deploy-integration-oidc dex-deploy-prod
+.PHONY: dex-template dex-deploy-integration dex-deploy-prod
 dex-template: ## Validate Dex values by rendering dex/dex chart
 	@$(MAKE) -C dex template
 
-dex-deploy-integration: ## Deploy Dex module to integration environment
+dex-deploy-integration: ## Deploy Dex module to integration environment (includes OIDC overlay)
 	@$(MAKE) -C dex deploy-integration
-
-dex-deploy-integration-oidc: ## Deploy Dex with OIDC in-cluster overlay (Tier 2 tests)
-	@$(MAKE) -C dex deploy-integration-oidc
 
 dex-deploy-prod: ## Deploy Dex module to production environment
 	@$(MAKE) -C dex deploy-prod

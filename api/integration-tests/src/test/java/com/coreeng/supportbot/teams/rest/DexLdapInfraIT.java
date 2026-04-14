@@ -10,7 +10,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,12 +21,12 @@ import org.slf4j.LoggerFactory;
  * <p>Requires LDAP and Dex already installed in the integration namespace (see README), and Secret
  * {@code ldap-secrets} with key {@code admin-password}.
  *
- * <p>Enable with {@code INTEGRATION_LDAP_DEX_SMOKE=true}. Run with tag {@code ldap-infra}, e.g. {@code
- * ./gradlew :integration-tests:test --tests '*DexLdapInfraIT'}.
+ * <p>Runs by default. Disable with {@code DISABLE_INTEGRATION_LDAP_DEX_TESTS=true}.
  */
 @Tag("integration")
 @Tag("ldap-infra")
-@EnabledIfEnvironmentVariable(named = "INTEGRATION_LDAP_DEX_SMOKE", matches = "true")
+@Order(1)
+@DisabledIfEnvironmentVariable(named = "DISABLE_INTEGRATION_LDAP_DEX_TESTS", matches = "true")
 public class DexLdapInfraIT {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DexLdapInfraIT.class);
