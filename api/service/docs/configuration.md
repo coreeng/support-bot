@@ -354,6 +354,8 @@ Avoid mixing `localhost` vs `127.0.0.1`, `http` vs `https`, or different ports b
 
 For local development you can omit **`UI_ORIGIN`** when using a **local-like** Spring profile (`local`, `functionaltests`, `integrationtests`, `integrationtests-oidc`); otherwise the API emits a startup warning if `UI_ORIGIN` is unset.
 
+When deploying with the repo **Helm chart** (`helm-chart/`), you can set **`publicWebOrigin`** once (scheme + host + port, no path): the chart appends **`UI_ORIGIN`** on the API deployment and **`NEXTAUTH_URL`** on the UI deployment from that value. Avoid also setting duplicate `UI_ORIGIN` / `NEXTAUTH_URL` entries in `env` / `ui.env` for the same pods.
+
 ### Google OAuth
 
 Console: https://console.cloud.google.com/apis/credentials

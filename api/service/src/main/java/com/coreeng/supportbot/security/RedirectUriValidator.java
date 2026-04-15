@@ -1,7 +1,6 @@
 package com.coreeng.supportbot.security;
 
 import java.net.URI;
-import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -16,9 +15,6 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 public class RedirectUriValidator {
-    private static final Set<String> KNOWN_PROVIDERS = Set.of("google", "azure", "dex");
-    private static final String CALLBACK_PATH_PREFIX = "/api/oauth/callback/";
-
     private final String allowedOrigin;
 
     public RedirectUriValidator(SecurityProperties properties) {
@@ -48,11 +44,12 @@ public class RedirectUriValidator {
         }
 
         String path = uri.getPath();
-        if (path == null || !path.startsWith(CALLBACK_PATH_PREFIX)) {
-            throw new IllegalArgumentException("redirect_uri path must start with " + CALLBACK_PATH_PREFIX);
+        if (path == null || !path.startsWith(OauthUiCallbackConstants.CALLBACK_PATH_PREFIX)) {
+            throw new IllegalArgumentException(
+                    "redirect_uri path must start with " + OauthUiCallbackConstants.CALLBACK_PATH_PREFIX);
         }
-        String provider = path.substring(CALLBACK_PATH_PREFIX.length());
-        if (!KNOWN_PROVIDERS.contains(provider)) {
+        String provider = path.substring(OauthUiCallbackConstants.CALLBACK_PATH_PREFIX.length());
+        if (!OauthUiCallbackConstants.KNOWN_PROVIDERS.contains(provider)) {
             throw new IllegalArgumentException("redirect_uri references unknown provider: " + provider);
         }
     }

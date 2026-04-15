@@ -198,7 +198,6 @@ describe('LoginPage', () => {
         expect(mockSignIn).toHaveBeenCalledWith('backend-code', {
           code: 'mycode',
           provider: 'google',
-          redirectUri: `${window.location.origin}/api/oauth/callback/google`,
           redirect: false,
         })
       })
@@ -300,7 +299,6 @@ describe('LoginPage', () => {
         expect(mockSignIn).toHaveBeenCalledWith('backend-code', {
           code: 'mycode',
           provider: 'azure',
-          redirectUri: `${window.location.origin}/api/oauth/callback/azure`,
           redirect: false,
         })
       })
@@ -419,7 +417,7 @@ describe('LoginPage', () => {
       })
     })
 
-    it('shows only Dex when only Dex is configured', async () => {
+    it('shows only SSO when only Dex is configured', async () => {
       global.fetch = jest.fn(() =>
         Promise.resolve({
           ok: true,
@@ -430,7 +428,7 @@ describe('LoginPage', () => {
       render(<LoginPage />)
 
       await waitFor(() => {
-        expect(screen.getByText('Continue with Dex')).toBeInTheDocument()
+        expect(screen.getByText('Continue with SSO')).toBeInTheDocument()
         expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
         expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
       })
@@ -449,7 +447,7 @@ describe('LoginPage', () => {
       await waitFor(() => {
         expect(screen.getByText('Continue with Google')).toBeInTheDocument()
         expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
-        expect(screen.getByText('Continue with Dex')).toBeInTheDocument()
+        expect(screen.getByText('Continue with SSO')).toBeInTheDocument()
         // No button for "unknown-provider" should be rendered
       })
     })

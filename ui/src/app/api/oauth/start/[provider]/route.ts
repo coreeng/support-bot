@@ -1,6 +1,7 @@
 import {NextRequest, NextResponse} from "next/server";
 import {publicFetch} from "../../../_lib/public-fetch";
-import {tryResolvePublicOrigin} from "@/lib/server/resolve-public-origin";
+import {isOauthUiKnownProvider} from "@/lib/auth/oauth-ui-callback";
+import {tryResolvePublicOrigin} from "@/lib/server/resolve-public-origin-response";
 import {sanitizeCallbackUrl} from "@/lib/utils/url";
 
 export async function GET(
@@ -9,7 +10,7 @@ export async function GET(
 ) {
   const { provider } = await params;
 
-  if (provider === "google" || provider === "azure" || provider === "dex") {
+  if (isOauthUiKnownProvider(provider)) {
     const resolved = tryResolvePublicOrigin();
     if (!resolved.ok) {
       return resolved.response;
