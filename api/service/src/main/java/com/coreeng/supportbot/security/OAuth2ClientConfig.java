@@ -160,15 +160,12 @@ public class OAuth2ClientConfig {
                 throw new IllegalArgumentException("dex internal-base-url has no host: " + normalized);
             }
             String host = uri.getHost();
-            if (!host.equals("localhost")
-                    && !host.equals("127.0.0.1")
-                    && !host.endsWith(".svc.cluster.local")
-                    && !host.matches("^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$")) {
-                log.warn(
-                        "dex internal-base-url host '{}' does not look like a Kubernetes service name or"
-                                + " cluster-local address — verify this is intentional to avoid leaking"
-                                + " the client secret to an external host",
-                        host);
+            if (!host.equals("localhost") && !host.equals("127.0.0.1") && !host.endsWith(".svc.cluster.local")) {
+                throw new IllegalArgumentException(
+                        "dex internal-base-url host must be localhost, 127.0.0.1, or end with"
+                                + " .svc.cluster.local to prevent leaking the client secret to an"
+                                + " external host, got: "
+                                + host);
             }
             return normalized;
         } catch (IllegalArgumentException e) {

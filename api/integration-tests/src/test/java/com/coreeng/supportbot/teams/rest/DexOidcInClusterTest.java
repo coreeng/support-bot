@@ -47,6 +47,11 @@ public class DexOidcInClusterTest {
     static void setup() throws IOException {
         config = Config.load();
         kubernetesClient = new KubernetesTestClient();
+
+        String deploymentName = config.service().deployment().name();
+        LOGGER.info("Verifying API deployment '{}' is ready before OIDC test...", deploymentName);
+        kubernetesClient.waitUntilDeploymentReady(deploymentName, config.namespace());
+
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         jobName = "support-bot-dex-ldap-oidc-" + suffix;
         configMapName = "support-bot-dex-ldap-oidc-script-" + suffix;
