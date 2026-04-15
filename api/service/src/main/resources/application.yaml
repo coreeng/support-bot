@@ -22,6 +22,7 @@ security:
     secret: ${JWT_SECRET}
     expiration: 24h
   oauth2:
+    # Proxied OAuth: API validates redirect_uri origin vs this URL — set UI_ORIGIN in prod to match NEXTAUTH_URL on the UI.
     redirect-uri: ${UI_ORIGIN:http://localhost:3000}/login
     # Default: omit login-providers — every IdP with full credentials (Google, Azure, Dex) is registered
     # and shown. Optional allowlist: when non-empty, only these registration ids are used (e.g. [dex]).

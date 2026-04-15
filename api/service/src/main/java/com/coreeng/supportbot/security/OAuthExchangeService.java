@@ -11,9 +11,11 @@ import com.nimbusds.jose.jwk.source.JWKSourceBuilder;
 import com.nimbusds.jose.proc.JWSVerificationKeySelector;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import java.net.URI;
+import java.text.ParseException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
@@ -99,27 +101,31 @@ public class OAuthExchangeService {
             var userInfo = new HashMap<>(userInfoResponse.getBody());
 
             // Merge ID token claims (Azure's userinfo endpoint often omits email/preferred_username).
-            // The token is verified against the provider's JWKS and iss/aud claims are checked.
+            // Google/Azure: legacy behaviour — parse JWT payload only (same as pre-Dex); do not depend on
+            // JWKS reachability for login. Dex: verify signature and iss/aud before trusting claims (groups).
             var idToken = (String) response.get("id_token");
             if (idToken != null) {
-                try {
-                    var claims = verifyAndExtractClaims(idToken, registration);
-                    claims.forEach(userInfo::putIfAbsent);
-                    if (claims.containsKey("groups")) {
-                        userInfo.put("groups", claims.get("groups"));
-                    }
-                } catch (Exception e) {
-                    if (requiresIdTokenClaims(provider)) {
+                if ("dex".equalsIgnoreCase(provider)) {
+                    try {
+                        var claims = verifyAndExtractClaims(idToken, registration);
+                        claims.forEach(userInfo::putIfAbsent);
+                        if (claims.containsKey("groups")) {
+                            userInfo.put("groups", claims.get("groups"));
+                        }
+                    } catch (Exception e) {
                         throw new IllegalStateException(
                                 "ID token verification failed for provider "
                                         + registration.getRegistrationId()
                                         + " which requires id_token claims (e.g. LDAP groups)",
                                 e);
                     }
-                    log.error(
-                            "ID token verification failed for provider {} — skipping id_token claims",
-                            registration.getRegistrationId(),
-                            e);
+                } else {
+                    try {
+                        var claims = SignedJWT.parse(idToken).getJWTClaimsSet().getClaims();
+                        claims.forEach(userInfo::putIfAbsent);
+                    } catch (ParseException e) {
+                        log.warn("Failed to parse id_token claims", e);
+                    }
                 }
             }
 
@@ -209,14 +215,9 @@ public class OAuthExchangeService {
                 .anyMatch(type -> pattern.matcher(type).find());
     }
 
-    /** Dex relies on ID token for LDAP group claims — verification failure must be fatal. */
-    private static boolean requiresIdTokenClaims(String provider) {
-        return "dex".equalsIgnoreCase(provider);
-    }
-
     /**
      * Verifies the ID token signature against the provider's JWKS and validates {@code iss} and
-     * {@code aud} claims per the OIDC spec.
+     * {@code aud} claims. Used for Dex only.
      *
      * @return verified claims, or empty map if JWKS URI is not configured (claims are never trusted
      *     without verification)

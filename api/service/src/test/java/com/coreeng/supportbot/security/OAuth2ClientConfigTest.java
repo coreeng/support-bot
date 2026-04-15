@@ -24,6 +24,15 @@ class OAuth2ClientConfigTest {
                 new SecurityProperties.AllowListProperties(List.of(), List.of()));
     }
 
+    private static SecurityProperties testSecurityWithAllowlist(List<String> loginProviders) {
+        return new SecurityProperties(
+                new SecurityProperties.JwtProperties("secret", Duration.ofHours(1)),
+                new SecurityProperties.OAuth2Properties("http://localhost:3000/login", loginProviders),
+                new SecurityProperties.CorsProperties(null),
+                new SecurityProperties.TestBypassProperties(false),
+                new SecurityProperties.AllowListProperties(List.of(), List.of()));
+    }
+
     @Test
     void dexRegistrationCreated_whenAllDexFieldsPresent() {
         var repository = config.clientRegistrationRepository(
@@ -145,6 +154,15 @@ class OAuth2ClientConfigTest {
                         "openid,email,profile,groups",
                         "https://dex.example.com",
                         "ftp://dex:5556"));
+    }
+
+    @Test
+    void noClients_whenLoginProvidersAllowlistNonEmptyButNoMatchingCredentials() {
+        var repository = config.clientRegistrationRepository(
+                testSecurityWithAllowlist(List.of("dex")), "", "", "", "", "", "", "", "", "", "");
+
+        assertNull(repository.findByRegistrationId("dex"));
+        assertNull(repository.findByRegistrationId("google"));
     }
 
     @Test

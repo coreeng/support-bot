@@ -1,4 +1,7 @@
-import {resolvePublicOrigin} from "../resolve-public-origin";
+import {
+  resolvePublicOrigin,
+  tryResolvePublicOrigin,
+} from "../resolve-public-origin";
 
 describe("resolvePublicOrigin", () => {
   const originalEnv = process.env;
@@ -34,5 +37,39 @@ describe("resolvePublicOrigin", () => {
   it("throws when NEXTAUTH_URL is malformed", () => {
     process.env.NEXTAUTH_URL = "not-a-url";
     expect(() => resolvePublicOrigin()).toThrow("NEXTAUTH_URL is not set or invalid");
+  });
+});
+
+describe("tryResolvePublicOrigin", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = {...originalEnv};
+    jest.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  it("returns origin when NEXTAUTH_URL is valid", () => {
+    process.env.NEXTAUTH_URL = "https://app.example.com/path";
+    const r = tryResolvePublicOrigin();
+    expect(r).toEqual({ok: true, origin: "https://app.example.com"});
+  });
+
+  it("returns 500 response when NEXTAUTH_URL is unset", async () => {
+    delete process.env.NEXTAUTH_URL;
+    const r = tryResolvePublicOrigin();
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.response.status).toBe(500);
+      const body = await r.response.json();
+      expect(body.error).toContain("NEXTAUTH_URL");
+    }
   });
 });

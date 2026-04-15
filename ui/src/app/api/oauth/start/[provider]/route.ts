@@ -1,6 +1,6 @@
 import {NextRequest, NextResponse} from "next/server";
 import {publicFetch} from "../../../_lib/public-fetch";
-import {resolvePublicOrigin} from "@/lib/server/resolve-public-origin";
+import {tryResolvePublicOrigin} from "@/lib/server/resolve-public-origin";
 import {sanitizeCallbackUrl} from "@/lib/utils/url";
 
 export async function GET(
@@ -10,13 +10,11 @@ export async function GET(
   const { provider } = await params;
 
   if (provider === "google" || provider === "azure" || provider === "dex") {
-    let origin: string;
-    try {
-      origin = resolvePublicOrigin();
-    } catch (e) {
-      console.error("OAuth start failed:", (e as Error).message);
-      return NextResponse.json({error: "Server misconfiguration: NEXTAUTH_URL is required"}, {status: 500});
+    const resolved = tryResolvePublicOrigin();
+    if (!resolved.ok) {
+      return resolved.response;
     }
+    const { origin } = resolved;
     const redirectUri = new URL(
       `/api/oauth/callback/${provider}`,
       origin

@@ -62,8 +62,15 @@ public class OAuth2ClientConfig {
         }
 
         if (registrations.isEmpty()) {
-            log.info("No OAuth2 clients registered - credentials not provided");
-            // Return empty repository - OAuth2 login will be disabled
+            if (!allowlist.isEmpty()) {
+                log.warn(
+                        "security.oauth2.login-providers is non-empty ({}) but no OAuth2 client registrations "
+                                + "were created — each allowlisted id (google, azure, dex) needs full credentials, "
+                                + "or remove the allowlist. SSO via /auth/oauth-url will be disabled.",
+                        allowlist);
+            } else {
+                log.info("No OAuth2 clients registered - credentials not provided");
+            }
             return registrationId -> null;
         }
 

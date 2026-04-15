@@ -1,5 +1,5 @@
 import {NextRequest, NextResponse} from "next/server";
-import {resolvePublicOrigin} from "@/lib/server/resolve-public-origin";
+import {tryResolvePublicOrigin} from "@/lib/server/resolve-public-origin";
 import {sanitizeCallbackUrl} from "@/lib/utils/url";
 
 export async function GET(
@@ -12,7 +12,11 @@ export async function GET(
   const error = searchParams.get("error");
   const returnedState = searchParams.get("state");
 
-  const loginUrl = new URL("/login", resolvePublicOrigin());
+  const resolved = tryResolvePublicOrigin();
+  if (!resolved.ok) {
+    return resolved.response;
+  }
+  const loginUrl = new URL("/login", resolved.origin);
   // Extract from cookie the user's last visited page to redirect to after login
   const rawCallbackUrl = request.cookies.get("oauth-callback-url")?.value || "/";
   loginUrl.searchParams.set("callbackUrl", sanitizeCallbackUrl(rawCallbackUrl));

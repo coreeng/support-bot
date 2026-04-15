@@ -307,7 +307,7 @@ Set these on the **API**:
 | Variable | Description                                                                                                                            |
 |----------|----------------------------------------------------------------------------------------------------------------------------------------|
 | `JWT_SECRET` | Signing key for JWTs. Must be at least 256 bits. **Required**  the app will fail to start if not set.                                  |
-| `UI_ORIGIN` | Base URL of the UI, e.g. `https://support-bot-ui.example.com`. Defaults to `http://localhost:3000`. Used for CORS and OAuth2 redirect. |
+| `UI_ORIGIN` | Public UI base URL (scheme + host + port, no path), e.g. `https://support-bot-ui.example.com`. Drives `security.oauth2.redirect-uri` (default `${UI_ORIGIN:http://localhost:3000}/login`). **Must match the origin of `NEXTAUTH_URL` on the Next.js app** (same scheme, host, and port) or proxied OAuth returns HTTP 400. Outside local-like Spring profiles, the API logs a **warning** at startup if `UI_ORIGIN` is unset. See [UI origin contract](#ui-origin-contract) below. |
 | `GOOGLE_CLIENT_ID` | Google OAuth2 client ID. Leave empty to disable Google SSO.                                                                            |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret.                                                                                                           |
 | `AZURE_CLIENT_ID` | Azure AD application (client) ID. Leave empty to disable Azure AD SSO.                                                                 |
@@ -326,6 +326,8 @@ Optional YAML list under `security.oauth2.login-providers` (values: `google`, `a
 - **Omitted or empty (default):** every provider with complete credentials is registered and shown on the login UI (multi-IdP).
 - **Non-empty (e.g. `[dex]`):** only those OAuth2 registration ids are registered and advertised, even if other IdP env vars are set. Use this to offer **Dex-only** (or any subset) while keeping `GOOGLE_*` / `AZURE_*` in the environment for other purposes (for example Azure Cloud integration or shared secrets).
 
+If the allowlist is non-empty but **no** registration is created (typo in the list, or a listed provider lacks full credentials), the API logs a **WARN** at startup and SSO via `/auth/oauth-url` is disabled until configuration is fixed.
+
 Team membership still comes from `platform-integration` (static-user, Azure Graph, GCP, Slack, `jwt-groups` for Dex) — this setting only affects which OAuth flows the API exposes.
 
 > Note: The `AZURE_*` variables above are shared between SSO (user login) and
@@ -337,6 +339,20 @@ Set this on the **UI**:
 | Variable | Description |
 |----------|-------------|
 | `BACKEND_URL` | Internal URL of the API, e.g. `http://support-bot:8080`. Defaults to `http://localhost:8080`. Used by the server-side proxy. |
+| `NEXTAUTH_URL` | Public URL of this Next.js app. Its **origin** must match **`UI_ORIGIN` on the API** so OAuth `redirect_uri` validation succeeds. |
+
+### UI origin contract
+
+The UI builds OAuth callbacks as `{origin of NEXTAUTH_URL}/api/oauth/callback/{provider}`. The API accepts that `redirect_uri` only if its **scheme + host + port** equals the origin parsed from `security.oauth2.redirect-uri` (by default `${UI_ORIGIN:http://localhost:3000}/login`, so the origin is `UI_ORIGIN`).
+
+Use **one canonical public UI URL** everywhere:
+
+1. Set **`NEXTAUTH_URL`** on the UI (e.g. `https://support.example.com` or `http://localhost:3000`).
+2. Set **`UI_ORIGIN`** on the API to the **same origin** (no path), e.g. `https://support.example.com` or `http://localhost:3000`.
+
+Avoid mixing `localhost` vs `127.0.0.1`, `http` vs `https`, or different ports between the two — mismatches produce **HTTP 400** on `/auth/oauth-url` and `/auth/oauth/exchange` for **all** UI-driven IdPs (Google, Azure, Dex).
+
+For local development you can omit **`UI_ORIGIN`** when using a **local-like** Spring profile (`local`, `functionaltests`, `integrationtests`, `integrationtests-oidc`); otherwise the API emits a startup warning if `UI_ORIGIN` is unset.
 
 ### Google OAuth
 

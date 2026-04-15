@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { resolvePublicOrigin } from "@/lib/server/resolve-public-origin";
+import { tryResolvePublicOrigin } from "@/lib/server/resolve-public-origin";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -15,13 +15,11 @@ const protectedProxy = auth((req) => {
   const { pathname } = nextUrl;
 
   if (!isLoggedIn) {
-    let origin: string;
-    try {
-      origin = resolvePublicOrigin();
-    } catch {
-      origin = nextUrl.origin;
+    const resolved = tryResolvePublicOrigin();
+    if (!resolved.ok) {
+      return resolved.response;
     }
-    const loginUrl = new URL("/login", origin);
+    const loginUrl = new URL("/login", resolved.origin);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
