@@ -13,18 +13,18 @@ if [[ -z "${LDAP_BOOTSTRAP_USER_PASSWORD:-}" ]]; then
 fi
 bash "${ROOT}/scripts/render_bootstrap_users_ldif.sh"
 
+TMPDIR=$(mktemp -d)
+trap 'rm -rf "${TMPDIR}"' EXIT
+cp -a "${CHART}" "${TMPDIR}/chart"
+cp -f "${ROOT}/bootstrap/"*.ldif "${TMPDIR}/chart/files/bootstrap/"
+
 case "${OP}" in
 template)
-	TMPDIR=$(mktemp -d)
-	trap 'rm -rf "${TMPDIR}"' EXIT
-	cp -a "${CHART}" "${TMPDIR}/chart"
-	cp -f "${ROOT}/bootstrap/"*.ldif "${TMPDIR}/chart/files/bootstrap/"
 	helm template support-bot-ldap "${TMPDIR}/chart" \
 		-f "${LDAP_K8S}/values-bitnami.yaml" \
 		-f "${LDAP_K8S}/values-integration.yaml" >/dev/null
 	;;
 deploy-integration)
-	cp -f "${ROOT}/bootstrap/"*.ldif "${CHART}/files/bootstrap/"
 	kubectl create namespace "${NAMESPACE}" 2>/dev/null || true
 
 	echo "Ensuring K8s secret ldap-secrets (admin-password) in ${NAMESPACE}..."
@@ -39,9 +39,9 @@ deploy-integration)
 
 	extra=()
 	if [[ -n "${DRY_RUN:-}" ]]; then
-		extra+=(--dry-run=client --debug)
+		extra+=(--dry-run=client)
 	fi
-	helm upgrade --install support-bot-ldap "${CHART}" \
+	helm upgrade --install support-bot-ldap "${TMPDIR}/chart" \
 		-n "${NAMESPACE}" \
 		-f "${LDAP_K8S}/values-bitnami.yaml" \
 		-f "${LDAP_K8S}/values-integration.yaml" \

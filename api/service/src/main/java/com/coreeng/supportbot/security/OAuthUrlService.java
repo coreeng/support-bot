@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.security;
 
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,26 +13,26 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class OAuthUrlService {
     private final ClientRegistrationRepository clientRegistrationRepository;
     private final RedirectUriValidator redirectUriValidator;
+    private final OAuthStateStore oauthStateStore;
 
     public record AuthorizationUrlResult(String url, String state) {}
 
-    public Optional<AuthorizationUrlResult> getAuthorizationUrl(String provider, String redirectUri) {
-        try {
-            redirectUriValidator.validate(redirectUri);
-        } catch (IllegalArgumentException e) {
-            log.warn("Rejected redirect_uri for provider {}: {}", provider, e.getMessage());
-            return Optional.empty();
-        }
+    /**
+     * @throws IllegalArgumentException if the redirect URI is invalid
+     * @throws IllegalArgumentException if the provider is unknown
+     */
+    public AuthorizationUrlResult getAuthorizationUrl(String provider, String redirectUri) {
+        redirectUriValidator.validate(redirectUri);
         var registration = clientRegistrationRepository.findByRegistrationId(provider);
         if (registration == null) {
-            log.warn("Unknown OAuth provider: {}", provider);
-            return Optional.empty();
+            throw new IllegalArgumentException("Unknown OAuth provider: " + provider);
         }
 
         var authorizationUri = registration.getProviderDetails().getAuthorizationUri();
         var clientId = registration.getClientId();
         var scopes = String.join(" ", registration.getScopes());
         var state = UUID.randomUUID().toString();
+        oauthStateStore.store(state);
 
         var url = UriComponentsBuilder.fromUriString(authorizationUri)
                 .queryParam("client_id", clientId)
@@ -44,6 +43,6 @@ public class OAuthUrlService {
                 .build()
                 .toUriString();
 
-        return Optional.of(new AuthorizationUrlResult(url, state));
+        return new AuthorizationUrlResult(url, state);
     }
 }

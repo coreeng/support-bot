@@ -49,8 +49,12 @@ public class OAuthExchangeService {
     private final AllowListService allowListService;
     private final JwtGroupTeamMerger jwtGroupTeamMerger;
     private final RedirectUriValidator redirectUriValidator;
+    private final OAuthStateStore oauthStateStore;
 
-    public String exchangeCodeForToken(String provider, String code, String redirectUri) {
+    public String exchangeCodeForToken(String provider, String code, String redirectUri, String state) {
+        if (!oauthStateStore.consumeIfValid(state)) {
+            throw new IllegalArgumentException("Invalid or expired OAuth state parameter");
+        }
         redirectUriValidator.validate(redirectUri);
 
         var registration = clientRegistrationRepository.findByRegistrationId(provider);
@@ -105,15 +109,19 @@ public class OAuthExchangeService {
                 try {
                     var claims = verifyAndExtractClaims(idToken, registration);
                     claims.forEach(userInfo::putIfAbsent);
-                    // Dex (and some IdPs) return an empty "groups" on userinfo while LDAP groups live only
-                    // on the ID token — putIfAbsent would keep the empty list and break jwt-groups.
                     if (claims.containsKey("groups")) {
                         userInfo.put("groups", claims.get("groups"));
                     }
                 } catch (Exception e) {
+                    if (requiresIdTokenClaims(provider)) {
+                        throw new IllegalStateException(
+                                "ID token verification failed for provider "
+                                        + registration.getRegistrationId()
+                                        + " which requires id_token claims (e.g. LDAP groups)",
+                                e);
+                    }
                     log.error(
-                            "ID token verification failed for provider {} — skipping id_token claims. "
-                                    + "If this provider relies on id_token for group claims, login may be degraded.",
+                            "ID token verification failed for provider {} — skipping id_token claims",
                             registration.getRegistrationId(),
                             e);
                 }
@@ -203,6 +211,11 @@ public class OAuthExchangeService {
                 .flatMap(t -> t.types().stream())
                 .map(TeamType::name)
                 .anyMatch(type -> pattern.matcher(type).find());
+    }
+
+    /** Dex relies on ID token for LDAP group claims — verification failure must be fatal. */
+    private static boolean requiresIdTokenClaims(String provider) {
+        return "dex".equalsIgnoreCase(provider);
     }
 
     /**

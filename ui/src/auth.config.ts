@@ -12,22 +12,23 @@ function oauthCallbackRedirectUri(
   const path = `/api/oauth/callback/${provider}`;
   const allowedOrigin = getAllowedOrigin();
 
+  if (!allowedOrigin) {
+    return null;
+  }
+
   if (clientRedirectUri) {
     try {
       const u = new URL(clientRedirectUri);
       if (
         u.pathname === path &&
         (u.protocol === "http:" || u.protocol === "https:") &&
-        (!allowedOrigin || u.origin === allowedOrigin)
+        u.origin === allowedOrigin
       ) {
         return u.toString();
       }
     } catch {
       /* use env fallback */
     }
-  }
-  if (!allowedOrigin) {
-    return null;
   }
   try {
     return new URL(path, allowedOrigin).toString();
@@ -181,11 +182,13 @@ export const authConfig: NextAuthConfig = {
         code: { label: "Auth Code", type: "text" },
         provider: { label: "Oauth2 Provider", type: "text" },
         redirectUri: { label: "OAuth redirect URI", type: "text" },
+        state: { label: "OAuth state", type: "text" },
       },
       async authorize(credentials) {
         const code = credentials?.code as string;
         const provider = credentials?.provider as string;
         const clientRedirectUri = credentials?.redirectUri as string | undefined;
+        const state = credentials?.state as string | undefined;
 
         if (
           code &&
@@ -202,7 +205,7 @@ export const authConfig: NextAuthConfig = {
 
             const response = await publicFetch("/auth/oauth/exchange", {
               method: "POST",
-              body: JSON.stringify({provider, code, redirectUri}),
+              body: JSON.stringify({provider, code, redirectUri, state}),
             });
 
             if (response.ok) {

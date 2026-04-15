@@ -95,6 +95,13 @@ public class ServiceStartupTest {
     @AfterAll
     static void cleanup() {
         try {
+            if (config != null) {
+                runServiceScript("delete");
+            }
+        } catch (Exception e) {
+            LOGGER.error("Error undeploying service", e);
+        }
+        try {
             if (kubernetesClient != null) {
                 kubernetesClient.deleteConfigMap(TEST_TEAM_CM_NAME, config.namespace());
                 kubernetesClient.deleteConfigMap(TEST_BAD_REF_TEAM_CM_NAME, config.namespace());

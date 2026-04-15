@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Render or deploy Dex via dexidp Helm chart (dex/dex).
 set -euo pipefail
-OP="${1:?usage: $0 template|deploy-integration}"
+OP="${1:?usage: $0 template|deploy-integration|deploy-prod}"
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DEX_K8S="${ROOT}/../api/k8s/dex"
 CHART_REPO_NAME="${DEX_CHART_REPO_NAME:-dex}"
@@ -43,8 +43,26 @@ deploy-integration)
 		--set-string "config.connectors[0].config.bindPW=${LDAP_BIND_PW}" \
 		"${extra[@]}"
 	;;
+deploy-prod)
+	NAMESPACE="${NAMESPACE:?Set NAMESPACE}"
+
+	echo "Ensuring K8s secret dex-secrets (client-id, client-secret)..."
+	kubectl create secret generic dex-secrets \
+		--from-literal=client-id="${DEX_CLIENT_ID:?Set DEX_CLIENT_ID}" \
+		--from-literal=client-secret="${DEX_CLIENT_SECRET:?Set DEX_CLIENT_SECRET}" \
+		-n "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+
+	LDAP_BIND_PW="${LDAP_BOOTSTRAP_USER_PASSWORD:?Set LDAP_BOOTSTRAP_USER_PASSWORD}"
+
+	helm upgrade --install support-bot-dex "${CHART_REPO_NAME}/${CHART_NAME}" --version "${CHART_VERSION}" \
+		-n "${NAMESPACE}" \
+		-f "${DEX_K8S}/values-dexidp.yaml" \
+		-f "${DEX_K8S}/values-tls.yaml" \
+		--set-string "config.staticClients[0].secret=${DEX_CLIENT_SECRET}" \
+		--set-string "config.connectors[0].config.bindPW=${LDAP_BIND_PW}"
+	;;
 *)
-	echo "usage: $0 template|deploy-integration" >&2
+	echo "usage: $0 template|deploy-integration|deploy-prod" >&2
 	exit 1
 	;;
 esac

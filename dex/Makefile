@@ -42,6 +42,8 @@ deploy-integration: ## Deploy Dex module to integration environment (sources .en
 	if [[ -f .env.local ]]; then set -a; source .env.local; set +a; fi; \
 	NAMESPACE="$(NAMESPACE)" DEX_CHART_VERSION="$(DEX_CHART_VERSION)" DRY_RUN="$(DRY_RUN)" bash ./scripts/helm_dex.sh deploy-integration'
 
-# .PHONY: deploy-prod
-# deploy-prod: ## Deploy Dex module to production environment
-# 	@DEX_CHART_VERSION="$(DEX_CHART_VERSION)" bash ./scripts/helm_dex.sh deploy-prod
+.PHONY: deploy-prod
+deploy-prod: ## Deploy Dex module to production environment
+	@bash -c 'set -eo pipefail; cd "$(CURDIR)"; \
+	if [[ -f .env.local ]]; then set -a; source .env.local; set +a; fi; \
+	NAMESPACE="$(NAMESPACE)" DEX_CHART_VERSION="$(DEX_CHART_VERSION)" bash ./scripts/helm_dex.sh deploy-prod'

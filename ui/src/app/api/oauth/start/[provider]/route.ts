@@ -23,36 +23,37 @@ export async function GET(
     if (oauthUrl.ok) {
       try {
         const {url, state} = await oauthUrl.json();
-        if (url) {
-          const providerRedirect = NextResponse.redirect(url);
-
-          // Remember the page the user was on before redirecting to the login page
-          const rawCallbackUrl = request.nextUrl.searchParams.get("callbackUrl");
-          const userCallbackUrl = sanitizeCallbackUrl(rawCallbackUrl);
-
-          providerRedirect.cookies.set("oauth-callback-url", userCallbackUrl, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            maxAge: 600,
-            path: "/",
-          });
-
-          if (state) {
-            providerRedirect.cookies.set("oauth-state", state, {
-              httpOnly: true,
-              secure: process.env.NODE_ENV === "production",
-              sameSite: "lax",
-              maxAge: 600,
-              path: "/",
-            });
-          }
-
-          return providerRedirect;
-        } else {
+        if (!url) {
           console.error("Backend returned empty OAuth URL");
           return NextResponse.json({error: "Backend returned empty OAuth URL"}, {status: 500});
         }
+        if (!state) {
+          console.error("Backend did not return OAuth state");
+          return NextResponse.json({error: "Backend did not return OAuth state"}, {status: 500});
+        }
+
+        const providerRedirect = NextResponse.redirect(url);
+
+        const rawCallbackUrl = request.nextUrl.searchParams.get("callbackUrl");
+        const userCallbackUrl = sanitizeCallbackUrl(rawCallbackUrl);
+
+        providerRedirect.cookies.set("oauth-callback-url", userCallbackUrl, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: 600,
+          path: "/",
+        });
+
+        providerRedirect.cookies.set("oauth-state", state, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: 600,
+          path: "/",
+        });
+
+        return providerRedirect;
       } catch (error) {
         console.error("OAuth start error: ", error);
         return NextResponse.json({error: "Failed to start OAuth flow"}, {status: 500});

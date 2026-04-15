@@ -62,20 +62,20 @@ public class AuthController {
     @GetMapping("/oauth-url")
     public ResponseEntity<OAuthUrlResponse> getOAuthUrl(
             @RequestParam String provider, @RequestParam String redirectUri) {
-        var authUrlOpt = oauthUrlService.getAuthorizationUrl(provider, redirectUri);
-        if (authUrlOpt.isEmpty()) {
-            log.warn("Invalid OAuth provider: {}", provider);
+        try {
+            var result = oauthUrlService.getAuthorizationUrl(provider, redirectUri);
+            return ResponseEntity.ok(new OAuthUrlResponse(result.url(), result.state()));
+        } catch (IllegalArgumentException e) {
+            log.warn("OAuth URL request rejected: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
         }
-        var result = authUrlOpt.get();
-        return ResponseEntity.ok(new OAuthUrlResponse(result.url(), result.state()));
     }
 
     @PostMapping("/oauth/exchange")
     public ResponseEntity<TokenResponse> exchangeOAuthCode(@RequestBody OAuthExchangeRequest request) {
         try {
             var jwt = oauthExchangeService.exchangeCodeForToken(
-                    request.provider(), request.code(), request.redirectUri());
+                    request.provider(), request.code(), request.redirectUri(), request.state());
             return ResponseEntity.ok(new TokenResponse(jwt));
         } catch (IllegalArgumentException e) {
             log.warn("Invalid OAuth provider: {}", request.provider());
@@ -107,7 +107,7 @@ public class AuthController {
 
     public record OAuthUrlResponse(String url, String state) {}
 
-    public record OAuthExchangeRequest(String provider, String code, String redirectUri) {}
+    public record OAuthExchangeRequest(String provider, String code, String redirectUri, String state) {}
 
     public record ProvidersResponse(List<String> providers) {}
 }
