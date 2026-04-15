@@ -230,9 +230,13 @@ public class OAuthExchangeService {
                 Set.of(JWSAlgorithm.RS256, JWSAlgorithm.RS384, JWSAlgorithm.RS512, JWSAlgorithm.ES256), jwkSource);
         jwtProcessor.setJWSKeySelector(keySelector);
 
+        var expectedClaimsBuilder = new JWTClaimsSet.Builder().audience(registration.getClientId());
+        String expectedIssuer = registration.getProviderDetails().getIssuerUri();
+        if (expectedIssuer != null && !expectedIssuer.isBlank()) {
+            expectedClaimsBuilder.issuer(expectedIssuer);
+        }
         var claimsVerifier = new DefaultJWTClaimsVerifier<SecurityContext>(
-                new JWTClaimsSet.Builder().audience(registration.getClientId()).build(),
-                new HashSet<>(Set.of("iss", "sub", "iat", "exp")));
+                expectedClaimsBuilder.build(), new HashSet<>(Set.of("iss", "sub", "iat", "exp")));
         jwtProcessor.setJWTClaimsSetVerifier(claimsVerifier);
 
         JWTClaimsSet verified = jwtProcessor.process(idToken, null);

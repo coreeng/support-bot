@@ -42,7 +42,7 @@ config:
         usernamePrompt: Email Address
         userSearch:
           baseDN: ou=People,dc=supportbot,dc=local
-          filter: "(objectClass=posixAccount)"
+          filter: "(objectClass=inetOrgPerson)"
           username: mail
           idAttr: uid
           emailAttr: mail
