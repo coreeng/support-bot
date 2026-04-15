@@ -14,10 +14,10 @@ the testing process with different configuration provided.
 
 ## Tier 1: LDAP + Dex in-cluster smoke (`ldap-infra`)
 
-[`DexLdapInfraIT`](src/test/java/com/coreeng/supportbot/teams/rest/DexLdapInfraIT.java) applies a short-lived **Kubernetes Job** that:
+[`DexLdapInfraTest`](src/test/java/com/coreeng/supportbot/teams/rest/DexLdapInfraTest.java) applies a short-lived **Kubernetes Job** that:
 
-1. `curl`s Dex **telemetry** liveness URL: `http://dex:5558/healthz/live` (matches [dexidp chart](https://charts.dexidp.io) probes).
-2. Runs `ldapsearch` against `ldap:389` for seed user `uid=alice` under `dc=supportbot,dc=local`, binding as `cn=admin,dc=supportbot,dc=local` using Secret **`ldap-secrets`** key **`admin-password`**.
+1. Checks Dex **telemetry** liveness URL: `http://dex:5558/healthz/live` (matches [dexidp chart](https://charts.dexidp.io) probes).
+2. Queries LDAP at `ldap:389` for seed user `uid=alice` under `dc=supportbot,dc=local`, binding as `cn=admin,dc=supportbot,dc=local` using Secret **`ldap-secrets`** key **`admin-password`**.
 
 The Job manifest lives at [`src/test/resources/k8s/dex-ldap-infra-job.yaml`](src/test/resources/k8s/dex-ldap-infra-job.yaml).
 
@@ -42,14 +42,14 @@ export DISABLE_INTEGRATION_LDAP_DEX_TESTS=true
 Run it (point `kubectl` at your cluster first):
 
 ```bash
-cd api && ./gradlew :integration-tests:test --tests 'com.coreeng.supportbot.teams.rest.DexLdapInfraIT'
+cd api && ./gradlew :integration-tests:test --tests 'com.coreeng.supportbot.teams.rest.DexLdapInfraTest'
 ```
 
 JUnit tags: `integration`, `ldap-infra` (for selective CI filters).
 
 ## Tier 2: Dex LDAP OAuth code + API exchange + jwt-groups (`oidc`)
 
-[`DexOidcInClusterIT`](src/test/java/com/coreeng/supportbot/teams/rest/DexOidcInClusterIT.java) applies a **ConfigMap** (Python script from [`dex-ldap-oidc-flow.py`](src/test/resources/k8s/dex-ldap-oidc-flow.py)) and a **Job** ([`dex-ldap-oidc-job.yaml`](src/test/resources/k8s/dex-ldap-oidc-job.yaml)) that:
+[`DexOidcInClusterTest`](src/test/java/com/coreeng/supportbot/teams/rest/DexOidcInClusterTest.java) applies a **ConfigMap** (Python script from [`dex-ldap-oidc-flow.py`](src/test/resources/k8s/dex-ldap-oidc-flow.py)) and a **Job** ([`dex-ldap-oidc-job.yaml`](src/test/resources/k8s/dex-ldap-oidc-job.yaml)) that:
 
 1. Listens on `http://127.0.0.1:8765/callback` and drives Dex’s LDAP login for bootstrap user `alice@supportbot.local` (password from a Secret, not from Git).
 2. Sends the authorization **code** once to Support Bot **`POST /auth/oauth/exchange`** with `provider=dex` and the same `redirectUri` (codes are single-use; the Job does not call Dex’s token endpoint itself).
@@ -72,7 +72,7 @@ The Job uses full svc FQDNs for **`dex`**, **`ldap`**, and **`support-bot`** in 
 ### How to run
 
 ```bash
-cd api && ./gradlew :integration-tests:test --tests 'com.coreeng.supportbot.teams.rest.DexOidcInClusterIT'
+cd api && ./gradlew :integration-tests:test --tests 'com.coreeng.supportbot.teams.rest.DexOidcInClusterTest'
 ```
 
 To disable, set `DISABLE_INTEGRATION_LDAP_DEX_TESTS=true` (same flag as Tier 1).

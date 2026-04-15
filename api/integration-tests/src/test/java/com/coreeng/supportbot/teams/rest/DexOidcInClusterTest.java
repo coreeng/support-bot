@@ -56,6 +56,9 @@ public class DexOidcInClusterTest {
     static void cleanup() {
         try {
             if (kubernetesClient != null) {
+                if (configMapName != null && config != null) {
+                    kubernetesClient.deleteConfigMap(configMapName, config.namespace());
+                }
                 kubernetesClient.close();
             }
         } catch (Exception e) {

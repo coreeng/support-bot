@@ -34,11 +34,11 @@ spec:
               mountPath: /tmp
           env:
             - name: DEX_HOST
-              value: "dex.support-bot-integration.svc.cluster.local"
+              value: "dex.PLACEHOLDER_NAMESPACE.svc.cluster.local"
             - name: DEX_TELEMETRY_PORT
               value: "5558"
             - name: LDAP_HOST
-              value: "ldap.support-bot-integration.svc.cluster.local"
+              value: "ldap.PLACEHOLDER_NAMESPACE.svc.cluster.local"
             - name: LDAP_PORT
               value: "389"
             - name: LDAP_BIND_DN
@@ -57,7 +57,7 @@ spec:
               python3 -c "import urllib.request; urllib.request.urlopen('http://${DEX_HOST}:${DEX_TELEMETRY_PORT}/healthz/live').read()"
               echo "OK_DEX"
               echo "Installing ldap3..."
-              python3 -m pip install --break-system-packages --no-cache-dir --target /tmp/pydeps ldap3 >/dev/null
+              python3 -m pip install --break-system-packages --no-cache-dir --target /tmp/pydeps ldap3==2.9.1 >/dev/null
               export PYTHONPATH=/tmp/pydeps
               echo "Checking LDAP uid=alice at ldap://${LDAP_HOST}:${LDAP_PORT} ..."
               python3 -c "

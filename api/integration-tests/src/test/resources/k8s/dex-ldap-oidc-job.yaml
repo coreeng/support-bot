@@ -32,13 +32,13 @@ spec:
               drop: ["ALL"]
           env:
             - name: DEX_ISSUER_URI
-              value: "http://dex.support-bot-integration.svc.cluster.local:5556"
+              value: "http://dex.PLACEHOLDER_NAMESPACE.svc.cluster.local:5556"
             - name: REDIRECT_URI
               value: "http://127.0.0.1:8765/api/oauth/callback/dex"
             - name: CALLBACK_PORT
               value: "8765"
             - name: API_BASE_URL
-              value: "http://support-bot.support-bot-integration.svc.cluster.local:8080"
+              value: "http://support-bot.PLACEHOLDER_NAMESPACE.svc.cluster.local:8080"
             - name: LDAP_USER_EMAIL
               value: "alice@supportbot.local"
             - name: EXPECTED_TEAM_CODE
@@ -64,7 +64,7 @@ spec:
             - |
               set -euo pipefail
               export HOME=/tmp
-              python3 -m pip install --break-system-packages --no-cache-dir --target /tmp/pydeps requests
+              python3 -m pip install --break-system-packages --no-cache-dir --target /tmp/pydeps requests==2.32.3
               cp /scripts/oidc.py /tmp/oidc.py
               export PYTHONPATH=/tmp/pydeps
               exec python3 /tmp/oidc.py

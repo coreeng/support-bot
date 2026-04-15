@@ -40,7 +40,15 @@ existingSecretPasswordKey: admin-password
 ldapRoot: dc=supportbot,dc=local
 adminUsername: admin
 
-resources: {}
+debug: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
 
 persistence:
   enabled: true

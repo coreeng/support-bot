@@ -29,7 +29,7 @@ deploy-integration)
 
 	extra=()
 	if [[ -n "${DRY_RUN:-}" ]]; then
-		extra+=(--dry-run=client --debug)
+		extra+=(--dry-run=client)
 	fi
 
 	LDAP_BIND_PW="${LDAP_BOOTSTRAP_USER_PASSWORD:?Set LDAP_BOOTSTRAP_USER_PASSWORD}"

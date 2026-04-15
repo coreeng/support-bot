@@ -36,7 +36,7 @@ spec:
             {{- end }}
           env:
             - name: BITNAMI_DEBUG
-              value: "true"
+              value: {{ .Values.debug | default false | toString | quote }}
             - name: LDAP_ROOT
               value: {{ .Values.ldapRoot | quote }}
             - name: LDAP_ADMIN_USERNAME
