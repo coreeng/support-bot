@@ -25,14 +25,15 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           # KSV-0014: readOnlyRootFilesystem is not set because the Bitnami OpenLDAP
           # image writes runtime config to /opt/bitnami/openldap/etc/slapd.d/ and pid/socket
-          # files to /opt/bitnami/openldap/var/run/ at startup. Mounting every writable path
-          # as emptyDir is fragile across image updates. The remaining container hardening
-          # (non-root, drop ALL, no privilege escalation) is applied below.
+          # files to /opt/bitnami/openldap/var/run/ at startup.
+          # capabilities: drop ALL + add back NET_BIND_SERVICE and SETUID/SETGID because
+          # slappasswd (called during bootstrap) needs them to hash passwords.
           securityContext:
             runAsNonRoot: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
+              add: ["NET_BIND_SERVICE", "SETUID", "SETGID"]
           ports:
             {{- if .Values.service.port }}
             - name: ldap
