@@ -160,7 +160,6 @@ class OAuthExchangeServiceTest {
     @Test
     void exchangeCodeForToken_rejectsInvalidState() {
         var service = createService(List.of(), List.of());
-        mockGoogleOAuth("user@test.com");
 
         assertThrows(
                 IllegalArgumentException.class,
@@ -170,7 +169,6 @@ class OAuthExchangeServiceTest {
     @Test
     void exchangeCodeForToken_rejectsNullState() {
         var service = createService(List.of(), List.of());
-        mockGoogleOAuth("user@test.com");
 
         assertThrows(
                 IllegalArgumentException.class,

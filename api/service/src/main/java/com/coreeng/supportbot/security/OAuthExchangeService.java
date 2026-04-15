@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -51,7 +52,7 @@ public class OAuthExchangeService {
     private final RedirectUriValidator redirectUriValidator;
     private final OAuthStateStore oauthStateStore;
 
-    public String exchangeCodeForToken(String provider, String code, String redirectUri, String state) {
+    public String exchangeCodeForToken(String provider, String code, String redirectUri, @Nullable String state) {
         if (!oauthStateStore.consumeIfValid(state)) {
             throw new IllegalArgumentException("Invalid or expired OAuth state parameter");
         }

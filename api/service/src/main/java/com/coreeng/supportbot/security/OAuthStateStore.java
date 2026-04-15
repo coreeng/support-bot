@@ -3,6 +3,7 @@ package com.coreeng.supportbot.security;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -19,7 +20,7 @@ public class OAuthStateStore {
     }
 
     /** Consumes the state (one-time use). Returns true if the state was valid and not yet consumed. */
-    public boolean consumeIfValid(String state) {
+    public boolean consumeIfValid(@Nullable String state) {
         if (state == null || state.isBlank()) {
             return false;
         }
