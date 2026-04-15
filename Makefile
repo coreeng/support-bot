@@ -91,8 +91,8 @@ help: ## Display this help.
 
 ##@ High level p2p targets
 p2p-build:         build-app           push-app                                                  ## Build support-bot
-p2p-functional:    build-functional    push-functional    deploy-functional    #run-functional    ## p2p functional tests
-p2p-nft:           build-nft           push-nft           deploy-nft           #run-nft           ## p2p nft tests
+p2p-functional:    build-functional    push-functional    deploy-functional    run-functional    ## p2p functional tests
+p2p-nft:           build-nft           push-nft           deploy-nft           run-nft           ## p2p nft tests
 p2p-integration:   build-integration   push-integration   deploy-integration   run-integration   ## p2p integration tests
 p2p-extended-test: build-extended-test push-extended-test deploy-extended-test run-extended-test ## p2p extended tests
 p2p-prod:          publish-prod        publish-chart                                             ## p2p release to production
