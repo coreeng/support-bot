@@ -34,9 +34,6 @@ export async function GET(
     loginUrl.searchParams.set("provider", provider);
     if (code) {
       loginUrl.searchParams.set("code", code);
-      if (returnedState) {
-        loginUrl.searchParams.set("state", returnedState);
-      }
     } else if (error) {
       const KNOWN_ERRORS = ["access_denied", "user_not_allowed", "server_error", "temporarily_unavailable"];
       const safeError = KNOWN_ERRORS.includes(error) ? error : "authentication_failed";

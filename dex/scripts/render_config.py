@@ -78,7 +78,7 @@ def _ldap_connector_item(e: dict) -> str:
       usernamePrompt: Email Address
       userSearch:
         baseDN: {json.dumps(e["DEX_LDAP_USER_SEARCH_BASE"])}
-        filter: "(objectClass=posixAccount)"
+        filter: "(objectClass=inetOrgPerson)"
         username: mail
         idAttr: uid
         emailAttr: mail

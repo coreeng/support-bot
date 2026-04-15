@@ -13,7 +13,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class OAuthUrlService {
     private final ClientRegistrationRepository clientRegistrationRepository;
     private final RedirectUriValidator redirectUriValidator;
-    private final OAuthStateStore oauthStateStore;
 
     public record AuthorizationUrlResult(String url, String state) {}
 
@@ -31,8 +30,9 @@ public class OAuthUrlService {
         var authorizationUri = registration.getProviderDetails().getAuthorizationUri();
         var clientId = registration.getClientId();
         var scopes = String.join(" ", registration.getScopes());
+        // State is verified client-side (cookie) — server-side store requires shared cache (Redis)
+        // which is not yet available. TODO: add server-side state verification when Redis is introduced.
         var state = UUID.randomUUID().toString();
-        oauthStateStore.store(state);
 
         var url = UriComponentsBuilder.fromUriString(authorizationUri)
                 .queryParam("client_id", clientId)

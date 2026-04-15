@@ -75,7 +75,7 @@ public class AuthController {
     public ResponseEntity<TokenResponse> exchangeOAuthCode(@RequestBody OAuthExchangeRequest request) {
         try {
             var jwt = oauthExchangeService.exchangeCodeForToken(
-                    request.provider(), request.code(), request.redirectUri(), request.state());
+                    request.provider(), request.code(), request.redirectUri());
             return ResponseEntity.ok(new TokenResponse(jwt));
         } catch (IllegalArgumentException e) {
             log.warn("Invalid OAuth provider: {}", request.provider());
@@ -107,7 +107,7 @@ public class AuthController {
 
     public record OAuthUrlResponse(String url, String state) {}
 
-    public record OAuthExchangeRequest(String provider, String code, String redirectUri, String state) {}
+    public record OAuthExchangeRequest(String provider, String code, String redirectUri) {}
 
     public record ProvidersResponse(List<String> providers) {}
 }

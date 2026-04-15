@@ -22,6 +22,14 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Deploys the support-bot API service and runs smoke tests against it.
+ *
+ * <p><b>Ordering contract:</b> The service deployed in {@code @BeforeAll} stays running for
+ * subsequent test classes (currently {@link DexOidcInClusterTest @Order(3)}). Teardown is handled
+ * by the <em>last</em> class that needs the API — see {@link DexOidcInClusterTest}. If that class
+ * is disabled, the Makefile {@code undeploy-integration} target cleans up instead.
+ */
 @Tag("integration")
 @Tag("smoke")
 @Order(2)

@@ -27,6 +27,12 @@ import org.slf4j.LoggerFactory;
  * bootstrap user {@code alice@supportbot.local}).
  *
  * <p>Runs by default. Disable with {@code DISABLE_INTEGRATION_LDAP_DEX_TESTS=true}.
+ *
+ * <p><b>Ordering contract:</b> This is the last test class that requires the API service
+ * (deployed by {@link ServiceStartupTest @Order(2)}). {@code @AfterAll} undeploys the service.
+ * Any future {@code @Order(4+)} class that needs the API must move the undeploy call there
+ * instead. If this class is disabled, the Makefile {@code undeploy-integration} target handles
+ * cleanup.
  */
 @Tag("integration")
 @Tag("oidc")

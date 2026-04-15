@@ -182,13 +182,11 @@ export const authConfig: NextAuthConfig = {
         code: { label: "Auth Code", type: "text" },
         provider: { label: "Oauth2 Provider", type: "text" },
         redirectUri: { label: "OAuth redirect URI", type: "text" },
-        state: { label: "OAuth state", type: "text" },
       },
       async authorize(credentials) {
         const code = credentials?.code as string;
         const provider = credentials?.provider as string;
         const clientRedirectUri = credentials?.redirectUri as string | undefined;
-        const state = credentials?.state as string | undefined;
 
         if (
           code &&
@@ -205,7 +203,7 @@ export const authConfig: NextAuthConfig = {
 
             const response = await publicFetch("/auth/oauth/exchange", {
               method: "POST",
-              body: JSON.stringify({provider, code, redirectUri, state}),
+              body: JSON.stringify({provider, code, redirectUri}),
             });
 
             if (response.ok) {

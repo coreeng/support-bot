@@ -20,7 +20,6 @@ function LoginContent() {
   const code = searchParams.get("code");
   const provider = searchParams.get("provider");
   const token = searchParams.get("token");
-  const oauthState = searchParams.get("state");
   const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const error = searchParams.get("error");
 
@@ -116,7 +115,7 @@ function LoginContent() {
     if (code && provider) {
       authAttemptedRef.current = true;
       const redirectUri = `${window.location.origin}/api/oauth/callback/${provider}`;
-      performSignIn("backend-code", { code, provider, redirectUri, ...(oauthState ? { state: oauthState } : {}) });
+      performSignIn("backend-code", { code, provider, redirectUri });
       return;
     }
 
@@ -124,7 +123,7 @@ function LoginContent() {
     if (isAuthenticated) {
       router.replace(callbackUrl);
     }
-  }, [code, provider, token, oauthState, isAuthenticated, isLoading, callbackUrl, router]);
+  }, [code, provider, token, isAuthenticated, isLoading, callbackUrl, router]);
 
   const handleLogin = (provider: LoginProvider) => {
     // OAuth goes through API route - server handles redirect to backend

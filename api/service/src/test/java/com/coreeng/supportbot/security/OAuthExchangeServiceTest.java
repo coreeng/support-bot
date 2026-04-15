@@ -47,14 +47,6 @@ class OAuthExchangeServiceTest {
     @Mock
     private JwtGroupTeamMerger jwtGroupTeamMerger;
 
-    private final OAuthStateStore oauthStateStore = new OAuthStateStore();
-
-    private String validState() {
-        var state = java.util.UUID.randomUUID().toString();
-        oauthStateStore.store(state);
-        return state;
-    }
-
     private OAuthExchangeService createService(List<String> allowedEmails, List<String> allowedDomains) {
         var props = new SecurityProperties(
                 new SecurityProperties.JwtProperties(
@@ -80,8 +72,7 @@ class OAuthExchangeServiceTest {
                 supportTeamService,
                 allowListService,
                 jwtGroupTeamMerger,
-                redirectUriValidator,
-                oauthStateStore);
+                redirectUriValidator);
     }
 
     private void mockGoogleOAuth(String email) {
@@ -112,7 +103,7 @@ class OAuthExchangeServiceTest {
 
         assertThrows(
                 UserNotAllowedException.class,
-                () -> service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI, validState()));
+                () -> service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI));
     }
 
     @Test
@@ -121,7 +112,7 @@ class OAuthExchangeServiceTest {
         mockGoogleOAuth("user@allowed.com");
         when(teamService.listTeamsByUserEmail("user@allowed.com")).thenReturn(ImmutableList.of());
 
-        var token = service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI, validState());
+        var token = service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI);
 
         assertFalse(token == null || token.isBlank());
     }
@@ -132,7 +123,7 @@ class OAuthExchangeServiceTest {
         mockGoogleOAuth("anyone@anywhere.com");
         when(teamService.listTeamsByUserEmail("anyone@anywhere.com")).thenReturn(ImmutableList.of());
 
-        var token = service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI, validState());
+        var token = service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI);
 
         assertFalse(token == null || token.isBlank());
     }
@@ -144,7 +135,7 @@ class OAuthExchangeServiceTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> service.exchangeCodeForToken(
-                        "google", "auth-code", "https://evil.example/api/oauth/callback/google", validState()));
+                        "google", "auth-code", "https://evil.example/api/oauth/callback/google"));
     }
 
     @Test
@@ -153,39 +144,6 @@ class OAuthExchangeServiceTest {
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> service.exchangeCodeForToken(
-                        "google", "auth-code", "http://localhost:3000/some/other/path", validState()));
-    }
-
-    @Test
-    void exchangeCodeForToken_rejectsInvalidState() {
-        var service = createService(List.of(), List.of());
-
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI, "bogus-state"));
-    }
-
-    @Test
-    void exchangeCodeForToken_rejectsNullState() {
-        var service = createService(List.of(), List.of());
-
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI, null));
-    }
-
-    @Test
-    void exchangeCodeForToken_stateIsOneTimeUse() {
-        var service = createService(List.of(), List.of());
-        mockGoogleOAuth("user@test.com");
-        when(teamService.listTeamsByUserEmail("user@test.com")).thenReturn(ImmutableList.of());
-
-        var state = validState();
-        service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI, state);
-
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI, state));
+                () -> service.exchangeCodeForToken("google", "auth-code", "http://localhost:3000/some/other/path"));
     }
 }
