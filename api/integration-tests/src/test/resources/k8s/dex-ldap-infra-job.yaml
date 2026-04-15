@@ -23,7 +23,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: smoke
-          image: nicolaka/netshoot:v0.13
+          image: python:3.12-slim-bookworm
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -52,13 +52,22 @@ spec:
           args:
             - |
               set -euo pipefail
+              export HOME=/tmp
               echo "Checking Dex telemetry health at http://${DEX_HOST}:${DEX_TELEMETRY_PORT}/healthz/live ..."
-              curl -sfS "http://${DEX_HOST}:${DEX_TELEMETRY_PORT}/healthz/live" >/dev/null
+              python3 -c "import urllib.request; urllib.request.urlopen('http://${DEX_HOST}:${DEX_TELEMETRY_PORT}/healthz/live').read()"
               echo "OK_DEX"
+              echo "Installing ldap3..."
+              python3 -m pip install --break-system-packages --no-cache-dir --target /tmp/pydeps ldap3 >/dev/null
+              export PYTHONPATH=/tmp/pydeps
               echo "Checking LDAP uid=alice at ldap://${LDAP_HOST}:${LDAP_PORT} ..."
-              ldapsearch -x -H "ldap://${LDAP_HOST}:${LDAP_PORT}" \
-                -D "${LDAP_BIND_DN}" -w "${LDAP_BIND_PW}" \
-                -b "ou=People,dc=supportbot,dc=local" "(uid=alice)" uid | grep -q "uid: alice"
+              python3 -c "
+              import ldap3, os
+              srv = ldap3.Server(os.environ['LDAP_HOST'], port=int(os.environ['LDAP_PORT']))
+              conn = ldap3.Connection(srv, os.environ['LDAP_BIND_DN'], os.environ['LDAP_BIND_PW'], auto_bind=True)
+              conn.search('ou=People,dc=supportbot,dc=local', '(uid=alice)', attributes=['uid'])
+              assert len(conn.entries) == 1 and str(conn.entries[0].uid) == 'alice', f'Expected alice, got {conn.entries}'
+              print(f'Found: {conn.entries[0]}')
+              "
               echo "OK_LDAP"
               echo "OK_ALL"
       volumes:
