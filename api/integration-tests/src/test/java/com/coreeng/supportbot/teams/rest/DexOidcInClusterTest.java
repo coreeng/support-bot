@@ -97,8 +97,8 @@ public class DexOidcInClusterTest {
         pb.redirectErrorStream(true);
         Process p = pb.start();
         String output;
-        try (var reader = new java.io.BufferedReader(
-                new java.io.InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+        try (var reader =
+                new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
             output = reader.lines().collect(java.util.stream.Collectors.joining("\n"));
         }
         int code = p.waitFor();
