@@ -26,7 +26,7 @@ hash_ssha() {
 	fi
 	if [[ -z "${h}" ]] && command -v docker >/dev/null 2>&1; then
 		# Pin matches ldap/docker-compose.yaml openldap image for consistency.
-		h=$(docker run --rm --entrypoint slappasswd osixia/openldap:1.5.0 -h '{SSHA}' -s "${pw}" 2>/dev/null || true)
+		h=$(docker run --rm --entrypoint slappasswd osixia/openldap:1.5.0@sha256:18742e9c449c9c1afe129d3f2f3ee15fb34cc43e5f940a20f3399728f41d7c28 -h '{SSHA}' -s "${pw}" 2>/dev/null || true)
 	fi
 	if [[ -z "${h}" ]]; then
 		echo "error: need slappasswd (apt install ldap-utils) or docker for osixia/openldap:1.5.0" >&2

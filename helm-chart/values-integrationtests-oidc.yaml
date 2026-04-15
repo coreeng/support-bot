@@ -1,7 +1,7 @@
 # Tier 2: API accepts Dex OAuth exchange and Bearer JWT; jwt-groups merge for LDAP "developers" -> core.
 # Deploy with the same base chart as integration tests, e.g.:
 #   helm upgrade --install ... -f values.yaml -f values-integrationtests.yaml -f values-integrationtests-oidc.yaml
-# Requires Dex values with issuer matching DEX_ISSUER_URI (use values-dex-oidc-incluster.yaml for http://dex:5556).
+# Requires Dex values with issuer matching DEX_ISSUER_URI (http://dex.support-bot-integration.svc.cluster.local:5556).
 
 env:
   - name: SPRING_PROFILES_ACTIVE

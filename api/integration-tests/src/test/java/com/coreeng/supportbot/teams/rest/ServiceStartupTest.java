@@ -25,10 +25,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Deploys the support-bot API service and runs smoke tests against it.
  *
- * <p><b>Ordering contract:</b> The service deployed in {@code @BeforeAll} stays running for
- * subsequent test classes (currently {@link DexOidcInClusterTest @Order(3)}). Teardown is handled
- * by the <em>last</em> class that needs the API — see {@link DexOidcInClusterTest}. If that class
- * is disabled, the Makefile {@code undeploy-integration} target cleans up instead.
+ * <p><b>Lifecycle:</b> The API service is deployed in {@code @BeforeAll} and stays running for
+ * subsequent test classes (e.g. {@link DexOidcInClusterTest @Order(3)}). Teardown is handled
+ * externally — by the Makefile {@code undeploy-integration} target (local) or by
+ * {@code cleanup_job()} in {@code run-integration-tests.sh} (pipeline). Test classes never
+ * undeploy the service themselves.
  */
 @Tag("integration")
 @Tag("smoke")

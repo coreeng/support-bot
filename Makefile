@@ -232,7 +232,8 @@ integration-test-local: deploy-integration ## Deploy infra and run integration t
 	exit $$rc
 
 .PHONY: undeploy-integration
-undeploy-integration: ## Uninstall DB + LDAP + Dex from integration namespace (service is undeployed by test @AfterAll)
+undeploy-integration: ## Uninstall service + DB + LDAP + Dex from integration namespace
+	-HELM_DRIVER=configmap helm uninstall support-bot -n $(INTEGRATION_NAMESPACE) --ignore-not-found
 	-helm uninstall support-bot-dex -n $(INTEGRATION_NAMESPACE) --ignore-not-found
 	-helm uninstall support-bot-ldap -n $(INTEGRATION_NAMESPACE) --ignore-not-found
 	-helm uninstall $(INTEGRATION_DB_RELEASE) -n $(INTEGRATION_NAMESPACE) --ignore-not-found

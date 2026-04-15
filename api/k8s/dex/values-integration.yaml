@@ -15,7 +15,7 @@ config:
   staticClients:
     - id: support-bot-dex
       name: Support Bot
-      secret: helm-template-placeholder-client-secret
+      secret: ${PLACEHOLDER_CLIENT_SECRET}
       redirectURIs:
         - http://127.0.0.1:8765/api/oauth/callback/dex
         - https://support-bot-api.integration.example.com/login/oauth2/code/dex
@@ -27,7 +27,7 @@ config:
         host: ldap.support-bot-integration.svc.cluster.local:389
         insecureNoSSL: true          # plaintext — see values-tls.yaml for production
         bindDN: cn=admin,dc=supportbot,dc=local
-        bindPW: helm-template-placeholder-ldap-bind
+        bindPW: ${PLACEHOLDER_LDAP_BIND}
         usernamePrompt: Email Address
         userSearch:
           baseDN: ou=People,dc=supportbot,dc=local

@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -28,11 +27,10 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Runs by default. Disable with {@code DISABLE_INTEGRATION_LDAP_DEX_TESTS=true}.
  *
- * <p><b>Ordering contract:</b> This is the last test class that requires the API service
- * (deployed by {@link ServiceStartupTest @Order(2)}). {@code @AfterAll} undeploys the service.
- * Any future {@code @Order(4+)} class that needs the API must move the undeploy call there
- * instead. If this class is disabled, the Makefile {@code undeploy-integration} target handles
- * cleanup.
+ * <p><b>Lifecycle:</b> The API service is deployed by {@link ServiceStartupTest @Order(2)} and
+ * undeployed externally — by the Makefile {@code undeploy-integration} target (local) or by
+ * {@code cleanup_job()} in {@code run-integration-tests.sh} (pipeline). Test classes are pure
+ * consumers and never manage the API service lifecycle.
  */
 @Tag("integration")
 @Tag("oidc")
@@ -67,13 +65,6 @@ public class DexOidcInClusterTest {
     @AfterAll
     static void cleanup() {
         try {
-            if (config != null) {
-                undeployService();
-            }
-        } catch (Exception e) {
-            LOGGER.error("Error undeploying service", e);
-        }
-        try {
             if (kubernetesClient != null) {
                 if (configMapName != null && config != null) {
                     kubernetesClient.deleteConfigMap(configMapName, config.namespace());
@@ -82,35 +73,6 @@ public class DexOidcInClusterTest {
             }
         } catch (Exception e) {
             LOGGER.error("Error during cleanup", e);
-        }
-    }
-
-    private static void undeployService() throws Exception {
-        String scriptPath = config.service().deploymentScript().scriptPath();
-        String chartPath = config.service().deploymentScript().chartPath();
-        String helmRelease = config.service().deploymentScript().releaseName();
-        ProcessBuilder pb = new ProcessBuilder(scriptPath);
-        Map<String, String> env = pb.environment();
-        env.put("ACTION", "delete");
-        env.put("NAMESPACE", config.namespace());
-        env.put("SERVICE_RELEASE", helmRelease);
-        env.put("SERVICE_CHART_PATH", chartPath);
-        env.put("SERVICE_IMAGE_REPOSITORY", config.service().image().repository());
-        env.put("SERVICE_IMAGE_TAG", config.service().image().tag());
-        env.put("VALUES_FILE", config.service().deploymentScript().valuesFilePath());
-        env.put("HELM_DRIVER", "configmap");
-
-        pb.redirectErrorStream(true);
-        Process p = pb.start();
-        String output;
-        try (var reader =
-                new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
-            output = reader.lines().collect(java.util.stream.Collectors.joining("\n"));
-        }
-        int code = p.waitFor();
-        LOGGER.info("deploy-service.sh (action=delete) output:\n{}", output);
-        if (code != 0) {
-            LOGGER.error("deploy-service.sh delete failed with exit code {}", code);
         }
     }
 

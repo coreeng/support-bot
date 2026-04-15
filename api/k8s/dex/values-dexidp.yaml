@@ -64,7 +64,7 @@ config:
   staticClients:
     - id: support-bot-dex
       name: Support Bot
-      secret: helm-template-placeholder-client-secret
+      secret: ${PLACEHOLDER_CLIENT_SECRET}
       redirectURIs:
         - https://support-bot-api.example.com/login/oauth2/code/dex
   connectors: []

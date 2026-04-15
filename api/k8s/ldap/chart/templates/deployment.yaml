@@ -23,6 +23,16 @@ spec:
         - name: openldap
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # KSV-0014: readOnlyRootFilesystem is not set because the Bitnami OpenLDAP
+          # image writes runtime config to /opt/bitnami/openldap/etc/slapd.d/ and pid/socket
+          # files to /opt/bitnami/openldap/var/run/ at startup. Mounting every writable path
+          # as emptyDir is fragile across image updates. The remaining container hardening
+          # (non-root, drop ALL, no privilege escalation) is applied below.
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             {{- if .Values.service.port }}
             - name: ldap

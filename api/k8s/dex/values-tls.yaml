@@ -38,7 +38,7 @@ config:
         # rootCAData: <base64-PEM>
 
         bindDN: cn=admin,dc=supportbot,dc=local
-        bindPW: helm-template-placeholder-ldap-bind
+        bindPW: ${PLACEHOLDER_LDAP_BIND}
         usernamePrompt: Email Address
         userSearch:
           baseDN: ou=People,dc=supportbot,dc=local

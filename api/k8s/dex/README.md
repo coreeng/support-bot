@@ -23,7 +23,7 @@ Baseline **`values-dexidp.yaml`** sets **`enablePasswordDB: false`** (connectors
 
 The **dex/dex** chart does not wire `dex-secrets` into config automatically. For production, keep sensitive strings out of Git: use a private `-f` values file or automation that sets `config.staticClients[].secret`, `config.connectors[].config.bindPW`, and OAuth client IDs/secrets.
 
-For **optional** Git / template checks, `values-dexidp.yaml` uses obvious placeholders (`helm-template-placeholder-*`). Replace them in your cluster overlay.
+For **optional** Git / template checks, `values-dexidp.yaml` uses `envsubst` placeholders (`${PLACEHOLDER_CLIENT_SECRET}`, `${PLACEHOLDER_LDAP_BIND}`). The `helm_dex.sh` script substitutes them at deploy time via `envsubst`.
 
 Example keys you may mirror from a Secret into values (conceptually):
 

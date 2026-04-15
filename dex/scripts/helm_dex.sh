@@ -17,16 +17,12 @@ trap 'rm -rf "${TMPDIR}"' EXIT
 
 # Copy values files with secret placeholders replaced so secrets never appear in
 # the process command line (vs --set-string which is visible in `ps`).
+# Uses envsubst instead of sed to avoid delimiter-escaping issues with special characters in secrets.
 prepare_values() {
 	local src="$1" dest="${TMPDIR}/$(basename "$1")"
-	cp "${src}" "${dest}"
-	if [[ -n "${DEX_CLIENT_SECRET:-}" ]]; then
-		sed -i.bak "s|helm-template-placeholder-client-secret|${DEX_CLIENT_SECRET}|g" "${dest}"
-	fi
-	if [[ -n "${LDAP_BIND_PW:-}" ]]; then
-		sed -i.bak "s|helm-template-placeholder-ldap-bind|${LDAP_BIND_PW}|g" "${dest}"
-	fi
-	rm -f "${dest}.bak"
+	PLACEHOLDER_CLIENT_SECRET="${DEX_CLIENT_SECRET:-helm-template-placeholder-client-secret}" \
+	PLACEHOLDER_LDAP_BIND="${LDAP_BIND_PW:-helm-template-placeholder-ldap-bind}" \
+		envsubst '$PLACEHOLDER_CLIENT_SECRET $PLACEHOLDER_LDAP_BIND' < "${src}" > "${dest}"
 	echo "${dest}"
 }
 
@@ -41,9 +37,11 @@ ensure_dex_k8s_secret() {
 
 case "${OP}" in
 template)
+	vf_base=$(prepare_values "${DEX_K8S}/values-dexidp.yaml")
+	vf_int=$(prepare_values "${DEX_K8S}/values-integration.yaml")
 	helm template support-bot-dex "${CHART_REPO_NAME}/${CHART_NAME}" --version "${CHART_VERSION}" \
-		-f "${DEX_K8S}/values-dexidp.yaml" \
-		-f "${DEX_K8S}/values-integration.yaml" >/dev/null
+		-f "${vf_base}" \
+		-f "${vf_int}" >/dev/null
 	;;
 deploy-integration)
 	NAMESPACE="${NAMESPACE:?Set NAMESPACE}"
@@ -51,6 +49,8 @@ deploy-integration)
 
 	LDAP_BIND_PW="${LDAP_BOOTSTRAP_USER_PASSWORD:?Set LDAP_BOOTSTRAP_USER_PASSWORD}"
 
+	vf_base=$(prepare_values "${DEX_K8S}/values-dexidp.yaml")
+	vf_int=$(prepare_values "${DEX_K8S}/values-integration.yaml")
 	vf_oidc=$(prepare_values "${DEX_K8S}/values-dex-oidc-incluster.yaml")
 
 	extra=()
@@ -60,8 +60,8 @@ deploy-integration)
 
 	helm upgrade --install support-bot-dex "${CHART_REPO_NAME}/${CHART_NAME}" --version "${CHART_VERSION}" \
 		-n "${NAMESPACE}" \
-		-f "${DEX_K8S}/values-dexidp.yaml" \
-		-f "${DEX_K8S}/values-integration.yaml" \
+		-f "${vf_base}" \
+		-f "${vf_int}" \
 		-f "${vf_oidc}" \
 		"${extra[@]}"
 	;;
