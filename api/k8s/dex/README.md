@@ -14,7 +14,7 @@ The **dex/dex** chart creates **namespace** `Role` + `RoleBinding` for `dex.core
 
 - `values-dexidp.yaml` — baseline: issuer, sqlite storage, web/telemetry ports, static client, optional empty `connectors: []`, namespaced RBAC only (`rbac.createClusterScoped: false`).
 - `values-integration.yaml` — sample integration overrides (issuer, LDAP connector using full svc FQDN, resource bumps). Ingress is **off** by default; reach Dex via full svc FQDN or port-forward.
-- `values-dex-oidc-incluster.yaml` — optional Tier 2 overlay: in-cluster issuer with full svc FQDN, static client redirect `http://127.0.0.1:8765/callback`, full LDAP connector (list replace-safe). Use when the API and integration Job talk to Dex only in-cluster; set `DEX_ISSUER_URI` and `DEX_INTERNAL_BASE_URL` to the same FQDN.
+- `values-dex-oidc-incluster.yaml` — optional Tier 2 overlay: in-cluster issuer with full svc FQDN, static client redirect `http://127.0.0.1:8765/api/oauth/callback/dex`, full LDAP connector (list replace-safe). Use when the API and integration Job talk to Dex only in-cluster; set `DEX_ISSUER_URI` and `DEX_INTERNAL_BASE_URL` to the same FQDN.
 - `values-legacy-core-platform-app.yaml` — archived `core-platform-app` + templated `config.yaml` with `${DEX_*}` placeholders.
 
 Baseline **`values-dexidp.yaml`** sets **`enablePasswordDB: false`** (connectors only). Add LDAP / Google / Microsoft under `config.connectors` via `values-integration.yaml` or another overlay, or set `enablePasswordDB: true` and `staticPasswords` in a private overlay if you need Dex’s built-in email login.

@@ -4,44 +4,12 @@ import {publicFetch} from "@/app/api/_lib/public-fetch";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 
-/** redirect_uri sent to IdP must match token exchange exactly (path is /api/oauth/callback/{provider}). */
-function oauthCallbackRedirectUri(
-  provider: string,
-  clientRedirectUri: string | undefined
-): string | null {
-  const path = `/api/oauth/callback/${provider}`;
-  const allowedOrigin = getAllowedOrigin();
-
-  if (!allowedOrigin) {
-    return null;
-  }
-
-  if (clientRedirectUri) {
-    try {
-      const u = new URL(clientRedirectUri);
-      if (
-        u.pathname === path &&
-        (u.protocol === "http:" || u.protocol === "https:") &&
-        u.origin === allowedOrigin
-      ) {
-        return u.toString();
-      }
-    } catch {
-      /* use env fallback */
-    }
-  }
-  try {
-    return new URL(path, allowedOrigin).toString();
-  } catch {
-    return null;
-  }
-}
-
-function getAllowedOrigin(): string | null {
+/** Build redirect_uri from NEXTAUTH_URL (single source of truth for OAuth origin). */
+function oauthCallbackRedirectUri(provider: string): string | null {
   const base = process.env.NEXTAUTH_URL?.trim();
   if (!base) return null;
   try {
-    return new URL(base).origin;
+    return new URL(`/api/oauth/callback/${provider}`, new URL(base).origin).toString();
   } catch {
     return null;
   }
@@ -181,22 +149,20 @@ export const authConfig: NextAuthConfig = {
       credentials: {
         code: { label: "Auth Code", type: "text" },
         provider: { label: "Oauth2 Provider", type: "text" },
-        redirectUri: { label: "OAuth redirect URI", type: "text" },
       },
       async authorize(credentials) {
         const code = credentials?.code as string;
         const provider = credentials?.provider as string;
-        const clientRedirectUri = credentials?.redirectUri as string | undefined;
 
         if (
           code &&
           (provider === "google" || provider === "azure" || provider === "dex")
         ) {
           try {
-            const redirectUri = oauthCallbackRedirectUri(provider, clientRedirectUri);
+            const redirectUri = oauthCallbackRedirectUri(provider);
             if (!redirectUri) {
               console.error(
-                "OAuth exchange: missing redirect URI (set NEXTAUTH_URL or pass redirectUri from client)"
+                "OAuth exchange: NEXTAUTH_URL is not set — cannot build redirect_uri"
               );
               return null;
             }

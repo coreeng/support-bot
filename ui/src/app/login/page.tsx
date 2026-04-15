@@ -111,11 +111,9 @@ function LoginContent() {
       return;
     }
 
-    // If we have a code, exchange it via NextAuth (redirect_uri must match IdP callback URL exactly)
     if (code && provider) {
       authAttemptedRef.current = true;
-      const redirectUri = `${window.location.origin}/api/oauth/callback/${provider}`;
-      performSignIn("backend-code", { code, provider, redirectUri });
+      performSignIn("backend-code", { code, provider });
       return;
     }
 

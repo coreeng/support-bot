@@ -51,7 +51,7 @@ JUnit tags: `integration`, `ldap-infra` (for selective CI filters).
 
 [`DexOidcInClusterTest`](src/test/java/com/coreeng/supportbot/teams/rest/DexOidcInClusterTest.java) applies a **ConfigMap** (Python script from [`dex-ldap-oidc-flow.py`](src/test/resources/k8s/dex-ldap-oidc-flow.py)) and a **Job** ([`dex-ldap-oidc-job.yaml`](src/test/resources/k8s/dex-ldap-oidc-job.yaml)) that:
 
-1. Listens on `http://127.0.0.1:8765/callback` and drives Dex’s LDAP login for bootstrap user `alice@supportbot.local` (password from a Secret, not from Git).
+1. Listens on `http://127.0.0.1:8765/api/oauth/callback/dex` and drives Dex’s LDAP login for bootstrap user `alice@supportbot.local` (password from a Secret, not from Git).
 2. Sends the authorization **code** once to Support Bot **`POST /auth/oauth/exchange`** with `provider=dex` and the same `redirectUri` (codes are single-use; the Job does not call Dex’s token endpoint itself).
 3. Decodes the **API-issued JWT** and asserts team code `core` is present (from `platform-integration.jwt-groups` mapping `developers` → `core` under profile `integrationtests-oidc`).
 4. Calls **`GET /auth/me`** with `Authorization: Bearer` and asserts the same team.
@@ -61,7 +61,7 @@ Log markers: `OK_TOKEN`, `OK_GROUPS`, `OK_API`, `OK_ALL`.
 ### Prerequisites
 
 1. Same namespace and kube context as Tier 1 ([`integration-test-local.yaml`](src/test/resources/integration-test-local.yaml)).
-2. **Dex** installed with issuer **identical** to the API’s `DEX_ISSUER_URI`. For in-cluster Jobs and Services, use the optional overlay [`values-dex-oidc-incluster.yaml`](../k8s/dex/values-dex-oidc-incluster.yaml) so `config.issuer` uses the full svc FQDN (e.g. `http://dex.support-bot-integration.svc.cluster.local:5556`) and apply after [`values-integration.yaml`](../k8s/dex/values-integration.yaml) (see [`api/k8s/dex/README.md`](../k8s/dex/README.md)). [`values-integration.yaml`](../k8s/dex/values-integration.yaml) also registers `http://127.0.0.1:8765/callback` on the static client.
+2. **Dex** installed with issuer **identical** to the API’s `DEX_ISSUER_URI`. For in-cluster Jobs and Services, use the optional overlay [`values-dex-oidc-incluster.yaml`](../k8s/dex/values-dex-oidc-incluster.yaml) so `config.issuer` uses the full svc FQDN (e.g. `http://dex.support-bot-integration.svc.cluster.local:5556`) and apply after [`values-integration.yaml`](../k8s/dex/values-integration.yaml) (see [`api/k8s/dex/README.md`](../k8s/dex/README.md)). [`values-integration.yaml`](../k8s/dex/values-integration.yaml) also registers `http://127.0.0.1:8765/api/oauth/callback/dex` on the static client.
 3. **Support Bot API** deployed for integration tests with **OIDC** env and profiles, e.g. Helm values [`values-integrationtests-oidc.yaml`](../k8s/service/values-integrationtests-oidc.yaml) (`SPRING_PROFILES_ACTIVE=integrationtests,integrationtests-oidc`, `DEX_*`, test-bypass off). `DEX_ISSUER_URI` and `DEX_INTERNAL_BASE_URL` must match Dex `config.issuer`.
 4. **Secrets** in that namespace:
    - `dex-secrets` with keys **`client-id`** and **`client-secret`** (same as Dex `staticClients` for `support-bot-dex`).

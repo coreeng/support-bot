@@ -10,11 +10,16 @@ export async function GET(
   const { provider } = await params;
 
   if (provider === "google" || provider === "azure" || provider === "dex") {
-    // Public origin for redirect_uri (must match IdP / Dex client config). Prefer NEXTAUTH_URL and
-    // X-Forwarded-* behind ingress; request.nextUrl.origin is often wrong in-cluster (e.g. 0.0.0.0:3000).
+    let origin: string;
+    try {
+      origin = resolvePublicOrigin();
+    } catch (e) {
+      console.error("OAuth start failed:", (e as Error).message);
+      return NextResponse.json({error: "Server misconfiguration: NEXTAUTH_URL is required"}, {status: 500});
+    }
     const redirectUri = new URL(
       `/api/oauth/callback/${provider}`,
-      resolvePublicOrigin(request)
+      origin
     ).toString();
 
     const urlParams = new URLSearchParams({provider, redirectUri});
@@ -45,7 +50,7 @@ export async function GET(
           path: "/",
         });
 
-        providerRedirect.cookies.set("oauth-state", state, {
+        providerRedirect.cookies.set("oauth-state", `${provider}:${state}`, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
           sameSite: "lax",

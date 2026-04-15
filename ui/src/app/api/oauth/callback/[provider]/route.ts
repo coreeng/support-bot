@@ -12,16 +12,17 @@ export async function GET(
   const error = searchParams.get("error");
   const returnedState = searchParams.get("state");
 
-  // Same origin logic as oauth/start redirect_uri (ingress / 0.0.0.0 bind).
-  const loginUrl = new URL("/login", resolvePublicOrigin(request));
+  const loginUrl = new URL("/login", resolvePublicOrigin());
   // Extract from cookie the user's last visited page to redirect to after login
   const rawCallbackUrl = request.cookies.get("oauth-callback-url")?.value || "/";
   loginUrl.searchParams.set("callbackUrl", sanitizeCallbackUrl(rawCallbackUrl));
 
-  // Verify OAuth state to prevent CSRF
-  const expectedState = request.cookies.get("oauth-state")?.value;
+  const stateCookie = request.cookies.get("oauth-state")?.value;
+  const expectedState = stateCookie?.startsWith(`${provider}:`)
+    ? stateCookie.slice(provider.length + 1)
+    : undefined;
   if (!expectedState || !returnedState || expectedState !== returnedState) {
-    console.error("OAuth state mismatch — possible CSRF attempt");
+    console.error("OAuth state mismatch — possible CSRF or provider confusion");
     loginUrl.searchParams.set("error", "authentication_failed");
     const redirectResponse = NextResponse.redirect(loginUrl);
     redirectResponse.cookies.set("oauth-callback-url", "", { path: "/", maxAge: 0 });

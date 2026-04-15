@@ -1,47 +1,38 @@
-import {computePublicOrigin} from "../resolve-public-origin";
+import {resolvePublicOrigin} from "../resolve-public-origin";
 
-describe("computePublicOrigin", () => {
-  it("uses NEXTAUTH_URL origin when set", () => {
-    expect(
-      computePublicOrigin({
-        nextAuthUrl: "https://app.example.com/support-bot/",
-        forwardedHost: "wrong.example",
-        forwardedProto: "http",
-        fallbackOrigin: "http://0.0.0.0:3000",
-      })
-    ).toBe("https://app.example.com");
+describe("resolvePublicOrigin", () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = {...originalEnv};
   });
 
-  it("uses first X-Forwarded-Host and X-Forwarded-Proto when NEXTAUTH_URL unset", () => {
-    expect(
-      computePublicOrigin({
-        nextAuthUrl: undefined,
-        forwardedHost: "ingress.example.com, internal",
-        forwardedProto: "https, http",
-        fallbackOrigin: "http://0.0.0.0:3000",
-      })
-    ).toBe("https://ingress.example.com");
+  afterAll(() => {
+    process.env = originalEnv;
   });
 
-  it("defaults proto to https when only forwarded host is present", () => {
-    expect(
-      computePublicOrigin({
-        nextAuthUrl: undefined,
-        forwardedHost: "only-host.example",
-        forwardedProto: null,
-        fallbackOrigin: "http://0.0.0.0:3000",
-      })
-    ).toBe("https://only-host.example");
+  it("returns origin from NEXTAUTH_URL", () => {
+    process.env.NEXTAUTH_URL = "https://app.example.com/support-bot/";
+    expect(resolvePublicOrigin()).toBe("https://app.example.com");
   });
 
-  it("falls back to fallbackOrigin when no env or forwarded host", () => {
-    expect(
-      computePublicOrigin({
-        nextAuthUrl: undefined,
-        forwardedHost: null,
-        forwardedProto: null,
-        fallbackOrigin: "http://127.0.0.1:3000",
-      })
-    ).toBe("http://127.0.0.1:3000");
+  it("strips path and trailing slash from NEXTAUTH_URL", () => {
+    process.env.NEXTAUTH_URL = "https://app.example.com:8443/path/";
+    expect(resolvePublicOrigin()).toBe("https://app.example.com:8443");
+  });
+
+  it("throws when NEXTAUTH_URL is not set", () => {
+    delete process.env.NEXTAUTH_URL;
+    expect(() => resolvePublicOrigin()).toThrow("NEXTAUTH_URL is not set or invalid");
+  });
+
+  it("throws when NEXTAUTH_URL is empty", () => {
+    process.env.NEXTAUTH_URL = "  ";
+    expect(() => resolvePublicOrigin()).toThrow("NEXTAUTH_URL is not set or invalid");
+  });
+
+  it("throws when NEXTAUTH_URL is malformed", () => {
+    process.env.NEXTAUTH_URL = "not-a-url";
+    expect(() => resolvePublicOrigin()).toThrow("NEXTAUTH_URL is not set or invalid");
   });
 });

@@ -236,7 +236,18 @@ public class OAuthExchangeService {
         var jwtProcessor = new DefaultJWTProcessor<SecurityContext>();
 
         var keySelector = new JWSVerificationKeySelector<>(
-                Set.of(JWSAlgorithm.RS256, JWSAlgorithm.RS384, JWSAlgorithm.RS512, JWSAlgorithm.ES256), jwkSource);
+                Set.of(
+                        JWSAlgorithm.RS256,
+                        JWSAlgorithm.RS384,
+                        JWSAlgorithm.RS512,
+                        JWSAlgorithm.ES256,
+                        JWSAlgorithm.ES384,
+                        JWSAlgorithm.ES512,
+                        JWSAlgorithm.PS256,
+                        JWSAlgorithm.PS384,
+                        JWSAlgorithm.PS512,
+                        JWSAlgorithm.EdDSA),
+                jwkSource);
         jwtProcessor.setJWSKeySelector(keySelector);
 
         var expectedClaimsBuilder = new JWTClaimsSet.Builder().audience(registration.getClientId());
