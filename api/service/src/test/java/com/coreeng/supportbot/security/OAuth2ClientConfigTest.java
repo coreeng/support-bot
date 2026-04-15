@@ -99,12 +99,34 @@ class OAuth2ClientConfigTest {
                 "dex-client-secret",
                 "openid,email,profile,groups",
                 "https://dex.example.com",
-                "http://dex:5556");
+                "http://dex.my-namespace.svc.cluster.local:5556");
 
         var dex = repository.findByRegistrationId("dex");
         assertNotNull(dex);
-        assertEquals("http://dex:5556/token", dex.getProviderDetails().getTokenUri());
-        assertEquals("http://dex:5556/keys", dex.getProviderDetails().getJwkSetUri());
+        assertEquals(
+                "http://dex.my-namespace.svc.cluster.local:5556/token",
+                dex.getProviderDetails().getTokenUri());
+        assertEquals(
+                "http://dex.my-namespace.svc.cluster.local:5556/keys",
+                dex.getProviderDetails().getJwkSetUri());
+    }
+
+    @Test
+    void dexRegistrationRejectsInternalBaseUrl_withBareHostname() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> config.clientRegistrationRepository(
+                        testSecurity(),
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "dex-client-id",
+                        "dex-client-secret",
+                        "openid,email,profile,groups",
+                        "https://dex.example.com",
+                        "http://dex:5556"));
     }
 
     @Test
