@@ -19,20 +19,31 @@ class OAuthUiOriginStartupWarningTest {
 
     @Test
     void skipsPropertyLookupWhenLocalProfileActive() {
+        when(environment.getProperty("spring.profiles.active")).thenReturn("local");
         when(environment.getActiveProfiles()).thenReturn(new String[] {"local"});
         new OAuthUiOriginStartupWarning(environment).warnIfUiOriginUnsetOutsideLocalProfiles();
         verify(environment, never()).getProperty("UI_ORIGIN");
     }
 
     @Test
-    void skipsPropertyLookupWhenNoActiveProfiles() {
-        when(environment.getActiveProfiles()).thenReturn(new String[] {});
+    void skipsPropertyLookupWhenSpringProfilesActiveUnset() {
+        when(environment.getProperty("spring.profiles.active")).thenReturn(null);
+        when(environment.getActiveProfiles()).thenReturn(new String[] {"default"});
+        new OAuthUiOriginStartupWarning(environment).warnIfUiOriginUnsetOutsideLocalProfiles();
+        verify(environment, never()).getProperty("UI_ORIGIN");
+    }
+
+    @Test
+    void skipsPropertyLookupWhenOnlyDefaultProfileActive() {
+        when(environment.getProperty("spring.profiles.active")).thenReturn("default");
+        when(environment.getActiveProfiles()).thenReturn(new String[] {"default"});
         new OAuthUiOriginStartupWarning(environment).warnIfUiOriginUnsetOutsideLocalProfiles();
         verify(environment, never()).getProperty("UI_ORIGIN");
     }
 
     @Test
     void skipsPropertyLookupWhenTestProfileActive() {
+        when(environment.getProperty("spring.profiles.active")).thenReturn("test");
         when(environment.getActiveProfiles()).thenReturn(new String[] {"test"});
         new OAuthUiOriginStartupWarning(environment).warnIfUiOriginUnsetOutsideLocalProfiles();
         verify(environment, never()).getProperty("UI_ORIGIN");
@@ -40,6 +51,7 @@ class OAuthUiOriginStartupWarningTest {
 
     @Test
     void readsUiOriginWhenNonLocalProfile() {
+        when(environment.getProperty("spring.profiles.active")).thenReturn("production");
         when(environment.getActiveProfiles()).thenReturn(new String[] {"production"});
         when(environment.getProperty("UI_ORIGIN")).thenReturn("https://ui.example.com");
         new OAuthUiOriginStartupWarning(environment).warnIfUiOriginUnsetOutsideLocalProfiles();
@@ -48,6 +60,7 @@ class OAuthUiOriginStartupWarningTest {
 
     @Test
     void throwsWhenNonLocalProfileAndUiOriginUnset() {
+        when(environment.getProperty("spring.profiles.active")).thenReturn("production");
         when(environment.getActiveProfiles()).thenReturn(new String[] {"production"});
         when(environment.getProperty("UI_ORIGIN")).thenReturn(null);
         assertThatThrownBy(() -> new OAuthUiOriginStartupWarning(environment).warnIfUiOriginUnsetOutsideLocalProfiles())
@@ -57,6 +70,7 @@ class OAuthUiOriginStartupWarningTest {
 
     @Test
     void throwsWhenNonLocalProfileAndUiOriginBlank() {
+        when(environment.getProperty("spring.profiles.active")).thenReturn("production");
         when(environment.getActiveProfiles()).thenReturn(new String[] {"production"});
         when(environment.getProperty("UI_ORIGIN")).thenReturn("  ");
         assertThatThrownBy(() -> new OAuthUiOriginStartupWarning(environment).warnIfUiOriginUnsetOutsideLocalProfiles())

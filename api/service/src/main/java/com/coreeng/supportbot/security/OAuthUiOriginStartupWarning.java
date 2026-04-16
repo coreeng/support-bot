@@ -14,8 +14,9 @@ import org.springframework.stereotype.Component;
  * OAuth {@code redirect_uri} against the origin from {@code security.oauth2.redirect-uri}, which
  * defaults from {@code UI_ORIGIN}; it must match the Next.js {@code NEXTAUTH_URL} origin.
  *
- * <p>Also treated as local-like: no explicitly activated profiles (typical {@code java -jar} with no
- * {@code -Dspring.profiles.active}) and the {@code test} profile (Spring Boot tests).
+ * <p>Also treated as local-like: no {@code spring.profiles.active} / {@code SPRING_PROFILES_ACTIVE}
+ * (typical {@code java -jar} with no profile env), only the Spring {@code default} profile active,
+ * or a named local-like profile (e.g. {@code local}, {@code test}, integration test profiles).
  */
 @Slf4j
 @Component
@@ -41,15 +42,19 @@ public class OAuthUiOriginStartupWarning {
                 + "public UI base URL (scheme + host + port, no path) so it matches the origin of NEXTAUTH_URL "
                 + "on the Next.js app — otherwise /auth/oauth-url and /auth/oauth/exchange return 400. "
                 + "For local development without setting UI_ORIGIN, use spring.profiles.active=local (or "
-                + "another local-like profile), or run with no explicitly active Spring profiles. "
+                + "another local-like profile), or omit SPRING_PROFILES_ACTIVE / spring.profiles.active. "
                 + "See api/service/docs/configuration.md (SSO, UI origin contract).";
         log.error(message);
         throw new IllegalStateException(message);
     }
 
     private boolean isLocalLikeProfile() {
+        String declared = environment.getProperty("spring.profiles.active");
+        if (declared == null || declared.isBlank()) {
+            return true;
+        }
         String[] active = environment.getActiveProfiles();
-        if (active.length == 0) {
+        if (active.length == 1 && "default".equalsIgnoreCase(active[0])) {
             return true;
         }
         return Arrays.stream(active).anyMatch(p -> LOCAL_LIKE_PROFILES.stream().anyMatch(l -> l.equalsIgnoreCase(p)));
