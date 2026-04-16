@@ -2,6 +2,7 @@ package com.coreeng.supportbot.rating;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.escalation.EscalationQueryService;
@@ -37,7 +38,7 @@ class RatingServiceSaveTest {
     }
 
     @Test
-    void returnsNull_whenTicketAlreadyRated() {
+    void rejects_whenTicketAlreadyRated() {
         Ticket ticket = Ticket.builder()
                 .channelId("C123")
                 .queryTs(MessageTs.of("111.222"))
@@ -45,21 +46,57 @@ class RatingServiceSaveTest {
                 .build();
         Ticket created = ticketRepository.createTicketIfNotExists(ticket);
         TicketId createdId = requireNonNull(created.id());
-        ticketRepository.markTicketAsRated(createdId);
+        assertThat(ticketRepository.tryMarkTicketAsRated(createdId)).isTrue();
 
-        Rating result = service.save(createdId, 4);
-
-        assertThat(result).isNull();
+        assertThatThrownBy(() -> service.save(createdId, 4))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Ticket has already been rated");
         assertThat(ratingRepository.size()).isEqualTo(0);
     }
 
     @Test
-    void returnsNull_whenTicketNotFound() {
+    void rejects_whenTicketNotFound() {
         TicketId missing = new TicketId(99_999);
 
-        Rating result = service.save(missing, 5);
+        assertThatThrownBy(() -> service.save(missing, 5))
+                .isInstanceOf(RatingTicketNotFoundException.class)
+                .hasMessage("Ticket not found: ID-99999");
+        assertThat(ratingRepository.size()).isEqualTo(0);
+    }
 
-        assertThat(result).isNull();
+    @Test
+    void rejects_whenTicketIsNotClosed() {
+        Ticket ticket = Ticket.builder()
+                .channelId("C123")
+                .queryTs(MessageTs.of("555.666"))
+                .status(TicketStatus.opened)
+                .build();
+        Ticket created = ticketRepository.createTicketIfNotExists(ticket);
+        TicketId createdId = requireNonNull(created.id());
+
+        assertThatThrownBy(() -> service.save(createdId, 4))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Ticket must be closed before rating can be submitted");
+        assertThat(ratingRepository.size()).isEqualTo(0);
+    }
+
+    @Test
+    void rejects_whenRatingIsBelowRange() {
+        TicketId createdId = createClosedTicket("777.888");
+
+        assertThatThrownBy(() -> service.save(createdId, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("rating must be between 1 and 5");
+        assertThat(ratingRepository.size()).isEqualTo(0);
+    }
+
+    @Test
+    void rejects_whenRatingIsAboveRange() {
+        TicketId createdId = createClosedTicket("999.000");
+
+        assertThatThrownBy(() -> service.save(createdId, 6))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("rating must be between 1 and 5");
         assertThat(ratingRepository.size()).isEqualTo(0);
     }
 
@@ -96,7 +133,8 @@ class RatingServiceSaveTest {
         assertThat(persisted.tags()).containsExactly("ingress", "api");
         assertThat(persisted.isEscalated()).isFalse();
 
-        assertThat(ticketRepository.isTicketRated(createdId)).isTrue();
+        assertThat(requireNonNull(ticketRepository.findTicketById(createdId)).ratingSubmitted())
+                .isTrue();
     }
 
     @Test
@@ -127,6 +165,32 @@ class RatingServiceSaveTest {
         assertThat(persisted).isNotNull();
         assertThat(persisted.isEscalated()).isTrue();
 
-        assertThat(ticketRepository.isTicketRated(createdId)).isTrue();
+        assertThat(requireNonNull(ticketRepository.findTicketById(createdId)).ratingSubmitted())
+                .isTrue();
+    }
+
+    @Test
+    void rejects_secondSubmissionForSameTicket() {
+        TicketId createdId = createClosedTicket("444.555");
+        when(escalationQueryService.existsByTicketId(createdId)).thenReturn(false);
+
+        Rating first = service.save(createdId, 5);
+
+        assertThat(first).isNotNull();
+        assertThatThrownBy(() -> service.save(createdId, 4))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Ticket has already been rated");
+        assertThat(ratingRepository.size()).isEqualTo(1);
+        assertThat(requireNonNull(ticketRepository.findTicketById(createdId)).ratingSubmitted())
+                .isTrue();
+    }
+
+    private TicketId createClosedTicket(String queryTs) {
+        Ticket created = ticketRepository.createTicketIfNotExists(Ticket.builder()
+                .channelId("C123")
+                .queryTs(MessageTs.of(queryTs))
+                .status(TicketStatus.closed)
+                .build());
+        return requireNonNull(created.id());
     }
 }

@@ -553,21 +553,14 @@ public class JdbcTicketRepository implements TicketRepository {
     }
 
     @Override
-    public boolean isTicketRated(TicketId ticketId) {
-        return dsl.select(TICKET.RATING_SUBMITTED)
-                .from(TICKET)
-                .where(TICKET.ID.eq(ticketId.id()))
-                .fetchOptional()
-                .map(r -> r.get(TICKET.RATING_SUBMITTED))
-                .orElse(false);
-    }
-
-    @Override
-    public void markTicketAsRated(TicketId ticketId) {
-        dsl.update(TICKET)
-                .set(TICKET.RATING_SUBMITTED, true)
-                .where(TICKET.ID.eq(ticketId.id()))
-                .execute();
+    public boolean tryMarkTicketAsRated(TicketId ticketId) {
+        return dsl.update(TICKET)
+                        .set(TICKET.RATING_SUBMITTED, true)
+                        .where(TICKET.ID.eq(ticketId.id()))
+                        .and(TICKET.RATING_SUBMITTED.isFalse())
+                        .and(TICKET.STATUS.eq(com.coreeng.supportbot.dbschema.enums.TicketStatus.closed))
+                        .execute()
+                == 1;
     }
 
     @Nullable private String toDbTeam(@Nullable TicketTeam team) {

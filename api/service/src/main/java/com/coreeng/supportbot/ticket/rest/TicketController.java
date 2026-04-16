@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.ticket.rest;
 
+import com.coreeng.supportbot.rating.RatingService;
+import com.coreeng.supportbot.rating.RatingTicketNotFoundException;
 import com.coreeng.supportbot.ticket.*;
 import com.coreeng.supportbot.util.Page;
 import com.google.common.collect.ImmutableList;
@@ -19,6 +21,7 @@ public class TicketController {
     private final TicketUpdateService ticketUpdateService;
     private final TicketProcessingService ticketProcessingService;
     private final TicketEscalationValidator ticketEscalationValidator;
+    private final RatingService ratingService;
     private final TicketUIMapper mapper;
     private final TicketTeamSuggestionsService teamSuggestionsService;
 
@@ -76,6 +79,21 @@ public class TicketController {
             TicketUI ticket = ticketUpdateService.update(id, request);
             return ResponseEntity.ok(ticket);
         } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/rating")
+    public ResponseEntity<?> submitRating(@PathVariable TicketId id, @RequestBody TicketRatingRequest request) {
+        try {
+            if (request.rating() == null) {
+                throw new IllegalArgumentException("rating is required");
+            }
+            ratingService.save(id, request.rating());
+            return ResponseEntity.ok().build();
+        } catch (RatingTicketNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
