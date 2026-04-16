@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -44,6 +45,7 @@ public class DexOidcInClusterTest {
 
     private static final String JOB_TEMPLATE_RESOURCE = "k8s/dex-ldap-oidc-job.yaml";
     private static final String OIDC_SCRIPT_RESOURCE = "k8s/dex-ldap-oidc-flow.py";
+    private static final String OIDC_REQUIREMENTS_RESOURCE = "k8s/oidc-requirements.txt";
 
     private static Config config;
     private static KubernetesTestClient kubernetesClient;
@@ -81,7 +83,9 @@ public class DexOidcInClusterTest {
     @Test
     void dexOidcFlowAgainstApi() throws IOException {
         String script = loadClasspathResource(OIDC_SCRIPT_RESOURCE);
-        kubernetesClient.createOrReplaceConfigMapData(configMapName, config.namespace(), "oidc.py", script);
+        String requirements = loadClasspathResource(OIDC_REQUIREMENTS_RESOURCE);
+        kubernetesClient.createOrReplaceConfigMapData(
+                configMapName, config.namespace(), Map.of("oidc.py", script, "requirements.txt", requirements));
 
         String yaml = loadJobTemplate(jobName, config.namespace(), configMapName);
         kubernetesClient.applyYamlManifest(yaml, config.namespace());

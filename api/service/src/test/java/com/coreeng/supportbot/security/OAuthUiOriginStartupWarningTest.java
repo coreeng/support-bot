@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.security;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,5 +30,23 @@ class OAuthUiOriginStartupWarningTest {
         when(environment.getProperty("UI_ORIGIN")).thenReturn("https://ui.example.com");
         new OAuthUiOriginStartupWarning(environment).warnIfUiOriginUnsetOutsideLocalProfiles();
         verify(environment).getProperty("UI_ORIGIN");
+    }
+
+    @Test
+    void throwsWhenNonLocalProfileAndUiOriginUnset() {
+        when(environment.getActiveProfiles()).thenReturn(new String[] {"production"});
+        when(environment.getProperty("UI_ORIGIN")).thenReturn(null);
+        assertThatThrownBy(() -> new OAuthUiOriginStartupWarning(environment).warnIfUiOriginUnsetOutsideLocalProfiles())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("UI_ORIGIN is not set");
+    }
+
+    @Test
+    void throwsWhenNonLocalProfileAndUiOriginBlank() {
+        when(environment.getActiveProfiles()).thenReturn(new String[] {"production"});
+        when(environment.getProperty("UI_ORIGIN")).thenReturn("  ");
+        assertThatThrownBy(() -> new OAuthUiOriginStartupWarning(environment).warnIfUiOriginUnsetOutsideLocalProfiles())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("UI_ORIGIN is not set");
     }
 }

@@ -10,9 +10,9 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 /**
- * Warns when {@code UI_ORIGIN} is unset outside local-like profiles. The API validates UI OAuth
- * {@code redirect_uri} against the origin from {@code security.oauth2.redirect-uri}, which defaults
- * from {@code UI_ORIGIN}; it must match the Next.js {@code NEXTAUTH_URL} origin.
+ * Fails startup when {@code UI_ORIGIN} is unset outside local-like profiles. The API validates UI
+ * OAuth {@code redirect_uri} against the origin from {@code security.oauth2.redirect-uri}, which
+ * defaults from {@code UI_ORIGIN}; it must match the Next.js {@code NEXTAUTH_URL} origin.
  */
 @Slf4j
 @Component
@@ -33,12 +33,14 @@ public class OAuthUiOriginStartupWarning {
         if (uiOrigin != null && !uiOrigin.isBlank()) {
             return;
         }
-        log.warn("UI_ORIGIN is not set. security.oauth2.redirect-uri defaults to http://localhost:3000/login; "
+        String message = "UI_ORIGIN is not set. security.oauth2.redirect-uri defaults to http://localhost:3000/login; "
                 + "the API allows UI redirect_uri only if its origin matches that value. Set UI_ORIGIN to your "
                 + "public UI base URL (scheme + host + port, no path) so it matches the origin of NEXTAUTH_URL "
                 + "on the Next.js app — otherwise /auth/oauth-url and /auth/oauth/exchange return 400. "
                 + "For local development without setting UI_ORIGIN, use spring.profiles.active=local (or "
-                + "another local-like profile). See api/service/docs/configuration.md (SSO, UI origin contract).");
+                + "another local-like profile). See api/service/docs/configuration.md (SSO, UI origin contract).";
+        log.error(message);
+        throw new IllegalStateException(message);
     }
 
     private boolean isLocalLikeProfile() {

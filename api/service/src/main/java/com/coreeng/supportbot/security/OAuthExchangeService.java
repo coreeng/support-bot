@@ -53,7 +53,7 @@ public class OAuthExchangeService {
     private final RedirectUriValidator redirectUriValidator;
 
     public String exchangeCodeForToken(String provider, String code, String redirectUri) {
-        redirectUriValidator.validate(redirectUri);
+        ValidatedRedirectUri validatedRedirectUri = redirectUriValidator.validate(redirectUri);
 
         var registration = clientRegistrationRepository.findByRegistrationId(provider);
         if (registration == null) {
@@ -71,7 +71,7 @@ public class OAuthExchangeService {
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
         body.add("grant_type", "authorization_code");
         body.add("code", code);
-        body.add("redirect_uri", redirectUri);
+        body.add("redirect_uri", validatedRedirectUri.value());
         body.add("client_id", clientId);
         body.add("client_secret", clientSecret);
 

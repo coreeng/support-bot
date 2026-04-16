@@ -21,7 +21,7 @@ public class OAuthUrlService {
      * @throws IllegalArgumentException if the provider is unknown
      */
     public AuthorizationUrlResult getAuthorizationUrl(String provider, String redirectUri) {
-        redirectUriValidator.validate(redirectUri);
+        ValidatedRedirectUri validatedRedirectUri = redirectUriValidator.validate(redirectUri);
         var registration = clientRegistrationRepository.findByRegistrationId(provider);
         if (registration == null) {
             throw new IllegalArgumentException("Unknown OAuth provider: " + provider);
@@ -36,7 +36,7 @@ public class OAuthUrlService {
 
         var url = UriComponentsBuilder.fromUriString(authorizationUri)
                 .queryParam("client_id", clientId)
-                .queryParam("redirect_uri", redirectUri)
+                .queryParam("redirect_uri", validatedRedirectUri.value())
                 .queryParam("response_type", "code")
                 .queryParam("scope", scopes)
                 .queryParam("state", state)

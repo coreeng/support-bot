@@ -11,7 +11,10 @@ export async function GET(
   const { provider } = await params;
 
   if (isOauthUiKnownProvider(provider)) {
-    const resolved = tryResolvePublicOrigin();
+    const resolved = tryResolvePublicOrigin(
+      request.nextUrl.origin,
+      sanitizeCallbackUrl(request.nextUrl.searchParams.get("callbackUrl"))
+    );
     if (!resolved.ok) {
       return resolved.response;
     }
@@ -38,8 +41,9 @@ export async function GET(
 
         const providerRedirect = NextResponse.redirect(url);
 
-        const rawCallbackUrl = request.nextUrl.searchParams.get("callbackUrl");
-        const userCallbackUrl = sanitizeCallbackUrl(rawCallbackUrl);
+        const userCallbackUrl = sanitizeCallbackUrl(
+          request.nextUrl.searchParams.get("callbackUrl")
+        );
 
         providerRedirect.cookies.set("oauth-callback-url", userCallbackUrl, {
           httpOnly: true,

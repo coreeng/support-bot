@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -32,19 +33,30 @@ class RedirectUriValidatorTest {
             })
     void acceptsValidCallbackUris(String uri) {
         var v = validator("http://localhost:3000/login");
-        assertDoesNotThrow(() -> v.validate(uri));
+        ValidatedRedirectUri validated = assertDoesNotThrow(() -> v.validate(uri));
+        assertThat(validated.value()).isEqualTo(uri);
+    }
+
+    @Test
+    void returnsValidatedRedirectUriWithCanonicalAsciiValue() {
+        var v = validator("http://localhost:3000/login");
+        var validated = v.validate("http://localhost:3000/api/oauth/callback/google");
+        assertThat(validated).isInstanceOf(ValidatedRedirectUri.class);
+        assertThat(validated.value()).isEqualTo("http://localhost:3000/api/oauth/callback/google");
     }
 
     @Test
     void acceptsHttpsOrigin() {
         var v = validator("https://app.example.com/login");
-        assertDoesNotThrow(() -> v.validate("https://app.example.com/api/oauth/callback/dex"));
+        var validated = assertDoesNotThrow(() -> v.validate("https://app.example.com/api/oauth/callback/dex"));
+        assertThat(validated.value()).isEqualTo("https://app.example.com/api/oauth/callback/dex");
     }
 
     @Test
     void acceptsNonDefaultPort() {
         var v = validator("https://app.example.com:8443/login");
-        assertDoesNotThrow(() -> v.validate("https://app.example.com:8443/api/oauth/callback/google"));
+        var validated = assertDoesNotThrow(() -> v.validate("https://app.example.com:8443/api/oauth/callback/google"));
+        assertThat(validated.value()).isEqualTo("https://app.example.com:8443/api/oauth/callback/google");
     }
 
     @Test
@@ -96,5 +108,48 @@ class RedirectUriValidatorTest {
     void rejectsSchemeRelativeUri() {
         var v = validator("http://localhost:3000/login");
         assertThrows(IllegalArgumentException.class, () -> v.validate("//attacker.example/api/oauth/callback/dex"));
+    }
+
+    /** Userinfo before {@code @} must not bypass origin checks (host is still allowed UI host). */
+    @Test
+    void rejectsUserinfoWhenHostMatchesAllowedOrigin() {
+        var v = validator("http://localhost:3000/login");
+        var ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> v.validate("http://attacker@localhost:3000/api/oauth/callback/google"));
+        assertThat(ex.getMessage()).containsIgnoringCase("userinfo");
+    }
+
+    /** Defense in depth: authority {@code localhost:3000@evil.example} yields a non-allowed host. */
+    @Test
+    void rejectsUserinfoDisguisedAsPort() {
+        var v = validator("http://localhost:3000/login");
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> v.validate("http://localhost:3000@evil.example/api/oauth/callback/google"));
+    }
+
+    /** Unicode “dot” in host breaks hostname parsing — must not be accepted as localhost. */
+    @Test
+    void rejectsUnicodeHomographHost() {
+        var v = validator("http://localhost:3000/login");
+        String malicious = "http://localhost\u3002example.com:3000/api/oauth/callback/google";
+        assertThrows(IllegalArgumentException.class, () -> v.validate(malicious));
+    }
+
+    @Test
+    void rejectsTrailingSlashAfterProvider() {
+        var v = validator("http://localhost:3000/login");
+        assertThrows(
+                IllegalArgumentException.class, () -> v.validate("http://localhost:3000/api/oauth/callback/google/"));
+    }
+
+    @Test
+    void rejectsFragment() {
+        var v = validator("http://localhost:3000/login");
+        var ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> v.validate("http://localhost:3000/api/oauth/callback/google#@evil.com"));
+        assertThat(ex.getMessage()).containsIgnoringCase("fragment");
     }
 }

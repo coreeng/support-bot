@@ -49,7 +49,7 @@ JUnit tags: `integration`, `ldap-infra` (for selective CI filters).
 
 ## Tier 2: Dex LDAP OAuth code + API exchange + jwt-groups (`oidc`)
 
-[`DexOidcInClusterTest`](src/test/java/com/coreeng/supportbot/teams/rest/DexOidcInClusterTest.java) applies a **ConfigMap** (Python script from [`dex-ldap-oidc-flow.py`](src/test/resources/k8s/dex-ldap-oidc-flow.py)) and a **Job** ([`dex-ldap-oidc-job.yaml`](src/test/resources/k8s/dex-ldap-oidc-job.yaml)) that:
+[`DexOidcInClusterTest`](src/test/java/com/coreeng/supportbot/teams/rest/DexOidcInClusterTest.java) applies a **ConfigMap** (Python script from [`dex-ldap-oidc-flow.py`](src/test/resources/k8s/dex-ldap-oidc-flow.py) plus pip [`requirements.txt`](src/test/resources/k8s/oidc-requirements.txt) generated with **`--require-hashes`** from [`oidc-requirements.in`](src/test/resources/k8s/oidc-requirements.in)) and a **Job** ([`dex-ldap-oidc-job.yaml`](src/test/resources/k8s/dex-ldap-oidc-job.yaml)) that:
 
 1. Listens on `http://127.0.0.1:8765/api/oauth/callback/dex` and drives Dex’s LDAP login for bootstrap user `alice@supportbot.local` (password from a Secret, not from Git).
 2. Sends the authorization **code** once to Support Bot **`POST /auth/oauth/exchange`** with `provider=dex` and the same `redirectUri` (codes are single-use; the Job does not call Dex’s token endpoint itself).

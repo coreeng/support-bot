@@ -5,10 +5,12 @@ jest.mock("next/server", () => ({
       headers: new Headers([["content-type", "application/json"]]),
       json: async () => body,
     }),
-    redirect: (url: string | URL) => {
+    redirect: (url: string | URL, init?: number | { status?: number }) => {
       const h = new Headers();
       h.set("Location", url instanceof URL ? url.toString() : String(url));
-      return { status: 307, headers: h };
+      const status =
+        typeof init === "number" ? init : (init && "status" in init ? init.status : undefined) ?? 307;
+      return { status, headers: h };
     },
   },
 }));
@@ -36,18 +38,23 @@ describe("tryResolvePublicOrigin", () => {
 
   it("returns origin when NEXTAUTH_URL is valid", () => {
     process.env.NEXTAUTH_URL = "https://app.example.com/path";
-    const r = tryResolvePublicOrigin();
+    const r = tryResolvePublicOrigin("https://request.example", "/");
     expect(r).toEqual({ ok: true, origin: "https://app.example.com" });
   });
 
-  it("returns 500 response when NEXTAUTH_URL is unset", async () => {
+  it("returns 302 redirect to login when NEXTAUTH_URL is unset", () => {
     delete process.env.NEXTAUTH_URL;
-    const r = tryResolvePublicOrigin();
+    const r = tryResolvePublicOrigin("https://request.example", "/dashboard");
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.response.status).toBe(500);
-      const body = await r.response.json();
-      expect(body.error).toContain("NEXTAUTH_URL");
+      expect(r.response.status).toBe(302);
+      const loc = r.response.headers.get("Location");
+      expect(loc).toBeTruthy();
+      const u = new URL(loc!);
+      expect(u.origin).toBe("https://request.example");
+      expect(u.pathname).toBe("/login");
+      expect(u.searchParams.get("error")).toBe("configuration");
+      expect(u.searchParams.get("callbackUrl")).toBe("/dashboard");
     }
   });
 });
@@ -85,6 +92,7 @@ describe("resolvePublicOriginOrConfigurationLoginRedirect", () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok) {
+      expect(r.response.status).toBe(302);
       const loc = r.response.headers.get("Location");
       expect(loc).toBeTruthy();
       const u = new URL(loc!);

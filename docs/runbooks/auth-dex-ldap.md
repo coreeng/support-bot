@@ -117,7 +117,7 @@ The Docker Compose setup (`ldap/docker-compose.yaml`) intentionally stays **plai
 
 **What it means:** This is **Dex’s service bind** to search the directory — **not** the end-user’s password. Dex must bind as the directory admin (or a dedicated read-only DN) before it can look up the user who typed their credentials.
 
-**Cause (most common in Kubernetes):** Dex `config.connectors[].config.bindPW` does **not** match the OpenLDAP admin password. The repo’s [`values-integration-ldap-plaintext-ephemeral.yaml`](../../api/k8s/dex/values-integration-ldap-plaintext-ephemeral.yaml) (when used) ships a **template placeholder** (`helm-template-placeholder-ldap-bind`) until `helm_dex.sh` substitutes `LDAP_BOOTSTRAP_USER_PASSWORD`. If you deploy Dex without replacing it, LDAP returns 49 while **Google/Microsoft connectors on the same Dex** still work.
+**Cause (most common in Kubernetes):** Dex `config.connectors[].config.bindPW` does **not** match the OpenLDAP admin password. In Git, the LDAP overlays ([`values-integration-ldap-plaintext-ephemeral.yaml`](../../api/k8s/dex/values-integration-ldap-plaintext-ephemeral.yaml) and [`values-tls.yaml`](../../api/k8s/dex/values-tls.yaml) when used) set `bindPW` to the **envsubst** token **`${PLACEHOLDER_LDAP_BIND}`**. [`dex/scripts/helm_dex.sh`](../../dex/scripts/helm_dex.sh) renders values through **`envsubst`** and supplies that from **`LDAP_BOOTSTRAP_USER_PASSWORD`** (defaulting to the fallback literal **`helm-template-placeholder-ldap-bind`** when it is unset). If the real admin password never makes it into the rendered config, LDAP returns **49** while **Google/Microsoft connectors on the same Dex** still work.
 
 **Fix:**
 

@@ -307,7 +307,7 @@ Set these on the **API**:
 | Variable | Description                                                                                                                            |
 |----------|----------------------------------------------------------------------------------------------------------------------------------------|
 | `JWT_SECRET` | Signing key for JWTs. Must be at least 256 bits. **Required**  the app will fail to start if not set.                                  |
-| `UI_ORIGIN` | Public UI base URL (scheme + host + port, no path), e.g. `https://support-bot-ui.example.com`. Drives `security.oauth2.redirect-uri` (default `${UI_ORIGIN:http://localhost:3000}/login`). **Must match the origin of `NEXTAUTH_URL` on the Next.js app** (same scheme, host, and port) or proxied OAuth returns HTTP 400. Outside local-like Spring profiles, the API logs a **warning** at startup if `UI_ORIGIN` is unset. See [UI origin contract](#ui-origin-contract) below. |
+| `UI_ORIGIN` | Public UI base URL (scheme + host + port, no path), e.g. `https://support-bot-ui.example.com`. Drives `security.oauth2.redirect-uri` (default `${UI_ORIGIN:http://localhost:3000}/login`). **Must match the origin of `NEXTAUTH_URL` on the Next.js app** (same scheme, host, and port) or proxied OAuth returns HTTP 400. Outside local-like Spring profiles, the API **fails at startup** if `UI_ORIGIN` is unset or blank. See [UI origin contract](#ui-origin-contract) below. |
 | `GOOGLE_CLIENT_ID` | Google OAuth2 client ID. Leave empty to disable Google SSO.                                                                            |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret.                                                                                                           |
 | `AZURE_CLIENT_ID` | Azure AD application (client) ID. Leave empty to disable Azure AD SSO.                                                                 |
@@ -352,7 +352,7 @@ Use **one canonical public UI URL** everywhere:
 
 Avoid mixing `localhost` vs `127.0.0.1`, `http` vs `https`, or different ports between the two — mismatches produce **HTTP 400** on `/auth/oauth-url` and `/auth/oauth/exchange` for **all** UI-driven IdPs (Google, Azure, Dex).
 
-For local development you can omit **`UI_ORIGIN`** when using a **local-like** Spring profile (`local`, `functionaltests`, `integrationtests`, `integrationtests-oidc`); otherwise the API emits a startup warning if `UI_ORIGIN` is unset.
+For local development you can omit **`UI_ORIGIN`** when using a **local-like** Spring profile (`local`, `functionaltests`, `integrationtests`, `integrationtests-oidc`); otherwise the API fails at startup if `UI_ORIGIN` is unset or blank.
 
 When deploying with the repo **Helm chart** (`helm-chart/`), you can set **`publicWebOrigin`** once (scheme + host + port, no path): the chart appends **`UI_ORIGIN`** on the API deployment and **`NEXTAUTH_URL`** on the UI deployment from that value. Avoid also setting duplicate `UI_ORIGIN` / `NEXTAUTH_URL` entries in `env` / `ui.env` for the same pods.
 

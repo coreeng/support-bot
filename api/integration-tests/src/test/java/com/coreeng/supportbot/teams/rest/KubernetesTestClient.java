@@ -14,6 +14,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.awaitility.Awaitility;
 import org.slf4j.Logger;
@@ -149,15 +150,20 @@ public class KubernetesTestClient implements AutoCloseable {
 
     /** Creates or replaces a ConfigMap with a single data entry (e.g. script for an integration Job). */
     public void createOrReplaceConfigMapData(String name, String namespace, String key, String data) {
-        LOGGER.info("Creating ConfigMap {} in namespace {} (key={})...", name, namespace, key);
+        createOrReplaceConfigMapData(name, namespace, Map.of(key, data));
+    }
+
+    /** Creates or replaces a ConfigMap with the given data keys (e.g. script + requirements lockfile). */
+    public void createOrReplaceConfigMapData(String name, String namespace, Map<String, String> data) {
+        LOGGER.info("Creating ConfigMap {} in namespace {} (keys={})...", name, namespace, data.keySet());
         try {
-            ConfigMap configMap = new ConfigMapBuilder()
+            ConfigMapBuilder builder = new ConfigMapBuilder()
                     .withNewMetadata()
                     .withName(name)
                     .withNamespace(namespace)
-                    .endMetadata()
-                    .addToData(key, data)
-                    .build();
+                    .endMetadata();
+            data.forEach(builder::addToData);
+            ConfigMap configMap = builder.build();
             client.configMaps().inNamespace(namespace).resource(configMap).createOr(NonDeletingOperation::update);
             LOGGER.info("ConfigMap {} applied.", name);
         } catch (Exception e) {

@@ -41,9 +41,9 @@ def build_password_db(e: dict) -> str:
     return """enablePasswordDB: true
 staticPasswords:
   - email: ${DEX_LOCAL_USER_EMAIL}
-    hash: "${DEX_LOCAL_USER_PASSWORD_HASH}"
+    hash: ${DEX_LOCAL_USER_PASSWORD_HASH}
     username: ${DEX_LOCAL_USER_USERNAME}
-    userID: "${DEX_LOCAL_USER_ID}"
+    userID: ${DEX_LOCAL_USER_ID}
 """
 
 
@@ -150,8 +150,9 @@ template = template.replace("@CONNECTORS@", build_connectors(env))
 
 
 def repl(match):
+    """Emit JSON-encoded scalars so substituted secrets cannot break or inject YAML."""
     key = match.group(1)
-    return env.get(key, "")
+    return json.dumps(env.get(key, ""), ensure_ascii=False)
 
 
 rendered = re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", repl, template)

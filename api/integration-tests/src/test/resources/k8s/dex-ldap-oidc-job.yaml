@@ -1,5 +1,6 @@
 # Template: replace PLACEHOLDER_JOB_NAME, PLACEHOLDER_NAMESPACE, PLACEHOLDER_CONFIGMAP_NAME.
-# ConfigMap PLACEHOLDER_CONFIGMAP_NAME must contain key oidc.py (script from dex-ldap-oidc-flow.py), created by the test.
+# ConfigMap PLACEHOLDER_CONFIGMAP_NAME must contain keys oidc.py (script from dex-ldap-oidc-flow.py) and
+# requirements.txt (hashed lock from oidc-requirements.txt), created by the test.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -64,7 +65,8 @@ spec:
             - |
               set -euo pipefail
               export HOME=/tmp
-              python3 -m pip install --break-system-packages --no-cache-dir --target /tmp/pydeps requests==2.32.3
+              python3 -m pip install --break-system-packages --no-cache-dir --require-hashes \
+                --target /tmp/pydeps -r /scripts/requirements.txt
               cp /scripts/oidc.py /tmp/oidc.py
               export PYTHONPATH=/tmp/pydeps
               exec python3 /tmp/oidc.py

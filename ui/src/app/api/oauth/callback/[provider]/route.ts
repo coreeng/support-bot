@@ -13,7 +13,10 @@ export async function GET(
   const error = searchParams.get("error");
   const returnedState = searchParams.get("state");
 
-  const resolved = tryResolvePublicOrigin();
+  const resolved = tryResolvePublicOrigin(
+    request.nextUrl.origin,
+    sanitizeCallbackUrl(request.cookies.get("oauth-callback-url")?.value)
+  );
   if (!resolved.ok) {
     return resolved.response;
   }

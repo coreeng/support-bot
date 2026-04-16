@@ -1,6 +1,8 @@
 package com.coreeng.supportbot.security;
 
+import java.net.IDN;
 import java.net.URI;
+import java.net.URISyntaxException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -9,8 +11,9 @@ import org.springframework.stereotype.Component;
  * forwards an attacker-controlled URI (and the embedded {@code client_secret}) to an arbitrary host.
  *
  * <p>The allowed origin is derived from {@code security.oauth2.redirect-uri} (the fixed post-login
- * redirect target). Only the scheme + authority (host:port) are compared; the path must begin with
- * {@code /api/oauth/callback/} followed by a known provider.
+ * redirect target). Only the scheme + authority (host:port) are compared; the path must be exactly
+ * {@code /api/oauth/callback/}{@code <provider>} with a known provider id. Userinfo, fragments, and
+ * ambiguous host forms are rejected.
  */
 @Slf4j
 @Component
@@ -25,12 +28,19 @@ public class RedirectUriValidator {
      * @throws IllegalArgumentException if the URI is malformed, targets an unknown origin, or has
      *     an unexpected path
      */
-    public void validate(String redirectUri) {
+    public ValidatedRedirectUri validate(String redirectUri) {
         URI uri;
         try {
             uri = URI.create(redirectUri).normalize();
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Malformed redirect_uri", e);
+        }
+
+        if (uri.getRawUserInfo() != null && !uri.getRawUserInfo().isEmpty()) {
+            throw new IllegalArgumentException("redirect_uri must not contain userinfo");
+        }
+        if (uri.getRawFragment() != null && !uri.getRawFragment().isEmpty()) {
+            throw new IllegalArgumentException("redirect_uri must not contain a fragment");
         }
 
         if (uri.getScheme() == null || uri.getHost() == null) {
@@ -48,9 +58,28 @@ public class RedirectUriValidator {
             throw new IllegalArgumentException(
                     "redirect_uri path must start with " + OauthUiCallbackConstants.CALLBACK_PATH_PREFIX);
         }
-        String provider = path.substring(OauthUiCallbackConstants.CALLBACK_PATH_PREFIX.length());
-        if (!OauthUiCallbackConstants.KNOWN_PROVIDERS.contains(provider)) {
-            throw new IllegalArgumentException("redirect_uri references unknown provider: " + provider);
+        if (path.contains("..")) {
+            throw new IllegalArgumentException("redirect_uri path must not contain '..' components");
+        }
+        String rest = path.substring(OauthUiCallbackConstants.CALLBACK_PATH_PREFIX.length());
+        if (rest.isEmpty() || rest.indexOf('/') >= 0) {
+            throw new IllegalArgumentException("redirect_uri path must be exactly "
+                    + OauthUiCallbackConstants.CALLBACK_PATH_PREFIX
+                    + "<provider> with no trailing slash or extra segments");
+        }
+        if (!OauthUiCallbackConstants.KNOWN_PROVIDERS.contains(rest)) {
+            throw new IllegalArgumentException("redirect_uri references unknown provider: " + rest);
+        }
+
+        return new ValidatedRedirectUri.Valid(canonicalRedirectUri(uri));
+    }
+
+    private static String canonicalRedirectUri(URI in) {
+        try {
+            URI rebuilt = new URI(in.getScheme(), null, in.getHost(), in.getPort(), in.getPath(), in.getQuery(), null);
+            return rebuilt.normalize().toASCIIString();
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Invalid redirect_uri components", e);
         }
     }
 
@@ -73,10 +102,18 @@ public class RedirectUriValidator {
 
     private static String originOf(URI uri) {
         String scheme = uri.getScheme();
-        String host = uri.getHost();
+        String host = asciiHost(uri.getHost());
         int port = uri.getPort();
         boolean defaultPort =
                 (port == -1) || ("http".equals(scheme) && port == 80) || ("https".equals(scheme) && port == 443);
         return defaultPort ? scheme + "://" + host : scheme + "://" + host + ":" + port;
+    }
+
+    private static String asciiHost(String host) {
+        try {
+            return IDN.toASCII(host);
+        } catch (IllegalArgumentException e) {
+            return host;
+        }
     }
 }
