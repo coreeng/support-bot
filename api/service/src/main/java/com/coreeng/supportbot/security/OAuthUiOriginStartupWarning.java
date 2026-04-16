@@ -52,7 +52,6 @@ public class OAuthUiOriginStartupWarning {
         if (active.length == 0) {
             return true;
         }
-        return Arrays.stream(active)
-                .anyMatch(p -> LOCAL_LIKE_PROFILES.stream().anyMatch(l -> l.equalsIgnoreCase(p)));
+        return Arrays.stream(active).anyMatch(p -> LOCAL_LIKE_PROFILES.stream().anyMatch(l -> l.equalsIgnoreCase(p)));
     }
 }
