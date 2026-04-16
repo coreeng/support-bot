@@ -9,12 +9,17 @@
 <module name="Checker">
     <property name="severity" value="error"/>
     <property name="fileExtensions" value="java"/>
+    <!-- Exclude the test-only Hub4j annotation shim because its package must match the upstream
+         com.infradna.tool.bridge_method_injector name exactly, including underscores. -->
+    <module name="SuppressionSingleFilter">
+        <property name="files" value=".*[\\/]BridgeMethodsAdded\.java"/>
+        <property name="id" value="PackageNameMain"/>
+    </module>
 
     <!-- Exclude generated code -->
     <module name="BeforeExecutionExclusionFileFilter">
         <property name="fileNamePattern" value=".*[\\/]dbschema[\\/].*"/>
     </module>
-
     <module name="TreeWalker">
         <!-- File name must match the outer type name -->
         <module name="OuterTypeFilename"/>
@@ -74,6 +79,7 @@
 
         <!-- Package names: lowercase, no underscores -->
         <module name="PackageName">
+            <property name="id" value="PackageNameMain"/>
             <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
             <message key="name.invalidPattern"
                 value="Package ''{0}'' must match pattern ''{1}'' (lowercase)."/>
