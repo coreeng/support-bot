@@ -6,7 +6,8 @@ LDAP_K8S := ../api/k8s/ldap
 p2p-build: template ## Fast feedback: validate Helm values
 p2p-functional:
 p2p-nft:
-p2p-integration: template deploy-integration
+p2p-integration: template ## P2P: render then deploy (sets LDAP_DEPLOY_INSECURE_PLAINTEXT for plaintext overlay)
+	@$(MAKE) deploy-integration LDAP_DEPLOY_INSECURE_PLAINTEXT=true
 p2p-extended-test:
 p2p-prod:
 
@@ -37,17 +38,19 @@ down-local: ## Stop local LDAP stack
 render-bootstrap-users: apply-bootstrap-users-ldif ## Generate bootstrap/20-users.ldif (requires LDAP_BOOTSTRAP_USER_PASSWORD in environment)
 
 .PHONY: template
-template: ## Validate LDAP chart (support-bot-openldap) with values-bitnami + integration overlay
+template: ## Validate LDAP chart (bitnami + integration + ephemeral plaintext overlay for render)
 	@bash ./scripts/helm_ldap.sh template
 
 NAMESPACE ?= support-bot-integration
 DRY_RUN ?=
 
 .PHONY: deploy-integration
-deploy-integration: ## Deploy LDAP module to integration environment (sources .env.local if present)
+deploy-integration: ## Deploy LDAP to integration (requires LDAP_DEPLOY_INSECURE_PLAINTEXT=true unless root Makefile sets it)
 	@bash -c 'set -eo pipefail; cd "$(CURDIR)"; \
 		if [[ -f .env.local ]]; then set -a; source .env.local; set +a; fi; \
-		NAMESPACE="$(NAMESPACE)" DRY_RUN="$(DRY_RUN)" bash ./scripts/helm_ldap.sh deploy-integration'
+		NAMESPACE="$(NAMESPACE)" DRY_RUN="$(DRY_RUN)" \
+		LDAP_DEPLOY_INSECURE_PLAINTEXT="$(LDAP_DEPLOY_INSECURE_PLAINTEXT)" \
+		bash ./scripts/helm_ldap.sh deploy-integration'
 
 .PHONY: sync-bootstrap-into-chart
 sync-bootstrap-into-chart: ## Render 20-users.ldif then copy ldap/bootstrap/*.ldif into api/k8s/ldap/chart/files/bootstrap/

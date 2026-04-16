@@ -1,5 +1,6 @@
 # Defaults for support-bot-openldap (Bitnami OpenLDAP image).
-# Override from api/k8s/ldap/values-bitnami.yaml and values-integration.yaml.
+# Override from api/k8s/ldap/values-bitnami.yaml, values-integration.yaml, and optionally
+# values-integration-ldap-plaintext-ephemeral.yaml or values-tls.yaml.
 
 fullnameOverride: ""
 
@@ -16,23 +17,23 @@ service:
   # K8s Service maps service.port → service.containerPort.
   containerPort: 1389
 
-# TLS / LDAPS (disabled by default — plaintext LDAP for local-dev only).
-# For integration / production, enable TLS and supply a cert Secret.
-# See docs/runbooks/auth-dex-ldap.md § "Enabling LDAPS / StartTLS".
+# TLS / LDAPS — default is secure posture: tls.enabled true requires tls.certSecret to be set
+# (see templates: effective TLS = enabled + non-empty certSecret). Without a Secret, Helm fails
+# unless you apply values-integration-ldap-plaintext-ephemeral.yaml (sets tls.enabled: false) for
+# ephemeral plaintext only. See api/k8s/ldap/README.md and docs/runbooks/auth-dex-ldap.md.
 tls:
-  enabled: false
+  enabled: true
   # Additional LDAPS port exposed on the Service (636 by convention).
   port: 636
-  # K8s TLS Secret with tls.crt, tls.key, and optionally ca.crt.
+  # K8s TLS Secret with tls.crt, tls.key, and optionally ca.crt (required when TLS is in use).
   certSecret: ""
   # Mount paths inside the container (Bitnami defaults).
   certFilename: tls.crt
   keyFilename: tls.key
   caFilename: ca.crt
 
-# K8s Secret holding the directory admin password.
-# WARNING: without TLS the admin password travels in plaintext — acceptable for
-# local dev / ephemeral integration clusters only.
+# K8s Secret holding the directory admin password. When using plaintext LDAP (ephemeral overlay),
+# that password is not protected on the wire — see values-integration-ldap-plaintext-ephemeral.yaml.
 existingSecret: ldap-secrets
 existingSecretPasswordKey: admin-password
 

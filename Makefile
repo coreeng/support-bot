@@ -421,9 +421,9 @@ dex-deploy-prod: ## Deploy Dex module to production environment
 ##@ LDAP module lifecycle (implemented in ldap/Makefile)
 
 .PHONY: ldap-template ldap-deploy-integration
-ldap-template: ## Validate LDAP chart (support-bot-openldap + values-bitnami)
+ldap-template: ## Validate LDAP chart (bitnami + integration + ephemeral plaintext overlay)
 	@$(MAKE) -C ldap template
 
-ldap-deploy-integration: ## Deploy LDAP module to integration environment
-	@$(MAKE) -C ldap deploy-integration
+ldap-deploy-integration: ## Deploy LDAP for integration (ephemeral plaintext 389 — opt-in env set here)
+	@$(MAKE) -C ldap deploy-integration LDAP_DEPLOY_INSECURE_PLAINTEXT=true
 

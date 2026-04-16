@@ -1,3 +1,4 @@
+{{- include "support-bot-openldap.validate" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -40,7 +41,7 @@ spec:
               containerPort: {{ .Values.service.containerPort | default 1389 }}
               protocol: TCP
             {{- end }}
-            {{- if and .Values.tls.enabled .Values.tls.port }}
+            {{- if and .Values.tls.enabled .Values.tls.certSecret .Values.tls.port }}
             - name: ldaps
               containerPort: {{ .Values.tls.port }}
               protocol: TCP
@@ -61,7 +62,7 @@ spec:
               value: {{ .Values.service.containerPort | default 1389 | toString | quote }}
             - name: LDAP_CUSTOM_LDIF_DIR
               value: /ldifs
-            {{- if .Values.tls.enabled }}
+            {{- if and .Values.tls.enabled .Values.tls.certSecret }}
             - name: LDAP_ENABLE_TLS
               value: "yes"
             - name: LDAP_LDAPS_PORT_NUMBER
@@ -88,19 +89,19 @@ spec:
             {{- end }}
           startupProbe:
             tcpSocket:
-              port: {{ if and .Values.tls.enabled .Values.tls.port }}ldaps{{ else }}ldap{{ end }}
+              port: {{ if and .Values.tls.enabled .Values.tls.certSecret .Values.tls.port }}ldaps{{ else }}ldap{{ end }}
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 36
           livenessProbe:
             tcpSocket:
-              port: {{ if and .Values.tls.enabled .Values.tls.port }}ldaps{{ else }}ldap{{ end }}
+              port: {{ if and .Values.tls.enabled .Values.tls.certSecret .Values.tls.port }}ldaps{{ else }}ldap{{ end }}
             periodSeconds: 30
             timeoutSeconds: 3
             failureThreshold: 5
           readinessProbe:
             tcpSocket:
-              port: {{ if and .Values.tls.enabled .Values.tls.port }}ldaps{{ else }}ldap{{ end }}
+              port: {{ if and .Values.tls.enabled .Values.tls.certSecret .Values.tls.port }}ldaps{{ else }}ldap{{ end }}
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 5

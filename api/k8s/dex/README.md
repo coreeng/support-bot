@@ -17,7 +17,6 @@ The **dex/dex** chart creates **namespace** `Role` + `RoleBinding` for `dex.core
 - `values-integration-ldap-plaintext-ephemeral.yaml` — **opt-in** LDAP connector on port **389** without TLS (`insecureNoSSL: true`). Only for disposable integration namespaces. `dex/scripts/helm_dex.sh deploy-integration` requires **`DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true`** to apply it; `helm_dex.sh template` always merges it to validate the chart. Layer **before** `values-dex-oidc-incluster.yaml` when using both.
 - `values-dex-oidc-incluster.yaml` — Tier 2 overlay: in-cluster issuer (full svc FQDN) and `staticClients` for `http://127.0.0.1:8765/api/oauth/callback/dex`. Does **not** define `connectors` (LDAP comes from the ephemeral plaintext overlay or TLS overlay). Set `DEX_ISSUER_URI` and `DEX_INTERNAL_BASE_URL` to match `config.issuer`.
 - `values-tls.yaml` — LDAP over StartTLS/LDAPS for non-ephemeral environments (see runbook).
-- `values-legacy-core-platform-app.yaml` — archived `core-platform-app` + templated `config.yaml` with `${DEX_*}` placeholders.
 
 Baseline **`values-dexidp.yaml`** sets **`enablePasswordDB: false`** (connectors only). Add LDAP / Google / Microsoft under `config.connectors` via **`values-integration-ldap-plaintext-ephemeral.yaml`**, **`values-tls.yaml`**, or another overlay, or set `enablePasswordDB: true` and `staticPasswords` in a private overlay if you need Dex’s built-in email login.
 

@@ -17,3 +17,14 @@ app.kubernetes.io/instance: {{ .Release.Name | quote }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
 {{- end }}
+
+{{/*
+Fail when tls.enabled is true but no cert Secret is configured (ambiguous / insecure).
+Explicitly set tls.enabled false via values-integration-ldap-plaintext-ephemeral.yaml for
+disposable plaintext 389, or supply tls.certSecret (see values-tls.yaml).
+*/}}
+{{- define "support-bot-openldap.validate" -}}
+{{- if and .Values.tls.enabled (not .Values.tls.certSecret) }}
+{{- fail "support-bot-openldap: tls.enabled is true but tls.certSecret is empty. For LDAPS, set tls.certSecret (see api/k8s/ldap/values-tls.yaml). For disposable plaintext on 389 only, apply api/k8s/ldap/values-integration-ldap-plaintext-ephemeral.yaml (tls.enabled: false) and use LDAP_DEPLOY_INSECURE_PLAINTEXT=true with ldap/scripts/helm_ldap.sh deploy-integration. See api/k8s/ldap/README.md." }}
+{{- end }}
+{{- end }}

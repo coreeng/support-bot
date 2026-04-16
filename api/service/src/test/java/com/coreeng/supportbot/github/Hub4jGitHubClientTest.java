@@ -3,10 +3,13 @@ package com.coreeng.supportbot.github;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.Date;
@@ -30,10 +33,6 @@ import org.kohsuke.github.PagedIterable;
 
 class Hub4jGitHubClientTest {
 
-    /** hub4j 1.3xx uses {@link Date}; newer releases use {@link Instant} for the same getters. */
-    private static final boolean CREATED_AT_IS_INSTANT = returnTypeIsInstant(GHPullRequest.class, "getCreatedAt");
-
-    private static final boolean MERGED_AT_IS_INSTANT = returnTypeIsInstant(GHPullRequest.class, "getMergedAt");
     private static final boolean SUBMITTED_AT_IS_INSTANT =
             returnTypeIsInstant(GHPullRequestReview.class, "getSubmittedAt");
 
@@ -80,12 +79,11 @@ class Hub4jGitHubClientTest {
     @Test
     void returnsMergedStateWhenMergedAtIsNonNull() throws IOException {
         // given
-        GHPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
-        doAnswer(inv -> hub4jTimestamp(instant("2026-01-15T10:00:00Z"), MERGED_AT_IS_INSTANT))
-                .when(pr)
-                .getMergedAt();
-        when(pr.getMergeable()).thenReturn(true);
-        when(pr.getMergeableState()).thenReturn("clean");
+        TestPullRequest pr =
+                stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
+        pr.testMergedAt = instant("2026-01-15T10:00:00Z");
+        pr.testMergeable = true;
+        pr.testMergeableState = "clean";
 
         // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
@@ -130,7 +128,7 @@ class Hub4jGitHubClientTest {
     void wrapsNullStateAsGitHubApiException() throws IOException {
         // given
         TestPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.OPEN);
-        pr.testState = null;
+        pr.returnNullIssueState = true;
 
         // when / then
         assertThatThrownBy(() -> client.getPullRequest("my-org/my-repo", 42))
@@ -399,12 +397,11 @@ class Hub4jGitHubClientTest {
     @Test
     void getPullRequestSkipsReviewsForMergedPr() throws IOException {
         // given
-        GHPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
-        doAnswer(inv -> hub4jTimestamp(instant("2026-01-15T10:00:00Z"), MERGED_AT_IS_INSTANT))
-                .when(pr)
-                .getMergedAt();
-        when(pr.getMergeable()).thenReturn(true);
-        when(pr.getMergeableState()).thenReturn("clean");
+        TestPullRequest pr =
+                stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.CLOSED);
+        pr.testMergedAt = instant("2026-01-15T10:00:00Z");
+        pr.testMergeable = true;
+        pr.testMergeableState = "clean";
 
         // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
@@ -534,6 +531,97 @@ class Hub4jGitHubClientTest {
                 .hasMessageContaining("my-org/platform-team");
     }
 
+    /**
+     * Minimal {@link GHPullRequest} for tests: avoids hub4j {@code refresh()}/HTTP, tracks access to teams and
+     * reviews, and exposes merge/mergeable/review inputs as fields.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked", "NullAway"
+    }) // test double: hub4j API is @NonNull; we return null by design
+    private static final class TestPullRequest extends GHPullRequest {
+        int requestedTeamsAccessCount;
+        int listReviewsAccessCount;
+
+        GHIssueState issueState = GHIssueState.OPEN;
+        boolean returnNullIssueState;
+
+        @Nullable Instant testCreatedAt;
+
+        @Nullable Instant testMergedAt;
+
+        @Nullable Boolean testMergeable;
+
+        @Nullable String testMergeableState;
+
+        List<GHTeam> testRequestedTeams = List.of();
+
+        @Nullable IOException testRequestedTeamsException;
+
+        @Nullable IOException testReviewsException;
+
+        @Nullable PagedIterable reviewsIterable;
+
+        @Override
+        public Date getCreatedAt() throws IOException {
+            return testCreatedAt == null ? null : Date.from(testCreatedAt);
+        }
+
+        @Override
+        public GHIssueState getState() {
+            if (returnNullIssueState) {
+                return null;
+            }
+            return issueState;
+        }
+
+        @Override
+        public Date getMergedAt() {
+            return testMergedAt == null ? null : Date.from(testMergedAt);
+        }
+
+        @Override
+        public Boolean getMergeable() throws IOException {
+            return testMergeable;
+        }
+
+        @Override
+        public String getMergeableState() throws IOException {
+            return testMergeableState;
+        }
+
+        @Override
+        public List getRequestedTeams() throws IOException {
+            requestedTeamsAccessCount++;
+            if (testRequestedTeamsException != null) {
+                throw testRequestedTeamsException;
+            }
+            return List.copyOf(testRequestedTeams);
+        }
+
+        @Override
+        public PagedIterable listReviews() {
+            listReviewsAccessCount++;
+            if (testReviewsException != null) {
+                PagedIterable it = mock(PagedIterable.class);
+                try {
+                    doThrow(testReviewsException).when(it).toList();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                return it;
+            }
+            if (reviewsIterable != null) {
+                return reviewsIterable;
+            }
+            PagedIterable empty = mock(PagedIterable.class);
+            try {
+                doReturn(List.of()).when(empty).toList();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            return empty;
+        }
+    }
+
     private TestPullRequest stubOpenPullRequest(String repositoryName, int pullNumber) throws IOException {
         TestPullRequest pr =
                 stubPullRequest(repositoryName, pullNumber, instant("2026-01-01T00:00:00Z"), GHIssueState.OPEN);
@@ -547,14 +635,32 @@ class Hub4jGitHubClientTest {
             String repositoryName, int pullNumber, @Nullable Instant createdAt, GHIssueState state) throws IOException {
         GHRepository repo = mock(GHRepository.class);
         TestPullRequest pr = new TestPullRequest();
+        pr.issueState = state;
+        pr.testCreatedAt = createdAt;
+        pr.testMergedAt = null;
+        pr.returnNullIssueState = false;
+        pr.testMergeable = null;
+        pr.testMergeableState = null;
+        pr.testRequestedTeams = List.of();
+        pr.testRequestedTeamsException = null;
+        pr.testReviewsException = null;
+        pr.reviewsIterable = null;
+        pr.requestedTeamsAccessCount = 0;
+        pr.listReviewsAccessCount = 0;
         when(gitHub.getRepository(repositoryName)).thenReturn(repo);
         when(repo.getPullRequest(pullNumber)).thenReturn(pr);
-        doAnswer(inv -> hub4jTimestamp(createdAt, CREATED_AT_IS_INSTANT))
-                .when(pr)
-                .getCreatedAt();
-        when(pr.getState()).thenReturn(state);
-        doAnswer(inv -> null).when(pr).getMergedAt();
         return pr;
+    }
+
+    @SuppressWarnings("rawtypes")
+    private void stubReviews(TestPullRequest pr, List<GHPullRequestReview> reviews) {
+        PagedIterable iterable = mock(PagedIterable.class);
+        try {
+            doReturn(reviews).when(iterable).toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        pr.reviewsIterable = iterable;
     }
 
     private static GHPullRequestReview review(String login, GHPullRequestReviewState state, String submittedAtIso)
@@ -570,7 +676,6 @@ class Hub4jGitHubClientTest {
         return review;
     }
 
-    @SuppressWarnings("unchecked")
     private static Instant instant(String iso) {
         return Instant.parse(iso);
     }

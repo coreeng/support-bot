@@ -69,10 +69,11 @@ Or from this directory:
 
 ```bash
 make -C ldap template
+export LDAP_DEPLOY_INSECURE_PLAINTEXT=true   # required for ephemeral plaintext 389 overlay
 make -C ldap deploy-integration
 ```
 
-Set **`LDAP_BOOTSTRAP_USER_PASSWORD`** in the environment when deploying integration (e.g. from **GitHub Actions secrets**).
+From **repo root**, `make ldap-deploy-integration` sets **`LDAP_DEPLOY_INSECURE_PLAINTEXT=true`** for you. Set **`LDAP_BOOTSTRAP_USER_PASSWORD`** when deploying integration (e.g. from **GitHub Actions secrets**).
 
 ### Keeping Helm bootstrap in sync
 

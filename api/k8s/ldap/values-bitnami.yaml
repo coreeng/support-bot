@@ -1,9 +1,10 @@
 # Support Bot overrides for api/k8s/ldap/chart (Bitnami OpenLDAP image).
 # Bootstrap LDIF is packaged under chart/files/bootstrap/ — keep in sync with ldap/bootstrap/.
 #
-# ⚠ SECURITY: port 389 is plain LDAP (no TLS). Acceptable for local dev and
-# ephemeral integration clusters. For production, also apply values-tls.yaml
-# (enables LDAPS on 636). See docs/runbooks/auth-dex-ldap.md § "Enabling LDAPS / StartTLS".
+# Chart defaults prefer TLS when tls.certSecret is set. Ephemeral plaintext on 389 requires
+# values-integration-ldap-plaintext-ephemeral.yaml and LDAP_DEPLOY_INSECURE_PLAINTEXT=true for
+# ldap/scripts/helm_ldap.sh deploy-integration. For production, use values-tls.yaml (LDAPS).
+# See docs/runbooks/auth-dex-ldap.md § "Enabling LDAPS / StartTLS".
 
 fullnameOverride: ldap
 

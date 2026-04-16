@@ -21,7 +21,7 @@ Apply secrets first, then workloads that depend on them.
 1. **Secrets**
    - `ldap-secrets` (`admin-password`) — see [`api/k8s/ldap/README.md`](../../api/k8s/ldap/README.md).
    - Dex credentials (`config.staticClients[].secret`, LDAP connector `bindPW`, optional Google/Microsoft client IDs and secrets) — usually supplied via a private values overlay or pipeline; see [`api/k8s/dex/README.md`](../../api/k8s/dex/README.md).
-2. **LDAP** — `make ldap-deploy-integration` (or equivalent `helm upgrade` with your tenant values). Confirm the Service (e.g. `ldap.<namespace>.svc.cluster.local:389`) is reachable from the namespace where Dex will run.
+2. **LDAP** — `make ldap-deploy-integration` from repo root (sets **`LDAP_DEPLOY_INSECURE_PLAINTEXT=true`** for the ephemeral plaintext overlay), or equivalent `helm upgrade` with **`values-bitnami.yaml`**, **`values-integration.yaml`**, and **`values-integration-ldap-plaintext-ephemeral.yaml`** for disposable namespaces only. Confirm the Service (e.g. `ldap.<namespace>.svc.cluster.local:389`) is reachable from the namespace where Dex will run. For TLS, use **`values-tls.yaml`** instead of the plaintext overlay.
 3. **Dex** — `make dex-deploy-integration` (from repo root: sets `DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true` for the ephemeral plaintext LDAP overlay). Ensure the LDAP connector in [`api/k8s/dex/values-integration-ldap-plaintext-ephemeral.yaml`](../../api/k8s/dex/values-integration-ldap-plaintext-ephemeral.yaml) or your TLS overlay uses the correct `host` / DNs for the cluster LDAP Service. For non-ephemeral clusters, use [`values-tls.yaml`](../../api/k8s/dex/values-tls.yaml) instead of the plaintext overlay.
 4. **Support Bot API** — deploy or upgrade the main app chart with `DEX_CLIENT_ID`, `DEX_CLIENT_SECRET`, `DEX_ISSUER_URI`, and application config for `platform-integration.jwt-groups` if you map LDAP groups to tenant teams. By default the API offers **every** fully configured IdP (Google, Azure, Dex). Optional: `security.oauth2.login-providers: [dex]` so the UI only offers Dex when `GOOGLE_*` / `AZURE_*` are still set for other purposes.
 
@@ -159,7 +159,7 @@ The container already has `LDAP_ADMIN_PASSWORD` from `ldap-secrets`. If this fai
 
 **Checks:**
 
-- LDAP: `make -C ldap template` uses `api/k8s/ldap/chart` and `values-bitnami.yaml` — it generates `20-users.ldif` and copies bootstrap files into `api/k8s/ldap/chart/files/bootstrap/` (after editing tracked `ldap/bootstrap/*.ldif` or the template, run `make -C ldap sync-bootstrap-into-chart` for `10-ou` / `30-groups` only; `20-users.ldif` stays gitignored).
+- LDAP: `make -C ldap template` uses `api/k8s/ldap/chart`, `values-bitnami.yaml`, `values-integration.yaml`, and **`values-integration-ldap-plaintext-ephemeral.yaml`** — it generates `20-users.ldif` and copies bootstrap files into `api/k8s/ldap/chart/files/bootstrap/` (after editing tracked `ldap/bootstrap/*.ldif` or the template, run `make -C ldap sync-bootstrap-into-chart` for `10-ou` / `30-groups` only; `20-users.ldif` stays gitignored).
 - Dex: `make -C dex template` uses `dex/dex` from `charts.dexidp.io` — run `helm repo update dex` if the chart version pin fails to download.
 
 ## Automated checks (CI)

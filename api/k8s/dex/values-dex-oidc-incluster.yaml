@@ -5,7 +5,8 @@
 #
 # Align Support Bot API: DEX_ISSUER_URI and DEX_INTERNAL_BASE_URL must equal config.issuer
 # (iss claim in Dex tokens). Use the full svc FQDN (<svc>.<ns>.svc.cluster.local) so the
-# API's internal-base-url validation does not warn about bare service names.
+# internal base URL is accepted — bare service names are rejected and the API fails to start
+# (IllegalArgumentException from OAuth2ClientConfig internal-base-url validation), not a warning.
 # Dex static client must list http://127.0.0.1:8765/api/oauth/callback/dex for the in-cluster Job listener.
 
 config:

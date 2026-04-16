@@ -16,7 +16,7 @@ spec:
       targetPort: {{ .Values.service.containerPort | default 1389 }}
       protocol: TCP
     {{- end }}
-    {{- if and .Values.tls.enabled .Values.tls.port }}
+    {{- if and .Values.tls.enabled .Values.tls.certSecret .Values.tls.port }}
     - name: ldaps
       port: {{ .Values.tls.port }}
       targetPort: ldaps

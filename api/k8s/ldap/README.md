@@ -9,7 +9,8 @@ The vendor Helm package is also published as **`oci://registry-1.docker.io/bitna
 - `chart/` — Helm chart (Deployment, Service, ConfigMap from `chart/files/bootstrap/*.ldif`, optional PVC). **`20-users.ldif` is not committed**; `make -C ldap template` / `deploy-integration` generate it from [`ldap/bootstrap/20-users.ldif.template`](../../../ldap/bootstrap/20-users.ldif.template) and copy bootstrap LDIF into `chart/files/bootstrap/` before Helm.
 - `values-bitnami.yaml` — Support Bot defaults (`fullnameOverride: ldap`, image, persistence, `ldap-secrets`).
 - `values-integration.yaml` — integration overrides (e.g. `persistence.enabled: false`, larger resources).
-- `values-legacy-core-platform-app.yaml` — archived values for the former `core-platform-app` / osixia layout.
+- `values-integration-ldap-plaintext-ephemeral.yaml` — **opt-in** `tls.enabled: false` for disposable integration (plain **389**). Merged by `ldap/scripts/helm_ldap.sh` for `template` and for `deploy-integration` when **`LDAP_DEPLOY_INSECURE_PLAINTEXT=true`**. Do not use on shared clusters.
+- `values-tls.yaml` — LDAPS / TLS (`tls.certSecret`, port **636**).
 
 ## Required secret
 
@@ -27,11 +28,16 @@ Admin DN for binds (e.g. Dex): `cn=admin,dc=supportbot,dc=local`.
 
 ## Install / upgrade
 
+**Ephemeral integration (plain 389)** — same value chain as `make ldap-deploy-integration` from repo root (sets **`LDAP_DEPLOY_INSECURE_PLAINTEXT=true`**):
+
 ```bash
 helm upgrade --install support-bot-ldap ./api/k8s/ldap/chart \
   -f api/k8s/ldap/values-bitnami.yaml \
-  -f api/k8s/ldap/values-integration.yaml
+  -f api/k8s/ldap/values-integration.yaml \
+  -f api/k8s/ldap/values-integration-ldap-plaintext-ephemeral.yaml
 ```
+
+Without the plaintext overlay, the chart defaults expect **`tls.certSecret`** when `tls.enabled` is true (see `chart/values.yaml`); Helm fails fast to avoid ambiguous insecure deploys.
 
 Validate render only:
 
@@ -47,7 +53,7 @@ After logging in to `registry-1.docker.io`, pin a version with `helm show chart 
 
 ## TLS / LDAPS
 
-The default values expose **plain LDAP on port 389** (no TLS). This is intentional for local development and ephemeral integration clusters. For production clusters, layer [`values-tls.yaml`](./values-tls.yaml) to enable LDAPS on port 636:
+**Chart defaults** (`chart/values.yaml`) use **`tls.enabled: true`** until you either supply **`tls.certSecret`** (LDAPS — use [`values-tls.yaml`](./values-tls.yaml)) or explicitly opt into ephemeral plaintext with [`values-integration-ldap-plaintext-ephemeral.yaml`](./values-integration-ldap-plaintext-ephemeral.yaml) (`tls.enabled: false`). For production clusters, use **`values-tls.yaml`** and a real TLS Secret:
 
 ```bash
 helm upgrade --install support-bot-ldap ./api/k8s/ldap/chart \

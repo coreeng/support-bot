@@ -6,6 +6,7 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 LDAP_K8S="${ROOT}/../api/k8s/ldap"
 CHART="${LDAP_K8S}/chart"
 NAMESPACE="${NAMESPACE:-support-bot-integration}"
+PLAIN="${LDAP_K8S}/values-integration-ldap-plaintext-ephemeral.yaml"
 
 if [[ -z "${LDAP_BOOTSTRAP_USER_PASSWORD:-}" ]]; then
 	echo "error: LDAP_BOOTSTRAP_USER_PASSWORD is required (local: ldap/.env.local; CI: secret LDAP_BOOTSTRAP_USER_PASSWORD / P2P env_vars — see ldap/README.md)." >&2
@@ -22,9 +23,20 @@ case "${OP}" in
 template)
 	helm template support-bot-ldap "${TMPDIR}/chart" \
 		-f "${LDAP_K8S}/values-bitnami.yaml" \
-		-f "${LDAP_K8S}/values-integration.yaml" >/dev/null
+		-f "${LDAP_K8S}/values-integration.yaml" \
+		-f "${PLAIN}" >/dev/null
 	;;
 deploy-integration)
+	if [[ "${LDAP_DEPLOY_INSECURE_PLAINTEXT:-}" != "true" ]]; then
+		echo "Refusing to deploy LDAP with ephemeral plaintext overlay (port 389, no TLS)." >&2
+		echo "That mode is only for disposable integration namespaces." >&2
+		echo "Set LDAP_DEPLOY_INSECURE_PLAINTEXT=true to confirm, or deploy with values-tls.yaml" >&2
+		echo "and a real tls cert Secret (no plaintext overlay)." >&2
+		echo "Repo Makefile target ldap-deploy-integration sets this for integration-test infra." >&2
+		echo "See api/k8s/ldap/README.md and docs/runbooks/auth-dex-ldap.md." >&2
+		exit 1
+	fi
+
 	kubectl create namespace "${NAMESPACE}" 2>/dev/null || true
 
 	echo "Ensuring K8s secret ldap-secrets (admin-password) in ${NAMESPACE}..."
@@ -45,6 +57,7 @@ deploy-integration)
 		-n "${NAMESPACE}" \
 		-f "${LDAP_K8S}/values-bitnami.yaml" \
 		-f "${LDAP_K8S}/values-integration.yaml" \
+		-f "${PLAIN}" \
 		"${extra[@]}"
 	;;
 *)

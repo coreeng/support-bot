@@ -25,7 +25,7 @@ The Job manifest lives at [`src/test/resources/k8s/dex-ldap-infra-job.yaml`](src
 
 1. **Namespace** — e.g. `support-bot-integration` from [`integration-test-local.yaml`](src/test/resources/integration-test-local.yaml) (`INTEGRATION_TEST_CONFIG` if overridden).
 2. **Helm releases** (install before running the test; not done by the test itself):
-   - LDAP: e.g. `make ldap-deploy-integration` / [`ldap/scripts/helm_ldap.sh`](../ldap/scripts/helm_ldap.sh) with [`values-bitnami.yaml`](../k8s/ldap/values-bitnami.yaml) so the Service is named **`ldap`** and plain LDAP is on **389**.
+   - LDAP: e.g. root `make ldap-deploy-integration` / [`ldap/scripts/helm_ldap.sh`](../ldap/scripts/helm_ldap.sh) (`values-bitnami.yaml` + `values-integration.yaml` + **`values-integration-ldap-plaintext-ephemeral.yaml`** with **`LDAP_DEPLOY_INSECURE_PLAINTEXT=true`**) so the Service is named **`ldap`** and plain LDAP is on **389**. See [`api/k8s/ldap/README.md`](../k8s/ldap/README.md).
    - Dex: e.g. root `make dex-deploy-integration` / [`dex/scripts/helm_dex.sh`](../dex/scripts/helm_dex.sh) (`values-dexidp.yaml` + `values-integration.yaml` + **`values-integration-ldap-plaintext-ephemeral.yaml`** with `DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true` + `values-dex-oidc-incluster.yaml`) so the Service is **`dex`** and telemetry listens on **5558**. See [`api/k8s/dex/README.md`](../k8s/dex/README.md).
 3. **Secret** `ldap-secrets` in that namespace with `admin-password` (see [`api/k8s/ldap/README.md`](../k8s/ldap/README.md)).
 
