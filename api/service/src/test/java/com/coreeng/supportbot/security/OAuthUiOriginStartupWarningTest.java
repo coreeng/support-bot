@@ -28,9 +28,9 @@ class OAuthUiOriginStartupWarningTest {
     @Test
     void skipsPropertyLookupWhenSpringProfilesActiveUnset() {
         when(environment.getProperty("spring.profiles.active")).thenReturn(null);
-        when(environment.getActiveProfiles()).thenReturn(new String[] {"default"});
         new OAuthUiOriginStartupWarning(environment).warnIfUiOriginUnsetOutsideLocalProfiles();
         verify(environment, never()).getProperty("UI_ORIGIN");
+        verify(environment, never()).getActiveProfiles();
     }
 
     @Test
