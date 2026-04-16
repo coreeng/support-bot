@@ -11,14 +11,15 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 /**
- * Fails startup when {@code UI_ORIGIN} is unset outside local-like profiles. The API validates UI
- * OAuth {@code redirect_uri} against the origin from {@code security.oauth2.redirect-uri}, which
- * defaults from {@code UI_ORIGIN}; it must match the Next.js {@code NEXTAUTH_URL} origin.
+ * Fails startup when {@code UI_ORIGIN} is unset outside local-like profiles, but only if at least
+ * one OAuth2 login provider is fully configured (UI-driven SSO is possible). With no OAuth2 clients,
+ * proxied OAuth endpoints are disabled — {@code UI_ORIGIN} is not required.
  *
- * <p>Local-like means every activated profile is either the Spring {@code default} profile or one of
- * the named dev/test profiles below. If {@link Environment#getActiveProfiles()} is empty, the same
- * check is applied to the comma-separated {@code spring.profiles.active} property (when unset or
- * blank, no explicit profiles — typical {@code java -jar} without {@code SPRING_PROFILES_ACTIVE}).
+ * <p>When OAuth2 is configured: local-like means every activated profile is either the Spring
+ * {@code default} profile or one of the named dev/test profiles below. If {@link
+ * Environment#getActiveProfiles()} is empty, the same check is applied to the comma-separated {@code
+ * spring.profiles.active} property (when unset or blank, no explicit profiles — typical {@code
+ * java -jar} without {@code SPRING_PROFILES_ACTIVE}).
  */
 @Slf4j
 @Component
@@ -29,9 +30,13 @@ public class OAuthUiOriginStartupWarning {
             Set.of("local", "test", "functionaltests", "integrationtests", "integrationtests-oidc");
 
     private final Environment environment;
+    private final OAuth2AvailabilityChecker oauth2AvailabilityChecker;
 
     @EventListener(ApplicationReadyEvent.class)
     public void warnIfUiOriginUnsetOutsideLocalProfiles() {
+        if (!oauth2AvailabilityChecker.isOAuth2Available()) {
+            return;
+        }
         if (isLocalLikeProfile()) {
             return;
         }
