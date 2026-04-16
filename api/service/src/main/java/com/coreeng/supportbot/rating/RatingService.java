@@ -4,12 +4,12 @@ import com.coreeng.supportbot.escalation.EscalationQueryService;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketRepository;
+import com.coreeng.supportbot.ticket.TicketStatus;
 import com.google.common.collect.ImmutableList;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,19 +23,25 @@ public class RatingService {
     private final EscalationQueryService escalationQueryService;
 
     @Transactional
-    @Nullable public Rating save(TicketId ticketId, int rating) {
+    public Rating save(TicketId ticketId, int rating) {
         log.info("Attempt to submit rating for ticket {}", ticketId);
 
-        if (ticketRepository.isTicketRated(ticketId)) {
-            log.info("Ticket {} has already been rated - ignoring duplicate", ticketId);
-            return null;
+        if (rating < 1 || rating > 5) {
+            throw new IllegalArgumentException("rating must be between 1 and 5");
         }
-
-        // Fetch ticket details for impact and tags
+        if (!ticketRepository.tryMarkTicketAsRated(ticketId)) {
+            Ticket ticket = ticketRepository.findTicketById(ticketId);
+            if (ticket == null) {
+                throw new RatingTicketNotFoundException(ticketId);
+            }
+            if (ticket.status() != TicketStatus.closed) {
+                throw new IllegalArgumentException("Ticket must be closed before rating can be submitted");
+            }
+            throw new IllegalArgumentException("Ticket has already been rated");
+        }
         Ticket ticket = ticketRepository.findTicketById(ticketId);
         if (ticket == null) {
-            log.warn("Ticket {} for rating not found", ticketId);
-            return null;
+            throw new IllegalStateException("Ticket not found after rating claim: " + ticketId.render());
         }
 
         boolean isEscalated = escalationQueryService.existsByTicketId(ticketId);
@@ -51,7 +57,6 @@ public class RatingService {
                 .build();
 
         UUID ratingId = repository.insertRating(ratingRecord);
-        ticketRepository.markTicketAsRated(ticketId);
 
         log.info("Successfully recorded rating for ticket {}", ticketId);
         return ratingRecord.toBuilder().id(ratingId).build();
