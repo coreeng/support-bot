@@ -25,6 +25,20 @@ class OAuthUiOriginStartupWarningTest {
     }
 
     @Test
+    void skipsPropertyLookupWhenNoActiveProfiles() {
+        when(environment.getActiveProfiles()).thenReturn(new String[] {});
+        new OAuthUiOriginStartupWarning(environment).warnIfUiOriginUnsetOutsideLocalProfiles();
+        verify(environment, never()).getProperty("UI_ORIGIN");
+    }
+
+    @Test
+    void skipsPropertyLookupWhenTestProfileActive() {
+        when(environment.getActiveProfiles()).thenReturn(new String[] {"test"});
+        new OAuthUiOriginStartupWarning(environment).warnIfUiOriginUnsetOutsideLocalProfiles();
+        verify(environment, never()).getProperty("UI_ORIGIN");
+    }
+
+    @Test
     void readsUiOriginWhenNonLocalProfile() {
         when(environment.getActiveProfiles()).thenReturn(new String[] {"production"});
         when(environment.getProperty("UI_ORIGIN")).thenReturn("https://ui.example.com");

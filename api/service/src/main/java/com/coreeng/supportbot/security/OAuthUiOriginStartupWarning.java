@@ -13,6 +13,9 @@ import org.springframework.stereotype.Component;
  * Fails startup when {@code UI_ORIGIN} is unset outside local-like profiles. The API validates UI
  * OAuth {@code redirect_uri} against the origin from {@code security.oauth2.redirect-uri}, which
  * defaults from {@code UI_ORIGIN}; it must match the Next.js {@code NEXTAUTH_URL} origin.
+ *
+ * <p>Also treated as local-like: no explicitly activated profiles (typical {@code java -jar} with no
+ * {@code -Dspring.profiles.active}) and the {@code test} profile (Spring Boot tests).
  */
 @Slf4j
 @Component
@@ -20,7 +23,7 @@ import org.springframework.stereotype.Component;
 public class OAuthUiOriginStartupWarning {
 
     private static final Set<String> LOCAL_LIKE_PROFILES =
-            Set.of("local", "functionaltests", "integrationtests", "integrationtests-oidc");
+            Set.of("local", "test", "functionaltests", "integrationtests", "integrationtests-oidc");
 
     private final Environment environment;
 
@@ -38,13 +41,18 @@ public class OAuthUiOriginStartupWarning {
                 + "public UI base URL (scheme + host + port, no path) so it matches the origin of NEXTAUTH_URL "
                 + "on the Next.js app — otherwise /auth/oauth-url and /auth/oauth/exchange return 400. "
                 + "For local development without setting UI_ORIGIN, use spring.profiles.active=local (or "
-                + "another local-like profile). See api/service/docs/configuration.md (SSO, UI origin contract).";
+                + "another local-like profile), or run with no explicitly active Spring profiles. "
+                + "See api/service/docs/configuration.md (SSO, UI origin contract).";
         log.error(message);
         throw new IllegalStateException(message);
     }
 
     private boolean isLocalLikeProfile() {
-        return Arrays.stream(environment.getActiveProfiles())
+        String[] active = environment.getActiveProfiles();
+        if (active.length == 0) {
+            return true;
+        }
+        return Arrays.stream(active)
                 .anyMatch(p -> LOCAL_LIKE_PROFILES.stream().anyMatch(l -> l.equalsIgnoreCase(p)));
     }
 }
