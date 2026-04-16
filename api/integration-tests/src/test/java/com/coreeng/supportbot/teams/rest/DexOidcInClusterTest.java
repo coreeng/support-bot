@@ -19,8 +19,10 @@ import org.slf4j.LoggerFactory;
  * Tier 2: in-cluster Job completes Dex LDAP authorization-code flow, exchanges the code once via
  * {@code POST /auth/oauth/exchange}, then checks API JWT teams (jwt-groups) and {@code GET /auth/me}.
  *
- * <p>Requires LDAP, Dex (issuer aligned with {@code DEX_ISSUER_URI}, typically {@code
- * values-dex-oidc-incluster.yaml}), and Support Bot deployed with {@code
+ * <p>Requires LDAP, Dex (issuer aligned with {@code DEX_ISSUER_URI}; Helm overlays typically {@code
+ * values-integration.yaml}, {@code values-integration-ldap-plaintext-ephemeral.yaml}, then {@code
+ * values-dex-oidc-incluster.yaml} via {@code make dex-deploy-integration} from repo root), and
+ * Support Bot deployed with {@code
  * values-integrationtests-oidc.yaml} (or equivalent). Secrets: {@code dex-secrets} ({@code
  * client-id}, {@code client-secret}), {@code integration-ldap-test-user} ({@code password} for
  * bootstrap user {@code alice@supportbot.local}).

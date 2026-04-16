@@ -22,7 +22,7 @@ Apply secrets first, then workloads that depend on them.
    - `ldap-secrets` (`admin-password`) — see [`api/k8s/ldap/README.md`](../../api/k8s/ldap/README.md).
    - Dex credentials (`config.staticClients[].secret`, LDAP connector `bindPW`, optional Google/Microsoft client IDs and secrets) — usually supplied via a private values overlay or pipeline; see [`api/k8s/dex/README.md`](../../api/k8s/dex/README.md).
 2. **LDAP** — `make ldap-deploy-integration` (or equivalent `helm upgrade` with your tenant values). Confirm the Service (e.g. `ldap.<namespace>.svc.cluster.local:389`) is reachable from the namespace where Dex will run.
-3. **Dex** — `make dex-deploy-integration`. Ensure `config.connectors` in [`api/k8s/dex/values-integration.yaml`](../../api/k8s/dex/values-integration.yaml) (or your overlay) includes the LDAP connector with the correct `host` / DNs when Dex should use the cluster LDAP Service.
+3. **Dex** — `make dex-deploy-integration` (from repo root: sets `DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true` for the ephemeral plaintext LDAP overlay). Ensure the LDAP connector in [`api/k8s/dex/values-integration-ldap-plaintext-ephemeral.yaml`](../../api/k8s/dex/values-integration-ldap-plaintext-ephemeral.yaml) or your TLS overlay uses the correct `host` / DNs for the cluster LDAP Service. For non-ephemeral clusters, use [`values-tls.yaml`](../../api/k8s/dex/values-tls.yaml) instead of the plaintext overlay.
 4. **Support Bot API** — deploy or upgrade the main app chart with `DEX_CLIENT_ID`, `DEX_CLIENT_SECRET`, `DEX_ISSUER_URI`, and application config for `platform-integration.jwt-groups` if you map LDAP groups to tenant teams. By default the API offers **every** fully configured IdP (Google, Azure, Dex). Optional: `security.oauth2.login-providers: [dex]` so the UI only offers Dex when `GOOGLE_*` / `AZURE_*` are still set for other purposes.
 
 Exact namespaces and release names depend on your P2P / tenant layout; align Dex `ldap.host` with the in-cluster DNS name of the LDAP Service.
@@ -117,7 +117,7 @@ The Docker Compose setup (`ldap/docker-compose.yaml`) intentionally stays **plai
 
 **What it means:** This is **Dex’s service bind** to search the directory — **not** the end-user’s password. Dex must bind as the directory admin (or a dedicated read-only DN) before it can look up the user who typed their credentials.
 
-**Cause (most common in Kubernetes):** Dex `config.connectors[].config.bindPW` does **not** match the OpenLDAP admin password. The repo’s [`values-integration.yaml`](../../api/k8s/dex/values-integration.yaml) ships a **template placeholder** (`helm-template-placeholder-ldap-bind`). If you deploy Dex without replacing it, LDAP returns 49 while **Google/Microsoft connectors on the same Dex** still work.
+**Cause (most common in Kubernetes):** Dex `config.connectors[].config.bindPW` does **not** match the OpenLDAP admin password. The repo’s [`values-integration-ldap-plaintext-ephemeral.yaml`](../../api/k8s/dex/values-integration-ldap-plaintext-ephemeral.yaml) (when used) ships a **template placeholder** (`helm-template-placeholder-ldap-bind`) until `helm_dex.sh` substitutes `LDAP_BOOTSTRAP_USER_PASSWORD`. If you deploy Dex without replacing it, LDAP returns 49 while **Google/Microsoft connectors on the same Dex** still work.
 
 **Fix:**
 

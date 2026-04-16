@@ -1,14 +1,11 @@
 # Integration overrides (dex/dex chart). Merges with values-dexidp.yaml (maps merge; lists here replace).
 # Ingress stays off (see values-dexidp.yaml); reach Dex in-cluster via full svc FQDN or port-forward.
 #
-# IMPORTANT — LDAP connector bindPW below is a TEMPLATE PLACEHOLDER. For a real cluster it MUST equal
-# Secret ldap-secrets key admin-password (same as Bitnami OpenLDAP admin). If you leave the placeholder,
-# Dex will fail with LDAP 49 Invalid Credentials on the cn=admin bind; Google/Azure connectors can
-# still work. Override via private -f values, --set-string, or your pipeline. See docs/runbooks/auth-dex-ldap.md.
+# LDAP connector is NOT defined here — plaintext LDAP for disposable integration is opt-in via
+# values-integration-ldap-plaintext-ephemeral.yaml (see api/k8s/dex/README.md). For TLS LDAP, use
+# values-tls.yaml. See docs/runbooks/auth-dex-ldap.md.
 #
-# ⚠ SECURITY: insecureNoSSL sends credentials in plaintext — acceptable for ephemeral integration
-# clusters only. For production, layer values-tls.yaml on top to enable StartTLS or LDAPS.
-# See docs/runbooks/auth-dex-ldap.md § "Enabling LDAPS / StartTLS".
+# staticClients.secret uses ${PLACEHOLDER_CLIENT_SECRET} — substituted by dex/scripts/helm_dex.sh.
 
 config:
   issuer: https://dex.integration.example.com
@@ -19,30 +16,6 @@ config:
       redirectURIs:
         - http://127.0.0.1:8765/api/oauth/callback/dex
         - https://support-bot-api.integration.example.com/login/oauth2/code/dex
-  connectors:
-    - type: ldap
-      id: ldap
-      name: LDAP
-      config:
-        host: ldap.support-bot-integration.svc.cluster.local:389
-        insecureNoSSL: true          # plaintext — see values-tls.yaml for production
-        bindDN: cn=admin,dc=supportbot,dc=local
-        bindPW: ${PLACEHOLDER_LDAP_BIND}
-        usernamePrompt: Email Address
-        userSearch:
-          baseDN: ou=People,dc=supportbot,dc=local
-          filter: "(objectClass=inetOrgPerson)"
-          username: mail
-          idAttr: uid
-          emailAttr: mail
-          nameAttr: cn
-        groupSearch:
-          baseDN: ou=Groups,dc=supportbot,dc=local
-          filter: "(objectClass=groupOfUniqueNames)"
-          userMatchers:
-            - userAttr: DN
-              groupAttr: uniqueMember
-          nameAttr: cn
 
 resources:
   requests:

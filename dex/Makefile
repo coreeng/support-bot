@@ -6,7 +6,8 @@ DEX_K8S := ../api/k8s/dex
 p2p-build: template ## Fast feedback: validate Helm values
 p2p-functional:    
 p2p-nft:           
-p2p-integration:   template deploy-integration 
+p2p-integration: template ## P2P: render then deploy (sets DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT for Dex LDAP overlay)
+	@$(MAKE) deploy-integration DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true
 p2p-extended-test: 
 p2p-prod:          
 
@@ -37,10 +38,12 @@ template: ## Validate Dex values by rendering dex/dex chart (charts.dexidp.io)
 	@DEX_CHART_VERSION="$(DEX_CHART_VERSION)" bash ./scripts/helm_dex.sh template
 
 .PHONY: deploy-integration
-deploy-integration: ## Deploy Dex module to integration environment (sources .env.local if present)
+deploy-integration: ## Deploy Dex to integration (requires DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true unless root Makefile sets it)
 	@bash -c 'set -eo pipefail; cd "$(CURDIR)"; \
 	if [[ -f .env.local ]]; then set -a; source .env.local; set +a; fi; \
-	NAMESPACE="$(NAMESPACE)" DEX_CHART_VERSION="$(DEX_CHART_VERSION)" DRY_RUN="$(DRY_RUN)" bash ./scripts/helm_dex.sh deploy-integration'
+	NAMESPACE="$(NAMESPACE)" DEX_CHART_VERSION="$(DEX_CHART_VERSION)" DRY_RUN="$(DRY_RUN)" \
+	DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT="$(DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT)" \
+	bash ./scripts/helm_dex.sh deploy-integration'
 
 .PHONY: deploy-prod
 deploy-prod: ## Deploy Dex module to production environment

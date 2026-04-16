@@ -90,8 +90,15 @@ make dex-template
 Deploy Dex module to integration:
 
 ```bash
+# From repo root (sets DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT for ephemeral plaintext LDAP):
 make dex-deploy-integration
+
+# From dex/ — must confirm plaintext LDAP explicitly:
+export DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true
+make deploy-integration
 ```
+
+See [`api/k8s/dex/README.md`](../api/k8s/dex/README.md) for overlays and TLS.
 
 Deploy Dex module to production:
 

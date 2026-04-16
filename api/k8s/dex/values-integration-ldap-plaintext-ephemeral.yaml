@@ -1,0 +1,39 @@
+# OPT-IN ONLY — ephemeral / disposable integration clusters (plain LDAP on 389).
+#
+# Dex LDAP connector traffic (including bindPW) is NOT TLS. Do not use on shared,
+# long-lived, or production-like clusters. Prefer api/k8s/dex/values-tls.yaml with LDAP
+# StartTLS/LDAPS (see docs/runbooks/auth-dex-ldap.md).
+#
+# Loaded by dex/scripts/helm_dex.sh only when DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true
+# (deploy-integration), or always for helm template validation. apply AFTER
+# values-integration.yaml and BEFORE values-dex-oidc-incluster.yaml so the OIDC overlay
+# can override issuer/staticClients without replacing this connectors list.
+#
+# bindPW uses ${PLACEHOLDER_LDAP_BIND} — substituted by helm_dex.sh (envsubst) from
+# LDAP_BOOTSTRAP_USER_PASSWORD, same as the previous values-integration.yaml block.
+
+config:
+  connectors:
+    - type: ldap
+      id: ldap
+      name: LDAP
+      config:
+        host: ldap.support-bot-integration.svc.cluster.local:389
+        insecureNoSSL: true
+        bindDN: cn=admin,dc=supportbot,dc=local
+        bindPW: ${PLACEHOLDER_LDAP_BIND}
+        usernamePrompt: Email Address
+        userSearch:
+          baseDN: ou=People,dc=supportbot,dc=local
+          filter: "(objectClass=inetOrgPerson)"
+          username: mail
+          idAttr: uid
+          emailAttr: mail
+          nameAttr: cn
+        groupSearch:
+          baseDN: ou=Groups,dc=supportbot,dc=local
+          filter: "(objectClass=groupOfUniqueNames)"
+          userMatchers:
+            - userAttr: DN
+              groupAttr: uniqueMember
+          nameAttr: cn

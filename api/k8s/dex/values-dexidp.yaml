@@ -65,6 +65,13 @@ config:
     - id: support-bot-dex
       name: Support Bot
       secret: ${PLACEHOLDER_CLIENT_SECRET}
+      # List every redirect_uri the app uses (Spring oauth2Login on API + UI-proxied flow on Next.js).
+      # See docs/runbooks/auth-dex-ldap.md — scheme/host/port/path must match exactly.
       redirectURIs:
         - https://support-bot-api.example.com/login/oauth2/code/dex
+        - http://localhost:8080/login/oauth2/code/dex
+        - http://127.0.0.1:8080/login/oauth2/code/dex
+        - https://support-bot-ui.example.com/api/oauth/callback/dex
+        - http://localhost:3000/api/oauth/callback/dex
+        - http://127.0.0.1:3000/api/oauth/callback/dex
   connectors: []

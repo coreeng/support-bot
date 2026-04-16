@@ -26,7 +26,7 @@ The Job manifest lives at [`src/test/resources/k8s/dex-ldap-infra-job.yaml`](src
 1. **Namespace** — e.g. `support-bot-integration` from [`integration-test-local.yaml`](src/test/resources/integration-test-local.yaml) (`INTEGRATION_TEST_CONFIG` if overridden).
 2. **Helm releases** (install before running the test; not done by the test itself):
    - LDAP: e.g. `make ldap-deploy-integration` / [`ldap/scripts/helm_ldap.sh`](../ldap/scripts/helm_ldap.sh) with [`values-bitnami.yaml`](../k8s/ldap/values-bitnami.yaml) so the Service is named **`ldap`** and plain LDAP is on **389**.
-   - Dex: e.g. `make dex-deploy-integration` / [`dex/scripts/helm_dex.sh`](../dex/scripts/helm_dex.sh) with [`values-dexidp.yaml`](../k8s/dex/values-dexidp.yaml) + integration overlay so the Service is **`dex`** and telemetry listens on **5558**.
+   - Dex: e.g. root `make dex-deploy-integration` / [`dex/scripts/helm_dex.sh`](../dex/scripts/helm_dex.sh) (`values-dexidp.yaml` + `values-integration.yaml` + **`values-integration-ldap-plaintext-ephemeral.yaml`** with `DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true` + `values-dex-oidc-incluster.yaml`) so the Service is **`dex`** and telemetry listens on **5558**. See [`api/k8s/dex/README.md`](../k8s/dex/README.md).
 3. **Secret** `ldap-secrets` in that namespace with `admin-password` (see [`api/k8s/ldap/README.md`](../k8s/ldap/README.md)).
 
 Service DNS names **`ldap`** and **`dex`** must match the Job env defaults; override the chart `fullnameOverride` if you use different names, and adjust the Job YAML accordingly.
@@ -61,7 +61,7 @@ Log markers: `OK_TOKEN`, `OK_GROUPS`, `OK_API`, `OK_ALL`.
 ### Prerequisites
 
 1. Same namespace and kube context as Tier 1 ([`integration-test-local.yaml`](src/test/resources/integration-test-local.yaml)).
-2. **Dex** installed with issuer **identical** to the API’s `DEX_ISSUER_URI`. For in-cluster Jobs and Services, use the optional overlay [`values-dex-oidc-incluster.yaml`](../k8s/dex/values-dex-oidc-incluster.yaml) so `config.issuer` uses the full svc FQDN (e.g. `http://dex.support-bot-integration.svc.cluster.local:5556`) and apply after [`values-integration.yaml`](../k8s/dex/values-integration.yaml) (see [`api/k8s/dex/README.md`](../k8s/dex/README.md)). [`values-integration.yaml`](../k8s/dex/values-integration.yaml) also registers `http://127.0.0.1:8765/api/oauth/callback/dex` on the static client.
+2. **Dex** installed with issuer **identical** to the API’s `DEX_ISSUER_URI`. For in-cluster Jobs and Services, use [`values-dex-oidc-incluster.yaml`](../k8s/dex/values-dex-oidc-incluster.yaml) after [`values-integration.yaml`](../k8s/dex/values-integration.yaml) and the opt-in plaintext LDAP overlay [`values-integration-ldap-plaintext-ephemeral.yaml`](../k8s/dex/values-integration-ldap-plaintext-ephemeral.yaml) (see [`api/k8s/dex/README.md`](../k8s/dex/README.md)). Root `make dex-deploy-integration` sets `DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true` and applies all of these. The static client must register `http://127.0.0.1:8765/api/oauth/callback/dex`.
 3. **Support Bot API** deployed for integration tests with **OIDC** env and profiles, e.g. Helm values [`values-integrationtests-oidc.yaml`](../k8s/service/values-integrationtests-oidc.yaml) (`SPRING_PROFILES_ACTIVE=integrationtests,integrationtests-oidc`, `DEX_*`, test-bypass off). `DEX_ISSUER_URI` and `DEX_INTERNAL_BASE_URL` must match Dex `config.issuer`.
 4. **Secrets** in that namespace:
    - `dex-secrets` with keys **`client-id`** and **`client-secret`** (same as Dex `staticClients` for `support-bot-dex`).

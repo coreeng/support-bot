@@ -21,7 +21,7 @@ trap 'rm -rf "${TMPDIR}"' EXIT
 prepare_values() {
 	local src="$1" dest="${TMPDIR}/$(basename "$1")"
 	PLACEHOLDER_CLIENT_SECRET="${DEX_CLIENT_SECRET:-helm-template-placeholder-client-secret}" \
-	PLACEHOLDER_LDAP_BIND="${LDAP_BIND_PW:-helm-template-placeholder-ldap-bind}" \
+	PLACEHOLDER_LDAP_BIND="${LDAP_BOOTSTRAP_USER_PASSWORD:-helm-template-placeholder-ldap-bind}" \
 		envsubst '$PLACEHOLDER_CLIENT_SECRET $PLACEHOLDER_LDAP_BIND' < "${src}" > "${dest}"
 	echo "${dest}"
 }
@@ -39,11 +39,25 @@ case "${OP}" in
 template)
 	vf_base=$(prepare_values "${DEX_K8S}/values-dexidp.yaml")
 	vf_int=$(prepare_values "${DEX_K8S}/values-integration.yaml")
+	vf_plain=$(prepare_values "${DEX_K8S}/values-integration-ldap-plaintext-ephemeral.yaml")
+	vf_oidc=$(prepare_values "${DEX_K8S}/values-dex-oidc-incluster.yaml")
 	helm template support-bot-dex "${CHART_REPO_NAME}/${CHART_NAME}" --version "${CHART_VERSION}" \
 		-f "${vf_base}" \
-		-f "${vf_int}" >/dev/null
+		-f "${vf_int}" \
+		-f "${vf_plain}" \
+		-f "${vf_oidc}" >/dev/null
 	;;
 deploy-integration)
+	if [[ "${DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT:-}" != "true" ]]; then
+		echo "Refusing to deploy Dex with plaintext LDAP (insecureNoSSL on port 389)." >&2
+		echo "That connector must only be used on disposable integration namespaces." >&2
+		echo "Set DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true to confirm, or deploy without" >&2
+		echo "values-integration-ldap-plaintext-ephemeral.yaml and use values-tls.yaml for LDAP/TLS." >&2
+		echo "Repo Makefile target dex-deploy-integration sets this for integration-test infra." >&2
+		echo "See api/k8s/dex/README.md and docs/runbooks/auth-dex-ldap.md." >&2
+		exit 1
+	fi
+
 	NAMESPACE="${NAMESPACE:?Set NAMESPACE}"
 	ensure_dex_k8s_secret "${NAMESPACE}"
 
@@ -51,6 +65,7 @@ deploy-integration)
 
 	vf_base=$(prepare_values "${DEX_K8S}/values-dexidp.yaml")
 	vf_int=$(prepare_values "${DEX_K8S}/values-integration.yaml")
+	vf_plain=$(prepare_values "${DEX_K8S}/values-integration-ldap-plaintext-ephemeral.yaml")
 	vf_oidc=$(prepare_values "${DEX_K8S}/values-dex-oidc-incluster.yaml")
 
 	extra=()
@@ -62,6 +77,7 @@ deploy-integration)
 		-n "${NAMESPACE}" \
 		-f "${vf_base}" \
 		-f "${vf_int}" \
+		-f "${vf_plain}" \
 		-f "${vf_oidc}" \
 		"${extra[@]}"
 	;;

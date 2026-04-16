@@ -1,6 +1,7 @@
 # Optional overlay for Tier 2 OIDC integration Job (and any in-cluster-only traffic).
-# Apply after values-integration.yaml so config.* maps merge; this replaces config.staticClients
-# and config.connectors lists (Helm merges maps; lists replace — include full connector block).
+# Apply after values-integration.yaml (and after values-integration-ldap-plaintext-ephemeral.yaml
+# when using ephemeral plaintext LDAP). This file replaces config.staticClients; it does not
+# set config.connectors — LDAP / TLS connectors come from earlier overlays or stay empty.
 #
 # Align Support Bot API: DEX_ISSUER_URI and DEX_INTERNAL_BASE_URL must equal config.issuer
 # (iss claim in Dex tokens). Use the full svc FQDN (<svc>.<ns>.svc.cluster.local) so the
@@ -16,27 +17,3 @@ config:
       redirectURIs:
         - http://127.0.0.1:8765/api/oauth/callback/dex
         - https://support-bot-api.integration.example.com/login/oauth2/code/dex
-  connectors:
-    - type: ldap
-      id: ldap
-      name: LDAP
-      config:
-        host: ldap.support-bot-integration.svc.cluster.local:389
-        insecureNoSSL: true
-        bindDN: cn=admin,dc=supportbot,dc=local
-        bindPW: ${PLACEHOLDER_LDAP_BIND}
-        usernamePrompt: Email Address
-        userSearch:
-          baseDN: ou=People,dc=supportbot,dc=local
-          filter: "(objectClass=inetOrgPerson)"
-          username: mail
-          idAttr: uid
-          emailAttr: mail
-          nameAttr: cn
-        groupSearch:
-          baseDN: ou=Groups,dc=supportbot,dc=local
-          filter: "(objectClass=groupOfUniqueNames)"
-          userMatchers:
-            - userAttr: DN
-              groupAttr: uniqueMember
-          nameAttr: cn

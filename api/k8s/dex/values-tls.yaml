@@ -1,5 +1,7 @@
-# Dex LDAP-over-TLS overlay — layer on top of values-integration.yaml to switch
-# the LDAP connector from plaintext (insecureNoSSL) to StartTLS or LDAPS.
+# Dex LDAP-over-TLS overlay — layer on top of values-dexidp.yaml (and usually
+# values-integration.yaml) to define a TLS LDAP connector (StartTLS or LDAPS).
+# For disposable integration with plain 389, use values-integration-ldap-plaintext-ephemeral.yaml
+# only with DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true (see api/k8s/dex/README.md); do not use both.
 #
 # Pick ONE of the two modes below (StartTLS on 389, or LDAPS on 636) and
 # uncomment the corresponding block. Delete or leave the other commented out.
@@ -11,6 +13,7 @@
 #
 # Usage:
 #   helm upgrade ... -f values-dexidp.yaml -f values-integration.yaml -f values-tls.yaml
+#   (omit values-integration-ldap-plaintext-ephemeral.yaml when using this file)
 
 config:
   connectors:
