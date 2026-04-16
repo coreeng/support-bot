@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
@@ -262,16 +263,17 @@ public class TicketInMemoryRepository implements TicketRepository {
     }
 
     @Override
-    public boolean isTicketRated(TicketId ticketId) {
-        Ticket ticket = tickets.get(ticketId);
-        return ticket != null && ticket.ratingSubmitted();
-    }
-
-    @Override
-    public void markTicketAsRated(TicketId ticketId) {
-        Ticket ticket = tickets.get(ticketId);
-        if (ticket != null) {
-            tickets.put(ticketId, ticket.toBuilder().ratingSubmitted(true).build());
-        }
+    public boolean tryMarkTicketAsRated(TicketId ticketId) {
+        AtomicBoolean claimed = new AtomicBoolean(false);
+        tickets.computeIfPresent(ticketId, (id, ticket) -> {
+            if (ticket.ratingSubmitted() || ticket.status() != TicketStatus.closed) {
+                return ticket;
+            }
+            claimed.set(true);
+            Ticket updated = ticket.toBuilder().ratingSubmitted(true).build();
+            ticketsByQuery.put(ticket.queryRef(), updated);
+            return updated;
+        });
+        return claimed.get();
     }
 }
