@@ -352,7 +352,7 @@ Use **one canonical public UI URL** everywhere:
 
 Avoid mixing `localhost` vs `127.0.0.1`, `http` vs `https`, or different ports between the two — mismatches produce **HTTP 400** on `/auth/oauth-url` and `/auth/oauth/exchange` for **all** UI-driven IdPs (Google, Azure, Dex).
 
-For local development you can omit **`UI_ORIGIN`** when using a **local-like** Spring profile (`local`, `test`, `functionaltests`, `integrationtests`, `integrationtests-oidc`), when **`spring.profiles.active` / `SPRING_PROFILES_ACTIVE` is unset or blank** (e.g. plain `java -jar` without those env vars), or when **only** the Spring **`default`** profile is active. Otherwise the API fails at startup if `UI_ORIGIN` is unset or blank.
+For local development you can omit **`UI_ORIGIN`** when **every** activated Spring profile is either the implicit **`default`** profile or one of **`local`**, **`test`**, **`functionaltests`**, **`integrationtests`**, **`integrationtests-oidc`** (see `OAuthUiOriginStartupWarning` in the API). That includes plain `java -jar` with no `SPRING_PROFILES_ACTIVE` / `spring.profiles.active`, and cases where the property string and resolved profiles disagree (empty resolved profiles with no explicit property, or only `default`). If **any** non-local profile is active (e.g. `nft`, `production`), set **`UI_ORIGIN`** or the API fails at startup when it is unset or blank.
 
 When deploying with the repo **Helm chart** (`helm-chart/`), you can set **`publicWebOrigin`** once (scheme + host + port, no path): the chart appends **`UI_ORIGIN`** on the API deployment and **`NEXTAUTH_URL`** on the UI deployment from that value. Avoid also setting duplicate `UI_ORIGIN` / `NEXTAUTH_URL` entries in `env` / `ui.env` for the same pods.
 

@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.security;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,9 +15,10 @@ import org.springframework.stereotype.Component;
  * OAuth {@code redirect_uri} against the origin from {@code security.oauth2.redirect-uri}, which
  * defaults from {@code UI_ORIGIN}; it must match the Next.js {@code NEXTAUTH_URL} origin.
  *
- * <p>Also treated as local-like: no {@code spring.profiles.active} / {@code SPRING_PROFILES_ACTIVE}
- * (typical {@code java -jar} with no profile env), only the Spring {@code default} profile active,
- * or a named local-like profile (e.g. {@code local}, {@code test}, integration test profiles).
+ * <p>Local-like means every activated profile is either the Spring {@code default} profile or one of
+ * the named dev/test profiles below. If {@link Environment#getActiveProfiles()} is empty, the same
+ * check is applied to the comma-separated {@code spring.profiles.active} property (when unset or
+ * blank, no explicit profiles — typical {@code java -jar} without {@code SPRING_PROFILES_ACTIVE}).
  */
 @Slf4j
 @Component
@@ -49,14 +51,29 @@ public class OAuthUiOriginStartupWarning {
     }
 
     private boolean isLocalLikeProfile() {
+        String[] rawActive = environment.getActiveProfiles();
+        String[] active = rawActive == null ? new String[0] : rawActive;
+        if (active.length > 0) {
+            return Arrays.stream(active).allMatch(this::isLocalLikeOrDefaultName);
+        }
         String declared = environment.getProperty("spring.profiles.active");
         if (declared == null || declared.isBlank()) {
             return true;
         }
-        String[] active = environment.getActiveProfiles();
-        if (active.length == 1 && "default".equalsIgnoreCase(active[0])) {
+        List<String> names = Arrays.stream(declared.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        if (names.isEmpty()) {
             return true;
         }
-        return Arrays.stream(active).anyMatch(p -> LOCAL_LIKE_PROFILES.stream().anyMatch(l -> l.equalsIgnoreCase(p)));
+        return names.stream().allMatch(this::isLocalLikeOrDefaultName);
+    }
+
+    private boolean isLocalLikeOrDefaultName(String profile) {
+        if ("default".equalsIgnoreCase(profile)) {
+            return true;
+        }
+        return LOCAL_LIKE_PROFILES.stream().anyMatch(l -> l.equalsIgnoreCase(profile));
     }
 }
