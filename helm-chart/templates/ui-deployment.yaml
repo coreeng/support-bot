@@ -37,7 +37,11 @@ spec:
               containerPort: {{ .Values.ui.service.port }}
               protocol: TCP
           env:
-            {{- toYaml .Values.ui.env | nindent 12 }}
+            {{- $uiEnv := .Values.ui.env | default list }}
+            {{- if .Values.publicWebOrigin }}
+            {{- $uiEnv = append $uiEnv (dict "name" "NEXTAUTH_URL" "value" .Values.publicWebOrigin) }}
+            {{- end }}
+            {{- toYaml $uiEnv | nindent 12 }}
           livenessProbe:
             {{- toYaml .Values.ui.livenessProbe | nindent 12 }}
           readinessProbe:

@@ -66,6 +66,11 @@ public class TeamService {
             return supportTeam;
         }
 
+        Team leadershipTeam = supportTeamService.getLeadershipTeam();
+        if (leadershipTeam.code().equals(code)) {
+            return leadershipTeam;
+        }
+
         PlatformTeam platformTeam = platformTeamsService.findTeamByName(code);
         if (platformTeam != null) {
             return mapPlatformTeam(platformTeam);

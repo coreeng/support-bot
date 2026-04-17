@@ -56,6 +56,9 @@ async function apiGet<T>(path: string): Promise<T> {
     if (res.status === 401) {
       return handle401();
     }
+    if (res.status === 403) {
+      throw new Error("Insufficient permissions");
+    }
     throw new Error(`API error: ${res.status}`);
   }
   return res.json();

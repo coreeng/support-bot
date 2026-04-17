@@ -39,6 +39,13 @@ ___
 
 To run the Support Bot locally, please refer to [the service README](https://github.com/coreeng/support-bot/blob/main/api/service/README.md) for instructions.
 
+### Auth modules (Dex / LDAP) and start order
+
+Optional **OpenLDAP** and **Dex** live under [`ldap/`](ldap/) and [`dex/`](dex/). When you use Dex with LDAP, start services in order so each dependency is ready before the next: **LDAP → Dex → API → UI** (and **PostgreSQL** before the API). See the [auth Dex/LDAP runbook](docs/runbooks/auth-dex-ldap.md) for the full checklist, integration deploy order, and troubleshooting (`redirect_uri`, `user_not_allowed`, JWT group mapping).
+
+- LDAP (local Docker): [`ldap/README.md`](ldap/README.md) — Helm: [`api/k8s/ldap/README.md`](api/k8s/ldap/README.md)
+- Dex (local Docker): [`dex/README.md`](dex/README.md) — Helm: [`api/k8s/dex/README.md`](api/k8s/dex/README.md)
+
 ## Running within a Kubernetes Cluster
 
 Follow these steps to deploy the Support Bot in a Kubernetes environment:
@@ -85,6 +92,7 @@ For a more detailed explanation of all configuration options see the [Configurat
 
 We've built a helm chart that you can use to make the deployment easier.
 Find the documentation for it [here](https://github.com/coreeng/support-bot/blob/main/helm-chart/README.md).
+Dex and LDAP deploy as separate platform-chart modules; see [api/k8s/dex/README.md](api/k8s/dex/README.md) and [api/k8s/ldap/README.md](api/k8s/ldap/README.md). For apply order and ops notes, use [docs/runbooks/auth-dex-ldap.md](docs/runbooks/auth-dex-ldap.md).
 
 How to use the helm chart:
 ```bash
@@ -110,7 +118,8 @@ so we are able to associate support tickets with teams.
 For local runs or testing, you can define a static list of users and groups instead.  
 If you want to use real users in Slack, configuring an Identity Provider is recommended.
 
-More details under `platform-integration` in the [configuration docs](https://github.com/coreeng/support-bot/blob/main/api/service/docs/configuration.md).
+More details under `platform-integration` in the [configuration docs](https://github.com/coreeng/support-bot/blob/main/api/service/docs/configuration.md).  
+**Dex + LDAP:** tenant membership from LDAP groups is configured with `platform-integration.jwt-groups` (see the same docs and [docs/runbooks/auth-dex-ldap.md](docs/runbooks/auth-dex-ldap.md)).
 
 ## 6️⃣ Feedback & Support
 

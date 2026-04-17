@@ -1,7 +1,8 @@
 'use client'
 
 import TenantRequestsPage from '@/components/tenant-requests/tenant-requests'
+import { RequireDashboardAccess } from '@/components/AccessDenied'
 
 export default function TenantRequests() {
-  return <TenantRequestsPage />
+  return <RequireDashboardAccess><TenantRequestsPage /></RequireDashboardAccess>
 }

@@ -42,6 +42,35 @@ db-up: ## Start PostgreSQL database container
 db-down: ## Stop PostgreSQL database container
 	@docker compose -f api/service/docker-compose.yaml stop db
 
+##@ Local full stack (Postgres + LDAP + Dex + API + UI)
+
+.PHONY: run-local-dex-ldap
+run-local-dex-ldap: ## Start Postgres, LDAP, Dex, API, UI (needs api/.env.local, ldap/.env.local, dex/.env.local)
+	@$(MAKE) db-up
+	@$(MAKE) -C ldap run-local
+	@echo "Waiting for LDAP container..."
+	@n=0; until docker compose -f ldap/docker-compose.yaml exec -T openldap true 2>/dev/null; do \
+		n=$$((n+1)); if [ "$$n" -ge 120 ]; then echo "Timeout waiting for LDAP"; exit 1; fi; sleep 1; \
+	done
+	@$(MAKE) -C dex run-local
+	@echo "Starting API and UI (Ctrl+C stops API and UI)..."
+	@trap 'kill 0' EXIT INT TERM; \
+		(cd api && $(MAKE) run-local 2>&1 | sed 's/^/[API] /') & \
+		(cd ui && $(MAKE) run-local 2>&1 | sed 's/^/[UI]  /') & \
+		wait
+
+.PHONY: stop-local-api-ui
+stop-local-api-ui: ## Best-effort: stop API (:8080) and UI (:3000) dev servers
+	@$(MAKE) -C api stop-local
+	@$(MAKE) -C ui stop-local
+
+.PHONY: stop-local-dex-ldap
+stop-local-dex-ldap: ## Stop API/UI, Dex, LDAP, Postgres (Docker + dev ports)
+	@$(MAKE) stop-local-api-ui
+	@$(MAKE) -C dex down-local
+	@$(MAKE) -C ldap down-local
+	@$(MAKE) db-down
+
 ##@ General
 
 # The help target prints out all targets with their descriptions organized
@@ -172,9 +201,42 @@ push-extended-test: ## Uses promoted image (no push needed)
 
 ##@ Deploy targets
 
+INTEGRATION_NAMESPACE ?= support-bot-integration
+INTEGRATION_DB_RELEASE ?= support-bot-db
+
 .PHONY: deploy-integration
-deploy-integration:
-	echo "Service deployment is managed by tests"
+deploy-integration: deploy-db-integration ## Deploy DB + LDAP + Dex infrastructure for integration tests
+	@$(MAKE) ldap-deploy-integration
+	@$(MAKE) dex-deploy-integration
+
+.PHONY: deploy-db-integration
+deploy-db-integration: ## Deploy PostgreSQL to integration namespace
+	@helm repo add bitnami https://charts.bitnami.com/bitnami 2>/dev/null || true
+	@helm repo update bitnami >/dev/null
+	helm upgrade --install $(INTEGRATION_DB_RELEASE) bitnami/postgresql \
+	  -n $(INTEGRATION_NAMESPACE) \
+	  --set image.repository=bitnamilegacy/postgresql \
+	  --set global.postgresql.auth.postgresPassword=rootpassword \
+	  --set global.postgresql.auth.username=supportbot \
+	  --set global.postgresql.auth.password=supportbotpassword \
+	  --set global.postgresql.auth.database=supportbot \
+	  --set primary.pdb.create=false \
+	  --set primary.networkPolicy.enabled=false \
+	  --set serviceAccount.create=false \
+	  --wait --atomic --timeout=3m
+
+.PHONY: integration-test-local
+integration-test-local: deploy-integration ## Deploy infra and run integration tests locally
+	@api/gradlew -p api :integration-tests:test; rc=$$?; \
+	$(MAKE) undeploy-integration; \
+	exit $$rc
+
+.PHONY: undeploy-integration
+undeploy-integration: ## Uninstall service + DB + LDAP + Dex from integration namespace
+	-HELM_DRIVER=configmap helm uninstall support-bot -n $(INTEGRATION_NAMESPACE) --ignore-not-found
+	-helm uninstall support-bot-dex -n $(INTEGRATION_NAMESPACE) --ignore-not-found
+	-helm uninstall support-bot-ldap -n $(INTEGRATION_NAMESPACE) --ignore-not-found
+	-helm uninstall $(INTEGRATION_DB_RELEASE) -n $(INTEGRATION_NAMESPACE) --ignore-not-found
 
 .PHONY: deploy-api-nft
 deploy-api-nft: ## Deploy service and DB for nft tests
@@ -343,3 +405,25 @@ monitoring-deploy: ## Deploy monitoring stack (Prometheus + Grafana) for support
 	  $(if $(DRY_RUN),--dry-run --debug,)
 	helm upgrade --install support-bot-dashboard ./api/k8s/dashboard \
 	  $(if $(DRY_RUN),--dry-run --debug,)
+
+##@ Dex module lifecycle (implemented in dex/Makefile)
+
+.PHONY: dex-template dex-deploy-integration dex-deploy-prod
+dex-template: ## Validate Dex values by rendering dex/dex chart
+	@$(MAKE) -C dex template
+
+dex-deploy-integration: ## Deploy Dex module to integration environment (OIDC overlay + ephemeral plaintext LDAP)
+	@$(MAKE) -C dex deploy-integration DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true
+
+dex-deploy-prod: ## Deploy Dex module to production environment
+	@$(MAKE) -C dex deploy-prod
+
+##@ LDAP module lifecycle (implemented in ldap/Makefile)
+
+.PHONY: ldap-template ldap-deploy-integration
+ldap-template: ## Validate LDAP chart (bitnami + integration + ephemeral plaintext overlay)
+	@$(MAKE) -C ldap template
+
+ldap-deploy-integration: ## Deploy LDAP for integration (ephemeral plaintext 389 — opt-in env set here)
+	@$(MAKE) -C ldap deploy-integration LDAP_DEPLOY_INSECURE_PLAINTEXT=true
+

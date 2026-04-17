@@ -3,7 +3,7 @@ service:
   deploymentScript:
     releaseName: support-bot
     chartPath: /app/helm-chart
-    valuesFilePath: /app/helm-chart/values-integrationtests.yaml
+    valuesFilePath: /app/helm-chart/values-integrationtests-oidc.yaml
     scriptPath: /app/scripts/deploy-service.sh
   deployment:
     name: support-bot

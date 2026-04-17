@@ -18,6 +18,10 @@ install: .yarn-install ## Install dependencies (only if needed)
 run-local: install ## Run UI dev server locally
 	yarn dev
 
+.PHONY: stop-local
+stop-local: ## Best-effort: stop process listening on UI dev port (default 3000)
+	@for p in $$(lsof -ti :3000 -sTCP:LISTEN 2>/dev/null); do kill $$p 2>/dev/null || true; done
+
 .PHONY: build
 build: install ## Build for production
 	yarn build

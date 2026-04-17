@@ -9,6 +9,16 @@ notify about events such as "message posted", "reaction added" and others.
 - Service listening on `http://localhost:8080` by default
   - Override target with `SERVICE_ENDPOINT=http://host:port` if different
 
+## Running from the repo root
+
+`./gradlew test` under `api/` runs every subproject. **`:functional:test` is skipped by default** (opt-in only), so you do not get `ConnectException` when no Support Bot API is running. A TCP check on port 8080 is not used: other tools often listen there while the API is down.
+
+Run functional tests explicitly after starting the API:
+
+- `RUN_FUNCTIONAL_TESTS=true ./gradlew :functional:test`
+- or `./gradlew :functional:test -PrunFunctionalTests`
+- or `make -C api/functional test` (sets `RUN_FUNCTIONAL_TESTS=true`)
+
 ## Steps to run
 Start the database, then run the service with the `functionaltests` Spring profile.
 Start the database first:

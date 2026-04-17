@@ -291,3 +291,14 @@ Then('user should NOT see {string} table', async function (this: CustomWorld, ta
     expect(isVisible).toBe(false);
 });
 
+When('user navigates directly to {string}', async function (this: CustomWorld, path: string) {
+    const base = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
+    await this.page.goto(`${base}${path}`);
+    await this.page.waitForTimeout(1500);
+});
+
+Then('user should see {string} message', async function (this: CustomWorld, messageText: string) {
+    const message = this.page.getByText(messageText);
+    await expect(message).toBeVisible({ timeout: 5000 });
+});
+

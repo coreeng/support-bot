@@ -134,6 +134,11 @@ prReviewTracking:
 #     installationId: "${GITHUB_APP_INSTALLATION_ID:}" # Used when authMode=app
 #     privateKeyPem: "${GITHUB_APP_PRIVATE_KEY_PEM:}" # Used when authMode=app
 
+# Optional single public origin (scheme + host + port, no path). When set, the chart appends
+# UI_ORIGIN on the API deployment and NEXTAUTH_URL on the UI deployment so OAuth redirect validation
+# stays aligned. Do not duplicate those env vars in env / ui.env when using this (last duplicate wins in K8s).
+publicWebOrigin: ""
+
 # Environment variables
 env:
   - name: DB_URL

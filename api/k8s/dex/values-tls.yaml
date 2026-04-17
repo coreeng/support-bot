@@ -1,0 +1,59 @@
+# Dex LDAP-over-TLS overlay — layer on top of values-dexidp.yaml (and usually
+# values-integration.yaml) to define a TLS LDAP connector (StartTLS or LDAPS).
+# For disposable integration with plain 389, use values-integration-ldap-plaintext-ephemeral.yaml
+# only with DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true (see api/k8s/dex/README.md); do not use both.
+#
+# Pick ONE of the two modes below (StartTLS on 389, or LDAPS on 636) and
+# uncomment the corresponding block. Delete or leave the other commented out.
+#
+# If the LDAP server uses a private CA, mount the CA bundle into the Dex pod
+# (extraVolumes + extraVolumeMounts on the dex/dex chart) and set
+# rootCAData or rootCA accordingly. See Dex upstream LDAP connector docs:
+# https://dexidp.io/docs/connectors/ldap/
+#
+# Usage:
+#   helm upgrade ... -f values-dexidp.yaml -f values-integration.yaml -f values-tls.yaml
+#   (omit values-integration-ldap-plaintext-ephemeral.yaml when using this file)
+
+config:
+  connectors:
+    - type: ldap
+      id: ldap
+      name: LDAP
+      config:
+        # --- Option A: StartTLS (upgrades plain 389 → TLS after STARTTLS handshake) ---
+        # Use full svc FQDN: ldap.<namespace>.svc.cluster.local
+        host: ldap.support-bot-integration.svc.cluster.local:389
+        insecureNoSSL: false
+        startTLS: true
+
+        # --- Option B: LDAPS (direct TLS on port 636) ---
+        # host: ldap.support-bot-integration.svc.cluster.local:636
+        # insecureNoSSL: false
+        # startTLS: false
+
+        # Set to true ONLY in non-production environments where the LDAP cert is
+        # self-signed and not in the Dex pod's trust store.
+        insecureSkipVerify: false
+
+        # If using a private CA, base64-encode the PEM and paste here, or mount
+        # the file and use rootCA: /path/to/ca.crt instead.
+        # rootCAData: <base64-PEM>
+
+        bindDN: cn=admin,dc=supportbot,dc=local
+        bindPW: ${PLACEHOLDER_LDAP_BIND}
+        usernamePrompt: Email Address
+        userSearch:
+          baseDN: ou=People,dc=supportbot,dc=local
+          filter: "(objectClass=inetOrgPerson)"
+          username: mail
+          idAttr: uid
+          emailAttr: mail
+          nameAttr: cn
+        groupSearch:
+          baseDN: ou=Groups,dc=supportbot,dc=local
+          filter: "(objectClass=groupOfUniqueNames)"
+          userMatchers:
+            - userAttr: DN
+              groupAttr: uniqueMember
+          nameAttr: cn

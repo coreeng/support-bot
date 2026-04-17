@@ -1,0 +1,10 @@
+# OPT-IN ONLY — disposable integration: plain LDAP on port 389 (no LDAPS / no StartTLS).
+#
+# Admin bind password and LDAP traffic are not encrypted on the wire. Do not use on shared or
+# long-lived clusters. For TLS, omit this file and use values-tls.yaml with a real tls.certSecret.
+#
+# Loaded by ldap/scripts/helm_ldap.sh when LDAP_DEPLOY_INSECURE_PLAINTEXT=true (deploy-integration),
+# and always merged for helm template validation. See api/k8s/ldap/README.md.
+
+tls:
+  enabled: false

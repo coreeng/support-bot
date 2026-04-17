@@ -16,13 +16,24 @@ import java.util.stream.Collectors;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Deploys the support-bot API service and runs smoke tests against it.
+ *
+ * <p><b>Lifecycle:</b> The API service is deployed in {@code @BeforeAll} and stays running for
+ * subsequent test classes (e.g. {@link DexOidcInClusterTest @Order(3)}). Teardown is handled
+ * externally — by the Makefile {@code undeploy-integration} target (local) or by
+ * {@code cleanup_job()} in {@code run-integration-tests.sh} (pipeline). Test classes never
+ * undeploy the service themselves.
+ */
 @Tag("integration")
 @Tag("smoke")
+@Order(2)
 public class ServiceStartupTest {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ServiceStartupTest.class);
@@ -92,12 +103,6 @@ public class ServiceStartupTest {
 
     @AfterAll
     static void cleanup() {
-        try {
-            runServiceScript("delete");
-        } catch (Exception e) {
-            LOGGER.error("Error during cleanup, couldn't uninstall service chart", e);
-        }
-
         try {
             if (kubernetesClient != null) {
                 kubernetesClient.deleteConfigMap(TEST_TEAM_CM_NAME, config.namespace());

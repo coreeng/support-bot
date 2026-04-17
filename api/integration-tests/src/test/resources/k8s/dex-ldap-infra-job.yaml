@@ -1,0 +1,75 @@
+# Template: replace PLACEHOLDER_NAMESPACE before apply. Job name is set in Java (unique per run).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: PLACEHOLDER_JOB_NAME
+  namespace: PLACEHOLDER_NAMESPACE
+  labels:
+    app.kubernetes.io/component: integration-smoke
+    app.kubernetes.io/name: support-bot-dex-ldap-infra
+spec:
+  ttlSecondsAfterFinished: 120
+  backoffLimit: 2
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: smoke
+          image: python:3.12-slim-bookworm@sha256:d97792894a6a4162cae14da44542a83c75e56c77a27b92d58f3f83b7bc961292
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          env:
+            - name: DEX_HOST
+              value: "dex.PLACEHOLDER_NAMESPACE.svc.cluster.local"
+            - name: DEX_TELEMETRY_PORT
+              value: "5558"
+            - name: LDAP_HOST
+              value: "ldap.PLACEHOLDER_NAMESPACE.svc.cluster.local"
+            - name: LDAP_PORT
+              value: "389"
+            - name: LDAP_BIND_DN
+              value: "cn=admin,dc=supportbot,dc=local"
+            - name: LDAP_BIND_PW
+              valueFrom:
+                secretKeyRef:
+                  name: ldap-secrets
+                  key: admin-password
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              export HOME=/tmp
+              echo "Checking Dex telemetry health at http://${DEX_HOST}:${DEX_TELEMETRY_PORT}/healthz/live ..."
+              python3 -c "import urllib.request; urllib.request.urlopen('http://${DEX_HOST}:${DEX_TELEMETRY_PORT}/healthz/live').read()"
+              echo "OK_DEX"
+              echo "Installing ldap3..."
+              python3 -m pip install --break-system-packages --no-cache-dir --target /tmp/pydeps ldap3==2.9.1 >/dev/null
+              export PYTHONPATH=/tmp/pydeps
+              echo "Checking LDAP uid=alice at ldap://${LDAP_HOST}:${LDAP_PORT} ..."
+              python3 -c "
+              import ldap3, os
+              srv = ldap3.Server(os.environ['LDAP_HOST'], port=int(os.environ['LDAP_PORT']))
+              conn = ldap3.Connection(srv, os.environ['LDAP_BIND_DN'], os.environ['LDAP_BIND_PW'], auto_bind=True)
+              conn.search('ou=People,dc=supportbot,dc=local', '(uid=alice)', attributes=['uid'])
+              assert len(conn.entries) == 1 and str(conn.entries[0].uid) == 'alice', f'Expected alice, got {conn.entries}'
+              print(f'Found: {conn.entries[0]}')
+              "
+              echo "OK_LDAP"
+              echo "OK_ALL"
+      volumes:
+        - name: tmp
+          emptyDir: {}

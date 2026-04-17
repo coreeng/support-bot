@@ -166,6 +166,22 @@ class TeamServiceTest {
     }
 
     @Test
+    void findTeamByCode_returnsLeadershipTeam() {
+        PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
+        EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of());
+        SupportTeamService supportTeamService = mockSupportTeamService();
+
+        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+
+        Team result = teamService.findTeamByCode("leadership");
+
+        assertNotNull(result);
+        assertEquals("Leadership Team", result.label());
+        assertEquals("leadership", result.code());
+        assertEquals(ImmutableList.of(TeamType.LEADERSHIP), result.types());
+    }
+
+    @Test
     void findTeamByCode_returnsPlatformOnlyTeam() {
         // given
         PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);

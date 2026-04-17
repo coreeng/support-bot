@@ -1,0 +1,129 @@
+{{- include "support-bot-openldap.validate" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "support-bot-openldap.fullname" . }}
+  labels:
+    {{- include "support-bot-openldap.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "support-bot-openldap.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "support-bot-openldap.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: openldap
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # KSV-0014: readOnlyRootFilesystem is not set because the Bitnami OpenLDAP
+          # image writes runtime config to /opt/bitnami/openldap/etc/slapd.d/ and pid/socket
+          # files to /opt/bitnami/openldap/var/run/ at startup.
+          # capabilities: drop ALL + add back NET_BIND_SERVICE and SETUID/SETGID because
+          # slappasswd (called during bootstrap) needs them to hash passwords.
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE", "SETUID", "SETGID"]
+          ports:
+            {{- if .Values.service.port }}
+            - name: ldap
+              containerPort: {{ .Values.service.containerPort | default 1389 }}
+              protocol: TCP
+            {{- end }}
+            {{- if and .Values.tls.enabled .Values.tls.certSecret .Values.tls.port }}
+            - name: ldaps
+              containerPort: {{ .Values.tls.port }}
+              protocol: TCP
+            {{- end }}
+          env:
+            - name: BITNAMI_DEBUG
+              value: {{ .Values.debug | default false | toString | quote }}
+            - name: LDAP_ROOT
+              value: {{ .Values.ldapRoot | quote }}
+            - name: LDAP_ADMIN_USERNAME
+              value: {{ .Values.adminUsername | quote }}
+            - name: LDAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret | quote }}
+                  key: {{ .Values.existingSecretPasswordKey | quote }}
+            - name: LDAP_PORT_NUMBER
+              value: {{ .Values.service.containerPort | default 1389 | toString | quote }}
+            - name: LDAP_CUSTOM_LDIF_DIR
+              value: /ldifs
+            {{- if and .Values.tls.enabled .Values.tls.certSecret }}
+            - name: LDAP_ENABLE_TLS
+              value: "yes"
+            - name: LDAP_LDAPS_PORT_NUMBER
+              value: {{ .Values.tls.port | toString | quote }}
+            - name: LDAP_TLS_CERT_FILE
+              value: "/opt/bitnami/openldap/certs/{{ .Values.tls.certFilename }}"
+            - name: LDAP_TLS_KEY_FILE
+              value: "/opt/bitnami/openldap/certs/{{ .Values.tls.keyFilename }}"
+            - name: LDAP_TLS_CA_FILE
+              value: "/opt/bitnami/openldap/certs/{{ .Values.tls.caFilename }}"
+            {{- end }}
+          volumeMounts:
+            - name: bootstrap-ldif
+              mountPath: /ldifs
+              readOnly: true
+            - name: data
+              mountPath: /bitnami/openldap
+            - name: tmp
+              mountPath: /tmp
+            {{- if and .Values.tls.enabled .Values.tls.certSecret }}
+            - name: tls-certs
+              mountPath: /opt/bitnami/openldap/certs
+              readOnly: true
+            {{- end }}
+          startupProbe:
+            tcpSocket:
+              port: {{ if and .Values.tls.enabled .Values.tls.certSecret .Values.tls.port }}ldaps{{ else }}ldap{{ end }}
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 36
+          livenessProbe:
+            tcpSocket:
+              port: {{ if and .Values.tls.enabled .Values.tls.certSecret .Values.tls.port }}ldaps{{ else }}ldap{{ end }}
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: {{ if and .Values.tls.enabled .Values.tls.certSecret .Values.tls.port }}ldaps{{ else }}ldap{{ end }}
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 5
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: bootstrap-ldif
+          configMap:
+            name: {{ include "support-bot-openldap.fullname" . }}-bootstrap
+        - name: tmp
+          emptyDir: {}
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "support-bot-openldap.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if and .Values.tls.enabled .Values.tls.certSecret }}
+        - name: tls-certs
+          secret:
+            secretName: {{ .Values.tls.certSecret }}
+        {{- end }}

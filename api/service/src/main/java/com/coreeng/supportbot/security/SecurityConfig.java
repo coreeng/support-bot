@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -20,7 +21,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@EnableConfigurationProperties(SecurityProperties.class)
+@EnableConfigurationProperties({SecurityProperties.class, JwtGroupsProperties.class})
 @RequiredArgsConstructor
 public class SecurityConfig {
     private final SecurityProperties properties;
@@ -30,6 +31,7 @@ public class SecurityConfig {
     private final SupportTeamService supportTeamService;
     private final OAuth2AvailabilityChecker oauth2AvailabilityChecker;
     private final AllowListService allowListService;
+    private final JwtGroupTeamMerger jwtGroupTeamMerger;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, CorsConfigurationSource corsConfigurationSource)
@@ -91,11 +93,20 @@ public class SecurityConfig {
     @Bean
     public OAuth2SuccessHandler oauth2SuccessHandler() {
         return new OAuth2SuccessHandler(
-                properties, jwtService, authCodeStore, teamService, supportTeamService, allowListService);
+                properties,
+                jwtService,
+                authCodeStore,
+                teamService,
+                supportTeamService,
+                allowListService,
+                jwtGroupTeamMerger);
     }
 
     @Bean
     public RestTemplate restTemplate() {
-        return new RestTemplate();
+        var factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10_000);
+        factory.setReadTimeout(30_000);
+        return new RestTemplate(factory);
     }
 }

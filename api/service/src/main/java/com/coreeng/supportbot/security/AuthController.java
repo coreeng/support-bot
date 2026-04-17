@@ -62,12 +62,13 @@ public class AuthController {
     @GetMapping("/oauth-url")
     public ResponseEntity<OAuthUrlResponse> getOAuthUrl(
             @RequestParam String provider, @RequestParam String redirectUri) {
-        var authUrlOpt = oauthUrlService.getAuthorizationUrl(provider, redirectUri);
-        if (authUrlOpt.isEmpty()) {
-            log.warn("Invalid OAuth provider: {}", provider);
+        try {
+            var result = oauthUrlService.getAuthorizationUrl(provider, redirectUri);
+            return ResponseEntity.ok(new OAuthUrlResponse(result.url(), result.state()));
+        } catch (IllegalArgumentException e) {
+            log.warn("OAuth URL request rejected: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(new OAuthUrlResponse(authUrlOpt.get()));
     }
 
     @PostMapping("/oauth/exchange")
@@ -104,7 +105,7 @@ public class AuthController {
 
     public record TeamResponse(String label, String code, List<String> types) {}
 
-    public record OAuthUrlResponse(String url) {}
+    public record OAuthUrlResponse(String url, String state) {}
 
     public record OAuthExchangeRequest(String provider, String code, String redirectUri) {}
 

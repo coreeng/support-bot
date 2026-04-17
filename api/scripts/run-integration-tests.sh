@@ -22,10 +22,13 @@ CLEANUP="${CLEANUP:-true}"
 
 cleanup_job() {
   if [[ "$CLEANUP" == "true" ]]; then
-    log "Cleaning up Helm release: $RELEASE_NAME"
+    log "Cleaning up Helm releases in namespace: $NAMESPACE"
     helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --ignore-not-found || true
+    helm uninstall support-bot-dex -n "$NAMESPACE" --ignore-not-found || true
+    helm uninstall support-bot-ldap -n "$NAMESPACE" --ignore-not-found || true
+    kubectl delete deployment support-bot -n "$NAMESPACE" --ignore-not-found || true
   else
-    log_warning "Cleanup disabled. Helm release $RELEASE_NAME will remain in namespace $NAMESPACE"
+    log_warning "Cleanup disabled. Helm releases will remain in namespace $NAMESPACE"
   fi
 
   if [[ "$DELETE_DB" == "true" && "$DEPLOY_DB" == "true" ]]; then

@@ -1,0 +1,18 @@
+# Activated with Spring profile "integrationtests-oidc" (stack on "integrationtests").
+# Tier 2: real OAuth exchange + JWT; map Dex LDAP group "developers" to escalation team code "core".
+
+spring:
+  config:
+    activate:
+      on-profile: integrationtests-oidc
+
+platform-integration:
+  fetch:
+    ignore-unknown-teams: true
+  jwt-groups:
+    enabled: true
+    claim-name: groups
+    mappings:
+      - team-code: core
+        claim-values:
+          - developers
