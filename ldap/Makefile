@@ -8,6 +8,8 @@ p2p-functional:
 p2p-nft:
 p2p-integration: template ## P2P: render then deploy (sets LDAP_DEPLOY_INSECURE_PLAINTEXT for plaintext overlay)
 	@$(MAKE) deploy-integration LDAP_DEPLOY_INSECURE_PLAINTEXT=true
+p2p-promote-to-extended-test: ## Delegate image promotion to repo root
+	@$(MAKE) -C .. p2p-promote-to-extended-test
 p2p-extended-test:
 p2p-prod:
 
