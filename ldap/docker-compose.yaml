@@ -1,0 +1,45 @@
+networks:
+  supportbot-ldap:
+    name: supportbot-ldap
+    driver: bridge
+
+services:
+  openldap:
+    image: osixia/openldap:1.5.0@sha256:18742e9c449c9c1afe129d3f2f3ee15fb34cc43e5f940a20f3399728f41d7c28
+    env_file:
+      - .env.local
+    environment:
+      LDAP_ORGANISATION: Support Bot
+      LDAP_DOMAIN: supportbot.local
+      LDAP_TLS: "false"              # local-dev only — credentials travel in plaintext
+      # Osixia deletes bootstrap assets after first start by default; restarts then fail (missing
+      # replication-disable.ldif / root-password-change.ldif under /container/service/...).
+      LDAP_REMOVE_CONFIG_AFTER_SETUP: "false"
+    ports:
+      - "389:389"
+    volumes:
+      - ldap-data:/var/lib/ldap
+      - ldap-config:/etc/ldap/slapd.d
+      # Writable mount: osixia entrypoint chowns this path on startup (fails with :ro).
+      - ./bootstrap:/container/service/slapd/assets/config/bootstrap/ldif/custom
+    restart: unless-stopped
+    networks:
+      - supportbot-ldap
+
+  phpldapadmin:
+    image: osixia/phpldapadmin:0.9.0
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: openldap
+      PHPLDAPADMIN_HTTPS: "false"
+    ports:
+      # Avoid clashing with Support Bot management/actuator (default 8081).
+      - "18081:80"
+    depends_on:
+      - openldap
+    restart: unless-stopped
+    networks:
+      - supportbot-ldap
+
+volumes:
+  ldap-data:
+  ldap-config:

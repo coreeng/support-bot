@@ -17,11 +17,16 @@ db-up: ## Start PostgreSQL database container
 db-down: ## Stop PostgreSQL database container
 	@docker compose -f service/docker-compose.yaml stop db
 
+.PHONY: stop-local
+stop-local: ## Best-effort: stop process listening on API dev port (default 8080)
+	@for p in $$(lsof -ti :8080 -sTCP:LISTEN 2>/dev/null); do kill $$p 2>/dev/null || true; done
+
 .PHONY: run-local
 run-local: db-up ## Run API locally (starts DB, loads .env.local)
 	@if [ -f .env.local ]; then \
 		set -a && source .env.local && set +a && \
-		cd service && ../gradlew bootRun; \
+		export SPRING_PROFILES_ACTIVE="$${SPRING_PROFILES_ACTIVE:-local}" && \
+		cd service && ../gradlew -Ddocker=true bootRun; \
 	else \
 		echo "Error: .env.local not found. Copy from .env.example and update values."; \
 		exit 1; \
@@ -36,5 +41,13 @@ test: ## Run tests
 	cd service && ../gradlew test
 
 .PHONY: codegen
-codegen: ## Generate JOOQ classes
+codegen: ## Generate JOOQ classes (uses Testcontainers unless Docker is unavailable)
 	cd service && ../gradlew jooqCodegen
+
+.PHONY: codegen-local
+codegen-local: ## Generate JOOQ classes against Postgres from `make db-up` (no Testcontainers)
+	cd service && ../gradlew -Ddocker=true jooqCodegen
+
+.PHONY: build-local
+build-local: ## Build against Postgres from `make db-up` (no Testcontainers)
+	cd service && ../gradlew -Ddocker=true build

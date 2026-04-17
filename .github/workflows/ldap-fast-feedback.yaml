@@ -1,0 +1,43 @@
+name: LDAP Fast Feedback
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ldap/**
+      - api/k8s/ldap/**
+      - api/k8s/ldap/chart/**
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ldap/**
+      - api/k8s/ldap/**
+      - api/k8s/ldap/chart/**
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  version:
+    uses: coreeng/p2p/.github/workflows/p2p-version.yaml@v1
+    with:
+      version-prefix: ldap/v
+    secrets:
+      git-token: ${{ secrets.GITHUB_TOKEN }}
+
+  fastfeedback:
+    needs: [version]
+    uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@v1
+    secrets:
+      env_vars: |
+        ${{ secrets.env_vars }}
+        LDAP_BOOTSTRAP_USER_PASSWORD=${{ secrets.LDAP_BOOTSTRAP_USER_PASSWORD }}
+    with:
+      app-name: ldap
+      version: ${{ needs.version.outputs.version }}
+      working-directory: ldap

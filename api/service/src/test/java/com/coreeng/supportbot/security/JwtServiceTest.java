@@ -20,7 +20,7 @@ class JwtServiceTest {
     private static JwtService createService(Duration expiration) {
         return new JwtService(new SecurityProperties(
                 new SecurityProperties.JwtProperties(TEST_SECRET, expiration),
-                new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
+                SecurityProperties.OAuth2Properties.withRedirectOnly("http://localhost:3000/auth/callback"),
                 new SecurityProperties.CorsProperties(null),
                 new SecurityProperties.TestBypassProperties(false),
                 new SecurityProperties.AllowListProperties(List.of(), List.of())));

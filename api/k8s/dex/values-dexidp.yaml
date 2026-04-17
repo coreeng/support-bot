@@ -1,0 +1,77 @@
+# Dex via official dexidp Helm chart (dex/dex). Chart: https://charts.dexidp.io
+# Pin chart version in dex/Makefile (DEX_CHART_VERSION).
+#
+# Secrets (client secret, LDAP bind, OAuth connector keys) belong in the rendered
+# config below for Helm template checks; override in a private values file or
+# --set for real clusters — the dex chart does not expand ${ENV} in config.yaml.
+
+fullnameOverride: dex
+replicaCount: 1
+
+# Chart default rbac.createClusterScoped: true installs ClusterRole/ClusterRoleBinding for CRD
+# management (apiextensions.k8s.io). That fails on tenant-scoped deployers (e.g. GKE SA without
+# container.clusterRoles.create). Sqlite + config Secret does not need cluster RBAC.
+rbac:
+  create: true
+  createClusterScoped: false
+
+image:
+  repository: ghcr.io/dexidp/dex
+  pullPolicy: IfNotPresent
+  tag: v2.44.0
+
+configSecret:
+  create: true
+
+volumes:
+  - name: dex-data
+    emptyDir: {}
+
+volumeMounts:
+  - name: dex-data
+    mountPath: /var/dex
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# In-cluster HTTP only (Service port 5556). Enable ingress in a private overlay if you need a public hostname.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []
+
+config:
+  issuer: https://dex.example.com
+  storage:
+    type: sqlite3
+    config:
+      file: /var/dex/dex.db
+  web:
+    http: 0.0.0.0:5556
+  telemetry:
+    http: 0.0.0.0:5558
+  oauth2:
+    skipApprovalScreen: true
+  # Connectors-only (LDAP / Google / Microsoft). Enable static email login only in a private overlay.
+  enablePasswordDB: false
+  staticClients:
+    - id: support-bot-dex
+      name: Support Bot
+      secret: ${PLACEHOLDER_CLIENT_SECRET}
+      # List every redirect_uri the app uses (Spring oauth2Login on API + UI-proxied flow on Next.js).
+      # See docs/runbooks/auth-dex-ldap.md — scheme/host/port/path must match exactly.
+      redirectURIs:
+        - https://support-bot-api.example.com/login/oauth2/code/dex
+        - http://localhost:8080/login/oauth2/code/dex
+        - http://127.0.0.1:8080/login/oauth2/code/dex
+        - https://support-bot-ui.example.com/api/oauth/callback/dex
+        - http://localhost:3000/api/oauth/callback/dex
+        - http://127.0.0.1:3000/api/oauth/callback/dex
+  connectors: []

@@ -1,6 +1,8 @@
 package com.coreeng.supportbot.github;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.kohsuke.github.GHFileNotFoundException;
@@ -20,6 +22,24 @@ import org.slf4j.LoggerFactory;
 public final class Hub4jGitHubClient implements GitHubClient {
     private static final Logger LOG = LoggerFactory.getLogger(Hub4jGitHubClient.class);
     private final GitHub github;
+
+    /**
+     * hub4j 1.3xx returns {@link Date} for several timestamps; newer releases return {@link Instant}. Normalize so we
+     * work with whichever version is on the classpath (CI/Docker may resolve a different revision than local).
+     */
+    private static @Nullable Instant instantFromHub4j(@Nullable Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Instant i) {
+            return i;
+        }
+        if (value instanceof Date d) {
+            return d.toInstant();
+        }
+        throw new IllegalStateException(
+                "Unexpected timestamp type from GitHub API: " + value.getClass().getName());
+    }
 
     public Hub4jGitHubClient(GitHub github) {
         this.github = github;
@@ -81,13 +101,13 @@ public final class Hub4jGitHubClient implements GitHubClient {
                 throw new GitHubApiException(
                         0, "GitHub returned null state for review on %s#%d".formatted(repositoryName, pullNumber));
             }
-            var submittedAt = review.getSubmittedAt();
+            Instant submittedAt = instantFromHub4j((Object) review.getSubmittedAt());
             if (submittedAt == null) {
                 throw new GitHubApiException(
                         0,
                         "GitHub returned null submitted_at for review on %s#%d".formatted(repositoryName, pullNumber));
             }
-            return new GitHubPullRequestReview(user.getLogin(), mapReviewState(state), submittedAt.toInstant());
+            return new GitHubPullRequestReview(user.getLogin(), mapReviewState(state), submittedAt);
         } catch (IOException e) {
             throw new GitHubApiException(
                     0, "GitHub API call failed mapping review for %s#%d".formatted(repositoryName, pullNumber), e);
@@ -158,7 +178,7 @@ public final class Hub4jGitHubClient implements GitHubClient {
     public GitHubPullRequest getPullRequest(String repositoryName, int pullNumber) {
         try {
             GHPullRequest pr = github.getRepository(repositoryName).getPullRequest(pullNumber);
-            var createdAt = pr.getCreatedAt();
+            Instant createdAt = instantFromHub4j((Object) pr.getCreatedAt());
             if (createdAt == null) {
                 throw new GitHubApiException(
                         0, "GitHub API returned null created_at for %s#%d".formatted(repositoryName, pullNumber));
@@ -177,7 +197,7 @@ public final class Hub4jGitHubClient implements GitHubClient {
             GitHubPullRequest.PrState prState;
             if (state == GHIssueState.OPEN) {
                 prState = GitHubPullRequest.PrState.OPEN;
-            } else if (pr.getMergedAt() != null) {
+            } else if (instantFromHub4j((Object) pr.getMergedAt()) != null) {
                 prState = GitHubPullRequest.PrState.MERGED;
             } else {
                 prState = GitHubPullRequest.PrState.CLOSED;
@@ -199,7 +219,7 @@ public final class Hub4jGitHubClient implements GitHubClient {
             return new GitHubPullRequest(
                     repositoryName,
                     pullNumber,
-                    createdAt.toInstant(),
+                    createdAt,
                     prState,
                     mergeable,
                     mergeableState,

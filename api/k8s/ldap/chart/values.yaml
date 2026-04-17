@@ -1,0 +1,59 @@
+# Defaults for support-bot-openldap (Bitnami OpenLDAP image).
+# Override from api/k8s/ldap/values-bitnami.yaml, values-integration.yaml, and optionally
+# values-integration-ldap-plaintext-ephemeral.yaml or values-tls.yaml.
+
+fullnameOverride: ""
+
+image:
+  repository: bitnami/openldap
+  tag: "2.6.10"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  # External Service port exposed to consumers.
+  port: 389
+  # Container/slapd port. Bitnami default for non-root is 1389.
+  # K8s Service maps service.port → service.containerPort.
+  containerPort: 1389
+
+# TLS / LDAPS — default is secure posture: tls.enabled true requires tls.certSecret to be set
+# (see templates: effective TLS = enabled + non-empty certSecret). Without a Secret, Helm fails
+# unless you apply values-integration-ldap-plaintext-ephemeral.yaml (sets tls.enabled: false) for
+# ephemeral plaintext only. See api/k8s/ldap/README.md and docs/runbooks/auth-dex-ldap.md.
+tls:
+  enabled: true
+  # Additional LDAPS port exposed on the Service (636 by convention).
+  port: 636
+  # K8s TLS Secret with tls.crt, tls.key, and optionally ca.crt (required when TLS is in use).
+  certSecret: ""
+  # Mount paths inside the container (Bitnami defaults).
+  certFilename: tls.crt
+  keyFilename: tls.key
+  caFilename: ca.crt
+
+# K8s Secret holding the directory admin password. When using plaintext LDAP (ephemeral overlay),
+# that password is not protected on the wire — see values-integration-ldap-plaintext-ephemeral.yaml.
+existingSecret: ldap-secrets
+existingSecretPasswordKey: admin-password
+
+# LDAP_ROOT / base suffix (admin DN becomes cn=<adminUsername>,<root>).
+ldapRoot: dc=supportbot,dc=local
+adminUsername: admin
+
+debug: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 8Gi

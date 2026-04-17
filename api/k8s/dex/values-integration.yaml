@@ -1,0 +1,26 @@
+# Integration overrides (dex/dex chart). Merges with values-dexidp.yaml (maps merge; lists here replace).
+# Ingress stays off (see values-dexidp.yaml); reach Dex in-cluster via full svc FQDN or port-forward.
+#
+# LDAP connector is NOT defined here — plaintext LDAP for disposable integration is opt-in via
+# values-integration-ldap-plaintext-ephemeral.yaml (see api/k8s/dex/README.md). For TLS LDAP, use
+# values-tls.yaml. See docs/runbooks/auth-dex-ldap.md.
+#
+# staticClients.secret uses ${PLACEHOLDER_CLIENT_SECRET} — substituted by dex/scripts/helm_dex.sh.
+
+config:
+  issuer: https://dex.integration.example.com
+  staticClients:
+    - id: support-bot-dex
+      name: Support Bot
+      secret: ${PLACEHOLDER_CLIENT_SECRET}
+      redirectURIs:
+        - http://127.0.0.1:8765/api/oauth/callback/dex
+        - https://support-bot-api.integration.example.com/login/oauth2/code/dex
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi

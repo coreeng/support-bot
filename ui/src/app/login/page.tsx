@@ -4,18 +4,23 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  isOauthUiKnownProvider,
+  type OauthUiKnownProvider,
+} from "@/lib/auth/oauth-ui-callback";
 import { sanitizeCallbackUrl } from "@/lib/utils/url";
+
+type LoginProvider = OauthUiKnownProvider;
 
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading } = useAuth();
   const authAttemptedRef = useRef(false);
-  const [providers, setProviders] = useState<("google" | "azure")[]>(["google", "azure"]);
+  const [providers, setProviders] = useState<LoginProvider[]>(["google", "azure"]);
   const [providersLoading, setProvidersLoading] = useState(true);
   const [providersError, setProvidersError] = useState(false);
 
-  // Handle callback from backend OAuth
   const code = searchParams.get("code");
   const provider = searchParams.get("provider");
   const token = searchParams.get("token");
@@ -37,8 +42,8 @@ function LoginContent() {
           setProvidersError(true);
           setProviders([]);
         } else {
-          const availableProviders = (data.providers || []).filter(
-            (p: string): p is "google" | "azure" => p === "google" || p === "azure"
+          const availableProviders = (data.providers || []).filter((p: string): p is LoginProvider =>
+            isOauthUiKnownProvider(p)
           );
           setProviders(availableProviders);
           setProvidersError(false);
@@ -110,7 +115,6 @@ function LoginContent() {
       return;
     }
 
-    // If we have a code, exchange it via NextAuth
     if (code && provider) {
       authAttemptedRef.current = true;
       performSignIn("backend-code", { code, provider });
@@ -123,7 +127,7 @@ function LoginContent() {
     }
   }, [code, provider, token, isAuthenticated, isLoading, callbackUrl, router]);
 
-  const handleLogin = (provider: "google" | "azure") => {
+  const handleLogin = (provider: LoginProvider) => {
     // OAuth goes through API route - server handles redirect to backend
     // Include callbackUrl so user returns to the right page after login
     const oauthUrl = `/api/oauth/start/${provider}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
@@ -169,6 +173,28 @@ function LoginContent() {
           <p className="text-gray-600">
             {code || token ? "Completing authentication..." : "Loading..."}
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error === "configuration") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-md w-full space-y-8 p-8 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Sign-in unavailable</h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            This deployment is misconfigured: the public app URL (<code className="text-sm">NEXTAUTH_URL</code>)
+            must be set and must match the API&apos;s expected UI origin (<code className="text-sm">UI_ORIGIN</code>).
+            Contact your administrator.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.replace("/login")}
+            className="text-blue-600 hover:underline"
+          >
+            Back to login
+          </button>
         </div>
       </div>
     );
@@ -278,6 +304,15 @@ function LoginContent() {
                 <path fill="#ffba08" d="M12 12h10v10H12z" />
               </svg>
               Continue with Microsoft
+            </button>
+          )}
+
+          {providers.includes("dex") && (
+            <button
+              onClick={() => handleLogin("dex")}
+              className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors"
+            >
+              Continue with SSO
             </button>
           )}
         </div>

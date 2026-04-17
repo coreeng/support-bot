@@ -41,7 +41,11 @@ spec:
               protocol: TCP
             {{- end }}
           env:
-            {{- toYaml .Values.env | nindent 12 }}
+            {{- $apiEnv := .Values.env | default list }}
+            {{- if .Values.publicWebOrigin }}
+            {{- $apiEnv = append $apiEnv (dict "name" "UI_ORIGIN" "value" .Values.publicWebOrigin) }}
+            {{- end }}
+            {{- toYaml $apiEnv | nindent 12 }}
             {{- if .Values.analysisBundle.enabled }}
             - name: SUMMARY_DATA_ANALYSIS_BUNDLE_PATH
               value: {{ .Values.analysisBundle.mountPath | default "/app/analysis.zip" }}

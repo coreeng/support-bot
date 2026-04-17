@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { resolvePublicOriginOrConfigurationLoginRedirect } from "@/lib/server/resolve-public-origin-response";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -13,9 +14,15 @@ const protectedProxy = auth((req) => {
   const isLoggedIn = !!session?.user;
   const { pathname } = nextUrl;
 
-  // Redirect unauthenticated users to login
   if (!isLoggedIn) {
-    const loginUrl = new URL("/login", nextUrl.origin);
+    const resolved = resolvePublicOriginOrConfigurationLoginRedirect(
+      nextUrl.origin,
+      pathname
+    );
+    if (!resolved.ok) {
+      return resolved.response;
+    }
+    const loginUrl = new URL("/login", resolved.origin);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }

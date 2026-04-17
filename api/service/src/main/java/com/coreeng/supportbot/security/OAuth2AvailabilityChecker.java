@@ -13,6 +13,10 @@ import org.springframework.stereotype.Component;
  * A provider is only considered available if ALL required credentials are present:
  * - Google: client-id AND client-secret
  * - Azure: client-id AND client-secret AND tenant-id
+ * - Dex: client-id AND client-secret AND issuer-uri
+ *
+ * <p>If {@code security.oauth2.login-providers} is non-empty, only those registration ids are returned
+ * (after credential checks), even when other provider credentials are set.
  */
 @Slf4j
 @Component
@@ -27,7 +31,10 @@ public class OAuth2AvailabilityChecker {
             @Value("${spring.security.oauth2.client.registration.google.client-secret:}") String googleClientSecret,
             @Value("${spring.security.oauth2.client.registration.azure.client-id:}") String azureClientId,
             @Value("${spring.security.oauth2.client.registration.azure.client-secret:}") String azureClientSecret,
-            @Value("${spring.security.oauth2.client.provider.azure.tenant-id:}") String azureTenantId) {
+            @Value("${spring.security.oauth2.client.provider.azure.tenant-id:}") String azureTenantId,
+            @Value("${spring.security.oauth2.client.registration.dex.client-id:}") String dexClientId,
+            @Value("${spring.security.oauth2.client.registration.dex.client-secret:}") String dexClientSecret,
+            @Value("${spring.security.oauth2.client.provider.dex.issuer-uri:}") String dexIssuerUri) {
         this.testBypassEnabled = securityProperties.testBypass() != null
                 && securityProperties.testBypass().enabled();
 
@@ -38,6 +45,14 @@ public class OAuth2AvailabilityChecker {
         }
         if (isNotBlank(azureClientId) && isNotBlank(azureClientSecret) && isNotBlank(azureTenantId)) {
             providers.add("azure");
+        }
+        if (isNotBlank(dexClientId) && isNotBlank(dexClientSecret) && isNotBlank(dexIssuerUri)) {
+            providers.add("dex");
+        }
+
+        var allowlist = securityProperties.oauth2().loginProviders();
+        if (!allowlist.isEmpty()) {
+            providers.removeIf(p -> !allowlist.contains(p));
         }
 
         // Store immutable copy to prevent accidental modification
@@ -60,7 +75,7 @@ public class OAuth2AvailabilityChecker {
     @EventListener(ApplicationReadyEvent.class)
     public void checkOAuth2Configuration() {
         if (oauth2Available) {
-            log.info("OAuth2 authentication configured and available.");
+            log.info("OAuth2 authentication configured. Active login providers: {}", availableProviders);
         } else if (testBypassEnabled) {
             log.info("OAuth2 credentials not configured, but test-bypass is enabled. "
                     + "Authentication will use X-Test-User/X-Test-Role headers.");
@@ -69,6 +84,7 @@ public class OAuth2AvailabilityChecker {
                     + "Users will not be able to authenticate. "
                     + "Set GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET or all three of "
                     + "AZURE_CLIENT_ID/AZURE_CLIENT_SECRET/AZURE_TENANT_ID, "
+                    + "or DEX_CLIENT_ID/DEX_CLIENT_SECRET/DEX_ISSUER_URI, "
                     + "or enable security.test-bypass.enabled for testing.");
         }
     }

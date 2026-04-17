@@ -36,6 +36,13 @@ Feature: Authorization Flow
     But user should NOT see "Analytics & Operations" navigation button
     And user should NOT see "SLA Dashboard" navigation button
 
+  Scenario: Regular tenant sees access restricted when navigating directly to SLA
+    Given user "tenant@example.com" is NOT in leadership or support lists
+    And the backend returns L2 support teams
+    When user "tenant@example.com" logs in
+    And user navigates directly to "/sla"
+    Then user should see "Access Restricted" message
+
   Scenario: Escalation team member sees escalation features when selecting their team
     Given the backend returns L2 support teams including "core-platform"
     And user "escalation@example.com" is member of "core-platform"
