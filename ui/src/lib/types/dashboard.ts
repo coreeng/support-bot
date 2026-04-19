@@ -109,6 +109,13 @@ export interface RepoInsights {
     p50Seconds: number
     p90Seconds: number
     p99Seconds: number
+    /** True if any PR in this repo had an sla_deadline set within the queried window.
+     *  When false, breachedCount is always 0 and the Breached column is suppressed in the UI.
+     *  Note: this is a window-scoped aggregate — a repo with SLA config may show false if the
+     *  date filter excludes all SLA-tracked PRs.
+     *  Optional at the type level to stay safe under API/UI version skew; callers should treat
+     *  `undefined` as "unknown" rather than collapsing to "no SLA". */
+    hasSla?: boolean
 }
 
 /**
@@ -139,6 +146,13 @@ export interface InFlightPr {
     ticketChannelId: string
     ticketQueryTs: string
     escalatedAt: string | null
+    /** True when the PR has an SLA configured. When true, exactly one of slaDeadline or
+     *  slaRemainingSeconds is expected to be non-null (enforced server-side). When false, both
+     *  slaDeadline and slaRemainingSeconds are null.
+     *  Distinct from a paused SLA (hasSla=true, slaDeadline=null, slaRemainingSeconds set).
+     *  Optional at the type level to stay safe under API/UI version skew; callers should treat
+     *  `undefined` as "unknown" rather than collapsing to "no SLA". */
+    hasSla?: boolean
 }
 
 /**

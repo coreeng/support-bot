@@ -18,6 +18,7 @@ import org.jooq.types.DayToSecond;
 import org.jooq.types.YearToMonth;
 import org.jooq.types.YearToSecond;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 .set(PR_TRACKING.PR_NUMBER, newRecord.prNumber())
                 .set(PR_TRACKING.PR_CREATED_AT, newRecord.prCreatedAt())
                 .set(PR_TRACKING.SLA_DEADLINE, newRecord.slaDeadline())
+                .set(PR_TRACKING.HAS_SLA, newRecord.hasSla())
                 .set(PR_TRACKING.OWNING_TEAM, newRecord.owningTeam())
                 .set(PR_TRACKING.CAN_AUTO_CLOSE_TICKET, newRecord.canAutoCloseTicket())
                 .onConflict(PR_TRACKING.TICKET_ID, PR_TRACKING.GITHUB_REPO, PR_TRACKING.PR_NUMBER)
@@ -176,11 +178,12 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
         String sql = """
                 SELECT github_repo, pr_number, status, pr_created_at,
                        sla_deadline, sla_remaining, last_review_at, owning_team,
-                       ticket_channel_id, ticket_query_ts, escalated_at
+                       ticket_channel_id, ticket_query_ts, escalated_at, has_sla
                 FROM (
                     SELECT DISTINCT ON (pt.github_repo, pt.pr_number)
                            pt.github_repo, pt.pr_number, pt.status, pt.pr_created_at,
                            pt.sla_deadline, pt.sla_remaining, pt.last_review_at, pt.owning_team,
+                           pt.has_sla,
                            q.channel_id AS ticket_channel_id, q.ts AS ticket_query_ts,
                            (SELECT el.date FROM escalation_log el
                             WHERE el.escalation_id = pt.escalation_id AND el.event = 'opened'
@@ -225,6 +228,8 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
             org.jooq.types.YearToSecond slaRemainingRaw = r.get("sla_remaining", org.jooq.types.YearToSecond.class);
             Long slaRemainingSeconds =
                     slaRemainingRaw != null ? slaRemainingRaw.toDuration().toSeconds() : null;
+            Boolean hasSlaRaw = r.get("has_sla", Boolean.class);
+            boolean hasSla = hasSlaRaw != null && hasSlaRaw;
             return new InFlightPr(
                     repo,
                     prNumber,
@@ -247,7 +252,8 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                             "ticket_query_ts was null for %s#%s",
                             repo,
                             prNumber),
-                    r.get("escalated_at", Instant.class));
+                    r.get("escalated_at", Instant.class),
+                    hasSla);
         });
     }
 
@@ -266,9 +272,10 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                     COUNT(*) FILTER (WHERE sla_deadline < COALESCE(closed_at, now())) AS breached_count,
                     percentile_cont(0.5) WITHIN GROUP (ORDER BY lifetime) AS p50,
                     percentile_cont(0.9) WITHIN GROUP (ORDER BY lifetime) AS p90,
-                    percentile_cont(0.99) WITHIN GROUP (ORDER BY lifetime) AS p99
+                    percentile_cont(0.99) WITHIN GROUP (ORDER BY lifetime) AS p99,
+                    BOOL_OR(has_sla) AS has_sla
                 FROM (
-                    SELECT github_repo, owning_team, status, sla_deadline, closed_at,
+                    SELECT github_repo, owning_team, status, sla_deadline, closed_at, has_sla,
                         EXTRACT(EPOCH FROM
                             CASE WHEN closed_at IS NOT NULL THEN closed_at - pr_created_at
                                  ELSE now() - pr_created_at END
@@ -281,17 +288,36 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 ORDER BY github_repo
                 """.formatted(dateFilter);
 
-        return dsl.resultQuery(sql, binds.toArray())
-                .fetch(r -> new RepoInsights(
-                        r.get("github_repo", String.class),
-                        r.get("owning_team", String.class),
-                        r.get("pr_count", Long.class),
-                        r.get("open_count", Long.class),
-                        r.get("escalated_count", Long.class),
-                        r.get("breached_count", Long.class),
-                        nullToZero(r.get("p50", Double.class)),
-                        nullToZero(r.get("p90", Double.class)),
-                        nullToZero(r.get("p99", Double.class))));
+        return dsl.resultQuery(sql, binds.toArray()).fetch(r -> {
+            String repo = checkNotNull(r.get("github_repo", String.class), "github_repo was null in insights row");
+            String owningTeam =
+                    checkNotNull(r.get("owning_team", String.class), "owning_team was null for repo %s", repo);
+            Boolean hasSlaRaw = requireNonNullAggregate(
+                    r.get("has_sla", Boolean.class),
+                    "has_sla",
+                    repo,
+                    "BOOL_OR returns null only for an empty group, but every grouped"
+                            + " repo has at least one row, so this indicates a JDBC Boolean"
+                            + " type-mapping issue");
+            Long prCount = requireNonNullAggregate(
+                    r.get("pr_count", Long.class), "pr_count", repo, "COUNT(*) should never return null");
+            Long openCount = requireNonNullAggregate(r.get("open_count", Long.class), "open_count", repo, null);
+            Long escalatedCount =
+                    requireNonNullAggregate(r.get("escalated_count", Long.class), "escalated_count", repo, null);
+            Long breachedCount =
+                    requireNonNullAggregate(r.get("breached_count", Long.class), "breached_count", repo, null);
+            return new RepoInsights(
+                    repo,
+                    owningTeam,
+                    prCount,
+                    openCount,
+                    escalatedCount,
+                    breachedCount,
+                    nullToZero(r.get("p50", Double.class)),
+                    nullToZero(r.get("p90", Double.class)),
+                    nullToZero(r.get("p99", Double.class)),
+                    hasSlaRaw);
+        });
     }
 
     @Transactional(readOnly = true)
@@ -326,6 +352,19 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                         r.get("total_pr_tickets", Long.class),
                         r.get("bot_escalated_tickets", Long.class),
                         r.get("manually_escalated_tickets", Long.class))));
+    }
+
+    private static <T> T requireNonNullAggregate(
+            @Nullable T value, String column, String repo, @Nullable String extra) {
+        if (value != null) {
+            return value;
+        }
+        log.atError().addArgument(column).addArgument(repo).log("{} null for repo {} — aborting insights fetch");
+        String msg = column + " was null for repo " + repo;
+        if (extra != null) {
+            msg += " — " + extra;
+        }
+        throw new DataIntegrityViolationException(msg);
     }
 
     private static String buildDateFilter(

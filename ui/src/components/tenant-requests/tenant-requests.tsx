@@ -159,6 +159,15 @@ export default function TenantRequestsPage() {
     }
 
     const repoCount = repos.length
+    const noSlaRepoCount = repos.filter(r => r.hasSla === false).length
+    useEffect(() => {
+        const missingHasSla = repos.filter(r => r.hasSla === undefined)
+        if (missingHasSla.length > 0) {
+            console.warn(
+                `[tenant-requests] ${missingHasSla.length} repo(s) missing hasSla — likely API/UI version skew: ${missingHasSla.map(r => r.repo).join(', ')}`
+            )
+        }
+    }, [repos])
 
     return (
         <Tooltip.Provider delayDuration={200}>
@@ -264,13 +273,20 @@ export default function TenantRequestsPage() {
                                     <p className="text-xs text-slate-400 mt-0.5">Pull request tracking across repositories</p>
                                 </div>
 
-                                <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+                                <div className="grid grid-cols-2 lg:grid-cols-7 gap-4">
                                     <StatCard
                                         label="Repositories"
                                         value={repoCount}
                                         isLoading={isLoading}
                                         gradient="from-slate-600 to-slate-700"
                                         iconBg="bg-slate-500/30"
+                                    />
+                                    <StatCard
+                                        label="No SLA Repos"
+                                        value={noSlaRepoCount}
+                                        isLoading={isLoading}
+                                        gradient="from-amber-500 to-amber-600"
+                                        iconBg="bg-amber-400/30"
                                     />
                                     <StatCard
                                         label="Total PRs"
@@ -363,7 +379,16 @@ export default function TenantRequestsPage() {
                                             <tbody className="divide-y divide-slate-100">
                                                 {pagedRepos.map((repo) => (
                                                     <tr key={repo.repo} className="hover:bg-slate-50/70 transition-colors">
-                                                        <td className="pl-6 pr-3 py-3.5 font-medium text-slate-900">{repo.repo}</td>
+                                                        <td className="pl-6 pr-3 py-3.5">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium text-slate-900">{repo.repo}</span>
+                                                                {repo.hasSla === false && (
+                                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+                                                                        No SLA
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
                                                         <td className="px-3 py-3.5 text-slate-500">{repo.owningTeam}</td>
                                                         <td className="px-3 py-3.5 text-right tabular-nums font-medium text-slate-900">{repo.prCount}</td>
                                                         <td className="px-3 py-3.5 text-right tabular-nums text-slate-600">{repo.openCount}</td>
@@ -371,7 +396,10 @@ export default function TenantRequestsPage() {
                                                             <Badge value={repo.escalatedCount} accent="amber" />
                                                         </td>
                                                         <td className="px-3 py-3.5 text-right">
-                                                            <Badge value={repo.breachedCount} accent="red" />
+                                                            {repo.hasSla === false
+                                                                ? <span className="text-slate-300 tabular-nums">{'\u2014'}</span>
+                                                                : <Badge value={repo.breachedCount} accent="red" />
+                                                            }
                                                         </td>
                                                         <td className="px-3 py-3.5 text-right">
                                                             <DurationPill seconds={repo.p50Seconds} />

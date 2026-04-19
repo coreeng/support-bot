@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Search, ExternalLink, HelpCircle } from 'lucide-react'
 import * as Tooltip from '@radix-ui/react-tooltip'
 import { useInFlightPrs } from '@/lib/hooks'
@@ -65,7 +65,11 @@ interface SlaInfo {
     sortValue: number // lower = more urgent
 }
 
-function slaInfo(pr: InFlightPr): SlaInfo {
+function slaInfo(pr: InFlightPr, now: number): SlaInfo {
+    if (pr.hasSla === false) {
+        return { label: 'No SLA', style: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', sortValue: 9999 }
+    }
+
     // Paused state: slaRemainingSeconds is set but slaDeadline is null
     if (pr.slaRemainingSeconds != null && pr.slaDeadline == null) {
         const hours = Math.max(0, pr.slaRemainingSeconds / 3600)
@@ -77,7 +81,6 @@ function slaInfo(pr: InFlightPr): SlaInfo {
     }
 
     if (pr.slaDeadline != null) {
-        const now = Date.now()
         const deadline = new Date(pr.slaDeadline).getTime()
         const remainingSec = (deadline - now) / 1000
 
@@ -96,22 +99,28 @@ function slaInfo(pr: InFlightPr): SlaInfo {
             return {
                 label: `Breached ${daysAgo > 0 ? `${daysAgo}d ago` : 'today'}`,
                 style: 'text-red-700 bg-red-50 ring-1 ring-red-200',
-                sortValue: remainingSec, // negative = already breached, sorts first
+                sortValue: remainingSec,
             }
         }
     }
 
-    return { label: '\u2014', style: 'text-slate-400', sortValue: 9999 }
+    // hasSla=true (or undefined-treated-as-unknown) but both SLA fields are null — should never
+    // happen if the API is healthy. Reported via useEffect in the component (not here) to avoid
+    // spamming the console for every render/sort pass.
+    // Sort to the bottom (MAX_SAFE_INTEGER) so these don't falsely read as "most urgent" — the
+    // Breached stat card can't classify them either, and sorting them to the top would create a
+    // visible stat-vs-rows mismatch. Users still see the badge via scroll/filter.
+    return { label: 'SLA data missing', style: 'text-slate-600 bg-slate-100 ring-1 ring-slate-300', sortValue: Number.MAX_SAFE_INTEGER }
 }
 
-function compareByKey(a: InFlightPr, b: InFlightPr, key: SortKey, dir: SortDir): number {
+function compareByKey(a: InFlightPr, b: InFlightPr, key: SortKey, dir: SortDir, now: number): number {
     let cmp = 0
     switch (key) {
         case 'severity': cmp = statusSeverity(a.status) - statusSeverity(b.status); break
         case 'pr': cmp = a.githubRepo.localeCompare(b.githubRepo) || a.prNumber - b.prNumber; break
         case 'status': cmp = statusSeverity(a.status) - statusSeverity(b.status); break
         case 'waitingOn': cmp = a.waitingOn.localeCompare(b.waitingOn); break
-        case 'sla': cmp = slaInfo(a).sortValue - slaInfo(b).sortValue; break
+        case 'sla': cmp = slaInfo(a, now).sortValue - slaInfo(b, now).sortValue; break
         case 'age': {
             const ageA = new Date(a.prCreatedAt).getTime()
             const ageB = new Date(b.prCreatedAt).getTime()
@@ -138,7 +147,9 @@ function repoShortName(fullRepo: string): string {
 export default function InFlightPrsTab() {
     const [teamFilter, setTeamFilter] = useState<string>('')
     const { data: allPrs, isLoading, error } = useInFlightPrs()
-    const unfilteredPrs = allPrs ?? []
+    // Stabilize to avoid a fresh [] identity on every render while data is loading,
+    // which would invalidate every downstream useMemo/useEffect unnecessarily.
+    const unfilteredPrs = useMemo(() => allPrs ?? [], [allPrs])
 
     // Derive team list from ALL data, not filtered
     const teams = useMemo(() => {
@@ -159,20 +170,54 @@ export default function InFlightPrsTab() {
     const [page, setPage] = useState(0)
     const pageSize = 20
 
+    // Clock tick: re-computed when data refreshes AND every minute so PRs crossing their
+    // deadline mid-session re-classify. Shared across totals stat cards and table badges to keep
+    // them in sync within a render. Interval is mounted once; dataTimestamp re-derives from data
+    // OR tick, avoiding setState-in-effect loops if upstream identities aren't stable.
+    const [clockTick, setClockTick] = useState(0)
+    useEffect(() => {
+        const id = setInterval(() => setClockTick(t => t + 1), 60_000)
+        return () => clearInterval(id)
+    }, [])
+    const dataTimestamp = useMemo(() => Date.now(), [prs, clockTick])
+
+    // Data-integrity warnings — emitted once per data refresh, not per render/sort pass.
+    useEffect(() => {
+        const missingHasSla = prs.filter(p => p.hasSla === undefined)
+        if (missingHasSla.length > 0) {
+            console.warn(
+                `[in-flight-prs] ${missingHasSla.length} PR(s) missing hasSla — likely API/UI version skew: ${missingHasSla.map(p => `${p.githubRepo}#${p.prNumber}`).join(', ')}`
+            )
+        }
+        const brokenSla = prs.filter(
+            p => p.hasSla !== false && p.slaDeadline == null && p.slaRemainingSeconds == null
+        )
+        if (brokenSla.length > 0) {
+            console.error(
+                `[in-flight-prs] ${brokenSla.length} PR(s) have hasSla!=false but both SLA fields are null: ${brokenSla.map(p => `${p.githubRepo}#${p.prNumber}`).join(', ')}`
+            )
+        }
+    }, [prs])
+
     const totals = useMemo(() => {
         let waitingOnTeam = 0
         let waitingOnTenant = 0
         let waitingOnMerge = 0
         let breached = 0
+        let noSla = 0
         for (const pr of prs) {
             if (pr.waitingOn === 'TEAM') waitingOnTeam++
             else if (pr.waitingOn === 'TENANT') waitingOnTenant++
             else if (pr.waitingOn === 'MERGE') waitingOnMerge++
-            const s = slaInfo(pr)
-            if (s.sortValue < 0) breached++
+            // Use `hasSla !== false` (not `=== true`) to stay consistent with slaInfo's gating
+            // at line 69 — under API/UI version skew hasSla can be undefined, and we must
+            // classify the row the same way here as in the row badge, otherwise a breached PR
+            // renders the red badge in the table but is missing from this stat.
+            if (pr.hasSla !== false && pr.slaDeadline != null && new Date(pr.slaDeadline).getTime() < dataTimestamp) breached++
+            if (pr.hasSla === false) noSla++
         }
-        return { total: prs.length, waitingOnTeam, waitingOnTenant, waitingOnMerge, breached }
-    }, [prs])
+        return { total: prs.length, waitingOnTeam, waitingOnTenant, waitingOnMerge, breached, noSla }
+    }, [prs, dataTimestamp])
 
     const filteredAndSorted = useMemo(() => {
         const q = search.toLowerCase()
@@ -184,8 +229,8 @@ export default function InFlightPrsTab() {
                 String(pr.prNumber).includes(q)
             )
             : prs
-        return [...filtered].sort((a, b) => compareByKey(a, b, sortKey, sortDir))
-    }, [prs, search, sortKey, sortDir])
+        return [...filtered].sort((a, b) => compareByKey(a, b, sortKey, sortDir, dataTimestamp))
+    }, [prs, search, sortKey, sortDir, dataTimestamp])
 
     const totalPages = Math.ceil(filteredAndSorted.length / pageSize)
     const pagedPrs = filteredAndSorted.slice(page * pageSize, (page + 1) * pageSize)
@@ -227,7 +272,7 @@ export default function InFlightPrsTab() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
                 <StatCard
                     label="Total In-Flight"
                     value={totals.total}
@@ -255,6 +300,13 @@ export default function InFlightPrsTab() {
                     isLoading={isLoading}
                     gradient="from-emerald-500 to-emerald-600"
                     iconBg="bg-emerald-400/30"
+                />
+                <StatCard
+                    label="No SLA"
+                    value={totals.noSla}
+                    isLoading={isLoading}
+                    gradient="from-amber-500 to-amber-600"
+                    iconBg="bg-amber-400/30"
                 />
                 <StatCard
                     label="SLA Breached"
@@ -317,7 +369,7 @@ export default function InFlightPrsTab() {
                         <tbody className="divide-y divide-slate-100">
                             {pagedPrs.map((pr) => {
                                 const age = ageFromNow(pr.prCreatedAt)
-                                const sla = slaInfo(pr)
+                                const sla = slaInfo(pr, dataTimestamp)
                                 return (
                                     <tr key={`${pr.githubRepo}-${pr.prNumber}`} className="hover:bg-slate-50/70 transition-colors">
                                         <td className="pl-6 pr-3 py-3.5">

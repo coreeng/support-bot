@@ -128,6 +128,118 @@ public class TenantInsightsFunctionalTests {
                         .build());
     }
 
+    private void createNoSlaPr(long ticketId, String repo, int prNumber, Instant createdAt, String owningTeam) {
+        supportBotClient
+                .test()
+                .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                        .ticketId(ticketId)
+                        .githubRepo(repo)
+                        .prNumber(prNumber)
+                        .prCreatedAt(createdAt)
+                        .slaDeadline(null)
+                        .owningTeam(owningTeam)
+                        .build());
+    }
+
+    @Test
+    public void insightsHasSlaReflectsPersistedColumnAcrossRepos() {
+        // given — one repo with an SLA'd PR, one repo with only a no-SLA PR
+        long ticketId = createTicket();
+        Instant recent = Instant.now().minus(Duration.ofHours(1));
+        createPr(ticketId, "test-org/pr-insights-has-sla-true", 9001, recent, "platform");
+        createNoSlaPr(ticketId, "test-org/pr-insights-has-sla-false", 9002, recent, "platform");
+
+        // when
+        List<RepoInsights> results = getAllTimeStats();
+
+        // then — has_sla is BOOL_OR across each repo's rows
+        assertThat(results)
+                .filteredOn(r -> r.repo().equals("test-org/pr-insights-has-sla-true"))
+                .singleElement()
+                .satisfies(r -> assertThat(r.hasSla()).isTrue());
+        assertThat(results)
+                .filteredOn(r -> r.repo().equals("test-org/pr-insights-has-sla-false"))
+                .singleElement()
+                .satisfies(r -> assertThat(r.hasSla()).isFalse());
+    }
+
+    @Test
+    public void insightsHasSlaStaysTrueForAllClosedRepo() {
+        // Motivating scenario for V15__pr_tracking_has_sla.sql — the reason this column exists.
+        // Every PR in a repo has been closed (which nulls sla_deadline per updateStatus), so any
+        // derivation like BOOL_OR(sla_deadline IS NOT NULL) would report has_sla=false and the
+        // tenant-insights tab would misclassify a correctly-configured SLA repo as no-SLA.
+        // The persisted has_sla column must survive the close.
+        long ticketId = createTicket();
+        Instant recent = Instant.now().minus(Duration.ofHours(1));
+
+        SupportBotClient.PrTrackingRecordResponse pr1 = supportBotClient
+                .test()
+                .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                        .ticketId(ticketId)
+                        .githubRepo("test-org/pr-insights-all-closed")
+                        .prNumber(9201)
+                        .prCreatedAt(recent)
+                        .slaDeadline(recent.plus(Duration.ofHours(24)))
+                        .owningTeam("platform")
+                        .build());
+        SupportBotClient.PrTrackingRecordResponse pr2 = supportBotClient
+                .test()
+                .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                        .ticketId(ticketId)
+                        .githubRepo("test-org/pr-insights-all-closed")
+                        .prNumber(9202)
+                        .prCreatedAt(recent)
+                        .slaDeadline(recent.plus(Duration.ofHours(24)))
+                        .owningTeam("platform")
+                        .build());
+
+        // when — close every PR (real write path; nulls sla_deadline, leaves has_sla untouched)
+        SupportBotClient.PrTrackingRecordResponse closed1 =
+                supportBotClient.test().closePrTrackingRecord(pr1.id());
+        SupportBotClient.PrTrackingRecordResponse closed2 =
+                supportBotClient.test().closePrTrackingRecord(pr2.id());
+        assertThat(closed1.status()).isEqualTo("CLOSED");
+        assertThat(closed2.status()).isEqualTo("CLOSED");
+        assertThat(closed1.slaDeadline()).isNull();
+        assertThat(closed2.slaDeadline()).isNull();
+
+        // then — the repo still reports hasSla=true because the column is persisted at insert
+        List<RepoInsights> results = getAllTimeStats();
+        assertThat(results)
+                .filteredOn(r -> r.repo().equals("test-org/pr-insights-all-closed"))
+                .singleElement()
+                .satisfies(r -> {
+                    assertThat(r.hasSla())
+                            .as("closing every PR in an SLA-configured repo must preserve hasSla=true")
+                            .isTrue();
+                    assertThat(r.prCount()).isEqualTo(2);
+                    assertThat(r.openCount()).isZero();
+                });
+    }
+
+    @Test
+    public void insightsHasSlaStaysTrueWhenRepoMixesSlaAndNoSlaPrs() {
+        // given — same repo has one SLA'd and one no-SLA PR (the scenario BOOL_OR exists to
+        // handle: a single no-SLA row would misclassify the whole repo without the aggregate)
+        long ticketId = createTicket();
+        Instant recent = Instant.now().minus(Duration.ofHours(1));
+        createNoSlaPr(ticketId, "test-org/pr-insights-mixed", 9101, recent, "platform");
+        createPr(ticketId, "test-org/pr-insights-mixed", 9102, recent, "platform");
+
+        // when
+        List<RepoInsights> results = getAllTimeStats();
+
+        // then
+        assertThat(results)
+                .filteredOn(r -> r.repo().equals("test-org/pr-insights-mixed"))
+                .singleElement()
+                .satisfies(r -> {
+                    assertThat(r.hasSla()).isTrue();
+                    assertThat(r.prCount()).isEqualTo(2);
+                });
+    }
+
     @Test
     public void escalationBreakdown_countsBotAndManualSources() {
         // given — three PR tickets: one with bot escalation, one with manual, one with none
@@ -204,7 +316,8 @@ public class TenantInsightsFunctionalTests {
             long breachedCount,
             double p50Seconds,
             double p90Seconds,
-            double p99Seconds) {}
+            double p99Seconds,
+            boolean hasSla) {}
 
     public record EscalationBreakdown(long totalPrTickets, long botEscalatedTickets, long manuallyEscalatedTickets) {}
 }

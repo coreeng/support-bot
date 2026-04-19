@@ -11,7 +11,8 @@ public record RepoInsights(
         long breachedCount,
         double p50Seconds,
         double p90Seconds,
-        double p99Seconds) {
+        double p99Seconds,
+        boolean hasSla) {
     public RepoInsights {
         requireNonNull(repo, "repo must not be null");
         requireNonNull(owningTeam, "owningTeam must not be null");
@@ -21,5 +22,8 @@ public record RepoInsights(
         if (p50Seconds < 0 || p90Seconds < 0 || p99Seconds < 0) {
             throw new IllegalArgumentException("percentile seconds must not be negative");
         }
+        // Note: we intentionally do not throw when (!hasSla && breachedCount > 0). That combination
+        // shouldn't occur in practice, but it could arise under the pre-V15 backfill gap (PRs closed before V15 lost the
+        // SLA signal; see V15__pr_tracking_has_sla.sql)
     }
 }

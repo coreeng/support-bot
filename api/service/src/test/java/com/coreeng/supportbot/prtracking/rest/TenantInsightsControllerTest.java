@@ -43,7 +43,7 @@ class TenantInsightsControllerTest {
         // given a repo with 10 PRs, 2 open, 1 escalated, 3 breached SLA
         LocalDate from = LocalDate.of(2026, 3, 1);
         List<RepoInsights> insights =
-                List.of(new RepoInsights("org/repo-a", "team-foo", 10, 2, 1, 3, 3600.0, 7200.0, 86400.0));
+                List.of(new RepoInsights("org/repo-a", "team-foo", 10, 2, 1, 3, 3600.0, 7200.0, 86400.0, true));
         when(prTrackingRepository.getInsightsByRepo(from, TO)).thenReturn(insights);
 
         // when requesting with a date range
@@ -61,17 +61,19 @@ class TenantInsightsControllerTest {
         // given two repos owned by different teams, with escalations and breaches
         LocalDate from = LocalDate.of(2026, 2, 1);
         List<RepoInsights> insights = List.of(
-                new RepoInsights("org/repo-a", "team-foo", 5, 1, 1, 2, 3600.0, 7200.0, 86400.0),
-                new RepoInsights("org/repo-b", "team-bar", 3, 0, 0, 0, 1800.0, 3600.0, 43200.0));
+                new RepoInsights("org/repo-a", "team-foo", 5, 1, 1, 2, 3600.0, 7200.0, 86400.0, true),
+                new RepoInsights("org/repo-b", "team-bar", 3, 0, 0, 0, 1800.0, 3600.0, 43200.0, false));
         when(prTrackingRepository.getInsightsByRepo(from, TO)).thenReturn(insights);
 
         // when requesting stats
         List<RepoInsights> response = controller.prStats(from, TO);
 
-        // then returns both repos with their owning teams
+        // then returns both repos with their owning teams and correct hasSla flags
         assertThat(response).hasSize(2);
         assertThat(response.get(0).owningTeam()).isEqualTo("team-foo");
+        assertThat(response.get(0).hasSla()).isTrue();
         assertThat(response.get(1).owningTeam()).isEqualTo("team-bar");
+        assertThat(response.get(1).hasSla()).isFalse();
     }
 
     @ParameterizedTest
@@ -196,22 +198,80 @@ class TenantInsightsControllerTest {
                 "reviewer",
                 now.minusSeconds(7200),
                 now.plusSeconds(86400),
-                86400L,
+                null,
                 null,
                 "team-foo",
                 "C_CHAN",
                 "1700000000.000001",
-                null);
+                null,
+                true);
         when(prTrackingRepository.findAllInFlight(null)).thenReturn(List.of(pr));
 
         // when
         List<InFlightPrResponse> result = controller.inFlightPrs(null);
 
-        // then
+        // then — sla-backed PR has hasSla=true
         assertThat(result).hasSize(1);
         assertThat(result.get(0).githubRepo()).isEqualTo("org/repo-a");
         assertThat(result.get(0).prNumber()).isEqualTo(101);
+        assertThat(result.get(0).hasSla()).isTrue();
         verify(prTrackingRepository).findAllInFlight(null);
+    }
+
+    @Test
+    void inFlightPrs_hasSlaFalseForNoSlaPr() {
+        // given — a no-SLA PR: both slaDeadline and slaRemainingSeconds are null
+        Instant now = Instant.parse("2026-03-25T12:00:00Z");
+        InFlightPr noSlaPr = new InFlightPr(
+                "org/no-sla-repo",
+                200,
+                "https://github.com/org/no-sla-repo/pull/200",
+                "OPEN",
+                "reviewer",
+                now.minusSeconds(3600),
+                null,
+                null,
+                null,
+                "team-foo",
+                "C_CHAN",
+                "1700000000.000010",
+                null,
+                false);
+        when(prTrackingRepository.findAllInFlight(null)).thenReturn(List.of(noSlaPr));
+
+        // when
+        List<InFlightPrResponse> result = controller.inFlightPrs(null);
+
+        // then — no-SLA PR must report hasSla=false
+        assertThat(result.get(0).hasSla()).isFalse();
+    }
+
+    @Test
+    void inFlightPrs_hasSlaTrueForPausedSla() {
+        // given — a PR with a paused SLA: slaDeadline is null, slaRemainingSeconds is set
+        Instant now = Instant.parse("2026-03-25T12:00:00Z");
+        InFlightPr pausedPr = new InFlightPr(
+                "org/repo-a",
+                201,
+                "https://github.com/org/repo-a/pull/201",
+                "CHANGES_REQUESTED",
+                "reviewer",
+                now.minusSeconds(7200),
+                null,
+                3600L,
+                null,
+                "team-foo",
+                "C_CHAN",
+                "1700000000.000011",
+                null,
+                true);
+        when(prTrackingRepository.findAllInFlight(null)).thenReturn(List.of(pausedPr));
+
+        // when
+        List<InFlightPrResponse> result = controller.inFlightPrs(null);
+
+        // then — paused SLA still means hasSla=true
+        assertThat(result.get(0).hasSla()).isTrue();
     }
 
     @Test
@@ -226,12 +286,13 @@ class TenantInsightsControllerTest {
                 "reviewer",
                 now.minusSeconds(3600),
                 now.plusSeconds(86400),
-                86400L,
+                null,
                 null,
                 "team-foo",
                 "C_CHAN",
                 "1700000000.000002",
-                null);
+                null,
+                true);
         when(prTrackingRepository.findAllInFlight(null)).thenReturn(List.of(pr));
         when(escalationTeamsRegistry.findEscalationTeamByCode("team-foo"))
                 .thenReturn(new EscalationTeam("Foo Team", "team-foo", "SG001"));
@@ -255,12 +316,13 @@ class TenantInsightsControllerTest {
                 "reviewer",
                 now.minusSeconds(1800),
                 now.plusSeconds(43200),
-                43200L,
+                null,
                 null,
                 "unknown-team",
                 "C_CHAN",
                 "1700000000.000003",
-                null);
+                null,
+                true);
         when(prTrackingRepository.findAllInFlight(null)).thenReturn(List.of(pr));
         when(escalationTeamsRegistry.findEscalationTeamByCode("unknown-team")).thenReturn(null);
 
