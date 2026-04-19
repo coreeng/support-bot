@@ -1,8 +1,20 @@
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import {publicFetch} from "@/app/api/_lib/public-fetch";
+import {isOauthUiKnownProvider} from "@/lib/auth/oauth-ui-callback";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
+
+/** Build redirect_uri from NEXTAUTH_URL (single source of truth for OAuth origin). */
+function oauthCallbackRedirectUri(provider: string): string | null {
+  const base = process.env.NEXTAUTH_URL?.trim();
+  if (!base) return null;
+  try {
+    return new URL(`/api/oauth/callback/${provider}`, new URL(base).origin).toString();
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Exchange auth code for token (public endpoint, no auth required).
@@ -143,12 +155,15 @@ export const authConfig: NextAuthConfig = {
         const code = credentials?.code as string;
         const provider = credentials?.provider as string;
 
-        if (code && (provider === "google" || provider === "azure")) {
+        if (code && isOauthUiKnownProvider(provider)) {
           try {
-            const redirectUri = new URL(
-              `/api/oauth/callback/${provider}`,
-              process.env.NEXTAUTH_URL
-            ).toString();
+            const redirectUri = oauthCallbackRedirectUri(provider);
+            if (!redirectUri) {
+              console.error(
+                "OAuth exchange: NEXTAUTH_URL is not set — cannot build redirect_uri"
+              );
+              return null;
+            }
 
             const response = await publicFetch("/auth/oauth/exchange", {
               method: "POST",

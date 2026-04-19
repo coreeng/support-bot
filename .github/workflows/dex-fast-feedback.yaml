@@ -1,0 +1,44 @@
+name: Dex Fast Feedback
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - dex/**
+      - api/k8s/dex/**
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - dex/**
+      - api/k8s/dex/**
+
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  version:
+    uses: coreeng/p2p/.github/workflows/p2p-version.yaml@v1
+    with:
+      version-prefix: dex/v
+    secrets:
+      git-token: ${{ secrets.GITHUB_TOKEN }}
+
+  fastfeedback:
+    needs: [version]
+    uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@v1
+    secrets:
+      env_vars: |
+        ${{ secrets.env_vars }}
+        DEX_CLIENT_ID=${{ secrets.DEX_CLIENT_ID }}
+        DEX_CLIENT_SECRET=${{ secrets.DEX_CLIENT_SECRET }}
+        LDAP_BOOTSTRAP_USER_PASSWORD=${{ secrets.LDAP_BOOTSTRAP_USER_PASSWORD }}
+    with:
+      app-name: dex
+      version: ${{ needs.version.outputs.version }}      
+      working-directory: dex

@@ -1,0 +1,79 @@
+# Template: replace PLACEHOLDER_JOB_NAME, PLACEHOLDER_NAMESPACE, PLACEHOLDER_CONFIGMAP_NAME.
+# ConfigMap PLACEHOLDER_CONFIGMAP_NAME must contain keys oidc.py (script from dex-ldap-oidc-flow.py) and
+# requirements.txt (hashed lock from oidc-requirements.txt), created by the test.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: PLACEHOLDER_JOB_NAME
+  namespace: PLACEHOLDER_NAMESPACE
+  labels:
+    app.kubernetes.io/component: integration-oidc
+    app.kubernetes.io/name: support-bot-dex-ldap-oidc
+spec:
+  ttlSecondsAfterFinished: 120
+  backoffLimit: 2
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: oidc-flow
+          image: python:3.12-slim-bookworm@sha256:d97792894a6a4162cae14da44542a83c75e56c77a27b92d58f3f83b7bc961292
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: DEX_ISSUER_URI
+              value: "http://dex.PLACEHOLDER_NAMESPACE.svc.cluster.local:5556"
+            - name: REDIRECT_URI
+              value: "http://127.0.0.1:8765/api/oauth/callback/dex"
+            - name: CALLBACK_PORT
+              value: "8765"
+            - name: API_BASE_URL
+              value: "http://support-bot.PLACEHOLDER_NAMESPACE.svc.cluster.local:8080"
+            - name: LDAP_USER_EMAIL
+              value: "alice@supportbot.local"
+            - name: EXPECTED_TEAM_CODE
+              value: "core"
+            - name: DEX_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: dex-secrets
+                  key: client-id
+            - name: LDAP_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: integration-ldap-test-user
+                  key: password
+          volumeMounts:
+            - name: oidc-script
+              mountPath: /scripts
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              export HOME=/tmp
+              python3 -m pip install --break-system-packages --no-cache-dir --require-hashes \
+                --target /tmp/pydeps -r /scripts/requirements.txt
+              cp /scripts/oidc.py /tmp/oidc.py
+              export PYTHONPATH=/tmp/pydeps
+              exec python3 /tmp/oidc.py
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: oidc-script
+          configMap:
+            name: PLACEHOLDER_CONFIGMAP_NAME
+            defaultMode: 292

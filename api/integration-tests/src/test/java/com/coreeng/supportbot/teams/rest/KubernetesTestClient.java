@@ -7,9 +7,16 @@ import io.fabric8.kubernetes.client.KubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import io.fabric8.kubernetes.client.LocalPortForward;
 import io.fabric8.kubernetes.client.dsl.NonDeletingOperation;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.awaitility.Awaitility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +27,7 @@ public class KubernetesTestClient implements AutoCloseable {
     private static final int DEPLOYMENT_TIMEOUT_MINUTES = 10;
     private static final int PORT_FORWARD_TIMEOUT_SECONDS = 120;
     private static final int PORT_FORWARD_RETRY_INTERVAL_MS = 1000;
+    private static final int JOB_WAIT_TIMEOUT_MINUTES = 5;
 
     private final KubernetesClient client;
     private LocalPortForward localPortForward;
@@ -137,6 +145,116 @@ public class KubernetesTestClient implements AutoCloseable {
             LOGGER.info("ConfigMap {} deleted.", name);
         } catch (Exception e) {
             LOGGER.warn("Failed to delete ConfigMap {}: {}", name, e.getMessage());
+        }
+    }
+
+    /** Creates or replaces a ConfigMap with a single data entry (e.g. script for an integration Job). */
+    public void createOrReplaceConfigMapData(String name, String namespace, String key, String data) {
+        createOrReplaceConfigMapData(name, namespace, Map.of(key, data));
+    }
+
+    /** Creates or replaces a ConfigMap with the given data keys (e.g. script + requirements lockfile). */
+    public void createOrReplaceConfigMapData(String name, String namespace, Map<String, String> data) {
+        LOGGER.info("Creating ConfigMap {} in namespace {} (keys={})...", name, namespace, data.keySet());
+        try {
+            ConfigMapBuilder builder = new ConfigMapBuilder()
+                    .withNewMetadata()
+                    .withName(name)
+                    .withNamespace(namespace)
+                    .endMetadata();
+            data.forEach(builder::addToData);
+            ConfigMap configMap = builder.build();
+            client.configMaps().inNamespace(namespace).resource(configMap).createOr(NonDeletingOperation::update);
+            LOGGER.info("ConfigMap {} applied.", name);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create ConfigMap " + name + " in namespace " + namespace, e);
+        }
+    }
+
+    /**
+     * Applies a single-document YAML manifest (e.g. Job) in the given namespace.
+     * Placeholders in the YAML should already be replaced by the caller.
+     */
+    public void applyYamlManifest(String yaml, String namespace) {
+        LOGGER.info("Applying manifest in namespace {}...", namespace);
+        try (InputStream in = new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8))) {
+            client.load(in).inNamespace(namespace).createOrReplace();
+            LOGGER.info("Manifest applied.");
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to apply YAML manifest in namespace " + namespace, e);
+        }
+    }
+
+    /**
+     * Waits until the Job finishes successfully ({@code succeeded} &gt; 0) or fails ({@code failed} &gt; 0).
+     *
+     * @throws IllegalStateException if the job failed or timed out
+     */
+    public void waitUntilJobComplete(String jobName, String namespace, Duration timeout) {
+        LOGGER.info("Waiting for Job {} to complete in {}...", jobName, namespace);
+        try {
+            Awaitility.await()
+                    .atMost(timeout)
+                    .pollInterval(Duration.ofSeconds(2))
+                    .until(() -> {
+                        var job = client.batch()
+                                .v1()
+                                .jobs()
+                                .inNamespace(namespace)
+                                .withName(jobName)
+                                .get();
+                        if (job == null || job.getStatus() == null) {
+                            return false;
+                        }
+                        Integer failed = job.getStatus().getFailed();
+                        if (failed != null && failed > 0) {
+                            throw new IllegalStateException(
+                                    "Job " + jobName + " failed (status.failed=" + failed + ")");
+                        }
+                        Integer succeeded = job.getStatus().getSucceeded();
+                        return succeeded != null && succeeded > 0;
+                    });
+            LOGGER.info("Job {} completed successfully.", jobName);
+        } catch (org.awaitility.core.ConditionTimeoutException e) {
+            throw new IllegalStateException("Job " + jobName + " did not succeed within " + timeout, e);
+        }
+    }
+
+    /** Default timeout for {@link #waitUntilJobComplete(String, String, Duration)}. */
+    public void waitUntilJobComplete(String jobName, String namespace) {
+        waitUntilJobComplete(jobName, namespace, Duration.ofMinutes(JOB_WAIT_TIMEOUT_MINUTES));
+    }
+
+    /**
+     * Returns aggregated logs from the first pod owned by the Job (label {@code job-name}).
+     */
+    public String getJobPodLogs(String jobName, String namespace) {
+        LOGGER.info("Fetching logs for Job {}...", jobName);
+        try {
+            List<Pod> pods = client.pods()
+                    .inNamespace(namespace)
+                    .withLabel("job-name", jobName)
+                    .list()
+                    .getItems();
+            if (pods.isEmpty()) {
+                return "[No pods found for job-name=" + jobName + "]";
+            }
+            String podName = pods.getFirst().getMetadata().getName();
+            return client.pods().inNamespace(namespace).withName(podName).getLog();
+        } catch (Exception e) {
+            LOGGER.warn("Failed to read Job pod logs: {}", e.getMessage());
+            return "[Failed to read logs: " + e.getMessage() + "]";
+        }
+    }
+
+    /** Deletes the Job; associated pods are removed per cluster garbage collection / cascade behavior. */
+    public void deleteJob(String jobName, String namespace) {
+        LOGGER.info("Deleting Job {} in namespace {}...", jobName, namespace);
+        try {
+            client.batch().v1().jobs().inNamespace(namespace).withName(jobName).delete();
+            LOGGER.info("Job {} delete requested.", jobName);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to delete Job {}: {}", jobName, e.getMessage());
         }
     }
 

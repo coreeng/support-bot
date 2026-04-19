@@ -46,10 +46,20 @@ serviceAccount:
         resources: ["roles", "rolebindings"]
         verbs: ["get", "list", "create", "delete"]
 
+      # Job operations - Dex/LDAP integration tests create K8s Jobs
+      - apiGroups: ["batch"]
+        resources: ["jobs"]
+        verbs: ["get", "list", "watch", "create", "delete"]
+
+      # Pod log access - read logs from test Job pods
+      - apiGroups: [""]
+        resources: ["pods/log"]
+        verbs: ["get"]
+
 job:
   restartPolicy: Never
   backoffLimit: 1
-  activeDeadlineSeconds: 180  # 3 minutes timeout
+  activeDeadlineSeconds: 600  # 10 minutes — includes LDAP/Dex smoke, API deploy, and OIDC flow
   parallelism: 1
   completions: 1
 
@@ -75,7 +85,7 @@ configMap:
       deploymentScript:
         releaseName: support-bot
         chartPath: /app/helm-chart
-        valuesFilePath: /app/helm-chart/values-integrationtests.yaml
+        valuesFilePath: /app/helm-chart/values-integrationtests-oidc.yaml
         scriptPath: /app/scripts/deploy-service.sh
       deployment:
         name: support-bot

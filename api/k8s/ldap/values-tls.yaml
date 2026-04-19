@@ -1,0 +1,20 @@
+# LDAPS overlay — layer on top of values-bitnami.yaml for clusters that require
+# encrypted LDAP traffic. Supply a TLS Secret before deploying:
+#
+#   kubectl create secret tls ldap-tls \
+#     --cert=ldap.crt --key=ldap.key -n <namespace>
+#
+# If the CA is not in the cluster trust store, bundle it into a separate Secret
+# and reference the filename below. Dex must also trust the CA (see
+# api/k8s/dex/values-tls.yaml or add it to Dex's pod via extraVolumes/Mounts).
+#
+# Usage:
+#   helm upgrade ... -f values-bitnami.yaml -f values-tls.yaml [-f values-integration.yaml]
+
+tls:
+  enabled: true
+  port: 636
+  certSecret: ldap-tls
+  certFilename: tls.crt
+  keyFilename: tls.key
+  caFilename: ca.crt

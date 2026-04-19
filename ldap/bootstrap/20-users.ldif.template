@@ -1,0 +1,19 @@
+dn: uid=alice,ou=People,dc=supportbot,dc=local
+objectClass: inetOrgPerson
+uid: alice
+sn: User
+givenName: Alice
+cn: Alice User
+displayName: Alice User
+mail: alice@supportbot.local
+userPassword: __USER_PASSWORD_HASH__
+
+dn: uid=bob,ou=People,dc=supportbot,dc=local
+objectClass: inetOrgPerson
+uid: bob
+sn: User
+givenName: Bob
+cn: Bob User
+displayName: Bob User
+mail: bob@supportbot.local
+userPassword: __USER_PASSWORD_HASH__

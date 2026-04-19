@@ -1,0 +1,7 @@
+dn: ou=People,dc=supportbot,dc=local
+objectClass: organizationalUnit
+ou: People
+
+dn: ou=Groups,dc=supportbot,dc=local
+objectClass: organizationalUnit
+ou: Groups

@@ -70,15 +70,28 @@ function getIncomingResolvedTeamCodes(
 
 function renderIncomingResolvedChart({
     hasNoTeamScope,
+    hasDashboardAccess,
     isLoading,
     error,
     data,
 }: {
     hasNoTeamScope: boolean
+    hasDashboardAccess: boolean
     isLoading: boolean
     error: Error | null
     data: IncomingVsResolvedRatePoint[]
 }): JSX.Element {
+    // No-team scope: show the chart empty state (not the role-restricted panel), which matches the
+    // dashboard banner that already explains missing team access.
+    if (!hasDashboardAccess && !hasNoTeamScope) {
+        return (
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+                <h2 className="text-lg font-semibold text-slate-900 mb-2">Incoming vs Resolved</h2>
+                <p className="text-sm text-slate-500">This chart requires Support Engineer or Leadership access.</p>
+            </div>
+        )
+    }
+
     if (error) {
         return (
             <div className="bg-white rounded-xl p-6 shadow-sm border border-red-200">
@@ -226,7 +239,8 @@ export default function StatsPage() {
         selectedTeam,
         isViewingAsEscalationTeam: contextIsViewingAsEscalationTeam
     } = useTeamFilter()
-    const { user, actualEscalationTeams } = useAuth()
+    const { user, actualEscalationTeams, isLeadership, isSupportEngineer } = useAuth()
+    const hasDashboardAccess = isLeadership || isSupportEngineer
     const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
     const isViewingAsEscalationTeam = contextIsViewingAsEscalationTeam ??
         (!!selectedTeam && actualEscalationTeams.includes(selectedTeam))
@@ -239,7 +253,7 @@ export default function StatsPage() {
         isLoading: isIncomingResolvedLoading,
         error: incomingResolvedError,
     } = useIncomingVsResolvedRate(
-        !hasNoTeamScope,
+        !hasNoTeamScope && hasDashboardAccess,
         isAllTime ? undefined : dateRange.from,
         dateRange.to,
         {
@@ -282,6 +296,7 @@ export default function StatsPage() {
 
     const incomingResolvedChart = renderIncomingResolvedChart({
         hasNoTeamScope,
+        hasDashboardAccess,
         isLoading: isIncomingResolvedLoading,
         error: incomingResolvedError,
         data: formattedIncomingResolvedSeries

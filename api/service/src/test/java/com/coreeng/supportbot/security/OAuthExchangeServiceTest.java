@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.teams.SupportTeamService;
@@ -29,6 +30,8 @@ import org.springframework.web.client.RestTemplate;
 @ExtendWith(MockitoExtension.class)
 class OAuthExchangeServiceTest {
 
+    private static final String VALID_REDIRECT_URI = "http://localhost:3000/api/oauth/callback/google";
+
     @Mock
     private ClientRegistrationRepository clientRegistrationRepository;
 
@@ -41,23 +44,35 @@ class OAuthExchangeServiceTest {
     @Mock
     private SupportTeamService supportTeamService;
 
+    @Mock
+    private JwtGroupTeamMerger jwtGroupTeamMerger;
+
     private OAuthExchangeService createService(List<String> allowedEmails, List<String> allowedDomains) {
         var props = new SecurityProperties(
                 new SecurityProperties.JwtProperties(
                         "test-jwt-secret-for-unit-tests-minimum-256-bits", Duration.ofHours(1)),
-                new SecurityProperties.OAuth2Properties("http://localhost:3000/login"),
+                SecurityProperties.OAuth2Properties.withRedirectOnly("http://localhost:3000/login"),
                 new SecurityProperties.CorsProperties(null),
                 new SecurityProperties.TestBypassProperties(false),
                 new SecurityProperties.AllowListProperties(allowedEmails, allowedDomains));
         var jwtService = new JwtService(props);
         var allowListService = new AllowListService(props);
+        var redirectUriValidator = new RedirectUriValidator(props);
+        lenient()
+                .when(jwtGroupTeamMerger.mergeForProvider(
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> invocation.getArgument(2));
         return new OAuthExchangeService(
                 clientRegistrationRepository,
                 restTemplate,
                 jwtService,
                 teamService,
                 supportTeamService,
-                allowListService);
+                allowListService,
+                jwtGroupTeamMerger,
+                redirectUriValidator);
     }
 
     private void mockGoogleOAuth(String email) {
@@ -72,7 +87,7 @@ class OAuthExchangeServiceTest {
                 .build();
         when(clientRegistrationRepository.findByRegistrationId("google")).thenReturn(registration);
 
-        // Mock token exchange
+        // Mock token exchange — no id_token so signature verification is not triggered
         when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(Map.class)))
                 .thenReturn(Map.of("access_token", "mock-access-token"));
 
@@ -83,41 +98,86 @@ class OAuthExchangeServiceTest {
 
     @Test
     void exchangeCodeForToken_userNotInAllowList_throws() {
-        // given — only allowed.com domain
         var service = createService(List.of(), List.of("allowed.com"));
         mockGoogleOAuth("user@blocked.com");
 
-        // when/then
         assertThrows(
                 UserNotAllowedException.class,
-                () -> service.exchangeCodeForToken("google", "auth-code", "http://localhost:3000/callback"));
+                () -> service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI));
     }
 
     @Test
     void exchangeCodeForToken_userInAllowList_succeeds() {
-        // given — allowed.com domain
         var service = createService(List.of(), List.of("allowed.com"));
         mockGoogleOAuth("user@allowed.com");
         when(teamService.listTeamsByUserEmail("user@allowed.com")).thenReturn(ImmutableList.of());
 
-        // when — should not throw
-        var token = service.exchangeCodeForToken("google", "auth-code", "http://localhost:3000/callback");
+        var token = service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI);
 
-        // then
         assertFalse(token == null || token.isBlank());
     }
 
     @Test
     void exchangeCodeForToken_emptyAllowList_allowsAll() {
-        // given — no restrictions
         var service = createService(List.of(), List.of());
         mockGoogleOAuth("anyone@anywhere.com");
         when(teamService.listTeamsByUserEmail("anyone@anywhere.com")).thenReturn(ImmutableList.of());
 
-        // when — should not throw
-        var token = service.exchangeCodeForToken("google", "auth-code", "http://localhost:3000/callback");
+        var token = service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI);
 
-        // then
+        assertFalse(token == null || token.isBlank());
+    }
+
+    @Test
+    void exchangeCodeForToken_rejectsRedirectUriWithWrongOrigin() {
+        var service = createService(List.of(), List.of());
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.exchangeCodeForToken(
+                        "google", "auth-code", "https://evil.example/api/oauth/callback/google"));
+    }
+
+    @Test
+    void exchangeCodeForToken_rejectsRedirectUriWithWrongPath() {
+        var service = createService(List.of(), List.of());
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.exchangeCodeForToken("google", "auth-code", "http://localhost:3000/some/other/path"));
+    }
+
+    /**
+     * Google/Azure legacy path: merge id_token payload without JWKS verification (same as pre-Dex).
+     * Ensures login still works when userinfo omits email but id_token carries it (common Azure edge).
+     */
+    @Test
+    void exchangeCodeForToken_google_mergesEmailFromIdTokenWithoutJwks() {
+        var service = createService(List.of(), List.of("allowed.com"));
+        var registration = ClientRegistration.withRegistrationId("google")
+                .clientId("client-id")
+                .clientSecret("client-secret")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                .authorizationUri("https://accounts.google.com/o/oauth2/auth")
+                .tokenUri("https://oauth2.googleapis.com/token")
+                .userInfoUri("https://openidconnect.googleapis.com/v1/userinfo")
+                // Intentionally no jwkSetUri — legacy path must not call JWKS
+                .build();
+        when(clientRegistrationRepository.findByRegistrationId("google")).thenReturn(registration);
+
+        // Well-formed JWS; legacy path only parses payload (no JWKS) — signature not verified here.
+        String idToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InVzZXJAYWxsb3dlZC5jb20ifQ.x";
+        when(restTemplate.postForObject(anyString(), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(Map.of("access_token", "mock-access-token", "id_token", idToken));
+
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(new ResponseEntity<>(Map.of("sub", "sub-only"), HttpStatus.OK));
+
+        when(teamService.listTeamsByUserEmail("user@allowed.com")).thenReturn(ImmutableList.of());
+
+        var token = service.exchangeCodeForToken("google", "auth-code", VALID_REDIRECT_URI);
+
         assertFalse(token == null || token.isBlank());
     }
 }
