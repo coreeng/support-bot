@@ -142,34 +142,79 @@ public class TenantInsightsFunctionalTests {
     }
 
     @Test
-    public void insightsHasSlaReflectsPersistedColumnAcrossRepos() {
-        // given — one repo with an SLA'd PR, one repo with only a no-SLA PR
+    public void insightsHasSlaIsTrueWhenRepoCurrentlyInSlaConfig() {
+        // given — a repo currently in SLA config (test-org/pr-test-repo ships in the
+        // functional-tests profile with sla.default=PT24H) whose stored rows happen to all have
+        // has_sla=false. Models the pre-V15 closed-row gap: stored signal is lost, current config
+        // rules.
         long ticketId = createTicket();
         Instant recent = Instant.now().minus(Duration.ofHours(1));
-        createPr(ticketId, "test-org/pr-insights-has-sla-true", 9001, recent, "platform");
-        createNoSlaPr(ticketId, "test-org/pr-insights-has-sla-false", 9002, recent, "platform");
+        createNoSlaPr(ticketId, "test-org/pr-test-repo", 9301, recent, "wow");
+        createNoSlaPr(ticketId, "test-org/pr-test-repo", 9302, recent, "wow");
 
         // when
         List<RepoInsights> results = getAllTimeStats();
 
-        // then — has_sla is BOOL_OR across each repo's rows
+        // then — config-driven hasSla=true despite zero SLA-marked rows in the DB
         assertThat(results)
-                .filteredOn(r -> r.repo().equals("test-org/pr-insights-has-sla-true"))
+                .filteredOn(r -> r.repo().equals("test-org/pr-test-repo"))
                 .singleElement()
-                .satisfies(r -> assertThat(r.hasSla()).isTrue());
+                .satisfies(r -> {
+                    assertThat(r.hasSla())
+                            .as("SLA-configured repo must report hasSla=true regardless of stored per-row signal")
+                            .isTrue();
+                    assertThat(r.prCount()).isEqualTo(2);
+                });
+    }
+
+    @Test
+    public void insightsHasSlaIsFalseWhenRepoIsNotInConfig() {
+        // given — a repo absent from functional-tests config; stored rows are has_sla=false
+        long ticketId = createTicket();
+        Instant recent = Instant.now().minus(Duration.ofHours(1));
+        createNoSlaPr(ticketId, "test-org/pr-insights-unconfigured", 9401, recent, "platform");
+
+        // when
+        List<RepoInsights> results = getAllTimeStats();
+
+        // then — not in config → hasSla=false
         assertThat(results)
-                .filteredOn(r -> r.repo().equals("test-org/pr-insights-has-sla-false"))
+                .filteredOn(r -> r.repo().equals("test-org/pr-insights-unconfigured"))
                 .singleElement()
                 .satisfies(r -> assertThat(r.hasSla()).isFalse());
     }
 
     @Test
-    public void insightsHasSlaStaysTrueForAllClosedRepo() {
-        // Motivating scenario for V15__pr_tracking_has_sla.sql — the reason this column exists.
-        // Every PR in a repo has been closed (which nulls sla_deadline per updateStatus), so any
-        // derivation like BOOL_OR(sla_deadline IS NOT NULL) would report has_sla=false and the
-        // tenant-insights tab would misclassify a correctly-configured SLA repo as no-SLA.
-        // The persisted has_sla column must survive the close.
+    public void insightsHasSlaIsFalseForRepoNotInConfigEvenWhenStoredRowsAreSlaMarked() {
+        // given — a repo absent from config but with SLA'd rows in the DB (simulates a repo
+        // reconfigured away from SLA, or fully removed from config after historical tracking)
+        long ticketId = createTicket();
+        Instant recent = Instant.now().minus(Duration.ofHours(1));
+        createPr(ticketId, "test-org/pr-insights-reconfigured-away", 9501, recent, "platform");
+        createPr(ticketId, "test-org/pr-insights-reconfigured-away", 9502, recent, "platform");
+
+        // when
+        List<RepoInsights> results = getAllTimeStats();
+
+        // then — stored SLA signal is ignored; present-day config is authoritative
+        assertThat(results)
+                .filteredOn(r -> r.repo().equals("test-org/pr-insights-reconfigured-away"))
+                .singleElement()
+                .satisfies(r -> {
+                    assertThat(r.hasSla())
+                            .as("repo not in current config must report hasSla=false even with SLA rows"
+                                    + " in the DB — badge reflects present state, not history")
+                            .isFalse();
+                    assertThat(r.prCount()).isEqualTo(2);
+                });
+    }
+
+    @Test
+    public void insightsHasSlaStaysTrueForAllClosedConfiguredRepo() {
+        // Documents that the badge on an SLA-configured repo survives closing every PR, even
+        // though close nulls sla_deadline. The DB-side has_sla column still holds per-row truth,
+        // but the dashboard ignores it — what matters is that config still says SLA. This
+        // exercises the full close → read path end-to-end for an in-config repo.
         long ticketId = createTicket();
         Instant recent = Instant.now().minus(Duration.ofHours(1));
 
@@ -177,24 +222,24 @@ public class TenantInsightsFunctionalTests {
                 .test()
                 .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
                         .ticketId(ticketId)
-                        .githubRepo("test-org/pr-insights-all-closed")
+                        .githubRepo("test-org/pr-test-repo")
                         .prNumber(9201)
                         .prCreatedAt(recent)
                         .slaDeadline(recent.plus(Duration.ofHours(24)))
-                        .owningTeam("platform")
+                        .owningTeam("wow")
                         .build());
         SupportBotClient.PrTrackingRecordResponse pr2 = supportBotClient
                 .test()
                 .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
                         .ticketId(ticketId)
-                        .githubRepo("test-org/pr-insights-all-closed")
+                        .githubRepo("test-org/pr-test-repo")
                         .prNumber(9202)
                         .prCreatedAt(recent)
                         .slaDeadline(recent.plus(Duration.ofHours(24)))
-                        .owningTeam("platform")
+                        .owningTeam("wow")
                         .build());
 
-        // when — close every PR (real write path; nulls sla_deadline, leaves has_sla untouched)
+        // when — close every PR (real write path; nulls sla_deadline)
         SupportBotClient.PrTrackingRecordResponse closed1 =
                 supportBotClient.test().closePrTrackingRecord(pr1.id());
         SupportBotClient.PrTrackingRecordResponse closed2 =
@@ -204,39 +249,17 @@ public class TenantInsightsFunctionalTests {
         assertThat(closed1.slaDeadline()).isNull();
         assertThat(closed2.slaDeadline()).isNull();
 
-        // then — the repo still reports hasSla=true because the column is persisted at insert
+        // then — still hasSla=true because test-org/pr-test-repo remains SLA-configured
         List<RepoInsights> results = getAllTimeStats();
         assertThat(results)
-                .filteredOn(r -> r.repo().equals("test-org/pr-insights-all-closed"))
+                .filteredOn(r -> r.repo().equals("test-org/pr-test-repo"))
                 .singleElement()
                 .satisfies(r -> {
                     assertThat(r.hasSla())
-                            .as("closing every PR in an SLA-configured repo must preserve hasSla=true")
+                            .as("closing every PR in an SLA-configured repo must not affect the badge")
                             .isTrue();
                     assertThat(r.prCount()).isEqualTo(2);
                     assertThat(r.openCount()).isZero();
-                });
-    }
-
-    @Test
-    public void insightsHasSlaStaysTrueWhenRepoMixesSlaAndNoSlaPrs() {
-        // given — same repo has one SLA'd and one no-SLA PR (the scenario BOOL_OR exists to
-        // handle: a single no-SLA row would misclassify the whole repo without the aggregate)
-        long ticketId = createTicket();
-        Instant recent = Instant.now().minus(Duration.ofHours(1));
-        createNoSlaPr(ticketId, "test-org/pr-insights-mixed", 9101, recent, "platform");
-        createPr(ticketId, "test-org/pr-insights-mixed", 9102, recent, "platform");
-
-        // when
-        List<RepoInsights> results = getAllTimeStats();
-
-        // then
-        assertThat(results)
-                .filteredOn(r -> r.repo().equals("test-org/pr-insights-mixed"))
-                .singleElement()
-                .satisfies(r -> {
-                    assertThat(r.hasSla()).isTrue();
-                    assertThat(r.prCount()).isEqualTo(2);
                 });
     }
 
