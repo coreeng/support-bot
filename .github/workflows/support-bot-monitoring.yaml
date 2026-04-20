@@ -37,6 +37,7 @@ jobs:
     with:
       github_env: gcp-dev
       app-name: support-bot
+      tenant-name: support-bot
       subnamespace: grafana
       version: ${{ needs.version.outputs.version }}
       command: monitoring-deploy
