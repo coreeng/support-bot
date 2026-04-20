@@ -674,6 +674,82 @@ class PrDetectionServiceTest {
         }
 
         @Test
+        void transitionsToChangesRequestedWhenPrAlreadyHasChangesRequestedReview() {
+            // given — a no-SLA PR that already has a CHANGES_REQUESTED review at detection time
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(2));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            NO_SLA_REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of(new GitHubPullRequestReview(
+                                    "reviewer",
+                                    GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                                    Instant.now().minusSeconds(600)))));
+            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(1L, prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — status flipped to CHANGES_REQUESTED (null remaining, null escalationId)
+            verify(prTrackingRepository)
+                    .updateStatus(eq(1L), eq(PrTrackingStatus.CHANGES_REQUESTED), eq(null), eq(null));
+            verify(prTrackingRepository, never()).pauseSla(anyLong(), any(), any());
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText()).contains("changes have been requested");
+            verifyNoInteractions(escalationProcessingService);
+        }
+
+        @Test
+        void transitionsToApprovedWhenPrAlreadyHasApprovedReview() {
+            // given — a no-SLA PR that already has an APPROVED review at detection time
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(2));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            NO_SLA_REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of(new GitHubPullRequestReview(
+                                    "reviewer",
+                                    GitHubPullRequestReview.ReviewState.APPROVED,
+                                    Instant.now().minusSeconds(600)))));
+            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(1L, prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — status flipped to APPROVED (null remaining, null escalationId)
+            verify(prTrackingRepository).updateStatus(eq(1L), eq(PrTrackingStatus.APPROVED), eq(null), eq(null));
+            verify(prTrackingRepository, never()).pauseSla(anyLong(), any(), any());
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText())
+                    .contains("has been approved and is ready to merge");
+            verifyNoInteractions(escalationProcessingService);
+        }
+
+        @Test
         void skipsWhenNoFilesMatchPathFilter() {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
