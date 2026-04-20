@@ -40,5 +40,6 @@ jobs:
         LDAP_BOOTSTRAP_USER_PASSWORD=${{ secrets.LDAP_BOOTSTRAP_USER_PASSWORD }}
     with:
       app-name: dex
+      tenant-name: support-bot
       version: ${{ needs.version.outputs.version }}      
       working-directory: dex
