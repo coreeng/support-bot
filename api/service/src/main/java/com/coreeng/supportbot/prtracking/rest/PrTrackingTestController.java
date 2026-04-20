@@ -2,11 +2,11 @@ package com.coreeng.supportbot.prtracking.rest;
 
 import static com.coreeng.supportbot.dbschema.Tables.PR_TRACKING;
 
+import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import com.coreeng.supportbot.prtracking.NewPrTracking;
 import com.coreeng.supportbot.prtracking.PrLifecyclePoller;
 import com.coreeng.supportbot.prtracking.PrTrackingRecord;
 import com.coreeng.supportbot.prtracking.PrTrackingRepository;
-import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;

@@ -196,20 +196,7 @@ class InFlightPrResponseTest {
     @Test
     void convenienceConstructorCopiesHasSlaFalseForNoSlaPr() {
         var pr = new InFlightPr(
-                "org/repo",
-                1,
-                "url",
-                "OPEN",
-                "TEAM",
-                NOW,
-                null,
-                null,
-                null,
-                "team",
-                "C1",
-                "ts1",
-                null,
-                false);
+                "org/repo", 1, "url", "OPEN", "TEAM", NOW, null, null, null, "team", "C1", "ts1", null, false);
         var response = new InFlightPrResponse(pr, "Team Label");
         assertThat(response.hasSla()).isFalse();
     }

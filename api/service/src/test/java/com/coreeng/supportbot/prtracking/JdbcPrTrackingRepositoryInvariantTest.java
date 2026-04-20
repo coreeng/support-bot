@@ -17,8 +17,8 @@ import org.junit.jupiter.api.Test;
  */
 class JdbcPrTrackingRepositoryInvariantTest {
 
-    private static final Path SOURCE = Path.of(
-            "src/main/java/com/coreeng/supportbot/prtracking/JdbcPrTrackingRepository.java");
+    private static final Path SOURCE =
+            Path.of("src/main/java/com/coreeng/supportbot/prtracking/JdbcPrTrackingRepository.java");
 
     /**
      * has_sla is set once on insert and must never be modified afterwards. A stray {@code

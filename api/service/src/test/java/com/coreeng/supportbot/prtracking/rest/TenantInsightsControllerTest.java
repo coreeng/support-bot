@@ -6,8 +6,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.prtracking.*;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -35,7 +37,26 @@ class TenantInsightsControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new TenantInsightsController(prTrackingRepository, escalationTeamsRegistry);
+        controller = new TenantInsightsController(prTrackingRepository, escalationTeamsRegistry, propsWithNoRepos());
+    }
+
+    private static PrTrackingProps propsWithNoRepos() {
+        return propsWithRepos(List.of());
+    }
+
+    private static PrTrackingProps propsWithRepos(List<PrTrackingProps.Repository> repos) {
+        // Non-enabled config: skips the strict validation but still exposes repositories() to the
+        // controller's config-join logic.
+        return new PrTrackingProps(false, "0 * * * * *", null, null, null, null, repos, null, null);
+    }
+
+    private static PrTrackingProps.Repository slaRepo(String name) {
+        return new PrTrackingProps.Repository(
+                name, "team-foo", null, List.of(), new PrTrackingProps.Sla(null, Duration.ofHours(24), null));
+    }
+
+    private static PrTrackingProps.Repository noSlaRepo(String name) {
+        return new PrTrackingProps.Repository(name, "team-foo", null, List.of("src/"), null);
     }
 
     @Test
@@ -58,17 +79,19 @@ class TenantInsightsControllerTest {
 
     @Test
     void prStats_returnsMultipleReposWithDifferentTeams() {
-        // given two repos owned by different teams, with escalations and breaches
+        // given — repo-a is in SLA config, repo-b is not
+        controller = new TenantInsightsController(
+                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/repo-a"))));
         LocalDate from = LocalDate.of(2026, 2, 1);
         List<RepoInsights> insights = List.of(
-                new RepoInsights("org/repo-a", "team-foo", 5, 1, 1, 2, 3600.0, 7200.0, 86400.0, true),
-                new RepoInsights("org/repo-b", "team-bar", 3, 0, 0, 0, 1800.0, 3600.0, 43200.0, false));
+                new RepoInsights("org/repo-a", "team-foo", 5, 1, 1, 2, 3600.0, 7200.0, 86400.0, false),
+                new RepoInsights("org/repo-b", "team-bar", 3, 0, 0, 0, 1800.0, 3600.0, 43200.0, true));
         when(prTrackingRepository.getInsightsByRepo(from, TO)).thenReturn(insights);
 
         // when requesting stats
         List<RepoInsights> response = controller.prStats(from, TO);
 
-        // then returns both repos with their owning teams and correct hasSla flags
+        // then — hasSla is driven by config, not the stored column
         assertThat(response).hasSize(2);
         assertThat(response.get(0).owningTeam()).isEqualTo("team-foo");
         assertThat(response.get(0).hasSla()).isTrue();
@@ -142,6 +165,129 @@ class TenantInsightsControllerTest {
         // then accepts the request
         assertThat(response).isEmpty();
         verify(prTrackingRepository).getInsightsByRepo(TO, TO);
+    }
+
+    @Test
+    void prStats_hasSlaIsTrueWhenRepoCurrentlyInSlaConfig() {
+        // given — a repo stored with has_sla=false (e.g. only pre-V15 closures) but currently
+        // in config with an SLA
+        controller = new TenantInsightsController(
+                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/repo-a"))));
+        when(prTrackingRepository.getInsightsByRepo(null, null))
+                .thenReturn(List.of(new RepoInsights("org/repo-a", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
+
+        // when
+        List<RepoInsights> response = controller.prStats(null, null);
+
+        // then — present-day config makes hasSla=true, overriding the stored false
+        assertThat(response).singleElement().satisfies(r -> assertThat(r.hasSla())
+                .isTrue());
+    }
+
+    @Test
+    void prStats_otherFieldsAreUntouchedByHasSlaReplacement() {
+        // given — config-based hasSla must not touch counts, percentiles, owning team etc
+        controller = new TenantInsightsController(
+                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/repo-a"))));
+        RepoInsights stored = new RepoInsights("org/repo-a", "team-foo", 5, 1, 1, 2, 10.0, 20.0, 30.0, false);
+        when(prTrackingRepository.getInsightsByRepo(null, null)).thenReturn(List.of(stored));
+
+        // when
+        RepoInsights result = controller.prStats(null, null).get(0);
+
+        // then — every historical-metric field round-trips; only hasSla changes
+        assertThat(result.repo()).isEqualTo("org/repo-a");
+        assertThat(result.owningTeam()).isEqualTo("team-foo");
+        assertThat(result.prCount()).isEqualTo(5);
+        assertThat(result.openCount()).isEqualTo(1);
+        assertThat(result.escalatedCount()).isEqualTo(1);
+        assertThat(result.breachedCount()).isEqualTo(2);
+        assertThat(result.p50Seconds()).isEqualTo(10.0);
+        assertThat(result.p90Seconds()).isEqualTo(20.0);
+        assertThat(result.p99Seconds()).isEqualTo(30.0);
+        assertThat(result.hasSla()).isTrue();
+    }
+
+    @Test
+    void prStats_hasSlaIsFalseWhenRepoConfiguredAsNoSla() {
+        // given — a repo present in config as a no-SLA tracked repo (hasNoSla()=true)
+        controller = new TenantInsightsController(
+                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(noSlaRepo("org/repo-a"))));
+        when(prTrackingRepository.getInsightsByRepo(null, null))
+                .thenReturn(List.of(new RepoInsights("org/repo-a", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
+
+        // when
+        List<RepoInsights> response = controller.prStats(null, null);
+
+        // then — config says no-SLA, so hasSla=false
+        assertThat(response).singleElement().satisfies(r -> assertThat(r.hasSla())
+                .isFalse());
+    }
+
+    @Test
+    void prStats_hasSlaIsFalseWhenRepoNotInConfig() {
+        // given — a repo absent from current config (e.g. previously tracked, now removed)
+        controller = new TenantInsightsController(
+                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/other-repo"))));
+        when(prTrackingRepository.getInsightsByRepo(null, null))
+                .thenReturn(List.of(new RepoInsights("org/repo-a", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
+
+        // when
+        List<RepoInsights> response = controller.prStats(null, null);
+
+        // then — repo is no longer in config → hasSla=false
+        assertThat(response).singleElement().satisfies(r -> assertThat(r.hasSla())
+                .isFalse());
+    }
+
+    @Test
+    void prStats_hasSlaIsFlippedFalseForRepoReconfiguredFromSlaToNoSla() {
+        // given — a repo that was SLA-tracked (so has stored rows with has_sla=true) and has
+        // since been reconfigured as no-SLA. The stored SLA signal is history; config rules present.
+        controller = new TenantInsightsController(
+                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(noSlaRepo("org/repo-a"))));
+        when(prTrackingRepository.getInsightsByRepo(null, null))
+                .thenReturn(List.of(new RepoInsights("org/repo-a", "team-foo", 2, 0, 0, 1, 1.0, 2.0, 3.0, true)));
+
+        // when
+        List<RepoInsights> response = controller.prStats(null, null);
+
+        // then — stored hasSla=true is overwritten to false because config says no-SLA now
+        assertThat(response).singleElement().satisfies(r -> assertThat(r.hasSla())
+                .isFalse());
+    }
+
+    @Test
+    void prStats_hasSlaIsFlippedFalseForRepoRemovedFromConfig() {
+        // given — a repo with historical SLA rows (has_sla=true) that is no longer in config at all
+        controller = new TenantInsightsController(
+                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/other-repo"))));
+        when(prTrackingRepository.getInsightsByRepo(null, null))
+                .thenReturn(List.of(new RepoInsights("org/repo-a", "team-foo", 2, 0, 0, 1, 1.0, 2.0, 3.0, true)));
+
+        // when
+        List<RepoInsights> response = controller.prStats(null, null);
+
+        // then — removed from config → hasSla=false (present-day truth wins)
+        assertThat(response).singleElement().satisfies(r -> assertThat(r.hasSla())
+                .isFalse());
+    }
+
+    @Test
+    void prStats_hasSlaMatchesAcrossCasingDifferences() {
+        // given — config is lowercased by PrTrackingProps, but a legacy DB row may be mixed case.
+        // The config match must still fire for that row.
+        controller = new TenantInsightsController(
+                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/repo-a"))));
+        when(prTrackingRepository.getInsightsByRepo(null, null))
+                .thenReturn(List.of(new RepoInsights("Org/Repo-A", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
+
+        // when
+        List<RepoInsights> response = controller.prStats(null, null);
+
+        // then — case-insensitive compare matches the lowercased config entry
+        assertThat(response).singleElement().satisfies(r -> assertThat(r.hasSla())
+                .isTrue());
     }
 
     @Test
@@ -344,5 +490,40 @@ class TenantInsightsControllerTest {
         // then
         assertThat(result).isEmpty();
         verify(prTrackingRepository).findAllInFlight("team-bar");
+    }
+
+    @Test
+    void inFlightPrs_preservesPerPrHasSlaAndIgnoresConfigJoin() {
+        // Boundary test: /in-flight-prs must NOT apply replaceHasSlaWithCurrentConfig. The per-PR
+        // hasSla column is the authoritative signal at row granularity — a future refactor that
+        // unified the two endpoints through the config-join would silently flip historical rows
+        // for repos no longer in config, hiding in-flight PRs that still have a live SLA deadline.
+        controller = new TenantInsightsController(prTrackingRepository, escalationTeamsRegistry, propsWithNoRepos());
+        Instant now = Instant.parse("2026-03-25T12:00:00Z");
+        InFlightPr pr = new InFlightPr(
+                "org/removed-from-config",
+                500,
+                "https://github.com/org/removed-from-config/pull/500",
+                "OPEN",
+                "reviewer",
+                now.minusSeconds(3600),
+                now.plusSeconds(86400),
+                86400L,
+                null,
+                "team-foo",
+                "C_CHAN",
+                "1700000000.000020",
+                null,
+                true);
+        when(prTrackingRepository.findAllInFlight(null)).thenReturn(List.of(pr));
+        when(escalationTeamsRegistry.findEscalationTeamByCode("team-foo"))
+                .thenReturn(new EscalationTeam("Foo Team", "team-foo", "SG001"));
+
+        // when
+        List<InFlightPrResponse> result = controller.inFlightPrs(null);
+
+        // then — hasSla stays true even though the repo is absent from config
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).hasSla()).isTrue();
     }
 }

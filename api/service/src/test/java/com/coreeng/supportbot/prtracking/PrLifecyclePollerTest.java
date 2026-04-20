@@ -522,8 +522,7 @@ class PrLifecyclePollerTest {
 
             poller.poll();
 
-            verify(prTrackingRepository, never())
-                    .updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), any(), any());
+            verify(prTrackingRepository, never()).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), any(), any());
             verifyNoInteractions(escalationProcessingService);
         }
 
