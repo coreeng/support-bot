@@ -65,52 +65,91 @@ interface SlaInfo {
     sortValue: number // lower = more urgent
 }
 
-function slaInfo(pr: InFlightPr, now: number): SlaInfo {
+/**
+ * Single source of truth for how this component interprets a PR's SLA state. Consumers (row
+ * badge via slaInfo, totals aggregation, data-integrity warnings) all route through this
+ * classifier so that a row rendered as "Breached" in the table is guaranteed to also count
+ * toward the Breached stat card — they read the same discriminant, not three similar-but-
+ * slightly-different boolean chains.
+ *
+ * hasSla=undefined (wire drift / older API without the V15 field) is classified as 'unknown'
+ * rather than collapsed to 'none' — mapping "missing" onto "No SLA" would silently hide
+ * breaches behind the amber badge. `slaInfo` maps 'unknown' onto the SLA path (deadline/
+ * paused/breached based on the other fields), matching the component's pre-classifier
+ * behaviour and keeping breached PRs visible.
+ */
+type SlaState =
+    | { kind: 'none' }
+    | { kind: 'unknown' }
+    | { kind: 'paused'; remainingSeconds: number }
+    | { kind: 'active'; deadlineMs: number; remainingSec: number }
+    | { kind: 'breached'; deadlineMs: number; remainingSec: number }
+    | { kind: 'missing' } // hasSla-true/unknown but both deadline fields null
+
+function classifySla(pr: InFlightPr, now: number): SlaState {
     if (pr.hasSla === false) {
-        return { label: 'No SLA', style: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', sortValue: 9999 }
+        return { kind: 'none' }
     }
-
-    // Paused state: slaRemainingSeconds is set but slaDeadline is null
+    const unknownGate: 'unknown' | 'active' | 'paused' | 'missing' | 'breached' =
+        pr.hasSla === undefined ? 'unknown' : 'active'
     if (pr.slaRemainingSeconds != null && pr.slaDeadline == null) {
-        const hours = Math.max(0, pr.slaRemainingSeconds / 3600)
-        return {
-            label: `Paused (${hours.toFixed(1)}h remaining)`,
-            style: 'text-slate-600',
-            sortValue: 1000 + pr.slaRemainingSeconds,
-        }
+        return { kind: 'paused', remainingSeconds: pr.slaRemainingSeconds }
     }
-
     if (pr.slaDeadline != null) {
-        const deadline = new Date(pr.slaDeadline).getTime()
-        const remainingSec = (deadline - now) / 1000
+        const deadlineMs = new Date(pr.slaDeadline).getTime()
+        const remainingSec = (deadlineMs - now) / 1000
+        return remainingSec > 0
+            ? { kind: 'active', deadlineMs, remainingSec }
+            : { kind: 'breached', deadlineMs, remainingSec }
+    }
+    // Fell through every SLA-shaped branch with hasSla true-or-unknown: both date fields null.
+    // unknownGate kept so a future refactor can route 'unknown + both-null' differently if we
+    // ever want to bias toward "assume no SLA" under skew. For now both collapse to 'missing'.
+    void unknownGate
+    return { kind: 'missing' }
+}
 
-        if (remainingSec > 0) {
-            const hours = remainingSec / 3600
+function slaInfo(pr: InFlightPr, now: number): SlaInfo {
+    const state = classifySla(pr, now)
+    switch (state.kind) {
+        case 'none':
+            return { label: 'No SLA', style: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200', sortValue: 9999 }
+        case 'paused': {
+            const hours = Math.max(0, state.remainingSeconds / 3600)
+            return {
+                label: `Paused (${hours.toFixed(1)}h remaining)`,
+                style: 'text-slate-600',
+                sortValue: 1000 + state.remainingSeconds,
+            }
+        }
+        case 'active': {
+            const hours = state.remainingSec / 3600
             const style = hours > 4
                 ? 'text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200'
                 : 'text-amber-700 bg-amber-50 ring-1 ring-amber-200'
-            return {
-                label: `${hours.toFixed(1)}h left`,
-                style,
-                sortValue: remainingSec,
-            }
-        } else {
-            const daysAgo = Math.floor(Math.abs(remainingSec) / 86400)
+            return { label: `${hours.toFixed(1)}h left`, style, sortValue: state.remainingSec }
+        }
+        case 'breached': {
+            const daysAgo = Math.floor(Math.abs(state.remainingSec) / 86400)
             return {
                 label: `Breached ${daysAgo > 0 ? `${daysAgo}d ago` : 'today'}`,
                 style: 'text-red-700 bg-red-50 ring-1 ring-red-200',
-                sortValue: remainingSec,
+                sortValue: state.remainingSec,
             }
         }
+        case 'unknown':
+        case 'missing':
+            // Sort to the bottom (MAX_SAFE_INTEGER) so these don't falsely read as "most urgent" —
+            // the Breached stat card can't classify them either, and sorting them to the top would
+            // create a visible stat-vs-rows mismatch. Diagnostics are emitted once per data refresh
+            // via a useEffect in the component, not here, to avoid spamming the console for every
+            // render/sort pass.
+            return {
+                label: 'SLA data missing',
+                style: 'text-slate-600 bg-slate-100 ring-1 ring-slate-300',
+                sortValue: Number.MAX_SAFE_INTEGER,
+            }
     }
-
-    // hasSla=true (or undefined-treated-as-unknown) but both SLA fields are null — should never
-    // happen if the API is healthy. Reported via useEffect in the component (not here) to avoid
-    // spamming the console for every render/sort pass.
-    // Sort to the bottom (MAX_SAFE_INTEGER) so these don't falsely read as "most urgent" — the
-    // Breached stat card can't classify them either, and sorting them to the top would create a
-    // visible stat-vs-rows mismatch. Users still see the badge via scroll/filter.
-    return { label: 'SLA data missing', style: 'text-slate-600 bg-slate-100 ring-1 ring-slate-300', sortValue: Number.MAX_SAFE_INTEGER }
 }
 
 function compareByKey(a: InFlightPr, b: InFlightPr, key: SortKey, dir: SortDir, now: number): number {
@@ -182,22 +221,28 @@ export default function InFlightPrsTab() {
     const dataTimestamp = useMemo(() => Date.now(), [prs, clockTick])
 
     // Data-integrity warnings — emitted once per data refresh, not per render/sort pass.
+    // Uses the same classifier as the row badge and totals: a row we count as 'unknown' here
+    // is the same row that gets the "SLA data missing" badge in the table and sorts to the
+    // bottom, so a divergence in gating between diagnostic and UI can't happen.
     useEffect(() => {
-        const missingHasSla = prs.filter(p => p.hasSla === undefined)
+        const classified = prs.map(p => ({ pr: p, state: classifySla(p, dataTimestamp) }))
+        const missingHasSla = classified
+            .filter(c => c.pr.hasSla === undefined)
+            .map(c => `${c.pr.githubRepo}#${c.pr.prNumber}`)
         if (missingHasSla.length > 0) {
             console.warn(
-                `[in-flight-prs] ${missingHasSla.length} PR(s) missing hasSla — likely API/UI version skew: ${missingHasSla.map(p => `${p.githubRepo}#${p.prNumber}`).join(', ')}`
+                `[in-flight-prs] ${missingHasSla.length} PR(s) missing hasSla — likely API/UI version skew: ${missingHasSla.join(', ')}`
             )
         }
-        const brokenSla = prs.filter(
-            p => p.hasSla !== false && p.slaDeadline == null && p.slaRemainingSeconds == null
-        )
+        const brokenSla = classified
+            .filter(c => c.state.kind === 'missing')
+            .map(c => `${c.pr.githubRepo}#${c.pr.prNumber}`)
         if (brokenSla.length > 0) {
             console.error(
-                `[in-flight-prs] ${brokenSla.length} PR(s) have hasSla!=false but both SLA fields are null: ${brokenSla.map(p => `${p.githubRepo}#${p.prNumber}`).join(', ')}`
+                `[in-flight-prs] ${brokenSla.length} PR(s) have hasSla!=false but both SLA fields are null: ${brokenSla.join(', ')}`
             )
         }
-    }, [prs])
+    }, [prs, dataTimestamp])
 
     const totals = useMemo(() => {
         let waitingOnTeam = 0
@@ -209,12 +254,9 @@ export default function InFlightPrsTab() {
             if (pr.waitingOn === 'TEAM') waitingOnTeam++
             else if (pr.waitingOn === 'TENANT') waitingOnTenant++
             else if (pr.waitingOn === 'MERGE') waitingOnMerge++
-            // Use `hasSla !== false` (not `=== true`) to stay consistent with slaInfo's gating
-            // at line 69 — under API/UI version skew hasSla can be undefined, and we must
-            // classify the row the same way here as in the row badge, otherwise a breached PR
-            // renders the red badge in the table but is missing from this stat.
-            if (pr.hasSla !== false && pr.slaDeadline != null && new Date(pr.slaDeadline).getTime() < dataTimestamp) breached++
-            if (pr.hasSla === false) noSla++
+            const state = classifySla(pr, dataTimestamp)
+            if (state.kind === 'breached') breached++
+            if (state.kind === 'none') noSla++
         }
         return { total: prs.length, waitingOnTeam, waitingOnTenant, waitingOnMerge, breached, noSla }
     }, [prs, dataTimestamp])

@@ -228,8 +228,12 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
             org.jooq.types.YearToSecond slaRemainingRaw = r.get("sla_remaining", org.jooq.types.YearToSecond.class);
             Long slaRemainingSeconds =
                     slaRemainingRaw != null ? slaRemainingRaw.toDuration().toSeconds() : null;
-            Boolean hasSlaRaw = r.get("has_sla", Boolean.class);
-            boolean hasSla = hasSlaRaw != null && hasSlaRaw;
+            // has_sla is NOT NULL DEFAULT false in the schema (see V15__pr_tracking_has_sla.sql),
+            // so a null here is a JDBC Boolean type-mapping regression or schema drift — treat it
+            // the same way the insights fetch does (loud failure) rather than silently coercing to
+            // false, which would hide every SLA-tracked PR from the dashboard.
+            boolean hasSla =
+                    checkNotNull(r.get("has_sla", Boolean.class), "has_sla was null for %s#%s", repo, prNumber);
             return new InFlightPr(
                     repo,
                     prNumber,

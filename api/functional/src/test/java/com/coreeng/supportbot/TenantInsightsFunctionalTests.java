@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -264,6 +265,51 @@ public class TenantInsightsFunctionalTests {
     }
 
     @Test
+    public void inFlightPrs_hasSlaRoundTripsDerivationFromSlaDeadline() {
+        // End-to-end coverage for the /in-flight-prs hasSla column: NewPrTracking derives hasSla
+        // from slaDeadline != null at insert time; the value is then stored in pr_tracking.has_sla
+        // (V15) and read back through findAllInFlight's DISTINCT ON query. A regression at any
+        // point in that chain (derivation, insert set(), SELECT projection, Boolean type mapping,
+        // or the null-coerce fix in JdbcPrTrackingRepository) would silently flip the badge.
+        long ticketId = createTicket();
+        Instant recent = Instant.now().minus(Duration.ofHours(1));
+        createPr(ticketId, "test-org/pr-inflight-sla", 7001, recent, "platform");
+        createNoSlaPr(ticketId, "test-org/pr-inflight-nosla", 7002, recent, "platform");
+
+        // when
+        List<InFlightPrResponse> inFlight = getInFlightPrs();
+
+        // then — each PR carries the hasSla its construction implied
+        assertThat(inFlight)
+                .filteredOn(p -> p.githubRepo().equals("test-org/pr-inflight-sla") && p.prNumber() == 7001)
+                .singleElement()
+                .satisfies(p -> {
+                    assertThat(p.hasSla())
+                            .as("PR created with an slaDeadline must round-trip hasSla=true")
+                            .isTrue();
+                    assertThat(p.slaDeadline()).isNotNull();
+                });
+        assertThat(inFlight)
+                .filteredOn(p -> p.githubRepo().equals("test-org/pr-inflight-nosla") && p.prNumber() == 7002)
+                .singleElement()
+                .satisfies(p -> {
+                    assertThat(p.hasSla())
+                            .as("PR created with null slaDeadline must round-trip hasSla=false")
+                            .isFalse();
+                    assertThat(p.slaDeadline()).isNull();
+                });
+    }
+
+    private List<InFlightPrResponse> getInFlightPrs() {
+        return given().get(config.supportBot().baseUrl() + "/tenant-insights/in-flight-prs")
+                .then()
+                .statusCode(200)
+                .extract()
+                .jsonPath()
+                .getList(".", InFlightPrResponse.class);
+    }
+
+    @Test
     public void escalationBreakdown_countsBotAndManualSources() {
         // given — three PR tickets: one with bot escalation, one with manual, one with none
         long botTicket = createTicket();
@@ -343,4 +389,21 @@ public class TenantInsightsFunctionalTests {
             boolean hasSla) {}
 
     public record EscalationBreakdown(long totalPrTickets, long botEscalatedTickets, long manuallyEscalatedTickets) {}
+
+    public record InFlightPrResponse(
+            String githubRepo,
+            int prNumber,
+            String prUrl,
+            String status,
+            String waitingOn,
+            Instant prCreatedAt,
+            @Nullable Instant slaDeadline,
+            @Nullable Long slaRemainingSeconds,
+            @Nullable Instant lastReviewAt,
+            String owningTeam,
+            String owningTeamLabel,
+            String ticketChannelId,
+            String ticketQueryTs,
+            @Nullable Instant escalatedAt,
+            boolean hasSla) {}
 }
