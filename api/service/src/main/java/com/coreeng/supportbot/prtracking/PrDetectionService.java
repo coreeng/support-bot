@@ -265,11 +265,21 @@ public class PrDetectionService {
     }
 
     private enum NotificationType {
-        TRACKED,
-        NO_SLA_TRACKED,
-        CHANGES_REQUESTED,
-        APPROVED,
-        ESCALATED
+        TRACKED(true),
+        NO_SLA_TRACKED(false),
+        CHANGES_REQUESTED(false),
+        APPROVED(false),
+        ESCALATED(true);
+
+        private final boolean requiresSla;
+
+        NotificationType(boolean requiresSla) {
+            this.requiresSla = requiresSla;
+        }
+
+        boolean requiresSla() {
+            return requiresSla;
+        }
     }
 
     private record PendingNotification(
@@ -282,7 +292,7 @@ public class PrDetectionService {
         PendingNotification {
             checkNotNull(repo);
             checkNotNull(type);
-            if (type != NotificationType.NO_SLA_TRACKED) {
+            if (type.requiresSla()) {
                 checkNotNull(sla, "sla required for %s", type);
                 checkNotNull(slaDeadline, "slaDeadline required for %s", type);
             }
@@ -315,7 +325,13 @@ public class PrDetectionService {
             if (repoConfig.get().hasNoSla()) {
                 // No-SLA tracking: track by path filter without a deadline or escalation.
                 return processNoSlaOpenPr(
-                        detectedPr, ticket, canAutoCloseTicket, repoConfig.get(), prMetadata, notifications);
+                        detectedPr,
+                        ticket,
+                        canAutoCloseTicket,
+                        repoConfig.get(),
+                        prMetadata,
+                        teamReviewerCache,
+                        notifications);
             } else {
                 return processOpenPr(
                         detectedPr,
@@ -473,6 +489,7 @@ public class PrDetectionService {
             boolean canAutoCloseTicket,
             PrTrackingProps.Repository repoConfig,
             GitHubPullRequest prMetadata,
+            Map<String, Optional<Set<String>>> teamReviewerCache,
             List<PendingNotification> notifications) {
 
         if (!matchesPathFilter(repoConfig.paths(), detectedPr.repositoryName(), detectedPr.pullNumber())) {
@@ -484,15 +501,15 @@ public class PrDetectionService {
         }
 
         TicketId ticketId = checkNotNull(ticket.id());
-        if (prTrackingRepository.insertIfAbsent(new NewPrTracking(
-                        ticketId.id(),
-                        detectedPr.repositoryName(),
-                        detectedPr.pullNumber(),
-                        prMetadata.createdAt(),
-                        null,
-                        repoConfig.owningTeam(),
-                        canAutoCloseTicket))
-                == null) {
+        PrTrackingRecord tracking = prTrackingRepository.insertIfAbsent(new NewPrTracking(
+                ticketId.id(),
+                detectedPr.repositoryName(),
+                detectedPr.pullNumber(),
+                prMetadata.createdAt(),
+                null,
+                repoConfig.owningTeam(),
+                canAutoCloseTicket));
+        if (tracking == null) {
             log.atInfo()
                     .addArgument(detectedPr::repositoryName)
                     .addArgument(detectedPr::pullNumber)
@@ -509,13 +526,41 @@ public class PrDetectionService {
 
         addReaction(prTrackingProps.prEmoji(), ticket.queryTs(), ticket.channelId());
         String teamLabel = resolveTeamLabel(repoConfig.owningTeam());
-        notifications.add(new PendingNotification(
-                detectedPr.repositoryName(),
-                detectedPr.pullNumber(),
-                NotificationType.NO_SLA_TRACKED,
-                null,
-                null,
-                teamLabel));
+
+        // Mirror the SLA branch: inspect reviews already fetched with the PR so that a no-SLA PR
+        // detected while already in CHANGES_REQUESTED or APPROVED state transitions correctly on
+        // first sight, instead of sitting in OPEN until the poller notices and posts a duplicate.
+        List<GitHubPullRequestReview> teamReviews =
+                teamReviewFilter.filterToOwningTeam(prMetadata.reviews(), prMetadata, repoConfig, teamReviewerCache);
+        GitHubPullRequestReview latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
+
+        if (latestVerdict != null && latestVerdict.requestsChanges()) {
+            prTrackingRepository.updateStatus(tracking.id(), PrTrackingStatus.CHANGES_REQUESTED, null, null);
+            notifications.add(new PendingNotification(
+                    detectedPr.repositoryName(),
+                    detectedPr.pullNumber(),
+                    NotificationType.CHANGES_REQUESTED,
+                    null,
+                    null,
+                    teamLabel));
+        } else if (latestVerdict != null && latestVerdict.isApproved()) {
+            prTrackingRepository.updateStatus(tracking.id(), PrTrackingStatus.APPROVED, null, null);
+            notifications.add(new PendingNotification(
+                    detectedPr.repositoryName(),
+                    detectedPr.pullNumber(),
+                    NotificationType.APPROVED,
+                    null,
+                    null,
+                    teamLabel));
+        } else {
+            notifications.add(new PendingNotification(
+                    detectedPr.repositoryName(),
+                    detectedPr.pullNumber(),
+                    NotificationType.NO_SLA_TRACKED,
+                    null,
+                    null,
+                    teamLabel));
+        }
 
         return PerPrResult.TRACKED;
     }
