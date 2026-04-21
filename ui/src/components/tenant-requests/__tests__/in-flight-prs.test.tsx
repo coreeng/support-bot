@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import InFlightPrsTab from '../in-flight-prs'
 import type { InFlightPr } from '../../../lib/types/dashboard'
 
@@ -28,6 +28,7 @@ function makePr(overrides: Partial<InFlightPr> = {}): InFlightPr {
         ticketChannelId: 'C1234567890',
         ticketQueryTs: '1234567890.123456',
         escalatedAt: null,
+        hasSla: true,
         ...overrides,
     }
 }
@@ -243,17 +244,45 @@ describe('InFlightPrsTab', () => {
             expect(screen.getByText(/Paused \(5\.0h remaining\)/)).toBeInTheDocument()
         })
 
-        it('should show dash when both slaDeadline and slaRemainingSeconds are null', () => {
+        it('should show No SLA badge for a no-SLA PR', () => {
             mockUseInFlightPrs.mockReturnValue({
-                data: [makePr({ slaDeadline: null, slaRemainingSeconds: null })],
+                data: [makePr({ hasSla: false, slaDeadline: null, slaRemainingSeconds: null })],
                 isLoading: false,
                 error: null,
             })
 
             render(<InFlightPrsTab />)
 
-            // The em-dash for SLA is present (there's also one for last review, so check ≥1)
-            expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1)
+            // "No SLA" appears in the stat card label AND the table SLA cell badge
+            expect(screen.getAllByText('No SLA').length).toBeGreaterThanOrEqual(2)
+        })
+
+        it('should show SLA data missing badge when hasSla=true but both SLA fields are null', () => {
+            jest.spyOn(console, 'error').mockImplementation(() => {})
+            mockUseInFlightPrs.mockReturnValue({
+                data: [makePr({ hasSla: true, slaDeadline: null, slaRemainingSeconds: null })],
+                isLoading: false,
+                error: null,
+            })
+
+            render(<InFlightPrsTab />)
+
+            expect(screen.getByText('SLA data missing')).toBeInTheDocument()
+        })
+
+        it('should not count hasSla=true with null SLA fields as a breach', () => {
+            jest.spyOn(console, 'error').mockImplementation(() => {})
+            mockUseInFlightPrs.mockReturnValue({
+                data: [makePr({ hasSla: true, slaDeadline: null, slaRemainingSeconds: null })],
+                isLoading: false,
+                error: null,
+            })
+
+            const { container } = render(<InFlightPrsTab />)
+
+            // SLA Breached card must stay green (from-emerald), not turn red (from-rose)
+            // rose gradient only appears when breached > 0
+            expect(container.querySelector('[class*="from-rose"]')).not.toBeInTheDocument()
         })
     })
 
@@ -307,6 +336,25 @@ describe('InFlightPrsTab', () => {
             const { container } = render(<InFlightPrsTab />)
 
             expect(container.querySelector('[class*="from-rose"]')).toBeInTheDocument()
+        })
+
+        it('should count no-SLA PRs in the No SLA stat card', () => {
+            mockUseInFlightPrs.mockReturnValue({
+                data: [
+                    makePr({ hasSla: true, slaDeadline: new Date(NOW + 24 * 3600 * 1000).toISOString() }),
+                    makePr({ hasSla: false, slaDeadline: null, slaRemainingSeconds: null }),
+                    makePr({ hasSla: false, slaDeadline: null, slaRemainingSeconds: null }),
+                ],
+                isLoading: false,
+                error: null,
+            })
+
+            render(<InFlightPrsTab />)
+
+            const statValues = screen.getAllByText(/^\d+$/).filter(el => el.className.includes('text-3xl'))
+            expect(statValues.length).toBeGreaterThan(0) // guard: stat card selector must match
+            const values = statValues.map(el => Number(el.textContent))
+            expect(values).toContain(2) // noSla count
         })
     })
 
@@ -445,6 +493,75 @@ describe('InFlightPrsTab', () => {
             const rows = screen.getAllByRole('row').slice(1)
             expect(rows[0]).toHaveTextContent('alpha')
             expect(rows[1]).toHaveTextContent('zebra')
+        })
+    })
+
+    describe('Clock Tick Recompute', () => {
+        // This covers the core reason the component wires a 60s setInterval into clockTick:
+        // a PR whose deadline passes mid-session must re-classify from "not breached" to
+        // "breached" without a user refresh. If the setInterval, clockTick state, or the
+        // `dataTimestamp` memo dependency on clockTick regresses, breach counts freeze in
+        // place and the Breached card silently under-reports until a data refetch.
+        it('should recompute breach status when clock advances past the deadline', () => {
+            jest.useFakeTimers()
+            jest.setSystemTime(NOW)
+
+            // Deadline is 30s in the future at mount — not yet breached.
+            const pr = makePr({ slaDeadline: new Date(NOW + 30 * 1000).toISOString(), slaRemainingSeconds: null })
+            mockUseInFlightPrs.mockReturnValue({ data: [pr], isLoading: false, error: null })
+
+            const { container } = render(<InFlightPrsTab />)
+
+            // At mount: not breached — Breached card must be green, not rose.
+            expect(container.querySelector('[class*="from-rose"]')).not.toBeInTheDocument()
+
+            // Advance the real clock past the deadline and fire the 60s clockTick interval.
+            act(() => {
+                jest.setSystemTime(NOW + 120 * 1000)
+                jest.advanceTimersByTime(60_000)
+            })
+
+            // After the tick: the same PR is now breached. Breached card gradient flips to rose
+            // and the table cell renders the red "Breached today" badge.
+            expect(container.querySelector('[class*="from-rose"]')).toBeInTheDocument()
+            expect(screen.getByText(/Breached today/)).toBeInTheDocument()
+
+            jest.useRealTimers()
+        })
+    })
+
+    describe('API/UI Version Skew', () => {
+        // Guards the backward-compatibility contract: the UI consumes tenants still running an
+        // older API that predates V15 and does not serialize `hasSla`. A PR with `hasSla` absent
+        // (JSON field missing → undefined after deserialization) must be treated as "unknown" —
+        // NOT as no-SLA (which would hide breaches behind the amber "No SLA" badge) and NOT
+        // throw. slaInfo's `hasSla === false` check and totals' `hasSla !== false` check both
+        // hinge on this; a regression like `hasSla !== true` would misclassify skewed rows.
+        it('should treat hasSla=undefined as SLA-tracked, not as no-SLA, and warn in console', () => {
+            jest.spyOn(console, 'warn').mockImplementation(() => {})
+            // Deadline 1h in the past → breached. If `hasSla === undefined` were treated like
+            // `hasSla === false`, this row would render "No SLA" amber and fall out of the
+            // breached count. We want it to render as Breached AND count toward the stat card.
+            const skewedPr = makePr({
+                hasSla: undefined as unknown as boolean,
+                slaDeadline: new Date(NOW - 3600 * 1000).toISOString(),
+                slaRemainingSeconds: null,
+            })
+            mockUseInFlightPrs.mockReturnValue({ data: [skewedPr], isLoading: false, error: null })
+
+            const { container } = render(<InFlightPrsTab />)
+
+            // Table cell: rendered as Breached, not as "No SLA"
+            expect(screen.getByText(/Breached today/)).toBeInTheDocument()
+            expect(screen.queryAllByText('No SLA')).toHaveLength(1) // only the empty stat card label
+
+            // Stat card: breached count flips the gradient to rose (proving the row was counted).
+            expect(container.querySelector('[class*="from-rose"]')).toBeInTheDocument()
+
+            // Diagnostic emitted so the skew is observable in devtools.
+            expect(console.warn).toHaveBeenCalledWith(
+                expect.stringContaining('missing hasSla')
+            )
         })
     })
 

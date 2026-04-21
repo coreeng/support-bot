@@ -43,6 +43,7 @@ function makeRepo(overrides: Partial<RepoInsights> = {}): RepoInsights {
         p50Seconds: 3600,
         p90Seconds: 14400,
         p99Seconds: 86400,
+        hasSla: true,
         ...overrides,
     }
 }
@@ -690,6 +691,68 @@ describe('TenantRequestsPage', () => {
             // date filter options (Last Month etc.) are hidden when inflight tab is active
             expect(screen.queryByRole('option', { name: 'Last Month' })).not.toBeInTheDocument()
             expect(screen.getByRole('heading', { name: 'In-Flight PRs' })).toBeInTheDocument()
+        })
+    })
+
+    describe('No SLA repo rendering', () => {
+        it('should show No SLA badge in repo name cell for hasSla=false repo', () => {
+            mockUseTenantInsightsStats.mockReturnValue({
+                data: [makeRepo({ hasSla: false, breachedCount: 0 })],
+                isLoading: false,
+                error: null,
+            })
+
+            render(<TenantRequestsPage />)
+
+            expect(screen.getByText('No SLA')).toBeInTheDocument()
+        })
+
+        it('should show dash for Breached column on hasSla=false repo', () => {
+            mockUseTenantInsightsStats.mockReturnValue({
+                data: [makeRepo({ hasSla: false, breachedCount: 0 })],
+                isLoading: false,
+                error: null,
+            })
+
+            const { container } = render(<TenantRequestsPage />)
+
+            // Breached column renders an em-dash in a tabular-nums span for no-SLA repos;
+            // check text content to distinguish it from zero-value Badge spans
+            const breachDash = Array.from(container.querySelectorAll('.tabular-nums'))
+                .find(el => el.textContent === '\u2014')
+            expect(breachDash).toBeTruthy()
+        })
+
+        it('should show escalation badge for hasSla=false repo with manual escalations', () => {
+            mockUseTenantInsightsStats.mockReturnValue({
+                data: [makeRepo({ hasSla: false, breachedCount: 0, escalatedCount: 2 })],
+                isLoading: false,
+                error: null,
+            })
+
+            render(<TenantRequestsPage />)
+
+            // escalatedCount=2 should appear in the Escalated column even for no-SLA repos
+            expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1)
+        })
+
+        it('should count no-SLA repos in the No SLA Repos stat card', () => {
+            mockUseTenantInsightsStats.mockReturnValue({
+                data: [
+                    makeRepo({ repo: 'org/sla-repo', hasSla: true }),
+                    makeRepo({ repo: 'org/no-sla-a', hasSla: false, breachedCount: 0 }),
+                    makeRepo({ repo: 'org/no-sla-b', hasSla: false, breachedCount: 0 }),
+                ],
+                isLoading: false,
+                error: null,
+            })
+
+            render(<TenantRequestsPage />)
+
+            const statValues = screen.getAllByText(/^\d+$/).filter(el => el.className.includes('text-3xl'))
+            expect(statValues.length).toBeGreaterThan(0) // guard: stat card selector must match
+            const values = statValues.map(el => Number(el.textContent))
+            expect(values).toContain(2) // noSlaRepoCount
         })
     })
 })

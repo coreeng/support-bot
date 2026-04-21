@@ -28,4 +28,15 @@ public record NewPrTracking(
             String owningTeam) {
         this(ticketId, githubRepo, prNumber, prCreatedAt, slaDeadline, owningTeam, true);
     }
+
+    /**
+     * Whether the PR was created under an SLA — i.e. the repo has an SLA configured for it.
+     * <p>Centralised here (rather than inlined at the insert call site) so that if this record
+     * ever grows fields relevant to SLA presence (e.g. an explicit paused-at-creation state), the
+     * rule for the {@code has_sla} column updates in one place and stays in lock-step with the
+     * V15 migration's back-fill predicate.
+     */
+    public boolean hasSla() {
+        return slaDeadline != null;
+    }
 }

@@ -274,6 +274,18 @@ public class SupportBotClient {
                     .extract()
                     .as(PrTrackingRecordResponse.class);
         }
+
+        public PrTrackingRecordResponse closePrTrackingRecord(long id) {
+            return given().config(REST_ASSURED_CONFIG)
+                    .when()
+                    .post(baseUrl + "/test/prtracking/record/{id}/close", id)
+                    .then()
+                    .log()
+                    .ifValidationFails(LogDetail.ALL, true)
+                    .statusCode(200)
+                    .extract()
+                    .as(PrTrackingRecordResponse.class);
+        }
     }
 
     @Builder
