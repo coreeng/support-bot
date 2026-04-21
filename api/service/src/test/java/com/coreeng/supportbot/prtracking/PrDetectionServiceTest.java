@@ -216,6 +216,22 @@ class PrDetectionServiceTest {
         }
 
         @Test
+        void insertsTrackingRecordWithHasSlaTrueForSlaRepo() {
+            // Guards against a trivial inversion in JdbcPrTrackingRepository.insertIfAbsent — the
+            // has_sla column powers BOOL_OR aggregation in the insights query, so flipping the
+            // polarity on insert would silently misclassify SLA-configured repos in the dashboard.
+            // given
+            setupDetectedPr(Instant.now().minus(Duration.ofHours(1)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().hasSla()).isTrue();
+        }
+
+        @Test
         void postsSlaReplyToCorrectChannelAndThread() {
             // given
             setupDetectedPr(Instant.now().minus(Duration.ofHours(1)));
@@ -659,16 +675,19 @@ class PrDetectionServiceTest {
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
-            // then — inserted with null slaDeadline
+            // then — inserted with null slaDeadline and hasSla=false (guards the has_sla column
+            // against a trivial inversion on insert — see insertsTrackingRecordWithHasSlaTrueForSlaRepo).
             verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
             assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
+            assertThat(newTrackingCaptor.getValue().hasSla()).isFalse();
             assertThat(newTrackingCaptor.getValue().githubRepo()).isEqualTo(NO_SLA_REPO);
             // Slack: pr emoji reaction + base "eyes" reaction (2 total) + tracking message (no SLA info)
             verify(slackClient, times(2)).addReaction(any());
             verify(slackClient).postMessage(postMessageCaptor.capture());
             assertThat(postMessageCaptor.getValue().message().getText())
-                    .contains("PRs to %s have no automated SLAs, they are monitored by %s team."
-                            .formatted(NO_SLA_REPO, TEAM_CODE));
+                    .contains(
+                            "PRs to %s have no automated SLAs, they are monitored by %s team. I'll still keep an eye on this one and let you know when it moves."
+                                    .formatted(NO_SLA_REPO, TEAM_CODE));
             // no escalation
             verifyNoInteractions(escalationProcessingService);
         }

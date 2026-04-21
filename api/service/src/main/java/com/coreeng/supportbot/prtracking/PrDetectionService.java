@@ -696,7 +696,7 @@ public class PrDetectionService {
                                         DEADLINE_FMT.format(checkNotNull(n.slaDeadline())),
                                         checkNotNull(n.teamLabel()));
                     case NO_SLA_TRACKED ->
-                        "PRs to %s have no automated SLAs, they are monitored by %s team."
+                        "PRs to %s have no automated SLAs, they are monitored by %s team. I'll still keep an eye on this one and let you know when it moves."
                                 .formatted(n.repo(), checkNotNull(n.teamLabel()));
                     case CHANGES_REQUESTED ->
                         "<%s|PR #%d> for `%s` has been reviewed and changes have been requested. :eyes:"
@@ -734,7 +734,7 @@ public class PrDetectionService {
                     switch (type) {
                         case TRACKED -> formatTrackedGroup(repo, group, prList);
                         case NO_SLA_TRACKED ->
-                            "PRs %s have no automated SLAs, they are monitored by %s team(s)."
+                            "PRs %s have no automated SLAs, they are monitored by %s team(s). I'll still keep an eye on them and let you know when they move."
                                     .formatted(prList, teams(group));
                         case CHANGES_REQUESTED ->
                             "PRs %s for `%s` have been reviewed and changes have been requested. :eyes:"
@@ -754,8 +754,17 @@ public class PrDetectionService {
         }
     }
 
-    private static String teams(List<PendingNotification> group) {
-        return group.stream().map(PendingNotification::teamLabel).collect(Collectors.joining(", "));
+    private String teams(List<PendingNotification> group) {
+        List<String> labels =
+                group.stream().map(PendingNotification::teamLabel).distinct().toList();
+        if (labels.size() < group.size()) {
+            log.atDebug()
+                    .addArgument(group.size())
+                    .addArgument(labels.size())
+                    .addArgument(labels)
+                    .log("team label dedup: {} notification(s) collapsed to {} unique label(s): {}");
+        }
+        return String.join(", ", labels);
     }
 
     private String formatTrackedGroup(String repo, List<PendingNotification> group, String prList) {

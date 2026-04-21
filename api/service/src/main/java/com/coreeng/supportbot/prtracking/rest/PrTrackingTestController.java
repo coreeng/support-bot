@@ -2,6 +2,7 @@ package com.coreeng.supportbot.prtracking.rest;
 
 import static com.coreeng.supportbot.dbschema.Tables.PR_TRACKING;
 
+import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import com.coreeng.supportbot.prtracking.NewPrTracking;
 import com.coreeng.supportbot.prtracking.PrLifecyclePoller;
 import com.coreeng.supportbot.prtracking.PrTrackingRecord;
@@ -65,6 +66,17 @@ public class PrTrackingTestController {
     @PostMapping("/cleanup")
     public void cleanupRecords() {
         dsl.deleteFrom(PR_TRACKING).execute();
+    }
+
+    @PostMapping("/record/{id}/close")
+    public PrTrackingRecord closeRecord(@PathVariable long id) {
+        // Uses the same repo method as the lifecycle poller so the test goes through the real
+        // write path — nulling SLA fields, leaving has_sla untouched. See V15__pr_tracking_has_sla.sql.
+        PrTrackingRecord existing = prTrackingRepository.findById(id);
+        if (existing == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "PR tracking record not found");
+        }
+        return prTrackingRepository.updateStatus(id, PrTrackingStatus.CLOSED, Instant.now(), existing.escalationId());
     }
 
     public record PrTrackingToCreate(
