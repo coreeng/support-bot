@@ -495,6 +495,38 @@ class PrLifecyclePollerTest {
         }
 
         @Test
+        void neverEscalatesNoSlaPrNoMatterHowOld() {
+            // Locks the load-bearing null guard at PrLifecyclePoller.java:133 (`slaDeadline != null &&
+            // Instant.now().isAfter(slaDeadline)`). Removing it would NPE (or, with a naive
+            // rewrite, blanket-escalate) every no-SLA PR. Ancient createdAt ensures this isn't
+            // passing only because the PR is young.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord ancientNoSlaRecord = new PrTrackingRecord(
+                    1L,
+                    100L,
+                    "my-org/repo-a",
+                    11,
+                    Instant.now().minus(Duration.ofDays(365)), // a year old, well past any SLA
+                    null, // no slaDeadline → no SLA
+                    "wow",
+                    true,
+                    PrTrackingStatus.OPEN,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(ancientNoSlaRecord));
+            when(gitHubClient.getPullRequest(ancientNoSlaRecord.githubRepo(), ancientNoSlaRecord.prNumber()))
+                    .thenReturn(openPr(ancientNoSlaRecord));
+
+            poller.poll();
+
+            verify(prTrackingRepository, never()).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), any(), any());
+            verifyNoInteractions(escalationProcessingService);
+        }
+
+        @Test
         void changesRequestedTransitionForNoSlaPr() {
             // given — OPEN record with null slaDeadline but a CHANGES_REQUESTED review present
             PrLifecyclePoller poller = createPoller();
@@ -538,8 +570,8 @@ class PrLifecyclePollerTest {
         }
 
         @Test
-        void skipsApprovedTransitionWhenSlaDeadlineIsNull() {
-            // given — OPEN record with null slaDeadline but an APPROVED review present
+        void approvedTransitionForNoSlaUpdatesStatusWithoutPausingSla() {
+            // given — OPEN no-SLA record (null slaDeadline) with an APPROVED review present
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record = new PrTrackingRecord(
                     1L,
@@ -564,9 +596,9 @@ class PrLifecyclePollerTest {
             // when
             poller.poll();
 
-            // then — transition is skipped; no state change, no Slack notification
+            // then — status is updated to APPROVED but pauseSla is skipped (no SLA to pause) and no Slack notification
             verify(prTrackingRepository, never()).pauseSla(anyLong(), any(), any());
-            verify(prTrackingRepository).updateStatus(eq(1L), eq(PrTrackingStatus.APPROVED), any(), any());
+            verify(prTrackingRepository).updateStatus(eq(1L), eq(PrTrackingStatus.APPROVED), isNull(), isNull());
             verify(slackClient, never()).postMessage(any());
         }
 
