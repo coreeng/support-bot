@@ -693,6 +693,85 @@ class PrDetectionServiceTest {
         }
 
         @Test
+        void groupsMultiplePrsFromSameRepoAndMentionsTeamOnce() {
+            // given — two no-SLA PRs posted to the same repo (same owning team)
+            int prNumber2 = PR_NUMBER + 1;
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null)));
+            when(prUrlParser.parse(any()))
+                    .thenReturn(
+                            List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER), new DetectedPr(NO_SLA_REPO, prNumber2)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            NO_SLA_REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.getPullRequest(NO_SLA_REPO, prNumber2))
+                    .thenReturn(new GitHubPullRequest(
+                            NO_SLA_REPO,
+                            prNumber2,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, prNumber2)).thenReturn(List.of("infra/vars.tf"));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(
+                            new PrTrackingRecord(
+                                    1L,
+                                    1L,
+                                    NO_SLA_REPO,
+                                    PR_NUMBER,
+                                    prCreatedAt,
+                                    null,
+                                    TEAM_CODE,
+                                    true,
+                                    PrTrackingStatus.OPEN,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null),
+                            new PrTrackingRecord(
+                                    2L,
+                                    1L,
+                                    NO_SLA_REPO,
+                                    prNumber2,
+                                    prCreatedAt,
+                                    null,
+                                    TEAM_CODE,
+                                    true,
+                                    PrTrackingStatus.OPEN,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — a single grouped message is posted, team mentioned once (not duplicated per PR)
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("#" + PR_NUMBER);
+            assertThat(text).contains("#" + prNumber2);
+            assertThat(text).containsOnlyOnce(TEAM_CODE);
+        }
+
+        @Test
         void transitionsToChangesRequestedWhenPrAlreadyHasChangesRequestedReview() {
             // given — a no-SLA PR that already has a CHANGES_REQUESTED review at detection time
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(2));
