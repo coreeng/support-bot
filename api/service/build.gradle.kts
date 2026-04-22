@@ -18,7 +18,7 @@ plugins {
     checkstyle
 
     id("net.ltgt.errorprone") version "4.3.0"
-    id("org.springframework.boot") version "3.5.9"
+    id("org.springframework.boot") version "3.5.13"
     id("io.spring.dependency-management") version "1.1.7"
 
     id("org.flywaydb.flyway") version "12.0.0"
