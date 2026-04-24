@@ -18,7 +18,7 @@ plugins {
     checkstyle
 
     id("net.ltgt.errorprone") version "4.3.0"
-    id("org.springframework.boot") version "3.5.9"
+    id("org.springframework.boot") version "3.5.13"
     id("io.spring.dependency-management") version "1.1.7"
 
     id("org.flywaydb.flyway") version "12.0.0"
@@ -112,7 +112,7 @@ dependencies {
     compileOnly("jakarta.websocket:jakarta.websocket-client-api:2.2.0")
     implementation("org.glassfish.tyrus.bundles:tyrus-standalone-client:2.2.0")
     implementation("com.google.guava:guava:33.4.0-jre")
-    implementation("org.kohsuke:github-api:1.327")
+    implementation("org.kohsuke:github-api:1.330")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.80")
     implementation("com.github.ben-manes.caffeine:caffeine")
 

@@ -67,7 +67,7 @@ dependencies {
     api("net.datafaker:datafaker:2.4.3")
 
     // Spring Boot for config loading
-    implementation("org.springframework.boot:spring-boot:3.5.6")
+    implementation("org.springframework.boot:spring-boot:3.5.13")
 
     // JSpecify for null annotations
     api("org.jspecify:jspecify:1.0.0")
