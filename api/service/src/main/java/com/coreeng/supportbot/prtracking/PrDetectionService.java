@@ -442,8 +442,13 @@ public class PrDetectionService {
                 // now visible to the poller (status=OPEN, SLA already breached), so if we deferred
                 // both steps the poller could fire between the insert and postNotificationsAndEscalations,
                 // posting the escalation card before our notification arrives in the thread.
+                String customEscalationMessage =
+                        repoConfig.sla() != null ? repoConfig.sla().escalationMessage() : null;
+                String breachText = customEscalationMessage != null
+                        ? customEscalationMessage
+                        : formatEscalatedText(detectedPr.repositoryName(), detectedPr.pullNumber(), sla);
                 postText(
-                        formatEscalatedText(detectedPr.repositoryName(), detectedPr.pullNumber(), sla),
+                        breachText,
                         detectedPr.repositoryName(),
                         detectedPr.pullNumber(),
                         NotificationType.ESCALATED,

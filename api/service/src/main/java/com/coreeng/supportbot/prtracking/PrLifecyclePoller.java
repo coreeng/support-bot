@@ -277,6 +277,13 @@ public class PrLifecyclePoller {
             return;
         }
 
+        // Post before createEscalation so the custom message lands in thread before the
+        // escalation card, matching the detection-time ordering in PrDetectionService.
+        PrTrackingProps.Repository repoConfig = findRepoConfig(record.githubRepo());
+        if (repoConfig != null && repoConfig.sla() != null && repoConfig.sla().escalationMessage() != null) {
+            postMessage(repoConfig.sla().escalationMessage(), ticket.channelId(), ticket.queryTs(), record);
+        }
+
         Escalation escalation = escalationProcessingService.createEscalation(CreateEscalationRequest.builder()
                 .ticket(ticket)
                 .team(record.owningTeam())

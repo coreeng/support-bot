@@ -43,7 +43,7 @@ class SlaLookupTest {
                 "low",
                 "days",
                 List.of(new PrTrackingProps.Repository(
-                        REPO, "wow", null, List.of(), new PrTrackingProps.Sla(null, SLA_48H, null))),
+                        REPO, "wow", null, List.of(), new PrTrackingProps.Sla(null, SLA_48H, null, null))),
                 new PrTrackingProps.GitHub(
                         PrTrackingProps.AuthMode.TOKEN, "https://api.github.com", "token", "", "", ""),
                 null);
@@ -462,7 +462,7 @@ class SlaLookupTest {
                 "low",
                 durationUnit,
                 List.of(new PrTrackingProps.Repository(
-                        REPO, "wow", null, List.of(), new PrTrackingProps.Sla(null, SLA_48H, null))),
+                        REPO, "wow", null, List.of(), new PrTrackingProps.Sla(null, SLA_48H, null, null))),
                 new PrTrackingProps.GitHub(
                         PrTrackingProps.AuthMode.TOKEN, "https://api.github.com", "token", "", "", ""),
                 null);
@@ -471,17 +471,17 @@ class SlaLookupTest {
 
     private static PrTrackingProps.Repository repo(Duration defaultSla) {
         return new PrTrackingProps.Repository(
-                REPO, "wow", null, List.of(), new PrTrackingProps.Sla(null, defaultSla, null));
+                REPO, "wow", null, List.of(), new PrTrackingProps.Sla(null, defaultSla, null, null));
     }
 
     private static PrTrackingProps.Repository repoWithOverrides(
             Duration defaultSla, List<PrTrackingProps.SlaOverride> overrides) {
         return new PrTrackingProps.Repository(
-                REPO, "wow", null, List.of(), new PrTrackingProps.Sla(null, defaultSla, overrides));
+                REPO, "wow", null, List.of(), new PrTrackingProps.Sla(null, defaultSla, overrides, null));
     }
 
     private static PrTrackingProps.Repository repoWithFile(String file, @Nullable Duration defaultSla) {
         return new PrTrackingProps.Repository(
-                REPO, "wow", null, List.of(), new PrTrackingProps.Sla(file, defaultSla, null));
+                REPO, "wow", null, List.of(), new PrTrackingProps.Sla(file, defaultSla, null, null));
     }
 }

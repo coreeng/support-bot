@@ -78,7 +78,7 @@ class PrTrackingGitHubConfigTest {
                         "wow",
                         null,
                         List.of(),
-                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
+                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null, null))),
                 appGithub,
                 DEFAULT_SLA_DISCOVERY);
 
@@ -110,7 +110,7 @@ class PrTrackingGitHubConfigTest {
                         "wow",
                         null,
                         List.of(),
-                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
+                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null, null))),
                 appGithub,
                 DEFAULT_SLA_DISCOVERY);
 
@@ -145,7 +145,7 @@ class PrTrackingGitHubConfigTest {
                         "wow",
                         null,
                         List.of(),
-                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
+                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null, null))),
                 appGithub,
                 DEFAULT_SLA_DISCOVERY);
 

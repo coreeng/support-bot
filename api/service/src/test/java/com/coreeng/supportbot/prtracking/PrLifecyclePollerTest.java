@@ -13,6 +13,8 @@ import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
+import com.coreeng.supportbot.escalation.Escalation;
+import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
 import com.coreeng.supportbot.github.GitHubApiException;
 import com.coreeng.supportbot.github.GitHubClient;
@@ -233,6 +235,77 @@ class PrLifecyclePollerTest {
         // then — record must be moved to ESCALATED to prevent infinite poller loop
         verify(prTrackingRepository).updateStatus(eq(record.id()), eq(PrTrackingStatus.ESCALATED), isNull(), isNull());
         verify(ticketSlackService, never()).markTicketEscalated(any());
+    }
+
+    @Test
+    void pollTimeBreachPostsNoTenantMessageWhenNotConfigured() {
+        // given breach scenario, no escalation-message configured
+        PrLifecyclePoller poller = createPoller();
+        PrTrackingRecord record = record(
+                1L,
+                100L,
+                "my-org/repo-a",
+                11,
+                PrTrackingStatus.OPEN,
+                Instant.now().minusSeconds(60));
+        when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+        when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
+                .thenReturn(openPr(record));
+        when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
+        when(escalationProcessingService.createEscalation(any()))
+                .thenReturn(Escalation.builder().id(new EscalationId(500L)).build());
+        when(prTrackingProps.repositories())
+                .thenReturn(List.of(new PrTrackingProps.Repository(
+                        "my-org/repo-a",
+                        "wow",
+                        null,
+                        List.of(),
+                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null, null))));
+
+        // when
+        poller.poll();
+
+        // then escalation fires as normal but no tenant-thread post
+        verify(prTrackingRepository).updateStatus(eq(record.id()), eq(PrTrackingStatus.ESCALATED), isNull(), eq(500L));
+        verify(ticketSlackService).markTicketEscalated(any());
+        verify(slackClient, never()).postMessage(any());
+    }
+
+    @Test
+    void pollTimeBreachPostsCustomMessageWhenConfigured() {
+        // given same breach scenario with custom escalation-message set
+        String customMessage = "Contact #pr-reviews to chase this review.";
+        PrLifecyclePoller poller = createPoller();
+        PrTrackingRecord record = record(
+                1L,
+                100L,
+                "my-org/repo-a",
+                11,
+                PrTrackingStatus.OPEN,
+                Instant.now().minusSeconds(60));
+        when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+        when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
+                .thenReturn(openPr(record));
+        when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
+        when(escalationProcessingService.createEscalation(any()))
+                .thenReturn(Escalation.builder().id(new EscalationId(500L)).build());
+        when(prTrackingProps.repositories())
+                .thenReturn(List.of(new PrTrackingProps.Repository(
+                        "my-org/repo-a",
+                        "wow",
+                        null,
+                        List.of(),
+                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null, customMessage))));
+
+        // when
+        poller.poll();
+
+        // then escalation fires AND the custom message is posted in the tenant thread
+        verify(prTrackingRepository).updateStatus(eq(record.id()), eq(PrTrackingStatus.ESCALATED), isNull(), eq(500L));
+        verify(ticketSlackService).markTicketEscalated(any());
+        ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
+        verify(slackClient).postMessage(captor.capture());
+        assertThat(captor.getValue().message().getText()).isEqualTo(customMessage);
     }
 
     @Test
@@ -989,7 +1062,7 @@ class PrLifecyclePollerTest {
                             "wow",
                             "platform-team",
                             List.of(),
-                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
+                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null, null))));
             when(gitHubClient.resolveTeamReviewers("my-org", "platform-team")).thenReturn(List.of("team-member"));
 
             // when
@@ -1021,7 +1094,7 @@ class PrLifecyclePollerTest {
                             "wow",
                             null,
                             List.of(),
-                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
+                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null, null))));
 
             // when
             poller.poll();
@@ -1052,7 +1125,7 @@ class PrLifecyclePollerTest {
                             "wow",
                             "platform-team",
                             List.of(),
-                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
+                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null, null))));
             when(gitHubClient.resolveTeamReviewers("my-org", "platform-team"))
                     .thenThrow(new GitHubApiException(403, "forbidden"));
 
@@ -1090,7 +1163,7 @@ class PrLifecyclePollerTest {
                             "wow",
                             "platform-team",
                             List.of(),
-                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
+                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null, null))));
             when(gitHubClient.resolveTeamReviewers("my-org", "platform-team")).thenReturn(List.of("team-member"));
 
             // when

@@ -129,6 +129,11 @@ public record PrTrackingProps(
                                 "pr-review-tracking.repositories[].sla.overrides[].sla must be a positive duration");
                     }
                 }
+                String escalationMessage = repository.sla().escalationMessage();
+                if (escalationMessage != null && escalationMessage.isBlank()) {
+                    throw new IllegalArgumentException(
+                            "pr-review-tracking.repositories[].sla.escalation-message must not be blank when provided");
+                }
             }
 
             String normalizedName = repository.name().toLowerCase(Locale.ROOT);
@@ -200,7 +205,8 @@ public record PrTrackingProps(
     public record Sla(
             @Nullable String file,
             @Name("default") @Nullable Duration defaultSla,
-            @Nullable List<SlaOverride> overrides) {
+            @Nullable List<SlaOverride> overrides,
+            @Nullable String escalationMessage) {
 
         public Sla {
             overrides = overrides == null ? List.of() : List.copyOf(overrides);

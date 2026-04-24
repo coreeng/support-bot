@@ -111,6 +111,11 @@ pr-review-tracking:
       sla:
         file: ".pr-sla.yaml"
         default: PT48H
+    - name: test-org/pr-escalation-message-repo
+      owning-team: wow
+      sla:
+        default: PT24H
+        escalation-message: "Contact #pr-reviews in Slack to chase this review."
   sla-discovery:
     cache: PT5M
   github:

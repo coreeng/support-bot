@@ -222,7 +222,7 @@ class PrTrackingConfigValidationTest {
     @Test
     void rejectsNullDefaultSlaWhenEnabled() {
         // given
-        PrTrackingProps.Sla slaWithNullDefault = new PrTrackingProps.Sla(null, null, null);
+        PrTrackingProps.Sla slaWithNullDefault = new PrTrackingProps.Sla(null, null, null, null);
         PrTrackingProps.Repository repo =
                 new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), slaWithNullDefault);
 
@@ -245,7 +245,7 @@ class PrTrackingConfigValidationTest {
     void rejectsZeroOverrideSlaWhenEnabled() {
         // given
         PrTrackingProps.Sla slaWithBadOverride = new PrTrackingProps.Sla(
-                null, Duration.ofDays(2), List.of(new PrTrackingProps.SlaOverride("infra/**", Duration.ZERO)));
+                null, Duration.ofDays(2), List.of(new PrTrackingProps.SlaOverride("infra/**", Duration.ZERO)), null);
         PrTrackingProps.Repository repo =
                 new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), slaWithBadOverride);
 
@@ -268,7 +268,7 @@ class PrTrackingConfigValidationTest {
     void rejectsBlankOverridePathWhenEnabled() {
         // given
         PrTrackingProps.Sla slaWithBlankPath = new PrTrackingProps.Sla(
-                null, Duration.ofDays(2), List.of(new PrTrackingProps.SlaOverride("  ", Duration.ofDays(7))));
+                null, Duration.ofDays(2), List.of(new PrTrackingProps.SlaOverride("  ", Duration.ofDays(7))), null);
         PrTrackingProps.Repository repo =
                 new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), slaWithBlankPath);
 
@@ -293,7 +293,8 @@ class PrTrackingConfigValidationTest {
         PrTrackingProps.Sla fullSla = new PrTrackingProps.Sla(
                 ".pr-sla.yaml",
                 Duration.ofDays(2),
-                List.of(new PrTrackingProps.SlaOverride("infra/**", Duration.ofDays(7))));
+                List.of(new PrTrackingProps.SlaOverride("infra/**", Duration.ofDays(7))),
+                null);
         PrTrackingProps.Repository repo =
                 new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), fullSla);
 
@@ -312,9 +313,53 @@ class PrTrackingConfigValidationTest {
     }
 
     @Test
+    void acceptsRepoWithEscalationMessage() {
+        // given
+        PrTrackingProps.Sla slaWithEscalationMessage =
+                new PrTrackingProps.Sla(null, Duration.ofDays(2), null, "Contact #pr-reviews to chase review.");
+        PrTrackingProps.Repository repo =
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), slaWithEscalationMessage);
+
+        // when / then
+        assertThatCode(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(repo),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsBlankEscalationMessage() {
+        // given
+        PrTrackingProps.Sla slaWithBlankMessage = new PrTrackingProps.Sla(null, Duration.ofDays(2), null, "   ");
+        PrTrackingProps.Repository repo =
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), slaWithBlankMessage);
+
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(repo),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("escalation-message must not be blank");
+    }
+
+    @Test
     void acceptsFileOnlyRepoWithNoDefaultSla() {
         // given (file set, no default, no overrides)
-        PrTrackingProps.Sla fileOnlySla = new PrTrackingProps.Sla(".pr-sla.yaml", null, null);
+        PrTrackingProps.Sla fileOnlySla = new PrTrackingProps.Sla(".pr-sla.yaml", null, null, null);
         PrTrackingProps.Repository repo =
                 new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), fileOnlySla);
 
@@ -584,7 +629,7 @@ class PrTrackingConfigValidationTest {
     }
 
     private static PrTrackingProps.Sla sla(Duration defaultSla) {
-        return new PrTrackingProps.Sla(null, defaultSla, null);
+        return new PrTrackingProps.Sla(null, defaultSla, null, null);
     }
 
     private static PrTrackingProps.GitHub validTokenGithub() {

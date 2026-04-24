@@ -38,6 +38,8 @@ public class PrTrackingFunctionalTests {
     private static final String SLA_FILE_PR = "https://github.com/" + SLA_FILE_REPO + "/pull/101";
     private static final String SLA_OVERRIDE_REPO = "test-org/pr-sla-override-repo";
     private static final String SLA_OVERRIDE_PR = "https://github.com/" + SLA_OVERRIDE_REPO + "/pull/201";
+    private static final String ESCALATION_MESSAGE_REPO = "test-org/pr-escalation-message-repo";
+    private static final String ESCALATION_MESSAGE_PR = "https://github.com/" + ESCALATION_MESSAGE_REPO + "/pull/301";
 
     /** Returns a PR created-at timestamp 1 hour ago — safely within the 24h SLA window. */
     private static String recentCreatedAt() {
@@ -483,6 +485,77 @@ public class PrTrackingFunctionalTests {
         SlackMessage tenantsMessage = asTenantSlack.postMessage(queryTs, messageWithPr);
 
         // then
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            prReactionStub.assertIsCalled();
+            eyesReactionStub.assertIsCalled();
+            escalatedReactionStub.assertIsCalled();
+        });
+
+        var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
+        assertThat(ticketResponse).isNotNull();
+        assertThat(ticketResponse.status()).isEqualTo("opened");
+        assertThat(ticketResponse.escalated()).isTrue();
+
+        githubStub.cleanUp();
+        creationStubs.cleanUp();
+    }
+
+    @Test
+    public void whenEscalationMessageConfigured_postsCustomMessageOnBreach() {
+        TestKit.RoledTestKit asTenant = testKit.as(tenant);
+        SlackTestKit asTenantSlack = asTenant.slack();
+        String channelId = testKit.config().mocks().slack().supportChannelId();
+
+        MessageTs queryTs = MessageTs.now();
+        String messageWithPr = "Could you review " + ESCALATION_MESSAGE_PR + "?";
+        MessageTs ticketMessageTs = MessageTs.now();
+
+        // Stub GitHub: PR created 2 days ago, breaking the 24h SLA on pr-escalation-message-repo.
+        Instant oldCreatedAt = Instant.now().minus(Duration.ofDays(2));
+        var githubStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("GitHub PR open", ESCALATION_MESSAGE_REPO, 301, "open", oldCreatedAt.toString());
+
+        // Stub reactions
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("PR reaction")
+                        .reaction("pr")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Eyes reaction")
+                        .reaction("eyes")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+        var escalatedReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Escalated reaction")
+                        .reaction("rocket")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+
+        // Stub ticket creation.
+        SlackMessage messageForStubs = SlackMessage.builder()
+                .slackWiremock(testKit.slack().wiremock())
+                .ts(queryTs)
+                .channelId(channelId)
+                .build();
+        var creationStubs = messageForStubs.stubTicketCreationFlow("ticket created", ticketMessageTs);
+
+        // when
+        asTenantSlack.postMessage(queryTs, messageWithPr);
+
+        // then
+        // Posted text is covered by unit tests in PrDetectionServiceTest; this only
+        // exercises the wired-up flow when the field is configured.
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
             prReactionStub.assertIsCalled();
             eyesReactionStub.assertIsCalled();

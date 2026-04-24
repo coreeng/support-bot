@@ -124,6 +124,7 @@ prReviewTracking:
 #         overrides: # optional: path-specific SLA overrides
 #           - path: "infra/**"
 #             sla: "7d"
+#         escalationMessage: "Contact #pr-reviews in Slack to chase this review" # optional: custom tenant facing message posted on SLA breach
 #   slaDiscovery:
 #     cache: "PT24H" # How long to cache SLA files fetched from repositories (default: 24h)
 #   github:

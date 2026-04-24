@@ -939,6 +939,76 @@ class PrDetectionServiceTest {
         }
 
         @Test
+        void postsDefaultEscalatedTextOnDetectionBreachWhenNoCustomMessage() {
+            // given no escalationMessage configured on the repo
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
+            Ticket ticket = ticketWithId(5L);
+            stubBreachedPrDetection(prCreatedAt, ticket);
+            when(escalationProcessingService.createEscalation(any()))
+                    .thenReturn(Escalation.builder()
+                            .id(new EscalationId(77L))
+                            .channelId(CHANNEL_ID)
+                            .build());
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticket);
+
+            // then tenant-thread message is the default formatEscalatedText
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("expected to be reviewed within");
+            assertThat(text).contains("has exceeded that timeframe");
+        }
+
+        @Test
+        void postsCustomMessageOnDetectionBreachWhenConfigured() {
+            // given same breach scenario but with a custom escalation-message
+            String customMessage = "Contact #pr-reviews to chase this review.";
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
+            Ticket ticket = ticketWithId(5L);
+            Instant slaDeadline = prCreatedAt.plus(SLA_24H);
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            null,
+                            List.of(),
+                            new PrTrackingProps.Sla(null, SLA_24H, null, customMessage))));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
+                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, slaDeadline));
+            when(escalationProcessingService.createEscalation(any()))
+                    .thenReturn(Escalation.builder()
+                            .id(new EscalationId(77L))
+                            .channelId(CHANNEL_ID)
+                            .build());
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticket);
+
+            // then tenant-thread message is the custom override, not the default
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText()).isEqualTo(customMessage);
+            // escalation still fires as usual
+            verify(escalationProcessingService).createEscalation(any());
+            verify(prTrackingRepository).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), eq(null), eq(77L));
+        }
+
+        @Test
         void doesNotEscalateWhenSlaBreachedButChangesRequested() {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
@@ -1939,7 +2009,7 @@ class PrDetectionServiceTest {
     }
 
     private static PrTrackingProps.Sla sla(Duration defaultSla) {
-        return new PrTrackingProps.Sla(null, defaultSla, null);
+        return new PrTrackingProps.Sla(null, defaultSla, null, null);
     }
 
     private static PrTrackingRecord stubTrackingRecord(Instant prCreatedAt, @Nullable Instant slaDeadline) {
