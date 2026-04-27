@@ -10,6 +10,7 @@ import java.util.Locale;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.boot.context.properties.bind.Name;
 
 @ConfigurationProperties(prefix = "pr-review-tracking")
@@ -50,7 +51,8 @@ public record PrTrackingProps(
                                 repository.owningTeam(),
                                 repository.githubTeamSlug(),
                                 repository.paths(),
-                                repository.sla()))
+                                repository.sla(),
+                                repository.noSlaMessage()))
                         .toList();
         this.slaDiscovery = slaDiscovery == null ? new SlaDiscovery(null) : slaDiscovery;
         this.github = github == null ? GitHub.defaultTokenModeConfig() : github;
@@ -93,6 +95,12 @@ public record PrTrackingProps(
 
             if (isBlank(repository.owningTeam())) {
                 throw new IllegalArgumentException("pr-review-tracking.repositories[].owning-team must not be blank");
+            }
+
+            String noSlaMessage = repository.noSlaMessage();
+            if (noSlaMessage != null && noSlaMessage.isBlank()) {
+                throw new IllegalArgumentException(
+                        "pr-review-tracking.repositories[].no-sla-message must not be blank when provided");
             }
 
             if (repository.sla() == null) {
@@ -186,14 +194,36 @@ public record PrTrackingProps(
             String owningTeam,
             @Nullable String githubTeamSlug,
             List<String> paths,
-            @Nullable Sla sla) {
-        public Repository {
+            @Nullable Sla sla,
+            @Nullable String noSlaMessage) {
+        @ConstructorBinding
+        public Repository(
+                String name,
+                String owningTeam,
+                @Nullable String githubTeamSlug,
+                List<String> paths,
+                @Nullable Sla sla,
+                @Nullable String noSlaMessage) {
             requireNonNull(name, "name must not be null");
             requireNonNull(owningTeam, "owningTeam must not be null");
             if (githubTeamSlug != null && githubTeamSlug.isBlank()) {
                 throw new IllegalArgumentException("githubTeamSlug must not be blank when provided");
             }
-            paths = paths == null ? List.of() : List.copyOf(paths);
+            this.name = name;
+            this.owningTeam = owningTeam;
+            this.githubTeamSlug = githubTeamSlug;
+            this.paths = paths == null ? List.of() : List.copyOf(paths);
+            this.sla = sla;
+            this.noSlaMessage = noSlaMessage;
+        }
+
+        public Repository(
+                String name,
+                String owningTeam,
+                @Nullable String githubTeamSlug,
+                List<String> paths,
+                @Nullable Sla sla) {
+            this(name, owningTeam, githubTeamSlug, paths, sla, null);
         }
 
         /** Returns true when this repository has no SLA configured (no-SLA tracking mode). */

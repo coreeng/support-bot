@@ -693,6 +693,117 @@ class PrDetectionServiceTest {
         }
 
         @Test
+        void postsCustomNoSlaMessageWhenConfigured() {
+            // given
+            String customMessage = "Docs PRs have no automated SLA. Tag #docs-team if urgent.";
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(
+                            new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null, customMessage)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            NO_SLA_REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(1L, prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — custom message replaces the default no-SLA text
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText()).isEqualTo(customMessage);
+        }
+
+        @Test
+        void postsCustomNoSlaMessageWhenConfiguredForGroupedPrs() {
+            // given — two no-SLA PRs to the same repo with a configured noSlaMessage
+            String customMessage = "Docs PRs have no automated SLA. Tag #docs-team if urgent.";
+            int prNumber2 = PR_NUMBER + 1;
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(
+                            new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null, customMessage)));
+            when(prUrlParser.parse(any()))
+                    .thenReturn(
+                            List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER), new DetectedPr(NO_SLA_REPO, prNumber2)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            NO_SLA_REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.getPullRequest(NO_SLA_REPO, prNumber2))
+                    .thenReturn(new GitHubPullRequest(
+                            NO_SLA_REPO,
+                            prNumber2,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, prNumber2)).thenReturn(List.of("infra/vars.tf"));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(
+                            new PrTrackingRecord(
+                                    1L,
+                                    1L,
+                                    NO_SLA_REPO,
+                                    PR_NUMBER,
+                                    prCreatedAt,
+                                    null,
+                                    TEAM_CODE,
+                                    true,
+                                    PrTrackingStatus.OPEN,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null),
+                            new PrTrackingRecord(
+                                    2L,
+                                    1L,
+                                    NO_SLA_REPO,
+                                    prNumber2,
+                                    prCreatedAt,
+                                    null,
+                                    TEAM_CODE,
+                                    true,
+                                    PrTrackingStatus.OPEN,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — custom message replaces the default grouped no-SLA text (single combined post)
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText()).isEqualTo(customMessage);
+        }
+
+        @Test
         void groupsMultiplePrsFromSameRepoAndMentionsTeamOnce() {
             // given — two no-SLA PRs posted to the same repo (same owning team)
             int prNumber2 = PR_NUMBER + 1;

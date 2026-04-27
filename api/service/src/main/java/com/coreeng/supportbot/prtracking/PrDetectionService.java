@@ -701,8 +701,10 @@ public class PrDetectionService {
                                         DEADLINE_FMT.format(checkNotNull(n.slaDeadline())),
                                         checkNotNull(n.teamLabel()));
                     case NO_SLA_TRACKED ->
-                        "PRs to %s have no automated SLAs, they are monitored by %s team. I'll still keep an eye on this one and let you know when it moves."
-                                .formatted(n.repo(), checkNotNull(n.teamLabel()));
+                        resolveNoSlaText(
+                                n.repo(),
+                                "PRs to %s have no automated SLAs, they are monitored by %s team. I'll still keep an eye on this one and let you know when it moves."
+                                        .formatted(n.repo(), checkNotNull(n.teamLabel())));
                     case CHANGES_REQUESTED ->
                         "<%s|PR #%d> for `%s` has been reviewed and changes have been requested. :eyes:"
                                 .formatted(prUrl(n.repo(), n.prNumber()), n.prNumber(), n.repo());
@@ -739,8 +741,10 @@ public class PrDetectionService {
                     switch (type) {
                         case TRACKED -> formatTrackedGroup(repo, group, prList);
                         case NO_SLA_TRACKED ->
-                            "PRs %s have no automated SLAs, they are monitored by %s team(s). I'll still keep an eye on them and let you know when they move."
-                                    .formatted(prList, teams(group));
+                            resolveNoSlaText(
+                                    repo,
+                                    "PRs %s have no automated SLAs, they are monitored by %s team(s). I'll still keep an eye on them and let you know when they move."
+                                            .formatted(prList, teams(group)));
                         case CHANGES_REQUESTED ->
                             "PRs %s for `%s` have been reviewed and changes have been requested. :eyes:"
                                     .formatted(prList, repo);
@@ -757,6 +761,14 @@ public class PrDetectionService {
                     };
             postText(text, repo, 0, type, queryTs, channelId);
         }
+    }
+
+    private String resolveNoSlaText(String repoName, String defaultText) {
+        return prTrackingProps.repositories().stream()
+                .filter(r -> r.name().equalsIgnoreCase(repoName))
+                .findFirst()
+                .map(PrTrackingProps.Repository::noSlaMessage)
+                .orElse(defaultText);
     }
 
     private String teams(List<PendingNotification> group) {

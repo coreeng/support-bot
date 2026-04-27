@@ -74,6 +74,9 @@ data:
             {{- if .sla.escalationMessage }}
             escalation-message: {{ .sla.escalationMessage | quote }}
             {{- end }}
+          {{- if .noSlaMessage }}
+          no-sla-message: {{ .noSlaMessage | quote }}
+          {{- end }}
       {{- end }}
       {{- else }}
       repositories: [ ]

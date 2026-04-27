@@ -620,6 +620,52 @@ class PrTrackingConfigValidationTest {
                 .hasMessageContaining("paths[] must not be blank");
     }
 
+    @Test
+    void acceptsNoSlaRepoWithNoSlaMessage() {
+        // given
+        PrTrackingProps.Repository noSlaRepo = new PrTrackingProps.Repository(
+                "my-org/repo",
+                "wow",
+                null,
+                List.of("docs/**"),
+                null,
+                "Docs PRs have no automated SLA. Tag #docs-team if urgent.");
+
+        // when / then
+        assertThatCode(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(noSlaRepo),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsBlankNoSlaMessage() {
+        // given
+        PrTrackingProps.Repository repoWithBlankMessage =
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of("docs/**"), null, "   ");
+
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(repoWithBlankMessage),
+                        validTokenGithub(),
+                        DEFAULT_SLA_DISCOVERY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no-sla-message must not be blank");
+    }
+
     private static PrTrackingProps.Repository validRepo() {
         return validRepoWithName("my-org/onboarding-repo");
     }

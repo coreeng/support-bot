@@ -116,15 +116,22 @@ prReviewTracking:
 #     - "pull-request" # Required when enabled: tag codes from enums.tags, applied when the bot auto-closes a ticket
 #   impact: "prReview" # Required when enabled: impact code from enums.impacts, applied when the bot auto-closes a ticket
 #   repositories:
+#     # Example A: SLA-backed repo. escalationMessage fires when an SLA is breached.
 #     - name: "coreeng/core-platform-environment" # Repository in org/repo format
 #       owningTeam: "infra-integration" # Team code from enums.escalation-teams — escalated when the SLA is breached
 #       sla:
 #         file: ".pr-sla.yaml" # optional: read SLA from this file in the repo
-#         default: "48h" # default SLA duration (required)
+#         default: "48h" # default SLA duration (required when sla is set)
 #         overrides: # optional: path-specific SLA overrides
 #           - path: "infra/**"
 #             sla: "7d"
-#         escalationMessage: "Contact #pr-reviews in Slack to chase this review" # optional: custom tenant facing message posted on SLA breach
+#         escalationMessage: "Contact #pr-reviews in Slack to chase this review" # optional: tenant-facing message posted on SLA breach
+#     # Example B: no-SLA repo. noSlaMessage fires when a PR is tracked but no SLA applies.
+#     # noSlaMessage is mutually exclusive with sla.escalationMessage above — they apply to different repo shapes.
+#     - name: "coreeng/docs"
+#       owningTeam: "docs-team"
+#       paths: ["docs/**"] # optional: only track PRs touching these paths
+#       noSlaMessage: "Engineers monitor this repository regularly. I'll keep an eye on this one and let you know when it moves." # optional: tenant-facing message posted when a no-SLA PR is tracked. Plain text, scoped to this repo.
 #   slaDiscovery:
 #     cache: "PT24H" # How long to cache SLA files fetched from repositories (default: 24h)
 #   github:

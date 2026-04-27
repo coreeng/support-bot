@@ -278,7 +278,11 @@ public class PrLifecyclePoller {
         }
 
         // Post before createEscalation so the custom message lands in thread before the
-        // escalation card, matching the detection-time ordering in PrDetectionService.
+        // escalation card. Poll-time semantics differ from detection-time: here the custom
+        // message is ADDED in front of the (unchanged) escalation card; in PrDetectionService
+        // the custom message REPLACES the default breach text. Do not try to harmonise these
+        // without revisiting the spec — the asymmetry is deliberate (poll-time previously
+        // posted no tenant-thread text at all, so unset = same as before).
         PrTrackingProps.Repository repoConfig = findRepoConfig(record.githubRepo());
         if (repoConfig != null && repoConfig.sla() != null && repoConfig.sla().escalationMessage() != null) {
             postMessage(repoConfig.sla().escalationMessage(), ticket.channelId(), ticket.queryTs(), record);
