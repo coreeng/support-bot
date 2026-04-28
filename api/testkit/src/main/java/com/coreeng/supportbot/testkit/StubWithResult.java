@@ -3,9 +3,6 @@ package com.coreeng.supportbot.testkit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 
-import com.github.tomakehurst.wiremock.WireMockServer;
-import com.github.tomakehurst.wiremock.admin.model.GetServeEventsResult;
-import com.github.tomakehurst.wiremock.admin.model.ServeEventQuery;
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import com.github.tomakehurst.wiremock.stubbing.StubMapping;
@@ -21,7 +18,7 @@ public class StubWithResult<T> {
 
     @NonNull private final StubMapping mapping;
 
-    @NonNull private final WireMockServer wireMockServer;
+    @NonNull private final WireMockBackend wireMockServer;
 
     @NonNull private final Receiver<T> receiver;
 
@@ -34,7 +31,7 @@ public class StubWithResult<T> {
     @Builder
     public StubWithResult(
             @NonNull StubMapping mapping,
-            @NonNull WireMockServer wireMockServer,
+            @NonNull WireMockBackend wireMockServer,
             @NonNull Receiver<T> receiver,
             @NonNull String description) {
         this.mapping = mapping;
@@ -48,14 +45,13 @@ public class StubWithResult<T> {
             LOGGER.debug("Stub '{}' already asserted, skipping", description);
             return;
         }
-        GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
-        assertThat(serveEvents.getServeEvents())
+        var serveEvents = wireMockServer.getServeEventsFor(mapping);
+        assertThat(serveEvents)
                 .as("%s: stub was called exactly once", description)
                 .hasSize(1);
         assertThatNoException()
                 .as("%s: stub returned a result", description)
-                .isThrownBy(() -> result = receiver.assertAndExtractResult(
-                        serveEvents.getServeEvents().getFirst()));
+                .isThrownBy(() -> result = receiver.assertAndExtractResult(serveEvents.getFirst()));
         assertThat(result)
                 .as("%s: stub returned a non-null result", description)
                 .isNotNull();
@@ -69,8 +65,7 @@ public class StubWithResult<T> {
             LOGGER.debug("Stub '{}' already asserted, skipping", description);
             return;
         }
-        GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
-        assertThat(serveEvents.getServeEvents())
+        assertThat(wireMockServer.getServeEventsFor(mapping))
                 .as("%s: stub should not have been called", description)
                 .isEmpty();
     }

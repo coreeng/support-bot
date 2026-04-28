@@ -1,0 +1,24 @@
+service:
+  externalPort: 8000
+  internalPort: 8080
+
+args:
+  - "--port=8080"
+  - "--max-request-journal=1000"
+  - "--global-response-templating"
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi

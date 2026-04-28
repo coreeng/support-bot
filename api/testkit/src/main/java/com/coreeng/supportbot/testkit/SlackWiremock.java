@@ -12,9 +12,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
 import com.coreeng.supportbot.testkit.matcher.UrlDecodedPattern;
-import com.github.tomakehurst.wiremock.WireMockServer;
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.github.tomakehurst.wiremock.client.MappingBuilder;
+import com.github.tomakehurst.wiremock.matching.RequestPatternBuilder;
+import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import com.github.tomakehurst.wiremock.stubbing.StubMapping;
+import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashSet;
@@ -31,33 +33,97 @@ import org.slf4j.LoggerFactory;
  * Wiremock implementation for Slack service.
  * Handles mocking of Slack API endpoints.
  */
-public class SlackWiremock extends WireMockServer {
+public class SlackWiremock implements WireMockBackend {
     private static final Logger LOGGER = LoggerFactory.getLogger(SlackWiremock.class);
 
     private final Config.SlackMock config;
+    private final WireMockBackend backend;
     private final Set<UUID> permanentStubIds = new HashSet<>();
 
     public SlackWiremock(Config.SlackMock config) {
-        super(WireMockConfiguration.options()
-                .port(config.port())
-                .globalTemplating(true)
-                .maxRequestJournalEntries(1000)
-                .extensions(new MessageTsHelperExtension()));
         this.config = config;
+        backend = createBackend(config);
     }
 
     @Override
     public void start() {
-        super.start();
+        backend.start();
+        resetAll();
+        permanentStubIds.clear();
         setupAppInitMocks();
         capturePermanentStubs();
-        LOGGER.info("Started Slack Wiremock server on port {}", this.port());
+        LOGGER.info("Started Slack Wiremock in {} mode on port {}", config.wireMockMode(), port());
     }
 
     @Override
     public void stop() {
-        super.stop();
-        LOGGER.info("Stopped Slack Wiremock server");
+        try {
+            backend.stop();
+        } finally {
+            permanentStubIds.clear();
+        }
+        LOGGER.info("Stopped Slack Wiremock");
+    }
+
+    @Override
+    public int port() {
+        return backend.port();
+    }
+
+    @Override
+    public void resetAll() {
+        backend.resetAll();
+    }
+
+    public StubMapping stubFor(MappingBuilder mappingBuilder) {
+        return givenThat(mappingBuilder);
+    }
+
+    @Override
+    public List<LoggedRequest> findAll(RequestPatternBuilder requestPatternBuilder) {
+        return backend.findAll(requestPatternBuilder);
+    }
+
+    @Override
+    public List<ServeEvent> getAllServeEvents() {
+        return backend.getAllServeEvents();
+    }
+
+    @Override
+    public List<ServeEvent> getServeEventsFor(StubMapping stubMapping) {
+        return backend.getServeEventsFor(stubMapping);
+    }
+
+    private static WireMockBackend createBackend(Config.SlackMock config) {
+        return switch (config.wireMockMode()) {
+            case EMBEDDED -> new EmbeddedWireMockBackend(config);
+            case REMOTE -> new RemoteWireMockBackend(config);
+        };
+    }
+
+    @Override
+    public StubMapping givenThat(MappingBuilder mappingBuilder) {
+        return backend.givenThat(mappingBuilder);
+    }
+
+    @Override
+    public List<StubMapping> getStubMappings() {
+        return backend.getStubMappings();
+    }
+
+    @Override
+    public void removeStubMapping(StubMapping stubMapping) {
+        backend.removeStubMapping(stubMapping);
+    }
+
+    @Override
+    public List<LoggedRequest> findAllUnmatchedRequests() {
+        return backend.findAllUnmatchedRequests();
+    }
+
+    @Override
+    public void resetRequests() {
+        backend.resetRequests();
     }
 
     private void setupAppInitMocks() {
@@ -738,7 +804,7 @@ public class SlackWiremock extends WireMockServer {
                             .withUniformRandomDelay(300, 350)
                             .withBody("""
                         {{formData request.body 'formArgs' urlDecode=true}}
-                        {{#assign 'generatedTs'}}{{messageTs}}{{/assign}}
+                        {{#assign 'generatedTs'}}{{randomValue length=10 type='NUMERIC'}}.{{randomValue length=6 type='NUMERIC'}}{{/assign}}
                         {
                           "ok": true,
                           "channel": "{{formArgs.channel}}",
