@@ -5,7 +5,9 @@ import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static io.restassured.RestAssured.given;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
+import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
 import java.time.Duration;
 import java.util.List;
 import org.awaitility.Awaitility;
@@ -96,6 +98,54 @@ class SlackWiremockTopologyTest {
                     .statusCode(200)
                     .body("ok", org.hamcrest.Matchers.equalTo(true))
                     .body("ts", org.hamcrest.Matchers.matchesPattern("[0-9]{10}\\.[0-9]{6}"));
+        } finally {
+            slackWiremock.stop();
+            remoteServer.stop();
+        }
+    }
+
+    @Test
+    void remoteModeSupportsViewsOpenStubRegistration() {
+        WireMockServer remoteServer =
+                new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        remoteServer.start();
+
+        SlackWiremock slackWiremock =
+                new SlackWiremock(slackConfig(0, "remote", "http", "localhost", remoteServer.port()));
+
+        try {
+            slackWiremock.start();
+            awaitUntilResponsive("http://localhost:" + remoteServer.port());
+
+            StubWithResult<String> stub = slackWiremock.stubViewsOpen(ViewsOpenExpectation.<String>builder()
+                    .description("remote: views.open")
+                    .triggerId("TRIGGER123")
+                    .viewCallbackId("ticket-summary")
+                    .receiver(new StubWithResult.Receiver<>() {
+                        @Override
+                        public MappingBuilder configureStub(MappingBuilder stubBuilder) {
+                            return stubBuilder;
+                        }
+
+                        @Override
+                        public String assertAndExtractResult(ServeEvent servedStub) {
+                            return servedStub
+                                    .getRequest()
+                                    .formParameter("trigger_id")
+                                    .firstValue();
+                        }
+                    })
+                    .build());
+
+            given().formParam("trigger_id", "TRIGGER123")
+                    .formParam("view", "{\"type\":\"modal\",\"callback_id\":\"ticket-summary\"}")
+                    .when()
+                    .post("http://localhost:" + remoteServer.port() + "/api/views.open")
+                    .then()
+                    .statusCode(200)
+                    .body("ok", org.hamcrest.Matchers.equalTo(true));
+
+            stub.assertIsCalled();
         } finally {
             slackWiremock.stop();
             remoteServer.stop();
