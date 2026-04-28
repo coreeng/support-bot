@@ -4,6 +4,12 @@ Functional tests are being run against a deployed version of application.
 It mocks Slack API via Wiremock and calls the service on behalf of Slack to
 notify about events such as "message posted", "reaction added" and others.
 
+## WireMock topology
+
+- **Local**: tests use the embedded `SlackWiremock` from `:testkit` (default admin/data port `localhost:8000`).
+- **Cluster**: `api/scripts/run-functional-tests.sh` deploys a dedicated `support-bot-functional-tests-wiremock` Helm release and the functional test job talks to it via remote admin mode.
+- The service deployed with `helm-chart/values-functional.yaml` also points its Slack/GitHub mock URLs at that dedicated cluster WireMock service.
+
 ## Prerequisites
 - A reachable PostgreSQL instance (see [service README](../service/README.md) for `make db-run`)
 - Service listening on `http://localhost:8080` by default

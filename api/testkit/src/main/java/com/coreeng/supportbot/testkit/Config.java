@@ -2,6 +2,7 @@ package com.coreeng.supportbot.testkit;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.bind.PropertySourcesPlaceholdersResolver;
@@ -62,7 +63,45 @@ public record Config(
             String supportBotId,
             String supportGroupId,
             String supportChannelId,
-            List<SlackSupportMember> supportMembers) {}
+            List<SlackSupportMember> supportMembers,
+            @Nullable String mode,
+            @Nullable String remoteAdminScheme,
+            @Nullable String remoteAdminHost,
+            @Nullable Integer remoteAdminPort) {
+        public WireMockMode wireMockMode() {
+            if (mode == null || mode.isBlank()) {
+                return WireMockMode.EMBEDDED;
+            }
+            return WireMockMode.valueOf(mode.trim().toUpperCase(Locale.ROOT));
+        }
+
+        public String remoteAdminSchemeOrDefault() {
+            if (remoteAdminScheme == null || remoteAdminScheme.isBlank()) {
+                return "http";
+            }
+            return remoteAdminScheme;
+        }
+
+        public String remoteAdminHostOrDefault() {
+            if (remoteAdminHost == null || remoteAdminHost.isBlank()) {
+                return "localhost";
+            }
+            return remoteAdminHost;
+        }
+
+        public int remoteAdminPortOrDefault() {
+            return remoteAdminPort != null ? remoteAdminPort : port;
+        }
+
+        public String adminBaseUrl() {
+            if (wireMockMode() == WireMockMode.REMOTE) {
+                return "%s://%s:%d"
+                        .formatted(
+                                remoteAdminSchemeOrDefault(), remoteAdminHostOrDefault(), remoteAdminPortOrDefault());
+            }
+            return "http://localhost:%d".formatted(port);
+        }
+    }
 
     public record SlackSupportMember(String userId, String name, String email) {}
 

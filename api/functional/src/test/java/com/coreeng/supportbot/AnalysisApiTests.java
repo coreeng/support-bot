@@ -1,5 +1,6 @@
 package com.coreeng.supportbot;
 
+import static com.coreeng.supportbot.testkit.UserRole.tenant;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static io.restassured.RestAssured.given;
@@ -7,7 +8,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.testkit.Config;
 import com.coreeng.supportbot.testkit.SlackWiremock;
+import com.coreeng.supportbot.testkit.SupportBotClient;
+import com.coreeng.supportbot.testkit.TestKit;
 import com.coreeng.supportbot.testkit.TestKitExtension;
+import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.MethodOrderer;
@@ -22,9 +26,27 @@ public class AnalysisApiTests {
 
     private Config config;
     private SlackWiremock slackWiremock;
+    private TestKit testKit;
+    private SupportBotClient supportBotClient;
 
     private String baseUrl() {
         return config.supportBot().baseUrl();
+    }
+
+    private void seedClosedTicketForAnalysis() {
+        var ticket = testKit.as(tenant).ticket().create(builder -> builder.message("Analysis functional test query"));
+
+        var closeFlowStubs = ticket.stubCloseFlow("analysis ticket closed");
+        var closeRequest = SupportBotClient.UpdateTicketRequest.builder()
+                .status("closed")
+                .authorsTeam("wow")
+                .tags(ImmutableList.of("ingresses", "networking"))
+                .impact("productionBlocking")
+                .build();
+        var closedTicket = supportBotClient.updateTicket(ticket.id(), closeRequest);
+
+        assertThat(closedTicket.status()).isEqualTo("closed");
+        closeFlowStubs.awaitAllCalled(Duration.ofSeconds(1));
     }
 
     @Test
@@ -47,6 +69,8 @@ public class AnalysisApiTests {
     @Order(2)
     void analysisRun_startsAndCompletes() {
         // given - analysis fetches threads from Slack for all tickets in the DB
+        seedClosedTicketForAnalysis();
+
         slackWiremock.stubFor(post("/api/conversations.replies")
                 .willReturn(aResponse()
                         .withStatus(200)
