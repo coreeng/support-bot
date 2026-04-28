@@ -2,6 +2,9 @@ service:
   externalPort: 8000
   internalPort: 8080
 
+mappingsFromConfigmap: false
+responsesFromConfigmap: false
+
 args:
   - "--port=8080"
   - "--max-request-journal=1000"
