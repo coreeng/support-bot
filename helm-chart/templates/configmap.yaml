@@ -54,11 +54,12 @@ data:
       {{- if .Values.prReviewTracking.repositories }}
       repositories:
       {{- range .Values.prReviewTracking.repositories }}
-        {{- if not .sla.default }}
-          {{- fail (printf "prReviewTracking.repositories[].sla.default is required for repository %s" .name) }}
-        {{- end }}
         - name: {{ .name | quote }}
           owning-team: {{ .owningTeam | quote }}
+          {{- if .sla }}
+          {{- if not .sla.default }}
+          {{- fail (printf "prReviewTracking.repositories[].sla.default is required when sla is set, repo: %s" .name) }}
+          {{- end }}
           sla:
             {{- if .sla.file }}
             file: {{ .sla.file | quote }}
@@ -71,6 +72,34 @@ data:
                 sla: {{ .sla | quote }}
             {{- end }}
             {{- end }}
+          {{- end }}
+          {{- if .paths }}
+          paths:
+          {{- range .paths }}
+            - {{ . | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if .messages }}
+          messages:
+            {{- if .messages.detected }}
+            detected: {{ .messages.detected | quote }}
+            {{- end }}
+            {{- if .messages.escalated }}
+            escalated: {{ .messages.escalated | quote }}
+            {{- end }}
+            {{- if .messages.approved }}
+            approved: {{ .messages.approved | quote }}
+            {{- end }}
+            {{- if .messages.changesRequested }}
+            changes-requested: {{ .messages.changesRequested | quote }}
+            {{- end }}
+            {{- if .messages.merged }}
+            merged: {{ .messages.merged | quote }}
+            {{- end }}
+            {{- if .messages.closed }}
+            closed: {{ .messages.closed | quote }}
+            {{- end }}
+          {{- end }}
       {{- end }}
       {{- else }}
       repositories: [ ]

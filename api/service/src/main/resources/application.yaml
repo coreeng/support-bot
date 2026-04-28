@@ -127,7 +127,7 @@ pr-review-tracking:
   tags: PR                               # Required when enabled: tag codes from enums.tags, applied when the bot auto-closes a ticket
   impact: Information Request            # Required when enabled: impact code from enums.impacts, applied when the bot auto-closes a ticket
   repositories: [ ]
-  # Example repository entry:
+  # Example repository entries:
   #   - name: my-org/my-repo
   #     owning-team: <team-code from enums.escalation-teams>
   #     github-team-slug: <slug>  # optional: GitHub team slug for review validation; when absent, falls back to PR requested teams
@@ -137,12 +137,26 @@ pr-review-tracking:
   #       overrides:            # optional: path-specific SLA overrides
   #         - path: infra/**
   #           sla: 7d
+  #     messages:               # optional: CEL expressions overriding default tenant-facing Slack messages
+  #       # Available variables: pr_number (int), pr_url, repo_name, repo_url, owning_team,
+  #       #                      sla_duration, sla_deadline (empty string when not applicable)
+  #       # Values must be CEL expressions — wrap plain strings in double quotes inside the YAML value:
+  #       #   escalated: '"Contact #pr-reviews in Slack to chase this review."'
+  #       # Use string() to convert pr_number in string concatenation, e.g. string(pr_number)
+  #       detected: '"PR " + string(pr_number) + " detected. SLA: " + sla_duration + ", deadline: " + sla_deadline + "."'
+  #       escalated: '"Contact #pr-reviews in Slack to chase this review."'
+  #       approved: '"PR " + string(pr_number) + " approved — ready to merge!"'
+  #       changes-requested: '"Changes requested on PR " + string(pr_number) + ". Please review the feedback."'
+  #       merged: '"PR " + string(pr_number) + " merged. Thanks!"'
+  #       closed: '"PR " + string(pr_number) + " closed."'
   #   - name: my-org/no-sla-repo
   #     owning-team: <team-code from enums.escalation-teams>
   #     github-team-slug: <slug>  # optional: GitHub team slug for review validation; when absent, falls back to PR requested teams
   #     paths:
   #     - infra/**
   #     - rbac/**
+  #     messages:               # escalated is never triggered for no-SLA repos and will be silently ignored if set
+  #       detected: '"Engineers monitor this repo regularly. I''ll keep an eye on this one."'
   sla-discovery:
     cache: PT24H                           # How long to cache SLA files fetched from repositories
   github:

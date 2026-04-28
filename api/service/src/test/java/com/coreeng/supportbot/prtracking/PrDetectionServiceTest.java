@@ -87,6 +87,9 @@ class PrDetectionServiceTest {
     @Mock
     private SlaLookup slaLookup;
 
+    @Mock
+    private PrMessageRenderer messageRenderer;
+
     @Captor
     private ArgumentCaptor<SlackPostMessageRequest> postMessageCaptor;
 
@@ -110,7 +113,8 @@ class PrDetectionServiceTest {
                 ticketTeamSuggestionsService,
                 slackClient,
                 slackTicketsProps,
-                slaLookup);
+                slaLookup,
+                messageRenderer);
         lenient().when(slackTicketsProps.expectedInitialReaction()).thenReturn("eyes");
         lenient().when(slaLookup.getSla(any(), any(), anyInt())).thenReturn(SLA_24H);
         lenient().when(prTrackingProps.tags()).thenReturn(List.of("pr-review"));
@@ -693,6 +697,124 @@ class PrDetectionServiceTest {
         }
 
         @Test
+        void postsCustomDetectedMessageWhenConfigured() {
+            // given
+            String customMessage = "Docs PRs have no automated SLA. Tag #docs-team if urgent.";
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null)));
+            when(messageRenderer.render(eq(NO_SLA_REPO), eq(MessageEvent.DETECTED), any()))
+                    .thenReturn(customMessage);
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            NO_SLA_REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(1L, prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — custom message replaces the default no-SLA text
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText()).isEqualTo(customMessage);
+        }
+
+        @Test
+        void postsCustomDetectedMessageIndividuallyForGroupedPrs() {
+            // given — two no-SLA PRs to the same repo with a custom detected message configured;
+            // the renderer override causes grouped PRs to be posted individually.
+            String customMessage = "Docs PRs have no automated SLA. Tag #docs-team if urgent.";
+            int prNumber2 = PR_NUMBER + 1;
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null)));
+            when(messageRenderer.hasOverride(NO_SLA_REPO, MessageEvent.DETECTED))
+                    .thenReturn(true);
+            when(messageRenderer.render(eq(NO_SLA_REPO), eq(MessageEvent.DETECTED), any()))
+                    .thenReturn(customMessage);
+            when(prUrlParser.parse(any()))
+                    .thenReturn(
+                            List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER), new DetectedPr(NO_SLA_REPO, prNumber2)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            NO_SLA_REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.getPullRequest(NO_SLA_REPO, prNumber2))
+                    .thenReturn(new GitHubPullRequest(
+                            NO_SLA_REPO,
+                            prNumber2,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, prNumber2)).thenReturn(List.of("infra/vars.tf"));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(
+                            new PrTrackingRecord(
+                                    1L,
+                                    1L,
+                                    NO_SLA_REPO,
+                                    PR_NUMBER,
+                                    prCreatedAt,
+                                    null,
+                                    TEAM_CODE,
+                                    true,
+                                    PrTrackingStatus.OPEN,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null),
+                            new PrTrackingRecord(
+                                    2L,
+                                    1L,
+                                    NO_SLA_REPO,
+                                    prNumber2,
+                                    prCreatedAt,
+                                    null,
+                                    TEAM_CODE,
+                                    true,
+                                    PrTrackingStatus.OPEN,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — each PR gets its own custom message post (2 posts, not 1 grouped)
+            verify(slackClient, times(2)).postMessage(postMessageCaptor.capture());
+            postMessageCaptor
+                    .getAllValues()
+                    .forEach(req -> assertThat(req.message().getText()).isEqualTo(customMessage));
+        }
+
+        @Test
         void groupsMultiplePrsFromSameRepoAndMentionsTeamOnce() {
             // given — two no-SLA PRs posted to the same repo (same owning team)
             int prNumber2 = PR_NUMBER + 1;
@@ -934,6 +1056,73 @@ class PrDetectionServiceTest {
             service.handleMessagePosted(messagePostedWith("msg"), ticket);
 
             // then
+            verify(escalationProcessingService).createEscalation(any());
+            verify(prTrackingRepository).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), eq(null), eq(77L));
+        }
+
+        @Test
+        void postsDefaultEscalatedTextOnDetectionBreachWhenNoCustomMessage() {
+            // given — renderer returns null (no override configured)
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
+            Ticket ticket = ticketWithId(5L);
+            stubBreachedPrDetection(prCreatedAt, ticket);
+            when(escalationProcessingService.createEscalation(any()))
+                    .thenReturn(Escalation.builder()
+                            .id(new EscalationId(77L))
+                            .channelId(CHANNEL_ID)
+                            .build());
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticket);
+
+            // then tenant-thread message is the default formatEscalatedText
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            String text = postMessageCaptor.getValue().message().getText();
+            assertThat(text).contains("expected to be reviewed within");
+            assertThat(text).contains("has exceeded that timeframe");
+        }
+
+        @Test
+        void postsCustomMessageOnDetectionBreachWhenConfigured() {
+            // given — renderer returns the custom escalated message
+            String customMessage = "Contact #pr-reviews to chase this review.";
+            Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
+            Ticket ticket = ticketWithId(5L);
+            Instant slaDeadline = prCreatedAt.plus(SLA_24H);
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO, TEAM_CODE, null, List.of(), new PrTrackingProps.Sla(null, SLA_24H, null))));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
+                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            prCreatedAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, slaDeadline));
+            when(escalationProcessingService.createEscalation(any()))
+                    .thenReturn(Escalation.builder()
+                            .id(new EscalationId(77L))
+                            .channelId(CHANNEL_ID)
+                            .build());
+            when(messageRenderer.render(eq(REPO), eq(MessageEvent.ESCALATED), any()))
+                    .thenReturn(customMessage);
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticket);
+
+            // then tenant-thread message is the custom override, escalation still fires as usual
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText()).isEqualTo(customMessage);
             verify(escalationProcessingService).createEscalation(any());
             verify(prTrackingRepository).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), eq(null), eq(77L));
         }
@@ -1350,6 +1539,54 @@ class PrDetectionServiceTest {
 
     @Nested
     class HandleMessagePostedGrouping {
+
+        @Test
+        void postsCustomDetectedMessageIndividuallyForGroupedSlaBackedPrs() {
+            // given — two SLA-backed PRs to the same repo with a custom detected message; the
+            // hasOverride check causes them to be posted individually rather than grouped.
+            String customMessage = "I'm tracking this PR — SLA applies.";
+            int prB = 99;
+            Instant createdAt = Instant.now().minus(Duration.ofHours(1));
+
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(
+                            List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), sla(SLA_24H))));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
+                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
+            when(messageRenderer.hasOverride(REPO, MessageEvent.DETECTED)).thenReturn(true);
+            when(messageRenderer.render(eq(REPO), eq(MessageEvent.DETECTED), any()))
+                    .thenReturn(customMessage);
+            when(prUrlParser.parse(any()))
+                    .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(REPO, prB)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.getPullRequest(REPO, prB))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(1L, createdAt, createdAt.plus(SLA_24H)))
+                    .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("two PRs"), ticketWithId(10L));
+
+            // then — each PR gets its own custom message post (2 posts, not 1 grouped)
+            verify(slackClient, times(2)).postMessage(postMessageCaptor.capture());
+            postMessageCaptor
+                    .getAllValues()
+                    .forEach(req -> assertThat(req.message().getText()).isEqualTo(customMessage));
+        }
 
         @Test
         void groupsTrackedPrsFromSameRepoIntoOneMessage() {

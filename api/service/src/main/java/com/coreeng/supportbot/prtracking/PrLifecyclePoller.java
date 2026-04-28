@@ -4,6 +4,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
+import com.coreeng.supportbot.enums.EscalationTeam;
+import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.escalation.CreateEscalationRequest;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
@@ -52,6 +54,8 @@ public class PrLifecyclePoller {
     private final TicketSlackService ticketSlackService;
     private final SlackClient slackClient;
     private final PrTrackingProps prTrackingProps;
+    private final PrMessageRenderer messageRenderer;
+    private final EscalationTeamsRegistry escalationTeamsRegistry;
 
     @Scheduled(cron = "${pr-review-tracking.poll-cron:0 0 9-18 * * 1-5}")
     public void poll() {
@@ -204,10 +208,15 @@ public class PrLifecyclePoller {
     }
 
     private void handlePrClosed(PrTrackingRecord record, GitHubPullRequest pr) {
-        String action = pr.state() == GitHubPullRequest.PrState.MERGED ? "merged" : "closed";
-        closeRecordAndNotify(
-                record,
-                "PR `%s#%d` has been %s. :white_check_mark:".formatted(record.githubRepo(), record.prNumber(), action));
+        boolean isMerged = pr.state() == GitHubPullRequest.PrState.MERGED;
+        MessageEvent event = isMerged ? MessageEvent.MERGED : MessageEvent.CLOSED;
+        PrMessageContext ctx = recordContext(record);
+        String override = messageRenderer.render(record.githubRepo(), event, ctx);
+        String message = override != null
+                ? override
+                : "PR `%s#%d` has been %s. :white_check_mark:"
+                        .formatted(record.githubRepo(), record.prNumber(), isMerged ? "merged" : "closed");
+        closeRecordAndNotify(record, message);
     }
 
     private void notifyChangesRequested(PrTrackingRecord record) {
@@ -224,19 +233,23 @@ public class PrLifecyclePoller {
             return;
         }
 
-        postMessage(
-                "PR `%s#%d` has been reviewed and changes have been requested."
-                        .formatted(record.githubRepo(), record.prNumber()),
-                ticket.channelId(),
-                ticket.queryTs(),
-                record);
+        PrMessageContext ctx = recordContext(record);
+        String override = messageRenderer.render(record.githubRepo(), MessageEvent.CHANGES_REQUESTED, ctx);
+        String message = override != null
+                ? override
+                : "PR `%s#%d` has been reviewed and changes have been requested."
+                        .formatted(record.githubRepo(), record.prNumber());
+        postMessage(message, ticket.channelId(), ticket.queryTs(), record);
     }
 
     private void handleApprovalClosure(PrTrackingRecord record) {
-        closeRecordAndNotify(
-                record,
-                "PR `%s#%d` has been approved and is ready to merge. :white_check_mark:"
-                        .formatted(record.githubRepo(), record.prNumber()));
+        PrMessageContext ctx = recordContext(record);
+        String override = messageRenderer.render(record.githubRepo(), MessageEvent.APPROVED, ctx);
+        String message = override != null
+                ? override
+                : "PR `%s#%d` has been approved and is ready to merge. :white_check_mark:"
+                        .formatted(record.githubRepo(), record.prNumber());
+        closeRecordAndNotify(record, message);
     }
 
     private void closeRecordAndNotify(PrTrackingRecord record, String message) {
@@ -275,6 +288,17 @@ public class PrLifecyclePoller {
         if (ticket == null) {
             log.atWarn().addArgument(record::ticketId).log("Ticket {} not found for SLA breach, skipping");
             return;
+        }
+
+        // Post before createEscalation so the custom message lands in thread before the escalation card.
+        // Poll-time semantics differ from detection-time: here the custom message is ADDED in front of
+        // the (unchanged) escalation card; in PrDetectionService the custom message REPLACES the default
+        // breach text. Do not try to harmonise these without revisiting the spec — the asymmetry is
+        // deliberate (poll-time previously posted no tenant-thread text at all, so unset = same as before).
+        String escalationOverride =
+                messageRenderer.render(record.githubRepo(), MessageEvent.ESCALATED, recordContext(record));
+        if (escalationOverride != null) {
+            postMessage(escalationOverride, ticket.channelId(), ticket.queryTs(), record);
         }
 
         Escalation escalation = escalationProcessingService.createEscalation(CreateEscalationRequest.builder()
@@ -336,6 +360,31 @@ public class PrLifecyclePoller {
         }
         Duration remaining = Duration.between(Instant.now(), record.slaDeadline());
         return remaining.isNegative() ? Duration.ZERO : remaining;
+    }
+
+    private PrMessageContext recordContext(PrTrackingRecord record) {
+        Duration sla = null;
+        Instant slaDeadline = null;
+        if (record.slaDeadline() != null) {
+            Duration computed = Duration.between(record.prCreatedAt(), record.slaDeadline());
+            if (computed.isPositive()) {
+                sla = computed;
+                slaDeadline = record.slaDeadline();
+            } else {
+                log.atWarn()
+                        .addArgument(record::githubRepo)
+                        .addArgument(record::prNumber)
+                        .log(
+                                "PR {}#{} has non-positive computed SLA duration; omitting sla_duration from message context");
+            }
+        }
+        return new PrMessageContext(
+                record.githubRepo(), record.prNumber(), resolveTeamLabel(record.owningTeam()), sla, slaDeadline);
+    }
+
+    private String resolveTeamLabel(String teamCode) {
+        EscalationTeam team = escalationTeamsRegistry.findEscalationTeamByCode(teamCode);
+        return team != null ? team.label() : teamCode;
     }
 
     private void postMessage(String text, String channelId, MessageTs queryTs, PrTrackingRecord record) {
