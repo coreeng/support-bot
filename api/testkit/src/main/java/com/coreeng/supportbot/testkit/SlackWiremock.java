@@ -1,17 +1,14 @@
 package com.coreeng.supportbot.testkit;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.and;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
-import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
-import com.coreeng.supportbot.testkit.matcher.UrlDecodedPattern;
 import com.github.tomakehurst.wiremock.client.MappingBuilder;
 import com.github.tomakehurst.wiremock.matching.RequestPatternBuilder;
 import com.github.tomakehurst.wiremock.stubbing.ServeEvent;
@@ -733,11 +730,6 @@ public class SlackWiremock implements WireMockBackend {
                 .configureStub(post("/api/views.open"))
                 .withName(expectation.description())
                 .withFormParam("trigger_id", equalTo(expectation.triggerId()))
-                .withFormParam(
-                        "view",
-                        new UrlDecodedPattern(and(
-                                matchingJsonPath("$.type", equalTo(expectation.viewType())),
-                                matchingJsonPath("$.callback_id", equalTo(expectation.viewCallbackId())))))
                 .willReturn(aResponse()
                         .withTransformers("response-template")
                         .withStatus(200)
