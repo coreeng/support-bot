@@ -116,14 +116,31 @@ prReviewTracking:
 #     - "pull-request" # Required when enabled: tag codes from enums.tags, applied when the bot auto-closes a ticket
 #   impact: "prReview" # Required when enabled: impact code from enums.impacts, applied when the bot auto-closes a ticket
 #   repositories:
+#     # Example A: SLA-backed repo with optional per-event message overrides.
 #     - name: "coreeng/core-platform-environment" # Repository in org/repo format
 #       owningTeam: "infra-integration" # Team code from enums.escalation-teams — escalated when the SLA is breached
 #       sla:
 #         file: ".pr-sla.yaml" # optional: read SLA from this file in the repo
-#         default: "48h" # default SLA duration (required)
+#         default: "48h" # default SLA duration (required when sla is set)
 #         overrides: # optional: path-specific SLA overrides
 #           - path: "infra/**"
 #             sla: "7d"
+#       messages: # optional: CEL expressions overriding the default tenant-facing Slack messages
+#         # Available variables: pr_number (int), pr_url, repo_name, repo_url, owning_team,
+#         #                      sla_duration, sla_deadline (empty string when not applicable)
+#         # Use string() to convert pr_number in string concatenation, e.g. string(pr_number)
+#         detected: '"PR " + string(pr_number) + " detected. SLA: " + sla_duration + ", deadline: " + sla_deadline + "."'
+#         escalated: '"Contact #pr-reviews in Slack to chase this review."'
+#         approved: '"PR " + string(pr_number) + " approved — ready to merge!"'
+#         changesRequested: '"Changes requested on PR " + string(pr_number) + ". Please review the feedback."'
+#         merged: '"PR " + string(pr_number) + " merged. Thanks!"'
+#         closed: '"PR " + string(pr_number) + " closed."'
+#     # Example B: no-SLA repo. escalated must not be set; other messages apply as above.
+#     - name: "coreeng/docs"
+#       owningTeam: "docs-team"
+#       paths: ["docs/**"] # required for no-SLA repos: only track PRs touching these paths
+#       messages:
+#         detected: '"Engineers monitor this repo regularly. I\'ll keep an eye on this one."'
 #   slaDiscovery:
 #     cache: "PT24H" # How long to cache SLA files fetched from repositories (default: 24h)
 #   github:

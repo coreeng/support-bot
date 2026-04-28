@@ -10,6 +10,7 @@ import java.util.Locale;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.boot.context.properties.bind.Name;
 
 @ConfigurationProperties(prefix = "pr-review-tracking")
@@ -50,7 +51,8 @@ public record PrTrackingProps(
                                 repository.owningTeam(),
                                 repository.githubTeamSlug(),
                                 repository.paths(),
-                                repository.sla()))
+                                repository.sla(),
+                                repository.messages()))
                         .toList();
         this.slaDiscovery = slaDiscovery == null ? new SlaDiscovery(null) : slaDiscovery;
         this.github = github == null ? GitHub.defaultTokenModeConfig() : github;
@@ -93,6 +95,10 @@ public record PrTrackingProps(
 
             if (isBlank(repository.owningTeam())) {
                 throw new IllegalArgumentException("pr-review-tracking.repositories[].owning-team must not be blank");
+            }
+
+            if (repository.messages() != null) {
+                validateMessages(repository.messages(), repository.sla() == null, repository.name());
             }
 
             if (repository.sla() == null) {
@@ -161,6 +167,14 @@ public record PrTrackingProps(
         requireNotBlank(githubConfig.token(), "pr-review-tracking.github.token must not be blank when auth-mode=token");
     }
 
+    private static void validateMessages(Messages messages, boolean isNoSlaRepo, String repoName) {
+        if (messages.escalated() != null && isNoSlaRepo) {
+            throw new IllegalArgumentException(
+                    "pr-review-tracking.repositories[].messages.escalated must not be set for no-SLA repositories (repo: "
+                            + repoName + ")");
+        }
+    }
+
     private static void requireNotBlank(String value, String errorMessage) {
         if (isBlank(value)) {
             throw new IllegalArgumentException(errorMessage);
@@ -181,14 +195,36 @@ public record PrTrackingProps(
             String owningTeam,
             @Nullable String githubTeamSlug,
             List<String> paths,
-            @Nullable Sla sla) {
-        public Repository {
+            @Nullable Sla sla,
+            @Nullable Messages messages) {
+        @ConstructorBinding
+        public Repository(
+                String name,
+                String owningTeam,
+                @Nullable String githubTeamSlug,
+                List<String> paths,
+                @Nullable Sla sla,
+                @Nullable Messages messages) {
             requireNonNull(name, "name must not be null");
             requireNonNull(owningTeam, "owningTeam must not be null");
             if (githubTeamSlug != null && githubTeamSlug.isBlank()) {
                 throw new IllegalArgumentException("githubTeamSlug must not be blank when provided");
             }
-            paths = paths == null ? List.of() : List.copyOf(paths);
+            this.name = name;
+            this.owningTeam = owningTeam;
+            this.githubTeamSlug = githubTeamSlug;
+            this.paths = paths == null ? List.of() : List.copyOf(paths);
+            this.sla = sla;
+            this.messages = messages;
+        }
+
+        public Repository(
+                String name,
+                String owningTeam,
+                @Nullable String githubTeamSlug,
+                List<String> paths,
+                @Nullable Sla sla) {
+            this(name, owningTeam, githubTeamSlug, paths, sla, null);
         }
 
         /** Returns true when this repository has no SLA configured (no-SLA tracking mode). */
@@ -204,6 +240,30 @@ public record PrTrackingProps(
 
         public Sla {
             overrides = overrides == null ? List.of() : List.copyOf(overrides);
+        }
+    }
+
+    public record Messages(
+            @Nullable String detected,
+            @Nullable String escalated,
+            @Nullable String approved,
+            @Name("changes-requested") @Nullable String changesRequested,
+            @Nullable String merged,
+            @Nullable String closed) {
+
+        public Messages {
+            checkBlank(detected, "detected");
+            checkBlank(escalated, "escalated");
+            checkBlank(approved, "approved");
+            checkBlank(changesRequested, "changes-requested");
+            checkBlank(merged, "merged");
+            checkBlank(closed, "closed");
+        }
+
+        private static void checkBlank(@Nullable String value, String field) {
+            if (value != null && value.isBlank()) {
+                throw new IllegalArgumentException("messages." + field + " must not be blank when provided");
+            }
         }
     }
 

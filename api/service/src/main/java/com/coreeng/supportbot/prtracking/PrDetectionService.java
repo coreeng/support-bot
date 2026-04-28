@@ -76,6 +76,7 @@ public class PrDetectionService {
     private final SlackClient slackClient;
     private final SlackTicketsProps slackTicketsProps;
     private final SlaLookup slaLookup;
+    private final PrMessageRenderer messageRenderer;
 
     public boolean containsPrLinks(String message) {
         return !prUrlParser.parse(message).isEmpty();
@@ -442,8 +443,19 @@ public class PrDetectionService {
                 // now visible to the poller (status=OPEN, SLA already breached), so if we deferred
                 // both steps the poller could fire between the insert and postNotificationsAndEscalations,
                 // posting the escalation card before our notification arrives in the thread.
+                PrMessageContext breachCtx = new PrMessageContext(
+                        detectedPr.repositoryName(),
+                        detectedPr.pullNumber(),
+                        repoConfig.owningTeam(),
+                        sla,
+                        slaDeadline);
+                String override =
+                        messageRenderer.render(detectedPr.repositoryName(), MessageEvent.ESCALATED, breachCtx);
+                String breachText = override != null
+                        ? override
+                        : formatEscalatedText(detectedPr.repositoryName(), detectedPr.pullNumber(), sla);
                 postText(
-                        formatEscalatedText(detectedPr.repositoryName(), detectedPr.pullNumber(), sla),
+                        breachText,
                         detectedPr.repositoryName(),
                         detectedPr.pullNumber(),
                         NotificationType.ESCALATED,
@@ -637,8 +649,10 @@ public class PrDetectionService {
             MessageTs queryTs,
             String channelId) {
         Map<String, List<PendingNotification>> notifsByRepo = new LinkedHashMap<>();
-        for (PendingNotification n : notifications) {
-            notifsByRepo.computeIfAbsent(n.repo(), k -> new ArrayList<>()).add(n);
+        for (PendingNotification pendingNotification : notifications) {
+            notifsByRepo
+                    .computeIfAbsent(pendingNotification.repo(), k -> new ArrayList<>())
+                    .add(pendingNotification);
         }
 
         Map<String, List<PendingEscalation>> escalationsByRepo = new LinkedHashMap<>();
@@ -683,30 +697,61 @@ public class PrDetectionService {
         }
     }
 
-    private void postSingleNotification(PendingNotification n, MessageTs queryTs, String channelId) {
-        String text =
-                switch (n.type()) {
+    private void postSingleNotification(PendingNotification pendingNotification, MessageTs queryTs, String channelId) {
+        MessageEvent event =
+                switch (pendingNotification.type()) {
+                    case TRACKED, NO_SLA_TRACKED -> MessageEvent.DETECTED;
+                    case ESCALATED -> MessageEvent.ESCALATED;
+                    case APPROVED -> MessageEvent.APPROVED;
+                    case CHANGES_REQUESTED -> MessageEvent.CHANGES_REQUESTED;
+                };
+        PrMessageContext ctx = new PrMessageContext(
+                pendingNotification.repo(),
+                pendingNotification.prNumber(),
+                checkNotNull(pendingNotification.teamLabel()),
+                pendingNotification.sla(),
+                pendingNotification.slaDeadline());
+        String override = messageRenderer.render(pendingNotification.repo(), event, ctx);
+        String text = override != null
+                ? override
+                : switch (pendingNotification.type()) {
                     case TRACKED ->
                         "Pull requests submitted to `%s` are expected to be reviewed within %s. You don't have to ping us for reviews, but I'll keep an eye on this one. If <%s|PR #%d> hasn't been reviewed by %s, I'll automatically escalate it to the owning team (%s)."
                                 .formatted(
-                                        n.repo(),
-                                        formatDuration(checkNotNull(n.sla())),
-                                        prUrl(n.repo(), n.prNumber()),
-                                        n.prNumber(),
-                                        DEADLINE_FMT.format(checkNotNull(n.slaDeadline())),
-                                        checkNotNull(n.teamLabel()));
+                                        pendingNotification.repo(),
+                                        formatDuration(checkNotNull(pendingNotification.sla())),
+                                        prUrl(pendingNotification.repo(), pendingNotification.prNumber()),
+                                        pendingNotification.prNumber(),
+                                        DEADLINE_FMT.format(checkNotNull(pendingNotification.slaDeadline())),
+                                        checkNotNull(pendingNotification.teamLabel()));
                     case NO_SLA_TRACKED ->
                         "PRs to %s have no automated SLAs, they are monitored by %s team. I'll still keep an eye on this one and let you know when it moves."
-                                .formatted(n.repo(), checkNotNull(n.teamLabel()));
+                                .formatted(pendingNotification.repo(), checkNotNull(pendingNotification.teamLabel()));
                     case CHANGES_REQUESTED ->
                         "<%s|PR #%d> for `%s` has been reviewed and changes have been requested. :eyes:"
-                                .formatted(prUrl(n.repo(), n.prNumber()), n.prNumber(), n.repo());
+                                .formatted(
+                                        prUrl(pendingNotification.repo(), pendingNotification.prNumber()),
+                                        pendingNotification.prNumber(),
+                                        pendingNotification.repo());
                     case APPROVED ->
                         "<%s|PR #%d> for `%s` has been approved and is ready to merge. :white_check_mark:"
-                                .formatted(prUrl(n.repo(), n.prNumber()), n.prNumber(), n.repo());
-                    case ESCALATED -> formatEscalatedText(n.repo(), n.prNumber(), checkNotNull(n.sla()));
+                                .formatted(
+                                        prUrl(pendingNotification.repo(), pendingNotification.prNumber()),
+                                        pendingNotification.prNumber(),
+                                        pendingNotification.repo());
+                    case ESCALATED ->
+                        formatEscalatedText(
+                                pendingNotification.repo(),
+                                pendingNotification.prNumber(),
+                                checkNotNull(pendingNotification.sla()));
                 };
-        postText(text, n.repo(), n.prNumber(), n.type(), queryTs, channelId);
+        postText(
+                text,
+                pendingNotification.repo(),
+                pendingNotification.prNumber(),
+                pendingNotification.type(),
+                queryTs,
+                channelId);
     }
 
     private void postGroupedNotifications(List<PendingNotification> repoNotifs, MessageTs queryTs, String channelId) {
@@ -723,6 +768,19 @@ public class PrDetectionService {
 
             if (group.size() == 1) {
                 postSingleNotification(group.getFirst(), queryTs, channelId);
+                continue;
+            }
+
+            // When a custom message is configured, post one message per PR so each has its own context.
+            MessageEvent event =
+                    switch (type) {
+                        case TRACKED, NO_SLA_TRACKED -> MessageEvent.DETECTED;
+                        case ESCALATED -> MessageEvent.ESCALATED;
+                        case APPROVED -> MessageEvent.APPROVED;
+                        case CHANGES_REQUESTED -> MessageEvent.CHANGES_REQUESTED;
+                    };
+            if (messageRenderer.hasOverride(repo, event)) {
+                group.forEach(n -> postSingleNotification(n, queryTs, channelId));
                 continue;
             }
 
