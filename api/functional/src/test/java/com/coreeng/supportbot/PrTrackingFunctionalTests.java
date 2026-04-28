@@ -514,7 +514,8 @@ public class PrTrackingFunctionalTests {
         Instant oldCreatedAt = Instant.now().minus(Duration.ofDays(2));
         var githubStub = testKit.slack()
                 .wiremock()
-                .stubGitHubGetPullRequest("GitHub PR open", ESCALATION_MESSAGE_REPO, 301, "open", oldCreatedAt.toString());
+                .stubGitHubGetPullRequest(
+                        "GitHub PR open", ESCALATION_MESSAGE_REPO, 301, "open", oldCreatedAt.toString());
 
         // Stub reactions
         var prReactionStub = testKit.slack()

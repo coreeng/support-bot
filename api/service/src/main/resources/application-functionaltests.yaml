@@ -115,7 +115,8 @@ pr-review-tracking:
       owning-team: wow
       sla:
         default: PT24H
-        escalation-message: "Contact #pr-reviews in Slack to chase this review."
+      messages:
+        escalated: '"Contact #pr-reviews in Slack to chase this review."'
   sla-discovery:
     cache: PT5M
   github:

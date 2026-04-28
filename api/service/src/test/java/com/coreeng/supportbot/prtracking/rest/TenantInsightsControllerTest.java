@@ -52,7 +52,7 @@ class TenantInsightsControllerTest {
 
     private static PrTrackingProps.Repository slaRepo(String name) {
         return new PrTrackingProps.Repository(
-                name, "team-foo", null, List.of(), new PrTrackingProps.Sla(null, Duration.ofHours(24), null, null));
+                name, "team-foo", null, List.of(), new PrTrackingProps.Sla(null, Duration.ofHours(24), null));
     }
 
     private static PrTrackingProps.Repository noSlaRepo(String name) {

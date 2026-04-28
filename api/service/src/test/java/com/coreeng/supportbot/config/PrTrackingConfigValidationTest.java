@@ -222,7 +222,7 @@ class PrTrackingConfigValidationTest {
     @Test
     void rejectsNullDefaultSlaWhenEnabled() {
         // given
-        PrTrackingProps.Sla slaWithNullDefault = new PrTrackingProps.Sla(null, null, null, null);
+        PrTrackingProps.Sla slaWithNullDefault = new PrTrackingProps.Sla(null, null, null);
         PrTrackingProps.Repository repo =
                 new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), slaWithNullDefault);
 
@@ -245,7 +245,7 @@ class PrTrackingConfigValidationTest {
     void rejectsZeroOverrideSlaWhenEnabled() {
         // given
         PrTrackingProps.Sla slaWithBadOverride = new PrTrackingProps.Sla(
-                null, Duration.ofDays(2), List.of(new PrTrackingProps.SlaOverride("infra/**", Duration.ZERO)), null);
+                null, Duration.ofDays(2), List.of(new PrTrackingProps.SlaOverride("infra/**", Duration.ZERO)));
         PrTrackingProps.Repository repo =
                 new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), slaWithBadOverride);
 
@@ -268,7 +268,7 @@ class PrTrackingConfigValidationTest {
     void rejectsBlankOverridePathWhenEnabled() {
         // given
         PrTrackingProps.Sla slaWithBlankPath = new PrTrackingProps.Sla(
-                null, Duration.ofDays(2), List.of(new PrTrackingProps.SlaOverride("  ", Duration.ofDays(7))), null);
+                null, Duration.ofDays(2), List.of(new PrTrackingProps.SlaOverride("  ", Duration.ofDays(7))));
         PrTrackingProps.Repository repo =
                 new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), slaWithBlankPath);
 
@@ -293,8 +293,7 @@ class PrTrackingConfigValidationTest {
         PrTrackingProps.Sla fullSla = new PrTrackingProps.Sla(
                 ".pr-sla.yaml",
                 Duration.ofDays(2),
-                List.of(new PrTrackingProps.SlaOverride("infra/**", Duration.ofDays(7))),
-                null);
+                List.of(new PrTrackingProps.SlaOverride("infra/**", Duration.ofDays(7))));
         PrTrackingProps.Repository repo =
                 new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), fullSla);
 
@@ -313,12 +312,12 @@ class PrTrackingConfigValidationTest {
     }
 
     @Test
-    void acceptsRepoWithEscalationMessage() {
+    void acceptsRepoWithMessageOverrides() {
         // given
-        PrTrackingProps.Sla slaWithEscalationMessage =
-                new PrTrackingProps.Sla(null, Duration.ofDays(2), null, "Contact #pr-reviews to chase review.");
-        PrTrackingProps.Repository repo =
-                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), slaWithEscalationMessage);
+        PrTrackingProps.Messages messages = new PrTrackingProps.Messages(
+                "\"PR detected.\"", "\"Contact #pr-reviews to chase this review.\"", null, null, null, null);
+        PrTrackingProps.Repository repo = new PrTrackingProps.Repository(
+                "my-org/repo", "wow", null, List.of(), sla(Duration.ofDays(2)), messages);
 
         // when / then
         assertThatCode(() -> new PrTrackingProps(
@@ -335,11 +334,21 @@ class PrTrackingConfigValidationTest {
     }
 
     @Test
-    void rejectsBlankEscalationMessage() {
-        // given
-        PrTrackingProps.Sla slaWithBlankMessage = new PrTrackingProps.Sla(null, Duration.ofDays(2), null, "   ");
-        PrTrackingProps.Repository repo =
-                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), slaWithBlankMessage);
+    void rejectsBlankMessageField() {
+        // Blank check lives in the Messages compact constructor, so it fires at construction time
+        // regardless of whether the feature is enabled.
+        assertThatThrownBy(() -> new PrTrackingProps.Messages("   ", null, null, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("messages.detected must not be blank");
+    }
+
+    @Test
+    void rejectsEscalatedMessageOnNoSlaRepo() {
+        // given — escalated is meaningless on a no-SLA repo (nothing to escalate)
+        PrTrackingProps.Messages messages =
+                new PrTrackingProps.Messages(null, "\"Will escalate.\"", null, null, null, null);
+        PrTrackingProps.Repository noSlaRepo =
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of("docs/**"), null, messages);
 
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
@@ -349,17 +358,17 @@ class PrTrackingConfigValidationTest {
                         List.of("tag"),
                         "low",
                         DEFAULT_DURATION_UNIT,
-                        List.of(repo),
+                        List.of(noSlaRepo),
                         validTokenGithub(),
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("escalation-message must not be blank");
+                .hasMessageContaining("messages.escalated must not be set for no-SLA repositories");
     }
 
     @Test
     void acceptsFileOnlyRepoWithNoDefaultSla() {
         // given (file set, no default, no overrides)
-        PrTrackingProps.Sla fileOnlySla = new PrTrackingProps.Sla(".pr-sla.yaml", null, null, null);
+        PrTrackingProps.Sla fileOnlySla = new PrTrackingProps.Sla(".pr-sla.yaml", null, null);
         PrTrackingProps.Repository repo =
                 new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of(), fileOnlySla);
 
@@ -621,15 +630,12 @@ class PrTrackingConfigValidationTest {
     }
 
     @Test
-    void acceptsNoSlaRepoWithNoSlaMessage() {
-        // given
-        PrTrackingProps.Repository noSlaRepo = new PrTrackingProps.Repository(
-                "my-org/repo",
-                "wow",
-                null,
-                List.of("docs/**"),
-                null,
-                "Docs PRs have no automated SLA. Tag #docs-team if urgent.");
+    void acceptsNoSlaRepoWithDetectedMessage() {
+        // given — no-SLA repos can configure any message except escalated
+        PrTrackingProps.Messages messages = new PrTrackingProps.Messages(
+                "\"Docs PRs have no automated SLA. Tag #docs-team if urgent.\"", null, null, null, null, null);
+        PrTrackingProps.Repository noSlaRepo =
+                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of("docs/**"), null, messages);
 
         // when / then
         assertThatCode(() -> new PrTrackingProps(
@@ -645,27 +651,6 @@ class PrTrackingConfigValidationTest {
                 .doesNotThrowAnyException();
     }
 
-    @Test
-    void rejectsBlankNoSlaMessage() {
-        // given
-        PrTrackingProps.Repository repoWithBlankMessage =
-                new PrTrackingProps.Repository("my-org/repo", "wow", null, List.of("docs/**"), null, "   ");
-
-        // when / then
-        assertThatThrownBy(() -> new PrTrackingProps(
-                        true,
-                        "0 0 9-18 * * 1-5",
-                        "pr",
-                        List.of("tag"),
-                        "low",
-                        DEFAULT_DURATION_UNIT,
-                        List.of(repoWithBlankMessage),
-                        validTokenGithub(),
-                        DEFAULT_SLA_DISCOVERY))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("no-sla-message must not be blank");
-    }
-
     private static PrTrackingProps.Repository validRepo() {
         return validRepoWithName("my-org/onboarding-repo");
     }
@@ -675,7 +660,7 @@ class PrTrackingConfigValidationTest {
     }
 
     private static PrTrackingProps.Sla sla(Duration defaultSla) {
-        return new PrTrackingProps.Sla(null, defaultSla, null, null);
+        return new PrTrackingProps.Sla(null, defaultSla, null);
     }
 
     private static PrTrackingProps.GitHub validTokenGithub() {

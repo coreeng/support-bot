@@ -87,6 +87,9 @@ class PrDetectionServiceTest {
     @Mock
     private SlaLookup slaLookup;
 
+    @Mock
+    private PrMessageRenderer messageRenderer;
+
     @Captor
     private ArgumentCaptor<SlackPostMessageRequest> postMessageCaptor;
 
@@ -110,7 +113,8 @@ class PrDetectionServiceTest {
                 ticketTeamSuggestionsService,
                 slackClient,
                 slackTicketsProps,
-                slaLookup);
+                slaLookup,
+                messageRenderer);
         lenient().when(slackTicketsProps.expectedInitialReaction()).thenReturn("eyes");
         lenient().when(slaLookup.getSla(any(), any(), anyInt())).thenReturn(SLA_24H);
         lenient().when(prTrackingProps.tags()).thenReturn(List.of("pr-review"));
@@ -693,14 +697,15 @@ class PrDetectionServiceTest {
         }
 
         @Test
-        void postsCustomNoSlaMessageWhenConfigured() {
+        void postsCustomDetectedMessageWhenConfigured() {
             // given
             String customMessage = "Docs PRs have no automated SLA. Tag #docs-team if urgent.";
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(
-                            new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null, customMessage)));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null)));
+            when(messageRenderer.render(eq(NO_SLA_REPO), eq(MessageEvent.DETECTED), any()))
+                    .thenReturn(customMessage);
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
@@ -726,15 +731,19 @@ class PrDetectionServiceTest {
         }
 
         @Test
-        void postsCustomNoSlaMessageWhenConfiguredForGroupedPrs() {
-            // given — two no-SLA PRs to the same repo with a configured noSlaMessage
+        void postsCustomDetectedMessageIndividuallyForGroupedPrs() {
+            // given — two no-SLA PRs to the same repo with a custom detected message configured;
+            // the renderer override causes grouped PRs to be posted individually.
             String customMessage = "Docs PRs have no automated SLA. Tag #docs-team if urgent.";
             int prNumber2 = PR_NUMBER + 1;
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
-                    .thenReturn(List.of(
-                            new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null, customMessage)));
+                    .thenReturn(List.of(new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null)));
+            when(messageRenderer.hasOverride(NO_SLA_REPO, MessageEvent.DETECTED))
+                    .thenReturn(true);
+            when(messageRenderer.render(eq(NO_SLA_REPO), eq(MessageEvent.DETECTED), any()))
+                    .thenReturn(customMessage);
             when(prUrlParser.parse(any()))
                     .thenReturn(
                             List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER), new DetectedPr(NO_SLA_REPO, prNumber2)));
@@ -798,9 +807,11 @@ class PrDetectionServiceTest {
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
-            // then — custom message replaces the default grouped no-SLA text (single combined post)
-            verify(slackClient).postMessage(postMessageCaptor.capture());
-            assertThat(postMessageCaptor.getValue().message().getText()).isEqualTo(customMessage);
+            // then — each PR gets its own custom message post (2 posts, not 1 grouped)
+            verify(slackClient, times(2)).postMessage(postMessageCaptor.capture());
+            postMessageCaptor
+                    .getAllValues()
+                    .forEach(req -> assertThat(req.message().getText()).isEqualTo(customMessage));
         }
 
         @Test
@@ -1051,7 +1062,7 @@ class PrDetectionServiceTest {
 
         @Test
         void postsDefaultEscalatedTextOnDetectionBreachWhenNoCustomMessage() {
-            // given no escalationMessage configured on the repo
+            // given — renderer returns null (no override configured)
             Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
             Ticket ticket = ticketWithId(5L);
             stubBreachedPrDetection(prCreatedAt, ticket);
@@ -1073,7 +1084,7 @@ class PrDetectionServiceTest {
 
         @Test
         void postsCustomMessageOnDetectionBreachWhenConfigured() {
-            // given same breach scenario but with a custom escalation-message
+            // given — renderer returns the custom escalated message
             String customMessage = "Contact #pr-reviews to chase this review.";
             Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
             Ticket ticket = ticketWithId(5L);
@@ -1081,11 +1092,7 @@ class PrDetectionServiceTest {
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(new PrTrackingProps.Repository(
-                            REPO,
-                            TEAM_CODE,
-                            null,
-                            List.of(),
-                            new PrTrackingProps.Sla(null, SLA_24H, null, customMessage))));
+                            REPO, TEAM_CODE, null, List.of(), new PrTrackingProps.Sla(null, SLA_24H, null))));
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
@@ -1107,14 +1114,15 @@ class PrDetectionServiceTest {
                             .id(new EscalationId(77L))
                             .channelId(CHANNEL_ID)
                             .build());
+            when(messageRenderer.render(eq(REPO), eq(MessageEvent.ESCALATED), any()))
+                    .thenReturn(customMessage);
 
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticket);
 
-            // then tenant-thread message is the custom override, not the default
+            // then tenant-thread message is the custom override, escalation still fires as usual
             verify(slackClient).postMessage(postMessageCaptor.capture());
             assertThat(postMessageCaptor.getValue().message().getText()).isEqualTo(customMessage);
-            // escalation still fires as usual
             verify(escalationProcessingService).createEscalation(any());
             verify(prTrackingRepository).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), eq(null), eq(77L));
         }
@@ -1531,6 +1539,54 @@ class PrDetectionServiceTest {
 
     @Nested
     class HandleMessagePostedGrouping {
+
+        @Test
+        void postsCustomDetectedMessageIndividuallyForGroupedSlaBackedPrs() {
+            // given — two SLA-backed PRs to the same repo with a custom detected message; the
+            // hasOverride check causes them to be posted individually rather than grouped.
+            String customMessage = "I'm tracking this PR — SLA applies.";
+            int prB = 99;
+            Instant createdAt = Instant.now().minus(Duration.ofHours(1));
+
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(
+                            List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), sla(SLA_24H))));
+            when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
+                    .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "SG123"));
+            when(messageRenderer.hasOverride(REPO, MessageEvent.DETECTED)).thenReturn(true);
+            when(messageRenderer.render(eq(REPO), eq(MessageEvent.DETECTED), any()))
+                    .thenReturn(customMessage);
+            when(prUrlParser.parse(any()))
+                    .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(REPO, prB)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+                    .thenReturn(false);
+            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO,
+                            PR_NUMBER,
+                            createdAt,
+                            GitHubPullRequest.PrState.OPEN,
+                            null,
+                            null,
+                            List.of(),
+                            List.of()));
+            when(gitHubClient.getPullRequest(REPO, prB))
+                    .thenReturn(new GitHubPullRequest(
+                            REPO, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(1L, createdAt, createdAt.plus(SLA_24H)))
+                    .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("two PRs"), ticketWithId(10L));
+
+            // then — each PR gets its own custom message post (2 posts, not 1 grouped)
+            verify(slackClient, times(2)).postMessage(postMessageCaptor.capture());
+            postMessageCaptor
+                    .getAllValues()
+                    .forEach(req -> assertThat(req.message().getText()).isEqualTo(customMessage));
+        }
 
         @Test
         void groupsTrackedPrsFromSameRepoIntoOneMessage() {
@@ -2120,7 +2176,7 @@ class PrDetectionServiceTest {
     }
 
     private static PrTrackingProps.Sla sla(Duration defaultSla) {
-        return new PrTrackingProps.Sla(null, defaultSla, null, null);
+        return new PrTrackingProps.Sla(null, defaultSla, null);
     }
 
     private static PrTrackingRecord stubTrackingRecord(Instant prCreatedAt, @Nullable Instant slaDeadline) {

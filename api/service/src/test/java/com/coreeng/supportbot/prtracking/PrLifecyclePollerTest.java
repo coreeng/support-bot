@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
+import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
@@ -66,6 +67,12 @@ class PrLifecyclePollerTest {
 
     @Mock
     private PrTrackingProps prTrackingProps;
+
+    @Mock
+    private PrMessageRenderer messageRenderer;
+
+    @Mock
+    private EscalationTeamsRegistry escalationTeamsRegistry;
 
     // ── Existing behaviour (PR closed/merged, escalation) ──
 
@@ -260,7 +267,7 @@ class PrLifecyclePollerTest {
                         "wow",
                         null,
                         List.of(),
-                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null, null))));
+                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
 
         // when
         poller.poll();
@@ -273,7 +280,7 @@ class PrLifecyclePollerTest {
 
     @Test
     void pollTimeBreachPostsCustomMessageWhenConfigured() {
-        // given same breach scenario with custom escalation-message set
+        // given same breach scenario with custom escalated message override
         String customMessage = "Contact #pr-reviews to chase this review.";
         PrLifecyclePoller poller = createPoller();
         PrTrackingRecord record = record(
@@ -295,7 +302,9 @@ class PrLifecyclePollerTest {
                         "wow",
                         null,
                         List.of(),
-                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null, customMessage))));
+                        new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
+        when(messageRenderer.render(eq("my-org/repo-a"), eq(MessageEvent.ESCALATED), any()))
+                .thenReturn(customMessage);
 
         // when
         poller.poll();
@@ -392,6 +401,114 @@ class PrLifecyclePollerTest {
         ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
         verify(slackClient).postMessage(captor.capture());
         assertThat(captor.getValue().message().getText()).contains("has been closed");
+    }
+
+    @Test
+    void postsCustomMergedMessageWhenOverrideConfigured() {
+        String customMessage = "PR merged — thanks for the contribution!";
+        PrLifecyclePoller poller = createPoller();
+        PrTrackingRecord record = record(
+                1L,
+                100L,
+                "my-org/repo-a",
+                42,
+                PrTrackingStatus.OPEN,
+                Instant.now().plusSeconds(7200));
+        when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+        when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
+                .thenReturn(mergedPr(record));
+        when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
+        when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
+                .thenReturn(true);
+        when(messageRenderer.render(eq("my-org/repo-a"), eq(MessageEvent.MERGED), any()))
+                .thenReturn(customMessage);
+
+        poller.poll();
+
+        ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
+        verify(slackClient).postMessage(captor.capture());
+        assertThat(captor.getValue().message().getText()).isEqualTo(customMessage);
+    }
+
+    @Test
+    void postsCustomClosedMessageWhenOverrideConfigured() {
+        String customMessage = "PR closed without merging.";
+        PrLifecyclePoller poller = createPoller();
+        PrTrackingRecord record = record(
+                1L,
+                100L,
+                "my-org/repo-a",
+                42,
+                PrTrackingStatus.OPEN,
+                Instant.now().plusSeconds(7200));
+        when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+        when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
+                .thenReturn(closedPr(record));
+        when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
+        when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
+                .thenReturn(true);
+        when(messageRenderer.render(eq("my-org/repo-a"), eq(MessageEvent.CLOSED), any()))
+                .thenReturn(customMessage);
+
+        poller.poll();
+
+        ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
+        verify(slackClient).postMessage(captor.capture());
+        assertThat(captor.getValue().message().getText()).isEqualTo(customMessage);
+    }
+
+    @Test
+    void postsCustomApprovedMessageWhenOverrideConfigured() {
+        String customMessage = "PR approved — ready to land.";
+        PrLifecyclePoller poller = createPoller();
+        PrTrackingRecord record = record(
+                1L,
+                100L,
+                "my-org/repo-a",
+                42,
+                PrTrackingStatus.OPEN,
+                Instant.now().plusSeconds(7200));
+        when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+        when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
+                .thenReturn(openMergeablePrWithReviews(
+                        record, List.of(review(GitHubPullRequestReview.ReviewState.APPROVED))));
+        when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
+        when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
+                .thenReturn(true);
+        when(messageRenderer.render(eq("my-org/repo-a"), eq(MessageEvent.APPROVED), any()))
+                .thenReturn(customMessage);
+
+        poller.poll();
+
+        ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
+        verify(slackClient).postMessage(captor.capture());
+        assertThat(captor.getValue().message().getText()).isEqualTo(customMessage);
+    }
+
+    @Test
+    void postsCustomChangesRequestedMessageWhenOverrideConfigured() {
+        String customMessage = "Reviewer requested changes — please address the feedback.";
+        PrLifecyclePoller poller = createPoller();
+        PrTrackingRecord record = record(
+                1L,
+                100L,
+                "my-org/repo-a",
+                42,
+                PrTrackingStatus.OPEN,
+                Instant.now().plusSeconds(7200));
+        when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+        when(gitHubClient.getPullRequest(record.githubRepo(), record.prNumber()))
+                .thenReturn(openPrWithReviews(
+                        record, List.of(review(GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED))));
+        when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
+        when(messageRenderer.render(eq("my-org/repo-a"), eq(MessageEvent.CHANGES_REQUESTED), any()))
+                .thenReturn(customMessage);
+
+        poller.poll();
+
+        ArgumentCaptor<SlackPostMessageRequest> captor = ArgumentCaptor.forClass(SlackPostMessageRequest.class);
+        verify(slackClient).postMessage(captor.capture());
+        assertThat(captor.getValue().message().getText()).isEqualTo(customMessage);
     }
 
     // ── OPEN state transitions ──
@@ -1062,7 +1179,7 @@ class PrLifecyclePollerTest {
                             "wow",
                             "platform-team",
                             List.of(),
-                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null, null))));
+                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
             when(gitHubClient.resolveTeamReviewers("my-org", "platform-team")).thenReturn(List.of("team-member"));
 
             // when
@@ -1094,7 +1211,7 @@ class PrLifecyclePollerTest {
                             "wow",
                             null,
                             List.of(),
-                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null, null))));
+                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
 
             // when
             poller.poll();
@@ -1125,7 +1242,7 @@ class PrLifecyclePollerTest {
                             "wow",
                             "platform-team",
                             List.of(),
-                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null, null))));
+                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
             when(gitHubClient.resolveTeamReviewers("my-org", "platform-team"))
                     .thenThrow(new GitHubApiException(403, "forbidden"));
 
@@ -1163,7 +1280,7 @@ class PrLifecyclePollerTest {
                             "wow",
                             "platform-team",
                             List.of(),
-                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null, null))));
+                            new PrTrackingProps.Sla(null, Duration.ofDays(2), null))));
             when(gitHubClient.resolveTeamReviewers("my-org", "platform-team")).thenReturn(List.of("team-member"));
 
             // when
@@ -1480,7 +1597,9 @@ class PrLifecyclePollerTest {
                 escalationProcessingService,
                 ticketSlackService,
                 slackClient,
-                prTrackingProps);
+                prTrackingProps,
+                messageRenderer,
+                escalationTeamsRegistry);
     }
 
     private static PrTrackingRecord record(

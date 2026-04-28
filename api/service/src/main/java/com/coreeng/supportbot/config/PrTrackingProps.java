@@ -52,7 +52,7 @@ public record PrTrackingProps(
                                 repository.githubTeamSlug(),
                                 repository.paths(),
                                 repository.sla(),
-                                repository.noSlaMessage()))
+                                repository.messages()))
                         .toList();
         this.slaDiscovery = slaDiscovery == null ? new SlaDiscovery(null) : slaDiscovery;
         this.github = github == null ? GitHub.defaultTokenModeConfig() : github;
@@ -97,10 +97,8 @@ public record PrTrackingProps(
                 throw new IllegalArgumentException("pr-review-tracking.repositories[].owning-team must not be blank");
             }
 
-            String noSlaMessage = repository.noSlaMessage();
-            if (noSlaMessage != null && noSlaMessage.isBlank()) {
-                throw new IllegalArgumentException(
-                        "pr-review-tracking.repositories[].no-sla-message must not be blank when provided");
+            if (repository.messages() != null) {
+                validateMessages(repository.messages(), repository.sla() == null, repository.name());
             }
 
             if (repository.sla() == null) {
@@ -137,11 +135,6 @@ public record PrTrackingProps(
                                 "pr-review-tracking.repositories[].sla.overrides[].sla must be a positive duration");
                     }
                 }
-                String escalationMessage = repository.sla().escalationMessage();
-                if (escalationMessage != null && escalationMessage.isBlank()) {
-                    throw new IllegalArgumentException(
-                            "pr-review-tracking.repositories[].sla.escalation-message must not be blank when provided");
-                }
             }
 
             String normalizedName = repository.name().toLowerCase(Locale.ROOT);
@@ -174,6 +167,14 @@ public record PrTrackingProps(
         requireNotBlank(githubConfig.token(), "pr-review-tracking.github.token must not be blank when auth-mode=token");
     }
 
+    private static void validateMessages(Messages messages, boolean isNoSlaRepo, String repoName) {
+        if (messages.escalated() != null && isNoSlaRepo) {
+            throw new IllegalArgumentException(
+                    "pr-review-tracking.repositories[].messages.escalated must not be set for no-SLA repositories (repo: "
+                            + repoName + ")");
+        }
+    }
+
     private static void requireNotBlank(String value, String errorMessage) {
         if (isBlank(value)) {
             throw new IllegalArgumentException(errorMessage);
@@ -195,7 +196,7 @@ public record PrTrackingProps(
             @Nullable String githubTeamSlug,
             List<String> paths,
             @Nullable Sla sla,
-            @Nullable String noSlaMessage) {
+            @Nullable Messages messages) {
         @ConstructorBinding
         public Repository(
                 String name,
@@ -203,7 +204,7 @@ public record PrTrackingProps(
                 @Nullable String githubTeamSlug,
                 List<String> paths,
                 @Nullable Sla sla,
-                @Nullable String noSlaMessage) {
+                @Nullable Messages messages) {
             requireNonNull(name, "name must not be null");
             requireNonNull(owningTeam, "owningTeam must not be null");
             if (githubTeamSlug != null && githubTeamSlug.isBlank()) {
@@ -214,7 +215,7 @@ public record PrTrackingProps(
             this.githubTeamSlug = githubTeamSlug;
             this.paths = paths == null ? List.of() : List.copyOf(paths);
             this.sla = sla;
-            this.noSlaMessage = noSlaMessage;
+            this.messages = messages;
         }
 
         public Repository(
@@ -235,11 +236,34 @@ public record PrTrackingProps(
     public record Sla(
             @Nullable String file,
             @Name("default") @Nullable Duration defaultSla,
-            @Nullable List<SlaOverride> overrides,
-            @Nullable String escalationMessage) {
+            @Nullable List<SlaOverride> overrides) {
 
         public Sla {
             overrides = overrides == null ? List.of() : List.copyOf(overrides);
+        }
+    }
+
+    public record Messages(
+            @Nullable String detected,
+            @Nullable String escalated,
+            @Nullable String approved,
+            @Name("changes-requested") @Nullable String changesRequested,
+            @Nullable String merged,
+            @Nullable String closed) {
+
+        public Messages {
+            checkBlank(detected, "detected");
+            checkBlank(escalated, "escalated");
+            checkBlank(approved, "approved");
+            checkBlank(changesRequested, "changes-requested");
+            checkBlank(merged, "merged");
+            checkBlank(closed, "closed");
+        }
+
+        private static void checkBlank(@Nullable String value, String field) {
+            if (value != null && value.isBlank()) {
+                throw new IllegalArgumentException("messages." + field + " must not be blank when provided");
+            }
         }
     }
 
