@@ -3,10 +3,8 @@ package com.coreeng.supportbot;
 import static com.coreeng.supportbot.testkit.UserRole.tenant;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
-import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.coreeng.supportbot.testkit.Config;
 import com.coreeng.supportbot.testkit.SlackWiremock;
 import com.coreeng.supportbot.testkit.SupportBotClient;
 import com.coreeng.supportbot.testkit.TestKit;
@@ -24,14 +22,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class AnalysisApiTests {
 
-    private Config config;
     private SlackWiremock slackWiremock;
     private TestKit testKit;
     private SupportBotClient supportBotClient;
-
-    private String baseUrl() {
-        return config.supportBot().baseUrl();
-    }
 
     private void seedClosedTicketForAnalysis() {
         var ticket = testKit.as(tenant).ticket().create(builder -> builder.message("Analysis functional test query"));
@@ -52,17 +45,7 @@ public class AnalysisApiTests {
     @Test
     @Order(1)
     void analysisEnabled_returnsTrue() {
-        // when
-        var response = given().when()
-                .get(baseUrl() + "/analysis/enabled")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath();
-
-        // then
-        assertThat(response.getBoolean("enabled")).isTrue();
+        assertThat(supportBotClient.analysis().enabled()).isTrue();
     }
 
     @Test
@@ -86,23 +69,17 @@ public class AnalysisApiTests {
                                 """)));
 
         // when
-        given().when().post(baseUrl() + "/analysis/run?days=365").then().statusCode(202);
+        assertThat(supportBotClient.analysis().runStatusCode(365)).isEqualTo(202);
 
         // then
         Awaitility.await()
                 .atMost(Duration.ofSeconds(30))
                 .pollInterval(Duration.ofSeconds(1))
                 .untilAsserted(() -> {
-                    var status = given().when()
-                            .get(baseUrl() + "/analysis/status")
-                            .then()
-                            .statusCode(200)
-                            .extract()
-                            .body()
-                            .jsonPath();
+                    var status = supportBotClient.analysis().status();
 
-                    assertThat(status.getBoolean("running")).isFalse();
-                    assertThat(status.getString("error")).isNull();
+                    assertThat(status.running()).isFalse();
+                    assertThat(status.error()).isNull();
                 });
 
         slackWiremock.cleanupTestStubs();
@@ -111,23 +88,21 @@ public class AnalysisApiTests {
     @Test
     @Order(3)
     void analysisRun_returns400_forInvalidDays() {
-        given().when().post(baseUrl() + "/analysis/run?days=0").then().statusCode(400);
+        assertThat(supportBotClient.analysis().runStatusCode(0)).isEqualTo(400);
     }
 
     @Test
     @Order(4)
     void analysisResults_includeQueryTimestampAndTicketId() {
-        var response = given().when()
-                .get(baseUrl() + "/summary-data/results")
-                .then()
-                .statusCode(200)
-                .extract()
-                .body()
-                .jsonPath();
+        var response = supportBotClient.analysis().results();
 
-        assertThat(response.getList("supportAreas")).isNotEmpty();
-        assertThat(response.getString("supportAreas[0].queries[0].text")).isNotBlank();
-        assertThat(response.getString("supportAreas[0].queries[0].timestamp")).isNotBlank();
-        assertThat(response.getString("supportAreas[0].queries[0].ticketId")).isNotBlank();
+        assertThat(response.supportAreas()).isNotEmpty();
+        assertThat(response.supportAreas().getFirst().queries()).isNotEmpty();
+        assertThat(response.supportAreas().getFirst().queries().getFirst().text())
+                .isNotBlank();
+        assertThat(response.supportAreas().getFirst().queries().getFirst().timestamp())
+                .isNotBlank();
+        assertThat(response.supportAreas().getFirst().queries().getFirst().ticketId())
+                .isNotBlank();
     }
 }

@@ -1,10 +1,8 @@
 package com.coreeng.supportbot;
 
 import static com.coreeng.supportbot.testkit.UserRole.support;
-import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.coreeng.supportbot.testkit.Config;
 import com.coreeng.supportbot.testkit.MessageTs;
 import com.coreeng.supportbot.testkit.SupportBotClient;
 import com.coreeng.supportbot.testkit.TestKit;
@@ -15,7 +13,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,7 +26,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 public class TenantInsightsFunctionalTests {
 
     private TestKit testKit;
-    private Config config;
     private SupportBotClient supportBotClient;
 
     @BeforeEach
@@ -49,7 +45,7 @@ public class TenantInsightsFunctionalTests {
         createPr(ticketId, "test-org/pr-insights-storage", 1, sixtyDaysAgo, "infra");
 
         // when — querying the last 30 days
-        List<RepoInsights> results =
+        List<SupportBotClient.RepoInsightsResponse> results =
                 getStats(LocalDate.now().minusDays(30), LocalDate.now().plusDays(1));
 
         // then — only networking PRs appear
@@ -69,11 +65,11 @@ public class TenantInsightsFunctionalTests {
         createPr(ticketId, "test-org/pr-insights-storage", 1, Instant.now().minus(Duration.ofDays(100)), "infra");
 
         // when — querying without date params
-        List<RepoInsights> results = getAllTimeStats();
+        List<SupportBotClient.RepoInsightsResponse> results = getAllTimeStats();
 
         // then — both repos returned
         assertThat(results)
-                .extracting(RepoInsights::repo)
+                .extracting(SupportBotClient.RepoInsightsResponse::repo)
                 .contains("test-org/pr-insights-networking", "test-org/pr-insights-storage");
     }
 
@@ -84,31 +80,19 @@ public class TenantInsightsFunctionalTests {
         createPr(ticketId, "test-org/pr-insights-networking", 1, Instant.now().minus(Duration.ofDays(200)), "platform");
 
         // when — querying the last 7 days
-        List<RepoInsights> results =
+        List<SupportBotClient.RepoInsightsResponse> results =
                 getStats(LocalDate.now().minusDays(7), LocalDate.now().plusDays(1));
 
         // then — empty list, not an error
         assertThat(results).isEmpty();
     }
 
-    private List<RepoInsights> getStats(LocalDate dateFrom, LocalDate dateTo) {
-        return given().queryParam("dateFrom", dateFrom.toString())
-                .queryParam("dateTo", dateTo.toString())
-                .get(config.supportBot().baseUrl() + "/tenant-insights/pr-stats")
-                .then()
-                .statusCode(200)
-                .extract()
-                .jsonPath()
-                .getList(".", RepoInsights.class);
+    private List<SupportBotClient.RepoInsightsResponse> getStats(LocalDate dateFrom, LocalDate dateTo) {
+        return supportBotClient.tenantInsights().prStats(dateFrom, dateTo).items();
     }
 
-    private List<RepoInsights> getAllTimeStats() {
-        return given().get(config.supportBot().baseUrl() + "/tenant-insights/pr-stats")
-                .then()
-                .statusCode(200)
-                .extract()
-                .jsonPath()
-                .getList(".", RepoInsights.class);
+    private List<SupportBotClient.RepoInsightsResponse> getAllTimeStats() {
+        return supportBotClient.tenantInsights().prStats().items();
     }
 
     private long createTicket() {
@@ -154,7 +138,7 @@ public class TenantInsightsFunctionalTests {
         createNoSlaPr(ticketId, "test-org/pr-test-repo", 9302, recent, "wow");
 
         // when
-        List<RepoInsights> results = getAllTimeStats();
+        List<SupportBotClient.RepoInsightsResponse> results = getAllTimeStats();
 
         // then — config-driven hasSla=true despite zero SLA-marked rows in the DB
         assertThat(results)
@@ -176,7 +160,7 @@ public class TenantInsightsFunctionalTests {
         createNoSlaPr(ticketId, "test-org/pr-insights-unconfigured", 9401, recent, "platform");
 
         // when
-        List<RepoInsights> results = getAllTimeStats();
+        List<SupportBotClient.RepoInsightsResponse> results = getAllTimeStats();
 
         // then — not in config → hasSla=false
         assertThat(results)
@@ -195,7 +179,7 @@ public class TenantInsightsFunctionalTests {
         createPr(ticketId, "test-org/pr-insights-reconfigured-away", 9502, recent, "platform");
 
         // when
-        List<RepoInsights> results = getAllTimeStats();
+        List<SupportBotClient.RepoInsightsResponse> results = getAllTimeStats();
 
         // then — stored SLA signal is ignored; present-day config is authoritative
         assertThat(results)
@@ -251,7 +235,7 @@ public class TenantInsightsFunctionalTests {
         assertThat(closed2.slaDeadline()).isNull();
 
         // then — still hasSla=true because test-org/pr-test-repo remains SLA-configured
-        List<RepoInsights> results = getAllTimeStats();
+        List<SupportBotClient.RepoInsightsResponse> results = getAllTimeStats();
         assertThat(results)
                 .filteredOn(r -> r.repo().equals("test-org/pr-test-repo"))
                 .singleElement()
@@ -277,7 +261,7 @@ public class TenantInsightsFunctionalTests {
         createNoSlaPr(ticketId, "test-org/pr-inflight-nosla", 7002, recent, "platform");
 
         // when
-        List<InFlightPrResponse> inFlight = getInFlightPrs();
+        List<SupportBotClient.InFlightPrResponse> inFlight = getInFlightPrs();
 
         // then — each PR carries the hasSla its construction implied
         assertThat(inFlight)
@@ -300,13 +284,8 @@ public class TenantInsightsFunctionalTests {
                 });
     }
 
-    private List<InFlightPrResponse> getInFlightPrs() {
-        return given().get(config.supportBot().baseUrl() + "/tenant-insights/in-flight-prs")
-                .then()
-                .statusCode(200)
-                .extract()
-                .jsonPath()
-                .getList(".", InFlightPrResponse.class);
+    private List<SupportBotClient.InFlightPrResponse> getInFlightPrs() {
+        return supportBotClient.tenantInsights().inFlightPrs().items();
     }
 
     @Test
@@ -349,19 +328,8 @@ public class TenantInsightsFunctionalTests {
         assertThat(response.manuallyEscalatedTickets()).isEqualTo(0);
     }
 
-    private EscalationBreakdown getEscalationBreakdown(LocalDate dateFrom, LocalDate dateTo) {
-        var request = given();
-        if (dateFrom != null) {
-            request = request.queryParam("dateFrom", dateFrom.toString());
-        }
-        if (dateTo != null) {
-            request = request.queryParam("dateTo", dateTo.toString());
-        }
-        return request.get(config.supportBot().baseUrl() + "/tenant-insights/escalation-breakdown")
-                .then()
-                .statusCode(200)
-                .extract()
-                .as(EscalationBreakdown.class);
+    private SupportBotClient.EscalationBreakdownResponse getEscalationBreakdown(LocalDate dateFrom, LocalDate dateTo) {
+        return supportBotClient.tenantInsights().escalationBreakdown(dateFrom, dateTo);
     }
 
     private void escalateTicket(long ticketId, String team, String source) {
@@ -375,35 +343,4 @@ public class TenantInsightsFunctionalTests {
                         .source(source)
                         .build());
     }
-
-    public record RepoInsights(
-            String repo,
-            String owningTeam,
-            long prCount,
-            long openCount,
-            long escalatedCount,
-            long breachedCount,
-            double p50Seconds,
-            double p90Seconds,
-            double p99Seconds,
-            boolean hasSla) {}
-
-    public record EscalationBreakdown(long totalPrTickets, long botEscalatedTickets, long manuallyEscalatedTickets) {}
-
-    public record InFlightPrResponse(
-            String githubRepo,
-            int prNumber,
-            String prUrl,
-            String status,
-            String waitingOn,
-            Instant prCreatedAt,
-            @Nullable Instant slaDeadline,
-            @Nullable Long slaRemainingSeconds,
-            @Nullable Instant lastReviewAt,
-            String owningTeam,
-            String owningTeamLabel,
-            String ticketChannelId,
-            String ticketQueryTs,
-            @Nullable Instant escalatedAt,
-            boolean hasSla) {}
 }

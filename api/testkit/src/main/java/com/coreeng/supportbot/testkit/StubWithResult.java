@@ -27,6 +27,7 @@ public class StubWithResult<T> {
     private T result;
     private boolean resultCalculated;
     private boolean asserted;
+    private boolean cleanedUp;
 
     @Builder
     public StubWithResult(
@@ -76,7 +77,12 @@ public class StubWithResult<T> {
     }
 
     public void cleanUp() {
+        if (cleanedUp) {
+            LOGGER.debug("Stub '{}' already cleaned up, skipping", description);
+            return;
+        }
         wireMockServer.removeStubMapping(mapping);
+        cleanedUp = true;
     }
 
     public interface Receiver<T> {

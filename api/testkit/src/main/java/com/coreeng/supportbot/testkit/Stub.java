@@ -24,6 +24,7 @@ public class Stub {
     @NonNull private final String description;
 
     private boolean asserted;
+    private boolean cleanedUp;
 
     @Builder
     public Stub(
@@ -66,9 +67,14 @@ public class Stub {
     }
 
     public void cleanUp() {
+        if (cleanedUp) {
+            LOGGER.debug("Stub '{}' already cleaned up, skipping", description);
+            return;
+        }
         wireMockServer.removeStubMapping(mapping);
         for (StubMapping extra : extraMappings) {
             wireMockServer.removeStubMapping(extra);
         }
+        cleanedUp = true;
     }
 }

@@ -781,76 +781,6 @@ public class SlackWiremock implements WireMockBackend {
      */
     public class PermanentStubs {
         /**
-         * Stub chat.postMessage for ticket form creation.
-         * Uses response templating to echo back channel, thread_ts, and generate a new ts.
-         * Latency: ~325ms (based on actual Slack API measurements).
-         */
-        public void stubTicketFormPosted() {
-            givenThat(post("/api/chat.postMessage")
-                    .withName("permanent-ticket-form-posted")
-                    // Match any channel - permanent stubs are broad
-                    .willReturn(aResponse()
-                            .withTransformers("response-template")
-                            .withStatus(200)
-                            .withHeader("Content-Type", "application/json")
-                            .withUniformRandomDelay(300, 350)
-                            .withBody("""
-                        {{formData request.body 'formArgs' urlDecode=true}}
-                        {{#assign 'generatedTs'}}{{randomValue length=10 type='NUMERIC'}}.{{randomValue length=6 type='NUMERIC'}}{{/assign}}
-                        {
-                          "ok": true,
-                          "channel": "{{formArgs.channel}}",
-                          "ts": "{{generatedTs}}",
-                          "message": {
-                            "user": "UNSET_BY_TESTS",
-                            "bot_id": "UNSET_BY_TESTS",
-                            "app_id": "UNSET_BY_TESTS",
-                            "team": "UNSET_BY_TESTS",
-                            "type": "message",
-                            "ts": "{{generatedTs}}",
-                            "thread_ts": "{{formArgs.thread_ts}}",
-                            "text": "{{formArgs.text}}",
-                            "blocks": {{formArgs.blocks}}
-                          }
-                        }
-                        """)));
-            LOGGER.info("Set up permanent stub for chat.postMessage (ticket form)");
-        }
-
-        /**
-         * Stub chat.update for ticket form updates (close/reopen).
-         * Uses response templating.
-         * Latency: ~350ms (based on actual Slack API measurements).
-         */
-        public void stubMessageUpdated() {
-            givenThat(post("/api/chat.update")
-                    .withName("permanent-message-updated")
-                    .willReturn(aResponse()
-                            .withTransformers("response-template")
-                            .withStatus(200)
-                            .withHeader("Content-Type", "application/json")
-                            .withUniformRandomDelay(300, 400)
-                            .withBody("""
-                        {{formData request.body 'formArgs' urlDecode=true}}
-                        {
-                          "ok": true,
-                          "channel": "{{formArgs.channel}}",
-                          "ts": "{{formArgs.ts}}",
-                          "message": {
-                            "user": "UNSET_BY_TESTS",
-                            "bot_id": "UNSET_BY_TESTS",
-                            "app_id": "UNSET_BY_TESTS",
-                            "team": "UNSET_BY_TESTS",
-                            "type": "message",
-                            "ts": "{{formArgs.ts}}",
-                            "blocks": {{formArgs.blocks}}
-                          }
-                        }
-                        """)));
-            LOGGER.info("Set up permanent stub for chat.update");
-        }
-
-        /**
          * Stub views.open for summary modal.
          * Uses response templating to echo back view content.
          * Latency: ~100ms (based on actual Slack API measurements).
@@ -1041,8 +971,6 @@ public class SlackWiremock implements WireMockBackend {
          */
         public void setupAllNftStubs() {
             stubAuthTest("nft-auth-test");
-            stubTicketFormPosted();
-            stubMessageUpdated();
             stubViewsOpen();
             stubReactionAdd();
             stubGetPermalink();

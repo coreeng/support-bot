@@ -88,16 +88,16 @@ class SlackWiremockTopologyTest {
             slackWiremock.permanent().setupAllNftStubs();
             awaitUntilResponsive("http://localhost:" + remoteServer.port());
 
-            given().formParam("channel", "C1234567891")
-                    .formParam("thread_ts", "1737123456.123456")
-                    .formParam("text", "Ticket 123")
-                    .formParam("blocks", "[]")
+            given().formParam("trigger_id", "TRIGGER123")
+                    .formParam("view", """
+                            {"callback_id":"ticket-summary","blocks":[],"private_metadata":"pm","title":{"type":"plain_text","text":"Summary"},"close":{"type":"plain_text","text":"Close"},"submit":{"type":"plain_text","text":"Submit"}}
+                            """)
                     .when()
-                    .post("http://localhost:" + remoteServer.port() + "/api/chat.postMessage")
+                    .post("http://localhost:" + remoteServer.port() + "/api/views.open")
                     .then()
                     .statusCode(200)
                     .body("ok", org.hamcrest.Matchers.equalTo(true))
-                    .body("ts", org.hamcrest.Matchers.matchesPattern("[0-9]{10}\\.[0-9]{6}"));
+                    .body("view.callback_id", org.hamcrest.Matchers.equalTo("ticket-summary"));
         } finally {
             slackWiremock.stop();
             remoteServer.stop();
@@ -138,7 +138,9 @@ class SlackWiremockTopologyTest {
                     .build());
 
             given().formParam("trigger_id", "TRIGGER123")
-                    .formParam("view", "{\"type\":\"modal\",\"callback_id\":\"ticket-summary\"}")
+                    .formParam("view", """
+                            {"type":"modal","callback_id":"ticket-summary","blocks":[],"private_metadata":"pm","title":{"type":"plain_text","text":"Summary"},"close":{"type":"plain_text","text":"Close"},"submit":{"type":"plain_text","text":"Submit"}}
+                            """)
                     .when()
                     .post("http://localhost:" + remoteServer.port() + "/api/views.open")
                     .then()
@@ -146,6 +148,99 @@ class SlackWiremockTopologyTest {
                     .body("ok", org.hamcrest.Matchers.equalTo(true));
 
             stub.assertIsCalled();
+        } finally {
+            slackWiremock.stop();
+            remoteServer.stop();
+        }
+    }
+
+    @Test
+    void remoteModeSupportsMessagePostedAndUpdatedStubRegistration() {
+        WireMockServer remoteServer =
+                new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        remoteServer.start();
+
+        SlackWiremock slackWiremock =
+                new SlackWiremock(slackConfig(0, "remote", "http", "localhost", remoteServer.port()));
+
+        try {
+            slackWiremock.start();
+            awaitUntilResponsive("http://localhost:" + remoteServer.port());
+
+            MessageTs threadTs = MessageTs.now();
+            MessageTs messageTs = MessageTs.now();
+
+            StubWithResult<String> postedStub =
+                    slackWiremock.stubMessagePosted(ThreadMessagePostedExpectation.<String>builder()
+                            .description("remote: chat.postMessage")
+                            .channelId("C1234567891")
+                            .threadTs(threadTs)
+                            .from(UserRole.supportBot)
+                            .newMessageTs(messageTs)
+                            .receiver(new StubWithResult.Receiver<>() {
+                                @Override
+                                public MappingBuilder configureStub(MappingBuilder stubBuilder) {
+                                    return stubBuilder;
+                                }
+
+                                @Override
+                                public String assertAndExtractResult(ServeEvent servedStub) {
+                                    return servedStub
+                                            .getRequest()
+                                            .formParameter("thread_ts")
+                                            .firstValue();
+                                }
+                            })
+                            .build());
+
+            given().formParam("channel", "C1234567891")
+                    .formParam("thread_ts", threadTs.toString())
+                    .formParam("text", "Ticket 123")
+                    .formParam("attachments", "[]")
+                    .formParam("blocks", "[]")
+                    .when()
+                    .post("http://localhost:" + remoteServer.port() + "/api/chat.postMessage")
+                    .then()
+                    .statusCode(200)
+                    .body("ok", org.hamcrest.Matchers.equalTo(true))
+                    .body("ts", org.hamcrest.Matchers.equalTo(messageTs.toString()));
+
+            postedStub.assertIsCalled();
+
+            StubWithResult<String> updatedStub =
+                    slackWiremock.stubMessageUpdated(MessageUpdatedExpectation.<String>builder()
+                            .description("remote: chat.update")
+                            .channelId("C1234567891")
+                            .ts(messageTs)
+                            .threadTs(threadTs)
+                            .receiver(new StubWithResult.Receiver<>() {
+                                @Override
+                                public MappingBuilder configureStub(MappingBuilder stubBuilder) {
+                                    return stubBuilder;
+                                }
+
+                                @Override
+                                public String assertAndExtractResult(ServeEvent servedStub) {
+                                    return servedStub
+                                            .getRequest()
+                                            .formParameter("ts")
+                                            .firstValue();
+                                }
+                            })
+                            .build());
+
+            given().formParam("channel", "C1234567891")
+                    .formParam("ts", messageTs.toString())
+                    .formParam("blocks", "[]")
+                    .formParam("attachments", "[]")
+                    .when()
+                    .post("http://localhost:" + remoteServer.port() + "/api/chat.update")
+                    .then()
+                    .statusCode(200)
+                    .body("ok", org.hamcrest.Matchers.equalTo(true))
+                    .body("ts", org.hamcrest.Matchers.equalTo(messageTs.toString()));
+
+            updatedStub.assertIsCalled();
         } finally {
             slackWiremock.stop();
             remoteServer.stop();
