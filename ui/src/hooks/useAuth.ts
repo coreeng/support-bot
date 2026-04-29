@@ -35,9 +35,7 @@ export function useAuth(): UseAuthReturn {
 
   const logout = async () => {
     await signOut({ redirect: false });
-    // ?signOut=1 suppresses the login page's auto-redirect to Dex; otherwise the user
-    // would be silently signed back in if Dex still has an active session.
-    window.location.href = "/login?signOut=1";
+    window.location.href = "/login";
   };
 
   return {

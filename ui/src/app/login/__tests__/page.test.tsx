@@ -60,18 +60,6 @@ describe('LoginPage', () => {
     expect(screen.queryByText('Continue with SSO')).not.toBeInTheDocument()
   })
 
-  it('does not auto-redirect when ?signOut=1 is set; shows SSO button', async () => {
-    mockUseSearchParams.mockReturnValue(new URLSearchParams('signOut=1') as any)
-
-    render(<LoginPage />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Sign in')).toBeInTheDocument()
-      expect(screen.getByText('Continue with SSO')).toBeInTheDocument()
-    })
-    expect(screen.queryByText('Redirecting to sign-in...')).not.toBeInTheDocument()
-  })
-
   it('redirects to home if already authenticated', async () => {
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true } as any)
 
@@ -405,7 +393,11 @@ describe('LoginPage', () => {
     })
 
     it('filters out unknown providers from API response', async () => {
-      mockUseSearchParams.mockReturnValue(new URLSearchParams('signOut=1') as any)
+      // Render inside an iframe so the auto-redirect is skipped and we can verify
+      // the rendered button set after the filter has run.
+      const origSelf = window.self
+      Object.defineProperty(window, 'self', { value: {}, writable: true, configurable: true })
+
       global.fetch = jest.fn(() =>
         Promise.resolve({
           ok: true,
@@ -416,10 +408,11 @@ describe('LoginPage', () => {
       render(<LoginPage />)
 
       await waitFor(() => {
-        // signOut=1 suppresses auto-redirect so we can verify the rendered button set.
         expect(screen.getByText('Continue with SSO')).toBeInTheDocument()
         // No buttons for legacy/unknown providers should be rendered
       })
+
+      Object.defineProperty(window, 'self', { value: origSelf, writable: true, configurable: true })
     })
 
     it('handles malformed API response gracefully', async () => {

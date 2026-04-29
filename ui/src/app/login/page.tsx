@@ -36,7 +36,6 @@ function LoginContent() {
   const token = searchParams.get("token");
   const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const error = searchParams.get("error");
-  const signOut = searchParams.get("signOut");
 
   /**
    * Fetch available providers from backend (skip if already authenticated).
@@ -139,15 +138,14 @@ function LoginContent() {
   }, [code, provider, token, isAuthenticated, isLoading, callbackUrl, router]);
 
   // Auto-redirect to Dex when it's the only configured provider. Skipped on iframes
-  // (popups need a user gesture), after explicit sign-out, when an in-flight code/token
-  // is being completed, or when an error is being shown — those paths need the page to
-  // render so the user sees the message or completes the flow.
+  // (popups need a user gesture), when an in-flight code/token is being completed, or
+  // when an error is being shown — those paths need the page to render so the user
+  // sees the message or completes the flow.
   useEffect(() => {
     if (autoRedirectAttemptedRef.current) return;
     if (isLoading || providersLoading) return;
     if (isAuthenticated) return;
     if (error || code || token) return;
-    if (signOut) return;
     if (providersError) return;
     if (providers.length !== 1 || providers[0] !== "dex") return;
     if (isInIframe()) return;
@@ -164,7 +162,6 @@ function LoginContent() {
     error,
     code,
     token,
-    signOut,
     callbackUrl,
   ]);
 
