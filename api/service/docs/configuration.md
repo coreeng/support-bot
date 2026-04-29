@@ -299,6 +299,19 @@ flow that is faciliated by the API. Dex is the only OAuth2 client the app regist
 Google, Azure AD, and LDAP are reachable only as Dex connectors (configured in your
 Dex deployment), not as separate front doors in this app.
 
+> **Want Google or Microsoft login?** Configure those as **Dex connectors**, not as
+> env vars on this API. The Google OAuth client ID/secret (and Microsoft equivalents)
+> live in Dex's own configuration:
+>
+> - Local dev: `DEX_GOOGLE_*` / `DEX_MICROSOFT_*` in [`dex/.env.example`](../../../dex/.env.example).
+> - Kubernetes: `config.connectors[]` in your Dex helm values; see
+>   [`api/k8s/dex/README.md`](../../k8s/dex/README.md) and the
+>   [auth/Dex/LDAP runbook](../../../docs/runbooks/auth-dex-ldap.md).
+>
+> The redirect URI registered with Google/Microsoft must be `{DEX_ISSUER}/callback`
+> (Dex's own callback) — **not** `/api/oauth/callback/google` or
+> `/login/oauth2/code/google` (those paths no longer exist on this app).
+
 ### Environment variables
 
 Set these on the **API**:
