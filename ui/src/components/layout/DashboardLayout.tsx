@@ -133,7 +133,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                         {!sidebarCollapsed ? (
                             <>
                                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg">
-                                    <Image src="/banner.png" alt="Core Community" width={160} height={40} priority />
+                                    <Image src="/logo-dark.png" alt="Core Community" width={160} height={40} priority />
                                 </div>
                                 <button
                                     onClick={() => setSidebarCollapsed(true)}
