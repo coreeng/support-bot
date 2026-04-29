@@ -125,8 +125,7 @@ public class OAuthExchangeService {
             log.info("OAuth2 login successful for user");
 
             // Compute roles (Dex: merge LDAP groups claim into email-based platform teams)
-            var teams =
-                    jwtGroupTeamMerger.mergeForProvider(provider, userInfo, teamService.listTeamsByUserEmail(email));
+            var teams = jwtGroupTeamMerger.merge(userInfo, teamService.listTeamsByUserEmail(email));
             var roles = computeRoles(email, teams);
 
             var principal = new UserPrincipal(email, name, teams, roles);

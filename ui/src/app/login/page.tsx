@@ -12,6 +12,14 @@ import { sanitizeCallbackUrl } from "@/lib/utils/url";
 
 type LoginProvider = OauthUiKnownProvider;
 
+function isInIframe(): boolean {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -142,15 +150,7 @@ function LoginContent() {
     if (signOut) return;
     if (providersError) return;
     if (providers.length !== 1 || providers[0] !== "dex") return;
-
-    const isInIframe = (() => {
-      try {
-        return window.self !== window.top;
-      } catch {
-        return true;
-      }
-    })();
-    if (isInIframe) return;
+    if (isInIframe()) return;
 
     autoRedirectAttemptedRef.current = true;
     setAutoRedirecting(true);
@@ -173,16 +173,7 @@ function LoginContent() {
     // Include callbackUrl so user returns to the right page after login
     const oauthUrl = `/api/oauth/start/${provider}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
-    // Check if we're in an iframe
-    const isInIframe = (() => {
-      try {
-        return window.self !== window.top;
-      } catch {
-        return true;
-      }
-    })();
-
-    if (!isInIframe) {
+    if (!isInIframe()) {
       window.location.href = oauthUrl;
       return;
     }
@@ -207,17 +198,13 @@ function LoginContent() {
 
   // Show loading state (but not if auth already failed - let error screen show)
   if (isLoading || showProvidersLoading || autoRedirecting || ((code || token) && !error)) {
+    const message =
+      code || token ? "Completing authentication..." : autoRedirecting ? "Redirecting to sign-in..." : "Loading...";
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">
-            {code || token
-              ? "Completing authentication..."
-              : autoRedirecting
-                ? "Redirecting to sign-in..."
-                : "Loading..."}
-          </p>
+          <p className="text-gray-600">{message}</p>
         </div>
       </div>
     );

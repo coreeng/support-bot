@@ -59,11 +59,8 @@ class OAuthExchangeServiceTest {
         var allowListService = new AllowListService(props);
         var redirectUriValidator = new RedirectUriValidator(props);
         lenient()
-                .when(jwtGroupTeamMerger.mergeForProvider(
-                        org.mockito.ArgumentMatchers.anyString(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any()))
-                .thenAnswer(invocation -> invocation.getArgument(2));
+                .when(jwtGroupTeamMerger.merge(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         return new OAuthExchangeService(
                 clientRegistrationRepository,
                 restTemplate,

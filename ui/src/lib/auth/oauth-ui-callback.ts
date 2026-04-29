@@ -4,12 +4,10 @@
  */
 export const OAUTH_UI_CALLBACK_PATH_PREFIX = "/api/oauth/callback/" as const;
 
-export const OAUTH_UI_KNOWN_PROVIDERS = ["dex"] as const;
-
-export type OauthUiKnownProvider = (typeof OAUTH_UI_KNOWN_PROVIDERS)[number];
+export type OauthUiKnownProvider = "dex";
 
 export function isOauthUiKnownProvider(
   id: string
 ): id is OauthUiKnownProvider {
-  return (OAUTH_UI_KNOWN_PROVIDERS as readonly string[]).includes(id);
+  return id === "dex";
 }

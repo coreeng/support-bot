@@ -58,11 +58,8 @@ class OAuth2SuccessHandlerTest {
         var authCodeStore = new AuthCodeStore();
         var allowListService = new AllowListService(props);
         lenient()
-                .when(jwtGroupTeamMerger.mergeForProvider(
-                        org.mockito.ArgumentMatchers.anyString(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any()))
-                .thenAnswer(invocation -> invocation.getArgument(2));
+                .when(jwtGroupTeamMerger.merge(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         return new OAuth2SuccessHandler(
                 props,
                 jwtService,
@@ -78,16 +75,11 @@ class OAuth2SuccessHandlerTest {
     }
 
     private Authentication mockAuth(Map<String, Object> attributes) {
-        return mockAuth("dex", attributes);
-    }
-
-    private Authentication mockAuth(String registrationId, Map<String, Object> attributes) {
         var oauth2User = mock(OAuth2User.class);
         when(oauth2User.getAttribute(anyString())).thenAnswer(inv -> attributes.get(inv.getArgument(0, String.class)));
         lenient().when(oauth2User.getAttributes()).thenReturn(attributes);
         var authentication = mock(OAuth2AuthenticationToken.class);
         when(authentication.getPrincipal()).thenReturn(oauth2User);
-        when(authentication.getAuthorizedClientRegistrationId()).thenReturn(registrationId);
         return authentication;
     }
 
