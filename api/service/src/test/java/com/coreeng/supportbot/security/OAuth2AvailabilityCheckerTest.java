@@ -39,8 +39,8 @@ class OAuth2AvailabilityCheckerTest {
 
     @Test
     void dexNotAvailable_whenMissingClientId() {
-        var checker =
-                new OAuth2AvailabilityChecker(createSecurityProperties(false), "", "dex-client-secret", "https://dex.example.com");
+        var checker = new OAuth2AvailabilityChecker(
+                createSecurityProperties(false), "", "dex-client-secret", "https://dex.example.com");
 
         assertFalse(checker.isOAuth2Available());
         assertEquals(List.of(), checker.getAvailableProviders());
@@ -48,8 +48,8 @@ class OAuth2AvailabilityCheckerTest {
 
     @Test
     void dexNotAvailable_whenMissingClientSecret() {
-        var checker =
-                new OAuth2AvailabilityChecker(createSecurityProperties(false), "dex-client-id", "", "https://dex.example.com");
+        var checker = new OAuth2AvailabilityChecker(
+                createSecurityProperties(false), "dex-client-id", "", "https://dex.example.com");
 
         assertFalse(checker.isOAuth2Available());
         assertEquals(List.of(), checker.getAvailableProviders());
@@ -65,8 +65,7 @@ class OAuth2AvailabilityCheckerTest {
 
     @Test
     void whitespaceStrings_treatedAsBlank() {
-        var checker =
-                new OAuth2AvailabilityChecker(createSecurityProperties(false), "   ", "  \t  ", " \n ");
+        var checker = new OAuth2AvailabilityChecker(createSecurityProperties(false), "   ", "  \t  ", " \n ");
 
         assertFalse(checker.isOAuth2Available());
         assertEquals(List.of(), checker.getAvailableProviders());

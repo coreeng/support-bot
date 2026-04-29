@@ -63,15 +63,13 @@ class RedirectUriValidatorTest {
     @Test
     void rejectsWrongPort() {
         var v = validator("http://localhost:3000/login");
-        assertThrows(
-                IllegalArgumentException.class, () -> v.validate("http://localhost:9999/api/oauth/callback/dex"));
+        assertThrows(IllegalArgumentException.class, () -> v.validate("http://localhost:9999/api/oauth/callback/dex"));
     }
 
     @Test
     void rejectsWrongScheme() {
         var v = validator("https://app.example.com/login");
-        assertThrows(
-                IllegalArgumentException.class, () -> v.validate("http://app.example.com/api/oauth/callback/dex"));
+        assertThrows(IllegalArgumentException.class, () -> v.validate("http://app.example.com/api/oauth/callback/dex"));
     }
 
     @Test
@@ -135,8 +133,7 @@ class RedirectUriValidatorTest {
     @Test
     void rejectsTrailingSlashAfterProvider() {
         var v = validator("http://localhost:3000/login");
-        assertThrows(
-                IllegalArgumentException.class, () -> v.validate("http://localhost:3000/api/oauth/callback/dex/"));
+        assertThrows(IllegalArgumentException.class, () -> v.validate("http://localhost:3000/api/oauth/callback/dex/"));
     }
 
     @Test

@@ -134,8 +134,7 @@ class OAuthExchangeServiceTest {
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> service.exchangeCodeForToken(
-                        "dex", "auth-code", "https://evil.example/api/oauth/callback/dex"));
+                () -> service.exchangeCodeForToken("dex", "auth-code", "https://evil.example/api/oauth/callback/dex"));
     }
 
     @Test
