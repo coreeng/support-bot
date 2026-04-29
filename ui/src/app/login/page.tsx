@@ -85,6 +85,19 @@ function LoginContent() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
+  // bfcache: when the browser restores this page after the user pressed "back" from Dex,
+  // the spinner state is restored too — clear it so the SSO button renders. The
+  // attempted-ref stays set so we don't immediately bounce them back to Dex.
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setAutoRedirecting(false);
+      }
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
   useEffect(() => {
     if (isLoading) return;
 
