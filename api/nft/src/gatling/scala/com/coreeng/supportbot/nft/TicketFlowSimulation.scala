@@ -73,16 +73,28 @@ class TicketFlowSimulation extends Simulation {
     val asSupport = tk.as(UserRole.support)
     val queryMessage = session("queryMessage").as[SlackMessage]
 
-    asSupport.slack().addReactionTo(queryMessage, "eyes")
-
-    val result = RequestJournalVerifier.awaitTicketFormAndExtractId(
-      slackWiremock,
-      queryMessage.ts().toString,
+    // Register a thread-specific chat.postMessage stub so NFT verification is tied to
+    // this exact ticket-form request in both embedded and remote modes.
+    val ticketMessagePostedStub = queryMessage.expectThreadMessagePosted(
+      ThreadMessagePostedExpectation.builder[TicketMessage]()
+        .description("nft create ticket: ticket form posted")
+        .receiver(new TicketMessage.Receiver())
+        .from(UserRole.supportBot)
+        .newMessageTs(MessageTs.now())
+        .build()
     )
 
-    session
-      .set("ticketId", result.ticketId)
-      .set("formMessageTs", result.formMessageTs)
+    try {
+      asSupport.slack().addReactionTo(queryMessage, "eyes")
+
+      val ticketMessage = RequestJournalVerifier.awaitStubCalled(ticketMessagePostedStub)
+
+      session
+        .set("ticketId", ticketMessage.ticketId())
+        .set("formMessageTs", ticketMessage.ts())
+    } finally {
+      ticketMessagePostedStub.cleanUp()
+    }
   }
 
   /**
@@ -114,26 +126,39 @@ class TicketFlowSimulation extends Simulation {
   private def submitSummaryForm(tk: TestKit, session: Session): Session = {
     val asSupport = tk.as(UserRole.support)
     val ticketId = session("ticketId").as[Long]
-    val formMessageTs = session("formMessageTs").as[String]
+    val formMessageTs = session("formMessageTs").as[MessageTs]
+    val queryMessage = session("queryMessage").as[SlackMessage]
     val triggerId = s"nft_submit_${System.currentTimeMillis()}_${ThreadLocalRandom.current().nextInt(100000)}"
 
-    asSupport.slack().submitView(
-      FullSummaryFormSubmission.builder()
-        .triggerId(triggerId)
-        .ticketId(ticketId)
-        .values(FullSummaryFormSubmission.Values.builder()
-          .status(Ticket.Status.closed)
-          .team("connected-app")
-          .tags(ImmutableList.of("networking"))
-          .impact("productionBlocking")
-          .build())
+    // Register a ts-specific chat.update stub so NFT verification is tied to
+    // this exact ticket-form update in both embedded and remote modes.
+    val formUpdatedStub = slackWiremock.stubMessageUpdated(
+      MessageUpdatedExpectation.builder[TicketMessage]()
+        .description("nft submit summary: ticket form update")
+        .channelId(queryMessage.channelId())
+        .ts(formMessageTs)
+        .threadTs(queryMessage.ts())
+        .receiver(new TicketMessage.Receiver())
         .build()
     )
 
-    RequestJournalVerifier.awaitChatUpdate(
-      slackWiremock,
-      formMessageTs,
-    )
+    try {
+      asSupport.slack().submitView(
+        FullSummaryFormSubmission.builder()
+          .triggerId(triggerId)
+          .ticketId(ticketId)
+          .values(FullSummaryFormSubmission.Values.builder()
+            .status(Ticket.Status.closed)
+            .team("connected-app")
+            .tags(ImmutableList.of("networking"))
+            .impact("productionBlocking")
+            .build())
+          .build())
+
+      RequestJournalVerifier.awaitStubCalled(formUpdatedStub)
+    } finally {
+      formUpdatedStub.cleanUp()
+    }
 
     session
   }

@@ -75,3 +75,7 @@ dependencies {
     // Guava
     api("com.google.guava:guava:33.4.0-jre")
 }
+
+tasks.test {
+    useJUnitPlatform()
+}

@@ -1,7 +1,5 @@
 package com.coreeng.supportbot.testkit;
 
-import io.restassured.RestAssured;
-import io.restassured.builder.RequestSpecBuilder;
 import org.junit.platform.engine.support.store.Namespace;
 import org.junit.platform.launcher.LauncherSession;
 import org.junit.platform.launcher.LauncherSessionListener;
@@ -25,13 +23,6 @@ public class TestKitSetupLauncherSessionListener implements LauncherSessionListe
             testKit = TestKit.create(config);
             testKit.slack().wiremock().start();
             LOGGER.info("SlackWiremock server started successfully");
-
-            // Configure RestAssured with default auth bypass headers
-            RestAssured.requestSpecification = new RequestSpecBuilder()
-                    .addHeader("X-Test-User", "test@functional.test")
-                    .addHeader("X-Test-Role", "support")
-                    .build();
-            LOGGER.info("RestAssured configured with test auth bypass headers");
 
             session.getStore()
                     .put(NAMESPACE, SlackWiremock.class, testKit.slack().wiremock());

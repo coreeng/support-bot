@@ -66,6 +66,15 @@ public class TicketQueryService {
         return new DetailedTicket(ticket, escalations);
     }
 
+    @Nullable public DetailedTicket findDetailedByQueryRef(MessageRef queryRef) {
+        Ticket ticket = repository.findTicketByQuery(queryRef);
+        if (ticket == null || ticket.id() == null) {
+            return null;
+        }
+        ImmutableList<Escalation> escalations = escalationQueryService.listByTicketId(ticket.id());
+        return new DetailedTicket(ticket, escalations);
+    }
+
     public boolean queryExists(MessageRef queryRef) {
         return repository.queryExists(queryRef);
     }
