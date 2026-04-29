@@ -35,56 +35,11 @@ class AuthControllerProvidersTest {
     }
 
     @Test
-    void shouldReturnProviders_whenBothConfigured() {
-        // given
-        when(oauth2AvailabilityChecker.getAvailableProviders()).thenReturn(List.of("google", "azure"));
-
-        // when
-        var response = controller.getAvailableProviders();
-
-        // then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().providers()).containsExactly("google", "azure");
-    }
-
-    @Test
-    void shouldReturnGoogleOnly_whenOnlyGoogleConfigured() {
-        // given
-        when(oauth2AvailabilityChecker.getAvailableProviders()).thenReturn(List.of("google"));
-
-        // when
-        var response = controller.getAvailableProviders();
-
-        // then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().providers()).containsExactly("google");
-    }
-
-    @Test
-    void shouldReturnAzureOnly_whenOnlyAzureConfigured() {
-        // given
-        when(oauth2AvailabilityChecker.getAvailableProviders()).thenReturn(List.of("azure"));
-
-        // when
-        var response = controller.getAvailableProviders();
-
-        // then
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().providers()).containsExactly("azure");
-    }
-
-    @Test
-    void shouldReturnDexOnly_whenOnlyDexConfigured() {
-        // given
+    void shouldReturnDexOnly_whenDexConfigured() {
         when(oauth2AvailabilityChecker.getAvailableProviders()).thenReturn(List.of("dex"));
 
-        // when
         var response = controller.getAvailableProviders();
 
-        // then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().providers()).containsExactly("dex");
@@ -92,13 +47,10 @@ class AuthControllerProvidersTest {
 
     @Test
     void shouldReturnEmptyArray_whenNoProvidersConfigured() {
-        // given
         when(oauth2AvailabilityChecker.getAvailableProviders()).thenReturn(List.of());
 
-        // when
         var response = controller.getAvailableProviders();
 
-        // then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().providers()).isEmpty();

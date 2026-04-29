@@ -4,7 +4,7 @@
  */
 export const OAUTH_UI_CALLBACK_PATH_PREFIX = "/api/oauth/callback/" as const;
 
-export const OAUTH_UI_KNOWN_PROVIDERS = ["google", "azure", "dex"] as const;
+export const OAUTH_UI_KNOWN_PROVIDERS = ["dex"] as const;
 
 export type OauthUiKnownProvider = (typeof OAUTH_UI_KNOWN_PROVIDERS)[number];
 

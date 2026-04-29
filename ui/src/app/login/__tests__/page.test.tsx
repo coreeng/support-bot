@@ -32,7 +32,7 @@ describe('LoginPage', () => {
     global.fetch = jest.fn(() =>
       Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ providers: ['google', 'azure'] }),
+        json: () => Promise.resolve({ providers: ['dex'] }),
       } as Response)
     )
 
@@ -50,14 +50,26 @@ describe('LoginPage', () => {
   // Basic rendering
   // -------------------------------------------------------------------
 
-  it('shows login form when not authenticated', async () => {
+  it('auto-redirects to Dex when not authenticated and Dex is the only provider', async () => {
+    render(<LoginPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Redirecting to sign-in...')).toBeInTheDocument()
+    })
+    // Button should not render because the page is in the auto-redirect spinner state.
+    expect(screen.queryByText('Continue with SSO')).not.toBeInTheDocument()
+  })
+
+  it('does not auto-redirect when ?signOut=1 is set; shows SSO button', async () => {
+    mockUseSearchParams.mockReturnValue(new URLSearchParams('signOut=1') as any)
+
     render(<LoginPage />)
 
     await waitFor(() => {
       expect(screen.getByText('Sign in')).toBeInTheDocument()
-      expect(screen.getByText('Continue with Google')).toBeInTheDocument()
-      expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
+      expect(screen.getByText('Continue with SSO')).toBeInTheDocument()
     })
+    expect(screen.queryByText('Redirecting to sign-in...')).not.toBeInTheDocument()
   })
 
   it('redirects to home if already authenticated', async () => {
@@ -136,11 +148,6 @@ describe('LoginPage', () => {
       expect(mockSignIn).not.toHaveBeenCalled()
       expect(mockReplace).not.toHaveBeenCalled()
     })
-
-    // Note: window.location.href assignment cannot be directly asserted in JSDOM
-    // because Location is a host object with internal type checks. The important
-    // security behaviour (origin validation, callbackUrl sanitization) is covered
-    // by the tests above and by the sanitizeCallbackUrl unit tests.
   })
 
   // -------------------------------------------------------------------
@@ -189,7 +196,7 @@ describe('LoginPage', () => {
     it('handles code flow identically', async () => {
       mockSignIn.mockResolvedValue({ error: undefined, ok: true, status: 200, url: '' } as any)
       mockUseSearchParams.mockReturnValue(
-        new URLSearchParams('code=mycode&provider=google&callbackUrl=/home') as any
+        new URLSearchParams('code=mycode&provider=dex&callbackUrl=/home') as any
       )
 
       render(<LoginPage />)
@@ -197,7 +204,7 @@ describe('LoginPage', () => {
       await waitFor(() => {
         expect(mockSignIn).toHaveBeenCalledWith('backend-code', {
           code: 'mycode',
-          provider: 'google',
+          provider: 'dex',
           redirect: false,
         })
       })
@@ -290,7 +297,7 @@ describe('LoginPage', () => {
     it('calls signIn with redirect:false for code', async () => {
       mockSignIn.mockResolvedValue({ ok: true } as any)
       mockUseSearchParams.mockReturnValue(
-        new URLSearchParams('code=mycode&provider=azure&callbackUrl=/dash') as any
+        new URLSearchParams('code=mycode&provider=dex&callbackUrl=/dash') as any
       )
 
       render(<LoginPage />)
@@ -298,7 +305,7 @@ describe('LoginPage', () => {
       await waitFor(() => {
         expect(mockSignIn).toHaveBeenCalledWith('backend-code', {
           code: 'mycode',
-          provider: 'azure',
+          provider: 'dex',
           redirect: false,
         })
       })
@@ -351,8 +358,7 @@ describe('LoginPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('No authentication providers configured.')).toBeInTheDocument()
-        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
-        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
+        expect(screen.queryByText('Continue with SSO')).not.toBeInTheDocument()
       })
     })
 
@@ -363,8 +369,7 @@ describe('LoginPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Unable to fetch identity provider configuration from backend/)).toBeInTheDocument()
-        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
-        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
+        expect(screen.queryByText('Continue with SSO')).not.toBeInTheDocument()
       })
     })
 
@@ -380,44 +385,11 @@ describe('LoginPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Unable to fetch identity provider configuration from backend/)).toBeInTheDocument()
-        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
-        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
+        expect(screen.queryByText('Continue with SSO')).not.toBeInTheDocument()
       })
     })
 
-    it('shows only Google when only Google is configured', async () => {
-      global.fetch = jest.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ providers: ['google'] }),
-        } as Response)
-      )
-
-      render(<LoginPage />)
-
-      await waitFor(() => {
-        expect(screen.getByText('Continue with Google')).toBeInTheDocument()
-        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
-      })
-    })
-
-    it('shows only Azure when only Azure is configured', async () => {
-      global.fetch = jest.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ providers: ['azure'] }),
-        } as Response)
-      )
-
-      render(<LoginPage />)
-
-      await waitFor(() => {
-        expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
-        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
-      })
-    })
-
-    it('shows only SSO when only Dex is configured', async () => {
+    it('auto-redirects when Dex is configured', async () => {
       global.fetch = jest.fn(() =>
         Promise.resolve({
           ok: true,
@@ -428,27 +400,25 @@ describe('LoginPage', () => {
       render(<LoginPage />)
 
       await waitFor(() => {
-        expect(screen.getByText('Continue with SSO')).toBeInTheDocument()
-        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
-        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
+        expect(screen.getByText('Redirecting to sign-in...')).toBeInTheDocument()
       })
     })
 
     it('filters out unknown providers from API response', async () => {
+      mockUseSearchParams.mockReturnValue(new URLSearchParams('signOut=1') as any)
       global.fetch = jest.fn(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ providers: ['google', 'unknown-provider', 'azure', 'dex'] }),
+          json: () => Promise.resolve({ providers: ['unknown-provider', 'google', 'azure', 'dex'] }),
         } as Response)
       )
 
       render(<LoginPage />)
 
       await waitFor(() => {
-        expect(screen.getByText('Continue with Google')).toBeInTheDocument()
-        expect(screen.getByText('Continue with Microsoft')).toBeInTheDocument()
+        // signOut=1 suppresses auto-redirect so we can verify the rendered button set.
         expect(screen.getByText('Continue with SSO')).toBeInTheDocument()
-        // No button for "unknown-provider" should be rendered
+        // No buttons for legacy/unknown providers should be rendered
       })
     })
 
@@ -464,8 +434,7 @@ describe('LoginPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('No authentication providers configured.')).toBeInTheDocument()
-        expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument()
-        expect(screen.queryByText('Continue with Microsoft')).not.toBeInTheDocument()
+        expect(screen.queryByText('Continue with SSO')).not.toBeInTheDocument()
       })
     })
 
@@ -474,7 +443,7 @@ describe('LoginPage', () => {
       const fetchSpy = jest.fn(() =>
         Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ providers: ['google', 'azure'] }),
+          json: () => Promise.resolve({ providers: ['dex'] }),
         } as Response)
       )
       global.fetch = fetchSpy
@@ -499,17 +468,19 @@ describe('LoginPage', () => {
       const mockPopup = { focus: jest.fn() }
       window.open = jest.fn(() => mockPopup) as any
 
-      // Simulate iframe: make window.self !== window.top
+      // Simulate iframe: make window.self !== window.top.
+      // The iframe check inside the auto-redirect effect also sees this and skips,
+      // so the SSO button is rendered for click rather than auto-redirecting.
       const origSelf = window.self
       Object.defineProperty(window, 'self', { value: {}, writable: true, configurable: true })
 
       render(<LoginPage />)
 
-      await waitFor(() => expect(screen.getByText('Continue with Google')).toBeInTheDocument())
-      fireEvent.click(screen.getByText('Continue with Google'))
+      await waitFor(() => expect(screen.getByText('Continue with SSO')).toBeInTheDocument())
+      fireEvent.click(screen.getByText('Continue with SSO'))
 
       expect(window.open).toHaveBeenCalledWith(
-        '/api/oauth/start/google?callbackUrl=%2F',
+        '/api/oauth/start/dex?callbackUrl=%2F',
         'supportbot-auth',
         expect.stringContaining('popup=yes')
       )

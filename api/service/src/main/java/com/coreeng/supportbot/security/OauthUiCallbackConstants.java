@@ -12,5 +12,5 @@ public final class OauthUiCallbackConstants {
 
     public static final String CALLBACK_PATH_PREFIX = "/api/oauth/callback/";
 
-    public static final Set<String> KNOWN_PROVIDERS = Set.of("google", "azure", "dex");
+    public static final Set<String> KNOWN_PROVIDERS = Set.of("dex");
 }

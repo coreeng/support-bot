@@ -50,7 +50,7 @@ class OAuth2SuccessHandlerTest {
     private OAuth2SuccessHandler createHandler(List<String> allowedEmails, List<String> allowedDomains) {
         var props = new SecurityProperties(
                 new SecurityProperties.JwtProperties(TEST_SECRET, Duration.ofHours(24)),
-                SecurityProperties.OAuth2Properties.withRedirectOnly("http://localhost:3000/auth/callback"),
+                new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
                 new SecurityProperties.CorsProperties(null),
                 new SecurityProperties.TestBypassProperties(false),
                 new SecurityProperties.AllowListProperties(allowedEmails, allowedDomains));
@@ -78,7 +78,7 @@ class OAuth2SuccessHandlerTest {
     }
 
     private Authentication mockAuth(Map<String, Object> attributes) {
-        return mockAuth("google", attributes);
+        return mockAuth("dex", attributes);
     }
 
     private Authentication mockAuth(String registrationId, Map<String, Object> attributes) {
@@ -147,14 +147,14 @@ class OAuth2SuccessHandlerTest {
     void onAuthenticationSuccess_extractsEmailFromPreferredUsername() throws Exception {
         // given
         var handler = createHandler();
-        when(teamService.listTeamsByUserEmail("azureuser@example.com")).thenReturn(ImmutableList.of());
-        var auth = mockAuth(Map.of("preferred_username", "azureuser@example.com", "name", "Azure User"));
+        when(teamService.listTeamsByUserEmail("dexuser@example.com")).thenReturn(ImmutableList.of());
+        var auth = mockAuth(Map.of("preferred_username", "dexuser@example.com", "name", "Dex User"));
 
         // when
         handler.onAuthenticationSuccess(request, response, auth);
 
         // then
-        verify(teamService).listTeamsByUserEmail("azureuser@example.com");
+        verify(teamService).listTeamsByUserEmail("dexuser@example.com");
         verify(response).sendRedirect(argThat(url -> url.contains("code=")));
     }
 

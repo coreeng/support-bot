@@ -8,7 +8,7 @@ const NO_CACHE_HEADERS = { "Cache-Control": "no-store" } as const;
 
 /**
  * Fetch available OAuth2 providers from backend.
- * Returns { providers: ["google", "azure"], error?: boolean }
+ * Returns { providers: ["dex"], error?: boolean }
  * This endpoint is public (unauthenticated) since it's needed on the login page.
  */
 export async function GET() {
