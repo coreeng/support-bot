@@ -6,8 +6,8 @@ DEX_K8S := ../api/k8s/dex
 p2p-build: template ## Fast feedback: validate Helm values
 p2p-functional:    
 p2p-nft:           
-p2p-integration: template ## P2P: render then deploy (sets DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT for Dex LDAP overlay)
-	@$(MAKE) deploy-integration DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true
+p2p-integration: template ## P2P: render then deploy (enables LDAP plaintext overlay for Dex integration)
+	@$(MAKE) deploy-integration DEX_LDAP_ENABLED=true DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true
 p2p-promote-to-extended-test: ## Delegate image promotion to repo root
 	@$(MAKE) -C .. p2p-promote-to-extended-test
 p2p-promote-to-prod: ## Delegate prod promotion to repo root
@@ -42,15 +42,21 @@ template: ## Validate Dex values by rendering dex/dex chart (charts.dexidp.io)
 	@DEX_CHART_VERSION="$(DEX_CHART_VERSION)" bash ./scripts/helm_dex.sh template
 
 .PHONY: deploy-integration
-deploy-integration: ## Deploy Dex to integration (requires DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true unless root Makefile sets it)
+deploy-integration: ## Deploy Dex to integration (LDAP/Google/Microsoft via DEX_*_ENABLED in env or .env.local; plaintext LDAP requires DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true)
 	@bash -c 'set -eo pipefail; cd "$(CURDIR)"; \
 	if [[ -f .env.local ]]; then set -a; source .env.local; set +a; fi; \
+	: $${DEX_LDAP_ENABLED:=$(DEX_LDAP_ENABLED)}; export DEX_LDAP_ENABLED; \
+	: $${DEX_GOOGLE_ENABLED:=$(DEX_GOOGLE_ENABLED)}; export DEX_GOOGLE_ENABLED; \
+	: $${DEX_MICROSOFT_ENABLED:=$(DEX_MICROSOFT_ENABLED)}; export DEX_MICROSOFT_ENABLED; \
+	: $${DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT:=$(DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT)}; export DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT; \
 	NAMESPACE="$(NAMESPACE)" DEX_CHART_VERSION="$(DEX_CHART_VERSION)" DRY_RUN="$(DRY_RUN)" \
-	DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT="$(DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT)" \
 	bash ./scripts/helm_dex.sh deploy-integration'
 
 .PHONY: deploy-prod
-deploy-prod: ## Deploy Dex module to production environment
+deploy-prod: ## Deploy Dex to production (LDAP/Google/Microsoft via DEX_*_ENABLED in env or .env.local)
 	@bash -c 'set -eo pipefail; cd "$(CURDIR)"; \
 	if [[ -f .env.local ]]; then set -a; source .env.local; set +a; fi; \
+	: $${DEX_LDAP_ENABLED:=$(DEX_LDAP_ENABLED)}; export DEX_LDAP_ENABLED; \
+	: $${DEX_GOOGLE_ENABLED:=$(DEX_GOOGLE_ENABLED)}; export DEX_GOOGLE_ENABLED; \
+	: $${DEX_MICROSOFT_ENABLED:=$(DEX_MICROSOFT_ENABLED)}; export DEX_MICROSOFT_ENABLED; \
 	NAMESPACE="$(NAMESPACE)" DEX_CHART_VERSION="$(DEX_CHART_VERSION)" bash ./scripts/helm_dex.sh deploy-prod'
