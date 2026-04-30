@@ -1,0 +1,29 @@
+# Dex Microsoft (Entra) connector overlay — adds a single `microsoft` entry to config.connectors.
+#
+# Do not pass directly to `helm -f`; layer alongside other per-backend overlays
+# only via dex/scripts/compose_helm_values.py, which concatenates connector lists
+# (Helm's last-wins overlay merge would otherwise drop earlier connectors).
+# helm_dex.sh enables this overlay automatically when DEX_MICROSOFT_ENABLED=true.
+#
+# Register an Entra app whose redirect URI is `${issuer}/callback` — Dex's own
+# callback, NOT the Support Bot API's /login/oauth2/code/dex.
+# See https://dexidp.io/docs/connectors/microsoft/.
+#
+# tenant: UUID for a single tenant, or one of common / organizations / consumers.
+#
+# Placeholders are substituted by helm_dex.sh prepare_values() via envsubst:
+#   PLACEHOLDER_MICROSOFT_CLIENT_ID     ← DEX_MICROSOFT_CLIENT_ID
+#   PLACEHOLDER_MICROSOFT_CLIENT_SECRET ← DEX_MICROSOFT_CLIENT_SECRET
+#   PLACEHOLDER_MICROSOFT_TENANT        ← DEX_MICROSOFT_TENANT (default: common)
+#   PLACEHOLDER_DEX_ISSUER              ← DEX_ISSUER (must match config.issuer)
+
+config:
+  connectors:
+    - type: microsoft
+      id: microsoft
+      name: Microsoft
+      config:
+        clientID: ${PLACEHOLDER_MICROSOFT_CLIENT_ID}
+        clientSecret: ${PLACEHOLDER_MICROSOFT_CLIENT_SECRET}
+        redirectURI: ${PLACEHOLDER_DEX_ISSUER}/callback
+        tenant: ${PLACEHOLDER_MICROSOFT_TENANT}

@@ -304,11 +304,16 @@ Dex deployment), not as separate front doors in this app.
 > live in Dex's own configuration:
 >
 > - Local dev: `DEX_GOOGLE_*` / `DEX_MICROSOFT_*` in [`dex/.env.example`](../../../dex/.env.example).
-> - Kubernetes: `config.connectors[]` in your Dex helm values; see
->   [`api/k8s/dex/README.md`](../../k8s/dex/README.md) and the
->   [auth/Dex/LDAP runbook](../../../docs/runbooks/auth-dex-ldap.md).
+> - Kubernetes: enable per-backend overlays with `DEX_LDAP_ENABLED` /
+>   `DEX_GOOGLE_ENABLED` / `DEX_MICROSOFT_ENABLED` —
+>   [`values-tls.yaml`](../../k8s/dex/values-tls.yaml) /
+>   [`values-google.yaml`](../../k8s/dex/values-google.yaml) /
+>   [`values-microsoft.yaml`](../../k8s/dex/values-microsoft.yaml). The
+>   `dex/scripts/helm_dex.sh` deploy script composes the enabled overlays into a
+>   single connector list; see [`api/k8s/dex/README.md`](../../k8s/dex/README.md)
+>   and the [auth/Dex/LDAP runbook](../../../docs/runbooks/auth-dex-ldap.md).
 >
-> The redirect URI registered with Google/Microsoft must be `{DEX_ISSUER}/callback`
+> The redirect URI registered with Google/Microsoft must be `${DEX_ISSUER}/callback`
 > (Dex's own callback) — **not** `/api/oauth/callback/google` or
 > `/login/oauth2/code/google` (those paths no longer exist on this app).
 
