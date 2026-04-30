@@ -21,7 +21,13 @@ jobs:
     needs: [get-latest-version]
     uses: coreeng/p2p/.github/workflows/p2p-workflow-prod.yaml@v1
     secrets:
-      env_vars: ${{ secrets.env_vars }}
+      env_vars: |
+        ${{ secrets.env_vars }}
+        DEX_MICROSOFT_CLIENT_ID=${{ secrets.DEX_MICROSOFT_CLIENT_ID_PROD }}
+        DEX_MICROSOFT_CLIENT_SECRET=${{ secrets.DEX_MICROSOFT_CLIENT_SECRET_PROD }}
+        DEX_MICROSOFT_TENANT=${{ secrets.DEX_MICROSOFT_TENANT_PROD }}
+        DEX_GOOGLE_CLIENT_ID=${{ secrets.DEX_GOOGLE_CLIENT_ID_PROD }}
+        DEX_GOOGLE_CLIENT_SECRET=${{ secrets.DEX_GOOGLE_CLIENT_SECRET_PROD }}
     with:
       app-name: support-bot
       tenant-name: support-bot
