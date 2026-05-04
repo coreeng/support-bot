@@ -50,17 +50,24 @@
 | `security.oauth2.redirect-uri` | `UI_ORIGIN` | `http://localhost:3000/login` | OAuth2 callback redirect URI |
 | `security.test-bypass.enabled` | - | `false` | Enable test auth bypass |
 
-### OAuth2 - Dex (only supported SSO)
+### OAuth2 - Google (Optional)
 
 | Property Path | Environment Variable | Default | Purpose |
 |--------------|---------------------|---------|---------|
-| `spring.security.oauth2.client.registration.dex.client-id` | `DEX_CLIENT_ID` | *(empty)* | Dex OAuth client ID |
-| `spring.security.oauth2.client.registration.dex.client-secret` | `DEX_CLIENT_SECRET` | *(empty)* | Dex OAuth client secret |
-| `spring.security.oauth2.client.provider.dex.issuer-uri` | `DEX_ISSUER_URI` | *(empty)* | Dex OIDC issuer URI |
-| `spring.security.oauth2.client.provider.dex.internal-base-url` | `DEX_INTERNAL_BASE_URL` | *(empty)* | Optional in-cluster base URL for `/token`, `/keys`, `/userinfo` |
-| `spring.security.oauth2.client.registration.dex.scope` | `DEX_SCOPES` | `openid,email,profile,groups` | Dex OAuth scopes |
+| `spring.security.oauth2.client.registration.google.client-id` | `GOOGLE_CLIENT_ID` | *(empty)* | Google OAuth client ID |
+| `spring.security.oauth2.client.registration.google.client-secret` | `GOOGLE_CLIENT_SECRET` | *(empty)* | Google OAuth client secret |
 
-> **Note:** All three (client-id, client-secret, issuer-uri) required to enable SSO. Google/Azure are reachable only through Dex connectors.
+> **Note:** Both client-id and client-secret required to enable Google OAuth.
+
+### OAuth2 - Azure (Optional)
+
+| Property Path | Environment Variable | Default | Purpose |
+|--------------|---------------------|---------|---------|
+| `spring.security.oauth2.client.registration.azure.client-id` | `AZURE_CLIENT_ID` | *(empty)* | Azure AD client ID |
+| `spring.security.oauth2.client.registration.azure.client-secret` | `AZURE_CLIENT_SECRET` | *(empty)* | Azure AD client secret |
+| `spring.security.oauth2.client.provider.azure.tenant-id` | `AZURE_TENANT_ID` | *(empty)* | Azure AD tenant ID |
+
+> **Note:** All three (client-id, client-secret, tenant-id) required to enable Azure OAuth.
 
 ### Database
 
@@ -85,12 +92,9 @@
 
 | Property Path | Environment Variable | Default | Purpose |
 |--------------|---------------------|---------|---------|
-| `platform-integration.azure.enabled` | - | `false` | Enable Azure (Entra ID) user fetching |
+| `platform-integration.azure.enabled` | - | `false` | Enable Azure user fetching |
 | `platform-integration.azure.client.base-url` | - | *(empty)* | Azure Graph API base URL override |
 | `platform-integration.azure.client.log-level` | `AZURE_CLIENT_LOG_LEVEL` | `NONE` | Azure client log level (NONE/BASIC/HEADERS/BODY) |
-| `spring.cloud.azure.profile.tenant-id` | `AZURE_TENANT_ID` | *(empty)* | Azure tenant id for Entra ID group reader |
-| `spring.cloud.azure.credential.client-id` | `AZURE_CLIENT_ID` | *(empty)* | Azure app client id for Entra ID group reader |
-| `spring.cloud.azure.credential.client-secret` | `AZURE_CLIENT_SECRET` | *(empty)* | Azure app client secret for Entra ID group reader |
 
 ### Platform Integration - General
 
@@ -145,20 +149,14 @@ DB_USERNAME=your-username
 DB_PASSWORD=your-password
 ```
 
-### Optional - SSO (Dex)
+### Optional - OAuth Providers
 
 ```bash
-# Dex is the only OAuth2 client this app registers; Google/Azure go via Dex connectors.
-# All three required to enable SSO.
-DEX_CLIENT_ID=<your-dex-client-id>
-DEX_CLIENT_SECRET=<your-dex-client-secret>
-DEX_ISSUER_URI=<https://dex.example.com>
-```
+# Google OAuth (both required to enable)
+GOOGLE_CLIENT_ID=<your-google-client-id>
+GOOGLE_CLIENT_SECRET=<your-google-client-secret>
 
-### Optional - Azure (Entra ID group reader, NOT SSO)
-
-```bash
-# Used only by platform-integration.azure to read group memberships from Entra ID.
+# Azure OAuth (all three required to enable)
 AZURE_CLIENT_ID=<your-azure-client-id>
 AZURE_CLIENT_SECRET=<your-azure-client-secret>
 AZURE_TENANT_ID=<your-azure-tenant-id>
