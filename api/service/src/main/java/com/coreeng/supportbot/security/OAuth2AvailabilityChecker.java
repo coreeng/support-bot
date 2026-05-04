@@ -29,8 +29,7 @@ public class OAuth2AvailabilityChecker {
         this.testBypassEnabled = securityProperties.testBypass() != null
                 && securityProperties.testBypass().enabled();
 
-        this.dexConfigured =
-                isNotBlank(dexClientId) && isNotBlank(dexClientSecret) && isNotBlank(dexIssuerUri);
+        this.dexConfigured = isNotBlank(dexClientId) && isNotBlank(dexClientSecret) && isNotBlank(dexIssuerUri);
     }
 
     public boolean isOAuth2Available() {
