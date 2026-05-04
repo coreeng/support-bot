@@ -99,8 +99,7 @@ class OAuthExchangeServiceTest {
         mockDexOAuth("user@blocked.com");
 
         assertThrows(
-                UserNotAllowedException.class,
-                () -> service.exchangeCodeForToken("dex", "auth-code", VALID_REDIRECT_URI));
+                UserNotAllowedException.class, () -> service.exchangeCodeForToken("auth-code", VALID_REDIRECT_URI));
     }
 
     @Test
@@ -109,7 +108,7 @@ class OAuthExchangeServiceTest {
         mockDexOAuth("user@allowed.com");
         when(teamService.listTeamsByUserEmail("user@allowed.com")).thenReturn(ImmutableList.of());
 
-        var token = service.exchangeCodeForToken("dex", "auth-code", VALID_REDIRECT_URI);
+        var token = service.exchangeCodeForToken("auth-code", VALID_REDIRECT_URI);
 
         assertFalse(token == null || token.isBlank());
     }
@@ -120,7 +119,7 @@ class OAuthExchangeServiceTest {
         mockDexOAuth("anyone@anywhere.com");
         when(teamService.listTeamsByUserEmail("anyone@anywhere.com")).thenReturn(ImmutableList.of());
 
-        var token = service.exchangeCodeForToken("dex", "auth-code", VALID_REDIRECT_URI);
+        var token = service.exchangeCodeForToken("auth-code", VALID_REDIRECT_URI);
 
         assertFalse(token == null || token.isBlank());
     }
@@ -131,7 +130,7 @@ class OAuthExchangeServiceTest {
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> service.exchangeCodeForToken("dex", "auth-code", "https://evil.example/api/oauth/callback/dex"));
+                () -> service.exchangeCodeForToken("auth-code", "https://evil.example/api/oauth/callback/dex"));
     }
 
     @Test
@@ -140,6 +139,6 @@ class OAuthExchangeServiceTest {
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> service.exchangeCodeForToken("dex", "auth-code", "http://localhost:3000/some/other/path"));
+                () -> service.exchangeCodeForToken("auth-code", "http://localhost:3000/some/other/path"));
     }
 }

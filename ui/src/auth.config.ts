@@ -164,7 +164,7 @@ export const authConfig: NextAuthConfig = {
 
             const response = await publicFetch("/auth/oauth/exchange", {
               method: "POST",
-              body: JSON.stringify({provider: "dex", code, redirectUri}),
+              body: JSON.stringify({code, redirectUri}),
             });
 
             if (response.ok) {

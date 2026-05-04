@@ -18,13 +18,13 @@ public class OAuthUrlService {
 
     /**
      * @throws IllegalArgumentException if the redirect URI is invalid
-     * @throws IllegalArgumentException if the provider is unknown
+     * @throws IllegalStateException if the Dex OAuth2 client is not configured
      */
-    public AuthorizationUrlResult getAuthorizationUrl(String provider, String redirectUri) {
+    public AuthorizationUrlResult getAuthorizationUrl(String redirectUri) {
         ValidatedRedirectUri validatedRedirectUri = redirectUriValidator.validate(redirectUri);
-        var registration = clientRegistrationRepository.findByRegistrationId(provider);
+        var registration = clientRegistrationRepository.findByRegistrationId("dex");
         if (registration == null) {
-            throw new IllegalArgumentException("Unknown OAuth provider: " + provider);
+            throw new IllegalStateException("Dex OAuth2 client is not configured");
         }
 
         var authorizationUri = registration.getProviderDetails().getAuthorizationUri();

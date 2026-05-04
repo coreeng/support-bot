@@ -50,12 +50,12 @@ public class OAuthExchangeService {
     private final JwtGroupTeamMerger jwtGroupTeamMerger;
     private final RedirectUriValidator redirectUriValidator;
 
-    public String exchangeCodeForToken(String provider, String code, String redirectUri) {
+    public String exchangeCodeForToken(String code, String redirectUri) {
         ValidatedRedirectUri validatedRedirectUri = redirectUriValidator.validate(redirectUri);
 
-        var registration = clientRegistrationRepository.findByRegistrationId(provider);
+        var registration = clientRegistrationRepository.findByRegistrationId("dex");
         if (registration == null) {
-            throw new IllegalArgumentException("Unknown OAuth provider: " + provider);
+            throw new IllegalStateException("Dex OAuth2 client is not configured");
         }
 
         // Exchange authorization code for access token

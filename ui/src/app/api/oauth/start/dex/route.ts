@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const { origin } = resolved;
   const redirectUri = new URL("/api/oauth/callback/dex", origin).toString();
 
-  const urlParams = new URLSearchParams({provider: "dex", redirectUri});
+  const urlParams = new URLSearchParams({redirectUri});
   const oauthUrl = await publicFetch(`/auth/oauth-url?${urlParams.toString()}`);
 
   if (oauthUrl.ok) {
