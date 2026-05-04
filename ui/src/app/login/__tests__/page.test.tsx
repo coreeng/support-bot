@@ -28,13 +28,6 @@ describe('LoginPage', () => {
     mockUseRouter.mockReturnValue({ replace: mockReplace } as any)
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: false } as any)
     mockUseSearchParams.mockReturnValue(new URLSearchParams() as any)
-    // Mock fetch for provider fetching
-    global.fetch = jest.fn(() =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ providers: ['dex'] }),
-      } as Response)
-    )
 
     // Default: no opener (not a popup)
     Object.defineProperty(window, 'opener', { value: null, writable: true, configurable: true })
@@ -50,13 +43,13 @@ describe('LoginPage', () => {
   // Basic rendering
   // -------------------------------------------------------------------
 
-  it('auto-redirects to Dex when not authenticated and Dex is the only provider', async () => {
+  it('auto-redirects to Dex on mount when not authenticated and not in iframe', async () => {
     render(<LoginPage />)
 
     await waitFor(() => {
       expect(screen.getByText('Redirecting to sign-in...')).toBeInTheDocument()
     })
-    // Button should not render because the page is in the auto-redirect spinner state.
+    // Button should not render — the page is in the auto-redirect spinner state.
     expect(screen.queryByText('Continue with SSO')).not.toBeInTheDocument()
   })
 
@@ -80,7 +73,7 @@ describe('LoginPage', () => {
     )).toBeInTheDocument()
   })
 
-  it('shows error from search params', async () => {
+  it('shows error from search params (skips auto-redirect)', async () => {
     mockUseSearchParams.mockReturnValue(new URLSearchParams('error=TokenExpired') as any)
 
     render(<LoginPage />)
@@ -89,6 +82,8 @@ describe('LoginPage', () => {
       expect(screen.getByText('Authentication Error')).toBeInTheDocument()
       expect(screen.getByText('TokenExpired')).toBeInTheDocument()
     })
+    // Auto-redirect spinner must not appear when an error is present.
+    expect(screen.queryByText('Redirecting to sign-in...')).not.toBeInTheDocument()
   })
 
   it('shows not-onboarded message for user_not_allowed error', async () => {
@@ -330,146 +325,24 @@ describe('LoginPage', () => {
   })
 
   // -------------------------------------------------------------------
-  // Provider fetching error scenarios
-  // -------------------------------------------------------------------
-
-  describe('provider fetching', () => {
-    it('shows "No authentication providers configured" when fetch returns empty array', async () => {
-      global.fetch = jest.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ providers: [] }),
-        } as Response)
-      )
-
-      render(<LoginPage />)
-
-      await waitFor(() => {
-        expect(screen.getByText('No authentication providers configured.')).toBeInTheDocument()
-        expect(screen.queryByText('Continue with SSO')).not.toBeInTheDocument()
-      })
-    })
-
-    it('shows error with no login buttons when fetch fails with network error', async () => {
-      global.fetch = jest.fn(() => Promise.reject(new Error('Network error')))
-
-      render(<LoginPage />)
-
-      await waitFor(() => {
-        expect(screen.getByText(/Unable to fetch identity provider configuration from backend/)).toBeInTheDocument()
-        expect(screen.queryByText('Continue with SSO')).not.toBeInTheDocument()
-      })
-    })
-
-    it('shows error with no login buttons when backend returns error', async () => {
-      global.fetch = jest.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ providers: [], error: true }),
-        } as Response)
-      )
-
-      render(<LoginPage />)
-
-      await waitFor(() => {
-        expect(screen.getByText(/Unable to fetch identity provider configuration from backend/)).toBeInTheDocument()
-        expect(screen.queryByText('Continue with SSO')).not.toBeInTheDocument()
-      })
-    })
-
-    it('auto-redirects when Dex is configured', async () => {
-      global.fetch = jest.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ providers: ['dex'] }),
-        } as Response)
-      )
-
-      render(<LoginPage />)
-
-      await waitFor(() => {
-        expect(screen.getByText('Redirecting to sign-in...')).toBeInTheDocument()
-      })
-    })
-
-    it('filters out unknown providers from API response', async () => {
-      // Render inside an iframe so the auto-redirect is skipped and we can verify
-      // the rendered button set after the filter has run.
-      const origSelf = window.self
-      Object.defineProperty(window, 'self', { value: {}, writable: true, configurable: true })
-
-      global.fetch = jest.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ providers: ['unknown-provider', 'google', 'azure', 'dex'] }),
-        } as Response)
-      )
-
-      render(<LoginPage />)
-
-      await waitFor(() => {
-        expect(screen.getByText('Continue with SSO')).toBeInTheDocument()
-        // No buttons for legacy/unknown providers should be rendered
-      })
-
-      Object.defineProperty(window, 'self', { value: origSelf, writable: true, configurable: true })
-    })
-
-    it('handles malformed API response gracefully', async () => {
-      global.fetch = jest.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ notProviders: 'malformed' }),
-        } as Response)
-      )
-
-      render(<LoginPage />)
-
-      await waitFor(() => {
-        expect(screen.getByText('No authentication providers configured.')).toBeInTheDocument()
-        expect(screen.queryByText('Continue with SSO')).not.toBeInTheDocument()
-      })
-    })
-
-    it('does not fetch providers when already authenticated', async () => {
-      mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true } as any)
-      const fetchSpy = jest.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ providers: ['dex'] }),
-        } as Response)
-      )
-      global.fetch = fetchSpy
-
-      render(<LoginPage />)
-
-      await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith('/')
-      })
-
-      // Fetch should not be called when already authenticated
-      expect(fetchSpy).not.toHaveBeenCalled()
-    })
-  })
-
-  // -------------------------------------------------------------------
-  // Iframe detection — handleLogin opens popup when in iframe
+  // Iframe detection — auto-redirect skipped, button rendered, popup opens on click
   // -------------------------------------------------------------------
 
   describe('iframe detection', () => {
-    it('opens popup when in an iframe', async () => {
+    it('renders SSO button instead of auto-redirecting, opens popup on click', async () => {
       const mockPopup = { focus: jest.fn() }
       window.open = jest.fn(() => mockPopup) as any
 
       // Simulate iframe: make window.self !== window.top.
-      // The iframe check inside the auto-redirect effect also sees this and skips,
-      // so the SSO button is rendered for click rather than auto-redirecting.
       const origSelf = window.self
       Object.defineProperty(window, 'self', { value: {}, writable: true, configurable: true })
 
       render(<LoginPage />)
 
+      // Auto-redirect must be suppressed in iframe context.
       await waitFor(() => expect(screen.getByText('Continue with SSO')).toBeInTheDocument())
+      expect(screen.queryByText('Redirecting to sign-in...')).not.toBeInTheDocument()
+
       fireEvent.click(screen.getByText('Continue with SSO'))
 
       expect(window.open).toHaveBeenCalledWith(
