@@ -218,8 +218,8 @@ platform-integration:
     client:
       base-url: ""
       log-level: ${AZURE_CLIENT_LOG_LEVEL:NONE}
-  # Map Dex ID-token group claims (LDAP) to platform team codes. Merged with email-based teams from
-  # static-user / Azure / GCP. Only applied when OAuth registration id is "dex".
+  # Map JWT group claims (e.g. Dex LDAP `groups`) to platform team codes. Merged with email-based
+  # teams from static-user / Azure / GCP. Activated by `jwt-groups.enabled: true`.
   jwt-groups:
     enabled: false
     claim-name: groups

@@ -13,9 +13,9 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Merges platform teams derived from Dex {@code groups} (or configured claim) into email-based team
- * resolution. LDAP-backed Dex logins expose groups; Google/Azure via Dex typically do not, so the
- * merge is a no-op there and behavior stays email + direct IdP group fetch only.
+ * Merges platform teams derived from JWT group claims (default claim: {@code groups}) into
+ * email-based team resolution. Only active when {@code jwt-groups.enabled} is true and the
+ * configured claim is present in the ID token.
  */
 @Slf4j
 @Component
