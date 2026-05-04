@@ -1,6 +1,5 @@
 package com.coreeng.supportbot.security;
 
-import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -8,15 +7,19 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Detects whether Dex is fully configured and available for authentication.
- * Dex is the only OAuth2 client this app registers; it is considered available
- * only when client-id, client-secret, and issuer-uri are all present.
+ * Detects whether Dex is fully configured. Dex is the only OAuth2 client this app registers; it is
+ * considered available only when client-id, client-secret, and issuer-uri are all present.
+ *
+ * <p>At {@link ApplicationReadyEvent} time, fails startup with {@link IllegalStateException} if Dex
+ * is not configured and {@code security.test-bypass.enabled} is false. Test-bypass is the
+ * documented escape hatch for the functionaltests / integrationtests / nft profiles that don't
+ * stand up real OAuth.
  */
 @Slf4j
 @Component
 public class OAuth2AvailabilityChecker {
     private final boolean testBypassEnabled;
-    private final List<String> availableProviders;
+    private final boolean dexConfigured;
 
     public OAuth2AvailabilityChecker(
             SecurityProperties securityProperties,
@@ -26,35 +29,31 @@ public class OAuth2AvailabilityChecker {
         this.testBypassEnabled = securityProperties.testBypass() != null
                 && securityProperties.testBypass().enabled();
 
-        this.availableProviders = isNotBlank(dexClientId) && isNotBlank(dexClientSecret) && isNotBlank(dexIssuerUri)
-                ? List.of("dex")
-                : List.of();
+        this.dexConfigured =
+                isNotBlank(dexClientId) && isNotBlank(dexClientSecret) && isNotBlank(dexIssuerUri);
     }
 
     public boolean isOAuth2Available() {
-        return !availableProviders.isEmpty();
-    }
-
-    /**
-     * Returns the list of fully configured OAuth2 providers (only ever {@code [dex]} or empty).
-     */
-    public List<String> getAvailableProviders() {
-        return availableProviders;
+        return dexConfigured;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void checkOAuth2Configuration() {
-        if (isOAuth2Available()) {
-            log.info("OAuth2 authentication configured. Active login providers: {}", availableProviders);
-        } else if (testBypassEnabled) {
-            log.info("OAuth2 credentials not configured, but test-bypass is enabled. "
-                    + "Authentication will use X-Test-User/X-Test-Role headers.");
-        } else {
-            log.warn("OAuth2 credentials not configured and test-bypass is disabled. "
-                    + "Users will not be able to authenticate. "
-                    + "Set DEX_CLIENT_ID/DEX_CLIENT_SECRET/DEX_ISSUER_URI, "
-                    + "or enable security.test-bypass.enabled for testing.");
+        if (dexConfigured) {
+            log.info("Dex OAuth2 client configured.");
+            return;
         }
+        if (testBypassEnabled) {
+            log.info("Dex OAuth2 not configured, but security.test-bypass.enabled=true. "
+                    + "Authentication will use X-Test-User/X-Test-Role headers.");
+            return;
+        }
+        String message = "Dex OAuth2 client is not configured. "
+                + "Set DEX_CLIENT_ID, DEX_CLIENT_SECRET, and DEX_ISSUER_URI, "
+                + "or set security.test-bypass.enabled=true for tests/local without auth. "
+                + "Refusing to start without a usable authentication path.";
+        log.error(message);
+        throw new IllegalStateException(message);
     }
 
     private static boolean isNotBlank(String value) {

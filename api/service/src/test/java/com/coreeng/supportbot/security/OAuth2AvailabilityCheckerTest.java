@@ -1,8 +1,8 @@
 package com.coreeng.supportbot.security;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.List;
@@ -24,8 +24,7 @@ class OAuth2AvailabilityCheckerTest {
         var checker = new OAuth2AvailabilityChecker(
                 createSecurityProperties(false), "dex-client-id", "dex-client-secret", "https://dex.example.com");
 
-        assertTrue(checker.isOAuth2Available());
-        assertEquals(List.of("dex"), checker.getAvailableProviders());
+        assertThat(checker.isOAuth2Available()).isTrue();
     }
 
     @Test
@@ -33,8 +32,7 @@ class OAuth2AvailabilityCheckerTest {
         var checker = new OAuth2AvailabilityChecker(
                 createSecurityProperties(false), "dex-client-id", "dex-client-secret", "");
 
-        assertFalse(checker.isOAuth2Available());
-        assertEquals(List.of(), checker.getAvailableProviders());
+        assertThat(checker.isOAuth2Available()).isFalse();
     }
 
     @Test
@@ -42,8 +40,7 @@ class OAuth2AvailabilityCheckerTest {
         var checker = new OAuth2AvailabilityChecker(
                 createSecurityProperties(false), "", "dex-client-secret", "https://dex.example.com");
 
-        assertFalse(checker.isOAuth2Available());
-        assertEquals(List.of(), checker.getAvailableProviders());
+        assertThat(checker.isOAuth2Available()).isFalse();
     }
 
     @Test
@@ -51,23 +48,46 @@ class OAuth2AvailabilityCheckerTest {
         var checker = new OAuth2AvailabilityChecker(
                 createSecurityProperties(false), "dex-client-id", "", "https://dex.example.com");
 
-        assertFalse(checker.isOAuth2Available());
-        assertEquals(List.of(), checker.getAvailableProviders());
+        assertThat(checker.isOAuth2Available()).isFalse();
     }
 
     @Test
-    void noProvidersAvailable_whenNoCredentialsConfigured() {
-        var checker = new OAuth2AvailabilityChecker(createSecurityProperties(false), "", "", "");
-
-        assertFalse(checker.isOAuth2Available());
-        assertEquals(List.of(), checker.getAvailableProviders());
-    }
-
-    @Test
-    void whitespaceStrings_treatedAsBlank() {
+    void whitespaceCredentials_treatedAsBlank() {
         var checker = new OAuth2AvailabilityChecker(createSecurityProperties(false), "   ", "  \t  ", " \n ");
 
-        assertFalse(checker.isOAuth2Available());
-        assertEquals(List.of(), checker.getAvailableProviders());
+        assertThat(checker.isOAuth2Available()).isFalse();
+    }
+
+    @Test
+    void checkOAuth2Configuration_throws_whenDexMissingAndTestBypassDisabled() {
+        var checker = new OAuth2AvailabilityChecker(createSecurityProperties(false), "", "", "");
+
+        assertThatThrownBy(checker::checkOAuth2Configuration)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DEX_CLIENT_ID")
+                .hasMessageContaining("test-bypass");
+    }
+
+    @Test
+    void checkOAuth2Configuration_doesNotThrow_whenDexConfigured() {
+        var checker = new OAuth2AvailabilityChecker(
+                createSecurityProperties(false), "dex-client-id", "dex-client-secret", "https://dex.example.com");
+
+        assertThatCode(checker::checkOAuth2Configuration).doesNotThrowAnyException();
+    }
+
+    @Test
+    void checkOAuth2Configuration_doesNotThrow_whenTestBypassEnabled() {
+        var checker = new OAuth2AvailabilityChecker(createSecurityProperties(true), "", "", "");
+
+        assertThatCode(checker::checkOAuth2Configuration).doesNotThrowAnyException();
+    }
+
+    @Test
+    void checkOAuth2Configuration_doesNotThrow_whenBothDexAndTestBypassPresent() {
+        var checker = new OAuth2AvailabilityChecker(
+                createSecurityProperties(true), "dex-client-id", "dex-client-secret", "https://dex.example.com");
+
+        assertThatCode(checker::checkOAuth2Configuration).doesNotThrowAnyException();
     }
 }

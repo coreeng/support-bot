@@ -323,9 +323,9 @@ Set these on the **API**:
 | `AZURE_CLIENT_ID` | Azure AD application (client) ID. Used only for [Azure Cloud integration](#azure-cloud) (Entra ID group reader); not used for SSO.   |
 | `AZURE_CLIENT_SECRET` | Azure AD client secret. Used only for Azure Cloud integration.                                                                 |
 | `AZURE_TENANT_ID` | Azure AD directory (tenant) ID. Used only for Azure Cloud integration.                                                            |
-| `DEX_CLIENT_ID` | Dex OAuth2 client ID. Required for SSO.                                                                                              |
-| `DEX_CLIENT_SECRET` | Dex OAuth2 client secret. Required for SSO.                                                                                       |
-| `DEX_ISSUER_URI` | Dex OIDC issuer URI, for example `https://dex.example.com/dex`. Required for SSO.                                                  |
+| `DEX_CLIENT_ID` | Dex OAuth2 client ID. **Required**  the API fails to start without all three `DEX_*` values, unless `security.test-bypass.enabled: true`. |
+| `DEX_CLIENT_SECRET` | Dex OAuth2 client secret. **Required** (see `DEX_CLIENT_ID`).                                                                  |
+| `DEX_ISSUER_URI` | Dex OIDC issuer URI, for example `https://dex.example.com/dex`. **Required** (see `DEX_CLIENT_ID`).                              |
 | `DEX_INTERNAL_BASE_URL` | Optional in-cluster base URL for server-to-server calls (`/token`, `/keys`, `/userinfo`). The `client_secret` is sent here, so use a trusted address — preferably the full svc FQDN, e.g. `http://dex.<namespace>.svc.cluster.local:5556`. If unset, `DEX_ISSUER_URI` is used for both browser and server-to-server. |
 | `DEX_SCOPES` | Optional comma-separated scopes used for Dex login. Defaults to `openid,email,profile,groups`.                                            |
 
