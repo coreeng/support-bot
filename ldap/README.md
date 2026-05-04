@@ -91,7 +91,7 @@ With release name `support-bot-ldap` and `fullnameOverride: ldap`, the ClusterIP
 
 ## CI
 
-- [`.github/workflows/ldap-fast-feedback.yaml`](../.github/workflows/ldap-fast-feedback.yaml) uses **`coreeng/p2p`** fast feedback (`make p2p-build` in **`ldap/`** → **`template`**). Create repository secret **`LDAP_BOOTSTRAP_USER_PASSWORD`** (plaintext for bootstrap users in rendered LDIF). The workflow merges it with **`secrets.env_vars`** so you do not need to edit the monolithic `env_vars` secret for LDAP. **Fork PRs** do not receive upstream secrets; CI may fail until a maintainer runs checks.
+- [`.github/workflows/ldap-fast-feedback.yaml`](../.github/workflows/ldap-fast-feedback.yaml) uses **`coreeng/p2p`** fast feedback (`make p2p-build` in **`ldap/`** → **`template`**). Create repository secret **`LDAP_BOOTSTRAP_USER_PASSWORD`** (plaintext for bootstrap users in rendered LDIF); the workflow passes it directly via `env_vars`. **Fork PRs** do not receive upstream secrets; CI may fail until a maintainer runs checks.
 
 ## Troubleshooting (quick)
 

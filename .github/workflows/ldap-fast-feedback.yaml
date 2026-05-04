@@ -35,7 +35,6 @@ jobs:
     uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@v1
     secrets:
       env_vars: |
-        ${{ secrets.env_vars }}
         LDAP_BOOTSTRAP_USER_PASSWORD=${{ secrets.LDAP_BOOTSTRAP_USER_PASSWORD }}
     with:
       app-name: ldap
