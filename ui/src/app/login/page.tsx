@@ -23,7 +23,6 @@ function LoginContent() {
   const autoRedirectingRef = useRef(false);
 
   const code = searchParams.get("code");
-  const provider = searchParams.get("provider");
   const token = searchParams.get("token");
   const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const error = searchParams.get("error");
@@ -94,9 +93,9 @@ function LoginContent() {
       return;
     }
 
-    if (code && provider) {
+    if (code) {
       authAttemptedRef.current = true;
-      performSignIn("backend-code", { code, provider });
+      performSignIn("backend-code", { code });
       return;
     }
 
@@ -104,7 +103,7 @@ function LoginContent() {
     if (isAuthenticated) {
       router.replace(callbackUrl);
     }
-  }, [code, provider, token, isAuthenticated, isLoading, callbackUrl, router]);
+  }, [code, token, isAuthenticated, isLoading, callbackUrl, router]);
 
   // Auto-redirect to Dex on mount. Skipped on iframes (popups need a user gesture),
   // when an in-flight code/token is being completed, or when an error is being shown —

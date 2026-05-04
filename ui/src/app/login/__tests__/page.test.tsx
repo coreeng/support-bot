@@ -179,7 +179,7 @@ describe('LoginPage', () => {
     it('handles code flow identically', async () => {
       mockSignIn.mockResolvedValue({ error: undefined, ok: true, status: 200, url: '' } as any)
       mockUseSearchParams.mockReturnValue(
-        new URLSearchParams('code=mycode&provider=dex&callbackUrl=/home') as any
+        new URLSearchParams('code=mycode&callbackUrl=/home') as any
       )
 
       render(<LoginPage />)
@@ -187,7 +187,6 @@ describe('LoginPage', () => {
       await waitFor(() => {
         expect(mockSignIn).toHaveBeenCalledWith('backend-code', {
           code: 'mycode',
-          provider: 'dex',
           redirect: false,
         })
       })
@@ -280,7 +279,7 @@ describe('LoginPage', () => {
     it('calls signIn with redirect:false for code', async () => {
       mockSignIn.mockResolvedValue({ ok: true } as any)
       mockUseSearchParams.mockReturnValue(
-        new URLSearchParams('code=mycode&provider=dex&callbackUrl=/dash') as any
+        new URLSearchParams('code=mycode&callbackUrl=/dash') as any
       )
 
       render(<LoginPage />)
@@ -288,7 +287,6 @@ describe('LoginPage', () => {
       await waitFor(() => {
         expect(mockSignIn).toHaveBeenCalledWith('backend-code', {
           code: 'mycode',
-          provider: 'dex',
           redirect: false,
         })
       })
