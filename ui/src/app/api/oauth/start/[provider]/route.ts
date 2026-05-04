@@ -1,6 +1,5 @@
 import {NextRequest, NextResponse} from "next/server";
 import {publicFetch} from "../../../_lib/public-fetch";
-import {isOauthUiKnownProvider} from "@/lib/auth/oauth-ui-callback";
 import {tryResolvePublicOrigin} from "@/lib/server/resolve-public-origin-response";
 import {sanitizeCallbackUrl} from "@/lib/utils/url";
 
@@ -10,7 +9,7 @@ export async function GET(
 ) {
   const { provider } = await params;
 
-  if (isOauthUiKnownProvider(provider)) {
+  if (provider === "dex") {
     const resolved = tryResolvePublicOrigin(
       request.nextUrl.origin,
       sanitizeCallbackUrl(request.nextUrl.searchParams.get("callbackUrl"))

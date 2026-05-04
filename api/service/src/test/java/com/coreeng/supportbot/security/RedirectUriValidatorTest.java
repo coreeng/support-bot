@@ -79,7 +79,7 @@ class RedirectUriValidatorTest {
     }
 
     @Test
-    void rejectsUnknownProvider() {
+    void rejectsNonDexProviderPath() {
         var v = validator("http://localhost:3000/login");
         assertThrows(IllegalArgumentException.class, () -> v.validate("http://localhost:3000/api/oauth/callback/evil"));
     }

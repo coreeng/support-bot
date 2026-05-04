@@ -4,13 +4,9 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  isOauthUiKnownProvider,
-  type OauthUiKnownProvider,
-} from "@/lib/auth/oauth-ui-callback";
 import { sanitizeCallbackUrl } from "@/lib/utils/url";
 
-type LoginProvider = OauthUiKnownProvider;
+type LoginProvider = "dex";
 
 function isInIframe(): boolean {
   try {
@@ -52,8 +48,8 @@ function LoginContent() {
           setProvidersError(true);
           setProviders([]);
         } else {
-          const availableProviders = (data.providers || []).filter((p: string): p is LoginProvider =>
-            isOauthUiKnownProvider(p)
+          const availableProviders = (data.providers || []).filter(
+            (p: string): p is LoginProvider => p === "dex"
           );
           setProviders(availableProviders);
           setProvidersError(false);

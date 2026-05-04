@@ -1,5 +1,4 @@
 import {NextRequest, NextResponse} from "next/server";
-import {isOauthUiKnownProvider} from "@/lib/auth/oauth-ui-callback";
 import {tryResolvePublicOrigin} from "@/lib/server/resolve-public-origin-response";
 import {sanitizeCallbackUrl} from "@/lib/utils/url";
 
@@ -39,7 +38,7 @@ export async function GET(
   }
 
   // Add provider and code/error parameters BEFORE creating the redirect response
-  if (isOauthUiKnownProvider(provider)) {
+  if (provider === "dex") {
     loginUrl.searchParams.set("provider", provider);
     if (code) {
       loginUrl.searchParams.set("code", code);

@@ -1,7 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import {publicFetch} from "@/app/api/_lib/public-fetch";
-import {isOauthUiKnownProvider} from "@/lib/auth/oauth-ui-callback";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 
@@ -155,7 +154,7 @@ export const authConfig: NextAuthConfig = {
         const code = credentials?.code as string;
         const provider = credentials?.provider as string;
 
-        if (code && isOauthUiKnownProvider(provider)) {
+        if (code && provider === "dex") {
           try {
             const redirectUri = oauthCallbackRedirectUri(provider);
             if (!redirectUri) {
