@@ -34,7 +34,12 @@ jobs:
     uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@v1
     secrets:
       env_vars: |
-        ${{ secrets.env_vars }}
+        SLACK_TOKEN=${{ secrets.SLACK_TOKEN_INTEGRATION }}
+        SLACK_SOCKET_TOKEN=${{ secrets.SLACK_SOCKET_TOKEN_INTEGRATION }}
+        SLACK_SIGNING_SECRET=${{ secrets.SLACK_SIGNING_SECRET_INTEGRATION }}
+        AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID_INTEGRATION }}
+        AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID_INTEGRATION }}
+        AZURE_CLIENT_SECRET=${{ secrets.AZURE_CLIENT_SECRET_INTEGRATION }}
         DEX_CLIENT_ID=${{ secrets.DEX_CLIENT_ID }}
         DEX_CLIENT_SECRET=${{ secrets.DEX_CLIENT_SECRET }}
         LDAP_BOOTSTRAP_USER_PASSWORD=${{ secrets.LDAP_BOOTSTRAP_USER_PASSWORD }}
