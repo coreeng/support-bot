@@ -6,6 +6,10 @@
 ldap/bootstrap/20-users.ldif
 api/k8s/ldap/chart/files/bootstrap/20-users.ldif
 
+# Python bytecode caches (created by `make -C dex test` importing compose_helm_values)
+__pycache__/
+*.pyc
+
 ## Generated
 # Created by https://www.toptal.com/developers/gitignore/api/vim,intellij,intellij+all,intellij+iml,windows,macos,linux,emacs,visualstudiocode,webstorm,webstorm+all,webstorm+iml
 # Edit at https://www.toptal.com/developers/gitignore?templates=vim,intellij,intellij+all,intellij+iml,windows,macos,linux,emacs,visualstudiocode,webstorm,webstorm+all,webstorm+iml
