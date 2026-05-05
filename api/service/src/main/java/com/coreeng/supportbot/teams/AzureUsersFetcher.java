@@ -21,11 +21,6 @@ public class AzureUsersFetcher implements PlatformUsersFetcher<GroupRef.Azure> {
     private final GraphServiceClient graphClient;
 
     @Override
-    public GroupRef.Provider provider() {
-        return GroupRef.Provider.AZURE;
-    }
-
-    @Override
     public List<Membership> fetchMembershipsByGroupRef(GroupRef.Azure groupRef) {
         UserCollectionResponse response = graphClient
                 .groups()

@@ -72,8 +72,7 @@ class PlatformTeamsServiceTest {
                                 new PlatformUsersFetcher.Membership("u2@test.com")))
                 .build();
 
-        EscalationTeamsRegistry registry =
-                new FakeEscalationTeamsRegistry(List.of(escalation("A"), escalation("B")));
+        EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(List.of(escalation("A"), escalation("B")));
 
         PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(4, Duration.ofSeconds(2), false);
         PlatformTeamsService service =

@@ -5,14 +5,15 @@ import com.coreeng.supportbot.teams.groups.GroupRef;
 import org.jspecify.annotations.Nullable;
 
 public record EscalationTeam(
-        String label, String code, GroupRef groupRef, @Nullable String slackMentionGroupId)
-        implements EnumerationValue {
+        String label,
+        String code,
+        GroupRef groupRef,
+        @Nullable String slackMentionGroupId) implements EnumerationValue {
 
     public EscalationTeam(String label, String code, GroupRef groupRef) {
         this(label, code, groupRef, null);
     }
 
-    /** Convenience overload that parses {@code groupRef} via {@link GroupRef#parse(String)}. */
     public EscalationTeam(String label, String code, String groupRef) {
         this(label, code, GroupRef.parse(groupRef), null);
     }
@@ -29,7 +30,7 @@ public record EscalationTeam(
         if (groupRef instanceof GroupRef.Slack slack) {
             return slack.id();
         }
-        throw new IllegalStateException("EscalationTeam '" + code + "' has non-Slack groupRef "
-                + groupRef.canonical() + " — set 'slack-mention-group-id' to enable Slack mentions");
+        throw new IllegalStateException("EscalationTeam '" + code + "' has non-Slack groupRef " + groupRef.canonical()
+                + " — set 'slack-mention-group-id' to enable Slack mentions");
     }
 }

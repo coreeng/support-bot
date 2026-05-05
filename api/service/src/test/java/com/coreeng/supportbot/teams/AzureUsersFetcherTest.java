@@ -5,13 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.microsoft.graph.groups.GroupsRequestBuilder;
 import com.microsoft.graph.groups.item.GroupItemRequestBuilder;
 import com.microsoft.graph.groups.item.transitivemembers.TransitiveMembersRequestBuilder;
 import com.microsoft.graph.groups.item.transitivemembers.graphuser.GraphUserRequestBuilder;
 import com.microsoft.graph.models.User;
 import com.microsoft.graph.models.UserCollectionResponse;
-import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.microsoft.graph.serviceclient.GraphServiceClient;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;

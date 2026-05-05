@@ -122,8 +122,9 @@ public sealed interface GroupRef
             case "azure" -> new Azure(value);
             case "jwt" -> new Jwt(value);
             case "static" -> new Static(value);
-            default -> throw new IllegalArgumentException(
-                    "Unknown GroupRef provider prefix \"" + prefix + "\" in \"" + raw + "\"");
+            default ->
+                throw new IllegalArgumentException(
+                        "Unknown GroupRef provider prefix \"" + prefix + "\" in \"" + raw + "\"");
         };
     }
 
@@ -160,6 +161,18 @@ public sealed interface GroupRef
         } catch (IllegalArgumentException e) {
             return false;
         }
+    }
+
+    /**
+     * Narrows a {@link GroupRef} to its underlying Slack subteam ID, or throws with the
+     * configured YAML key in the message. Shared between props records that require a Slack-typed
+     * group reference (e.g. {@code team.support}, {@code team.leadership}).
+     */
+    static String requireSlackId(GroupRef ref, String configKey) {
+        if (ref instanceof Slack slack) {
+            return slack.id();
+        }
+        throw new IllegalStateException(configKey + " must reference a Slack group; got " + ref.canonical());
     }
 
     private static void requireNonBlank(@Nullable String s, String type) {

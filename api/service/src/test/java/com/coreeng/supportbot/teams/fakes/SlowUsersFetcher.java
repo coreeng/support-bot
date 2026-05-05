@@ -25,11 +25,6 @@ public class SlowUsersFetcher implements PlatformUsersFetcher<GroupRef.Static> {
     }
 
     @Override
-    public GroupRef.Provider provider() {
-        return GroupRef.Provider.STATIC;
-    }
-
-    @Override
     public List<Membership> fetchMembershipsByGroupRef(GroupRef.Static groupRef) {
         int now = inFlight.incrementAndGet();
         maxObserved.getAndAccumulate(now, Math::max);

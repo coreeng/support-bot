@@ -77,7 +77,8 @@ public class PlatformTeamsConfig {
 
     @Bean
     @ConditionalOnProperty("platform-integration.gcp.enabled")
-    public PlatformUsersFetcher<GroupRef.Google> gcpUsersFetcher(CredentialsProvider gcpCredsProvider) throws IOException {
+    public PlatformUsersFetcher<GroupRef.Google> gcpUsersFetcher(CredentialsProvider gcpCredsProvider)
+            throws IOException {
         var cloundIdentityBuilder = new CloudIdentity.Builder(
                         Utils.getDefaultTransport(),
                         Utils.getDefaultJsonFactory(),

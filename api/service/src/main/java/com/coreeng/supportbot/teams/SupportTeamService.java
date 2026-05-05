@@ -25,8 +25,7 @@ public class SupportTeamService {
     @PostConstruct
     void init() {
         this.members = supportTeamFetcher.loadInitialMembers(SlackId.group(supportTeamProps.slackId()));
-        this.leadershipMembers =
-                leadershipTeamFetcher.loadInitialMembers(SlackId.group(leadershipTeamProps.slackId()));
+        this.leadershipMembers = leadershipTeamFetcher.loadInitialMembers(SlackId.group(leadershipTeamProps.slackId()));
     }
 
     public Team getTeam() {

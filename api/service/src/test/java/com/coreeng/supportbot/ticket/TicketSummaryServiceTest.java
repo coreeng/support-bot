@@ -238,8 +238,8 @@ class TicketSummaryServiceTest {
                 .thenReturn(ImmutableList.of(escalation2, escalation1)); // reversed order
         when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
         when(escalationTeamsRegistry.findEscalationTeamByCode("platform-team"))
-                .thenReturn(new EscalationTeam(
-                        "Platform Team", "platform-team", new GroupRef.Slack("platform-support")));
+                .thenReturn(
+                        new EscalationTeam("Platform Team", "platform-team", new GroupRef.Slack("platform-support")));
         when(escalationTeamsRegistry.findEscalationTeamByCode("security-team"))
                 .thenReturn(new EscalationTeam("Security Team", "security-team", new GroupRef.Slack("security-group")));
 

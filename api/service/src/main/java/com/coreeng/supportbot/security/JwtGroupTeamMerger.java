@@ -41,20 +41,20 @@ public class JwtGroupTeamMerger {
         ImmutableList.Builder<Team> out = ImmutableList.builder();
         out.addAll(emailTeams);
 
-        for (String jwtGroup : rawGroups) {
-            for (JwtGroupsProperties.Mapping mapping : properties.mappings()) {
-                if (mapping.teamCode() == null || mapping.teamCode().isBlank()) {
+        for (JwtGroupsProperties.Mapping mapping : properties.mappings()) {
+            String teamCode = mapping.teamCode();
+            if (teamCode == null || teamCode.isBlank()) {
+                continue;
+            }
+            List<String> matchValues = mapping.matchValues();
+            for (String jwtGroup : rawGroups) {
+                if (!anyClaimValueMatches(matchValues, jwtGroup)) {
                     continue;
                 }
-                if (!anyClaimValueMatches(mapping.matchValues(), jwtGroup)) {
-                    continue;
-                }
-                Team team = teamService.findTeamByCode(mapping.teamCode());
+                Team team = teamService.findTeamByCode(teamCode);
                 if (team == null) {
-                    log.warn("jwt-groups mapping references unknown team-code {}", mapping.teamCode());
-                    continue;
-                }
-                if (seenCodes.add(team.code())) {
+                    log.warn("jwt-groups mapping references unknown team-code {}", teamCode);
+                } else if (seenCodes.add(team.code())) {
                     out.add(team);
                 }
                 break;
