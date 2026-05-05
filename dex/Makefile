@@ -3,7 +3,7 @@ SHELL := /bin/bash
 DEX_K8S := ../api/k8s/dex
 
 ##@ High level p2p targets
-p2p-build: template ## Fast feedback: validate Helm values
+p2p-build: test template ## Fast feedback: run unit tests + validate Helm values
 p2p-functional:    
 p2p-nft:           
 p2p-integration: template ## P2P: render then deploy (enables LDAP plaintext overlay for Dex integration)
@@ -45,6 +45,10 @@ DEX_LDAP_ENABLED ?=
 DEX_GOOGLE_ENABLED ?=
 DEX_MICROSOFT_ENABLED ?=
 DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT ?=
+
+.PHONY: test
+test: ## Run unit tests for dex scripts (compose_helm_values composer)
+	@python3 -m unittest discover -s scripts -p 'test_*.py' -v
 
 .PHONY: template
 template: ## Validate Dex values by rendering dex/dex chart (charts.dexidp.io)
