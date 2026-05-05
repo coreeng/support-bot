@@ -37,6 +37,15 @@ DEX_CHART_VERSION ?= 0.24.0
 NAMESPACE ?= support-bot-integration
 DRY_RUN ?=
 
+# Default to empty so $(DEX_*_ENABLED) references in the recipes below don't
+# trigger --warn-undefined-variables when callers don't pass them. Operators set
+# them via dex/.env.local, the command line, or root Makefile targets
+# (dex-deploy-integration sets DEX_LDAP_ENABLED=true).
+DEX_LDAP_ENABLED ?=
+DEX_GOOGLE_ENABLED ?=
+DEX_MICROSOFT_ENABLED ?=
+DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT ?=
+
 .PHONY: template
 template: ## Validate Dex values by rendering dex/dex chart (charts.dexidp.io)
 	@DEX_CHART_VERSION="$(DEX_CHART_VERSION)" bash ./scripts/helm_dex.sh template

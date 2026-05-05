@@ -415,7 +415,7 @@ dex-template: ## Validate Dex values by rendering dex/dex chart
 	@$(MAKE) -C dex template
 
 dex-deploy-integration: ## Deploy Dex module to integration environment (OIDC overlay + ephemeral plaintext LDAP)
-	@$(MAKE) -C dex deploy-integration DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true
+	@$(MAKE) -C dex deploy-integration DEX_LDAP_ENABLED=true DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true
 
 dex-deploy-prod: ## Deploy Dex module to production environment
 	@$(MAKE) -C dex deploy-prod
