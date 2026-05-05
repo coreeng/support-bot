@@ -16,7 +16,7 @@ class CorsConfigTest {
     private static SecurityProperties createProperties(@Nullable String allowedOrigins) {
         return new SecurityProperties(
                 new SecurityProperties.JwtProperties("test-secret-minimum-256-bits-for-testing", Duration.ofHours(1)),
-                SecurityProperties.OAuth2Properties.withRedirectOnly("http://localhost:3000/auth/callback"),
+                new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
                 new SecurityProperties.CorsProperties(allowedOrigins),
                 new SecurityProperties.TestBypassProperties(false),
                 new SecurityProperties.AllowListProperties(List.of(), List.of()));

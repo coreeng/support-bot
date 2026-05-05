@@ -11,11 +11,9 @@ import com.nimbusds.jose.jwk.source.JWKSourceBuilder;
 import com.nimbusds.jose.proc.JWSVerificationKeySelector;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import java.net.URI;
-import java.text.ParseException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
@@ -52,12 +50,12 @@ public class OAuthExchangeService {
     private final JwtGroupTeamMerger jwtGroupTeamMerger;
     private final RedirectUriValidator redirectUriValidator;
 
-    public String exchangeCodeForToken(String provider, String code, String redirectUri) {
+    public String exchangeCodeForToken(String code, String redirectUri) {
         ValidatedRedirectUri validatedRedirectUri = redirectUriValidator.validate(redirectUri);
 
-        var registration = clientRegistrationRepository.findByRegistrationId(provider);
+        var registration = clientRegistrationRepository.findByRegistrationId("dex");
         if (registration == null) {
-            throw new IllegalArgumentException("Unknown OAuth provider: " + provider);
+            throw new IllegalStateException("Dex OAuth2 client is not configured");
         }
 
         // Exchange authorization code for access token
@@ -100,32 +98,19 @@ public class OAuthExchangeService {
 
             var userInfo = new HashMap<>(userInfoResponse.getBody());
 
-            // Merge ID token claims (Azure's userinfo endpoint often omits email/preferred_username).
-            // Google/Azure: legacy behaviour — parse JWT payload only (same as pre-Dex); do not depend on
-            // JWKS reachability for login. Dex: verify signature and iss/aud before trusting claims (groups).
+            // Verify ID token signature and iss/aud against the provider's JWKS before trusting
+            // claims (e.g. LDAP groups merged into the JWT by Dex).
             var idToken = (String) response.get("id_token");
             if (idToken != null) {
-                if ("dex".equalsIgnoreCase(provider)) {
-                    try {
-                        var claims = verifyAndExtractClaims(idToken, registration);
-                        claims.forEach(userInfo::putIfAbsent);
-                        if (claims.containsKey("groups")) {
-                            userInfo.put("groups", claims.get("groups"));
-                        }
-                    } catch (Exception e) {
-                        throw new IllegalStateException(
-                                "ID token verification failed for provider "
-                                        + registration.getRegistrationId()
-                                        + " which requires id_token claims (e.g. LDAP groups)",
-                                e);
+                try {
+                    var claims = verifyAndExtractClaims(idToken, registration);
+                    claims.forEach(userInfo::putIfAbsent);
+                    if (claims.containsKey("groups")) {
+                        userInfo.put("groups", claims.get("groups"));
                     }
-                } else {
-                    try {
-                        var claims = SignedJWT.parse(idToken).getJWTClaimsSet().getClaims();
-                        claims.forEach(userInfo::putIfAbsent);
-                    } catch (ParseException e) {
-                        log.warn("Failed to parse id_token claims", e);
-                    }
+                } catch (Exception e) {
+                    throw new IllegalStateException(
+                            "ID token verification failed for provider " + registration.getRegistrationId(), e);
                 }
             }
 
@@ -140,8 +125,7 @@ public class OAuthExchangeService {
             log.info("OAuth2 login successful for user");
 
             // Compute roles (Dex: merge LDAP groups claim into email-based platform teams)
-            var teams =
-                    jwtGroupTeamMerger.mergeForProvider(provider, userInfo, teamService.listTeamsByUserEmail(email));
+            var teams = jwtGroupTeamMerger.merge(userInfo, teamService.listTeamsByUserEmail(email));
             var roles = computeRoles(email, teams);
 
             var principal = new UserPrincipal(email, name, teams, roles);
@@ -217,7 +201,7 @@ public class OAuthExchangeService {
 
     /**
      * Verifies the ID token signature against the provider's JWKS and validates {@code iss} and
-     * {@code aud} claims. Used for Dex only.
+     * {@code aud} claims.
      *
      * @return verified claims, or empty map if JWKS URI is not configured (claims are never trusted
      *     without verification)

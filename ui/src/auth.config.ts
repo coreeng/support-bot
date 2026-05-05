@@ -1,16 +1,15 @@
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import {publicFetch} from "@/app/api/_lib/public-fetch";
-import {isOauthUiKnownProvider} from "@/lib/auth/oauth-ui-callback";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 
 /** Build redirect_uri from NEXTAUTH_URL (single source of truth for OAuth origin). */
-function oauthCallbackRedirectUri(provider: string): string | null {
+function dexCallbackRedirectUri(): string | null {
   const base = process.env.NEXTAUTH_URL?.trim();
   if (!base) return null;
   try {
-    return new URL(`/api/oauth/callback/${provider}`, new URL(base).origin).toString();
+    return new URL("/api/oauth/callback/dex", new URL(base).origin).toString();
   } catch {
     return null;
   }
@@ -149,15 +148,13 @@ export const authConfig: NextAuthConfig = {
       name: "Backend OAuth",
       credentials: {
         code: { label: "Auth Code", type: "text" },
-        provider: { label: "Oauth2 Provider", type: "text" },
       },
       async authorize(credentials) {
         const code = credentials?.code as string;
-        const provider = credentials?.provider as string;
 
-        if (code && isOauthUiKnownProvider(provider)) {
+        if (code) {
           try {
-            const redirectUri = oauthCallbackRedirectUri(provider);
+            const redirectUri = dexCallbackRedirectUri();
             if (!redirectUri) {
               console.error(
                 "OAuth exchange: NEXTAUTH_URL is not set — cannot build redirect_uri"
@@ -167,7 +164,7 @@ export const authConfig: NextAuthConfig = {
 
             const response = await publicFetch("/auth/oauth/exchange", {
               method: "POST",
-              body: JSON.stringify({provider, code, redirectUri}),
+              body: JSON.stringify({code, redirectUri}),
             });
 
             if (response.ok) {
@@ -206,7 +203,7 @@ export const authConfig: NextAuthConfig = {
             throw error;
           }
         } else {
-          console.error(`Missing code or invalid provider: ${provider}`);
+          console.error("Missing code");
         }
         return null;
       }, // authorize()

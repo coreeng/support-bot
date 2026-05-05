@@ -21,7 +21,6 @@ public class AuthController {
     private final AuthCodeStore authCodeStore;
     private final OAuthUrlService oauthUrlService;
     private final OAuthExchangeService oauthExchangeService;
-    private final OAuth2AvailabilityChecker oauth2AvailabilityChecker;
 
     @PostMapping("/token")
     public ResponseEntity<TokenResponse> exchangeToken(@RequestBody TokenRequest request) {
@@ -60,10 +59,9 @@ public class AuthController {
     }
 
     @GetMapping("/oauth-url")
-    public ResponseEntity<OAuthUrlResponse> getOAuthUrl(
-            @RequestParam String provider, @RequestParam String redirectUri) {
+    public ResponseEntity<OAuthUrlResponse> getOAuthUrl(@RequestParam String redirectUri) {
         try {
-            var result = oauthUrlService.getAuthorizationUrl(provider, redirectUri);
+            var result = oauthUrlService.getAuthorizationUrl(redirectUri);
             return ResponseEntity.ok(new OAuthUrlResponse(result.url(), result.state()));
         } catch (IllegalArgumentException e) {
             log.warn("OAuth URL request rejected: {}", e.getMessage());
@@ -74,11 +72,10 @@ public class AuthController {
     @PostMapping("/oauth/exchange")
     public ResponseEntity<TokenResponse> exchangeOAuthCode(@RequestBody OAuthExchangeRequest request) {
         try {
-            var jwt = oauthExchangeService.exchangeCodeForToken(
-                    request.provider(), request.code(), request.redirectUri());
+            var jwt = oauthExchangeService.exchangeCodeForToken(request.code(), request.redirectUri());
             return ResponseEntity.ok(new TokenResponse(jwt));
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid OAuth provider: {}", request.provider());
+            log.warn("OAuth exchange request rejected: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
         } catch (UserNotAllowedException e) {
             log.warn("Allow-list rejected user during direct OAuth exchange");
@@ -92,11 +89,6 @@ public class AuthController {
         }
     }
 
-    @GetMapping("/providers")
-    public ResponseEntity<ProvidersResponse> getAvailableProviders() {
-        return ResponseEntity.ok(new ProvidersResponse(oauth2AvailabilityChecker.getAvailableProviders()));
-    }
-
     public record TokenRequest(String code) {}
 
     public record TokenResponse(String token) {}
@@ -107,7 +99,5 @@ public class AuthController {
 
     public record OAuthUrlResponse(String url, String state) {}
 
-    public record OAuthExchangeRequest(String provider, String code, String redirectUri) {}
-
-    public record ProvidersResponse(List<String> providers) {}
+    public record OAuthExchangeRequest(String code, String redirectUri) {}
 }

@@ -133,7 +133,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                         {!sidebarCollapsed ? (
                             <>
                                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg">
-                                    <Image src="/banner.png" alt="Core Community" width={160} height={40} priority />
+                                    <Image src="/logo-dark.png" alt="Core Community" width={160} height={40} priority />
                                 </div>
                                 <button
                                     onClick={() => setSidebarCollapsed(true)}
@@ -150,7 +150,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                                 title="Expand sidebar"
                             >
                                 <div className="w-10 h-10 rounded-lg flex items-center justify-center p-1">
-                                    <Image src="/banner.png" alt="Core Community" width={32} height={32} priority />
+                                    {/* Plain <img> rather than next/image — .ico is multi-resolution
+                                        and small; sharp optimization is unnecessary here. */}
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src="/favicon.ico" alt="Core Community" width={24} height={24} className="w-6 h-6" />
                                 </div>
                                 <ChevronRight className="w-4 h-4" />
                             </button>
