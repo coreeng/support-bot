@@ -32,8 +32,6 @@ jobs:
   deploy-monitoring:
     needs: [version]
     uses: coreeng/p2p/.github/workflows/p2p-execute-command.yaml@v1
-    secrets:
-      env_vars: ${{ secrets.env_vars }}
     with:
       github_env: gcp-dev
       app-name: support-bot
