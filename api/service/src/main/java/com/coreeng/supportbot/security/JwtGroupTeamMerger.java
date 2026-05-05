@@ -46,7 +46,7 @@ public class JwtGroupTeamMerger {
                 if (mapping.teamCode() == null || mapping.teamCode().isBlank()) {
                     continue;
                 }
-                if (!anyClaimValueMatches(mapping.claimValues(), jwtGroup)) {
+                if (!anyClaimValueMatches(mapping.matchValues(), jwtGroup)) {
                     continue;
                 }
                 Team team = teamService.findTeamByCode(mapping.teamCode());

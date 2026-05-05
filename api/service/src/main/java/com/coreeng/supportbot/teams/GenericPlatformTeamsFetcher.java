@@ -2,6 +2,7 @@ package com.coreeng.supportbot.teams;
 
 import static java.lang.String.format;
 
+import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.coreeng.supportbot.util.JsonMapper;
 import com.google.common.collect.ImmutableList;
 import dev.cel.common.CelAbstractSyntaxTree;
@@ -91,9 +92,9 @@ public class GenericPlatformTeamsFetcher implements PlatformTeamsFetcher {
             Map<String, Object> resourceMap = jsonMapper.getObjectMapper().convertValue(item, Map.class);
             try {
                 String teamName = evaluateExpression("teamName", item, teamNameProgram, resourceMap);
-                String groupRef = evaluateExpression("groupRef", item, groupRefProgram, resourceMap);
+                String groupRefStr = evaluateExpression("groupRef", item, groupRefProgram, resourceMap);
 
-                TeamAndGroupTuple apply = new TeamAndGroupTuple(teamName, groupRef);
+                TeamAndGroupTuple apply = new TeamAndGroupTuple(teamName, GroupRef.parse(groupRefStr));
                 teams.add(apply);
             } catch (PropertyExtractionException e) {
                 log.atWarn().setCause(e).log("Failed to extract teamName or groupRef. Skipping the team");

@@ -2,6 +2,8 @@ package com.coreeng.supportbot.teams;
 
 import com.azure.core.credential.TokenCredential;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
+import com.coreeng.supportbot.teams.groups.GroupRef;
+import com.coreeng.supportbot.teams.groups.GroupResolver;
 import com.coreeng.supportbot.util.JsonMapper;
 import com.google.api.client.googleapis.util.Utils;
 import com.google.api.gax.core.CredentialsProvider;
@@ -50,8 +52,8 @@ public class PlatformTeamsConfig {
 
     @Bean
     public PlatformTeamsService platformTeamsService(
-            PlatformTeamsFetcher teamsFetcher, PlatformUsersFetcher usersFetcher, PlatformTeamsFetchProps fetchProps) {
-        return new PlatformTeamsService(teamsFetcher, usersFetcher, escalationTeamsRegistry, fetchProps);
+            PlatformTeamsFetcher teamsFetcher, GroupResolver groupResolver, PlatformTeamsFetchProps fetchProps) {
+        return new PlatformTeamsService(teamsFetcher, groupResolver, escalationTeamsRegistry, fetchProps);
     }
 
     @Bean
@@ -75,7 +77,7 @@ public class PlatformTeamsConfig {
 
     @Bean
     @ConditionalOnProperty("platform-integration.gcp.enabled")
-    public PlatformUsersFetcher gcpUsersFetcher(CredentialsProvider gcpCredsProvider) throws IOException {
+    public PlatformUsersFetcher<GroupRef.Google> gcpUsersFetcher(CredentialsProvider gcpCredsProvider) throws IOException {
         var cloundIdentityBuilder = new CloudIdentity.Builder(
                         Utils.getDefaultTransport(),
                         Utils.getDefaultJsonFactory(),
@@ -89,7 +91,7 @@ public class PlatformTeamsConfig {
 
     @Bean
     @ConditionalOnProperty("platform-integration.azure.enabled")
-    public PlatformUsersFetcher azureUsersFetcher(
+    public PlatformUsersFetcher<GroupRef.Azure> azureUsersFetcher(
             TokenCredential credential,
             @Value("${platform-integration.azure.client.base-url}") String baseUrl,
             @Value("${platform-integration.azure.client.log-level}") String azureClientLogLevel) {
@@ -110,7 +112,7 @@ public class PlatformTeamsConfig {
 
     @Bean
     @ConditionalOnProperty("platform-integration.static-user.enabled")
-    public PlatformUsersFetcher staticUsersFetcher() {
+    public PlatformUsersFetcher<GroupRef.Static> staticUsersFetcher() {
         return new StaticUsersFetcher(staticPlatformUsersProps);
     }
 

@@ -7,6 +7,8 @@ import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.teams.fakes.FakeEscalationTeamsRegistry;
 import com.coreeng.supportbot.teams.fakes.FakeTeamsFetcher;
 import com.coreeng.supportbot.teams.fakes.SlowUsersFetcher;
+import com.coreeng.supportbot.teams.groups.GroupRef;
+import com.coreeng.supportbot.teams.groups.GroupResolver;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,9 +33,9 @@ class PlatformTeamsServiceConcurrencyTest {
         List<EscalationTeam> escalationTeams = new ArrayList<>();
         for (int i = 1; i <= groups; i++) {
             String teamName = "team-" + i;
-            String groupRef = "G" + i;
-            teams.add(new PlatformTeamsFetcher.TeamAndGroupTuple(teamName, groupRef));
-            escalationTeams.add(new EscalationTeam(teamName, teamName, "SOME"));
+            String groupKey = "G" + i;
+            teams.add(new PlatformTeamsFetcher.TeamAndGroupTuple(teamName, GroupRef.parse(groupKey)));
+            escalationTeams.add(new EscalationTeam(teamName, teamName, GroupRef.parse("SOME")));
         }
 
         PlatformTeamsFetcher teamsFetcher = new FakeTeamsFetcher(teams);
@@ -41,11 +43,12 @@ class PlatformTeamsServiceConcurrencyTest {
                 perCallDelay,
                 groupRef ->
                         List.of(new PlatformUsersFetcher.Membership(groupRef.toLowerCase(Locale.ROOT) + "@test.com")));
+        GroupResolver resolver = new GroupResolver(null, null, usersFetcher);
 
         EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(escalationTeams);
 
         PlatformTeamsFetchProps props = new PlatformTeamsFetchProps(maxConcurrency, timeout, false);
-        PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, usersFetcher, registry, props);
+        PlatformTeamsService service = new PlatformTeamsService(teamsFetcher, resolver, registry, props);
 
         // Act
         Instant start = Instant.now();
@@ -72,14 +75,14 @@ class PlatformTeamsServiceConcurrencyTest {
         assertEquals(groups, service.listTeams().size());
         for (int i = 1; i <= groups; i++) {
             String teamName = "team-" + i;
-            String groupRef = "G" + i;
+            String groupKey = "G" + i;
             var team = service.findTeamByName(teamName);
             assertNotNull(team);
-            assertTrue(team.groupRefs().contains(groupRef));
+            assertTrue(team.groupRefs().contains(GroupRef.parse(groupKey)));
             assertEquals(1, team.users().size());
-            var user = service.findUserByEmail(groupRef.toLowerCase(Locale.ROOT) + "@test.com");
+            var user = service.findUserByEmail(groupKey.toLowerCase(Locale.ROOT) + "@test.com");
             assertNotNull(user);
-            assertTrue(service.listTeamsByUserEmail(groupRef.toLowerCase(Locale.ROOT) + "@test.com").stream()
+            assertTrue(service.listTeamsByUserEmail(groupKey.toLowerCase(Locale.ROOT) + "@test.com").stream()
                     .anyMatch(t -> t.name().equals(teamName)));
         }
     }
