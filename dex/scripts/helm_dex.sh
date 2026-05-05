@@ -126,6 +126,37 @@ require_at_least_one_backend() {
 	fi
 }
 
+# Fail loudly if a backend is enabled but its credentials are missing — without this,
+# prepare_values() would substitute the helm-template-placeholder-* defaults into a
+# real deploy, producing a Dex pod that starts cleanly but rejects every login.
+# Skipped by the template op (no real cluster, placeholders are fine for chart validation).
+require_credentials_for_enabled_backends() {
+	local missing=()
+	if is_truthy "${DEX_LDAP_ENABLED:-}"; then
+		[[ -n "${LDAP_BOOTSTRAP_USER_PASSWORD:-}" ]] || missing+=("LDAP_BOOTSTRAP_USER_PASSWORD (DEX_LDAP_ENABLED)")
+	fi
+	if is_truthy "${DEX_GOOGLE_ENABLED:-}"; then
+		[[ -n "${DEX_GOOGLE_CLIENT_ID:-}" ]]     || missing+=("DEX_GOOGLE_CLIENT_ID (DEX_GOOGLE_ENABLED)")
+		[[ -n "${DEX_GOOGLE_CLIENT_SECRET:-}" ]] || missing+=("DEX_GOOGLE_CLIENT_SECRET (DEX_GOOGLE_ENABLED)")
+	fi
+	if is_truthy "${DEX_MICROSOFT_ENABLED:-}"; then
+		[[ -n "${DEX_MICROSOFT_CLIENT_ID:-}" ]]     || missing+=("DEX_MICROSOFT_CLIENT_ID (DEX_MICROSOFT_ENABLED)")
+		[[ -n "${DEX_MICROSOFT_CLIENT_SECRET:-}" ]] || missing+=("DEX_MICROSOFT_CLIENT_SECRET (DEX_MICROSOFT_ENABLED)")
+	fi
+	if is_truthy "${DEX_GOOGLE_ENABLED:-}" || is_truthy "${DEX_MICROSOFT_ENABLED:-}"; then
+		[[ -n "${DEX_ISSUER:-}" ]] || missing+=("DEX_ISSUER (required for Google/Microsoft redirectURI; must match config.issuer in your Dex values)")
+	fi
+	if [[ "${#missing[@]}" -gt 0 ]]; then
+		echo "Missing required env vars for enabled Dex connectors:" >&2
+		local m
+		for m in "${missing[@]}"; do
+			echo "  - ${m}" >&2
+		done
+		echo "See dex/.env.example and api/k8s/dex/README.md." >&2
+		exit 1
+	fi
+}
+
 case "${OP}" in
 template)
 	# Render every meaningful combination so values mistakes for any backend are caught in CI,
@@ -150,10 +181,12 @@ deploy-integration)
 	fi
 
 	NAMESPACE="${NAMESPACE:?Set NAMESPACE}"
-	ensure_dex_k8s_secret "${NAMESPACE}"
 
 	read_selected_overlays
 	require_at_least_one_backend
+	require_credentials_for_enabled_backends
+
+	ensure_dex_k8s_secret "${NAMESPACE}"
 
 	merged="${TMPDIR}/connectors.yaml"
 	compose_connectors "${merged}" "${SELECTED_OVERLAYS[@]}"
@@ -182,10 +215,12 @@ deploy-prod)
 	fi
 
 	NAMESPACE="${NAMESPACE:?Set NAMESPACE}"
-	ensure_dex_k8s_secret "${NAMESPACE}"
 
 	read_selected_overlays
 	require_at_least_one_backend
+	require_credentials_for_enabled_backends
+
+	ensure_dex_k8s_secret "${NAMESPACE}"
 
 	merged="${TMPDIR}/connectors.yaml"
 	compose_connectors "${merged}" "${SELECTED_OVERLAYS[@]}"
