@@ -21,7 +21,7 @@ p2p-prod:
 apply-bootstrap-users-ldif: ## Require LDAP_BOOTSTRAP_USER_PASSWORD and write bootstrap/20-users.ldif
 	@bash -c 'set -euo pipefail; cd "$(CURDIR)"; \
 		if [[ -z "$${LDAP_BOOTSTRAP_USER_PASSWORD:-}" ]]; then \
-			echo "error: LDAP_BOOTSTRAP_USER_PASSWORD is required (local: ldap/.env.local; CI: secret LDAP_BOOTSTRAP_USER_PASSWORD / P2P env_vars — see ldap/README.md)." >&2; \
+			echo "error: LDAP_BOOTSTRAP_USER_PASSWORD is required (local: ldap/.env.local; CI: GitHub repo secret LDAP_BOOTSTRAP_USER_PASSWORD — see ldap/README.md)." >&2; \
 			exit 1; \
 		fi; \
 		bash scripts/render_bootstrap_users_ldif.sh'
