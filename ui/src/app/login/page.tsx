@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,8 +19,10 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading } = useAuth();
   const authAttemptedRef = useRef(false);
-  const autoRedirectAttemptedRef = useRef(false);
-  const autoRedirectingRef = useRef(false);
+  // Tracked as React state (not refs) so the bfcache-restore handler below can
+  // re-render the page out of the "Redirecting to sign-in..." spinner.
+  const [autoRedirectAttempted, setAutoRedirectAttempted] = useState(false);
+  const [autoRedirecting, setAutoRedirecting] = useState(false);
 
   const code = searchParams.get("code");
   const token = searchParams.get("token");
@@ -42,12 +44,12 @@ function LoginContent() {
   }, []);
 
   // bfcache: when the browser restores this page after the user pressed "back" from Dex,
-  // the in-flight redirect attempt should not auto-fire again — the attempted-ref keeps
-  // the user on the login page so they can decide what to do.
+  // clear the spinner so the SSO button renders as a fallback. autoRedirectAttempted stays
+  // true so the auto-redirect effect doesn't re-fire and bounce the user straight back.
   useEffect(() => {
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
-        autoRedirectingRef.current = false;
+        setAutoRedirecting(false);
       }
     };
     window.addEventListener("pageshow", handlePageShow);
@@ -109,16 +111,16 @@ function LoginContent() {
   // when an in-flight code/token is being completed, or when an error is being shown —
   // those paths need the page to render so the user sees the message or completes the flow.
   useEffect(() => {
-    if (autoRedirectAttemptedRef.current) return;
+    if (autoRedirectAttempted) return;
     if (isLoading) return;
     if (isAuthenticated) return;
     if (error || code || token) return;
     if (isInIframe()) return;
 
-    autoRedirectAttemptedRef.current = true;
-    autoRedirectingRef.current = true;
+    setAutoRedirectAttempted(true);
+    setAutoRedirecting(true);
     window.location.href = `/api/oauth/start/dex?callbackUrl=${encodeURIComponent(callbackUrl)}`;
-  }, [isLoading, isAuthenticated, error, code, token, callbackUrl]);
+  }, [autoRedirectAttempted, isLoading, isAuthenticated, error, code, token, callbackUrl]);
 
   const handleLogin = () => {
     // OAuth goes through API route - server handles redirect to backend
@@ -149,12 +151,20 @@ function LoginContent() {
   };
 
   // Show loading state during auth checks, in-flight callbacks, or while the auto-redirect is firing.
-  // Iframes never auto-redirect, so they fall through to the button render path.
-  const willAutoRedirect =
-    !isLoading && !isAuthenticated && !error && !code && !token && !isInIframe();
-  if (isLoading || willAutoRedirect || ((code || token) && !error)) {
+  // The pre-emptive `willAutoRedirectSoon` clause covers the gap between first render and
+  // the effect firing, so the SSO button doesn't flicker into view; once the effect has run,
+  // `autoRedirectAttempted` flips and only the `autoRedirecting` state controls the spinner —
+  // which the bfcache pageshow handler clears when the user pressed Back from Dex.
+  const willAutoRedirectSoon =
+    !autoRedirectAttempted && !isLoading && !isAuthenticated && !error && !code && !token && !isInIframe();
+  const showSpinner = isLoading || autoRedirecting || willAutoRedirectSoon || ((code || token) && !error);
+  if (showSpinner) {
     const message =
-      code || token ? "Completing authentication..." : willAutoRedirect ? "Redirecting to sign-in..." : "Loading...";
+      code || token
+        ? "Completing authentication..."
+        : autoRedirecting || willAutoRedirectSoon
+          ? "Redirecting to sign-in..."
+          : "Loading...";
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
@@ -229,7 +239,8 @@ function LoginContent() {
     );
   }
 
-  // Iframe path: render the SSO button (popups need a user gesture).
+  // Iframe path (popups need a user gesture) and bfcache fallback (when the user pressed
+  // Back from Dex) both render the SSO button so the user can complete login manually.
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
       <div className="max-w-md w-full space-y-8 p-8">
