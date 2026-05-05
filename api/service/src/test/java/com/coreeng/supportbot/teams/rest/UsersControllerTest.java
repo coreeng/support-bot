@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.teams.PlatformTeam;
 import com.coreeng.supportbot.teams.PlatformTeamsService;
+import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.coreeng.supportbot.teams.PlatformUser;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.Team;
@@ -51,7 +52,7 @@ class UsersControllerTest {
     void shouldReturnUserWhenFound() {
         // given
         String email = "user@test.com";
-        PlatformTeam platformTeam = new PlatformTeam("team1", Set.of("group-1"), Set.of());
+        PlatformTeam platformTeam = new PlatformTeam("team1", Set.of(GroupRef.parse("group-1")), Set.of());
         PlatformUser user = new PlatformUser(email, Set.of(platformTeam));
 
         Team supportTeam = new Team("Support Team", "support", ImmutableList.of(TeamType.SUPPORT));

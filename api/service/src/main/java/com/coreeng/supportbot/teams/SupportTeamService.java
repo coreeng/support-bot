@@ -24,9 +24,9 @@ public class SupportTeamService {
 
     @PostConstruct
     void init() {
-        this.members = supportTeamFetcher.loadInitialMembers(SlackId.group(supportTeamProps.slackGroupId()));
+        this.members = supportTeamFetcher.loadInitialMembers(SlackId.group(supportTeamProps.slackId()));
         this.leadershipMembers =
-                leadershipTeamFetcher.loadInitialMembers(SlackId.group(leadershipTeamProps.slackGroupId()));
+                leadershipTeamFetcher.loadInitialMembers(SlackId.group(leadershipTeamProps.slackId()));
     }
 
     public Team getTeam() {
@@ -50,14 +50,14 @@ public class SupportTeamService {
     }
 
     public void handleMembershipUpdate(SlackId.Group groupId, ImmutableList<SlackId.User> teamUsers) {
-        if (supportTeamProps.slackGroupId().equals(groupId.id())) {
+        if (supportTeamProps.slackId().equals(groupId.id())) {
             ImmutableList<TeamMemberFetcher.TeamMember> updatedMembers =
                     supportTeamFetcher.handleMembershipUpdate(groupId, teamUsers);
             if (!updatedMembers.isEmpty()) {
                 this.members = updatedMembers;
                 log.atInfo().addArgument(updatedMembers::size).log("Updated support team members to {} entries");
             }
-        } else if (leadershipTeamProps.slackGroupId().equals(groupId.id())) {
+        } else if (leadershipTeamProps.slackId().equals(groupId.id())) {
             ImmutableList<TeamMemberFetcher.TeamMember> updatedMembers =
                     leadershipTeamFetcher.handleMembershipUpdate(groupId, teamUsers);
             if (!updatedMembers.isEmpty()) {

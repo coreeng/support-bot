@@ -154,13 +154,13 @@ enums:
   escalation-teams:
     - label: wow
       code: wow
-      slack-group-id: S08948NBMED
+      group-ref: "slack:S08948NBMED"
     - label: infra-integration
       code: infra-integration
-      slack-group-id: S08948NBMED
+      group-ref: "slack:S08948NBMED"
     - label: connected-app
       code: connected-app
-      slack-group-id: S08948NBMED
+      group-ref: "slack:S08948NBMED"
   tags:
     - label: Ingresses
       code: ingresses
@@ -255,7 +255,7 @@ team:
   support:
     name: Core Support
     code: support
-    slack-group-id: S08948NBMED
+    group-ref: "slack:S08948NBMED"
     static:
       enabled: false
       members:
@@ -268,7 +268,7 @@ team:
   leadership:
     name: Support Leadership
     code: support-leadership
-    slack-group-id: S08948NBMED
+    group-ref: "slack:S08948NBMED"
     static:
       enabled: false
       members:

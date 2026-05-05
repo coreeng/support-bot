@@ -27,6 +27,7 @@ import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.TeamMemberFetcher;
+import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.coreeng.supportbot.util.JsonMapper;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.Message;
@@ -237,9 +238,10 @@ class TicketSummaryServiceTest {
                 .thenReturn(ImmutableList.of(escalation2, escalation1)); // reversed order
         when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
         when(escalationTeamsRegistry.findEscalationTeamByCode("platform-team"))
-                .thenReturn(new EscalationTeam("Platform Team", "platform-team", "platform-support"));
+                .thenReturn(new EscalationTeam(
+                        "Platform Team", "platform-team", new GroupRef.Slack("platform-support")));
         when(escalationTeamsRegistry.findEscalationTeamByCode("security-team"))
-                .thenReturn(new EscalationTeam("Security Team", "security-team", "security-group"));
+                .thenReturn(new EscalationTeam("Security Team", "security-team", new GroupRef.Slack("security-group")));
 
         // when
         TicketSummaryView result = service.summaryView(ticketId);

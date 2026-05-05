@@ -11,6 +11,7 @@ import com.microsoft.graph.groups.item.transitivemembers.TransitiveMembersReques
 import com.microsoft.graph.groups.item.transitivemembers.graphuser.GraphUserRequestBuilder;
 import com.microsoft.graph.models.User;
 import com.microsoft.graph.models.UserCollectionResponse;
+import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.microsoft.graph.serviceclient.GraphServiceClient;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -69,7 +70,8 @@ class AzureUsersFetcherTest {
         AzureUsersFetcher fetcher = new AzureUsersFetcher(mockGraphClient);
 
         // When
-        List<PlatformUsersFetcher.Membership> memberships = fetcher.fetchMembershipsByGroupRef("group-id");
+        List<PlatformUsersFetcher.Membership> memberships =
+                fetcher.fetchMembershipsByGroupRef(new GroupRef.Azure("group-id"));
 
         // Then
         assertEquals(2, memberships.size());
