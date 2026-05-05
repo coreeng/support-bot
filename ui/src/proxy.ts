@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
  * Next.js 16 proxy (formerly middleware) for route protection.
  * Redirects unauthenticated users to /login for protected routes.
  */
-const publicPaths = ["/login", "/api/auth", "/api/health", "/api/identity-providers"];
+const publicPaths = ["/login", "/api/auth", "/api/health"];
 
 const protectedProxy = auth((req) => {
   const { nextUrl, auth: session } = req;

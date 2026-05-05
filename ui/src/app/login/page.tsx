@@ -4,62 +4,30 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  isOauthUiKnownProvider,
-  type OauthUiKnownProvider,
-} from "@/lib/auth/oauth-ui-callback";
 import { sanitizeCallbackUrl } from "@/lib/utils/url";
 
-type LoginProvider = OauthUiKnownProvider;
+function isInIframe(): boolean {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
 
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading } = useAuth();
   const authAttemptedRef = useRef(false);
-  const [providers, setProviders] = useState<LoginProvider[]>(["google", "azure"]);
-  const [providersLoading, setProvidersLoading] = useState(true);
-  const [providersError, setProvidersError] = useState(false);
+  // Tracked as React state (not refs) so the bfcache-restore handler below can
+  // re-render the page out of the "Redirecting to sign-in..." spinner.
+  const [autoRedirectAttempted, setAutoRedirectAttempted] = useState(false);
+  const [autoRedirecting, setAutoRedirecting] = useState(false);
 
   const code = searchParams.get("code");
-  const provider = searchParams.get("provider");
   const token = searchParams.get("token");
   const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const error = searchParams.get("error");
-
-  /**
-   * Fetch available providers from backend (skip if already authenticated).
-   * Shows error message with no login options if backend is unreachable.
-   */
-  useEffect(() => {
-    if (isAuthenticated) return;
-
-    fetch("/api/identity-providers", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.error) {
-          console.error("[Login] Failed to fetch providers from backend");
-          setProvidersError(true);
-          setProviders([]);
-        } else {
-          const availableProviders = (data.providers || []).filter((p: string): p is LoginProvider =>
-            isOauthUiKnownProvider(p)
-          );
-          setProviders(availableProviders);
-          setProvidersError(false);
-        }
-      })
-      .catch((error) => {
-        console.error("[Login] Exception fetching providers:", error);
-        setProvidersError(true);
-        setProviders([]);
-      })
-      .finally(() => {
-        setProvidersLoading(false);
-      });
-  }, [isAuthenticated]);
-
-  const showProvidersLoading = !isAuthenticated && providersLoading;
 
   // Iframe: listen for auth completion from popup
   useEffect(() => {
@@ -75,6 +43,19 @@ function LoginContent() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
+  // bfcache: when the browser restores this page after the user pressed "back" from Dex,
+  // clear the spinner so the SSO button renders as a fallback. autoRedirectAttempted stays
+  // true so the auto-redirect effect doesn't re-fire and bounce the user straight back.
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setAutoRedirecting(false);
+      }
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
   useEffect(() => {
     if (isLoading) return;
 
@@ -84,7 +65,6 @@ function LoginContent() {
     // Detect if we're in a popup opened by the iframe
     const isPopup = !!window.opener && !window.opener.closed;
 
-    // If we have a token from the new OAuth flow, use it
     // Helper to perform sign-in with consistent error handling
     const performSignIn = (providerId: string, credentials: Record<string, string>) => {
       signIn(providerId, { ...credentials, redirect: false })
@@ -115,9 +95,9 @@ function LoginContent() {
       return;
     }
 
-    if (code && provider) {
+    if (code) {
       authAttemptedRef.current = true;
-      performSignIn("backend-code", { code, provider });
+      performSignIn("backend-code", { code });
       return;
     }
 
@@ -125,23 +105,29 @@ function LoginContent() {
     if (isAuthenticated) {
       router.replace(callbackUrl);
     }
-  }, [code, provider, token, isAuthenticated, isLoading, callbackUrl, router]);
+  }, [code, token, isAuthenticated, isLoading, callbackUrl, router]);
 
-  const handleLogin = (provider: LoginProvider) => {
+  // Auto-redirect to Dex on mount. Skipped on iframes (popups need a user gesture),
+  // when an in-flight code/token is being completed, or when an error is being shown —
+  // those paths need the page to render so the user sees the message or completes the flow.
+  useEffect(() => {
+    if (autoRedirectAttempted) return;
+    if (isLoading) return;
+    if (isAuthenticated) return;
+    if (error || code || token) return;
+    if (isInIframe()) return;
+
+    setAutoRedirectAttempted(true);
+    setAutoRedirecting(true);
+    window.location.href = `/api/oauth/start/dex?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+  }, [autoRedirectAttempted, isLoading, isAuthenticated, error, code, token, callbackUrl]);
+
+  const handleLogin = () => {
     // OAuth goes through API route - server handles redirect to backend
     // Include callbackUrl so user returns to the right page after login
-    const oauthUrl = `/api/oauth/start/${provider}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+    const oauthUrl = `/api/oauth/start/dex?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
-    // Check if we're in an iframe
-    const isInIframe = (() => {
-      try {
-        return window.self !== window.top;
-      } catch {
-        return true;
-      }
-    })();
-
-    if (!isInIframe) {
+    if (!isInIframe()) {
       window.location.href = oauthUrl;
       return;
     }
@@ -164,15 +150,26 @@ function LoginContent() {
     }
   };
 
-  // Show loading state (but not if auth already failed - let error screen show)
-  if (isLoading || showProvidersLoading || ((code || token) && !error)) {
+  // Show loading state during auth checks, in-flight callbacks, or while the auto-redirect is firing.
+  // The pre-emptive `willAutoRedirectSoon` clause covers the gap between first render and
+  // the effect firing, so the SSO button doesn't flicker into view; once the effect has run,
+  // `autoRedirectAttempted` flips and only the `autoRedirecting` state controls the spinner —
+  // which the bfcache pageshow handler clears when the user pressed Back from Dex.
+  const willAutoRedirectSoon =
+    !autoRedirectAttempted && !isLoading && !isAuthenticated && !error && !code && !token && !isInIframe();
+  const showSpinner = isLoading || autoRedirecting || willAutoRedirectSoon || ((code || token) && !error);
+  if (showSpinner) {
+    const message =
+      code || token
+        ? "Completing authentication..."
+        : autoRedirecting || willAutoRedirectSoon
+          ? "Redirecting to sign-in..."
+          : "Loading...";
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">
-            {code || token ? "Completing authentication..." : "Loading..."}
-          </p>
+          <p className="text-gray-600">{message}</p>
         </div>
       </div>
     );
@@ -242,6 +239,8 @@ function LoginContent() {
     );
   }
 
+  // Iframe path (popups need a user gesture) and bfcache fallback (when the user pressed
+  // Back from Dex) both render the SSO button so the user can complete login manually.
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
       <div className="max-w-md w-full space-y-8 p-8">
@@ -253,68 +252,12 @@ function LoginContent() {
         </div>
 
         <div className="space-y-4">
-          {providersError && (
-            <div className="text-sm text-amber-700 text-center p-4 bg-amber-50 rounded-lg dark:bg-amber-900/20 dark:text-amber-400">
-              Unable to fetch identity provider configuration from backend.
-            </div>
-          )}
-
-          {!providersError && providers.length === 0 && (
-            <div className="text-sm text-gray-600 text-center p-4">
-              No authentication providers configured.
-            </div>
-          )}
-
-          {providers.includes("google") && (
-            <button
-              onClick={() => handleLogin("google")}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              Continue with Google
-            </button>
-          )}
-
-          {providers.includes("azure") && (
-            <button
-              onClick={() => handleLogin("azure")}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 23 23">
-                <path fill="#f35325" d="M1 1h10v10H1z" />
-                <path fill="#81bc06" d="M12 1h10v10H12z" />
-                <path fill="#05a6f0" d="M1 12h10v10H1z" />
-                <path fill="#ffba08" d="M12 12h10v10H12z" />
-              </svg>
-              Continue with Microsoft
-            </button>
-          )}
-
-          {providers.includes("dex") && (
-            <button
-              onClick={() => handleLogin("dex")}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors"
-            >
-              Continue with SSO
-            </button>
-          )}
+          <button
+            onClick={handleLogin}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors"
+          >
+            Continue with SSO
+          </button>
         </div>
       </div>
     </div>

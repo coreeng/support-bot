@@ -50,7 +50,7 @@ class OAuth2SuccessHandlerTest {
     private OAuth2SuccessHandler createHandler(List<String> allowedEmails, List<String> allowedDomains) {
         var props = new SecurityProperties(
                 new SecurityProperties.JwtProperties(TEST_SECRET, Duration.ofHours(24)),
-                SecurityProperties.OAuth2Properties.withRedirectOnly("http://localhost:3000/auth/callback"),
+                new SecurityProperties.OAuth2Properties("http://localhost:3000/auth/callback"),
                 new SecurityProperties.CorsProperties(null),
                 new SecurityProperties.TestBypassProperties(false),
                 new SecurityProperties.AllowListProperties(allowedEmails, allowedDomains));
@@ -58,11 +58,8 @@ class OAuth2SuccessHandlerTest {
         var authCodeStore = new AuthCodeStore();
         var allowListService = new AllowListService(props);
         lenient()
-                .when(jwtGroupTeamMerger.mergeForProvider(
-                        org.mockito.ArgumentMatchers.anyString(),
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any()))
-                .thenAnswer(invocation -> invocation.getArgument(2));
+                .when(jwtGroupTeamMerger.merge(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         return new OAuth2SuccessHandler(
                 props,
                 jwtService,
@@ -78,16 +75,11 @@ class OAuth2SuccessHandlerTest {
     }
 
     private Authentication mockAuth(Map<String, Object> attributes) {
-        return mockAuth("google", attributes);
-    }
-
-    private Authentication mockAuth(String registrationId, Map<String, Object> attributes) {
         var oauth2User = mock(OAuth2User.class);
         when(oauth2User.getAttribute(anyString())).thenAnswer(inv -> attributes.get(inv.getArgument(0, String.class)));
         lenient().when(oauth2User.getAttributes()).thenReturn(attributes);
         var authentication = mock(OAuth2AuthenticationToken.class);
         when(authentication.getPrincipal()).thenReturn(oauth2User);
-        when(authentication.getAuthorizedClientRegistrationId()).thenReturn(registrationId);
         return authentication;
     }
 
@@ -147,14 +139,14 @@ class OAuth2SuccessHandlerTest {
     void onAuthenticationSuccess_extractsEmailFromPreferredUsername() throws Exception {
         // given
         var handler = createHandler();
-        when(teamService.listTeamsByUserEmail("azureuser@example.com")).thenReturn(ImmutableList.of());
-        var auth = mockAuth(Map.of("preferred_username", "azureuser@example.com", "name", "Azure User"));
+        when(teamService.listTeamsByUserEmail("dexuser@example.com")).thenReturn(ImmutableList.of());
+        var auth = mockAuth(Map.of("preferred_username", "dexuser@example.com", "name", "Dex User"));
 
         // when
         handler.onAuthenticationSuccess(request, response, auth);
 
         // then
-        verify(teamService).listTeamsByUserEmail("azureuser@example.com");
+        verify(teamService).listTeamsByUserEmail("dexuser@example.com");
         verify(response).sendRedirect(argThat(url -> url.contains("code=")));
     }
 
