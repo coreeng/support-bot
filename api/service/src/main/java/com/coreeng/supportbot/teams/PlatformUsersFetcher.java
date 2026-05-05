@@ -4,8 +4,6 @@ import com.coreeng.supportbot.teams.groups.GroupRef;
 import java.util.List;
 
 public interface PlatformUsersFetcher<R extends GroupRef> {
-    GroupRef.Provider provider();
-
     /**
      * If the group doesn't exist, return an empty membership list
      */

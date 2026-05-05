@@ -15,17 +15,15 @@ public class GcpUsersFetcher implements PlatformUsersFetcher<GroupRef.Google> {
     private final CloudIdentity cloudIdentity;
 
     @Override
-    public GroupRef.Provider provider() {
-        return GroupRef.Provider.GOOGLE;
-    }
-
-    @Override
     public List<Membership> fetchMembershipsByGroupRef(GroupRef.Google groupRef) {
         ImmutableList.Builder<Membership> result = ImmutableList.builder();
         String groupId;
         try {
-            var lookupResp =
-                    cloudIdentity.groups().lookup().setGroupKeyId(groupRef.key()).execute();
+            var lookupResp = cloudIdentity
+                    .groups()
+                    .lookup()
+                    .setGroupKeyId(groupRef.key())
+                    .execute();
             groupId = lookupResp.getName();
         } catch (GoogleJsonResponseException e) {
             if (e.getStatusCode() == 403) {

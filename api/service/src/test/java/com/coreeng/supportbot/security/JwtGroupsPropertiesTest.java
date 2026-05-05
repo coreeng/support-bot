@@ -35,8 +35,8 @@ class JwtGroupsPropertiesTest {
 
     @Test
     void mapping_bothSet_throws() {
-        assertThatThrownBy(() -> new JwtGroupsProperties.Mapping(
-                        new GroupRef.Jwt("developers"), "wow", List.of("developers")))
+        assertThatThrownBy(() ->
+                        new JwtGroupsProperties.Mapping(new GroupRef.Jwt("developers"), "wow", List.of("developers")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("both")
                 .hasMessageContaining("wow");
@@ -44,8 +44,7 @@ class JwtGroupsPropertiesTest {
 
     @Test
     void mapping_nonJwtGroupRef_throws() {
-        assertThatThrownBy(() ->
-                        new JwtGroupsProperties.Mapping(new GroupRef.Slack("S08948NBMED"), "wow", List.of()))
+        assertThatThrownBy(() -> new JwtGroupsProperties.Mapping(new GroupRef.Slack("S08948NBMED"), "wow", List.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must use a 'jwt:' prefixed")
                 .hasMessageContaining("slack:S08948NBMED");

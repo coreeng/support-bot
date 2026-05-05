@@ -12,11 +12,6 @@ public class StaticUsersFetcher implements PlatformUsersFetcher<GroupRef.Static>
     private final StaticPlatformUsersProps props;
 
     @Override
-    public GroupRef.Provider provider() {
-        return GroupRef.Provider.STATIC;
-    }
-
-    @Override
     public List<Membership> fetchMembershipsByGroupRef(GroupRef.Static groupRef) {
         return props.users().getOrDefault(groupRef.key(), List.of()).stream()
                 .map(Membership::new)

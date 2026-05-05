@@ -3,6 +3,7 @@ package com.coreeng.supportbot.security;
 import com.coreeng.supportbot.teams.groups.GroupRef;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -17,6 +18,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "platform-integration.jwt-groups")
 public record JwtGroupsProperties(boolean enabled, String claimName, List<Mapping> mappings) {
+    private static final Logger LOG = LoggerFactory.getLogger(JwtGroupsProperties.class);
+
     public JwtGroupsProperties {
         if (claimName == null || claimName.isBlank()) {
             claimName = "groups";
@@ -26,11 +29,10 @@ public record JwtGroupsProperties(boolean enabled, String claimName, List<Mappin
         }
         for (Mapping m : mappings) {
             if (m.usingDeprecatedClaimValues()) {
-                LoggerFactory.getLogger(JwtGroupsProperties.class)
-                        .warn(
-                                "platform-integration.jwt-groups.mappings[team-code={}] uses deprecated 'claim-values'; "
-                                        + "switch to 'group-ref: \"jwt:<value>\"'",
-                                m.teamCode());
+                LOG.warn(
+                        "platform-integration.jwt-groups.mappings[team-code={}] uses deprecated 'claim-values'; "
+                                + "switch to 'group-ref: \"jwt:<value>\"'",
+                        m.teamCode());
             }
         }
     }
@@ -54,7 +56,6 @@ public record JwtGroupsProperties(boolean enabled, String claimName, List<Mappin
             }
         }
 
-        /** Backwards-compat overload accepting the legacy {@code (claimValues, teamCode)} order. */
         public Mapping(List<String> claimValues, String teamCode) {
             this(null, teamCode, claimValues);
         }

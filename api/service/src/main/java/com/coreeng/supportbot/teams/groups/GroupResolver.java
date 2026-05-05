@@ -36,17 +36,7 @@ public class GroupResolver {
         };
     }
 
-    public boolean providerAvailable(GroupRef.Provider provider) {
-        return switch (provider) {
-            case GOOGLE -> googleFetcher != null;
-            case AZURE -> azureFetcher != null;
-            case STATIC -> staticFetcher != null;
-            case SLACK, JWT -> false;
-        };
-    }
-
-    private static <R extends GroupRef> List<Membership> tryFetch(
-            @Nullable PlatformUsersFetcher<R> fetcher, R ref) {
+    private static <R extends GroupRef> List<Membership> tryFetch(@Nullable PlatformUsersFetcher<R> fetcher, R ref) {
         if (fetcher == null) {
             log.warn("No PlatformUsersFetcher registered for {}", ref.canonical());
             return ImmutableList.of();
