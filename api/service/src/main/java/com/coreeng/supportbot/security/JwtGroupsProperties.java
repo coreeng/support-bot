@@ -6,6 +6,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 /**
  * Maps Dex (LDAP) ID-token group claims to Support Bot platform {@linkplain com.coreeng.supportbot.teams.Team}
@@ -38,6 +39,7 @@ public record JwtGroupsProperties(boolean enabled, String claimName, List<Mappin
     }
 
     public record Mapping(@Nullable GroupRef groupRef, String teamCode, List<String> claimValues) {
+        @ConstructorBinding
         public Mapping {
             if (claimValues == null) {
                 claimValues = List.of();

@@ -2,9 +2,11 @@ package com.coreeng.supportbot.config;
 
 import com.coreeng.supportbot.teams.groups.GroupRef;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 @ConfigurationProperties("team.support")
 public record SupportTeamProps(String name, String code, GroupRef groupRef) {
+    @ConstructorBinding
     public SupportTeamProps {
         if (groupRef == null) {
             throw new IllegalStateException("team.support.group-ref is required."

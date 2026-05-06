@@ -3,6 +3,7 @@ package com.coreeng.supportbot.enums;
 import com.coreeng.supportbot.config.EnumerationValue;
 import com.coreeng.supportbot.teams.groups.GroupRef;
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 public record EscalationTeam(
         String label,
@@ -10,6 +11,7 @@ public record EscalationTeam(
         GroupRef groupRef,
         @Nullable String slackMentionGroupId) implements EnumerationValue {
 
+    @ConstructorBinding
     public EscalationTeam {
         if (groupRef == null) {
             throw new IllegalStateException("enums.escalation-teams[" + code + "].group-ref is required."
