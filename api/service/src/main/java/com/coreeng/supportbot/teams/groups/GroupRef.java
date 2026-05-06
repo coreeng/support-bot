@@ -37,6 +37,14 @@ public sealed interface GroupRef
         public Provider provider() {
             return Provider.SLACK;
         }
+
+        /** Extracts the Slack subteam id from {@code ref}, or throws if {@code ref} isn't Slack-typed. */
+        public static String idFrom(GroupRef ref, String configKey) {
+            if (ref instanceof Slack slack) {
+                return slack.id();
+            }
+            throw new IllegalStateException(configKey + " must reference a Slack group; got " + ref.canonical());
+        }
     }
 
     record Google(String key) implements GroupRef {
@@ -161,18 +169,6 @@ public sealed interface GroupRef
         } catch (IllegalArgumentException e) {
             return false;
         }
-    }
-
-    /**
-     * Narrows a {@link GroupRef} to its underlying Slack subteam ID, or throws with the
-     * configured YAML key in the message. Shared between props records that require a Slack-typed
-     * group reference (e.g. {@code team.support}, {@code team.leadership}).
-     */
-    static String requireSlackId(GroupRef ref, String configKey) {
-        if (ref instanceof Slack slack) {
-            return slack.id();
-        }
-        throw new IllegalStateException(configKey + " must reference a Slack group; got " + ref.canonical());
     }
 
     private static void requireNonBlank(@Nullable String s, String type) {

@@ -10,6 +10,6 @@ public record SupportLeadershipTeamProps(String name, String code, GroupRef grou
     }
 
     public String slackId() {
-        return GroupRef.requireSlackId(groupRef, "team.leadership.group-ref");
+        return GroupRef.Slack.idFrom(groupRef, "team.leadership.group-ref");
     }
 }
