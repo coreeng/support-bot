@@ -1,0 +1,474 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "stringMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "quantity": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "integer" }
+      ]
+    },
+    "envVar": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "value": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "integer" },
+            { "type": "boolean" }
+          ]
+        },
+        "valueFrom": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "ingressPath": {
+      "type": "object",
+      "required": ["path"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string" },
+        "pathType": { "type": "string" }
+      }
+    },
+    "ingressHost": {
+      "type": "object",
+      "required": ["host", "paths"],
+      "additionalProperties": false,
+      "properties": {
+        "host": { "type": "string" },
+        "paths": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ingressPath" }
+        }
+      }
+    },
+    "ingressTls": {
+      "type": "object",
+      "required": ["hosts", "secretName"],
+      "additionalProperties": false,
+      "properties": {
+        "hosts": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "secretName": { "type": "string" }
+      }
+    },
+    "resourceMap": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/quantity" }
+    },
+    "roleRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "apiGroups": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "resources": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "verbs": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "prReviewSlaOverride": {
+      "type": "object",
+      "required": ["path", "sla"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string" },
+        "sla": { "type": "string" }
+      }
+    },
+    "prReviewRepository": {
+      "type": "object",
+      "required": ["name", "owning-team"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "owning-team": { "type": "string" },
+        "paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "sla": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["default"],
+          "properties": {
+            "file": { "type": "string" },
+            "default": { "type": "string" },
+            "overrides": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/prReviewSlaOverride" }
+            }
+          }
+        },
+        "messages": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "detected": { "type": "string" },
+            "escalated": { "type": "string" },
+            "approved": { "type": "string" },
+            "changes-requested": { "type": "string" },
+            "merged": { "type": "string" },
+            "closed": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "properties": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": { "type": "string" },
+        "tag": { "type": "string" },
+        "pullPolicy": { "type": "string" }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create": { "type": "boolean" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "name": { "type": "string" },
+        "role": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "create": { "type": "boolean" },
+            "rules": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/roleRule" }
+            }
+          }
+        }
+      }
+    },
+    "podAnnotations": { "$ref": "#/definitions/stringMap" },
+    "podSecurityContext": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "securityContext": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string" },
+        "port": { "type": "integer" }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "hosts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ingressHost" }
+        },
+        "tls": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ingressTls" }
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requests": { "$ref": "#/definitions/resourceMap" },
+        "limits": { "$ref": "#/definitions/resourceMap" }
+      }
+    },
+    "livenessProbe": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "readinessProbe": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "port": { "type": "integer" }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "serviceMonitor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "namespace": { "type": "string" },
+            "labels": { "$ref": "#/definitions/stringMap" },
+            "annotations": { "$ref": "#/definitions/stringMap" },
+            "selector": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "matchLabels": { "$ref": "#/definitions/stringMap" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "nodeSelector": { "$ref": "#/definitions/stringMap" },
+    "tolerations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "affinity": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "publicWebOrigin": { "type": "string" },
+    "env": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/envVar" }
+    },
+    "envFrom": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "analysisBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "configMapName": { "type": "string" },
+        "mountPath": { "type": "string" },
+        "subPath": { "type": "string" }
+      }
+    },
+    "configMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "create": { "type": "boolean" },
+        "name": { "type": "string" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "config": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "summary-data": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "sanitisation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "patterns": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "exceptions": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            },
+            "security": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "allow-list": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "domains": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    },
+                    "emails": {
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            },
+            "pr-review-tracking": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "poll-cron": { "type": "string" },
+                "pr-emoji": { "type": "string" },
+                "tags": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "impact": { "type": "string" },
+                "repositories": {
+                  "type": "array",
+                  "items": { "$ref": "#/definitions/prReviewRepository" }
+                },
+                "sla-discovery": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cache": { "type": "string" }
+                  }
+                },
+                "github": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "api-base-url": { "type": "string" },
+                    "auth-mode": { "type": "string" },
+                    "token": { "type": "string" },
+                    "app-id": { "type": "string" },
+                    "installation-id": { "type": "string" },
+                    "private-key-pem": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": { "type": "string" },
+            "tag": { "type": "string" },
+            "pullPolicy": { "type": "string" }
+          }
+        },
+        "replicaCount": { "type": "integer" },
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string" },
+            "port": { "type": "integer" }
+          }
+        },
+        "ingress": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "className": { "type": "string" },
+            "annotations": { "$ref": "#/definitions/stringMap" },
+            "hosts": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/ingressHost" }
+            },
+            "tls": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/ingressTls" }
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requests": { "$ref": "#/definitions/resourceMap" },
+            "limits": { "$ref": "#/definitions/resourceMap" }
+          }
+        },
+        "livenessProbe": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "readinessProbe": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "podAnnotations": { "$ref": "#/definitions/stringMap" },
+        "podSecurityContext": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "securityContext": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "nodeSelector": { "$ref": "#/definitions/stringMap" },
+        "tolerations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "affinity": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "env": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/envVar" }
+        }
+      }
+    }
+  }
+}

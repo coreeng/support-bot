@@ -113,6 +113,57 @@ lint-ui: ## Lint UI Dockerfiles
 .PHONY: lint-app
 lint-app: lint-api lint-ui ## Lint all Dockerfiles
 
+.PHONY: lint-chart
+lint-chart: ## Lint the Helm chart
+	helm lint $(HELM_CHART_PATH)
+
+.PHONY: ensure-helm-unittest
+ensure-helm-unittest: ## Install the helm-unittest plugin when missing or at the wrong version
+	@set -eu; \
+	current_version="$$(helm plugin list 2>/dev/null | awk '$$1=="unittest" { print $$2 }')"; \
+	if [ "$$current_version" = "1.0.3" ]; then \
+		echo "helm-unittest 1.0.3 already installed"; \
+	else \
+		if [ -n "$$current_version" ]; then \
+			echo "Replacing helm-unittest $$current_version with 1.0.3"; \
+			helm plugin uninstall unittest; \
+		else \
+			echo "Installing helm-unittest 1.0.3"; \
+		fi; \
+			install_verify_args=""; \
+			if helm plugin install --help 2>/dev/null | grep -q -- '--verify'; then \
+				install_verify_args="--verify=false"; \
+			fi; \
+			helm plugin install $$install_verify_args https://github.com/helm-unittest/helm-unittest.git --version 1.0.3; \
+	fi
+
+.PHONY: test-chart
+test-chart: ensure-helm-unittest ## Run Helm chart unit tests
+	helm unittest $(HELM_CHART_PATH)
+
+.PHONY: validate-chart-values
+validate-chart-values: ## Validate Helm values files against the chart schema by linting and rendering
+	@set -eu; \
+	check_values() { \
+		name="$$1"; \
+		shift; \
+		echo "Validating $$name values..."; \
+		helm lint $(HELM_CHART_PATH) "$$@"; \
+		helm template support-bot $(HELM_CHART_PATH) "$$@" >/dev/null; \
+	}; \
+	check_values default; \
+	for values_file in $(sort $(wildcard $(HELM_CHART_PATH)/values*.yaml)); do \
+		case "$$values_file" in \
+			$(HELM_CHART_PATH)/values.yaml|$(HELM_CHART_PATH)/values-integrationtests-oidc.yaml) continue ;; \
+		esac; \
+		check_values "$$(basename "$$values_file")" -f "$$values_file"; \
+	done; \
+	check_values integrationtests-oidc -f $(HELM_CHART_PATH)/values-integrationtests.yaml -f $(HELM_CHART_PATH)/values-integrationtests-oidc.yaml; \
+	true
+
+.PHONY: check-chart
+check-chart: lint-chart test-chart validate-chart-values ## Run all Helm chart checks
+
 ##@ Build targets
 
 .PHONY: build-api-app
@@ -124,7 +175,7 @@ build-ui-app: lint-ui ## Build UI
 	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" --build-arg P2P_VERSION="$(p2p_version)" ui
 
 .PHONY: build-app
-build-app: build-api-app build-ui-app ## Build all apps
+build-app: check-chart build-api-app build-ui-app ## Build all apps
 
 .PHONY: build-api-functional
 build-api-functional: ## Build API functional test docker image

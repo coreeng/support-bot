@@ -1,0 +1,9 @@
+configMap:
+  config:
+    pr-review-tracking:
+      enabled: true
+      repositories:
+        - name: coreeng/docs
+          owning-team: docs-team
+          sla:
+            file: .pr-sla.yaml

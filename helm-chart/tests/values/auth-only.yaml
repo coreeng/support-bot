@@ -1,0 +1,6 @@
+configMap:
+  config:
+    security:
+      allow-list:
+        emails:
+          - user@example.com
