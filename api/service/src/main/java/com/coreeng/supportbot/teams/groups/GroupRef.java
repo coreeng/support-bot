@@ -113,7 +113,7 @@ public sealed interface GroupRef
 
     static GroupRef parse(@Nullable String raw) {
         if (raw == null || raw.isBlank()) {
-            throw new IllegalArgumentException(
+            throw new GroupRefParseException(
                     "GroupRef cannot be blank (got: " + (raw == null ? "null" : "\"" + raw + "\"") + ")");
         }
         Matcher m = PREFIXED.matcher(raw);
@@ -131,7 +131,7 @@ public sealed interface GroupRef
             case "jwt" -> new Jwt(value);
             case "static" -> new Static(value);
             default ->
-                throw new IllegalArgumentException(
+                throw new GroupRefParseException(
                         "Unknown GroupRef provider prefix \"" + prefix + "\" in \"" + raw + "\"");
         };
     }
@@ -173,7 +173,7 @@ public sealed interface GroupRef
 
     private static void requireNonBlank(@Nullable String s, String type) {
         if (s == null || s.isBlank()) {
-            throw new IllegalArgumentException("GroupRef." + type + " value cannot be blank");
+            throw new GroupRefParseException("GroupRef." + type + " value cannot be blank");
         }
     }
 

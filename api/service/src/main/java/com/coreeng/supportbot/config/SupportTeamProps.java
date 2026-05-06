@@ -5,6 +5,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("team.support")
 public record SupportTeamProps(String name, String code, GroupRef groupRef) {
+    public SupportTeamProps {
+        if (groupRef == null) {
+            throw new IllegalStateException("team.support.group-ref is required."
+                    + " If you previously used 'slack-group-id', rename it to 'group-ref' (PT-351 migration).");
+        }
+    }
+
     public SupportTeamProps(String name, String code, String groupRef) {
         this(name, code, GroupRef.parse(groupRef));
     }

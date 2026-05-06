@@ -10,6 +10,13 @@ public record EscalationTeam(
         GroupRef groupRef,
         @Nullable String slackMentionGroupId) implements EnumerationValue {
 
+    public EscalationTeam {
+        if (groupRef == null) {
+            throw new IllegalStateException("enums.escalation-teams[" + code + "].group-ref is required."
+                    + " If you previously used 'slack-group-id', rename it to 'group-ref' (PT-351 migration).");
+        }
+    }
+
     public EscalationTeam(String label, String code, GroupRef groupRef) {
         this(label, code, groupRef, null);
     }

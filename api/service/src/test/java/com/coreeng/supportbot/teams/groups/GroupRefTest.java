@@ -76,15 +76,15 @@ class GroupRefTest {
 
     @Test
     void parse_blankInputs_throw() {
-        assertThatThrownBy(() -> GroupRef.parse("")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> GroupRef.parse("   ")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> GroupRef.parse(null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> GroupRef.parse("")).isInstanceOf(GroupRefParseException.class);
+        assertThatThrownBy(() -> GroupRef.parse("   ")).isInstanceOf(GroupRefParseException.class);
+        assertThatThrownBy(() -> GroupRef.parse(null)).isInstanceOf(GroupRefParseException.class);
     }
 
     @Test
     void parse_unknownPrefix_throws() {
         assertThatThrownBy(() -> GroupRef.parse("ldap:foo"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(GroupRefParseException.class)
                 .hasMessageContaining("ldap");
     }
 
@@ -117,7 +117,7 @@ class GroupRefTest {
 
     @Test
     void recordCompactConstructor_rejectsBlank() {
-        assertThatThrownBy(() -> new GroupRef.Slack("")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new GroupRef.Jwt("  ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new GroupRef.Slack("")).isInstanceOf(GroupRefParseException.class);
+        assertThatThrownBy(() -> new GroupRef.Jwt("  ")).isInstanceOf(GroupRefParseException.class);
     }
 }

@@ -3,6 +3,7 @@ package com.coreeng.supportbot.teams;
 import static java.lang.String.format;
 
 import com.coreeng.supportbot.teams.groups.GroupRef;
+import com.coreeng.supportbot.teams.groups.GroupRefParseException;
 import com.coreeng.supportbot.util.JsonMapper;
 import com.google.common.collect.ImmutableList;
 import dev.cel.common.CelAbstractSyntaxTree;
@@ -98,6 +99,8 @@ public class GenericPlatformTeamsFetcher implements PlatformTeamsFetcher {
                 teams.add(apply);
             } catch (PropertyExtractionException e) {
                 log.atWarn().setCause(e).log("Failed to extract teamName or groupRef. Skipping the team");
+            } catch (GroupRefParseException e) {
+                log.atWarn().setCause(e).log("Malformed groupRef from CEL expression. Skipping the team");
             }
         }
         return teams.build();
