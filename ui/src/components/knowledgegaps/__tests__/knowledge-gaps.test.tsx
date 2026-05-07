@@ -1,8 +1,8 @@
 import React from 'react'
 import {fireEvent, render, screen, waitFor} from '@testing-library/react'
+import {Toaster} from 'sonner'
 import KnowledgeGapsPage from '../knowledge-gaps'
 import * as hooks from '../../../lib/hooks'
-import {ToastProvider} from '@/components/ui/toast'
 import * as useAuthHook from '../../../hooks/useAuth'
 
 const mockInvalidateQueries = jest.fn()
@@ -38,9 +38,8 @@ jest.mock('@tanstack/react-query', () => ({
     }))
 }))
 
-// Helper to render with ToastProvider
 const renderWithToast = (component: React.ReactElement) => {
-    return render(<ToastProvider>{component}</ToastProvider>)
+    return render(<>{component}<Toaster /></>)
 }
 
 const mockUseAnalysis = hooks.useAnalysis as jest.MockedFunction<typeof hooks.useAnalysis>

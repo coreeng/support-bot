@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useId } from 'react'
 import { ChevronDown, ChevronRight, BarChart3, Download, Upload, FileText, Play, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAnalysis, apiFetch } from '@/lib/hooks'
-import { useToast } from '@/components/ui/toast'
+import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import type { DimensionSummary, QuerySummary } from '@/lib/types'
 import EditTicketModal from '@/components/tickets/EditTicketModal'
@@ -21,7 +21,6 @@ export default function KnowledgeGapsPage() {
     const queryClient = useQueryClient()
     const { isSupportEngineer } = useAuth()
     const { data: analysisData, isLoading, error } = useAnalysis()
-    const { showToast } = useToast()
     const [supportAreasExpanded, setSupportAreasExpanded] = useState(true)
     const [knowledgeGapsExpanded, setKnowledgeGapsExpanded] = useState(true)
     const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
@@ -144,7 +143,7 @@ export default function KnowledgeGapsPage() {
                         setShowCompletedStatus(false)
                         setAnalysisStatus(null)
                         isCompletedRef.current = false
-                        showToast(`Analysis failed: ${status.error}`, 'error')
+                        toast.error(`Analysis failed: ${status.error}`)
                     }, 5000)
                 } else {
                     setIsCompletionError(false)
@@ -290,7 +289,7 @@ export default function KnowledgeGapsPage() {
                             setShowCompletedStatus(false)
                             setAnalysisStatus(null)
                             isCompletedRef.current = false
-                            showToast(`Analysis failed: ${status.error}`, 'error')
+                            toast.error(`Analysis failed: ${status.error}`)
                         }, 5000)
                     } else {
                         setIsCompletionError(false)
@@ -314,13 +313,13 @@ export default function KnowledgeGapsPage() {
                     startPolling()
                 }
             } else if (response.status === 409) {
-                showToast('Analysis was just started by someone else', 'error')
+                toast.error('Analysis was just started by someone else')
             } else {
-                showToast('Failed to start analysis.. Please try again.', 'error')
+                toast.error('Failed to start analysis.. Please try again.')
             }
         } catch (error) {
             console.error('Error starting analysis:', error)
-            showToast('Failed to start analysis.. Please try again.', 'error')
+            toast.error('Failed to start analysis.. Please try again.')
         } finally {
             setIsStartingAnalysis(false)
         }
@@ -359,7 +358,7 @@ export default function KnowledgeGapsPage() {
             document.body.removeChild(a)
         } catch (error) {
             console.error('Error downloading export:', error)
-            showToast('Failed to download export. Please try again.', 'error')
+            toast.error('Failed to download export. Please try again.')
         } finally {
             setIsDownloading(false)
         }
@@ -384,7 +383,7 @@ export default function KnowledgeGapsPage() {
             document.body.removeChild(a)
         } catch (error) {
             console.error('Error downloading prompt:', error)
-            showToast('Failed to download prompt. Please try again.', 'error')
+            toast.error('Failed to download prompt. Please try again.')
         }
     }
 
@@ -411,7 +410,7 @@ export default function KnowledgeGapsPage() {
             }
 
             const result = await response.json()
-            showToast(`Import successful! ${result.recordsImported} records imported.`, 'success')
+            toast.success(`Import successful! ${result.recordsImported} records imported.`)
 
             // Invalidate and refetch the analysis data
             await queryClient.invalidateQueries({ queryKey: ['analysis'] })
@@ -422,7 +421,7 @@ export default function KnowledgeGapsPage() {
             }
         } catch (error) {
             console.error('Error uploading file:', error)
-            showToast('Failed to upload file. Please try again.', 'error')
+            toast.error('Failed to upload file. Please try again.')
         } finally {
             setIsUploading(false)
         }

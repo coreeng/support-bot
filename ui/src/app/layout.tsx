@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import {GlobalProviders} from "@/components/providers/Providers";
+import { GlobalProviders } from "@/components/providers/Providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,22 +14,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ticket Management",
+  title: "Support Bot",
   description: "Support Bot Ticket Management",
 };
 
 export default function RootLayout({
-                                       children,
-                                   }: Readonly<{
-    children: React.ReactNode;
+  children,
+}: Readonly<{
+  children: React.ReactNode;
 }>) {
-    return (
-        <html lang="en" suppressHydrationWarning>
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+  return (
+    <html lang="en" suppressHydrationWarning className="bg-sidebar">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <GlobalProviders>
-            {children}
+          {children}
         </GlobalProviders>
-        </body>
-        </html>
-    );
+      </body>
+    </html>
+  );
 }
