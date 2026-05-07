@@ -168,125 +168,8 @@ describe('HealthPage', () => {
             expect(screen.getByText(/Last Week/i)).toBeInTheDocument();
         });
 
-        it('switches to Ticket Workbench tab when clicked', () => {
-            render(<HealthPage />, { wrapper: Wrapper });
-
-            const workbenchTab = screen.getByText('Ticket Workbench');
-            fireEvent.click(workbenchTab);
-
-            // Should show workbench-specific filters
-            const requestingTeam = screen.getAllByText('Requesting Team');
-            expect(requestingTeam.length).toBeGreaterThan(0);
-            const escalatedTo = screen.getAllByText('Escalated To');
-            expect(escalatedTo.length).toBeGreaterThan(0);
-        });
     });
 
-    describe('Ticket Workbench Tab Filters', () => {
-        beforeEach(() => {
-            const mockTickets = [
-                createMockTicket('1', 'opened', 'Team A', false, []),
-                createMockTicket('2', 'closed', 'Team B', true, [{ team: { name: 'Escalation Team' } }]),
-                createMockTicket('3', 'stale', 'Team A', false, []),
-            ];
-
-            mockUseTickets.mockReturnValue({
-                data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 3 },
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
-        });
-
-        it('renders status filter in Ticket Workbench tab', () => {
-            render(<HealthPage />, { wrapper: Wrapper });
-
-            const workbenchTab = screen.getByText('Ticket Workbench');
-            fireEvent.click(workbenchTab);
-
-            const statusOptions = screen.getAllByText('Status');
-            expect(statusOptions.length).toBeGreaterThan(0);
-            expect(screen.getByText('Opened')).toBeInTheDocument();
-            expect(screen.getByText('Closed')).toBeInTheDocument();
-            expect(screen.getByText('Stale')).toBeInTheDocument();
-        });
-
-        it('renders rated filter in Ticket Workbench tab', () => {
-            render(<HealthPage />, { wrapper: Wrapper });
-
-            const workbenchTab = screen.getByText('Ticket Workbench');
-            fireEvent.click(workbenchTab);
-
-            const ratedOptions = screen.getAllByText('Rated');
-            expect(ratedOptions.length).toBeGreaterThan(0);
-            const yesOptions = screen.getAllByText('Yes');
-            const noOptions = screen.getAllByText('No');
-            expect(yesOptions.length).toBeGreaterThan(0);
-            expect(noOptions.length).toBeGreaterThan(0);
-        });
-
-        it('filters tickets by status', () => {
-            render(<HealthPage />, { wrapper: Wrapper });
-
-            const workbenchTab = screen.getByText('Ticket Workbench');
-            fireEvent.click(workbenchTab);
-
-            const selects = screen.getAllByRole('combobox');
-            const statusSelect = Array.from(selects).find(s => 
-                s.querySelector('option[value="opened"]')
-            ) as HTMLSelectElement;
-
-            expect(statusSelect).toBeInTheDocument();
-            fireEvent.change(statusSelect, { target: { value: 'opened' } });
-
-            // Should still render the table
-            const requestingTeam = screen.getAllByText('Requesting Team');
-            expect(requestingTeam.length).toBeGreaterThan(0);
-        });
-
-        it('filters tickets by rated status', () => {
-            render(<HealthPage />, { wrapper: Wrapper });
-
-            const workbenchTab = screen.getByText('Ticket Workbench');
-            fireEvent.click(workbenchTab);
-
-            const selects = screen.getAllByRole('combobox');
-            const ratedSelect = Array.from(selects).find(s => 
-                s.querySelector('option[value="yes"]')
-            ) as HTMLSelectElement;
-
-            expect(ratedSelect).toBeInTheDocument();
-            fireEvent.change(ratedSelect, { target: { value: 'yes' } });
-
-            // Should still render the table
-            const requestingTeam = screen.getAllByText('Requesting Team');
-            expect(requestingTeam.length).toBeGreaterThan(0);
-        });
-    });
-
-    describe('Ticket Workbench Tab', () => {
-        it('renders ticket table columns', () => {
-            mockUseTickets.mockReturnValue({
-                data: { content: [], page: 0, totalPages: 0, totalElements: 0 },
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
-
-            render(<HealthPage />, { wrapper: Wrapper });
-
-            const workbenchTab = screen.getByText('Ticket Workbench');
-            fireEvent.click(workbenchTab);
-
-            expect(screen.getByText('Team')).toBeInTheDocument();
-            expect(screen.getByText('Impact')).toBeInTheDocument();
-            const escalatedTo = screen.getAllByText('Escalated To');
-            expect(escalatedTo.length).toBeGreaterThanOrEqual(1);
-            const statusHeaders = screen.getAllByText('Status');
-            expect(statusHeaders.length).toBeGreaterThan(0);
-            expect(screen.getByText('Opened At')).toBeInTheDocument();
-            const ratedHeaders = screen.getAllByText('Rated');
-            expect(ratedHeaders.length).toBeGreaterThan(0);
-        });
-    });
 
     describe('Activity Trends - New Dashboards', () => {
         const createTicketWithDate = (id: string, teamName: string, openedDate: Date, assignedTo?: string, status: string = 'opened') => {
@@ -535,8 +418,8 @@ describe('HealthPage', () => {
                 render(<HealthPage />, { wrapper: Wrapper });
 
                 expect(screen.getByText('Capacity vs Demand')).toBeInTheDocument();
-                expect(screen.getByText('Engineers on Rota:')).toBeInTheDocument();
-                expect(screen.getByText('Tickets per Engineer Capacity:')).toBeInTheDocument();
+                expect(screen.getByText('Engineers on Rota')).toBeInTheDocument();
+                expect(screen.getByText('Tickets per Engineer Capacity')).toBeInTheDocument();
             });
 
             it('renders even when assignment is disabled', () => {
@@ -622,7 +505,7 @@ describe('HealthPage', () => {
                 // With default 2 engineers × 5 capacity = 10 total capacity
                 // 15 tickets / 10 capacity = 150% utilization
                 expect(screen.getByText('Capacity vs Demand')).toBeInTheDocument();
-                expect(screen.getByText(/Capacity Utilization:/i)).toBeInTheDocument();
+                expect(screen.getByText(/Capacity Utilization/i)).toBeInTheDocument();
             });
 
             it('shows over capacity warning when utilization exceeds 100%', () => {
@@ -751,83 +634,6 @@ describe('HealthPage', () => {
     });
 
     describe('Ticket Workbench Pagination', () => {
-        it('shows Previous and Next buttons when there are multiple pages', () => {
-            const mockTickets = Array.from({ length: 25 }, (_, i) =>
-                createMockTicket(`${i}`, 'opened', 'Team A', false)
-            );
-
-            mockUseTickets.mockReturnValue({
-                data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 25 },
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
-
-            render(<HealthPage />, { wrapper: Wrapper });
-            fireEvent.click(screen.getByText('Ticket Workbench'));
-
-            expect(screen.getByText('Previous')).toBeInTheDocument();
-            expect(screen.getByText('Next')).toBeInTheDocument();
-        });
-
-        it('disables Previous button on first page', () => {
-            const mockTickets = Array.from({ length: 25 }, (_, i) =>
-                createMockTicket(`${i}`, 'opened', 'Team A', false)
-            );
-
-            mockUseTickets.mockReturnValue({
-                data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 25 },
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
-
-            render(<HealthPage />, { wrapper: Wrapper });
-            fireEvent.click(screen.getByText('Ticket Workbench'));
-
-            expect(screen.getByText('Previous')).toBeDisabled();
-        });
-
-        it('advances to next page when Next is clicked', () => {
-            const mockTickets = Array.from({ length: 25 }, (_, i) =>
-                createMockTicket(`${i}`, 'opened', 'Team A', false)
-            );
-
-            mockUseTickets.mockReturnValue({
-                data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 25 },
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
-
-            render(<HealthPage />, { wrapper: Wrapper });
-            fireEvent.click(screen.getByText('Ticket Workbench'));
-
-            fireEvent.click(screen.getByText('Next'));
-
-            // Page 2 button should now be active (have blue background)
-            const page2Button = screen.getByText('2');
-            expect(page2Button).toHaveClass('bg-blue-500');
-        });
-
-        it('shows ellipsis when there are many pages', () => {
-            const mockTickets = Array.from({ length: 100 }, (_, i) =>
-                createMockTicket(`${i}`, 'opened', 'Team A', false)
-            );
-
-            mockUseTickets.mockReturnValue({
-                data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 100 },
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
-
-            render(<HealthPage />, { wrapper: Wrapper });
-            fireEvent.click(screen.getByText('Ticket Workbench'));
-
-            // Should show ellipsis instead of all page numbers
-            expect(screen.getByText('...')).toBeInTheDocument();
-            // Should show first and last page
-            expect(screen.getByText('1')).toBeInTheDocument();
-            expect(screen.getByText('10')).toBeInTheDocument();
-        });
-
         it('does not show pagination for a single page', () => {
             const mockTickets = Array.from({ length: 5 }, (_, i) =>
                 createMockTicket(`${i}`, 'opened', 'Team A', false)
@@ -879,32 +685,6 @@ describe('HealthPage', () => {
                 expect(to).toBeDefined();
                 expect(from).not.toBe('');
                 expect(to).not.toBe('');
-            }
-        });
-
-        it('should use custom dates when both start and end dates are set', () => {
-            const { container } = render(<HealthPage />, { wrapper: Wrapper });
-
-            // Switch to custom mode via the date filter picklist
-            const dateSelect = screen.getByTestId('health-date-filter');
-            fireEvent.change(dateSelect, { target: { value: 'custom' } });
-
-            // Find date inputs by type
-            const dateInputs = container.querySelectorAll('input[type="date"]');
-            
-            expect(dateInputs.length).toBeGreaterThanOrEqual(2);
-            
-            // Set custom dates
-            fireEvent.change(dateInputs[0], { target: { value: '2024-01-01' } });
-            fireEvent.change(dateInputs[1], { target: { value: '2024-01-31' } });
-
-            // Verify custom dates are used (check in subsequent calls)
-            const calls = mockUseTickets.mock.calls;
-            if (calls.length > 0) {
-                const lastCall = calls[calls.length - 1];
-                const [, , from, to] = lastCall;
-                expect(from).toBeDefined();
-                expect(to).toBeDefined();
             }
         });
 

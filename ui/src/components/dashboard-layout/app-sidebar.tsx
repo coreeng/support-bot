@@ -4,9 +4,10 @@ import * as React from "react";
 import {
   type LucideIcon,
   AlertCircle,
-  BarChart2,
-  BarChart3,
+  Activity,
   BookOpen,
+  GaugeCircle,
+  GitPullRequest,
   Home,
   Ticket,
 } from "lucide-react";
@@ -61,19 +62,19 @@ const SUPPORT_TABS: SupportTab[] = [
   {
     path: "/health",
     title: "Analytics & Operations",
-    icon: BarChart2,
+    icon: Activity,
     visibility: { requiresFullAccess: true },
   },
   {
     path: "/sla",
     title: "SLA Dashboard",
-    icon: BarChart3,
+    icon: GaugeCircle,
     visibility: { requiresFullAccess: true },
   },
   {
     path: "/tenant-requests",
     title: "Tenant Requests",
-    icon: BarChart2,
+    icon: GitPullRequest,
     visibility: { requiresFullAccess: true, requiresFeatureFlag: "tenantInsights" },
   },
 ];

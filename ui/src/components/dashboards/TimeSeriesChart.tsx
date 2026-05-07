@@ -30,23 +30,23 @@ export function TimeSeriesChart<V extends ValueType = ValueType, N extends NameT
     emptyMessage = 'No data available'
 }: TimeSeriesChartProps<V, N>) {
     return (
-        <div className="rounded-xl border bg-card p-5">
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">
+        <div className="rounded-xl border bg-card p-6">
+            <h3 className="text-base font-semibold text-foreground mb-4">
                 {title}
             </h3>
             {data && data.length > 0 ? (
                 <ResponsiveContainer width="100%" height={height}>
                     <LineChart data={data}>
-                        <CartesianGrid strokeDasharray="3 3" />
+                        <CartesianGrid strokeDasharray="3 3"  stroke="var(--border)"/>
                         <XAxis 
                             dataKey={xAxisDataKey}
                             angle={-45}
                             textAnchor="end"
                             height={100}
-                            tick={{ fontSize: 11 }}
+                            tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
                             interval="preserveStartEnd"
-                        />
-                        <YAxis label={{ value: yAxisLabel, angle: -90, position: 'insideLeft' }} />
+                         stroke="var(--border)"/>
+                        <YAxis label={{ value: yAxisLabel, angle: -90, position: 'insideLeft' }}  stroke="var(--border)" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}/>
                         <Tooltip
                             formatter={tooltipFormatter}
                             contentStyle={{

@@ -212,7 +212,7 @@ export default function EditTicketModal({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent data-testid="edit-ticket-modal" className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogContent data-testid="edit-ticket-modal" className="min-w-2xl max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-xl">
                         <Ticket className="h-5 w-5 text-primary" />
@@ -235,7 +235,7 @@ export default function EditTicketModal({
                         Failed to load ticket details.
                     </div>
                 )}
-                {isTicketLoading && (
+                {isTicketLoading ? (
                     <div data-testid="ticket-loading-skeleton" className="space-y-4 pt-2">
                         {[1, 2, 3, 4, 5, 6].map((i) => (
                             <div key={i} className="space-y-1.5">
@@ -244,7 +244,7 @@ export default function EditTicketModal({
                             </div>
                         ))}
                     </div>
-                )}
+                ) : (
                 <div className="space-y-4 pt-2">
                         {/* Ticket Message */}
                         {displayTicket?.query?.text && (
@@ -554,6 +554,7 @@ export default function EditTicketModal({
                             </div>
                         )}
                 </div>
+                )}
 
                 <DialogFooter className="flex items-center justify-between w-full pt-2">
                     <div className="flex-1">

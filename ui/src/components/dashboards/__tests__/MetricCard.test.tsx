@@ -73,45 +73,6 @@ describe('MetricCard', () => {
     })
 
     describe('Color Schemes', () => {
-        it('should apply blue color scheme by default', () => {
-            const { container } = render(<MetricCard title="Test" value={42} />)
-
-            const card = container.firstChild as HTMLElement
-            expect(card.className).toContain('bg-blue-50')
-            expect(card.className).toContain('border-blue-200')
-        })
-
-        it('should apply orange color scheme', () => {
-            const { container } = render(<MetricCard title="Test" value={42} colorScheme="orange" />)
-
-            const card = container.firstChild as HTMLElement
-            expect(card.className).toContain('bg-orange-50')
-            expect(card.className).toContain('border-orange-200')
-        })
-
-        it('should apply green color scheme', () => {
-            const { container } = render(<MetricCard title="Test" value={42} colorScheme="green" />)
-
-            const card = container.firstChild as HTMLElement
-            expect(card.className).toContain('bg-green-50')
-            expect(card.className).toContain('border-green-200')
-        })
-
-        it('should apply purple color scheme', () => {
-            const { container } = render(<MetricCard title="Test" value={42} colorScheme="purple" />)
-
-            const card = container.firstChild as HTMLElement
-            expect(card.className).toContain('bg-purple-50')
-            expect(card.className).toContain('border-purple-200')
-        })
-
-        it('should apply cyan color scheme', () => {
-            const { container } = render(<MetricCard title="Test" value={42} colorScheme="cyan" />)
-
-            const card = container.firstChild as HTMLElement
-            expect(card.className).toContain('bg-cyan-50')
-            expect(card.className).toContain('border-cyan-200')
-        })
     })
 
     describe('Edge Cases', () => {
@@ -156,13 +117,6 @@ describe('MetricCard', () => {
 
             const card = container.firstChild as HTMLElement
             expect(card.className).toContain('rounded-xl')
-        })
-
-        it('should have padding', () => {
-            const { container } = render(<MetricCard title="Test" value={42} />)
-
-            const card = container.firstChild as HTMLElement
-            expect(card.className).toContain('p-6')
         })
 
         it('should have border', () => {

@@ -10,72 +10,40 @@ interface PercentileCardProps {
     colorScheme?: 'blue' | 'green' | 'purple'
 }
 
-export function PercentileCard({ 
-    title, 
-    p50, 
-    p90, 
+export function PercentileCard({
+    title,
+    p50,
+    p90,
     p75,
     icon,
-    colorScheme = 'blue' 
 }: PercentileCardProps) {
-    const colors = {
-        blue: {
-            bg: 'bg-blue-50',
-            border: 'border-blue-200',
-            text: 'text-blue-800',
-            accent: 'text-blue-600',
-            iconColor: 'text-blue-600'
-        },
-        green: {
-            bg: 'bg-green-50',
-            border: 'border-green-200',
-            text: 'text-green-800',
-            accent: 'text-green-600',
-            iconColor: 'text-green-600'
-        },
-        purple: {
-            bg: 'bg-purple-50',
-            border: 'border-purple-200',
-            text: 'text-purple-800',
-            accent: 'text-purple-600',
-            iconColor: 'text-purple-600'
-        }
-    }
-
-    const scheme = colors[colorScheme]
-
     return (
-        <div className={`w-full ${scheme.bg} border ${scheme.border} rounded-xl p-6 flex flex-col md:flex-row items-center justify-between`}>
-            {/* Header */}
-            <div className="flex items-center mb-4 md:mb-0">
+        <div className="rounded-xl border bg-card p-6">
+            <div className="flex items-center gap-2 mb-6">
                 {icon ? (
-                    <span className={`${scheme.iconColor} mr-2`}>{icon}</span>
+                    <span className="text-muted-foreground">{icon}</span>
                 ) : (
-                    <Clock className={`w-6 h-6 ${scheme.iconColor} mr-2`} />
+                    <Clock className="h-4 w-4 text-muted-foreground" />
                 )}
-                <h2 className={`text-lg font-semibold ${scheme.text}`}>
-                    {title}
-                </h2>
+                <h2 className="text-base font-semibold text-foreground">{title}</h2>
             </div>
 
-            {/* Values */}
-            <div className="flex justify-around md:justify-between flex-1 w-full mt-4 md:mt-0">
-                <div className="text-center flex-1">
-                    <p className={`text-sm font-medium ${scheme.accent}`}>P50</p>
-                    <p className={`font-mono text-2xl font-semibold tracking-tight tabular-nums ${scheme.text}`}>{p50}</p>
+            <div className={`grid ${p75 ? 'grid-cols-3' : 'grid-cols-2'} gap-4`}>
+                <div>
+                    <p className="text-sm font-medium text-muted-foreground">P50</p>
+                    <p className="mt-2 font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground">{p50}</p>
                 </div>
                 {p75 && (
-                    <div className="text-center flex-1">
-                        <p className={`text-sm font-medium ${scheme.accent}`}>P75</p>
-                        <p className={`font-mono text-2xl font-semibold tracking-tight tabular-nums ${scheme.text}`}>{p75}</p>
+                    <div>
+                        <p className="text-sm font-medium text-muted-foreground">P75</p>
+                        <p className="mt-2 font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground">{p75}</p>
                     </div>
                 )}
-                <div className="text-center flex-1">
-                    <p className={`text-sm font-medium ${scheme.accent}`}>P90</p>
-                    <p className={`font-mono text-2xl font-semibold tracking-tight tabular-nums ${scheme.text}`}>{p90}</p>
+                <div>
+                    <p className="text-sm font-medium text-muted-foreground">P90</p>
+                    <p className="mt-2 font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground">{p90}</p>
                 </div>
             </div>
         </div>
     )
 }
-

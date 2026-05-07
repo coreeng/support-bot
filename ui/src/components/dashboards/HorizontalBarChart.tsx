@@ -26,21 +26,21 @@ export function HorizontalBarChart<V extends ValueType = ValueType, N extends Na
     height = 350
 }: HorizontalBarChartProps<V, N>) {
     return (
-        <div className="rounded-xl border bg-card p-5">
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">
+        <div className="rounded-xl border bg-card p-6">
+            <h3 className="text-base font-semibold text-foreground mb-4">
                 {title}
             </h3>
             {data && data.length > 0 ? (
                 <ResponsiveContainer width="100%" height={height}>
                     <BarChart data={data} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" />
+                        <CartesianGrid strokeDasharray="3 3"  stroke="var(--border)"/>
+                        <XAxis type="number"  stroke="var(--border)" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}/>
                         <YAxis 
                             dataKey={yAxisDataKey} 
                             type="category" 
                             width={150}
                             style={{ fontSize: '12px' }}
-                        />
+                         stroke="var(--border)" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}/>
                         <Tooltip
                             formatter={tooltipFormatter}
                             labelFormatter={tooltipLabelFormatter}

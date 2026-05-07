@@ -9,165 +9,169 @@ import { formatHoursToDHMS, formatInterval, TimeBucket } from '@/lib/utils'
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts'
 
 interface ResolutionSLASectionProps {
-    resolutionPercentiles: { p50: number; p75: number; p90: number } | undefined
-    resolutionDurationDistribution: { label: string; count: number; minMinutes: number; maxMinutes: number }[] | undefined
-    resolutionTimesByWeek: { week: string; p50: number; p75: number; p90: number }[] | undefined
-    resolutionTimeByTagInHours: { tag: string; p50: number; p90: number }[] | undefined
-    unresolvedTicketAges: { p50: string; p90: string } | undefined
-    incomingVsResolvedRate: IncomingVsResolvedRate | undefined
-    isResolutionDistributionLoading: boolean
-    isRefreshing: boolean
-    onRefresh: () => void
+ resolutionPercentiles: { p50: number; p75: number; p90: number } | undefined
+ resolutionDurationDistribution: { label: string; count: number; minMinutes: number; maxMinutes: number }[] | undefined
+ resolutionTimesByWeek: { week: string; p50: number; p75: number; p90: number }[] | undefined
+ resolutionTimeByTagInHours: { tag: string; p50: number; p90: number }[] | undefined
+ unresolvedTicketAges: { p50: string; p90: string } | undefined
+ incomingVsResolvedRate: IncomingVsResolvedRate | undefined
+ isResolutionDistributionLoading: boolean
+ isRefreshing: boolean
+ onRefresh: () => void
 }
 
 export function ResolutionSLASection({
-    resolutionPercentiles,
-    resolutionDurationDistribution,
-    resolutionTimesByWeek,
-    resolutionTimeByTagInHours,
-    unresolvedTicketAges,
-    incomingVsResolvedRate,
-    isResolutionDistributionLoading,
-    isRefreshing,
-    onRefresh
+ resolutionPercentiles,
+ resolutionDurationDistribution,
+ resolutionTimesByWeek,
+ resolutionTimeByTagInHours,
+ unresolvedTicketAges,
+ incomingVsResolvedRate,
+ isResolutionDistributionLoading,
+ isRefreshing,
+ onRefresh
 }: ResolutionSLASectionProps) {
-    // Convert resolution times by week from seconds to hours
-    const resolutionTimesByWeekInHours = resolutionTimesByWeek?.map(week => ({
-        ...week,
-        p50: week.p50 / 3600,
-        p75: week.p75 / 3600,
-        p90: week.p90 / 3600
-    }))
-    // Backend provides pre-bucketed data; just map it to the TimeBucket shape.
-    const timeBuckets: TimeBucket[] = (resolutionDurationDistribution || []).map(b => ({
-        label: b.label,
-        count: b.count,
-        minMinutes: b.minMinutes,
-        maxMinutes: b.maxMinutes,
-    }))
-    const formattedIncomingVsResolvedRate = formatIncomingVsResolvedSeries(
-        incomingVsResolvedRate?.data ?? [],
-        incomingVsResolvedRate?.granularity
-    )
-    return (
-        <div>
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                    <h2 className="text-xl font-bold text-gray-800">Resolution Performance</h2>
-                    <p className="text-sm text-gray-500">Monitor ticket resolution times and trends</p>
-                </div>
-                <RefreshButton onRefresh={onRefresh} isRefreshing={isRefreshing} />
-            </div>
-            
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
-                {resolutionPercentiles ? (
-                    <ResolutionPercentileChart
-                        p50={resolutionPercentiles.p50}
-                        p75={resolutionPercentiles.p75}
-                        p90={resolutionPercentiles.p90}
-                    />
-                ) : (
-                    <div className="bg-gradient-to-r from-purple-50 to-purple-100 shadow-lg rounded-xl p-6">
-                        <p className="text-gray-500">No data available</p>
-                    </div>
-                )}
-                
-                <TimeBucketChart
-                    title="Ticket Resolution Duration Distribution"
-                    data={timeBuckets}
-                    isLoading={isResolutionDistributionLoading}
-                />
-            </div>
-            
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
-                <TimeSeriesChart
-                    title="Resolution Times by Week (P50/P75/P90)"
-                    data={resolutionTimesByWeekInHours || []}
-                    lines={[
-                        { dataKey: 'p50', name: 'P50', color: '#22c55e' },
-                        { dataKey: 'p75', name: 'P75', color: '#f59e0b' },
-                        { dataKey: 'p90', name: 'P90', color: '#3b82f6' }
-                    ]}
-                    tooltipFormatter={(value: number) => [formatHoursToDHMS(value), '']}
-                />
-                
-                {/* Resolution Time by Tag */}
-                <div className="bg-white shadow-lg rounded-xl p-6 border border-gray-200">
-                    <h2 className="text-xl font-semibold text-gray-700 mb-4">
-                        Resolution Time by Tag (P50/P90) - Hours
-                    </h2>
-                    {resolutionTimeByTagInHours && resolutionTimeByTagInHours.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={400}>
-                            <BarChart data={resolutionTimeByTagInHours}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis 
-                                    dataKey="tag" 
-                                    angle={-45}
-                                    textAnchor="end"
-                                    height={100}
-                                />
-                                <YAxis label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
-                                <Tooltip 
-                                    formatter={(value: number) => [value.toFixed(2) + ' hours', '']}
-                                />
-                                <Bar dataKey="p50" fill="#22c55e" name="P50 (Median)" />
-                                <Bar dataKey="p90" fill="#3b82f6" name="P90" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <p className="text-gray-500">No data available</p>
-                    )}
-                </div>
-                
-                {/* Unresolved Ticket Ages */}
-                <div className="bg-gradient-to-r from-cyan-50 to-cyan-100 border border-cyan-200 rounded-xl p-6">
-                    <h2 className="text-xl font-semibold text-gray-700 mb-4">
-                        Unresolved Ticket Ages
-                    </h2>
-                    {unresolvedTicketAges ? (
-                        <div className="flex justify-around">
-                            <div className="text-center">
-                                <p className="text-sm font-medium text-cyan-600">P50 (Median)</p>
-                                <p className="font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground">{formatInterval(unresolvedTicketAges.p50)}</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-sm font-medium text-cyan-600">P90</p>
-                                <p className="font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground">{formatInterval(unresolvedTicketAges.p90)}</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <p className="text-gray-500">No data available</p>
-                    )}
-                </div>
-            </div>
-            
-            {/* Incoming vs Resolved Rate */}
-            <div className="grid grid-cols-1 gap-6">
-                {formattedIncomingVsResolvedRate.length > 0 ? (
-                    <TimeSeriesChart
-                        title="Incoming vs Resolved Rate - Performance SLA"
-                        data={formattedIncomingVsResolvedRate}
-                        lines={[
-                            { dataKey: 'incoming', name: 'Incoming Queries', color: '#ef4444' },
-                            { dataKey: 'resolved', name: 'Resolved Tickets', color: '#22c55e' }
-                        ]}
-                        yAxisLabel="Tickets"
-                        xAxisDataKey="time"
-                        tooltipFormatter={(value: number) => [`${value} tickets`, '']}
-                        showLegend={true}
-                    />
-                ) : (
-                    <div className="bg-white shadow-lg rounded-xl p-6 border border-gray-200">
-                        <h2 className="text-xl font-semibold text-gray-700 mb-4">
-                            Incoming vs Resolved Rate - Performance SLA
-                        </h2>
-                        <p className="text-gray-500">
-                            {!incomingVsResolvedRate ? 'Loading...' : 'No data available for the selected date range'}
-                        </p>
-                    </div>
-                )}
-            </div>
-        </div>
-    )
+ // Convert resolution times by week from seconds to hours
+ const resolutionTimesByWeekInHours = resolutionTimesByWeek?.map(week => ({
+ ...week,
+ p50: week.p50 / 3600,
+ p75: week.p75 / 3600,
+ p90: week.p90 / 3600
+ }))
+ // Backend provides pre-bucketed data; just map it to the TimeBucket shape.
+ const timeBuckets: TimeBucket[] = (resolutionDurationDistribution || []).map(b => ({
+ label: b.label,
+ count: b.count,
+ minMinutes: b.minMinutes,
+ maxMinutes: b.maxMinutes,
+ }))
+ const formattedIncomingVsResolvedRate = formatIncomingVsResolvedSeries(
+ incomingVsResolvedRate?.data ?? [],
+ incomingVsResolvedRate?.granularity
+ )
+ return (
+ <div>
+ <div className="flex justify-between items-center mb-6">
+ <div>
+ <h2 className="text-base font-semibold text-foreground">Resolution Performance</h2>
+ <p className="text-sm text-muted-foreground">Monitor ticket resolution times and trends</p>
+ </div>
+ <RefreshButton onRefresh={onRefresh} isRefreshing={isRefreshing} />
+ </div>
+ 
+ <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+ {resolutionPercentiles ? (
+ <ResolutionPercentileChart
+ p50={resolutionPercentiles.p50}
+ p75={resolutionPercentiles.p75}
+ p90={resolutionPercentiles.p90}
+ />
+ ) : (
+ <div className="rounded-xl border bg-card p-6">
+ <p className="text-muted-foreground text-sm">No data available</p>
+ </div>
+ )}
+ 
+ <TimeBucketChart
+ title="Ticket Resolution Duration Distribution"
+ data={timeBuckets}
+ isLoading={isResolutionDistributionLoading}
+ />
+ </div>
+ 
+ <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+ <TimeSeriesChart
+ title="Resolution Times by Week (P50/P75/P90)"
+ data={resolutionTimesByWeekInHours || []}
+ lines={[
+ { dataKey: 'p50', name: 'P50', color: 'var(--chart-2)' },
+ { dataKey: 'p75', name: 'P75', color: 'var(--chart-3)' },
+ { dataKey: 'p90', name: 'P90', color: 'var(--chart-1)' }
+ ]}
+ tooltipFormatter={(value: number) => [formatHoursToDHMS(value), '']}
+ />
+ 
+ {/* Resolution Time by Tag */}
+ <div className="bg-card rounded-xl p-6 border">
+ <h2 className="text-base font-semibold text-foreground mb-4">
+ Resolution Time by Tag (P50/P90) - Hours
+ </h2>
+ {resolutionTimeByTagInHours && resolutionTimeByTagInHours.length > 0 ? (
+ <ResponsiveContainer width="100%" height={400}>
+ <BarChart data={resolutionTimeByTagInHours}>
+ <CartesianGrid strokeDasharray="3 3" stroke="var(--border)"/>
+ <XAxis 
+ dataKey="tag" 
+ angle={-45}
+ textAnchor="end"
+ height={100}
+ stroke="var(--border)" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}/>
+ <YAxis label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} stroke="var(--border)" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}/>
+ <Tooltip
+ formatter={(value: number) => [value.toFixed(2) + ' hours', '']}
+ contentStyle={{ background: 'var(--popover)', color: 'var(--popover-foreground)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
+ labelStyle={{ color: 'var(--popover-foreground)' }}
+ itemStyle={{ color: 'var(--popover-foreground)' }}
+ cursor={{ stroke: 'var(--border)', fill: 'var(--accent)' }}
+ />
+ <Bar dataKey="p50" fill="var(--chart-2)" name="P50 (Median)" />
+ <Bar dataKey="p90" fill="var(--chart-1)" name="P90" />
+ </BarChart>
+ </ResponsiveContainer>
+ ) : (
+ <p className="text-muted-foreground">No data available</p>
+ )}
+ </div>
+ 
+ {/* Unresolved Ticket Ages */}
+ <div className="rounded-xl border bg-card p-6">
+ <h2 className="text-base font-semibold text-foreground mb-4">
+ Unresolved Ticket Ages
+ </h2>
+ {unresolvedTicketAges ? (
+ <div className="grid grid-cols-2 gap-4">
+ <div>
+ <p className="text-sm font-medium text-muted-foreground">P50 (Median)</p>
+ <p className="mt-2 font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground">{formatInterval(unresolvedTicketAges.p50)}</p>
+ </div>
+ <div>
+ <p className="text-sm font-medium text-muted-foreground">P90</p>
+ <p className="mt-2 font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground">{formatInterval(unresolvedTicketAges.p90)}</p>
+ </div>
+ </div>
+ ) : (
+ <p className="text-muted-foreground text-sm">No data available</p>
+ )}
+ </div>
+ </div>
+ 
+ {/* Incoming vs Resolved Rate */}
+ <div className="grid grid-cols-1 gap-6">
+ {formattedIncomingVsResolvedRate.length > 0 ? (
+ <TimeSeriesChart
+ title="Incoming vs Resolved Rate - Performance SLA"
+ data={formattedIncomingVsResolvedRate}
+ lines={[
+ { dataKey: 'incoming', name: 'Incoming Queries', color: 'var(--chart-5)' },
+ { dataKey: 'resolved', name: 'Resolved Tickets', color: 'var(--chart-2)' }
+ ]}
+ yAxisLabel="Tickets"
+ xAxisDataKey="time"
+ tooltipFormatter={(value: number) => [`${value} tickets`, '']}
+ showLegend={true}
+ />
+ ) : (
+ <div className="bg-card rounded-xl p-6 border">
+ <h2 className="text-base font-semibold text-foreground mb-4">
+ Incoming vs Resolved Rate - Performance SLA
+ </h2>
+ <p className="text-muted-foreground">
+ {!incomingVsResolvedRate ? 'Loading...' : 'No data available for the selected date range'}
+ </p>
+ </div>
+ )}
+ </div>
+ </div>
+ )
 }
 
