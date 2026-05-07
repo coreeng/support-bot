@@ -134,7 +134,7 @@ describe('LoginPage', () => {
   })
 
   // -------------------------------------------------------------------
-  // Popup flow — token/code arrives in popup window (has window.opener)
+  // Popup flow — code arrives in popup window (has window.opener)
   // -------------------------------------------------------------------
 
   describe('popup flow (window.opener present)', () => {
@@ -155,31 +155,7 @@ describe('LoginPage', () => {
     it('calls signIn(redirect:false), sends postMessage to opener, and closes', async () => {
       mockSignIn.mockResolvedValue({ error: undefined, ok: true, status: 200, url: '' } as any)
       mockUseSearchParams.mockReturnValue(
-        new URLSearchParams('token=mytoken&callbackUrl=/dash') as any
-      )
-
-      render(<LoginPage />)
-
-      await waitFor(() => {
-        expect(mockSignIn).toHaveBeenCalledWith('backend-token', {
-          token: 'mytoken',
-          redirect: false,
-        })
-      })
-
-      await waitFor(() => {
-        expect(mockPostMessage).toHaveBeenCalledWith(
-          { type: 'auth:success', callbackUrl: '/dash' },
-          window.location.origin
-        )
-        expect(window.close).toHaveBeenCalled()
-      })
-    })
-
-    it('handles code flow identically', async () => {
-      mockSignIn.mockResolvedValue({ error: undefined, ok: true, status: 200, url: '' } as any)
-      mockUseSearchParams.mockReturnValue(
-        new URLSearchParams('code=mycode&callbackUrl=/home') as any
+        new URLSearchParams('code=mycode&callbackUrl=/dash') as any
       )
 
       render(<LoginPage />)
@@ -193,7 +169,7 @@ describe('LoginPage', () => {
 
       await waitFor(() => {
         expect(mockPostMessage).toHaveBeenCalledWith(
-          { type: 'auth:success', callbackUrl: '/home' },
+          { type: 'auth:success', callbackUrl: '/dash' },
           window.location.origin
         )
         expect(window.close).toHaveBeenCalled()
@@ -204,7 +180,7 @@ describe('LoginPage', () => {
       mockSignIn.mockResolvedValue({
         error: 'CredentialsSignin', ok: false, status: 401, url: '',
       } as any)
-      mockUseSearchParams.mockReturnValue(new URLSearchParams('token=bad') as any)
+      mockUseSearchParams.mockReturnValue(new URLSearchParams('code=bad') as any)
 
       render(<LoginPage />)
 
@@ -221,7 +197,7 @@ describe('LoginPage', () => {
     it('sanitizes callbackUrl sent in postMessage', async () => {
       mockSignIn.mockResolvedValue({ error: undefined, ok: true, status: 200, url: '' } as any)
       mockUseSearchParams.mockReturnValue(
-        new URLSearchParams('token=t&callbackUrl=https://evil.com') as any
+        new URLSearchParams('code=c&callbackUrl=https://evil.com') as any
       )
 
       render(<LoginPage />)
@@ -238,7 +214,7 @@ describe('LoginPage', () => {
     it('does not call signIn a second time on re-render', async () => {
       mockSignIn.mockResolvedValue({ error: undefined, ok: true, status: 200, url: '' } as any)
       mockUseSearchParams.mockReturnValue(
-        new URLSearchParams('token=mytoken') as any
+        new URLSearchParams('code=mycode') as any
       )
 
       const { rerender } = render(<LoginPage />)
@@ -256,26 +232,10 @@ describe('LoginPage', () => {
   })
 
   // -------------------------------------------------------------------
-  // Non-popup flow — token/code arrives in normal page (no opener)
+  // Non-popup flow — code arrives in normal page (no opener)
   // -------------------------------------------------------------------
 
   describe('non-popup flow', () => {
-    it('calls signIn with redirect:false for token', async () => {
-      mockSignIn.mockResolvedValue({ ok: true } as any)
-      mockUseSearchParams.mockReturnValue(
-        new URLSearchParams('token=mytoken&callbackUrl=/dash') as any
-      )
-
-      render(<LoginPage />)
-
-      await waitFor(() => {
-        expect(mockSignIn).toHaveBeenCalledWith('backend-token', {
-          token: 'mytoken',
-          redirect: false,
-        })
-      })
-    })
-
     it('calls signIn with redirect:false for code', async () => {
       mockSignIn.mockResolvedValue({ ok: true } as any)
       mockUseSearchParams.mockReturnValue(
@@ -292,7 +252,7 @@ describe('LoginPage', () => {
       })
     })
 
-    it('sanitizes callbackUrl passed to signIn', async () => {
+    it('ignores token query parameters instead of signing in with bearer tokens', async () => {
       mockSignIn.mockResolvedValue({ ok: true } as any)
       mockUseSearchParams.mockReturnValue(
         new URLSearchParams('token=t&callbackUrl=//evil.com') as any
@@ -301,11 +261,9 @@ describe('LoginPage', () => {
       render(<LoginPage />)
 
       await waitFor(() => {
-        expect(mockSignIn).toHaveBeenCalledWith('backend-token', {
-          token: 't',
-          redirect: false,
-        })
+        expect(screen.getByText('Redirecting to sign-in...')).toBeInTheDocument()
       })
+      expect(mockSignIn).not.toHaveBeenCalled()
     })
 
     it('sanitizes callbackUrl in authenticated redirect', async () => {

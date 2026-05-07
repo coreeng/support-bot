@@ -7,12 +7,12 @@ import {
 import { mapTicket } from "../_lib/map-ticket";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
 
-  const response = await backendFetch(`/ticket/${id}`);
+  const response = await backendFetch(request, `/ticket/${id}`);
   if (!response) return unauthorizedResponse();
 
   if (!response.ok) {
@@ -30,7 +30,7 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
-  const response = await backendFetch(`/ticket/${id}`, {
+  const response = await backendFetch(request, `/ticket/${id}`, {
     method: "PATCH",
     body: JSON.stringify(body),
   });

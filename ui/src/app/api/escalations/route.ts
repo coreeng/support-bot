@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   const pageSize = searchParams.get("pageSize") ?? "50";
 
   const response = await backendFetch(
+    request,
     `/escalation?page=${page}&pageSize=${pageSize}&escalated=true`
   );
   if (!response) return unauthorizedResponse();

@@ -81,7 +81,6 @@ export interface AuthUser {
 declare module "next-auth" {
   interface Session {
     user: AuthUser;
-    accessToken: string;
   }
 
   interface User extends AuthUser {
@@ -208,41 +207,6 @@ export const authConfig: NextAuthConfig = {
         return null;
       }, // authorize()
     }),
-    Credentials({
-      id: "backend-token",
-      name: "Backend Token",
-      credentials: {
-        token: { label: "Token", type: "text" },
-      },
-      async authorize(credentials) {
-        const token = credentials?.token as string;
-        if (!token) return null;
-
-        try {
-          // Token is already a valid backend JWT, just fetch user data
-          const userData = await fetchUserWithToken(token);
-          if (!userData) {
-            console.error("User fetch failed");
-            return null;
-          }
-
-          return {
-            id: userData.email as string,
-            email: userData.email as string,
-            name: userData.name as string,
-            teams: (userData.teams as Array<{ label: string; code: string; types: string[] }>).map((t) => ({
-              ...t,
-              name: t.code || t.label,
-            })),
-            roles: userData.roles as string[],
-            accessToken: token,
-          };
-        } catch (error) {
-          console.error("Authorization error:", error);
-          return null;
-        }
-      },
-    }),
   ],
 
   callbacks: {
@@ -259,7 +223,6 @@ export const authConfig: NextAuthConfig = {
     },
 
     async session({ session, token }) {
-      session.accessToken = token.accessToken as string;
       if (session.user) {
         session.user.id = token.email as string;
         session.user.email = token.email as string;
