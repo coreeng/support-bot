@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     return errorResponse("Invalid type parameter", 400);
   }
 
-  const response = await backendFetch(`/team?type=${type}`);
+  const response = await backendFetch(request, `/team?type=${type}`);
   if (!response) return unauthorizedResponse();
 
   if (!response.ok) {

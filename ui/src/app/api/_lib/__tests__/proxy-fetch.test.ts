@@ -1,5 +1,9 @@
 import { proxyFetch } from '../backend-fetch'
 
+jest.mock('next-auth/jwt', () => ({
+  getToken: jest.fn(),
+}))
+
 describe('proxyFetch', () => {
   const originalFetch = global.fetch
 

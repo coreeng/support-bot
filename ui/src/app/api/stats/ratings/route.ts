@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   if (from) statsRequest.from = from;
   if (to) statsRequest.to = to;
 
-  const response = await backendFetch("/stats", {
+  const response = await backendFetch(request, "/stats", {
     method: "POST",
     body: JSON.stringify([statsRequest]),
   });

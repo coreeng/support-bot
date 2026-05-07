@@ -1,11 +1,12 @@
+import { NextRequest } from "next/server";
 import {
   backendFetch,
   unauthorizedResponse,
   errorResponse,
 } from "../../_lib/backend-fetch";
 
-export async function GET() {
-  const response = await backendFetch("/summary-data/results");
+export async function GET(request: NextRequest) {
+  const response = await backendFetch(request, "/summary-data/results");
   if (!response) return unauthorizedResponse();
 
   if (!response.ok) {

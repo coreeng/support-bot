@@ -13,6 +13,7 @@ export async function GET(request: Request) {
   const query = params.toString();
 
   const response = await backendFetch(
+    request,
     `/tenant-insights/in-flight-prs${query ? `?${query}` : ""}`
   );
   if (!response) return unauthorizedResponse();
