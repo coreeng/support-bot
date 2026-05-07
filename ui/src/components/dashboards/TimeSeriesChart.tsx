@@ -30,10 +30,10 @@ export function TimeSeriesChart<V extends ValueType = ValueType, N extends NameT
     emptyMessage = 'No data available'
 }: TimeSeriesChartProps<V, N>) {
     return (
-        <div className="bg-white shadow-lg rounded-xl p-6 border border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-700 mb-4">
+        <div className="rounded-xl border bg-card p-5">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">
                 {title}
-            </h2>
+            </h3>
             {data && data.length > 0 ? (
                 <ResponsiveContainer width="100%" height={height}>
                     <LineChart data={data}>
@@ -47,8 +47,18 @@ export function TimeSeriesChart<V extends ValueType = ValueType, N extends NameT
                             interval="preserveStartEnd"
                         />
                         <YAxis label={{ value: yAxisLabel, angle: -90, position: 'insideLeft' }} />
-                        <Tooltip 
+                        <Tooltip
                             formatter={tooltipFormatter}
+                            contentStyle={{
+                                background: 'var(--popover)',
+                                color: 'var(--popover-foreground)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            }}
+                            labelStyle={{ color: 'var(--popover-foreground)' }}
+                            itemStyle={{ color: 'var(--popover-foreground)' }}
+                            cursor={{ stroke: 'var(--border)' }}
                         />
                         {showLegend && <Legend />}
                         {lines.map(line => (
@@ -64,7 +74,7 @@ export function TimeSeriesChart<V extends ValueType = ValueType, N extends NameT
                     </LineChart>
                 </ResponsiveContainer>
             ) : (
-                <p className="text-gray-500">{emptyMessage}</p>
+                <p className="text-muted-foreground">{emptyMessage}</p>
             )}
         </div>
     )

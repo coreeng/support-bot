@@ -38,7 +38,7 @@ export function ResolutionPercentileChart({ p50, p75, p90 }: ResolutionPercentil
                                 <span className={`text-lg font-bold ${p.textColor}`}>{p.label}</span>
                                 <span className="text-sm text-gray-500">{p.sublabel}</span>
                             </div>
-                            <span className="text-2xl font-bold text-gray-800">
+                            <span className="font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground">
                                 {formatHoursToDHMS(p.value)}
                             </span>
                         </div>

@@ -26,10 +26,10 @@ export function HorizontalBarChart<V extends ValueType = ValueType, N extends Na
     height = 350
 }: HorizontalBarChartProps<V, N>) {
     return (
-        <div className="bg-white shadow-lg rounded-xl p-6 border border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-700 mb-4">
+        <div className="rounded-xl border bg-card p-5">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">
                 {title}
-            </h2>
+            </h3>
             {data && data.length > 0 ? (
                 <ResponsiveContainer width="100%" height={height}>
                     <BarChart data={data} layout="vertical">
@@ -41,12 +41,26 @@ export function HorizontalBarChart<V extends ValueType = ValueType, N extends Na
                             width={150}
                             style={{ fontSize: '12px' }}
                         />
-                        <Tooltip formatter={tooltipFormatter} labelFormatter={tooltipLabelFormatter} separator={tooltipSeparator} />
+                        <Tooltip
+                            formatter={tooltipFormatter}
+                            labelFormatter={tooltipLabelFormatter}
+                            separator={tooltipSeparator}
+                            contentStyle={{
+                                background: 'var(--popover)',
+                                color: 'var(--popover-foreground)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            }}
+                            labelStyle={{ color: 'var(--popover-foreground)' }}
+                            itemStyle={{ color: 'var(--popover-foreground)' }}
+                            cursor={{ fill: 'var(--accent)' }}
+                        />
                         <Bar dataKey={dataKey} fill={color} />
                     </BarChart>
                 </ResponsiveContainer>
             ) : (
-                <p className="text-gray-500">No data available</p>
+                <p className="text-muted-foreground">No data available</p>
             )}
         </div>
     )

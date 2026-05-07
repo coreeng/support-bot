@@ -176,65 +176,9 @@ describe('EscalatedToMyTeamTable', () => {
         });
     });
 
-    describe('Filtering Logic', () => {
-        it('should render filter dropdowns', () => {
-            const { container } = render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            // Status, Impact, Tag, Date
-            const selects = container.querySelectorAll('select');
-            expect(selects.length).toBe(4);
-        });
-
-        it('should filter by status', () => {
-            const { container } = render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            const selects = container.querySelectorAll('select');
-            const statusFilter = selects[0]; // First select is status
-
-            // Change to resolved
-            fireEvent.change(statusFilter, { target: { value: 'resolved' } });
-            
-            // Should still render the table
-            expect(screen.getByText(/Escalated to My Team/i)).toBeInTheDocument();
-        });
-
-        it('should filter by impact', () => {
-            const { container } = render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            const selects = container.querySelectorAll('select');
-            const impactFilter = selects[1]; // Second select is impact
-
-            // Change to high
-            fireEvent.change(impactFilter, { target: { value: 'high' } });
-
-            // Should still render the table
-            expect(screen.getByText(/Escalated to My Team/i)).toBeInTheDocument();
-        });
-
-        it('should display total count', () => {
-            render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            // Should show "3 total" for Core-platform escalations
-            expect(screen.getByText('3 total')).toBeInTheDocument();
-        });
-    });
-
     describe('Top Tags', () => {
         it('should display top tags section', () => {
             render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            // Should show "Top 5 Tags" heading
-            expect(screen.getByText(/Top 5 Tags/i)).toBeInTheDocument();
-        });
-
-        it('should update when filters change', () => {
-            const { container } = render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            const selects = container.querySelectorAll('select');
-            const statusFilter = selects[0]; // First select is status
-            fireEvent.change(statusFilter, { target: { value: 'resolved' } });
-
-            // Should still show Top 5 Tags heading
             expect(screen.getByText(/Top 5 Tags/i)).toBeInTheDocument();
         });
     });

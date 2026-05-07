@@ -65,7 +65,7 @@ export function MetricCard({
             {isLoading ? (
                 <p className="text-gray-500">Loading...</p>
             ) : (
-                <p className={`text-3xl font-bold ${scheme.value}`}>
+                <p className={`font-mono text-3xl font-semibold tracking-tight tabular-nums ${scheme.value}`}>
                     {value}
                 </p>
             )}

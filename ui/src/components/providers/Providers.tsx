@@ -4,7 +4,6 @@ import { ReactNode, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 
-import { ThemeProvider } from './theme-provider'
 import { SessionProvider } from './SessionProvider'
 import { TeamFilterProvider } from '@/contexts/TeamFilterContext'
 
@@ -24,12 +23,10 @@ export function GlobalProviders({ children }: ProvidersProps) {
     return (
         <SessionProvider>
             <QueryClientProvider client={queryClient}>
-                <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-                    <TeamFilterProvider>
-                        {children}
-                        <Toaster position="top-center" richColors duration={5000} closeButton />
-                    </TeamFilterProvider>
-                </ThemeProvider>
+                <TeamFilterProvider>
+                    {children}
+                    <Toaster position="top-center" richColors duration={5000} closeButton />
+                </TeamFilterProvider>
             </QueryClientProvider>
         </SessionProvider>
     )

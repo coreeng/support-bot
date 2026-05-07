@@ -478,7 +478,7 @@ function StatCard({ label, value, suffix, isLoading, gradient, iconBg, tooltip }
                 {isLoading ? (
                     <div className="h-9 mt-1 w-16 bg-white/20 rounded animate-pulse" />
                 ) : (
-                    <p className="text-3xl font-bold text-white mt-1 tabular-nums">
+                    <p className="font-mono text-3xl font-semibold tracking-tight text-white mt-1 tabular-nums">
                         {value !== null ? `${value}${suffix ?? ''}` : '—'}
                     </p>
                 )}

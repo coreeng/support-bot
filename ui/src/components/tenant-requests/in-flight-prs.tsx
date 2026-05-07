@@ -531,7 +531,7 @@ function StatCard({ label, value, isLoading, gradient, iconBg }: {
                 {isLoading ? (
                     <div className="h-9 mt-1 w-16 bg-white/20 rounded animate-pulse" />
                 ) : (
-                    <p className="text-3xl font-bold text-white mt-1 tabular-nums">{value}</p>
+                    <p className="font-mono text-3xl font-semibold tracking-tight text-white mt-1 tabular-nums">{value}</p>
                 )}
             </div>
         </div>

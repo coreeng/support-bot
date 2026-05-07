@@ -72,7 +72,7 @@ export function WeeklyTrendsSection({
                                 <h3 className="text-sm font-medium text-gray-600 capitalize mb-2">
                                     {metric.label} This Week
                                 </h3>
-                                <p className="text-3xl font-bold text-gray-800">{metric.thisWeek}</p>
+                                <p className="font-mono text-3xl font-semibold tracking-tight tabular-nums text-foreground">{metric.thisWeek}</p>
                                 <div className="mt-2 flex items-center gap-2">
                                     <span className="text-sm font-semibold text-blue-600">
                                         {isPositive ? '↑' : '↓'} {Math.abs(metric.change)}

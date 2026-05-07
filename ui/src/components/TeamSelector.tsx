@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { useUrlParams } from '@/lib/hooks/useUrlParams'
-import { AlertTriangle, Users } from 'lucide-react'
+import { AlertTriangle, Check, Users } from 'lucide-react'
 import {
     Dialog,
     DialogContent,
@@ -14,14 +14,20 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 export default function TeamSelector() {
     const { user, isLeadership, isSupportEngineer } = useAuth()
     const { selectedTeam, setSelectedTeam } = useTeamFilter()
     const [teamParams, setTeamParam] = useUrlParams({ team: '' })
 
-    // Set when the URL carries a ?team= value this user doesn't have access to.
-    // Cleared when the user dismisses the modal.
     const [deniedTeam, setDeniedTeam] = useState<string | null>(null)
 
     const teams = useMemo(() => user?.teams ?? [], [user])
@@ -47,13 +53,11 @@ export default function TeamSelector() {
         [teams]
     )
 
-    // User's escalation teams (from session)
     const userEscalationTeams = useMemo(
         () => teams.filter(t => isEscalationTeam(t) && !isRoleTeam(t)),
         [teams]
     )
 
-    // User's role teams (from session — leadership/support)
     const userRoleTeams = useMemo(
         () => teams.filter(t => isRoleTeam(t)),
         [teams]
@@ -62,7 +66,6 @@ export default function TeamSelector() {
     const firstAvailableSelection =
         tenantTeamNames[0] || userEscalationTeams[0]?.name || userRoleTeams[0]?.name || null
 
-    // All valid selection values
     const validSelections = useMemo(() => {
         const set = new Set(tenantTeamNames)
         userEscalationTeams.forEach(t => set.add(t.name))
@@ -70,13 +73,9 @@ export default function TeamSelector() {
         return set
     }, [tenantTeamNames, userEscalationTeams, userRoleTeams])
 
-    // Ensure selectedTeam is initialised and valid, otherwise reset.
-    // The URL ?team param takes priority over the auth-based default so that
-    // bookmarked or shared URLs restore the intended view.
     useEffect(() => {
         const urlTeam = teamParams.team
 
-        // URL team is present and valid — sync it into context.
         if (urlTeam && validSelections.size > 0 && validSelections.has(urlTeam)) {
             if (urlTeam !== selectedTeam) {
                 setSelectedTeam(urlTeam)
@@ -84,27 +83,15 @@ export default function TeamSelector() {
             return
         }
 
-        // URL team is present but invalid for this user — show the access modal,
-        // then clean up the URL.  The modal fires exactly once: after the URL is
-        // corrected below, urlTeam will be valid on the next effect run and this
-        // branch will no longer be entered.
         if (urlTeam && validSelections.size > 0 && !validSelections.has(urlTeam)) {
-            // Local state update inside an effect is intentional: `deniedTeam` is not an effect
-            // dependency so there is no cascade risk.  State (rather than a ref) is required here
-            // so the modal stays open after the URL self-corrects below — a purely-derived value
-            // would close the modal before the user can read it.
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setDeniedTeam(urlTeam)
             if (selectedTeam && validSelections.has(selectedTeam)) {
                 setTeamParam({ team: selectedTeam })
                 return
             }
-            // selectedTeam is also absent/invalid — fall through to the
-            // initialisation/reset branches below, which will fix both.
         }
 
-        // No valid URL team — apply the existing initialisation / reset logic
-        // and write the resolved team back into the URL.
         if (!selectedTeam && firstAvailableSelection) {
             setSelectedTeam(firstAvailableSelection)
             return
@@ -149,14 +136,31 @@ export default function TeamSelector() {
         ? selectedTeam
         : (firstAvailableSelection || '')
 
-    // The team this user will fall back to — shown in the modal body.
     const fallbackTeam = (selectedTeam && validSelections.has(selectedTeam))
         ? selectedTeam
         : firstAvailableSelection
 
+    const handleSelect = (name: string) => {
+        setTeamParam({ team: name })
+    }
+
+    const renderItem = (name: string, suffix?: string | null) => (
+        <DropdownMenuItem
+            key={name}
+            onSelect={() => handleSelect(name)}
+            className="cursor-pointer"
+        >
+            <Users className="mr-2 h-4 w-4" />
+            <span className="flex-1 break-words">
+                {name}
+                {suffix && <span className="ml-1 text-muted-foreground">· {suffix}</span>}
+            </span>
+            {displayValue === name && <Check className="ml-2 h-4 w-4 text-primary" />}
+        </DropdownMenuItem>
+    )
+
     return (
-        <div className="space-y-2">
-            {/* Access-denied modal — shown when the URL carries an inaccessible ?team= value */}
+        <>
             <Dialog open={deniedTeam !== null} onOpenChange={(open) => { if (!open) setDeniedTeam(null) }}>
                 <DialogContent data-testid="team-access-denied-modal">
                     <DialogHeader>
@@ -175,56 +179,54 @@ export default function TeamSelector() {
                 </DialogContent>
             </Dialog>
 
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Users className="w-3 h-3" />
-                <span>View as:</span>
-            </div>
-            <select
-                data-testid="team-selector"
-                value={displayValue}
-                onChange={(e) => {
-                    // Only update the URL here. The useEffect above will sync the context
-                    // once the URL commits, avoiding a race where a stale searchParams
-                    // snapshot in the page's own reset effect overwrites the new ?team= value.
-                    setTeamParam({ team: e.target.value })
-                }}
-                className="w-full text-xs border border-input rounded px-2 py-1.5 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring hover:bg-accent transition-colors max-h-56"
-            >
-                {tenantTeamNames.length > 0 && (
-                    <>
-                        <option disabled>— Teams —</option>
-                        {tenantTeamNames.map(name => (
-                            <option key={name} value={name}>{name}</option>
-                        ))}
-                    </>
-                )}
-                {userEscalationTeams.length > 0 && (
-                    <>
-                        <option disabled>— Escalation Teams —</option>
-                        {userEscalationTeams.map(t => (
-                            <option key={t.name} value={t.name}>
-                                {t.name} · Escalation
-                            </option>
-                        ))}
-                    </>
-                )}
-                {userRoleTeams.length > 0 && (
-                    <>
-                        <option disabled>— Access Roles —</option>
-                        {userRoleTeams.map(t => (
-                            <option key={t.name} value={t.name}>
-                                {t.name} · {tagForTypes(t.types)}
-                            </option>
-                        ))}
-                    </>
-                )}
-            </select>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        variant="outline"
+                        data-testid="team-selector-trigger"
+                        className="cursor-pointer"
+                    >
+                        <Users className="h-4 w-4" />
+                        <span className="text-sm">{displayValue || 'Select team'}</span>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                    align="end"
+                    className="w-max min-w-[14rem] max-w-[min(32rem,calc(100vw-2rem))]"
+                >
+                    {tenantTeamNames.length > 0 && (
+                        <>
+                            <DropdownMenuLabel className="text-xs text-muted-foreground">
+                                Teams
+                            </DropdownMenuLabel>
+                            {tenantTeamNames.map(name => renderItem(name))}
+                        </>
+                    )}
+                    {userEscalationTeams.length > 0 && (
+                        <>
+                            {tenantTeamNames.length > 0 && <DropdownMenuSeparator />}
+                            <DropdownMenuLabel className="text-xs text-muted-foreground">
+                                Escalation Teams
+                            </DropdownMenuLabel>
+                            {userEscalationTeams.map(t => renderItem(t.name, 'Escalation'))}
+                        </>
+                    )}
+                    {userRoleTeams.length > 0 && (
+                        <>
+                            {(tenantTeamNames.length > 0 || userEscalationTeams.length > 0) && <DropdownMenuSeparator />}
+                            <DropdownMenuLabel className="text-xs text-muted-foreground">
+                                Access Roles
+                            </DropdownMenuLabel>
+                            {userRoleTeams.map(t => renderItem(t.name, tagForTypes(t.types)))}
+                        </>
+                    )}
+                </DropdownMenuContent>
+            </DropdownMenu>
             {selectedTeam && !(isLeadership || isSupportEngineer) && (
-                <p className="text-xs text-warning italic">
+                <span className="text-xs text-warning italic ml-2">
                     Viewing: {selectedTeam}
-                </p>
+                </span>
             )}
-        </div>
+        </>
     )
 }
-

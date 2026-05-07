@@ -128,11 +128,11 @@ export function ResolutionSLASection({
                         <div className="flex justify-around">
                             <div className="text-center">
                                 <p className="text-sm font-medium text-cyan-600">P50 (Median)</p>
-                                <p className="text-2xl font-bold text-cyan-800">{formatInterval(unresolvedTicketAges.p50)}</p>
+                                <p className="font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground">{formatInterval(unresolvedTicketAges.p50)}</p>
                             </div>
                             <div className="text-center">
                                 <p className="text-sm font-medium text-cyan-600">P90</p>
-                                <p className="text-2xl font-bold text-cyan-800">{formatInterval(unresolvedTicketAges.p90)}</p>
+                                <p className="font-mono text-2xl font-semibold tracking-tight tabular-nums text-foreground">{formatInterval(unresolvedTicketAges.p90)}</p>
                             </div>
                         </div>
                     ) : (

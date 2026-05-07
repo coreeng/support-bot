@@ -13,9 +13,21 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectSeparator,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { MultiSelect } from '@/components/ui/multi-select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Ticket, AlertCircle, Tag, User, Clock, Slack, X, MessageSquare } from 'lucide-react'
 import SlackMessageRenderer from '@/components/ui/SlackMessageRenderer'
-import TeamCombobox from './TeamCombobox'
 
 interface EditTicketModalProps {
     ticketId: string | null
@@ -96,9 +108,9 @@ export default function EditTicketModal({
     }, [status, originalStatus, ticketDetails])
 
     const statusColors: Record<string, string> = {
-        opened: 'bg-blue-100 text-blue-800',
-        closed: 'bg-green-100 text-green-800',
-        stale: 'bg-yellow-100 text-yellow-800',
+        opened: 'bg-info/10 text-info',
+        closed: 'bg-success/10 text-success',
+        stale: 'bg-warning/10 text-warning',
     }
 
     const handleTagToggle = (tagCode: string) => {
@@ -200,18 +212,18 @@ export default function EditTicketModal({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent data-testid="edit-ticket-modal" className="max-w-4xl max-h-[90vh] overflow-y-auto sm:p-6">
-                <DialogHeader className="pb-4 border-b border-gray-200">
-                    <DialogTitle className="flex items-center gap-3 text-3xl">
-                        <Ticket className="w-7 h-7 text-blue-500" />
+            <DialogContent data-testid="edit-ticket-modal" className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-xl">
+                        <Ticket className="h-5 w-5 text-primary" />
                         Ticket #{ticketId}
                         {!canEdit && (
-                            <span className="text-base font-normal text-gray-500 ml-2">
+                            <span className="text-xs font-normal text-muted-foreground ml-1">
                                 (Read-only)
                             </span>
                         )}
                     </DialogTitle>
-                    <DialogDescription className="leading-relaxed">
+                    <DialogDescription className="text-sm">
                         {canEdit
                             ? 'Edit ticket details below.'
                             : 'View ticket details. Only support engineers can edit tickets.'}
@@ -219,74 +231,29 @@ export default function EditTicketModal({
                 </DialogHeader>
 
                 {ticketError && (
-                    <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 text-red-800 text-sm font-medium">
+                    <div className="bg-destructive/10 border-2 border-destructive/30 rounded-lg p-4 text-destructive text-sm font-medium">
                         Failed to load ticket details.
                     </div>
                 )}
                 {isTicketLoading && (
-                    <div data-testid="ticket-loading-skeleton" className="space-y-4 pt-4 animate-pulse">
-                        {/* Ticket Message Skeleton */}
-                        <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-blue-50/30 shadow-sm">
-                            <div className="flex items-center gap-2 pb-2 border-b border-gray-200/60">
-                                <div className="w-5 h-5 bg-gray-300 rounded"></div>
-                                <div className="h-5 bg-gray-300 rounded w-32"></div>
-                            </div>
-                            <div className="p-4 bg-white border border-gray-200 rounded-md space-y-2">
-                                <div className="h-4 bg-gray-200 rounded w-full"></div>
-                                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                                <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-                            </div>
-                        </div>
-
-                        {/* Status History Skeleton */}
-                        <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-gray-50/50 shadow-sm">
-                            <div className="flex items-center gap-2 pb-2 border-b border-gray-200/60">
-                                <div className="w-5 h-5 bg-gray-300 rounded"></div>
-                                <div className="h-5 bg-gray-300 rounded w-28"></div>
-                            </div>
-                            <div className="space-y-2 border border-gray-200 rounded-md p-3 bg-white">
-                                <div className="h-6 bg-gray-200 rounded w-full"></div>
-                                <div className="h-6 bg-gray-200 rounded w-full"></div>
-                                <div className="h-6 bg-gray-200 rounded w-4/5"></div>
-                            </div>
-                        </div>
-
-                        {/* Escalations Skeleton */}
-                        <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-white shadow-sm">
-                            <div className="flex items-center gap-2 pb-2 border-b border-gray-200/60">
-                                <div className="w-5 h-5 bg-gray-300 rounded"></div>
-                                <div className="h-5 bg-gray-300 rounded w-24"></div>
-                            </div>
-                            <div className="h-10 bg-gray-200 rounded w-full"></div>
-                        </div>
-
-                        {/* Form Fields Skeleton */}
-                        {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className={`space-y-3 p-4 border border-gray-200/60 rounded-lg shadow-sm ${i % 2 === 0 ? 'bg-gray-50/50' : 'bg-white'}`}>
-                                <div className="flex items-center gap-2 pb-2 border-b border-gray-200/60">
-                                    <div className="w-5 h-5 bg-gray-300 rounded"></div>
-                                    <div className="h-5 bg-gray-300 rounded w-36"></div>
-                                </div>
-                                <div className="h-10 bg-gray-200 rounded w-full"></div>
+                    <div data-testid="ticket-loading-skeleton" className="space-y-4 pt-2">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                            <div key={i} className="space-y-1.5">
+                                <Skeleton className="h-4 w-32" />
+                                <Skeleton className="h-9 w-full" />
                             </div>
                         ))}
                     </div>
                 )}
-                <div className="space-y-4 pt-4">
-                        {/* Ticket Message Section */}
+                <div className="space-y-4 pt-2">
+                        {/* Ticket Message */}
                         {displayTicket?.query?.text && (
-                            <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-blue-50/30 shadow-sm">
-                                <label className="text-base font-semibold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-200/60">
-                                    <MessageSquare className="w-5 h-5 text-gray-600" />
-                                    Ticket Message
-                                </label>
-                                <div className="p-3 bg-white border border-gray-200 rounded-md">
-                                    <SlackMessageRenderer 
-                                        text={displayTicket.query.text} 
-                                        className="break-words"
-                                    />
+                            <div className="space-y-1.5">
+                                <Label className="text-sm font-medium text-foreground">Ticket Message</Label>
+                                <div className="rounded-md border bg-muted/40 px-3 py-2">
+                                    <SlackMessageRenderer text={displayTicket.query.text} className="break-words text-sm" />
                                     {displayTicket.query.date && (
-                                        <p className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-100">
+                                        <p className="mt-2 text-xs text-muted-foreground">
                                             {new Date(displayTicket.query.date).toLocaleString()}
                                         </p>
                                     )}
@@ -295,100 +262,92 @@ export default function EditTicketModal({
                         )}
 
                         {displayTicket?.summary?.trim() && (
-                            <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-emerald-50/40 shadow-sm">
-                                <label className="text-base font-semibold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-200/60">
-                                    <MessageSquare className="w-5 h-5 text-gray-600" />
-                                    AI Summary
-                                </label>
-                                <div className="p-3 bg-white border border-gray-200 rounded-md">
-                                    <p className="text-sm leading-6 text-gray-700 whitespace-pre-wrap break-words">
+                            <div className="space-y-1.5">
+                                <Label className="text-sm font-medium text-foreground">AI Summary</Label>
+                                <div className="rounded-md border bg-muted/40 px-3 py-2">
+                                    <p className="text-sm leading-6 text-foreground whitespace-pre-wrap break-words">
                                         {displayTicket.summary}
                                     </p>
                                 </div>
                             </div>
                         )}
 
-                        {/* Status History (Logs Section) */}
-                        <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-gray-50/50 shadow-sm">
-                            <label className="text-base font-semibold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-200/60">
-                                <Clock className="w-5 h-5 text-gray-600" />
-                                Status History
-                            </label>
-                            <ul className="space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-3 bg-white">
-                                {displayTicket.logs?.map((log: { event: string; date: string }, idx: number) => (
-                                    <li
-                                        key={idx}
-                                        className="text-sm text-gray-700 flex justify-between hover:bg-gray-50 px-2 py-1.5 rounded transition border-b border-gray-100 last:border-b-0"
-                                    >
-                                        <span className="font-medium">{log.event}</span>
-                                        <span className="text-gray-500 text-xs">
-                                            {new Date(log.date).toLocaleString()}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
+                        {/* Status History */}
+                        <div className="space-y-1.5">
+                            <Label className="text-sm font-medium text-foreground">Status History</Label>
+                            <div className="max-h-40 overflow-y-auto rounded-md border bg-muted/40 text-sm">
+                                <ul className="divide-y">
+                                    {displayTicket.logs?.map((log: { event: string; date: string }, idx: number) => (
+                                        <li key={idx} className="flex h-9 items-center justify-between px-3 hover:bg-muted/60 transition">
+                                            <span className="font-medium text-foreground">{log.event}</span>
+                                            <span className="text-muted-foreground text-xs">
+                                                {new Date(log.date).toLocaleString()}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
                         </div>
 
-                        {/* Escalations Section */}
-                        <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-white shadow-sm">
-                            <label className="text-base font-semibold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-200/60">
-                                <AlertCircle className="w-5 h-5 text-gray-600" />
-                                Escalations
-                            </label>
-                            <div className="p-3 border border-gray-200 rounded-md bg-gray-50">
+                        {/* Escalations */}
+                        <div className="space-y-1.5">
+                            <Label className="text-sm font-medium text-foreground">Escalations</Label>
+                            <div className="rounded-md border bg-muted/40 text-sm">
                                 {displayTicket.escalations?.length ? (
-                                    <div className="space-y-2">
+                                    <ul className="divide-y">
                                         {displayTicket.escalations.map((esc, idx) => (
-                                            <div key={idx} className="text-sm text-gray-700">
-                                                <span className="font-medium">Escalated to:</span>{' '}
-                                                <span className="text-gray-800 font-semibold">{esc.team?.name || 'Unknown team'}</span>
-                                            </div>
+                                            <li key={idx} className="flex h-9 items-center px-3 text-foreground">
+                                                Escalated to <span className="ml-1 font-medium">{esc.team?.name || 'Unknown team'}</span>
+                                            </li>
                                         ))}
-                                    </div>
+                                    </ul>
                                 ) : (
-                                    <span className="text-gray-500">No escalations</span>
+                                    <div className="flex h-9 items-center px-3 text-muted-foreground">No escalations</div>
                                 )}
                             </div>
                         </div>
 
-                        {/* Change Status Section */}
-                        <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-gray-50/50 shadow-sm">
-                            <label htmlFor="status-select" className="text-base font-semibold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-200/60">
-                                <AlertCircle className="w-5 h-5 text-gray-600" />
-                                Change Status <span className="text-red-500">*</span>
-                            </label>
+                        {/* Change Status */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="status-select" className="text-sm font-medium text-foreground">
+                                Change Status <span className="text-destructive">*</span>
+                            </Label>
                             {canEdit ? (
                                 <div className="space-y-1">
-                                    <select
-                                        data-testid="status-select"
-                                        id="status-select"
+                                    <Select
                                         value={status}
-                                        onChange={(e) => {
-                                            setStatus(e.target.value)
+                                        onValueChange={(v) => {
+                                            setStatus(v)
                                             if (validationErrors.status) {
                                                 clearValidationError('status')
                                             }
                                         }}
-                                        className={`w-full p-2.5 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:shadow-md transition-all ${
-                                            validationErrors.status ? 'border-red-500' : 'border-gray-300'
-                                        }`}
                                     >
-                                        <option value="">Select status...</option>
-                                        <option value="opened">Opened</option>
-                                        <option value="closed">Closed</option>
-                                    </select>
+                                        <SelectTrigger
+                                            id="status-select"
+                                            data-testid="status-select"
+                                            className={`w-full ${validationErrors.status ? 'border-destructive' : ''}`}
+                                        >
+                                            <SelectValue placeholder="Select status..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="opened">Opened</SelectItem>
+                                            <SelectItem value="closed">Closed</SelectItem>
+                                            <SelectItem value="stale">Stale</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                     {validationErrors.status && (
-                                        <p className="text-sm text-red-600">{validationErrors.status}</p>
+                                        <p className="text-sm text-destructive">{validationErrors.status}</p>
                                     )}
                                     {showEscalationWarning && (
-                                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded-md">
+                                        <div className="mt-3 p-3 bg-warning/10 border border-warning/30 rounded-md">
                                             <div className="flex gap-2">
-                                                <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                                                <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
                                                 <div className="flex-1">
-                                                    <p className="text-sm font-semibold text-yellow-800">
+                                                    <p className="text-sm font-semibold text-warning">
                                                         Ticket has {ticketDetails?.escalations?.filter((esc: Escalation) => !esc.resolvedAt).length} unresolved escalation{(ticketDetails?.escalations?.filter((esc: Escalation) => !esc.resolvedAt).length || 0) > 1 ? 's' : ''}.
                                                     </p>
-                                                    <p className="text-sm text-yellow-700 mt-1">
+                                                    <p className="text-sm text-warning mt-1">
                                                         Closing the ticket will close all related escalations.
                                                     </p>
                                                 </div>
@@ -397,252 +356,240 @@ export default function EditTicketModal({
                                     )}
                                 </div>
                             ) : (
-                                <span className={`px-4 py-2 rounded-full text-sm font-semibold inline-block shadow-sm ${
-                                    statusColors[displayTicket.status] || 'bg-gray-100 text-gray-800'
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                    statusColors[displayTicket.status] || 'bg-muted text-foreground'
                                 }`}>
                                     {displayTicket.status || '-'}
                                 </span>
                             )}
                         </div>
 
-                        {/* Assignee Section - Only show if assignment is enabled */}
+                        {/* Assignee */}
                         {isAssignmentEnabled && (
-                            <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-blue-50/30 shadow-sm">
-                                <label htmlFor="assignee-select" className="text-base font-semibold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-200/60">
-                                    <User className="w-5 h-5 text-gray-600" />
+                            <div className="space-y-1.5">
+                                <Label htmlFor="assignee-select" className="text-sm font-medium text-foreground">
                                     Support Engineer
-                                </label>
+                                </Label>
                                 {canEdit ? (
-                                    <select
-                                        id="assignee-select"
-                                        value={assignedTo}
-                                        onChange={(e) => setAssignedTo(e.target.value)}
-                                        className="w-full p-2.5 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:shadow-md transition-all"
+                                    <Select
+                                        value={assignedTo || '__unassigned'}
+                                        onValueChange={(v) => setAssignedTo(v === '__unassigned' ? '' : v)}
                                     >
-                                        <option value="">Unassigned</option>
-                                        {supportMembers?.map((member: SupportMember) => (
-                                            <option key={member.userId} value={member.displayName}>
-                                                {member.displayName}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger id="assignee-select" className="w-full">
+                                            <SelectValue placeholder="Unassigned" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__unassigned">Unassigned</SelectItem>
+                                            {supportMembers?.map((member: SupportMember) => (
+                                                <SelectItem key={member.userId} value={member.displayName}>
+                                                    {member.displayName}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 ) : (
-                                    <div className="p-3 bg-white border border-gray-200 rounded-md">
-                                        <span className="font-medium text-gray-700">
-                                            {assignedTo || 'Unassigned'}
-                                        </span>
-                                    </div>
+                                    <p className="text-sm text-foreground">{assignedTo || 'Unassigned'}</p>
                                 )}
                             </div>
                         )}
 
-                        {/* Select the Author's Team Section */}
-                        <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-white shadow-sm">
-                            <label htmlFor="team-select" className="text-base font-semibold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-200/60">
-                                <User className="w-5 h-5 text-gray-600" />
-                                Select the Author&apos;s Team <span className="text-red-500">*</span>
-                            </label>
-                            {canEdit ? (
-                                <TeamCombobox
-                                    id="team-select"
-                                    suggestedTeams={
-                                        isTeamSuggestionsError
-                                            ? []
-                                            : (teamSuggestionsData?.suggestedTeams ?? [])
-                                    }
-                                    otherTeams={
-                                        isTeamSuggestionsError
-                                            ? (teamsData?.map((t) => t.name) ?? [])
-                                            : (teamSuggestionsData?.otherTeams ?? [])
-                                    }
-                                    value={authorTeam}
-                                    onChange={(val) => {
-                                        setAuthorTeam(val)
-                                        if (validationErrors.authorTeam) {
-                                            clearValidationError('authorTeam')
-                                        }
-                                    }}
-                                    error={validationErrors.authorTeam}
-                                />
-                            ) : (
-                                <span className="font-medium text-gray-700 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-md inline-block">
-                                    {displayTicket.team?.name || '-'}
-                                </span>
+                        {/* Author's Team */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="team-select" className="text-sm font-medium text-foreground">
+                                Author&apos;s Team <span className="text-destructive">*</span>
+                            </Label>
+                            {canEdit ? (() => {
+                                const CLEAR_SENTINEL = '__clear__'
+                                const suggested = isTeamSuggestionsError
+                                    ? []
+                                    : (teamSuggestionsData?.suggestedTeams ?? [])
+                                const others = isTeamSuggestionsError
+                                    ? (teamsData?.map((t) => t.name) ?? [])
+                                    : (teamSuggestionsData?.otherTeams ?? [])
+                                return (
+                                    <div className="space-y-1">
+                                        <Select
+                                            value={authorTeam || undefined}
+                                            onValueChange={(v) => {
+                                                const next = v === CLEAR_SENTINEL ? '' : v
+                                                setAuthorTeam(next)
+                                                if (validationErrors.authorTeam && next) {
+                                                    clearValidationError('authorTeam')
+                                                }
+                                            }}
+                                        >
+                                            <SelectTrigger
+                                                id="team-select"
+                                                className={`w-full ${validationErrors.authorTeam ? 'border-destructive' : ''}`}
+                                            >
+                                                <SelectValue placeholder="Select team..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {suggested.length > 0 && (
+                                                    <SelectGroup>
+                                                        <SelectLabel>Suggested teams</SelectLabel>
+                                                        {suggested.map((name) => (
+                                                            <SelectItem key={`s-${name}`} value={name}>{name}</SelectItem>
+                                                        ))}
+                                                    </SelectGroup>
+                                                )}
+                                                {others.length > 0 && (
+                                                    <SelectGroup>
+                                                        {suggested.length > 0 && <SelectSeparator />}
+                                                        <SelectLabel>Others</SelectLabel>
+                                                        {others.map((name) => (
+                                                            <SelectItem key={`o-${name}`} value={name}>{name}</SelectItem>
+                                                        ))}
+                                                    </SelectGroup>
+                                                )}
+                                                {authorTeam && (
+                                                    <>
+                                                        <SelectSeparator />
+                                                        <SelectItem value={CLEAR_SENTINEL} className="text-muted-foreground">
+                                                            Clear selection
+                                                        </SelectItem>
+                                                    </>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                        {validationErrors.authorTeam && (
+                                            <p className="text-sm text-destructive">{validationErrors.authorTeam}</p>
+                                        )}
+                                    </div>
+                                )
+                            })() : (
+                                <p className="text-sm text-foreground">{displayTicket.team?.name || '-'}</p>
                             )}
                         </div>
 
-                        {/* Tags Section */}
-                        <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-gray-50/50 shadow-sm">
-                            <label htmlFor="tags-select" className="text-base font-semibold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-200/60">
-                                <Tag className="w-5 h-5 text-gray-600" />
-                                Tags <span className="text-red-500">*</span>
-                            </label>
+                        {/* Tags */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="tags-select" className="text-sm font-medium text-foreground">
+                                Tags <span className="text-destructive">*</span>
+                            </Label>
                             {canEdit ? (
-                                <div className="space-y-3">
-                                    {/* Selected Tags Display */}
-                                    <div className={`flex flex-wrap gap-2 p-3 border rounded-md bg-white min-h-[50px] ${
-                                        validationErrors.tags ? 'border-red-500' : 'border-gray-200'
-                                    }`}>
-                                        {selectedTags.length === 0 ? (
-                                            <span className="text-gray-400 text-sm">No tags selected</span>
-                                        ) : (
-                                            selectedTags.map((tagCode) => {
-                                                const tag = registryData?.tags.find((t: TicketTag) => t.code === tagCode)
-                                                return (
-                                                    <span
-                                                        key={tagCode}
-                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-200 text-gray-700 rounded-full text-sm font-medium shadow-sm hover:bg-gray-300 transition-colors"
-                                                    >
-                                                        {tag?.label || tagCode}
-                                                        <button
-                                                            onClick={() => {
-                                                                handleTagToggle(tagCode)
-                                                                if (validationErrors.tags && selectedTags.length === 1) {
-                                                                    clearValidationError('tags')
-                                                                }
-                                                            }}
-                                                            className="hover:bg-gray-400/50 rounded-full p-0.5 transition-colors"
-                                                            type="button"
-                                                        >
-                                                            <X className="w-3 h-3" />
-                                                        </button>
-                                                    </span>
-                                                )
-                                            })
-                                        )}
-                                    </div>
-                                    {validationErrors.tags && (
-                                        <p className="text-sm text-red-600">{validationErrors.tags}</p>
-                                    )}
-                                    {/* Tags Dropdown */}
-                                    <select
-                                        id="tags-select"
-                                        value=""
-                                        onChange={(e) => {
-                                            if (e.target.value && !selectedTags.includes(e.target.value)) {
-                                                setSelectedTags([...selectedTags, e.target.value])
-                                                if (validationErrors.tags) {
-                                                    clearValidationError('tags')
-                                                }
+                                <div className="space-y-1">
+                                    <MultiSelect
+                                        triggerId="tags-select"
+                                        placeholder="Select tags..."
+                                        searchPlaceholder="Search tags..."
+                                        error={!!validationErrors.tags}
+                                        options={(registryData?.tags ?? []).map((t: TicketTag) => ({
+                                            label: t.label,
+                                            value: t.code,
+                                        }))}
+                                        selected={selectedTags}
+                                        onChange={(next) => {
+                                            setSelectedTags(next)
+                                            if (validationErrors.tags && next.length > 0) {
+                                                clearValidationError('tags')
                                             }
-                                            e.target.value = '' // Reset dropdown
                                         }}
-                                        className="w-full p-2.5 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:shadow-md transition-all"
-                                    >
-                                        <option value="">Select a tag to add...</option>
-                                        {registryData?.tags
-                                            .filter((tag: TicketTag) => !selectedTags.includes(tag.code))
-                                            .map((tag: TicketTag) => (
-                                                <option key={tag.code} value={tag.code}>
-                                                    {tag.label}
-                                                </option>
-                                            ))}
-                                    </select>
+                                    />
+                                    {validationErrors.tags && (
+                                        <p className="text-sm text-destructive">{validationErrors.tags}</p>
+                                    )}
                                 </div>
                             ) : (
-                                <div className="flex flex-wrap gap-2 p-3 bg-white border border-gray-200 rounded-md">
+                                <div className="flex flex-wrap gap-1.5">
                                     {(displayTicket.tags ?? []).length ? (
                                         (displayTicket.tags as string[]).map((tag: string, idx: number) => (
-                                            <span
-                                                key={idx}
-                                                className="px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-xs font-medium"
-                                            >
+                                            <span key={idx} className="rounded-full border px-2 py-0.5 text-xs text-foreground">
                                                 {tag}
                                             </span>
                                         ))
                                     ) : (
-                                        <span className="text-gray-500">-</span>
+                                        <span className="text-sm text-muted-foreground">-</span>
                                     )}
                                 </div>
                             )}
                         </div>
 
-                        {/* Impact Section */}
-                        <div className="space-y-3 p-4 border border-gray-200/60 rounded-lg bg-white shadow-sm">
-                            <label htmlFor="impact-select" className="text-base font-semibold text-gray-900 flex items-center gap-2 pb-2 border-b border-gray-200/60">
-                                <AlertCircle className="w-5 h-5 text-gray-600" />
-                                Impact <span className="text-red-500">*</span>
-                            </label>
+                        {/* Impact */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="impact-select" className="text-sm font-medium text-foreground">
+                                Impact <span className="text-destructive">*</span>
+                            </Label>
                             {canEdit ? (
                                 <div className="space-y-1">
-                                    <select
-                                        data-testid="impact-select"
-                                        id="impact-select"
+                                    <Select
                                         value={impact}
-                                        onChange={(e) => {
-                                            setImpact(e.target.value)
+                                        onValueChange={(v) => {
+                                            setImpact(v)
                                             if (validationErrors.impact) {
                                                 clearValidationError('impact')
                                             }
                                         }}
-                                        className={`w-full p-2.5 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:shadow-md transition-all ${
-                                            validationErrors.impact ? 'border-red-500' : 'border-gray-300'
-                                        }`}
                                     >
-                                        <option value="">Select impact...</option>
-                                        {registryData?.impacts.map((imp: TicketImpact) => (
-                                            <option key={imp.code} value={imp.code}>
-                                                {imp.label}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger
+                                            id="impact-select"
+                                            data-testid="impact-select"
+                                            className={`w-full ${validationErrors.impact ? 'border-destructive' : ''}`}
+                                        >
+                                            <SelectValue placeholder="Select impact..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {registryData?.impacts.map((imp: TicketImpact) => (
+                                                <SelectItem key={imp.code} value={imp.code}>
+                                                    {imp.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                     {validationErrors.impact && (
-                                        <p className="text-sm text-red-600">{validationErrors.impact}</p>
+                                        <p className="text-sm text-destructive">{validationErrors.impact}</p>
                                     )}
                                 </div>
                             ) : (
-                                <span className="font-medium text-gray-700 bg-gray-100 text-gray-800 px-4 py-2 rounded-full inline-block shadow-sm">
+                                <p className="text-sm text-foreground">
                                     {registryData?.impacts.find((i: TicketImpact) => i.code === displayTicket.impact)?.label || displayTicket.impact || '-'}
-                                </span>
+                                </p>
                             )}
                         </div>
 
                         {/* Error Message */}
                         {error && (
-                            <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 text-red-800 text-sm font-medium">
+                            <div className="bg-destructive/10 border-2 border-destructive/30 rounded-lg p-4 text-destructive text-sm font-medium">
                                 {error}
                             </div>
                         )}
                 </div>
 
-                <DialogFooter className="flex items-center justify-between w-full pt-4 border-t border-gray-200">
+                <DialogFooter className="flex items-center justify-between w-full pt-2">
                     <div className="flex-1">
                         {displayTicket?.query?.link && (
-                            <a
-                                href={displayTicket.query.link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 hover:shadow-lg transition-all"
-                            >
-                                <Slack className="w-5 h-5 mr-2" />
-                                Open in Slack
-                            </a>
+                            <Button asChild variant="outline" size="sm">
+                                <a
+                                    href={displayTicket.query.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <Slack className="h-4 w-4" />
+                                    Open in Slack
+                                </a>
+                            </Button>
                         )}
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
                         {canEdit && (
                             <>
                                 <Button
                                     variant="outline"
                                     onClick={() => onOpenChange(false)}
                                     disabled={isSaving}
-                                    className="px-6 py-2.5"
                                 >
                                     Cancel
                                 </Button>
-                            <Button
-                                onClick={handleSave}
-                                disabled={isSaving || !status || !impact || !authorTeam || selectedTags.length === 0}
-                                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg transition-all"
-                            >
-                                {isSaving ? 'Saving...' : 'Save Changes'}
-                            </Button>
+                                <Button
+                                    onClick={handleSave}
+                                    disabled={isSaving || !status || !impact || !authorTeam || selectedTags.length === 0}
+                                >
+                                    {isSaving ? 'Saving...' : 'Save Changes'}
+                                </Button>
                             </>
                         )}
                         {!canEdit && (
-                            <Button onClick={() => onOpenChange(false)} className="px-6 py-2.5">
-                                Close
-                            </Button>
+                            <Button onClick={() => onOpenChange(false)}>Close</Button>
                         )}
                     </div>
                 </DialogFooter>

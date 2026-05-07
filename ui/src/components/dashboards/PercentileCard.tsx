@@ -62,17 +62,17 @@ export function PercentileCard({
             <div className="flex justify-around md:justify-between flex-1 w-full mt-4 md:mt-0">
                 <div className="text-center flex-1">
                     <p className={`text-sm font-medium ${scheme.accent}`}>P50</p>
-                    <p className={`text-2xl font-bold ${scheme.text}`}>{p50}</p>
+                    <p className={`font-mono text-2xl font-semibold tracking-tight tabular-nums ${scheme.text}`}>{p50}</p>
                 </div>
                 {p75 && (
                     <div className="text-center flex-1">
                         <p className={`text-sm font-medium ${scheme.accent}`}>P75</p>
-                        <p className={`text-2xl font-bold ${scheme.text}`}>{p75}</p>
+                        <p className={`font-mono text-2xl font-semibold tracking-tight tabular-nums ${scheme.text}`}>{p75}</p>
                     </div>
                 )}
                 <div className="text-center flex-1">
                     <p className={`text-sm font-medium ${scheme.accent}`}>P90</p>
-                    <p className={`text-2xl font-bold ${scheme.text}`}>{p90}</p>
+                    <p className={`font-mono text-2xl font-semibold tracking-tight tabular-nums ${scheme.text}`}>{p90}</p>
                 </div>
             </div>
         </div>
