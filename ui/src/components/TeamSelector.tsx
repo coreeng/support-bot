@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { useUrlParams } from '@/lib/hooks/useUrlParams'
-import { Users } from 'lucide-react'
+import { AlertTriangle, Users } from 'lucide-react'
 import {
     Dialog,
     DialogContent,
@@ -117,14 +117,26 @@ export default function TeamSelector() {
 
     if (user && teams.length === 0) {
         return (
-            <div className="bg-yellow-50 border border-yellow-300 rounded-lg px-4 py-3 space-y-2">
-                <div className="flex items-center gap-2 text-yellow-800">
-                    <Users className="w-4 h-4" />
-                    <span className="font-semibold text-sm">No Teams Assigned</span>
+            <div className="group relative">
+                <button
+                    type="button"
+                    aria-label="No teams assigned"
+                    className="flex h-9 w-9 items-center justify-center rounded-md border border-warning/30 bg-warning/10 text-warning transition-colors hover:bg-warning/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <AlertTriangle className="h-4 w-4" />
+                </button>
+                <div
+                    role="tooltip"
+                    className="invisible absolute right-0 top-full z-50 mt-2 w-72 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-warning opacity-0 shadow-md transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
+                >
+                    <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        <span className="text-sm font-semibold">No Teams Assigned</span>
+                    </div>
+                    <p className="mt-1 text-xs leading-tight">
+                        You are not a member of any teams. Please contact your administrator to be added to a team to access tickets and dashboards.
+                    </p>
                 </div>
-                <p className="text-xs text-yellow-700">
-                    You are not a member of any teams. Please contact your administrator to be added to a team to access tickets and dashboards.
-                </p>
             </div>
         )
     }
@@ -163,7 +175,7 @@ export default function TeamSelector() {
                 </DialogContent>
             </Dialog>
 
-            <div className="flex items-center gap-2 text-xs text-gray-400">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Users className="w-3 h-3" />
                 <span>View as:</span>
             </div>
@@ -176,7 +188,7 @@ export default function TeamSelector() {
                     // snapshot in the page's own reset effect overwrites the new ?team= value.
                     setTeamParam({ team: e.target.value })
                 }}
-                className="w-full text-xs border border-gray-600 rounded px-2 py-1.5 bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-gray-600 transition-colors max-h-56"
+                className="w-full text-xs border border-input rounded px-2 py-1.5 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring hover:bg-accent transition-colors max-h-56"
             >
                 {tenantTeamNames.length > 0 && (
                     <>
@@ -208,7 +220,7 @@ export default function TeamSelector() {
                 )}
             </select>
             {selectedTeam && !(isLeadership || isSupportEngineer) && (
-                <p className="text-xs text-yellow-400 italic">
+                <p className="text-xs text-warning italic">
                     Viewing: {selectedTeam}
                 </p>
             )}
