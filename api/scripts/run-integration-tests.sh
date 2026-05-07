@@ -60,6 +60,22 @@ deploy_chart() {
   log_success "Chart deployed successfully"
 }
 
+ensure_app_k8s_secrets() {
+  log "Ensuring K8s secret support-bot (Slack credentials) in ${NAMESPACE}..."
+  kubectl create secret generic support-bot \
+    --from-literal=SLACK_TOKEN="${SLACK_TOKEN:?Set SLACK_TOKEN}" \
+    --from-literal=SLACK_SOCKET_TOKEN="${SLACK_SOCKET_TOKEN:?Set SLACK_SOCKET_TOKEN}" \
+    --from-literal=SLACK_SIGNING_SECRET="${SLACK_SIGNING_SECRET:?Set SLACK_SIGNING_SECRET}" \
+    -n "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+
+  log "Ensuring K8s secret azure (Azure credentials) in ${NAMESPACE}..."
+  kubectl create secret generic azure \
+    --from-literal=AZURE_TENANT_ID="${AZURE_TENANT_ID:?Set AZURE_TENANT_ID}" \
+    --from-literal=AZURE_CLIENT_ID="${AZURE_CLIENT_ID:?Set AZURE_CLIENT_ID}" \
+    --from-literal=AZURE_CLIENT_SECRET="${AZURE_CLIENT_SECRET:?Set AZURE_CLIENT_SECRET}" \
+    -n "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+}
+
 main() {
   log "Starting integration test deployment and execution"
   log "  Namespace: $NAMESPACE"
@@ -77,6 +93,7 @@ main() {
     log_warning "DEPLOY_DB is false; assuming database already available in $NAMESPACE"
   fi
 
+  ensure_app_k8s_secrets
   deploy_chart
 
   if wait_for_job_with_logs "$RELEASE_NAME" "$NAMESPACE" "$TIMEOUT" "integration-tests"; then
