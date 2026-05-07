@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams.toString();
   const query = searchParams ? `?${searchParams}` : "";
 
-  const response = await backendFetch(`/analysis/run${query}`, {
+  const response = await backendFetch(request, `/analysis/run${query}`, {
     method: "POST",
   });
   if (!response) return unauthorizedResponse();

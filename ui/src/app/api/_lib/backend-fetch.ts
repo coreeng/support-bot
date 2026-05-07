@@ -1,6 +1,27 @@
-import { auth } from "@/auth";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
+
+function sessionCookieName(): string {
+  return process.env.NODE_ENV === "production"
+    ? "__Secure-authjs.session-token"
+    : "authjs.session-token";
+}
+
+export async function backendAccessToken(
+  request: Request | NextRequest
+): Promise<string | null> {
+  const cookieName = sessionCookieName();
+  const token = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    cookieName,
+    salt: cookieName,
+  });
+
+  return typeof token?.accessToken === "string" ? token.accessToken : null;
+}
 
 /**
  * Fetch with logging and error handling.
@@ -36,19 +57,20 @@ export async function proxyFetch(
  * Returns null if user is not authenticated (caller should handle 401).
  */
 export async function backendFetch(
+  request: Request | NextRequest,
   path: string,
   options: RequestInit = {}
 ): Promise<Response | null> {
-  const session = await auth();
+  const accessToken = await backendAccessToken(request);
 
-  if (!session?.accessToken) {
+  if (!accessToken) {
     return null;
   }
 
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
   headers.set("Accept", "application/json");
-  headers.set("Authorization", `Bearer ${session.accessToken}`);
+  headers.set("Authorization", `Bearer ${accessToken}`);
 
   const url = path.startsWith("http") ? path : `${BACKEND_URL}${path}`;
   return proxyFetch("proxy", path, url, { ...options, headers });

@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   const query = params.toString();
 
   const response = await backendFetch(
+    request,
     `/tenant-insights/escalation-breakdown${query ? `?${query}` : ""}`
   );
   if (!response) return unauthorizedResponse();

@@ -87,13 +87,11 @@ export function mockUnauthenticatedSession(): MockSessionReturn {
  * Creates an authenticated session state with the provided user.
  */
 export function mockAuthenticatedSession(
-  user: AuthUser,
-  accessToken = "test-token"
+  user: AuthUser
 ): MockSessionReturn {
   return {
     data: {
       user,
-      accessToken,
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     },
     status: "authenticated",

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   if (dateFrom) params.append("dateFrom", dateFrom);
   if (dateTo) params.append("dateTo", dateTo);
 
-  const response = await backendFetch(`/ticket?${params}`);
+  const response = await backendFetch(request, `/ticket?${params}`);
   if (!response) return unauthorizedResponse();
 
   if (!response.ok) {

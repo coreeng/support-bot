@@ -57,7 +57,7 @@ export async function GET(
   const queryString = backendParams.toString();
   const backendPath = `/dashboard/${endpoint}${queryString ? `?${queryString}` : ""}`;
 
-  const response = await backendFetch(backendPath);
+  const response = await backendFetch(request, backendPath);
   if (!response) return unauthorizedResponse();
 
   if (!response.ok) {

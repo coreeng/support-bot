@@ -8,7 +8,7 @@ import {
 export async function POST(request: NextRequest) {
   const body = await request.json();
 
-  const response = await backendFetch("/assignment/bulk-reassign", {
+  const response = await backendFetch(request, "/assignment/bulk-reassign", {
     method: "POST",
     body: JSON.stringify(body),
   });

@@ -25,7 +25,6 @@ function LoginContent() {
   const [autoRedirecting, setAutoRedirecting] = useState(false);
 
   const code = searchParams.get("code");
-  const token = searchParams.get("token");
   const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const error = searchParams.get("error");
 
@@ -59,7 +58,7 @@ function LoginContent() {
   useEffect(() => {
     if (isLoading) return;
 
-    // Don't retry if we already attempted authentication with this token/code
+    // Don't retry if we already attempted authentication with this code
     if (authAttemptedRef.current) return;
 
     // Detect if we're in a popup opened by the iframe
@@ -89,12 +88,6 @@ function LoginContent() {
         });
     };
 
-    if (token) {
-      authAttemptedRef.current = true;
-      performSignIn("backend-token", { token });
-      return;
-    }
-
     if (code) {
       authAttemptedRef.current = true;
       performSignIn("backend-code", { code });
@@ -105,22 +98,26 @@ function LoginContent() {
     if (isAuthenticated) {
       router.replace(callbackUrl);
     }
-  }, [code, token, isAuthenticated, isLoading, callbackUrl, router]);
+  }, [code, isAuthenticated, isLoading, callbackUrl, router]);
 
   // Auto-redirect to Dex on mount. Skipped on iframes (popups need a user gesture),
-  // when an in-flight code/token is being completed, or when an error is being shown —
+  // when an in-flight code is being completed, or when an error is being shown —
   // those paths need the page to render so the user sees the message or completes the flow.
   useEffect(() => {
     if (autoRedirectAttempted) return;
     if (isLoading) return;
     if (isAuthenticated) return;
-    if (error || code || token) return;
+    if (error || code) return;
     if (isInIframe()) return;
 
-    setAutoRedirectAttempted(true);
-    setAutoRedirecting(true);
-    window.location.href = `/api/oauth/start/dex?callbackUrl=${encodeURIComponent(callbackUrl)}`;
-  }, [autoRedirectAttempted, isLoading, isAuthenticated, error, code, token, callbackUrl]);
+    const redirectTimer = window.setTimeout(() => {
+      setAutoRedirectAttempted(true);
+      setAutoRedirecting(true);
+      window.location.href = `/api/oauth/start/dex?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+    }, 0);
+
+    return () => window.clearTimeout(redirectTimer);
+  }, [autoRedirectAttempted, isLoading, isAuthenticated, error, code, callbackUrl]);
 
   const handleLogin = () => {
     // OAuth goes through API route - server handles redirect to backend
@@ -156,11 +153,11 @@ function LoginContent() {
   // `autoRedirectAttempted` flips and only the `autoRedirecting` state controls the spinner —
   // which the bfcache pageshow handler clears when the user pressed Back from Dex.
   const willAutoRedirectSoon =
-    !autoRedirectAttempted && !isLoading && !isAuthenticated && !error && !code && !token && !isInIframe();
-  const showSpinner = isLoading || autoRedirecting || willAutoRedirectSoon || ((code || token) && !error);
+    !autoRedirectAttempted && !isLoading && !isAuthenticated && !error && !code && !isInIframe();
+  const showSpinner = isLoading || autoRedirecting || willAutoRedirectSoon || (code && !error);
   if (showSpinner) {
     const message =
-      code || token
+      code
         ? "Completing authentication..."
         : autoRedirecting || willAutoRedirectSoon
           ? "Redirecting to sign-in..."

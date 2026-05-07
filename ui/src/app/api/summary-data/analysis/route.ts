@@ -1,13 +1,12 @@
 import { NextRequest } from "next/server";
-import { auth } from "@/auth";
-import { unauthorizedResponse, errorResponse } from "../../_lib/backend-fetch";
+import { backendAccessToken, unauthorizedResponse, errorResponse } from "../../_lib/backend-fetch";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 
 export async function GET(request: NextRequest) {
-  const session = await auth();
+  const accessToken = await backendAccessToken(request);
 
-  if (!session?.accessToken) {
+  if (!accessToken) {
     return unauthorizedResponse();
   }
 
@@ -35,7 +34,7 @@ export async function GET(request: NextRequest) {
   try {
     const response = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${session.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         Accept: "application/zip",
       },
     });
@@ -57,4 +56,3 @@ export async function GET(request: NextRequest) {
     return errorResponse("Failed to fetch analysis bundle from backend", 502);
   }
 }
-
