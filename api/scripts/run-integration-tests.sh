@@ -11,6 +11,36 @@ NAMESPACE="${NAMESPACE:-support-bot-integration}"
 CHART_PATH="${CHART_PATH:-${SCRIPT_DIR}/../k8s/integration-tests}"
 RELEASE_NAME="${RELEASE_NAME:-support-bot-integration-tests}"
 TIMEOUT="${TIMEOUT:-600}" # 10 mins
+
+usage() {
+  echo "Usage: $0 [options]"
+  echo ""
+  echo "Environment variables:"
+  echo "  NAMESPACE                  Kubernetes namespace (default: support-bot-integration)"
+  echo "  CHART_PATH                 Path to Helm chart (default: ../k8s/integration-tests)"
+  echo "  RELEASE_NAME               Helm release name (default: support-bot-integration-tests)"
+  echo "  TIMEOUT                    Job timeout in seconds (default: 600)"
+  echo "  JOB_IMAGE_REPOSITORY       Docker repository for test job container (required)"
+  echo "  IMAGE_TAG                  Docker image tag for test container (required)"
+  echo "  SERVICE_IMAGE_REPOSITORY   Service Docker repository (required)"
+  echo "  SERVICE_IMAGE_TAG          Service Docker image tag (required)"
+  echo "  CLEANUP                    Cleanup resources after completion (default: true)"
+  echo "  DEPLOY_DB                  Deploy DB before tests (default: true)"
+  echo "  DB_RELEASE                 Helm release name for DB (default: support-bot-db)"
+  echo "  DELETE_DB                  Delete DB during cleanup (default: true)"
+  echo "  SLACK_TOKEN                Slack bot token for support-bot Secret (required)"
+  echo "  SLACK_SOCKET_TOKEN         Slack socket token for support-bot Secret (required)"
+  echo "  SLACK_SIGNING_SECRET       Slack signing secret for support-bot Secret (required)"
+  echo "  AZURE_TENANT_ID            Azure tenant ID for azure Secret (required)"
+  echo "  AZURE_CLIENT_ID            Azure client ID for azure Secret (required)"
+  echo "  AZURE_CLIENT_SECRET        Azure client secret for azure Secret (required)"
+}
+
+if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
+  usage
+  exit 0
+fi
+
 JOB_IMAGE_REPOSITORY="${JOB_IMAGE_REPOSITORY:?required argument}"
 IMAGE_TAG="${IMAGE_TAG:?required argument}"
 SERVICE_IMAGE_REPOSITORY="${SERVICE_IMAGE_REPOSITORY:?required argument}"
@@ -60,6 +90,22 @@ deploy_chart() {
   log_success "Chart deployed successfully"
 }
 
+ensure_app_k8s_secrets() {
+  log "Ensuring K8s secret support-bot (Slack credentials) in ${NAMESPACE}..."
+  kubectl create secret generic support-bot \
+    --from-literal=SLACK_TOKEN="${SLACK_TOKEN:?Set SLACK_TOKEN}" \
+    --from-literal=SLACK_SOCKET_TOKEN="${SLACK_SOCKET_TOKEN:?Set SLACK_SOCKET_TOKEN}" \
+    --from-literal=SLACK_SIGNING_SECRET="${SLACK_SIGNING_SECRET:?Set SLACK_SIGNING_SECRET}" \
+    -n "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+
+  log "Ensuring K8s secret azure (Azure credentials) in ${NAMESPACE}..."
+  kubectl create secret generic azure \
+    --from-literal=AZURE_TENANT_ID="${AZURE_TENANT_ID:?Set AZURE_TENANT_ID}" \
+    --from-literal=AZURE_CLIENT_ID="${AZURE_CLIENT_ID:?Set AZURE_CLIENT_ID}" \
+    --from-literal=AZURE_CLIENT_SECRET="${AZURE_CLIENT_SECRET:?Set AZURE_CLIENT_SECRET}" \
+    -n "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+}
+
 main() {
   log "Starting integration test deployment and execution"
   log "  Namespace: $NAMESPACE"
@@ -77,6 +123,7 @@ main() {
     log_warning "DEPLOY_DB is false; assuming database already available in $NAMESPACE"
   fi
 
+  ensure_app_k8s_secrets
   deploy_chart
 
   if wait_for_job_with_logs "$RELEASE_NAME" "$NAMESPACE" "$TIMEOUT" "integration-tests"; then
@@ -88,24 +135,5 @@ main() {
     exit 1
   fi
 }
-
-if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
-  echo "Usage: $0 [options]"
-  echo ""
-  echo "Environment variables:"
-  echo "  NAMESPACE                  Kubernetes namespace (default: support-bot-integration)"
-  echo "  CHART_PATH                 Path to Helm chart (default: ../k8s/integration-tests)"
-  echo "  RELEASE_NAME               Helm release name (default: support-bot-integration-tests)"
-  echo "  TIMEOUT                    Job timeout in seconds (default: 600)"
-  echo "  JOB_IMAGE_REPOSITORY       Docker repository for test job container (required)"
-  echo "  IMAGE_TAG                  Docker image tag for test container (required)"
-  echo "  SERVICE_IMAGE_REPOSITORY   Service Docker repository (required)"
-  echo "  SERVICE_IMAGE_TAG          Service Docker image tag (required)"
-  echo "  CLEANUP                    Cleanup resources after completion (default: true)"
-  echo "  DEPLOY_DB                  Deploy DB before tests (default: true)"
-  echo "  DB_RELEASE                 Helm release name for DB (default: support-bot-db)"
-  echo "  DELETE_DB                  Delete DB during cleanup (default: true)"
-  exit 0
-fi
 
 main "$@"
