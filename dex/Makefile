@@ -8,10 +8,10 @@ p2p-functional:
 p2p-nft:           
 p2p-integration: template ## P2P: render then deploy (sets DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT for Dex LDAP overlay)
 	@$(MAKE) deploy-integration DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true
-p2p-promote-to-extended-test: ## Delegate image promotion to repo root
-	@$(MAKE) -C .. p2p-promote-to-extended-test
-p2p-promote-to-prod: ## Delegate prod promotion to repo root
-	@$(MAKE) -C .. p2p-promote-to-prod
+p2p-promote-to-extended-test: ## No image artifact to promote for Dex infra module
+	@echo "NOOP: Dex uses upstream images and produces no P2P image artifact"
+p2p-promote-to-prod: ## No image artifact to promote for Dex infra module
+	@echo "NOOP: Dex uses upstream images and produces no P2P image artifact"
 p2p-extended-test: 
 p2p-prod:          
 

@@ -8,10 +8,10 @@ p2p-functional:
 p2p-nft:
 p2p-integration: template ## P2P: render then deploy (sets LDAP_DEPLOY_INSECURE_PLAINTEXT for plaintext overlay)
 	@$(MAKE) deploy-integration LDAP_DEPLOY_INSECURE_PLAINTEXT=true
-p2p-promote-to-extended-test: ## Delegate image promotion to repo root
-	@$(MAKE) -C .. p2p-promote-to-extended-test
-p2p-promote-to-prod: ## Delegate prod promotion to repo root
-	@$(MAKE) -C .. p2p-promote-to-prod
+p2p-promote-to-extended-test: ## No image artifact to promote for LDAP infra module
+	@echo "NOOP: LDAP uses upstream images and produces no P2P image artifact"
+p2p-promote-to-prod: ## No image artifact to promote for LDAP infra module
+	@echo "NOOP: LDAP uses upstream images and produces no P2P image artifact"
 p2p-extended-test:
 p2p-prod:
 
