@@ -218,6 +218,8 @@ export default function InFlightPrsTab() {
         const id = setInterval(() => setClockTick(t => t + 1), 60_000)
         return () => clearInterval(id)
     }, [])
+    // Intentional: re-derive a wall-clock timestamp when data refreshes OR the minute tick fires.
+    // eslint-disable-next-line react-hooks/purity
     const dataTimestamp = useMemo(() => Date.now(), [prs, clockTick])
 
     // Data-integrity warnings — emitted once per data refresh, not per render/sort pass.
