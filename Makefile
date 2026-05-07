@@ -249,8 +249,27 @@ deploy-api-nft: ## Deploy service and DB for nft tests
 	VALUES_FILE=$(HELM_CHART_PATH)/values-nft.yaml \
 	./api/scripts/deploy-service.sh
 
+.PHONY: ensure-extended-test-secrets
+ensure-extended-test-secrets: ## Ensure K8s secrets required by extended-test values
+	@echo "Ensuring K8s secret support-bot in $(p2p_namespace)..."
+	@kubectl create secret generic support-bot \
+	  --from-literal=DB_HOST="support-bot-db-postgresql" \
+	  --from-literal=DB_USERNAME="supportbot" \
+	  --from-literal=DB_PASSWORD="supportbotpassword" \
+	  --from-literal=JWT_SECRET="extended-test-jwt-secret-minimum-256-bits" \
+	  --from-literal=SLACK_TOKEN="$${SLACK_TOKEN:?Set SLACK_TOKEN}" \
+	  --from-literal=SLACK_SOCKET_TOKEN="$${SLACK_SOCKET_TOKEN:?Set SLACK_SOCKET_TOKEN}" \
+	  --from-literal=SLACK_SIGNING_SECRET="$${SLACK_SIGNING_SECRET:?Set SLACK_SIGNING_SECRET}" \
+	  -n "$(p2p_namespace)" --dry-run=client -o yaml | kubectl apply -f -
+	@echo "Ensuring K8s secret azure in $(p2p_namespace)..."
+	@kubectl create secret generic azure \
+	  --from-literal=AZURE_TENANT_ID="$${AZURE_TENANT_ID:?Set AZURE_TENANT_ID}" \
+	  --from-literal=AZURE_CLIENT_ID="$${AZURE_CLIENT_ID:?Set AZURE_CLIENT_ID}" \
+	  --from-literal=AZURE_CLIENT_SECRET="$${AZURE_CLIENT_SECRET:?Set AZURE_CLIENT_SECRET}" \
+	  -n "$(p2p_namespace)" --dry-run=client -o yaml | kubectl apply -f -
+
 .PHONY: deploy-api-extended-test
-deploy-api-extended-test: ## Deploy service and DB for extended test environment
+deploy-api-extended-test: ensure-extended-test-secrets ## Deploy service and DB for extended test environment
 	NAMESPACE="$(p2p_namespace)" \
 	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
 	SERVICE_IMAGE_TAG="$(p2p_version)" \
@@ -426,4 +445,3 @@ ldap-template: ## Validate LDAP chart (bitnami + integration + ephemeral plainte
 
 ldap-deploy-integration: ## Deploy LDAP for integration (ephemeral plaintext 389 — opt-in env set here)
 	@$(MAKE) -C ldap deploy-integration LDAP_DEPLOY_INSECURE_PLAINTEXT=true
-
