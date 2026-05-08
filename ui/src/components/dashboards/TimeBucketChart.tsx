@@ -12,9 +12,9 @@ export function TimeBucketChart({ title, data, isLoading }: TimeBucketChartProps
  // Color coding: green (fast) -> yellow -> orange -> red (slow)
  const getColor = (label: string) => {
  if (label.includes('< 15') || label.includes('15-30')) return 'var(--chart-2)' // green
- if (label.includes('30-60') || label.includes('1-2 hours')) return '#84cc16' // lime
- if (label.includes('2-4') || label.includes('4-8')) return '#eab308' // yellow
- if (label.includes('8-24') || label.includes('1-3 days')) return '#f97316' // orange
+ if (label.includes('30-60') || label.includes('1-2 hours')) return 'var(--chart-11)' // lime
+ if (label.includes('2-4') || label.includes('4-8')) return 'var(--chart-3)' // amber
+ if (label.includes('8-24') || label.includes('1-3 days')) return 'var(--chart-7)' // orange
  return 'var(--chart-5)' // red for > 3 days
  }
 

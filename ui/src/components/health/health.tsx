@@ -141,7 +141,7 @@ export default function HealthPage() {
  const {data: ratingStats, isLoading: ratingsLoading} = useRatings(dateRange.from, dateRange.to)
  const [currentPage, setCurrentPage] = useState(1)
  const ticketsPerPage = 10
- const COLORS = ['var(--chart-1)', 'var(--chart-2)', '#FFBB28', 'var(--chart-3)', '#A28EFF', '#FF6699', '#33CC99']
+ const COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-9)', 'var(--chart-10)', 'var(--chart-8)']
  const statusColors: Record<string, string> = {
  opened: 'bg-info/10 text-primary',
  closed: 'bg-success/10 text-success',
@@ -716,14 +716,14 @@ export default function HealthPage() {
  <Line
  type="monotone"
  dataKey="avgAssignments"
- stroke="#8b5cf6"
+ stroke="var(--chart-4)"
  strokeWidth={2}
  activeDot={{r: 6}}
  />
  <Line
  type="monotone"
  dataKey="totalAssignments"
- stroke="#a78bfa"
+ stroke="var(--chart-4)"
  strokeWidth={2}
  strokeDasharray="5 5"
  />
@@ -776,7 +776,7 @@ export default function HealthPage() {
   stroke="var(--border)" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}/>
  <YAxis allowDecimals={false} stroke="var(--border)" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}/>
  <Tooltip contentStyle={{ background: 'var(--popover)', color: 'var(--popover-foreground)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }} labelStyle={{ color: 'var(--popover-foreground)' }} itemStyle={{ color: 'var(--popover-foreground)' }} cursor={{ stroke: 'var(--border)', fill: 'var(--accent)' }} />
- <Bar dataKey="tickets" fill="#8b5cf6">
+ <Bar dataKey="tickets" fill="var(--chart-4)">
  {activeTicketsPerEngineer.map((_, idx) => (
  <Cell key={idx} fill={COLORS[idx % COLORS.length]}/>
  ))}
@@ -808,7 +808,7 @@ export default function HealthPage() {
   stroke="var(--border)" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}/>
  <YAxis allowDecimals={false} stroke="var(--border)" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}/>
  <Tooltip contentStyle={{ background: 'var(--popover)', color: 'var(--popover-foreground)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }} labelStyle={{ color: 'var(--popover-foreground)' }} itemStyle={{ color: 'var(--popover-foreground)' }} cursor={{ stroke: 'var(--border)', fill: 'var(--accent)' }} />
- <Bar dataKey="count" fill="#10b981"/>
+ <Bar dataKey="count" fill="var(--chart-2)"/>
  </BarChart>
  </ResponsiveContainer>
  </div>
@@ -1108,7 +1108,7 @@ export default function HealthPage() {
  <Tooltip labelFormatter={(label) => new Date(label as string).toLocaleDateString()}
  contentStyle={{ background: 'var(--popover)', color: 'var(--popover-foreground)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }} labelStyle={{ color: 'var(--popover-foreground)' }} itemStyle={{ color: 'var(--popover-foreground)' }} cursor={{ stroke: 'var(--border)', fill: 'var(--accent)' }} />
  <Legend />
- <Bar dataKey="count" name="Ratings" fill="#10b981">
+ <Bar dataKey="count" name="Ratings" fill="var(--chart-2)">
  {ratingsByWeek.map((_, idx) => (
  <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
  ))}

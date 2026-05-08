@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { useTeamFilter } from "@/contexts/TeamFilterContext";
-import { useKnowledgeGapsEnabled } from "@/lib/hooks";
+import { useKnowledgeGapsEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
 
 type NavItem = {
   title: string;
@@ -85,7 +85,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   useAuth();
   const { hasFullAccess } = useTeamFilter();
   const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled();
-  const isTenantInsightsEnabled = true;
+  const { data: isTenantInsightsEnabled } = useTenantInsightsEnabled();
 
   const flags: Record<NonNullable<TabVisibility["requiresFeatureFlag"]>, boolean | undefined> = {
     knowledgeGaps: isKnowledgeGapsEnabled,

@@ -53,7 +53,7 @@ export function EscalationSLASection({
  data={avgEscalationDurationByTag || []}
  dataKey="avgDuration"
  yAxisDataKey="tag"
- color="#8b5cf6"
+ color="var(--chart-4)"
  tooltipFormatter={(value: number) => [value.toFixed(2) + ' hours', 'Avg Duration']}
  />
  
@@ -82,7 +82,7 @@ export function EscalationSLASection({
  data={escalationsByTeam || []}
  dataKey="totalEscalations"
  yAxisDataKey="assigneeName"
- color="#7c3aed"
+ color="var(--chart-9)"
  />
  
  {/* Escalations by Impact */}
