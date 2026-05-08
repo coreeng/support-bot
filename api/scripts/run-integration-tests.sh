@@ -27,7 +27,6 @@ cleanup_job() {
     helm uninstall support-bot-dex -n "$NAMESPACE" --ignore-not-found || true
     helm uninstall support-bot-ldap -n "$NAMESPACE" --ignore-not-found || true
     HELM_DRIVER=configmap helm uninstall support-bot -n "$NAMESPACE" --ignore-not-found || true
-    kubectl delete deployment support-bot -n "$NAMESPACE" --ignore-not-found || true
   else
     log_warning "Cleanup disabled. Helm releases will remain in namespace $NAMESPACE"
   fi
