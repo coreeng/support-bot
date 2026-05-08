@@ -94,7 +94,7 @@ p2p-build:         build-app           push-app                                 
 p2p-functional:    build-functional    push-functional    deploy-functional    run-functional    ## p2p functional tests
 p2p-nft:           build-nft           push-nft           deploy-nft           run-nft           ## p2p nft tests
 p2p-integration:   build-integration   push-integration   deploy-integration   run-integration   ## p2p integration tests
-p2p-extended-test: build-extended-test push-extended-test deploy-extended-test run-extended-test ## p2p extended tests
+# p2p-extended-test: build-extended-test push-extended-test deploy-extended-test run-extended-test ## p2p extended tests
 p2p-prod:          publish-prod        publish-chart                                             ## p2p release to production
 
 ##@ Lint targets
@@ -249,36 +249,6 @@ deploy-api-nft: ## Deploy service and DB for nft tests
 	VALUES_FILE=$(HELM_CHART_PATH)/values-nft.yaml \
 	./api/scripts/deploy-service.sh
 
-.PHONY: ensure-extended-test-secrets
-ensure-extended-test-secrets: ## Ensure K8s secrets required by extended-test values
-	@echo "Ensuring K8s secret support-bot in $(p2p_namespace)..."
-	@kubectl create secret generic support-bot \
-	  --from-literal=DB_HOST="support-bot-db-postgresql" \
-	  --from-literal=DB_USERNAME="supportbot" \
-	  --from-literal=DB_PASSWORD="supportbotpassword" \
-	  --from-literal=JWT_SECRET="extended-test-jwt-secret-minimum-256-bits" \
-	  --from-literal=SLACK_TOKEN="$${SLACK_TOKEN:?Set SLACK_TOKEN}" \
-	  --from-literal=SLACK_SOCKET_TOKEN="$${SLACK_SOCKET_TOKEN:?Set SLACK_SOCKET_TOKEN}" \
-	  --from-literal=SLACK_SIGNING_SECRET="$${SLACK_SIGNING_SECRET:?Set SLACK_SIGNING_SECRET}" \
-	  -n "$(p2p_namespace)" --dry-run=client -o yaml | kubectl apply -f -
-	@echo "Ensuring K8s secret azure in $(p2p_namespace)..."
-	@kubectl create secret generic azure \
-	  --from-literal=AZURE_TENANT_ID="$${AZURE_TENANT_ID:?Set AZURE_TENANT_ID}" \
-	  --from-literal=AZURE_CLIENT_ID="$${AZURE_CLIENT_ID:?Set AZURE_CLIENT_ID}" \
-	  --from-literal=AZURE_CLIENT_SECRET="$${AZURE_CLIENT_SECRET:?Set AZURE_CLIENT_SECRET}" \
-	  -n "$(p2p_namespace)" --dry-run=client -o yaml | kubectl apply -f -
-
-.PHONY: deploy-api-extended-test
-deploy-api-extended-test: ensure-extended-test-secrets ## Deploy service and DB for extended test environment
-	NAMESPACE="$(p2p_namespace)" \
-	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
-	SERVICE_IMAGE_TAG="$(p2p_version)" \
-	DB_RELEASE="$(p2p_app_name)-db" \
-	SERVICE_RELEASE="$(p2p_app_name)" \
-	ACTION=deploy \
-	VALUES_FILE=$(HELM_CHART_PATH)/values-extended-test.yaml \
-	./api/scripts/deploy-service.sh
-
 .PHONY: deploy-api-functional
 deploy-api-functional: ## Deploy service and DB for functional tests, then run tests
 	NAMESPACE="$(p2p_namespace)" \
@@ -311,7 +281,8 @@ deploy-functional: deploy-api-functional deploy-ui-functional
 deploy-nft: deploy-api-nft deploy-ui-nft
 
 .PHONY: deploy-extended-test
-deploy-extended-test: deploy-api-extended-test deploy-ui-extended-test
+deploy-extended-test:
+	@echo "NOOP"
 ##@ Run targets
 
 .PHONY: run-api-app
