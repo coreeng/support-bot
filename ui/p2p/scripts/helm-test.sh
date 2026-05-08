@@ -13,6 +13,22 @@ printLogs() {
 	logs_url="https://grafana.${INTERNAL_SERVICES_DOMAIN}/explore?orgId=1&left=%7B%22datasource%22:%22CloudLogging%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22queryText%22:%22resource.type%3D%5C%22k8s_container%5C%22%5Cnresource.labels.namespace_name%3D%5C%22${namespace}%5C%22%5Cnresource.labels.pod_name%3D%5C%22${test_name}%5C%22%22,%22projectId%22:%22${PROJECT_ID}%22,%22bucketId%22:%22global%2Fbuckets%2F_Default%22,%22viewId%22:%22_AllLogs%22%7D%5D,%22range%22:%7B%22from%22:%22${logs_start}000%22,%22to%22:%22${current_timestamp}000%22%7D%7D"
 
 	echo "Logs: $logs_url"
+
+	# Also dump the test pod's stdout/stderr into the CI log so failures are
+	# diagnosable without leaving GitHub Actions. helm test creates one pod
+	# per attempt; --tail=-1 grabs the full output, --previous handles the
+	# common case where the most-recent pod was restarted by the BackoffLimit.
+	pod=$(kubectl -n "${namespace}" get pods -l "app.kubernetes.io/component=${test_name},batch.kubernetes.io/job-name=${test_name}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+	if [ -z "${pod}" ]; then
+		pod="${test_name}"
+	fi
+	echo "==== begin pod logs (${pod}) ===="
+	kubectl -n "${namespace}" logs "${pod}" --all-containers=true --tail=-1 2>&1 || true
+	kubectl -n "${namespace}" logs "${pod}" --all-containers=true --tail=-1 --previous 2>&1 || true
+	echo "==== end pod logs ===="
+	echo "==== job describe ===="
+	kubectl -n "${namespace}" describe job "${test_name}" 2>&1 || true
+	echo "==== end job describe ===="
 }
 
 scaleDownApp() {
