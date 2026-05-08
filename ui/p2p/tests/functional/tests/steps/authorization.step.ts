@@ -177,9 +177,8 @@ When('user {string} logs in', async function (this: CustomWorld, email: string) 
     await this.page.goto(BASE_URL);
     await this.page.waitForTimeout(1500); // Wait for session and context to fully load
     
-    // Ensure Support menu is expanded (it should be by default, but verify)
-    const supportButton = this.page.getByRole('button', { name: /Support/i }).first();
-    await supportButton.waitFor({ state: 'visible', timeout: 5000 });
+    // Sidebar hydration sentinel: the Tickets nav link is always rendered.
+    await this.page.getByRole('link', { name: /^Tickets$/i }).first().waitFor({ state: 'visible', timeout: 5000 });
 });
 
 When('user selects {string} from team dropdown', async function (this: CustomWorld, teamName: string) {

@@ -357,7 +357,7 @@ When("user navigates to the tickets page", async function (this: CustomWorld) {
 });
 
 When("user selects {string} tab", async function (this: CustomWorld, tabName: string) {
-    const tab = this.page.getByRole('button', { name: new RegExp(`^${tabName}$`, 'i') }).first();
+    const tab = this.page.getByRole('tab', { name: new RegExp(`^${tabName}$`, 'i') }).first();
     await expect(tab).toBeVisible({ timeout: 8000 });
     await tab.click();
     await this.page.waitForTimeout(300);

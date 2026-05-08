@@ -307,7 +307,7 @@ When('user logs in', async function (this: CustomWorld) {
     // Navigate and wait for minimal load; avoid long waits that can hang
     await this.page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 });
     
-    await this.page.getByRole('button', { name: /Support/i }).first().waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.getByRole('link', { name: /^Tickets$/i }).first().waitFor({ state: 'visible', timeout: 5000 });
 });
 
 When('user logs in and selects {string} from dropdown', async function (this: CustomWorld, teamName: string) {
@@ -372,7 +372,7 @@ When('user logs in and selects {string} from dropdown', async function (this: Cu
     // Navigate and wait for load
     await this.page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 });
     
-    await this.page.getByRole('button', { name: /Support/i }).first().waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.getByRole('link', { name: /^Tickets$/i }).first().waitFor({ state: 'visible', timeout: 10000 });
 
     // The team selector is now a Radix DropdownMenu rendered as a Button.
     const dropdown = this.page.locator('[data-testid="team-selector-trigger"]');

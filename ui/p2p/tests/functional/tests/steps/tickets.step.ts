@@ -325,10 +325,7 @@ When("User navigates to the tickets page", async function (this: CustomWorld) {
         timeout: 10000
     });
 
-    // Wait for sidebar to be visible - Support section should be expanded by default
-    await this.page.getByRole('button', { name: /Support/i }).first().waitFor({ state: 'visible', timeout: 5000 });
-
-    // Click on Tickets navigation in sidebar (it's a button)
+    // Sidebar hydration sentinel: the Tickets nav link is always rendered.
     const ticketsNav = this.page.getByRole('link', { name: /^Tickets$/i });
     await ticketsNav.waitFor({ state: 'visible', timeout: 5000 });
     await ticketsNav.click();
