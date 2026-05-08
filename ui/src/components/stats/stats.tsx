@@ -15,8 +15,25 @@ import { normalizeTeamKey } from '@/lib/teamUtils'
 import { useUrlParams, enumValidator, isoDateValidator } from '@/lib/hooks/useUrlParams'
 import { type DateFilter, getDateRangeFromFilter, PRESET_DAYS } from '@/lib/dateRange'
 import { formatIncomingVsResolvedSeries } from '@/lib/incomingVsResolved'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 
 const VALID_DATE_FILTERS = ['lastWeek', 'last2Weeks', 'lastMonth', 'lastYear', 'custom', 'all'] as const satisfies readonly DateFilter[]
+
+function StatTile({ label, value, valueClass }: { label: string; value: number; valueClass?: string }) {
+    return (
+        <div className="rounded-xl border bg-card p-5">
+            <p className="text-sm font-medium text-muted-foreground">{label}</p>
+            <p className={`mt-2 font-mono text-3xl font-semibold tracking-tight tabular-nums ${valueClass ?? 'text-foreground'}`}>{value}</p>
+        </div>
+    )
+}
 
 type DateFilterControlsProps = {
     dateFilter: DateFilter
@@ -27,21 +44,9 @@ type DateFilterControlsProps = {
     onDateToChange: (value: string) => void
 }
 
-function getDashboardTitle(effectiveTeams: string[], hasNoTeamScope: boolean): string {
-    if (hasNoTeamScope) {
-        return 'Home Dashboard'
-    }
-
-    if (effectiveTeams.length === 0) {
-        return 'Home Dashboard - All Teams'
-    }
-
-    return `Home Dashboard - ${effectiveTeams.join(', ')}`
-}
-
 const INCOMING_RESOLVED_LINES = [
-    { dataKey: 'incoming', name: 'Incoming', color: '#ef4444' },
-    { dataKey: 'resolved', name: 'Resolved', color: '#22c55e' },
+    { dataKey: 'incoming', name: 'Incoming', color: 'var(--chart-5)' },
+    { dataKey: 'resolved', name: 'Resolved', color: 'var(--chart-2)' },
 ]
 
 function getIncomingResolvedTeamCodes(
@@ -85,27 +90,27 @@ function renderIncomingResolvedChart({
     // dashboard banner that already explains missing team access.
     if (!hasDashboardAccess && !hasNoTeamScope) {
         return (
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-                <h2 className="text-lg font-semibold text-slate-900 mb-2">Incoming vs Resolved</h2>
-                <p className="text-sm text-slate-500">This chart requires Support Engineer or Leadership access.</p>
+            <div className="rounded-xl border bg-card p-6">
+                <h3 className="text-sm font-medium text-muted-foreground">Incoming vs Resolved</h3>
+                <p className="mt-3 text-sm text-muted-foreground">This chart requires Support Engineer or Leadership access.</p>
             </div>
         )
     }
 
     if (error) {
         return (
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-red-200">
-                <h2 className="text-lg font-semibold text-slate-900 mb-2">Incoming vs Resolved</h2>
-                <p className="text-sm text-red-600">Unable to load incoming and resolved ticket activity.</p>
+            <div className="rounded-xl border border-destructive/30 bg-card p-6">
+                <h3 className="text-sm font-medium text-muted-foreground">Incoming vs Resolved</h3>
+                <p className="mt-3 text-sm text-destructive">Unable to load incoming and resolved ticket activity.</p>
             </div>
         )
     }
 
     if (isLoading) {
         return (
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-                <h2 className="text-lg font-semibold text-slate-900 mb-2">Incoming vs Resolved</h2>
-                <p className="text-sm text-slate-500">Loading incoming and resolved ticket activity...</p>
+            <div className="rounded-xl border bg-card p-6">
+                <h3 className="text-sm font-medium text-muted-foreground">Incoming vs Resolved</h3>
+                <p className="mt-3 text-sm text-muted-foreground">Loading incoming and resolved ticket activity...</p>
             </div>
         )
     }
@@ -138,32 +143,33 @@ function DateFilterControls({
 }: DateFilterControlsProps): JSX.Element {
     return (
         <div className="flex items-center gap-2">
-            <select
-                value={dateFilter}
-                onChange={e => onDateFilterChange(e.target.value as DateFilter)}
-                className="p-2 border rounded text-sm"
-            >
-                <option value="lastWeek">Last Week</option>
-                <option value="last2Weeks">Last 2 Weeks</option>
-                <option value="lastMonth">Last Month</option>
-                <option value="lastYear">Last Year</option>
-                <option value="custom">Custom Range</option>
-                <option value="all">All Time</option>
-            </select>
+            <Select value={dateFilter} onValueChange={value => onDateFilterChange(value as DateFilter)}>
+                <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="lastWeek">Last Week</SelectItem>
+                    <SelectItem value="last2Weeks">Last 2 Weeks</SelectItem>
+                    <SelectItem value="lastMonth">Last Month</SelectItem>
+                    <SelectItem value="lastYear">Last Year</SelectItem>
+                    <SelectItem value="custom">Custom Range</SelectItem>
+                    <SelectItem value="all">All Time</SelectItem>
+                </SelectContent>
+            </Select>
             {dateFilter === 'custom' && (
                 <>
-                    <input
+                    <Input
                         type="date"
                         value={dateFrom}
                         onChange={e => onDateFromChange(e.target.value)}
-                        className="p-2 border rounded text-sm"
+                        className="w-[160px]"
                     />
-                    <span className="text-gray-500">to</span>
-                    <input
+                    <span className="text-muted-foreground">to</span>
+                    <Input
                         type="date"
                         value={dateTo}
                         onChange={e => onDateToChange(e.target.value)}
-                        className="p-2 border rounded text-sm"
+                        className="w-[160px]"
                     />
                 </>
             )}
@@ -229,8 +235,6 @@ export default function StatsPage() {
         [dateFilter, params.dateFrom, params.dateTo]
     )
 
-    // Use useAllTickets to fetch all tickets within date range (not just first 1000)
-    // This ensures we get complete data for accurate statistics
     const { data: ticketsData, isLoading: isTicketsLoading, error: ticketsError } = useAllTickets(200, dateRange.from, dateRange.to)
     const { data: registryData } = useRegistry()
     const {
@@ -275,13 +279,11 @@ export default function StatsPage() {
         [ticketsData, effectiveTeams, hasNoTeamScope]
     )
 
-    // Compute stats
     const totalTickets = teamTickets.length
     const openTickets = teamTickets.filter(t => t.status === 'opened').length
     const resolvedTickets = teamTickets.filter(t => t.status === 'closed').length
     const escalatedTickets = teamTickets.filter(t => (t.escalations?.length ?? 0) > 0).length
 
-    // Tickets by Impact (excludes untagged tickets)
     const ticketsByImpact = useMemo(() => {
         const counts: Record<string, number> = {}
         teamTickets.forEach(t => {
@@ -322,15 +324,13 @@ export default function StatsPage() {
         />
     )
 
-    const dashboardTitle = getDashboardTitle(effectiveTeams, hasNoTeamScope)
-
     const impactChart = (
         <HorizontalBarChart
             title="Tickets by Impact"
             data={ticketsByImpact}
             dataKey="value"
             yAxisDataKey="name"
-            color="#6366f1"
+            color="var(--chart-4)"
             tooltipFormatter={value => [`${value} ${value === 1 ? 'ticket' : 'tickets'}`, '']}
             tooltipLabelFormatter={() => ''}
             tooltipSeparator=""
@@ -340,100 +340,69 @@ export default function StatsPage() {
 
     if (isTicketsLoading) return <LoadingSkeleton />
     if (ticketsError) return (
-        <div className="p-6">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
-                <p className="font-semibold">Error loading dashboard</p>
-                <p className="text-sm mt-1">Unable to load dashboard data. Please try refreshing the page.</p>
-            </div>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
+            <p className="font-semibold">Error loading dashboard</p>
+            <p className="text-sm mt-1">Unable to load dashboard data. Please try refreshing the page.</p>
         </div>
     )
-    // Render split view for escalation teams
+
     if (isViewingAsEscalationTeam) {
         return (
-            <div className="p-6 space-y-8">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-3xl font-bold text-gray-800">
-                        {`Home Dashboard - ${selectedTeam}`}
-                    </h1>
+            <div className="space-y-8">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-foreground">Support Dashboard</h1>
+                        <p className="text-muted-foreground text-sm">Overview of your team&apos;s support load</p>
+                    </div>
                     {dateFilterControls}
                 </div>
 
-                {/* Section 1: Escalations We Are Handling */}
-                <div className="border-2 border-purple-300 rounded-lg bg-gradient-to-br from-purple-50 to-indigo-50 p-6 shadow-lg">
-                    <h2 className="text-xl font-bold text-purple-900 mb-6">Escalations We Are Handling</h2>
+                <section className="space-y-4">
+                    <h2 className="text-base font-semibold text-foreground">Escalations We Are Handling</h2>
                     <EscalatedToMyTeamWidget />
-                </div>
+                </section>
 
-                {/* Section 2: Tickets We Own */}
-                <div className="border-2 border-slate-300 rounded-lg bg-gradient-to-br from-slate-50 to-gray-50 p-6 shadow-lg">
-                    <h2 className="text-xl font-bold text-slate-900 mb-6">Tickets We Own</h2>
-
-                    {/* Summary cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                        <div className="p-6 bg-white shadow-md rounded-lg border border-gray-200">
-                            <h3 className="font-semibold text-gray-700">Total Tickets</h3>
-                            <p className="text-2xl font-bold text-blue-600 mt-2">{totalTickets}</p>
-                        </div>
-                        <div className="p-6 bg-white shadow-md rounded-lg border border-gray-200">
-                            <h3 className="font-semibold text-gray-700">Open Tickets</h3>
-                            <p className="text-2xl font-bold text-yellow-600 mt-2">{openTickets}</p>
-                        </div>
-                        <div className="p-6 bg-white shadow-md rounded-lg border border-gray-200">
-                            <h3 className="font-semibold text-gray-700">Escalated Tickets</h3>
-                            <p className="text-2xl font-bold text-red-600 mt-2">{escalatedTickets}</p>
-                        </div>
-                        <div className="p-6 bg-white shadow-md rounded-lg border border-gray-200">
-                            <h3 className="font-semibold text-gray-700">Resolved Tickets</h3>
-                            <p className="text-2xl font-bold text-green-600 mt-2">{resolvedTickets}</p>
-                        </div>
+                <section className="space-y-4">
+                    <h2 className="text-base font-semibold text-foreground">Tickets We Own</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <StatTile label="Total Tickets" value={totalTickets} />
+                        <StatTile label="Open Tickets" value={openTickets} valueClass="text-warning" />
+                        <StatTile label="Escalated Tickets" value={escalatedTickets} valueClass="text-destructive" />
+                        <StatTile label="Resolved Tickets" value={resolvedTickets} valueClass="text-success" />
                     </div>
-
-                    {/* Charts */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {incomingResolvedChart}
                         {impactChart}
                     </div>
-                </div>
+                </section>
             </div>
         )
     }
 
-    // Default view for non-escalation teams
     return (
-        <div className="p-6 space-y-6 relative">
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold text-gray-800">{dashboardTitle}</h1>
+        <div className="space-y-6">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-foreground">Support Dashboard</h1>
+                    <p className="text-muted-foreground text-sm">Overview of your team&apos;s support load</p>
+                </div>
                 {dateFilterControls}
             </div>
 
             {hasNoTeamScope && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900">
+                <div className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-warning">
                     <p className="font-semibold">No Team Access</p>
                     <p className="text-sm mt-1">You are not assigned to any teams, so dashboard data cannot be displayed.</p>
                 </div>
             )}
 
-            {/* Summary cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="p-6 bg-white shadow-md rounded-lg border border-gray-200">
-                    <h2 className="font-semibold text-gray-700">Total Tickets</h2>
-                    <p className="text-2xl font-bold text-blue-600 mt-2">{totalTickets}</p>
-                </div>
-                <div className="p-6 bg-white shadow-md rounded-lg border border-gray-200">
-                    <h2 className="font-semibold text-gray-700">Open Tickets</h2>
-                    <p className="text-2xl font-bold text-yellow-600 mt-2">{openTickets}</p>
-                </div>
-                <div className="p-6 bg-white shadow-md rounded-lg border border-gray-200">
-                    <h2 className="font-semibold text-gray-700">Escalated Tickets</h2>
-                    <p className="text-2xl font-bold text-amber-500 mt-2">{escalatedTickets}</p>
-                </div>
-                <div className="p-6 bg-white shadow-md rounded-lg border border-gray-200">
-                    <h2 className="font-semibold text-gray-700">Resolved Tickets</h2>
-                    <p className="text-2xl font-bold text-green-600 mt-2">{resolvedTickets}</p>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatTile label="Total Tickets" value={totalTickets} />
+                <StatTile label="Open Tickets" value={openTickets} valueClass="text-warning" />
+                <StatTile label="Escalated Tickets" value={escalatedTickets} valueClass="text-destructive" />
+                <StatTile label="Resolved Tickets" value={resolvedTickets} valueClass="text-success" />
             </div>
 
-            {/* Charts */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {incomingResolvedChart}
                 {impactChart}

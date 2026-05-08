@@ -11,6 +11,26 @@ import {TEAM_SCOPE} from '@/lib/constants'
 import {normalizeTeamKey} from '@/lib/teamUtils'
 import {getDateRangeFromFilter, PRESET_DAYS} from '@/lib/dateRange'
 import { enumValidator, isoDateValidator, nonNegativeIntValidator, useUrlParams } from '@/lib/hooks/useUrlParams'
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { SingleSelectFilter } from '@/components/ui/single-select-filter'
 
 
 export default function TicketsPage() {
@@ -128,8 +148,8 @@ export default function TicketsPage() {
     const ticketsError = shouldUseAllTickets ? allTicketsQuery.error : pagedTicketsQuery.error
 
     const statusColors: Record<string, string> = {
-        opened: 'bg-blue-100 text-blue-800',
-        closed: 'bg-green-100 text-green-800',
+        opened: 'bg-info/10 text-info',
+        closed: 'bg-success/10 text-success',
     }
     // --- Utility functions ---
     const getOpenedClosed = (ticket: TicketWithLogs) => {
@@ -299,242 +319,269 @@ export default function TicketsPage() {
         ? (ticketsDataTyped?.totalElements || 0)
         : sortedTickets.length
 
+    // shadcn Select needs non-empty values; "" means "any" sentinel.
+    const ANY = '__any'
+    const fromAny = (v: string) => (v === ANY ? '' : v)
+    const toAny = (v: string) => (v === '' ? ANY : v)
+
     // --- Render ---
     return (
-        <div className="p-6 space-y-6">
-            <h1 className="text-3xl font-bold text-gray-800">
-                {hasNoTeamScope
-                    ? 'Tickets Dashboard'
-                    : effectiveTeams.length === 0
-                    ? 'Tickets Dashboard - All Teams'
-                    : `Tickets Dashboard - ${effectiveTeams.join(', ')}`}
-            </h1>
+        <div className="space-y-6">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-foreground">Tickets</h1>
+                    <p className="text-muted-foreground text-sm">Browse, filter, and update support tickets</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Select value={toAny(dateFilter)} onValueChange={(v) => {
+                        const next = fromAny(v) as TicketDateFilter
+                        setParams(next !== 'custom'
+                            ? { dateFilter: next, dateFrom: '', dateTo: '' }
+                            : { dateFilter: next })
+                    }}>
+                        <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ANY}>Any Date</SelectItem>
+                            <SelectItem value="lastWeek">Last Week</SelectItem>
+                            <SelectItem value="last2Weeks">Last 2 Weeks</SelectItem>
+                            <SelectItem value="lastMonth">Last Month</SelectItem>
+                            <SelectItem value="custom">Custom Range</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    {dateFilter === 'custom' && (
+                        <>
+                            <Input type="date" value={params.dateFrom}
+                                   onChange={e => setParams({ dateFrom: e.target.value })}
+                                   className="w-[150px]"/>
+                            <Input type="date" value={params.dateTo}
+                                   onChange={e => setParams({ dateTo: e.target.value })}
+                                   className="w-[150px]"/>
+                        </>
+                    )}
+                </div>
+            </div>
 
             {hasNoTeamScope && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900">
+                <div className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-warning">
                     <p className="font-semibold">No Team Access</p>
                     <p className="text-sm mt-1">You are not assigned to any teams, so tickets cannot be displayed.</p>
                 </div>
             )}
 
-            {/* Filters */}
-            <div className={`grid grid-cols-1 gap-2 mb-4 ${hasNoTeamScope ? 'sm:grid-cols-5' : 'sm:grid-cols-6'}`}>
-                {/* Date Filter - First */}
-                <select value={dateFilter} onChange={e => {
-                    const next = e.target.value as TicketDateFilter
-                    setParams(next !== 'custom'
-                        ? { dateFilter: next, dateFrom: '', dateTo: '' }
-                        : { dateFilter: next })
-                }} className="p-2 border rounded">
-                    <option value="">Any Date</option>
-                    <option value="lastWeek">Last Week</option>
-                    <option value="last2Weeks">Last 2 Weeks</option>
-                    <option value="lastMonth">Last Month</option>
-                    <option value="custom">Custom Range</option>
-                </select>
-
-                <select value={statusFilter} onChange={e => setParams({ status: e.target.value })}
-                        className="p-2 border rounded">
-                    <option value="">All Status</option>
-                    <option value="opened">Opened</option>
-                    <option value="closed">Closed</option>
-                    <option value="stale">Stale</option>
-                </select>
-
+            {/* Faceted filters — single-value, modeled on elevate's data-table-faceted-filter */}
+            <div className="flex flex-wrap items-center gap-2">
+                <SingleSelectFilter
+                    title="Status"
+                    value={statusFilter || undefined}
+                    onChange={(v) => setParams({ status: v ?? '' })}
+                    options={[
+                        { label: 'Opened', value: 'opened' },
+                        { label: 'Closed', value: 'closed' },
+                        { label: 'Stale', value: 'stale' },
+                    ]}
+                />
                 {!hasNoTeamScope && (
-                    <select value={teamFilter} onChange={e => setParams({ teamFilter: e.target.value })} className="p-2 border rounded">
-                        <option value="">Current Team Scope</option>
-                        {!isViewingAllTeams && <option value={ALL_TEAMS_FILTER}>All Teams</option>}
-                        {teamOptions.map((name: string, index: number) => (
-                            <option key={`team-${index}-${name}`} value={name}>{name}</option>
-                        ))}
-                    </select>
+                    <SingleSelectFilter
+                        title="Team"
+                        value={teamFilter || undefined}
+                        onChange={(v) => setParams({ teamFilter: v ?? '' })}
+                        options={[
+                            ...(!isViewingAllTeams ? [{ label: 'All Teams', value: ALL_TEAMS_FILTER }] : []),
+                            ...teamOptions.map((name: string) => ({ label: name, value: name })),
+                        ]}
+                    />
                 )}
-
-                <select value={impactFilter} onChange={e => setParams({ impact: e.target.value })}
-                        className="p-2 border rounded">
-                    <option value="">All Impacts</option>
-                    {registryData?.impacts.map((impact: TicketImpact) => <option key={impact.code} value={impact.code}>{impact.label}</option>)}
-                </select>
-
-                <select value={tagFilter} onChange={e => setParams({ tag: e.target.value })} className="p-2 border rounded">
-                    <option value="">All Tags</option>
-                    {registryData?.tags.map((tag: TicketTag) => <option key={tag.code} value={tag.code}>{tag.label}</option>)}
-                </select>
-
-                <select value={escalatedFilter} onChange={e => setParams({ escalated: e.target.value })}
-                        className="p-2 border rounded">
-                    <option value="">Escalated?</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                </select>
-
-                <select value={escalatedToFilter} onChange={e => setParams({ escalatedTo: e.target.value })}
-                        className="p-2 border rounded">
-                    <option value="">Escalated To</option>
-                    {escalatedToOptions.map((name: string, index: number) => (
-                        <option key={`escalated-to-${index}-${name}`} value={name}>{name}</option>
-                    ))}
-                </select>
-
-                {dateFilter === 'custom' && (
-                    <>
-                        <input type="date" value={params.dateFrom}
-                               onChange={e => setParams({ dateFrom: e.target.value })}
-                               className="p-2 border rounded"/>
-                        <input type="date" value={params.dateTo}
-                               onChange={e => setParams({ dateTo: e.target.value })}
-                               className="p-2 border rounded"/>
-                    </>
-                )}
+                <SingleSelectFilter
+                    title="Impact"
+                    value={impactFilter || undefined}
+                    onChange={(v) => setParams({ impact: v ?? '' })}
+                    options={(registryData?.impacts ?? []).map((impact: TicketImpact) => ({
+                        label: impact.label, value: impact.code,
+                    }))}
+                />
+                <SingleSelectFilter
+                    title="Tag"
+                    value={tagFilter || undefined}
+                    onChange={(v) => setParams({ tag: v ?? '' })}
+                    options={(registryData?.tags ?? []).map((tag: TicketTag) => ({
+                        label: tag.label, value: tag.code,
+                    }))}
+                />
+                <SingleSelectFilter
+                    title="Escalated"
+                    value={escalatedFilter || undefined}
+                    onChange={(v) => setParams({ escalated: v ?? '' })}
+                    showSearch={false}
+                    options={[
+                        { label: 'Yes', value: 'Yes' },
+                        { label: 'No', value: 'No' },
+                    ]}
+                />
+                <SingleSelectFilter
+                    title="Escalated To"
+                    value={escalatedToFilter || undefined}
+                    onChange={(v) => setParams({ escalatedTo: v ?? '' })}
+                    options={escalatedToOptions.map((name: string) => ({ label: name, value: name }))}
+                />
             </div>
 
             {/* Tickets Table */}
-            <div className="overflow-x-auto border rounded shadow-sm mb-6">
+            <div className="border rounded-lg overflow-hidden">
                 {ticketsLoading ? <LoadingSkeleton /> :
                     ticketsError ? (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 m-6">
+                        <div className="m-6 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
                             <p className="font-semibold">Error loading tickets</p>
                             <p className="text-sm mt-1">Unable to load ticket data. Please try refreshing the page.</p>
                         </div>
                     ) :
-                        <table className="min-w-full divide-y table-fixed">
-                            <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                                <th
-                                    className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider"
-                                    style={{ width: SUMMARY_COLUMN_WIDTH }}
-                                >
-                                    Summary
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Team</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Impact</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Tags</th>
-                                {isAssignmentEnabled && (
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Support Engineer</th>
-                                )}
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Escalated</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Escalated To</th>
-                                <th
-                                    className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer select-none"
-                                    onClick={() => {
-                                        if (sortColumn === 'openedAt') {
-                                            setParams({ sortDir: sortDirection === 'asc' ? 'desc' : 'asc', page: '0' })
-                                        } else {
-                                            setParams({ sortBy: 'openedAt', sortDir: 'desc', page: '0' })
-                                        }
-                                    }}
-                                >
-                                    Opened At {sortColumn === 'openedAt' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
-                                </th>
-                                <th
-                                    className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer select-none"
-                                    onClick={() => {
-                                        if (sortColumn === 'closedAt') {
-                                            setParams({ sortDir: sortDirection === 'asc' ? 'desc' : 'asc', page: '0' })
-                                        } else {
-                                            setParams({ sortBy: 'closedAt', sortDir: 'desc', page: '0' })
-                                        }
-                                    }}
-                                >
-                                    Closed At {sortColumn === 'closedAt' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
-                                </th>
-                            </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                            {paginatedTickets.map((t: TicketWithLogs) => {
-                                const {opened, closed} = getOpenedClosed(t)
-                                const escalatedTo = Array.from(
-                                    new Set(
-                                        (t.escalations ?? [])
-                                            .map(e => e.team?.name)
-                                            .filter((name): name is string => !!name)
-                                    )
-                                )
-                                return (
-                                    <tr key={t.id}
+                        <Table>
+                            <TableHeader className="bg-muted z-10">
+                                <TableRow>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead style={{ width: SUMMARY_COLUMN_WIDTH }}>Summary</TableHead>
+                                    <TableHead>Team</TableHead>
+                                    <TableHead>Impact</TableHead>
+                                    <TableHead>Tags</TableHead>
+                                    {isAssignmentEnabled && (
+                                        <TableHead>Support Engineer</TableHead>
+                                    )}
+                                    <TableHead>Escalated</TableHead>
+                                    <TableHead>Escalated To</TableHead>
+                                    <TableHead
+                                        className="cursor-pointer select-none"
                                         onClick={() => {
-                                            setSelectedTicketId(t.id)
-                                            setIsModalOpen(true)
+                                            if (sortColumn === 'openedAt') {
+                                                setParams({ sortDir: sortDirection === 'asc' ? 'desc' : 'asc', page: '0' })
+                                            } else {
+                                                setParams({ sortBy: 'openedAt', sortDir: 'desc', page: '0' })
+                                            }
                                         }}
-                                        className={`cursor-pointer transition-all hover:bg-blue-50 hover:shadow-md border-l-4 border-transparent hover:border-blue-400`}
                                     >
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm"><span
-                                            className={`px-2 py-1 rounded-full text-xs font-semibold ${statusColors[t.status] || 'bg-gray-100 text-gray-800'}`}>{t.status}</span>
-                                        </td>
-                                        <td
-                                            className="px-4 py-4 text-sm text-gray-700 whitespace-normal break-words align-top"
-                                            style={{ width: SUMMARY_COLUMN_WIDTH, minWidth: SUMMARY_COLUMN_WIDTH }}
+                                        <span className="inline-flex items-center gap-1">
+                                            Opened At
+                                            {sortColumn === 'openedAt'
+                                                ? (sortDirection === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />)
+                                                : <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />}
+                                        </span>
+                                    </TableHead>
+                                    <TableHead
+                                        className="cursor-pointer select-none"
+                                        onClick={() => {
+                                            if (sortColumn === 'closedAt') {
+                                                setParams({ sortDir: sortDirection === 'asc' ? 'desc' : 'asc', page: '0' })
+                                            } else {
+                                                setParams({ sortBy: 'closedAt', sortDir: 'desc', page: '0' })
+                                            }
+                                        }}
+                                    >
+                                        <span className="inline-flex items-center gap-1">
+                                            Closed At
+                                            {sortColumn === 'closedAt'
+                                                ? (sortDirection === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />)
+                                                : <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />}
+                                        </span>
+                                    </TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {paginatedTickets.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={columnCount} className="text-center text-muted-foreground py-8">
+                                            No tickets found
+                                        </TableCell>
+                                    </TableRow>
+                                ) : paginatedTickets.map((t: TicketWithLogs) => {
+                                    const {opened, closed} = getOpenedClosed(t)
+                                    const escalatedTo = Array.from(
+                                        new Set(
+                                            (t.escalations ?? [])
+                                                .map(e => e.team?.name)
+                                                .filter((name): name is string => !!name)
+                                        )
+                                    )
+                                    return (
+                                        <TableRow
+                                            key={t.id}
+                                            onClick={() => {
+                                                setSelectedTicketId(t.id)
+                                                setIsModalOpen(true)
+                                            }}
+                                            className="cursor-pointer hover:bg-accent"
                                         >
-                                            <div
-                                                className="overflow-hidden"
-                                                style={{
-                                                    display: '-webkit-box',
-                                                    WebkitLineClamp: 4,
-                                                    WebkitBoxOrient: 'vertical',
-                                                }}
+                                            <TableCell>
+                                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusColors[t.status] || 'bg-muted text-muted-foreground'}`}>
+                                                    {t.status}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell
+                                                className="whitespace-normal break-words align-top"
+                                                style={{ width: SUMMARY_COLUMN_WIDTH, minWidth: SUMMARY_COLUMN_WIDTH }}
                                             >
-                                                {t.summary?.trim() ? t.summary : '—'}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{t.team?.name || '-'}</td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{registryData?.impacts.find((i: TicketImpact) => i.code === t.impact)?.label || t.impact || '-'}</td>
-                                        <td className="px-4 py-4 text-sm text-gray-700">
-                                            {(t.tags?.length ?? 0) > 0
-                                                ? t.tags
-                                                    ?.map(getTagLabel)
-                                                    .filter(Boolean)
-                                                    .map((tag, idx) => (
-                                                        <span key={`${t.id}-tag-${idx}`} className="block w-fit bg-indigo-100 text-indigo-800 text-xs font-semibold px-2 py-0.5 rounded mb-1 last:mb-0">
-                                                            {tag}
-                                                        </span>
-                                                    ))
-                                                : '-'}
-                                        </td>
-                                        {isAssignmentEnabled && (
-                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{t.assignedTo || '-'}</td>
-                                        )}
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{(t.escalations?.length ?? 0) > 0 ? 'Yes' : 'No'}</td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{escalatedTo.length ? escalatedTo.join(', ') : '-'}</td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{opened ? new Date(opened).toLocaleString() : '-'}</td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{closed ? new Date(closed).toLocaleString() : '-'}</td>
-                                    </tr>
-                                )
-                            })}
-                            {filteredTickets.length === 0 && <tr>
-                                <td colSpan={columnCount} className="text-center py-4 text-gray-500">No tickets found</td>
-                            </tr>}
-                            </tbody>
-                        </table>
+                                                <div
+                                                    className="overflow-hidden"
+                                                    style={{
+                                                        display: '-webkit-box',
+                                                        WebkitLineClamp: 4,
+                                                        WebkitBoxOrient: 'vertical',
+                                                    }}
+                                                >
+                                                    {t.summary?.trim() ? t.summary : '—'}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>{t.team?.name || '-'}</TableCell>
+                                            <TableCell>{registryData?.impacts.find((i: TicketImpact) => i.code === t.impact)?.label || t.impact || '-'}</TableCell>
+                                            <TableCell>
+                                                {(t.tags?.length ?? 0) > 0
+                                                    ? t.tags
+                                                        ?.map(getTagLabel)
+                                                        .filter(Boolean)
+                                                        .map((tag, idx) => (
+                                                            <Badge key={`${t.id}-tag-${idx}`} variant="outline" className="mb-1 last:mb-0 block w-fit">
+                                                                {tag}
+                                                            </Badge>
+                                                        ))
+                                                    : '-'}
+                                            </TableCell>
+                                            {isAssignmentEnabled && (
+                                                <TableCell>{t.assignedTo || '-'}</TableCell>
+                                            )}
+                                            <TableCell>{(t.escalations?.length ?? 0) > 0 ? 'Yes' : 'No'}</TableCell>
+                                            <TableCell>{escalatedTo.length ? escalatedTo.join(', ') : '-'}</TableCell>
+                                            <TableCell>{opened ? new Date(opened).toLocaleString() : '-'}</TableCell>
+                                            <TableCell>{closed ? new Date(closed).toLocaleString() : '-'}</TableCell>
+                                        </TableRow>
+                                    )
+                                })}
+                            </TableBody>
+                        </Table>
                 }
             </div>
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-                <div className="flex justify-center items-center space-x-4 mt-4">
-                    <button
+                <div className="flex justify-center items-center space-x-4">
+                    <Button
+                        variant="outline"
                         disabled={currentPage === 0}
                         onClick={() => setParams({ page: String(currentPage - 1) })}
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
                     >
                         Previous
-                    </button>
-                    <div className="text-sm text-gray-600">
+                    </Button>
+                    <div className="text-sm text-muted-foreground">
                         Page {currentPage + 1} of {totalPages}
-                        <span className="ml-2 text-gray-500">
+                        <span className="ml-2">
                             ({paginatedTickets.length}
                             {params.status || params.teamFilter || params.impact || params.tag || params.escalated || params.escalatedTo || params.dateFilter ? ' matching' : ''}
                             {' '}on this page, {totalTickets} total)
                         </span>
                     </div>
-                    <button
+                    <Button
+                        variant="outline"
                         disabled={currentPage >= totalPages - 1}
                         onClick={() => setParams({ page: String(currentPage + 1) })}
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
                     >
                         Next
-                    </button>
+                    </Button>
                 </div>
             )}
 

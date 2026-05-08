@@ -1,6 +1,7 @@
 import { Given, When, Then } from "@cucumber/cucumber";
 import { expect } from "@playwright/test";
 import type { CustomWorld } from "./custom-world";
+import { selectShadcnOption } from "../helpers/shadcn";
 
 const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
@@ -356,7 +357,7 @@ When("user navigates to the tickets page", async function (this: CustomWorld) {
 });
 
 When("user selects {string} tab", async function (this: CustomWorld, tabName: string) {
-    const tab = this.page.getByRole('button', { name: new RegExp(`^${tabName}$`, 'i') }).first();
+    const tab = this.page.getByRole('tab', { name: new RegExp(`^${tabName}$`, 'i') }).first();
     await expect(tab).toBeVisible({ timeout: 8000 });
     await tab.click();
     await this.page.waitForTimeout(300);
@@ -380,9 +381,8 @@ When("user filters by assignee {string}", async function (
     this: CustomWorld,
     assignee: string
 ) {
-    const assigneeSelect = this.page.locator('select').filter({ hasText: /Assignee|Select assignee/ }).first();
-    await assigneeSelect.waitFor({ state: 'visible', timeout: 5000 });
-    await assigneeSelect.selectOption(assignee);
+    const assigneeSelect = this.page.getByRole('button', { name: /Assignee|Select assignee/i }).first();
+    await selectShadcnOption(this.page, assigneeSelect, new RegExp(assignee, 'i'));
     await this.page.waitForTimeout(500);
 });
 
@@ -401,11 +401,9 @@ When("user selects {string} from assignee filter", async function (
     this: CustomWorld,
     assignee: string
 ) {
-    // Find the "From" dropdown in bulk reassign section
-    const fromLabel = this.page.locator('label').filter({ hasText: 'From:' });
-    const fromSelect = fromLabel.locator('..').locator('select');
-    await fromSelect.waitFor({ state: 'visible', timeout: 5000 });
-    await fromSelect.selectOption(assignee);
+    // The bulk reassign "From" dropdown is a shadcn Select with id="bulk-from".
+    const fromSelect = this.page.locator('#bulk-from');
+    await selectShadcnOption(this.page, fromSelect, new RegExp(assignee, 'i'));
     await this.page.waitForTimeout(300);
 });
 
@@ -413,11 +411,8 @@ When("user selects {string} as reassign target", async function (
     this: CustomWorld,
     assignee: string
 ) {
-    // Find the "To" dropdown in bulk reassign section
-    const toLabel = this.page.locator('label').filter({ hasText: 'To:' });
-    const toSelect = toLabel.locator('..').locator('select');
-    await toSelect.waitFor({ state: 'visible', timeout: 5000 });
-    await toSelect.selectOption(assignee);
+    const toSelect = this.page.locator('#bulk-to');
+    await selectShadcnOption(this.page, toSelect, new RegExp(assignee, 'i'));
     await this.page.waitForTimeout(300);
 });
 
@@ -426,11 +421,9 @@ When("user changes assignee to {string}", async function (
     this: CustomWorld,
     newAssignee: string
 ) {
-    // Find the Support Engineer select in the modal
     const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    const assigneeSelect = modal.locator('#assignee-select');
-    await assigneeSelect.waitFor({ state: 'visible', timeout: 5000 });
-    await assigneeSelect.selectOption(newAssignee);
+    const assigneeTrigger = modal.locator('#assignee-select');
+    await selectShadcnOption(this.page, assigneeTrigger, new RegExp(newAssignee, 'i'));
     await this.page.waitForTimeout(500);
     
     // Wait for Save Changes button to become enabled
@@ -531,7 +524,9 @@ Then("bulk reassign count should show {string}", async function (
     this: CustomWorld,
     expectedCount: string
 ) {
-    const countText = this.page.getByText(new RegExp(`${expectedCount}\\s*ticket`, 'i'));
+    // The badge renders "{n} open ticket{s}", so allow any words between the count
+    // and "ticket" (the previous regex required them to be adjacent).
+    const countText = this.page.getByText(new RegExp(`\\b${expectedCount}\\b[^\\d]*ticket`, 'i'));
     await expect(countText).toBeVisible({ timeout: 5000 });
 });
 

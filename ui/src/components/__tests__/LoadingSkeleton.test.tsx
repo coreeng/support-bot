@@ -34,11 +34,11 @@ describe('LoadingSkeleton', () => {
         expect(largeSkeletons.length).toBeGreaterThanOrEqual(2);
     });
 
-    it('applies shimmer animation to skeleton elements', () => {
+    it('applies pulse animation to skeleton elements', () => {
         const { container } = render(<LoadingSkeleton />);
-        
-        const shimmerElements = container.querySelectorAll('.animate-shimmer');
-        expect(shimmerElements.length).toBeGreaterThan(0);
+
+        const pulseElements = container.querySelectorAll('.animate-pulse');
+        expect(pulseElements.length).toBeGreaterThan(0);
     });
 });
 
