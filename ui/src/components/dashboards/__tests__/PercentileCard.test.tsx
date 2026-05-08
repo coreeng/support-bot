@@ -65,56 +65,27 @@ describe('PercentileCard', () => {
     })
 
     describe('Color Schemes', () => {
-        it('should apply blue color scheme by default', () => {
+        it('renders flat tokenized card regardless of colorScheme prop', () => {
+            // colorScheme is now a no-op — card uses bg-card / text-foreground tokens.
             const { container } = render(
-                <PercentileCard title="Response Time" p50="2h 30m" p90="8h 15m" />
+                <PercentileCard title="Response Time" p50="2h 30m" p90="8h 15m" colorScheme="green" />
             )
 
             const card = container.firstChild as HTMLElement
-            expect(card.className).toContain('bg-blue-50')
-            expect(card.className).toContain('border-blue-200')
-        })
-
-        it('should apply green color scheme', () => {
-            const { container } = render(
-                <PercentileCard 
-                    title="Response Time" 
-                    p50="2h 30m" 
-                    p90="8h 15m"
-                    colorScheme="green"
-                />
-            )
-
-            const card = container.firstChild as HTMLElement
-            expect(card.className).toContain('bg-green-50')
-            expect(card.className).toContain('border-green-200')
-        })
-
-        it('should apply purple color scheme', () => {
-            const { container } = render(
-                <PercentileCard 
-                    title="Response Time" 
-                    p50="2h 30m" 
-                    p90="8h 15m"
-                    colorScheme="purple"
-                />
-            )
-
-            const card = container.firstChild as HTMLElement
-            expect(card.className).toContain('bg-purple-50')
-            expect(card.className).toContain('border-purple-200')
+            expect(card.className).toContain('bg-card')
+            expect(card.className).toContain('border')
         })
     })
 
     describe('Layout', () => {
-        it('should have responsive flex layout', () => {
-            const { container } = render(
+        it('uses a grid for percentile columns', () => {
+            render(
                 <PercentileCard title="Response Time" p50="2h 30m" p90="8h 15m" />
             )
 
-            const card = container.firstChild as HTMLElement
-            expect(card.className).toContain('flex')
-            expect(card.className).toContain('md:flex-row')
+            const p50Label = screen.getByText('P50')
+            const grid = p50Label.parentElement?.parentElement as HTMLElement
+            expect(grid.className).toContain('grid')
         })
 
         it('should show 2 percentile columns when P75 not provided', () => {
@@ -197,14 +168,6 @@ describe('PercentileCard', () => {
             expect(card.className).toContain('border')
         })
 
-        it('should be full width', () => {
-            const { container } = render(
-                <PercentileCard title="Response Time" p50="2h 30m" p90="8h 15m" />
-            )
-
-            const card = container.firstChild as HTMLElement
-            expect(card.className).toContain('w-full')
-        })
     })
 
     describe('Edge Cases', () => {

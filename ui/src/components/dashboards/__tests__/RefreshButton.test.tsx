@@ -117,19 +117,11 @@ describe('RefreshButton', () => {
     })
 
     describe('Visual States', () => {
-        it('should have different styling when disabled', () => {
-            render(<RefreshButton onRefresh={mockOnRefresh} isRefreshing={true} />)
-            
-            const button = screen.getByRole('button')
-            expect(button.className).toContain('bg-gray-200')
-            expect(button.className).toContain('cursor-not-allowed')
-        })
-
-        it('should have hover state when enabled', () => {
+        it('uses shadcn outline variant styling', () => {
             render(<RefreshButton onRefresh={mockOnRefresh} isRefreshing={false} />)
-            
+
             const button = screen.getByRole('button')
-            expect(button.className).toContain('hover:bg-blue-200')
+            expect(button.className).toContain('border')
         })
     })
 })

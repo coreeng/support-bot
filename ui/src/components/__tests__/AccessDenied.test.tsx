@@ -51,6 +51,16 @@ describe('AccessDenied', () => {
         const { container } = render(<AccessDenied />);
         expect(container.firstChild).toBeNull();
     });
+
+    it('sign-out CTA has a distinct hover state from its resting state', () => {
+        mockAuth();
+        render(<AccessDenied />);
+        const button = screen.getByText(/Sign in with a different account/i).closest('button')!;
+        expect(button.className).toContain('bg-muted');
+        expect(button.className).toContain('hover:bg-accent');
+        // Regression guard: the bug had hover:bg-muted, making the button feel inert.
+        expect(button.className).not.toContain('hover:bg-muted');
+    });
 });
 
 describe('RequireDashboardAccess', () => {

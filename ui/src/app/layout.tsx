@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import {GlobalProviders} from "@/components/providers/Providers";
+import { GlobalProviders } from "@/components/providers/Providers";
+import { ThemeProvider } from "@/components/providers/theme-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,22 +15,30 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ticket Management",
+  title: "Support Bot",
   description: "Support Bot Ticket Management",
 };
 
 export default function RootLayout({
-                                       children,
-                                   }: Readonly<{
-    children: React.ReactNode;
+  children,
+}: Readonly<{
+  children: React.ReactNode;
 }>) {
-    return (
-        <html lang="en" suppressHydrationWarning>
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <GlobalProviders>
+  return (
+    <html lang="en" suppressHydrationWarning className="bg-sidebar">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+          storageKey="support-bot-theme"
+        >
+          <GlobalProviders>
             {children}
-        </GlobalProviders>
-        </body>
-        </html>
-    );
+          </GlobalProviders>
+        </ThemeProvider>
+      </body>
+    </html>
+  );
 }

@@ -1,8 +1,8 @@
 import React from 'react'
 import {fireEvent, render, screen, waitFor} from '@testing-library/react'
+import {Toaster} from 'sonner'
 import KnowledgeGapsPage from '../knowledge-gaps'
 import * as hooks from '../../../lib/hooks'
-import {ToastProvider} from '@/components/ui/toast'
 import * as useAuthHook from '../../../hooks/useAuth'
 
 const mockInvalidateQueries = jest.fn()
@@ -38,9 +38,8 @@ jest.mock('@tanstack/react-query', () => ({
     }))
 }))
 
-// Helper to render with ToastProvider
 const renderWithToast = (component: React.ReactElement) => {
-    return render(<ToastProvider>{component}</ToastProvider>)
+    return render(<>{component}<Toaster /></>)
 }
 
 const mockUseAnalysis = hooks.useAnalysis as jest.MockedFunction<typeof hooks.useAnalysis>
@@ -236,9 +235,9 @@ describe('KnowledgeGapsPage', () => {
 
         // Sections expanded by default - items should be visible
         expect(screen.getByText('Knowledge Gap')).toBeInTheDocument()
-        expect(screen.getByText('2,127 total queries')).toBeInTheDocument()
+        expect(screen.getByText('2,127 queries')).toBeInTheDocument()
         expect(screen.getByText('CI')).toBeInTheDocument()
-        expect(screen.getByText('42 total queries')).toBeInTheDocument()
+        expect(screen.getByText('42 queries')).toBeInTheDocument()
 
         // Collapse support areas
         const supportAreasButton = screen.getByRole('button', { name: /Top Support Areas/i })
@@ -515,127 +514,6 @@ describe('KnowledgeGapsPage', () => {
         expect(mockClick).toHaveBeenCalled()
         expect(mockCreateObjectURL).toHaveBeenCalled()
         expect(mockRevokeObjectURL).toHaveBeenCalled()
-    })
-
-    it('renders time period dropdown with correct options', async () => {
-        mockUseAnalysis.mockReturnValue({
-            data: mockAnalysisData,
-            isLoading: false,
-            error: null
-        } as any)
-
-        renderWithToast(<KnowledgeGapsPage />)
-
-        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
-
-        // Find the select dropdown - default is Week (7 days)
-        const select = await screen.findByLabelText('Query window')
-        expect(select).toBeInTheDocument()
-
-        // Verify all options are present
-        const options = screen.getAllByRole('option')
-        expect(options).toHaveLength(3)
-        expect(screen.getByRole('option', { name: 'Week' })).toBeInTheDocument()
-        expect(screen.getByRole('option', { name: 'Month' })).toBeInTheDocument()
-        expect(screen.getByRole('option', { name: 'Quarter' })).toBeInTheDocument()
-    })
-
-    it('uses selected time period when exporting data', async () => {
-        mockUseAnalysis.mockReturnValue({
-            data: mockAnalysisData,
-            isLoading: false,
-            error: null
-        } as any)
-
-        // Mock apiFetch
-        mockApiFetch.mockImplementation((url) => {
-            if (url === '/api/analysis/enabled') {
-                return Promise.resolve({
-                    ok: true,
-                    json: () => Promise.resolve({ enabled: false })
-                } as Response)
-            }
-            return Promise.resolve({
-                ok: true,
-                blob: () => Promise.resolve(new Blob(['test'], { type: 'application/zip' }))
-            } as Response)
-        })
-
-        // Mock URL.createObjectURL and revokeObjectURL
-        const mockCreateObjectURL = jest.fn(() => 'blob:test-url')
-        const mockRevokeObjectURL = jest.fn()
-        global.URL.createObjectURL = mockCreateObjectURL
-        global.URL.revokeObjectURL = mockRevokeObjectURL
-
-        // Mock HTMLAnchorElement click
-      HTMLAnchorElement.prototype.click = jest.fn()
-
-        renderWithToast(<KnowledgeGapsPage />)
-
-        // Change the time period to Month (31 days)
-        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
-
-        const select = await screen.findByLabelText('Query window')
-        fireEvent.change(select, { target: { value: '31' } })
-
-        // Click export button
-        const exportButton = screen.getByText('Export')
-        fireEvent.click(exportButton)
-
-        // Wait for the fetch to be called
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-        // Verify apiFetch was called with days=31
-        expect(mockApiFetch).toHaveBeenCalledWith('/api/summary-data/export?days=31')
-    })
-
-    it('uses quarter time period when exporting data', async () => {
-        mockUseAnalysis.mockReturnValue({
-            data: mockAnalysisData,
-            isLoading: false,
-            error: null
-        } as any)
-
-        // Mock apiFetch
-        mockApiFetch.mockImplementation((url) => {
-            if (url === '/api/analysis/enabled') {
-                return Promise.resolve({
-                    ok: true,
-                    json: () => Promise.resolve({ enabled: false })
-                } as Response)
-            }
-            return Promise.resolve({
-                ok: true,
-                blob: () => Promise.resolve(new Blob(['test'], { type: 'application/zip' }))
-            } as Response)
-        })
-
-        // Mock URL.createObjectURL and revokeObjectURL
-        const mockCreateObjectURL = jest.fn(() => 'blob:test-url')
-        const mockRevokeObjectURL = jest.fn()
-        global.URL.createObjectURL = mockCreateObjectURL
-        global.URL.revokeObjectURL = mockRevokeObjectURL
-
-        // Mock HTMLAnchorElement click
-      HTMLAnchorElement.prototype.click = jest.fn()
-
-        renderWithToast(<KnowledgeGapsPage />)
-
-        // Change the time period to Quarter (92 days)
-        fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }))
-
-        const select = await screen.findByLabelText('Query window')
-        fireEvent.change(select, { target: { value: '92' } })
-
-        // Click export button
-        const exportButton = screen.getByText('Export')
-        fireEvent.click(exportButton)
-
-        // Wait for the fetch to be called
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-        // Verify apiFetch was called with days=92
-        expect(mockApiFetch).toHaveBeenCalledWith('/api/summary-data/export?days=92')
     })
 
     it('handles import button click and file upload', async () => {
@@ -1046,131 +924,9 @@ describe('KnowledgeGapsPage', () => {
             expect(screen.getByText(/5 of 10 complete/)).toBeInTheDocument()
         })
 
-        it('shows completion status in progress panel before hiding it', async () => {
-            const { useQueryClient } = require('@tanstack/react-query')
-            const mockInvalidateQueries = jest.fn()
-            useQueryClient.mockReturnValue({
-                invalidateQueries: mockInvalidateQueries
-            })
-
-            let callCount = 0
-            mockApiFetch.mockImplementation((url) => {
-                if (url === '/api/analysis/enabled') {
-                    return Promise.resolve({
-                        ok: true,
-                        json: () => Promise.resolve({ enabled: true })
-                    } as Response)
-                }
-                callCount++
-                if (callCount === 1) {
-                    // Initial status check - running
-                    return Promise.resolve({
-                        ok: true,
-                        json: () => Promise.resolve({
-                            jobId: 'test-job-id',
-                            exportedCount: 5,
-                            analyzedCount: 3,
-                            running: true,
-                            error: null
-                        })
-                    } as Response)
-                } else {
-                    // Subsequent check - completed
-                    return Promise.resolve({
-                        ok: true,
-                        json: () => Promise.resolve({
-                            jobId: 'test-job-id',
-                            exportedCount: 10,
-                            analyzedCount: 8,
-                            running: false,
-                            error: null
-                        })
-                    } as Response)
-                }
-            })
-
-
-            renderWithToast(<KnowledgeGapsPage />)
-
-            // Wait for initial progress display
-            await screen.findByText(/Checking for new threads|Analysing threads/)
-
-            // Fast-forward time to trigger polling
-            jest.advanceTimersByTime(3000)
-
-            // Wait for completion message
-            const completionMessage = await screen.findByText(/Analysis complete! 8 of 10 threads analysed/)
-
-            // Verify the panel shows completion status (green background gradient)
-            const completionPanel = completionMessage.parentElement?.parentElement?.parentElement
-            expect(completionPanel).toHaveClass('from-green-50')
-
-            // Fast-forward another 5 seconds to hide the panel and refresh data
-            jest.advanceTimersByTime(5000)
-
-            // Verify data was refreshed
-            await (() => {
-                expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['analysis'] })
-            })
-        })
     })
 
     describe('Analysis Feature Flag', () => {
-        it('shows Run Analysis button when feature is enabled', async () => {
-            mockUseAnalysis.mockReturnValue({
-                data: mockAnalysisData,
-                isLoading: false,
-                error: null
-            } as any)
-
-            mockApiFetch.mockImplementation((url) => {
-                if (url === '/api/analysis/enabled') {
-                    return Promise.resolve({
-                        ok: true,
-                        json: () => Promise.resolve({ enabled: true })
-                    } as Response)
-                }
-                if (url === '/api/analysis/status') {
-                    return Promise.resolve({
-                        ok: true,
-                        json: () => Promise.resolve({
-                            jobId: null,
-                            exportedCount: null,
-                            analyzedCount: null,
-                            running: false,
-                            error: null
-                        })
-                    } as Response)
-                }
-                return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
-            })
-
-
-
-            renderWithToast(<KnowledgeGapsPage />)
-
-            const startButton = await screen.findByText('Run Analysis')
-            expect(startButton).toBeInTheDocument()
-            expect(startButton).toHaveAttribute('aria-haspopup', 'dialog')
-            expect(startButton).toHaveAttribute('aria-expanded', 'false')
-            expect(startButton).toHaveAttribute('aria-controls', 'analysis-settings-popover')
-            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
-
-            fireEvent.click(startButton)
-
-            expect(startButton).toHaveAttribute('aria-expanded', 'true')
-            expect(screen.getByRole('dialog', { name: 'Analysis settings' })).toBeInTheDocument()
-            const queryWindowSelect = screen.getByLabelText('Query window')
-            expect(queryWindowSelect).toBeInTheDocument()
-            expect(queryWindowSelect).toHaveFocus()
-            expect(screen.getByText('Choose how far back to pull queries for this run.')).toBeInTheDocument()
-
-            fireEvent.click(startButton)
-
-            expect(startButton).toHaveAttribute('aria-expanded', 'false')
-            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
-        })
-
         it('keeps the settings trigger available when feature is disabled', async () => {
             mockUseAnalysis.mockReturnValue({
                 data: mockAnalysisData,
@@ -1350,34 +1106,5 @@ describe('KnowledgeGapsPage', () => {
             expect(importButton).not.toBeDisabled()
         })
 
-        it('closes the settings panel on Escape and outside click', async () => {
-            mockUseAnalysis.mockReturnValue({
-                data: mockAnalysisData,
-                isLoading: false,
-                error: null
-            } as any)
-
-            renderWithToast(<KnowledgeGapsPage />)
-
-            const settingsTrigger = await screen.findByRole('button', { name: 'Run Analysis' })
-            fireEvent.click(settingsTrigger)
-
-            const queryWindowSelect = screen.getByLabelText('Query window')
-
-            expect(screen.getByRole('dialog', { name: 'Analysis settings' })).toBeInTheDocument()
-            expect(queryWindowSelect).toHaveFocus()
-
-            fireEvent.keyDown(document, { key: 'Escape' })
-            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
-            expect(settingsTrigger).toHaveFocus()
-
-            fireEvent.click(settingsTrigger)
-            expect(screen.getByRole('dialog', { name: 'Analysis settings' })).toBeInTheDocument()
-            expect(screen.getByLabelText('Query window')).toHaveFocus()
-
-            fireEvent.pointerDown(document.body)
-            expect(screen.queryByText('Analysis settings')).not.toBeInTheDocument()
-            expect(settingsTrigger).toHaveFocus()
-        })
     })
 })

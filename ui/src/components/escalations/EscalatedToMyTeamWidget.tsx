@@ -90,15 +90,15 @@ export default function EscalatedToMyTeamWidget() {
 
     if (isLoading) {
         return (
-            <div className="p-6 bg-white shadow-md rounded-lg border border-gray-200">
-                <p className="text-gray-500">Loading...</p>
+            <div className="p-6 bg-card shadow-md rounded-lg border border-border">
+                <p className="text-muted-foreground">Loading...</p>
             </div>
         )
     }
 
     if (escalationsError) {
         return (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
                 <p className="font-semibold">Error loading escalations</p>
                 <p className="text-sm mt-1">Unable to load escalation data. Please try refreshing the page.</p>
             </div>
@@ -107,26 +107,26 @@ export default function EscalatedToMyTeamWidget() {
 
     return (
         <div className="space-y-6">
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-6 bg-white shadow-md rounded-lg border border-gray-200">
-                    <h3 className="font-semibold text-gray-700">Total Received</h3>
-                    <p className="text-3xl font-bold text-purple-700 mt-2">{escalatedToMyTeam.total}</p>
+            {/* Summary tiles */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-xl border bg-card p-5">
+                    <p className="text-sm font-medium text-muted-foreground">Total Received</p>
+                    <p className="mt-2 font-mono text-3xl font-semibold tracking-tight tabular-nums text-primary">{escalatedToMyTeam.total}</p>
                 </div>
-                <div className="p-6 bg-white shadow-md rounded-lg border border-gray-200">
-                    <h3 className="font-semibold text-gray-700">Active</h3>
-                    <p className="text-3xl font-bold text-yellow-600 mt-2">{escalatedToMyTeam.active}</p>
+                <div className="rounded-xl border bg-card p-5">
+                    <p className="text-sm font-medium text-muted-foreground">Active</p>
+                    <p className="mt-2 font-mono text-3xl font-semibold tracking-tight tabular-nums text-warning">{escalatedToMyTeam.active}</p>
                 </div>
-                <div className="p-6 bg-white shadow-md rounded-lg border border-gray-200">
-                    <h3 className="font-semibold text-gray-700">Resolved</h3>
-                    <p className="text-3xl font-bold text-green-600 mt-2">{escalatedToMyTeam.resolved}</p>
+                <div className="rounded-xl border bg-card p-5">
+                    <p className="text-sm font-medium text-muted-foreground">Resolved</p>
+                    <p className="mt-2 font-mono text-3xl font-semibold tracking-tight tabular-nums text-success">{escalatedToMyTeam.resolved}</p>
                 </div>
             </div>
 
             {/* Charts */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white shadow-md rounded-lg p-4 border">
-                    <h3 className="font-semibold mb-2 text-gray-700">Escalations by Status</h3>
+                <div className="rounded-xl border bg-card p-5">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-3">Escalations by Status</h3>
                     <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
                             <Pie
@@ -143,14 +143,24 @@ export default function EscalatedToMyTeamWidget() {
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip />
+                            <Tooltip
+                                contentStyle={{
+                                    background: 'var(--popover)',
+                                    color: 'var(--popover-foreground)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                }}
+                                itemStyle={{ color: 'var(--popover-foreground)' }}
+                                labelStyle={{ color: 'var(--popover-foreground)' }}
+                            />
                             <Legend verticalAlign="bottom" height={60} />
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
 
-                <div className="bg-white shadow-md rounded-lg p-4 border">
-                    <h3 className="font-semibold mb-2 text-gray-700">Escalations by Impact</h3>
+                <div className="rounded-xl border bg-card p-5">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-3">Escalations by Impact</h3>
                     <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
                             <Pie
@@ -167,7 +177,17 @@ export default function EscalatedToMyTeamWidget() {
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip />
+                            <Tooltip
+                                contentStyle={{
+                                    background: 'var(--popover)',
+                                    color: 'var(--popover-foreground)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                }}
+                                itemStyle={{ color: 'var(--popover-foreground)' }}
+                                labelStyle={{ color: 'var(--popover-foreground)' }}
+                            />
                             <Legend verticalAlign="bottom" height={60} />
                         </PieChart>
                     </ResponsiveContainer>

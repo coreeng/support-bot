@@ -163,10 +163,10 @@ function LoginContent() {
           ? "Redirecting to sign-in..."
           : "Loading...";
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">{message}</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground mx-auto mb-4"></div>
+          <p className="text-muted-foreground">{message}</p>
         </div>
       </div>
     );
@@ -174,10 +174,10 @@ function LoginContent() {
 
   if (error === "configuration") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="max-w-md w-full space-y-8 p-8 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Sign-in unavailable</h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <h2 className="text-2xl font-bold text-foreground">Sign-in unavailable</h2>
+          <p className="text-muted-foreground">
             This deployment is misconfigured: the public app URL (<code className="text-sm">NEXTAUTH_URL</code>)
             must be set and must match the API&apos;s expected UI origin (<code className="text-sm">UI_ORIGIN</code>).
             Contact your administrator.
@@ -185,7 +185,7 @@ function LoginContent() {
           <button
             type="button"
             onClick={() => router.replace("/login")}
-            className="text-blue-600 hover:underline"
+            className="text-primary hover:underline"
           >
             Back to login
           </button>
@@ -197,19 +197,19 @@ function LoginContent() {
   // Show not-onboarded message for allow-list rejections
   if (error === "user_not_allowed") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="max-w-md w-full space-y-8 p-8 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Access Restricted</h2>
-          <p className="text-gray-600 dark:text-gray-400">
+          <h2 className="text-2xl font-bold text-foreground">Access Restricted</h2>
+          <p className="text-muted-foreground">
             You have successfully authenticated but your user has not been
             onboarded to the Support UI.
           </p>
-          <p className="text-gray-500 dark:text-gray-500 text-sm">
+          <p className="text-muted-foreground text-sm">
             Please contact your administrator for access.
           </p>
           <button
             onClick={() => router.replace("/login")}
-            className="text-blue-600 hover:underline"
+            className="text-primary hover:underline"
           >
             Back to login
           </button>
@@ -221,13 +221,13 @@ function LoginContent() {
   // Show error if present
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="max-w-md w-full space-y-8 p-8 text-center">
-          <h2 className="text-2xl font-bold text-red-600">Authentication Error</h2>
-          <p className="text-gray-600">{error}</p>
+          <h2 className="text-2xl font-bold text-destructive">Authentication Error</h2>
+          <p className="text-muted-foreground">{error}</p>
           <button
             onClick={() => router.replace("/login")}
-            className="text-blue-600 hover:underline"
+            className="text-primary hover:underline"
           >
             Try again
           </button>
@@ -239,11 +239,11 @@ function LoginContent() {
   // Iframe path (popups need a user gesture) and bfcache fallback (when the user pressed
   // Back from Dex) both render the SSO button so the user can complete login manually.
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="max-w-md w-full space-y-8 p-8">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Sign in</h2>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
+          <h2 className="text-3xl font-bold text-foreground">Sign in</h2>
+          <p className="mt-2 text-muted-foreground">
             Choose your authentication method
           </p>
         </div>
@@ -251,7 +251,7 @@ function LoginContent() {
         <div className="space-y-4">
           <button
             onClick={handleLogin}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-border rounded-lg shadow-sm bg-card hover:bg-accent text-foreground font-medium transition-colors"
           >
             Continue with SSO
           </button>
@@ -265,8 +265,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
         </div>
       }
     >

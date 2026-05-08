@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import TeamSelector from '../TeamSelector'
 
@@ -30,6 +31,12 @@ const baseTeamFilter = () => ({
 
 const renderSelector = () => render(<TeamSelector />)
 
+const openMenu = async () => {
+  const user = userEvent.setup()
+  await user.click(screen.getByTestId('team-selector-trigger'))
+  return user
+}
+
 describe('TeamSelector', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -55,13 +62,13 @@ describe('TeamSelector', () => {
 
     renderSelector()
 
-    expect(screen.queryByRole('combobox')).toBeNull()
+    expect(screen.queryByTestId('team-selector-trigger')).toBeNull()
     expect(screen.getByText('No Teams Assigned')).toBeInTheDocument()
     expect(screen.getByText(/not a member of any teams/i)).toBeInTheDocument()
     expect(screen.getByText(/contact your administrator/i)).toBeInTheDocument()
   })
 
-  it('shows dropdown when user has only role teams (leadership/support) and is leadership or support engineer', () => {
+  it('shows dropdown when user has only role teams (leadership/support) and is leadership or support engineer', async () => {
     mockUseAuth.mockReturnValue({
       user: {
         teams: [
@@ -74,14 +81,14 @@ describe('TeamSelector', () => {
     })
 
     renderSelector()
+    await openMenu()
 
-    // Dropdown should now be visible for leadership/support engineers even with only role teams
-    expect(screen.getByRole('combobox')).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: /Leadership Team/i })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: /Support Engineers/i })).toBeInTheDocument()
+    expect(screen.getByTestId('team-selector-trigger')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Leadership Team/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Support Engineers/i })).toBeInTheDocument()
   })
 
-  it('shows dropdown when a non-role team exists and includes role teams as options', () => {
+  it('shows dropdown when a non-role team exists and includes role teams as options', async () => {
     mockUseAuth.mockReturnValue({
       user: {
         teams: [
@@ -95,23 +102,16 @@ describe('TeamSelector', () => {
     })
 
     renderSelector()
+    await openMenu()
 
-    const select = screen.getByRole('combobox')
-    const options = screen.getAllByRole('option').map((o) => o.textContent)
-
-    expect(select).toBeInTheDocument()
-    expect(options).toEqual(
-      expect.arrayContaining([
-        '— Teams —',
-        'Tenant A',
-        '— Access Roles —',
-        'Leadership Team · Leadership',
-        'Support Engineers · Support',
-      ])
-    )
+    expect(screen.getByTestId('team-selector-trigger')).toBeInTheDocument()
+    const itemTexts = screen.getAllByRole('menuitem').map(o => o.textContent || '')
+    expect(itemTexts.some(t => /Tenant A/.test(t))).toBe(true)
+    expect(itemTexts.some(t => /Leadership Team.*Leadership/.test(t))).toBe(true)
+    expect(itemTexts.some(t => /Support Engineers.*Support/.test(t))).toBe(true)
   })
 
-  it('deduplicates team names when building options', () => {
+  it('deduplicates team names when building options', async () => {
     mockUseAuth.mockReturnValue({
       user: {
         teams: [
@@ -124,12 +124,12 @@ describe('TeamSelector', () => {
     })
 
     renderSelector()
+    await openMenu()
 
-    // One group header plus one deduped tenant option
-    expect(screen.getAllByRole('option')).toHaveLength(2)
+    expect(screen.getAllByRole('menuitem')).toHaveLength(1)
   })
 
-  it('renders tenant options from session teams for the current logged-in user', () => {
+  it('renders tenant options from session teams for the current logged-in user', async () => {
     mockUseAuth.mockReturnValue({
       user: {
         teams: [
@@ -142,13 +142,14 @@ describe('TeamSelector', () => {
     })
 
     renderSelector()
+    await openMenu()
 
-    expect(screen.getByRole('combobox')).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Tenant A' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Tenant B' })).toBeInTheDocument()
+    expect(screen.getByTestId('team-selector-trigger')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Tenant A/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Tenant B/ })).toBeInTheDocument()
   })
 
-  it('shows only tenant teams from the logged-in user session', () => {
+  it('shows only tenant teams from the logged-in user session', async () => {
     mockUseAuth.mockReturnValue({
       user: {
         teams: [
@@ -162,12 +163,13 @@ describe('TeamSelector', () => {
     })
 
     renderSelector()
+    await openMenu()
 
-    expect(screen.getByRole('option', { name: 'Tenant A' })).toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: 'Tenant X' })).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Tenant A/ })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /Tenant X/ })).not.toBeInTheDocument()
   })
 
-  it('resets selected team to first option if current selection is no longer valid', async () => {
+  it('resets selected team to first option if current selection is no longer valid', () => {
     const setSelectedTeam = jest.fn()
     mockUseTeamFilter.mockReturnValue({
       selectedTeam: 'Old Team',
@@ -189,11 +191,7 @@ describe('TeamSelector', () => {
     expect(setSelectedTeam).toHaveBeenCalledWith('Tenant A')
   })
 
-  it('writes the new team into the URL when the user changes the dropdown', async () => {
-    // Context is updated via the useEffect (URL → context) once the URL commits,
-    // not synchronously in the onChange handler. This avoids a race where the
-    // page's own reset effect uses a stale searchParams snapshot and overwrites
-    // the new ?team= value before it is committed.
+  it('writes the new team into the URL when the user picks an item', async () => {
     const setSelectedTeam = jest.fn()
     mockUseTeamFilter.mockReturnValue({
       selectedTeam: 'Tenant A',
@@ -211,12 +209,10 @@ describe('TeamSelector', () => {
     })
 
     renderSelector()
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Leadership Team' } })
+    const user = await openMenu()
+    await user.click(screen.getByRole('menuitem', { name: /Leadership Team/ }))
 
-    // The URL is updated with the new team value
     expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('team=Leadership+Team'))
-    // setSelectedTeam is NOT called directly from onChange — it fires via the
-    // useEffect once the URL has committed (tested by the URL-sync tests below).
     expect(setSelectedTeam).not.toHaveBeenCalledWith('Leadership Team')
   })
 
@@ -240,7 +236,6 @@ describe('TeamSelector', () => {
 
     renderSelector()
 
-    // URL team param wins over the auth-based default (Tenant A)
     expect(setSelectedTeam).toHaveBeenCalledWith('Tenant B')
   })
 
@@ -263,10 +258,8 @@ describe('TeamSelector', () => {
 
     renderSelector()
 
-    // Falls back to first available team; invalid URL team is ignored
     expect(setSelectedTeam).toHaveBeenCalledWith('Tenant A')
     expect(setSelectedTeam).not.toHaveBeenCalledWith('Other Team')
-    // The access-denied modal must appear naming the invalid team and the fallback
     const modal = screen.getByTestId('team-access-denied-modal')
     expect(modal).toBeInTheDocument()
     expect(within(modal).getByText(/Other Team/)).toBeInTheDocument()
@@ -274,13 +267,10 @@ describe('TeamSelector', () => {
   })
 
   it('rewrites a stale invalid ?team URL param when selectedTeam is already valid', () => {
-    // Scenario: user opens a shared URL with ?team=OldTeam but their context
-    // already has a valid selectedTeam (e.g. from a previous navigation).
-    // The stale param must be cleaned up without touching selectedTeam.
     mockUseSearchParams.mockReturnValue(new URLSearchParams({ team: 'OldTeam' }))
     const setSelectedTeam = jest.fn()
     mockUseTeamFilter.mockReturnValue({
-      selectedTeam: 'Tenant A',   // already valid
+      selectedTeam: 'Tenant A',
       setSelectedTeam,
     })
     mockUseAuth.mockReturnValue({
@@ -295,16 +285,12 @@ describe('TeamSelector', () => {
 
     renderSelector()
 
-    // selectedTeam should not change — it is already correct
     expect(setSelectedTeam).not.toHaveBeenCalled()
-    // The access-denied modal must appear naming the invalid team and the fallback
     const modal = screen.getByTestId('team-access-denied-modal')
     expect(modal).toBeInTheDocument()
     expect(within(modal).getByText(/OldTeam/)).toBeInTheDocument()
     expect(within(modal).getByText(/Tenant A/)).toBeInTheDocument()
-    // URL must be updated to replace the stale invalid team with the valid one
     expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining('team=Tenant+A'))
     expect(mockReplace).not.toHaveBeenCalledWith(expect.stringContaining('OldTeam'))
   })
 })
-

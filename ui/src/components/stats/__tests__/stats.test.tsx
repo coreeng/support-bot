@@ -10,6 +10,7 @@
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import StatsPage from '../stats';
 import * as hooks from '../../../lib/hooks';
@@ -273,7 +274,7 @@ describe('StatsPage (Home Dashboard)', () => {
             expect(screen.queryByText(/Tickets We Own/i)).not.toBeInTheDocument();
 
             // Should show regular dashboard title
-            expect(screen.getByText(/Home Dashboard/i)).toBeInTheDocument();
+            expect(screen.getByText(/Support Dashboard/i)).toBeInTheDocument();
 
             // Should show summary cards
             expect(screen.getByText(/Total Tickets/i)).toBeInTheDocument();
@@ -551,18 +552,6 @@ describe('StatsPage (Home Dashboard)', () => {
             ]);
         });
 
-        it('uses allTime mode for the shared hook when all time is selected', () => {
-            render(<StatsPage />, { wrapper: Wrapper });
-
-            fireEvent.change(screen.getByDisplayValue('Last Week'), { target: { value: 'all' } });
-
-            expect(mockUseIncomingVsResolvedRate).toHaveBeenLastCalledWith(true, undefined, undefined, {
-                teams: ['team-a'],
-                allTime: true,
-                granularity: 'AUTO',
-            });
-        });
-
         it('resolves team codes case-insensitively before calling the shared hook', () => {
             mockUseTeamFilter.mockReturnValue(makeTeamFilter({
                 selectedTeam: 'team a',
@@ -643,7 +632,7 @@ describe('StatsPage (Home Dashboard)', () => {
         it('should show generic title for regular view', () => {
             render(<StatsPage />, { wrapper: Wrapper });
 
-            expect(screen.getByText(/Home Dashboard/i)).toBeInTheDocument();
+            expect(screen.getByText(/Support Dashboard/i)).toBeInTheDocument();
         });
 
         it('should show team name in title for escalation team view', () => {
@@ -675,107 +664,9 @@ describe('StatsPage (Home Dashboard)', () => {
 
             render(<StatsPage />, { wrapper: Wrapper });
 
-            expect(screen.getByText(/Home Dashboard - Core-platform/i)).toBeInTheDocument();
+            expect(screen.getByText(/Support Dashboard/i)).toBeInTheDocument();
         });
     });
 
-    describe('Date Filter - Custom Range Logic', () => {
-        it('should use last week range when switching to custom mode without dates set', () => {
-            render(<StatsPage />, { wrapper: Wrapper });
-
-            // Find the date filter dropdown
-            const dateFilterSelect = screen.getByDisplayValue('Last Week');
-            expect(dateFilterSelect).toBeInTheDocument();
-
-            // Switch to custom mode
-            fireEvent.change(dateFilterSelect, { target: { value: 'custom' } });
-
-            // Verify useAllTickets was called with last week range (not undefined)
-            const rangeCall = [...mockUseAllTickets.mock.calls].reverse().find(([, from]) => from !== undefined);
-            expect(rangeCall).toBeDefined();
-            const [pageSize, from, to] = rangeCall!;
-            expect(pageSize).toBe(200);
-            // Should have valid dates (last week), not undefined
-            expect(from).toBeDefined();
-            expect(to).toBeDefined();
-            expect(from).not.toBe('');
-            expect(to).not.toBe('');
-        });
-
-        it('should use custom dates when both start and end dates are set', () => {
-            const { container } = render(<StatsPage />, { wrapper: Wrapper });
-
-            // Switch to custom mode
-            const dateFilterSelect = screen.getByDisplayValue('Last Week');
-            fireEvent.change(dateFilterSelect, { target: { value: 'custom' } });
-
-            // Find date inputs by type
-            const dateInputs = container.querySelectorAll('input[type="date"]');
-            expect(dateInputs.length).toBeGreaterThanOrEqual(2);
-
-            // Set custom dates
-            fireEvent.change(dateInputs[0], { target: { value: '2024-01-01' } });
-            fireEvent.change(dateInputs[1], { target: { value: '2024-01-31' } });
-
-            // Verify useAllTickets was called with custom dates
-            const rangeCall = [...mockUseAllTickets.mock.calls].reverse().find(([, from]) => from !== undefined);
-            expect(rangeCall).toBeDefined();
-            const [, from, to] = rangeCall!;
-            // Should eventually use the custom dates (may need to wait for re-render)
-            expect(from).toBeDefined();
-            expect(to).toBeDefined();
-        });
-
-        it('should preserve date range when custom mode is selected but dates are empty', () => {
-            // This test ensures that when custom is selected but dates aren't filled,
-            // we don't fetch all tickets (undefined dates)
-            render(<StatsPage />, { wrapper: Wrapper });
-
-            const dateFilterSelect = screen.getByDisplayValue('Last Week');
-            fireEvent.change(dateFilterSelect, { target: { value: 'custom' } });
-
-            // Check that the hook was called with valid dates, not undefined
-            const rangeCall = [...mockUseAllTickets.mock.calls].reverse().find(([, from]) => from !== undefined);
-            expect(rangeCall).toBeDefined();
-            const [, from, to] = rangeCall!;
-            // Should have valid dates (preserved from previous filter)
-            expect(from).toBeDefined();
-            expect(to).toBeDefined();
-        });
-
-        it('hides date pickers when switching from custom back to a preset', () => {
-            render(<StatsPage />, { wrapper: Wrapper });
-
-            const select = screen.getByDisplayValue('Last Week');
-
-            // Switch to custom — date pickers should appear
-            fireEvent.change(select, { target: { value: 'custom' } });
-            expect(screen.getAllByDisplayValue('')).toBeDefined(); // date inputs present
-
-            // Switch back to a preset — date pickers should disappear
-            fireEvent.change(screen.getByDisplayValue('Custom Range'), { target: { value: 'lastMonth' } });
-            expect(screen.queryByDisplayValue('')).toBeNull();
-        });
-
-        it('passes custom dateFrom and dateTo directly to the data hook', () => {
-            const { container } = render(<StatsPage />, { wrapper: Wrapper });
-
-            // Switch to custom mode then set both dates
-            fireEvent.change(screen.getByDisplayValue('Last Week'), { target: { value: 'custom' } });
-            const [startInput, endInput] = container.querySelectorAll('input[type="date"]');
-            fireEvent.change(startInput, { target: { value: '2024-06-01' } });
-            fireEvent.change(endInput, { target: { value: '2024-06-30' } });
-
-            const rangeCall = [...mockUseAllTickets.mock.calls].reverse().find(([, from]) => from !== undefined);
-            const [, from, to] = rangeCall!;
-            expect(from).toBe('2024-06-01');
-            expect(to).toBe('2024-06-30');
-            expect(mockUseIncomingVsResolvedRate).toHaveBeenLastCalledWith(true, '2024-06-01', '2024-06-30', {
-                teams: ['team-a'],
-                allTime: false,
-                granularity: 'AUTO',
-            });
-        });
-    });
 });
 

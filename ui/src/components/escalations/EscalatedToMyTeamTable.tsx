@@ -6,6 +6,12 @@ import { useEscalations, useRegistry } from '@/lib/hooks'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeamFilter } from '@/contexts/TeamFilterContext'
 import { useNow } from '@/hooks/useNow'
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SingleSelectFilter } from '@/components/ui/single-select-filter'
 
 export default function EscalatedToMyTeamTable() {
     const { isEscalationTeam, actualEscalationTeams } = useAuth()
@@ -160,7 +166,7 @@ export default function EscalatedToMyTeamTable() {
         const mins = minutes % 60
         return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
     }
-    const getDurationColor = (minutes: number) => minutes < 30 ? 'text-green-700' : minutes < 120 ? 'text-yellow-700' : 'text-indigo-700 font-semibold'
+    const getDurationColor = (minutes: number) => minutes < 30 ? 'text-success' : minutes < 120 ? 'text-warning' : 'text-destructive font-semibold'
 
     // Don't show if not in escalation team OR not viewing escalations team specifically (after all hooks)
     if (!isEscalationTeam || !isViewingEscalationsOnly) {
@@ -168,105 +174,90 @@ export default function EscalatedToMyTeamTable() {
     }
 
     if (isLoading) return <p>Loading...</p>
-    if (error) return <p className="text-red-500">Error loading escalations</p>
+    if (error) return <p className="text-destructive">Error loading escalations</p>
+
+    const ANY_DATE = '__any'
+    const fromAny = (v: string) => (v === ANY_DATE ? '' : v)
+    const toAny = (v: string) => (v === '' ? ANY_DATE : v)
 
     return (
-        <div className="space-y-6 bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
-            <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-purple-900">Escalated to My Team</h2>
-                <span className="text-sm text-gray-600">{filteredEscalations.length} total</span>
-            </div>
-
-            {/* Filters */}
-            <div className="flex gap-4 flex-wrap">
+        <div className="space-y-4 rounded-xl border bg-card p-6">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h2 className="text-base font-semibold text-foreground">Escalated to My Team</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">Escalations routed to your team for handling</p>
+                </div>
                 <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">Date:</label>
-                    <select
-                        value={dateFilter}
-                        onChange={e => { setDateFilter(e.target.value as DateFilter); setPageIndex(0) }}
-                        className="p-2 border rounded bg-white"
+                    <Select
+                        value={toAny(dateFilter)}
+                        onValueChange={(v) => { setDateFilter(fromAny(v) as DateFilter); setPageIndex(0) }}
                     >
-                        <option value="">Any Date</option>
-                        <option value="lastWeek">Last Week</option>
-                        <option value="last2Weeks">Last 2 Weeks</option>
-                        <option value="lastMonth">Last Month</option>
-                        <option value="custom">Custom Range</option>
-                    </select>
+                        <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ANY_DATE}>Any Date</SelectItem>
+                            <SelectItem value="lastWeek">Last Week</SelectItem>
+                            <SelectItem value="last2Weeks">Last 2 Weeks</SelectItem>
+                            <SelectItem value="lastMonth">Last Month</SelectItem>
+                            <SelectItem value="custom">Custom Range</SelectItem>
+                        </SelectContent>
+                    </Select>
                     {dateFilter === 'custom' && (
                         <>
-                            <input
-                                type="date"
-                                aria-label="Date filter start"
-                                value={customDateRange.start || ''}
-                                onChange={e => { setCustomDateRange(r => ({ ...r, start: e.target.value })); setPageIndex(0) }}
-                                className="p-2 border rounded text-sm bg-white"
-                            />
-                            <span className="text-gray-500 text-sm">to</span>
-                            <input
-                                type="date"
-                                aria-label="Date filter end"
-                                value={customDateRange.end || ''}
-                                onChange={e => { setCustomDateRange(r => ({ ...r, end: e.target.value })); setPageIndex(0) }}
-                                className="p-2 border rounded text-sm bg-white"
-                            />
+                            <Input type="date" aria-label="Date filter start"
+                                   value={customDateRange.start || ''}
+                                   onChange={e => { setCustomDateRange(r => ({ ...r, start: e.target.value })); setPageIndex(0) }}
+                                   className="w-[150px]"/>
+                            <Input type="date" aria-label="Date filter end"
+                                   value={customDateRange.end || ''}
+                                   onChange={e => { setCustomDateRange(r => ({ ...r, end: e.target.value })); setPageIndex(0) }}
+                                   className="w-[150px]"/>
                         </>
                     )}
                 </div>
-                <div>
-                    <label className="text-sm font-medium text-gray-700 mr-2">Status:</label>
-                    <select 
-                        value={statusFilter} 
-                        onChange={e => { setStatusFilter(e.target.value as 'all' | 'ongoing' | 'resolved'); setPageIndex(0) }}
-                        className="p-2 border rounded bg-white"
-                    >
-                        <option value="all">All</option>
-                        <option value="ongoing">Ongoing</option>
-                        <option value="resolved">Resolved</option>
-                    </select>
-                </div>
-                <div>
-                    <label className="text-sm font-medium text-gray-700 mr-2">Impact:</label>
-                    <select 
-                        value={impactFilter} 
-                        onChange={e => { setImpactFilter(e.target.value); setPageIndex(0) }}
-                        className="p-2 border rounded bg-white"
-                    >
-                        <option value="all">All</option>
-                        {registryData?.impacts?.map((impact: { code: string; label: string }) => (
-                            <option key={impact.code} value={impact.code}>{impact.label}</option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <label className="text-sm font-medium text-gray-700 mr-2">Tag:</label>
-                    <select
-                        value={tagFilter}
-                        onChange={e => { setTagFilter(e.target.value); setPageIndex(0) }}
-                        className="p-2 border rounded bg-white"
-                    >
-                        <option value="">All Tags</option>
-                        {registryData?.tags?.map((tag: { code: string; label: string }) => (
-                            <option key={tag.code} value={tag.code}>{tag.label}</option>
-                        ))}
-                    </select>
-                </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+                <SingleSelectFilter
+                    title="Status"
+                    value={statusFilter !== 'all' ? statusFilter : undefined}
+                    onChange={(v) => { setStatusFilter((v ?? 'all') as 'all' | 'ongoing' | 'resolved'); setPageIndex(0) }}
+                    showSearch={false}
+                    options={[
+                        { label: 'Ongoing', value: 'ongoing' },
+                        { label: 'Resolved', value: 'resolved' },
+                    ]}
+                />
+                <SingleSelectFilter
+                    title="Impact"
+                    value={impactFilter !== 'all' ? impactFilter : undefined}
+                    onChange={(v) => { setImpactFilter(v ?? 'all'); setPageIndex(0) }}
+                    options={(registryData?.impacts ?? []).map((impact: { code: string; label: string }) => ({
+                        label: impact.label, value: impact.code,
+                    }))}
+                />
+                <SingleSelectFilter
+                    title="Tag"
+                    value={tagFilter || undefined}
+                    onChange={(v) => { setTagFilter(v ?? ''); setPageIndex(0) }}
+                    options={(registryData?.tags ?? []).map((tag: { code: string; label: string }) => ({
+                        label: tag.label, value: tag.code,
+                    }))}
+                />
             </div>
 
             {/* Top 5 Tags */}
             {topTags.length > 0 && (
                 <div>
-                    <h3 className="text-sm font-semibold text-purple-700 uppercase tracking-wide mb-2">Top 5 Tags</h3>
+                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Top 5 Tags</h3>
                     <div className="flex flex-col gap-1.5">
-                        {topTags.map(({ tag, count }, idx) => {
+                        {topTags.map(({ tag, count }) => {
                             const maxCount = topTags[0].count
                             const widthPercent = Math.min(100, (count / maxCount) * 100)
-                            const palette = ['from-purple-500 to-purple-400', 'from-pink-400 to-pink-300', 'from-violet-500 to-indigo-400', 'from-fuchsia-500 to-pink-400', 'from-rose-500 to-pink-400']
-                            const bgColor = palette[idx % palette.length]
                             return (
                                 <div key={tag} className="flex items-center gap-3">
-                                    <span className="shrink-0 bg-purple-100 text-purple-800 text-xs font-semibold px-2 py-0.5 rounded">{tag}</span>
-                                    <div className="flex-1 h-4 rounded-full overflow-hidden bg-gray-200">
-                                        <div className={`h-4 rounded-full bg-gradient-to-r ${bgColor} flex items-center justify-end pr-2 text-white font-semibold text-xs transition-all duration-500`} style={{ width: `${widthPercent}%` }}>
+                                    <Badge variant="outline" className="shrink-0">{tag}</Badge>
+                                    <div className="flex-1 h-4 rounded-full overflow-hidden bg-muted">
+                                        <div className="h-4 rounded-full bg-primary flex items-center justify-end pr-2 text-primary-foreground font-mono font-semibold text-xs tabular-nums transition-all duration-500" style={{ width: `${widthPercent}%` }}>
                                             {count}
                                         </div>
                                     </div>
@@ -279,37 +270,37 @@ export default function EscalatedToMyTeamTable() {
 
             {/* Table */}
             {filteredEscalations.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No escalations found for your team.</p>
+                <p className="text-muted-foreground text-center py-8">No escalations found for your team.</p>
             ) : (
                 <>
-                    <div className="overflow-x-auto border rounded-lg shadow-sm bg-white">
+                    <div className="overflow-x-auto border rounded-lg bg-card">
                         <table className="min-w-full divide-y">
-                            <thead className="bg-purple-100">
+                            <thead className="bg-muted">
                                 <tr>
                                     {(() => {
                                         const SortableHeader = ({ col, label }: { col: SortColumn; label: string }) => (
                                             <th
-                                                className="px-4 py-2 text-left text-xs font-bold text-purple-900 uppercase cursor-pointer select-none hover:bg-purple-200 transition-colors"
+                                                className="px-4 py-2 text-left text-xs font-bold text-foreground uppercase cursor-pointer select-none hover:bg-muted/70 transition-colors"
                                                 onClick={() => handleSort(col)}
                                             >
-                                                <span className="flex items-center gap-1">
+                                                <span className="inline-flex items-center gap-1">
                                                     {label}
-                                                    <span className="text-purple-400">
-                                                        {sortColumn === col ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
-                                                    </span>
+                                                    {sortColumn === col
+                                                        ? (sortDirection === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />)
+                                                        : <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />}
                                                 </span>
                                             </th>
                                         )
                                         return (
                                             <>
                                                 <SortableHeader col="ticketId" label="Ticket ID" />
-                                                <th className="px-4 py-2 text-left text-xs font-bold text-purple-900 uppercase">Status</th>
-                                                <th className="px-4 py-2 text-left text-xs font-bold text-purple-900 uppercase">Impact</th>
+                                                <th className="px-4 py-2 text-left text-xs font-bold text-foreground uppercase">Status</th>
+                                                <th className="px-4 py-2 text-left text-xs font-bold text-foreground uppercase">Impact</th>
                                                 <SortableHeader col="openedAt" label="Opened" />
                                                 <SortableHeader col="resolvedAt" label="Resolved" />
                                                 <SortableHeader col="duration" label="Duration" />
-                                                <th className="px-4 py-2 text-left text-xs font-bold text-purple-900 uppercase">Tags</th>
-                                                <th className="px-4 py-2 text-left text-xs font-bold text-purple-900 uppercase">Thread</th>
+                                                <th className="px-4 py-2 text-left text-xs font-bold text-foreground uppercase">Tags</th>
+                                                <th className="px-4 py-2 text-left text-xs font-bold text-foreground uppercase">Thread</th>
                                             </>
                                         )
                                     })()}
@@ -320,10 +311,10 @@ export default function EscalatedToMyTeamTable() {
                                     const durationMs = esc.openedAt ? (esc.resolvedAt ? new Date(esc.resolvedAt).getTime() : now) - new Date(esc.openedAt).getTime() : 0
                                     const durationMinutes = Math.floor(durationMs / 1000 / 60)
                                     return (
-                                        <tr key={esc.id} className="hover:bg-purple-50 transition-colors">
+                                        <tr key={esc.id} className="hover:bg-accent transition-colors">
                                             <td className="px-4 py-2 text-sm font-medium">{esc.ticketId}</td>
                                             <td className="px-4 py-2">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${esc.resolvedAt ? 'bg-green-200 text-green-800' : 'bg-yellow-200 text-yellow-800'}`}>
+                                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${esc.resolvedAt ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning'}`}>
                                                     {esc.resolvedAt ? 'Resolved' : 'Ongoing'}
                                                 </span>
                                             </td>
@@ -334,7 +325,7 @@ export default function EscalatedToMyTeamTable() {
                                             <td className="px-4 py-2 text-sm">{esc.resolvedAt ? formatDate(esc.resolvedAt) : 'Ongoing'}</td>
                                             <td className={`px-4 py-2 text-sm ${getDurationColor(durationMinutes)}`}>{formatDuration(esc.openedAt, esc.resolvedAt ?? undefined)}</td>
                                             <td className="px-4 py-2 text-sm">
-                                                {esc.tags?.length ? esc.tags.map((tag, i) => <span key={i} className="bg-purple-100 text-purple-800 text-xs font-semibold px-2 py-0.5 rounded mr-1">{tag}</span>) : '-'}
+                                                {esc.tags?.length ? esc.tags.map((tag, i) => <Badge key={i} variant="outline" className="mr-1">{tag}</Badge>) : '-'}
                                             </td>
                                             <td className="px-4 py-2 text-sm">
                                                 {esc.hasThread ? (
@@ -342,7 +333,7 @@ export default function EscalatedToMyTeamTable() {
                                                         href={`/api/escalations/${esc.id}/permalink`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="text-blue-600 hover:underline"
+                                                        className="text-link hover:underline"
                                                     >
                                                         View
                                                     </a>
@@ -357,24 +348,24 @@ export default function EscalatedToMyTeamTable() {
 
                     {/* Pagination */}
                     {filteredEscalations.length > pageSize && (
-                        <div className="flex justify-between items-center">
-                            <button
-                                className="px-4 py-2 bg-purple-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700"
+                        <div className="flex items-center justify-between gap-4">
+                            <Button
+                                variant="outline"
                                 onClick={() => setPageIndex(prev => Math.max(0, prev - 1))}
                                 disabled={pageIndex === 0}
                             >
                                 Previous
-                            </button>
-                            <span className="text-sm text-gray-600">
+                            </Button>
+                            <span className="text-sm text-muted-foreground">
                                 Page {pageIndex + 1} of {totalPages}
                             </span>
-                            <button
-                                className="px-4 py-2 bg-purple-600 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700"
+                            <Button
+                                variant="outline"
                                 onClick={() => setPageIndex(prev => Math.min(totalPages - 1, prev + 1))}
                                 disabled={pageIndex >= totalPages - 1}
                             >
                                 Next
-                            </button>
+                            </Button>
                         </div>
                     )}
                 </>

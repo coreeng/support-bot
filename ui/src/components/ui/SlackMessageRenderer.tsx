@@ -41,9 +41,9 @@ export const SlackMessageRenderer: React.FC<SlackMessageRendererProps> = ({ text
             if (segment.type === 'codeblock') {
                 // Render code block
                 elements.push(
-                    <pre 
+                    <pre
                         key={`codeblock-${segmentIdx}`}
-                        className="bg-gray-900 text-gray-100 p-4 rounded-md overflow-x-auto font-mono text-sm my-2 border border-gray-700"
+                        className="bg-muted text-foreground p-3 rounded-md overflow-x-auto font-mono text-sm my-2 border"
                     >
                         <code>{segment.content}</code>
                     </pre>
@@ -75,9 +75,9 @@ export const SlackMessageRenderer: React.FC<SlackMessageRendererProps> = ({ text
             
             // Add inline code
             elements.push(
-                <code 
+                <code
                     key={`inline-${keyCounter++}`}
-                    className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded font-mono text-sm border border-gray-200"
+                    className="bg-muted text-foreground px-1.5 py-0.5 rounded font-mono text-sm border"
                 >
                     {match[1]}
                 </code>
@@ -119,7 +119,7 @@ export const SlackMessageRenderer: React.FC<SlackMessageRendererProps> = ({ text
     const renderedContent = parseMessage(text)
 
     return (
-        <div className={`text-gray-700 leading-relaxed ${className}`}>
+        <div className={`text-foreground leading-relaxed ${className}`}>
             {renderedContent}
         </div>
     )
