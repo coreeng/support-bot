@@ -2,6 +2,7 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import { expect, Route, Page } from '@playwright/test';
 import { CustomWorld } from './custom-world';
 import { mockAuthorizationEndpoints } from '../helpers/auth-mocks';
+import { selectShadcnOption, selectDropdownMenuItem, readSortDirection } from '../helpers/shadcn';
 
 const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
@@ -28,7 +29,7 @@ const getMainEscalationsSection = (page: Page) => page.locator('[data-testid="es
 const clearEscalationsDateFilter = async (page: Page) => {
     const dateFilter = page.locator('[data-testid="escalations-date-filter"]');
     if (await dateFilter.isVisible().catch(() => false)) {
-        await dateFilter.selectOption('');
+        await selectShadcnOption(page, dateFilter, /Any Date/i);
         await page.waitForTimeout(300);
     }
 };
@@ -372,18 +373,18 @@ When('user logs in and selects {string} from dropdown', async function (this: Cu
     await this.page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 });
     
     await this.page.getByRole('button', { name: /Support/i }).first().waitFor({ state: 'visible', timeout: 10000 });
-    
-    // Select team from dropdown if needed (use data-testid to avoid matching date filter dropdown)
-    const dropdown = this.page.locator('select[data-testid="team-selector"]');
-    if (await dropdown.isVisible()) {
-        await dropdown.selectOption(teamName);
+
+    // The team selector is now a Radix DropdownMenu rendered as a Button.
+    const dropdown = this.page.locator('[data-testid="team-selector-trigger"]');
+    if (await dropdown.isVisible().catch(() => false)) {
+        await selectDropdownMenuItem(this.page, dropdown, new RegExp(teamName, 'i'));
         await this.page.waitForTimeout(500);
     }
 });
 
 When('user switches to {string} from dropdown', async function (this: CustomWorld, teamName: string) {
-    const dropdown = this.page.locator('select[data-testid="team-selector"]');
-    await dropdown.selectOption(teamName);
+    const dropdown = this.page.locator('[data-testid="team-selector-trigger"]');
+    await selectDropdownMenuItem(this.page, dropdown, new RegExp(teamName, 'i'));
     await this.page.waitForTimeout(500);
 });
 
@@ -408,52 +409,33 @@ When('user views the {string} dashboard', async function (this: CustomWorld, das
 });
 
 When('user filters escalations by status {string}', async function (this: CustomWorld, status: string) {
-    const statusFilter = this.page.locator('[data-testid="escalations-status-filter"]');
-    await statusFilter.waitFor({ state: 'visible', timeout: 10000 });
-    await statusFilter.selectOption(status);
+    const trigger = getMainEscalationsSection(this.page).getByRole('button', { name: /Status/i }).first();
+    await selectShadcnOption(this.page, trigger, new RegExp(status, 'i'));
     await this.page.waitForTimeout(500);
 });
 
 When('user filters escalations by impact {string}', async function (this: CustomWorld, impact: string) {
-    const impactFilter = this.page.locator('[data-testid="escalations-impact-filter"]');
-    await impactFilter.waitFor({ state: 'visible', timeout: 10000 });
-    await impactFilter.selectOption(impact);
+    const trigger = getMainEscalationsSection(this.page).getByRole('button', { name: /Impact/i }).first();
+    await selectShadcnOption(this.page, trigger, new RegExp(impact, 'i'));
     await this.page.waitForTimeout(500);
 });
 
 When('user filters escalations by team {string}', async function (this: CustomWorld, teamName: string) {
-    const teamFilter = this.page.locator('[data-testid="escalations-team-filter"]');
-    await teamFilter.waitFor({ state: 'visible', timeout: 10000 });
-    const target = teamName.trim().toLowerCase();
-    const options = await teamFilter.locator('option').evaluateAll((els) =>
-        els.map((el) => ({
-            label: (el.textContent || '').trim(),
-            value: (el as HTMLOptionElement).value
-        }))
-    );
-    const match = options.find(option =>
-        option.label.toLowerCase() === target || option.value.toLowerCase() === target
-    );
-    if (match) {
-        await teamFilter.selectOption(match.value);
-    } else {
-        throw new Error(`Escalation team option "${teamName}" not found. Available: ${options.map(o => `${o.label}(${o.value})`).join(', ')}`);
-    }
+    const trigger = getMainEscalationsSection(this.page).getByRole('button', { name: /Team/i }).first();
+    await selectShadcnOption(this.page, trigger, new RegExp(teamName, 'i'));
     await this.page.waitForTimeout(500);
 });
 
 When('user filters escalations by tag {string}', async function (this: CustomWorld, tag: string) {
-    const tagFilter = this.page.locator('[data-testid="escalations-tag-filter"]');
-    await tagFilter.waitFor({ state: 'visible', timeout: 10000 });
-    await tagFilter.selectOption(tag);
+    const trigger = getMainEscalationsSection(this.page).getByRole('button', { name: /Tag/i }).first();
+    await selectShadcnOption(this.page, trigger, new RegExp(tag, 'i'));
     await this.page.waitForTimeout(500);
 });
 
 When('user sorts escalations by {string}', async function (this: CustomWorld, columnName: string) {
     const header = getMainEscalationsSection(this.page).locator('thead th').filter({ hasText: new RegExp(`^${columnName}\\b`, 'i') }).first();
     await header.waitFor({ state: 'visible', timeout: 5000 });
-    const text = (await header.textContent()) || '';
-    if (!text.includes('↓')) {
+    if ((await readSortDirection(header)) !== 'desc') {
         await header.click();
         await this.page.waitForTimeout(400);
     }
@@ -481,15 +463,13 @@ Then('user should see escalation metrics in the handling section', async functio
 });
 
 Then('user should see status filter for escalations', async function (this: CustomWorld) {
-    // Check for select elements (filters) in the escalations dashboard
-    const selects = await this.page.locator('select').all();
-    expect(selects.length).toBeGreaterThan(1); // Should have team selector + escalation filters
+    const trigger = getMainEscalationsSection(this.page).getByRole('button', { name: /Status/i }).first();
+    await expect(trigger).toBeVisible({ timeout: 5000 });
 });
 
 Then('user should see impact filter for escalations', async function (this: CustomWorld) {
-    // Check for select elements (filters) in the escalations dashboard
-    const selects = await this.page.locator('select').all();
-    expect(selects.length).toBeGreaterThan(1); // Should have team selector + escalation filters
+    const trigger = getMainEscalationsSection(this.page).getByRole('button', { name: /Impact/i }).first();
+    await expect(trigger).toBeVisible({ timeout: 5000 });
 });
 
 Then('user should only see regular home dashboard', async function (this: CustomWorld) {
@@ -551,9 +531,7 @@ Then('user should only see escalations with tag {string}', async function (this:
 Then('escalations should be sorted by {string} in {string} order', async function (this: CustomWorld, columnName: string, direction: string) {
     const header = getMainEscalationsSection(this.page).locator('thead th').filter({ hasText: new RegExp(`^${columnName}\\b`, 'i') }).first();
     await header.waitFor({ state: 'visible', timeout: 5000 });
-    const text = (await header.textContent()) || '';
-    const expectedArrow = direction.toLowerCase() === 'asc' ? '↑' : '↓';
-    expect(text).toContain(expectedArrow);
+    expect(await readSortDirection(header)).toBe(direction.toLowerCase());
 });
 
 Then('user should have full access to all teams', async function (this: CustomWorld) {

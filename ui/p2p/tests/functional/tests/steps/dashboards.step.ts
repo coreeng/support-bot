@@ -1,6 +1,7 @@
 import { Then, Given, When } from "@cucumber/cucumber";
 import { expect } from "@playwright/test";
 import { CustomWorld } from "./custom-world";
+import { selectShadcnOption, expectShadcnSelectValue, clickTab } from "../helpers/shadcn";
 
 const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
@@ -179,7 +180,7 @@ Given("User navigates to the dashboards page", async function (this: CustomWorld
   await expect(slaDashboardButton).toBeVisible({ timeout: 5000 });
   await slaDashboardButton.click();
 
-  const responseSLATab = this.page.getByRole('button', { name: /Response SLAs/i }).first();
+  const responseSLATab = this.page.getByRole('tab', { name: /Response SLAs/i }).first();
   await expect(responseSLATab).toBeVisible({ timeout: 8000 });
 });
 
@@ -197,20 +198,21 @@ Then("The page subtitle should contain {string}", async function (this: CustomWo
 // Date filter assertions
 // The SLA dashboard now uses a <select> picklist instead of individual buttons.
 Then("Date filter options should be visible", async function (this: CustomWorld) {
-  // Verify the date-filter select (not buttons) is visible with the expected options.
   const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
   await expect(dateSelect).toBeVisible({ timeout: 15000 });
-  await expect(dateSelect.locator('option[value="lastWeek"]')).toHaveCount(1);
-  await expect(dateSelect.locator('option[value="lastMonth"]')).toHaveCount(1);
-  await expect(dateSelect.locator('option[value="lastYear"]')).toHaveCount(1);
-  await expect(dateSelect.locator('option[value="custom"]')).toHaveCount(1);
+  // Open the Radix Select once and verify the expected options render in the listbox.
+  await dateSelect.click();
+  for (const label of ['Last Week', 'Last Month', 'Last Year', 'Custom']) {
+    await expect(this.page.getByRole('option', { name: new RegExp(label, 'i') })).toBeVisible({ timeout: 5000 });
+  }
+  await this.page.keyboard.press('Escape');
 });
 
 Then("Date filter option {string} should be available", async function (this: CustomWorld, filterName: string) {
-  // Verify the corresponding <option> exists in the date-filter select.
-  const value = filterNameToValue(filterName);
   const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
-  await expect(dateSelect.locator(`option[value="${value}"]`)).toHaveCount(1);
+  await dateSelect.click();
+  await expect(this.page.getByRole('option', { name: new RegExp(filterName, 'i') })).toBeVisible({ timeout: 5000 });
+  await this.page.keyboard.press('Escape');
 });
 
 Then("Date range inputs should be visible", async function (this: CustomWorld) {
@@ -223,10 +225,10 @@ Then("Date range inputs should be visible", async function (this: CustomWorld) {
 // Tab assertions
 Then("All tab sections should be visible", async function (this: CustomWorld) {
   // Check that all tab buttons are visible
-  const responseSLATab = this.page.getByRole('button', { name: /Response SLAs/i });
-  const resolutionSLATab = this.page.getByRole('button', { name: /Resolution SLAs/i });
-  const escalationSLATab = this.page.getByRole('button', { name: /Escalation SLAs/i });
-  const weeklyTrendsTab = this.page.getByRole('button', { name: /Weekly Trends/i });
+  const responseSLATab = this.page.getByRole('tab', { name: /Response SLAs/i });
+  const resolutionSLATab = this.page.getByRole('tab', { name: /Resolution SLAs/i });
+  const escalationSLATab = this.page.getByRole('tab', { name: /Escalation SLAs/i });
+  const weeklyTrendsTab = this.page.getByRole('tab', { name: /Weekly Trends/i });
 
   await expect(responseSLATab).toBeVisible({ timeout: 15000 });
   await expect(resolutionSLATab).toBeVisible({ timeout: 15000 });
@@ -235,36 +237,41 @@ Then("All tab sections should be visible", async function (this: CustomWorld) {
 });
 
 Then("Response SLAs tab should be visible", async function (this: CustomWorld) {
-  const tab = this.page.getByRole('button', { name: /Response SLAs/i });
+  const tab = this.page.getByRole('tab', { name: /Response SLAs/i });
   await expect(tab).toBeVisible({ timeout: 15000 });
 });
 
 Then("Resolution SLAs tab should be visible", async function (this: CustomWorld) {
-  const tab = this.page.getByRole('button', { name: /Resolution SLAs/i });
+  const tab = this.page.getByRole('tab', { name: /Resolution SLAs/i });
   await expect(tab).toBeVisible({ timeout: 15000 });
 });
 
 Then("Escalation SLAs tab should be visible", async function (this: CustomWorld) {
-  const tab = this.page.getByRole('button', { name: /Escalation SLAs/i });
+  const tab = this.page.getByRole('tab', { name: /Escalation SLAs/i });
   await expect(tab).toBeVisible({ timeout: 15000 });
 });
 
 Then("Weekly Trends tab should be visible", async function (this: CustomWorld) {
-  const tab = this.page.getByRole('button', { name: /Weekly Trends/i });
+  const tab = this.page.getByRole('tab', { name: /Weekly Trends/i });
   await expect(tab).toBeVisible({ timeout: 15000 });
 });
 
 // Tab interactions
 Given("Response SLAs tab is active by default", async function (this: CustomWorld) {
   // The first tab (Response SLAs) should be active by default
-  const responseTab = this.page.getByRole('button', { name: /Response SLAs/i });
+  const responseTab = this.page.getByRole('tab', { name: /Response SLAs/i });
   await expect(responseTab).toBeVisible({ timeout: 15000 });
 });
 
 When("User clicks on {string} tab", async function (this: CustomWorld, tabName: string) {
-  const tab = this.page.getByRole('button', { name: new RegExp(tabName, 'i') });
-  await tab.click({ force: true, timeout: 10000 });
-  // Wait for potential content render
+  // Page-level navigation tabs are now sidebar links; SLA section tabs are Radix Tabs (role="tab").
+  const sectionTab = this.page.getByRole('tab', { name: new RegExp(tabName, 'i') });
+  if ((await sectionTab.count()) > 0) {
+    await sectionTab.click({ timeout: 10000 });
+  } else {
+    const navLink = this.page.getByRole('link', { name: new RegExp(tabName, 'i') });
+    await navLink.click({ timeout: 10000 });
+  }
   await this.page.waitForTimeout(3500);
 });
 
@@ -348,29 +355,23 @@ Then("Dashboard content should be visible or show loading state", async function
 // The SLA dashboard uses a <select> picklist; "selecting a filter" means choosing
 // the matching option via filterNameToValue.
 When("User selects {string} date filter", async function (this: CustomWorld, filterName: string) {
-  const value = filterNameToValue(filterName);
   const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
-  await dateSelect.selectOption(value);
+  await selectShadcnOption(this.page, dateSelect, new RegExp(filterName, 'i'));
   await this.page.waitForTimeout(500);
 });
 
 Then("{string} should be the selected date filter", async function (this: CustomWorld, buttonName: string) {
-  // "Active" now means the select has this value selected.
-  const value = filterNameToValue(buttonName);
   const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
-  await expect(dateSelect).toHaveValue(value, { timeout: 5000 });
+  await expectShadcnSelectValue(dateSelect, new RegExp(buttonName, 'i'));
 });
 
 Then("Other date filter options should not be selected", async function (this: CustomWorld) {
-  // Verified implicitly by the preceding assertion.
   expect(true).toBeTruthy();
 });
 
 Then("{string} should not be the selected date filter", async function (this: CustomWorld, buttonName: string) {
-  const value = filterNameToValue(buttonName);
   const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
-  const currentValue = await dateSelect.inputValue();
-  expect(currentValue).not.toBe(value);
+  await expect(dateSelect).not.toContainText(new RegExp(buttonName, 'i'));
 });
 
 When("User sets start date to {string}", async function (this: CustomWorld, date: string) {

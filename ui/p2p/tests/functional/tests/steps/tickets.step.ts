@@ -1,6 +1,7 @@
 import { Given, When, Then } from "@cucumber/cucumber";
 import { expect } from "@playwright/test";
 import { CustomWorld } from "./custom-world";
+import { selectShadcnOption, readSortDirection } from "../helpers/shadcn";
 
 const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
@@ -338,17 +339,16 @@ When("User navigates to the tickets page", async function (this: CustomWorld) {
 
 // Actions
 When("User selects {string} from status filter", async function (this: CustomWorld, status: string) {
-    // Wait for tickets table to be visible first (ensures data is loaded)
     await this.page.locator('table').waitFor({ state: 'visible', timeout: 5000 });
+    await this.page.waitForTimeout(500); // React hydration
 
-    // Status filter is the second select (after date filter)
-    // Use a more specific selector to target the status filter
-    const statusFilter = this.page.locator('select').filter({ hasText: 'All Status' });
-    await statusFilter.waitFor({ state: 'visible', timeout: 5000 });
-    await this.page.waitForTimeout(500); // Wait for React hydration
-
-    await statusFilter.selectOption(status);
-    // Wait for React to re-render with filtered data
+    // SingleSelectFilter renders a button trigger labelled "Status".
+    const statusFilter = this.page.getByRole('button', { name: /Status/i }).first();
+    // Map the legacy values opened/closed to the labels the new picker shows.
+    const optionLabel = status.toLowerCase() === 'opened' ? /Opened/i
+        : status.toLowerCase() === 'closed' ? /Closed/i
+        : new RegExp(status, 'i');
+    await selectShadcnOption(this.page, statusFilter, optionLabel);
     await this.page.waitForTimeout(2000);
 });
 
@@ -375,17 +375,15 @@ When("User clicks on the first ticket", async function (this: CustomWorld) {
 
 When("User selects {string} from escalated to filter", async function (this: CustomWorld, teamName: string) {
     await this.page.locator('table').waitFor({ state: 'visible', timeout: 5000 });
-    const escalatedToFilter = this.page.locator('select').filter({ hasText: 'Escalated To' }).first();
-    await escalatedToFilter.waitFor({ state: 'visible', timeout: 5000 });
-    await escalatedToFilter.selectOption(teamName);
+    const escalatedToFilter = this.page.getByRole('button', { name: /Escalated To/i }).first();
+    await selectShadcnOption(this.page, escalatedToFilter, new RegExp(teamName, 'i'));
     await this.page.waitForTimeout(800);
 });
 
 When("User sorts tickets by opened at", async function (this: CustomWorld) {
     await this.page.locator('table').waitFor({ state: 'visible', timeout: 5000 });
     const openedHeader = this.page.locator('thead th', { hasText: 'Opened At' });
-    const openedHeaderText = (await openedHeader.textContent()) || '';
-    if (!openedHeaderText.includes('↓')) {
+    if ((await readSortDirection(openedHeader)) !== 'desc') {
         await openedHeader.click();
     }
     await this.page.waitForTimeout(500);
@@ -398,8 +396,7 @@ When("User toggles opened at sort", async function (this: CustomWorld) {
 
 When("User sorts tickets by closed at", async function (this: CustomWorld) {
     const closedHeader = this.page.locator('thead th', { hasText: 'Closed At' });
-    const closedHeaderText = (await closedHeader.textContent()) || '';
-    if (!closedHeaderText.includes('↓')) {
+    if ((await readSortDirection(closedHeader)) !== 'desc') {
         await closedHeader.click();
     }
     await this.page.waitForTimeout(500);
@@ -673,48 +670,34 @@ When('User changes ticket status to {string}', async function (this: CustomWorld
     const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
     await expect(modal).toBeVisible({ timeout: 5000 });
 
-    // Use the first select in the modal (Change Status is the first select)
-    let statusSelect = modal.locator('select').first();
-
-    await expect(statusSelect).toBeVisible({ timeout: 5000 });
-    await statusSelect.selectOption(status);
+    const statusTrigger = modal.locator('#status-select');
+    await selectShadcnOption(this.page, statusTrigger, new RegExp(status, 'i'));
 });
 
 When('User selects impact {string}', async function (this: CustomWorld, impact: string) {
     const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    let impactSelect = modal.locator('#impact-select');
-    if (await impactSelect.count() === 0) {
-        impactSelect = modal.locator('label:has-text("Impact")').locator('..').locator('select').first();
-    }
-    await expect(impactSelect).toBeVisible({ timeout: 5000 });
-    await impactSelect.selectOption(impact);
+    const impactTrigger = modal.locator('#impact-select');
+    await selectShadcnOption(this.page, impactTrigger, new RegExp(impact, 'i'));
 });
 
 When('User selects team {string}', async function (this: CustomWorld, team: string) {
     const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
     const teamTrigger = modal.locator('#team-select');
-    await expect(teamTrigger).toBeVisible({ timeout: 5000 });
-
-    // Click the combobox trigger to open the popover
-    await teamTrigger.click();
-
-    // Wait for the popover to appear and click the matching team option (case-insensitive)
-    const teamOption = this.page.locator('[data-radix-popper-content-wrapper]').getByText(team, { exact: false });
-    await expect(teamOption.first()).toBeVisible({ timeout: 5000 });
-    await teamOption.first().click();
+    await selectShadcnOption(this.page, teamTrigger, new RegExp(team, 'i'));
 });
 
 When('User adds tag {string}', async function (this: CustomWorld, tag: string) {
     const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    let tagSelect = modal.locator('#tags-select');
-    if (await tagSelect.count() === 0) {
-        tagSelect = modal.locator('label:has-text("Tags")').locator('..').locator('select').last();
-    }
-    await expect(tagSelect).toBeVisible({ timeout: 5000 });
-
-    // Wait a moment for options to populate, then select
-    await this.page.waitForTimeout(1000);
-    await tagSelect.selectOption(tag);
+    const tagsTrigger = modal.locator('#tags-select');
+    await expect(tagsTrigger).toBeVisible({ timeout: 5000 });
+    await this.page.waitForTimeout(500);
+    // MultiSelect opens a popover with checkbox options on click.
+    await tagsTrigger.click();
+    const option = this.page.getByRole('option', { name: new RegExp(tag, 'i') });
+    await option.first().waitFor({ state: 'visible', timeout: 5000 });
+    await option.first().click();
+    // Close the popover so the next click target is reachable.
+    await this.page.keyboard.press('Escape');
 });
 
 When('User clicks {string}', async function (this: CustomWorld, buttonText: string) {

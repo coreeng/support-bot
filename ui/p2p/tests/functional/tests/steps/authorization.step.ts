@@ -14,6 +14,7 @@ import {
     getLeadershipEmailsForPersona,
     getSupportEmailsForPersona
 } from '../helpers/personas';
+import { selectDropdownMenuItem } from '../helpers/shadcn';
 
 const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
@@ -182,21 +183,15 @@ When('user {string} logs in', async function (this: CustomWorld, email: string) 
 });
 
 When('user selects {string} from team dropdown', async function (this: CustomWorld, teamName: string) {
-    // Try to locate the team selector; if not present, skip (user may already be scoped)
-    // Use data-testid to reliably find the team selector (not the date filter dropdown)
-    const dropdown = this.page.locator('select[data-testid="team-selector"]');
-    const found = await dropdown.count();
-    if (found === 0) return;
+    const dropdown = this.page.locator('[data-testid="team-selector-trigger"]');
+    if (!(await dropdown.isVisible().catch(() => false))) return;
 
-    const rendered = await dropdown.isVisible();
-    if (!rendered) return;
-
-    await dropdown.selectOption(teamName);
+    await selectDropdownMenuItem(this.page, dropdown, new RegExp(teamName, 'i'));
     await this.page.waitForTimeout(3000);
 
-    const selectedValue = await dropdown.inputValue();
-    if (selectedValue !== teamName) {
-        throw new Error(`Team selection failed: expected ${teamName}, got ${selectedValue}`);
+    const triggerLabel = (await dropdown.textContent())?.toLowerCase() ?? '';
+    if (!triggerLabel.includes(teamName.toLowerCase())) {
+        throw new Error(`Team selection failed: trigger shows "${triggerLabel}", expected "${teamName}"`);
     }
 });
 
@@ -223,7 +218,7 @@ Then('user should see {string} section', async function (this: CustomWorld, sect
     await this.page.waitForTimeout(2500);
     // Debug helpers
     const sessionData = await this.page.evaluate(() => fetch('/api/auth/session').then(r => r.json()).catch(() => null));
-    const selectedTeam = await this.page.locator('select[data-testid="team-selector"]').evaluate((el: HTMLSelectElement) => el.value).catch(() => null);
+    const selectedTeam = (await this.page.locator('[data-testid="team-selector-trigger"]').textContent().catch(() => null))?.trim() ?? null;
     const pageContent = await this.page.content();
     const escalationsTeamsResp = await this.page.evaluate(() => fetch('/team?type=escalation').then(r => r.json()).catch(() => null));
     const section = this.page.getByText(sectionText);
@@ -268,7 +263,7 @@ Then('user should see {string} table', async function (this: CustomWorld, tableT
     });
     
     // Debug: Check selected team from dropdown
-    const selectedTeam = await this.page.locator('select[data-testid="team-selector"]').evaluate((el: HTMLSelectElement) => el.value).catch(() => null);
+    const selectedTeam = (await this.page.locator('[data-testid="team-selector-trigger"]').textContent().catch(() => null))?.trim() ?? null;
     
     // Debug: Check if component rendered at all
     const pageContent = await this.page.content();

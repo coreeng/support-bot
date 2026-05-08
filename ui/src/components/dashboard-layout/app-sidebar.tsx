@@ -117,13 +117,13 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:p-1.5!">
               <Link href="/">
                 {state === "collapsed" ? (
-                  <Image src="/favicon.ico" alt="Support Bot" width={20} height={20} priority />
+                  <Image src="/favicon.ico" alt="Core Community" width={20} height={20} priority />
                 ) : (
                   <>
                     <Image
                       src="/logo-dark.png"
                       className="hidden dark:block"
-                      alt="Support Bot"
+                      alt="Core Community"
                       width={170}
                       height={20}
                       priority
@@ -131,7 +131,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
                     <Image
                       src="/logo.png"
                       className="block dark:hidden"
-                      alt="Support Bot"
+                      alt="Core Community"
                       width={170}
                       height={20}
                       priority
