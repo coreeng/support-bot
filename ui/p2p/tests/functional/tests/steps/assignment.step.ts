@@ -401,9 +401,8 @@ When("user selects {string} from assignee filter", async function (
     this: CustomWorld,
     assignee: string
 ) {
-    // The "From" dropdown sits next to the "From:" label in the bulk reassign section.
-    const fromLabel = this.page.locator('label').filter({ hasText: 'From:' });
-    const fromSelect = fromLabel.locator('..').getByRole('button').first();
+    // The bulk reassign "From" dropdown is a shadcn Select with id="bulk-from".
+    const fromSelect = this.page.locator('#bulk-from');
     await selectShadcnOption(this.page, fromSelect, new RegExp(assignee, 'i'));
     await this.page.waitForTimeout(300);
 });
@@ -412,8 +411,7 @@ When("user selects {string} as reassign target", async function (
     this: CustomWorld,
     assignee: string
 ) {
-    const toLabel = this.page.locator('label').filter({ hasText: 'To:' });
-    const toSelect = toLabel.locator('..').getByRole('button').first();
+    const toSelect = this.page.locator('#bulk-to');
     await selectShadcnOption(this.page, toSelect, new RegExp(assignee, 'i'));
     await this.page.waitForTimeout(300);
 });

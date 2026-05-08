@@ -16,7 +16,11 @@ export async function selectShadcnOption(page: Page, trigger: Locator, optionNam
     await trigger.click();
     const option = page.getByRole('option', { name: optionName });
     await option.first().waitFor({ state: 'visible', timeout: 5000 });
-    await option.first().click();
+    // cmdk re-renders option rows as keyboard-focus shifts (data-selected toggles),
+    // which makes Playwright's stability check repeatedly retry until the element
+    // detaches. force:true skips the stability check; the option is still visible
+    // and clickable, just animating its selected state.
+    await option.first().click({ force: true });
 }
 
 /** Read the visible text shown in a Radix Select trigger button. */
