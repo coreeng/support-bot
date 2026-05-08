@@ -524,7 +524,9 @@ Then("bulk reassign count should show {string}", async function (
     this: CustomWorld,
     expectedCount: string
 ) {
-    const countText = this.page.getByText(new RegExp(`${expectedCount}\\s*ticket`, 'i'));
+    // The badge renders "{n} open ticket{s}", so allow any words between the count
+    // and "ticket" (the previous regex required them to be adjacent).
+    const countText = this.page.getByText(new RegExp(`\\b${expectedCount}\\b[^\\d]*ticket`, 'i'));
     await expect(countText).toBeVisible({ timeout: 5000 });
 });
 
