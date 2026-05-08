@@ -5,6 +5,10 @@ plugins {
 subprojects {
     apply(plugin = "com.diffplug.spotless")
 
+    dependencyLocking {
+        lockAllConfigurations()
+    }
+
     configure<com.diffplug.gradle.spotless.SpotlessExtension> {
         java {
             target("src/*/java/**/*.java")
