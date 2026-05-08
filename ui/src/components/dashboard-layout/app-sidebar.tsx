@@ -25,7 +25,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useAuth } from "@/hooks/useAuth";
 import { useTeamFilter } from "@/contexts/TeamFilterContext";
 import { useKnowledgeGapsEnabled, useTenantInsightsEnabled } from "@/lib/hooks";
 
@@ -82,7 +81,6 @@ const SUPPORT_TABS: SupportTab[] = [
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const { state } = useSidebar();
-  useAuth();
   const { hasFullAccess } = useTeamFilter();
   const { data: isKnowledgeGapsEnabled } = useKnowledgeGapsEnabled();
   const { data: isTenantInsightsEnabled } = useTenantInsightsEnabled();

@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ModeToggle } from "@/components/ui/mode-toggle";
@@ -78,9 +77,12 @@ export function SiteHeader() {
         <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
         <div className="hidden md:block">{renderBreadcrumb(pathname)}</div>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
+          {/* `Button asChild` would forward props to ModeToggle's root, but that root is
+              a Radix DropdownMenu (not a DOM element), so the responsive class would be
+              dropped. Wrap with a real div instead. */}
+          <div className="hidden sm:flex">
             <ModeToggle />
-          </Button>
+          </div>
           <TeamSelector />
           <UserDropdown />
         </div>

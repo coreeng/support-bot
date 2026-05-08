@@ -13,7 +13,7 @@ export function ScatterChart({
  title, 
  data, 
  yAxisLabel = 'Minutes',
- color = '#3B82F6',
+ color = 'var(--chart-1)',
  isLoading 
 }: ScatterChartProps) {
  return (

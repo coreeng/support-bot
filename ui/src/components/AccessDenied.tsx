@@ -34,7 +34,7 @@ export function AccessDenied() {
  </p>
  <button
  onClick={logout}
- className="inline-flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted text-foreground rounded-lg transition-colors text-sm font-medium"
+ className="inline-flex items-center gap-2 px-4 py-2 bg-muted hover:bg-accent text-foreground rounded-lg transition-colors text-sm font-medium"
  >
  <LogOut className="w-4 h-4" />
  Sign in with a different account

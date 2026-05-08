@@ -9,7 +9,7 @@ interface HistogramChartProps {
  color?: string
 }
 
-export function HistogramChart({ title, data, isLoading, color = '#3B82F6' }: HistogramChartProps) {
+export function HistogramChart({ title, data, isLoading, color = 'var(--chart-1)' }: HistogramChartProps) {
  return (
  <div className="bg-card rounded-xl p-6 border">
  <h2 className="text-base font-semibold text-foreground mb-4">

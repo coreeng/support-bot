@@ -73,6 +73,61 @@ describe('MetricCard', () => {
     })
 
     describe('Color Schemes', () => {
+        const valueClassFor = (colorScheme: 'blue' | 'orange' | 'green' | 'purple' | 'cyan' | 'red'): string => {
+            const { container } = render(
+                <MetricCard title="Test" value={42} colorScheme={colorScheme} />
+            )
+            const valueNode = container.querySelector('.font-mono') as HTMLElement
+            return valueNode.className
+        }
+
+        it('applies the info token for blue (default) scheme', () => {
+            expect(valueClassFor('blue')).toContain('text-info')
+        })
+
+        it('applies the warning token for orange scheme', () => {
+            expect(valueClassFor('orange')).toContain('text-warning')
+        })
+
+        it('applies the success token for green scheme', () => {
+            expect(valueClassFor('green')).toContain('text-success')
+        })
+
+        it('applies the foreground token for purple scheme', () => {
+            expect(valueClassFor('purple')).toContain('text-foreground')
+        })
+
+        it('applies the info token for cyan scheme', () => {
+            expect(valueClassFor('cyan')).toContain('text-info')
+        })
+
+        it('applies the destructive token for red scheme', () => {
+            expect(valueClassFor('red')).toContain('text-destructive')
+        })
+
+        it('renders the value with mono / tabular-nums for consistent alignment', () => {
+            const className = valueClassFor('blue')
+            expect(className).toContain('font-mono')
+            expect(className).toContain('tabular-nums')
+        })
+    })
+
+    describe('Icon', () => {
+        it('renders the icon when provided', () => {
+            render(
+                <MetricCard
+                    title="Test"
+                    value={42}
+                    icon={<span data-testid="metric-icon" />}
+                />
+            )
+            expect(screen.getByTestId('metric-icon')).toBeInTheDocument()
+        })
+
+        it('does not render an icon slot when icon prop is omitted', () => {
+            const { container } = render(<MetricCard title="Test" value={42} />)
+            expect(container.querySelector('[data-testid="metric-icon"]')).toBeNull()
+        })
     })
 
     describe('Edge Cases', () => {
