@@ -129,12 +129,16 @@ ticket:
       key: ${TICKET_ASSIGNMENT_ENCRYPTION_KEY:}
 
 pr-review-tracking:
-  enabled: false
+  enabled: true
   poll-cron: 0 0 9-18 * * 1-5
-  pr-emoji: pr                           # Slack emoji name added to the message when a PR is detected
+  pr-emoji: mag                          # Slack emoji name added to the message when a PR is detected
   tags: PR                               # Required when enabled: tag codes from enums.tags, applied when the bot auto-closes a ticket
   impact: Information Request            # Required when enabled: impact code from enums.impacts, applied when the bot auto-closes a ticket
-  repositories: [ ]
+  repositories:
+    - name: alexandrosvagkidas/support-bot-pr-track-sandbox
+      owning-team: support-team
+      sla:
+        default: 48h
   # Example repository entries:
   #   - name: my-org/my-repo
   #     owning-team: <team-code from enums.escalation-teams>
@@ -186,6 +190,9 @@ enums:
     - label: connected-app
       code: connected-app
       group-ref: "slack:S08948NBMED"
+    - label: support-team
+      code: support-team
+      slack-group-id: S0B2CC1EBQU
   tags:
     - label: Ingresses
       code: ingresses
@@ -203,6 +210,8 @@ enums:
       code: dns
     - label: Osprey
       code: osprey
+    - label: Pull Request
+      code: PR
   impacts:
     - label: Production Blocking
       code: productionBlocking
@@ -210,6 +219,8 @@ enums:
       code: bauBlocking
     - label: Abnormal Behaviour
       code: abnormalBehaviour
+    - label: Information Request
+      code: Information Request
 
 platform-integration:
   enabled: true
@@ -238,6 +249,9 @@ platform-integration:
         - connected-app1@test.com
         - connected-app2@test.com
         - connected-app3@test.com
+      support-group:
+        - support1@test.com
+        - support2@test.com
   azure:
     enabled: false
     client:
@@ -259,6 +273,8 @@ platform-integration:
           group-ref: infra-group
         - name: connected-app
           group-ref: connected-app-group
+        - name: support-team
+          group-ref: support-group
     core-platform:
       enabled: false
     k8s-generic:
