@@ -17,6 +17,7 @@ val safeDependencyVersions =
         "net.minidev:json-smart" to "2.5.2",
         "net.sourceforge.pmd:pmd-core" to "7.22.0",
         "org.apache.commons:commons-compress" to "1.26.0",
+        "org.apache.commons:commons-lang3" to "3.18.0",
         "org.apache.httpcomponents.client5:httpclient5" to "5.4.3",
         "org.assertj:assertj-core" to "3.27.7",
         "org.eclipse.jetty:jetty-http" to "12.0.35",
