@@ -27,12 +27,18 @@ class EscalationTeamTest {
     }
 
     @Test
-    void slackMentionId_throwsWhenGroupRefIsNonSlackAndNoOverrideSet() {
-        var team = new EscalationTeam("WoW", "wow", new GroupRef.Google("eng@corp.com"));
-        assertThatThrownBy(team::slackMentionId)
+    void construction_failsFast_whenGroupRefIsNonSlackAndNoOverrideSet() {
+        assertThatThrownBy(() -> new EscalationTeam("WoW", "wow", new GroupRef.Google("eng@corp.com")))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("non-Slack groupRef")
+                .hasMessageContaining("wow")
                 .hasMessageContaining("google:eng@corp.com")
+                .hasMessageContaining("slack-mention-group-id");
+    }
+
+    @Test
+    void construction_failsFast_whenGroupRefIsNonSlackAndOverrideIsBlank() {
+        assertThatThrownBy(() -> new EscalationTeam("WoW", "wow", new GroupRef.Google("eng@corp.com"), "  "))
+                .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("slack-mention-group-id");
     }
 }

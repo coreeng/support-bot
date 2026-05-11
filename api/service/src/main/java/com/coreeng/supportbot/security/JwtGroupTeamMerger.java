@@ -46,9 +46,9 @@ public class JwtGroupTeamMerger {
             if (teamCode == null || teamCode.isBlank()) {
                 continue;
             }
-            List<String> matchValues = mapping.matchValues();
+            String expected = mapping.groupRef().value();
             for (String jwtGroup : rawGroups) {
-                if (!anyClaimValueMatches(matchValues, jwtGroup)) {
+                if (!jwtGroup.equalsIgnoreCase(expected)) {
                     continue;
                 }
                 Team team = teamService.findTeamByCode(teamCode);
@@ -62,18 +62,6 @@ public class JwtGroupTeamMerger {
         }
 
         return out.build();
-    }
-
-    private static boolean anyClaimValueMatches(List<String> claimValues, String jwtGroup) {
-        for (String expected : claimValues) {
-            if (expected == null || expected.isBlank()) {
-                continue;
-            }
-            if (jwtGroup.equalsIgnoreCase(expected)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static List<String> extractGroupStrings(@Nullable Object claim) {

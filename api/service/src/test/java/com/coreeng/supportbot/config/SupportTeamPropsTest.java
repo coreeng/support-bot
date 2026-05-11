@@ -22,4 +22,15 @@ class SupportTeamPropsTest {
                 .hasMessageContaining("must reference a Slack group")
                 .hasMessageContaining("static:wow-group");
     }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void construction_throwsMigrationHint_whenGroupRefIsNull() {
+        GroupRef nullRef = null;
+        assertThatThrownBy(() -> new SupportTeamProps("Support", "support", nullRef))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("team.support.group-ref is required")
+                .hasMessageContaining("slack-group-id")
+                .hasMessageContaining("PT-351");
+    }
 }

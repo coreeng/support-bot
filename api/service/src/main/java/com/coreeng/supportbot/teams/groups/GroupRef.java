@@ -1,6 +1,8 @@
 package com.coreeng.supportbot.teams.groups;
 
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
@@ -124,23 +126,17 @@ public sealed interface GroupRef
     }
 
     private static GroupRef parsePrefixed(String prefix, String value, String raw) {
-        return switch (prefix) {
-            case "slack" -> new Slack(value);
-            case "google" -> new Google(value);
-            case "azure" -> new Azure(value);
-            case "jwt" -> new Jwt(value);
-            case "static" -> new Static(value);
-            default ->
-                throw new GroupRefParseException(
-                        "Unknown GroupRef provider prefix \"" + prefix + "\" in \"" + raw + "\"");
-        };
+        return Provider.fromPrefix(prefix)
+                .map(p -> p.build(value))
+                .orElseThrow(() -> new GroupRefParseException(
+                        "Unknown GroupRef provider prefix \"" + prefix + "\" in \"" + raw + "\""));
     }
 
     /**
      * Legacy parsing path: infers the provider from the shape of an unprefixed string.
      * <p>Exists only for backwards compatibility with pre-PT-351 YAML; new configurations
-     * should use the typed {@code "<provider>:<value>"} form. This path will be removed in
-     * a future release.
+     * should use the typed {@code "<provider>:<value>"} form. Bare-string parsing will be
+     * removed in the release following PT-351.
      */
     private static GroupRef parseLegacyBareString(String raw) {
         GroupRef inferred;
@@ -153,9 +149,9 @@ public sealed interface GroupRef
         } else {
             inferred = new Static(raw);
         }
-        LOGGER.info(
+        LOGGER.warn(
                 "Parsed legacy bare-string GroupRef \"{}\" as {} via shape inference — "
-                        + "migrate to typed form \"{}\".",
+                        + "migrate to typed form \"{}\". Bare-string parsing will be removed in the release following PT-351.",
                 raw,
                 inferred.provider(),
                 inferred.canonical());
@@ -178,20 +174,35 @@ public sealed interface GroupRef
     }
 
     enum Provider {
-        SLACK("slack"),
-        GOOGLE("google"),
-        AZURE("azure"),
-        JWT("jwt"),
-        STATIC("static");
+        SLACK("slack", Slack::new),
+        GOOGLE("google", Google::new),
+        AZURE("azure", Azure::new),
+        JWT("jwt", Jwt::new),
+        STATIC("static", Static::new);
 
         private final String prefix;
+        private final Function<String, GroupRef> factory;
 
-        Provider(String prefix) {
+        Provider(String prefix, Function<String, GroupRef> factory) {
             this.prefix = prefix;
+            this.factory = factory;
         }
 
         public String prefix() {
             return prefix;
+        }
+
+        GroupRef build(String value) {
+            return factory.apply(value);
+        }
+
+        static Optional<Provider> fromPrefix(String prefix) {
+            for (Provider p : values()) {
+                if (p.prefix.equals(prefix)) {
+                    return Optional.of(p);
+                }
+            }
+            return Optional.empty();
         }
     }
 }

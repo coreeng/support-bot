@@ -26,7 +26,7 @@ class PlatformTeamsServiceTest {
     }
 
     private static EscalationTeam escalation(String name) {
-        return new EscalationTeam(name, name, ref("SOME"));
+        return new EscalationTeam(name, name, ref("slack:SOME"));
     }
 
     @Test

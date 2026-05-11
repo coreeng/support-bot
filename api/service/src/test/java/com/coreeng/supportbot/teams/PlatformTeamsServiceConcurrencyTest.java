@@ -35,7 +35,7 @@ class PlatformTeamsServiceConcurrencyTest {
             String teamName = "team-" + i;
             String groupKey = "G" + i;
             teams.add(new PlatformTeamsFetcher.TeamAndGroupTuple(teamName, GroupRef.parse(groupKey)));
-            escalationTeams.add(new EscalationTeam(teamName, teamName, GroupRef.parse("SOME")));
+            escalationTeams.add(new EscalationTeam(teamName, teamName, GroupRef.parse("slack:SOME")));
         }
 
         PlatformTeamsFetcher teamsFetcher = new FakeTeamsFetcher(teams);

@@ -11,4 +11,7 @@
  * handled separately by {@code JwtGroupTeamMerger}. {@link com.coreeng.supportbot.teams.groups.GroupRef}
  * is the shared identifier across both, but the operations stay distinct.
  */
+@NullMarked
 package com.coreeng.supportbot.teams.groups;
+
+import org.jspecify.annotations.NullMarked;

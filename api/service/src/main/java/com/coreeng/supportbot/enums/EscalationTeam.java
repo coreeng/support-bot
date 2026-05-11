@@ -12,11 +12,21 @@ public record EscalationTeam(
         @Nullable String slackMentionGroupId) implements EnumerationValue {
 
     @ConstructorBinding
-    public EscalationTeam {
+    public EscalationTeam(
+            String label, String code, @Nullable GroupRef groupRef, @Nullable String slackMentionGroupId) {
         if (groupRef == null) {
             throw new IllegalStateException("enums.escalation-teams[" + code + "].group-ref is required."
                     + " If you previously used 'slack-group-id', rename it to 'group-ref' (PT-351 migration).");
         }
+        if (!(groupRef instanceof GroupRef.Slack) && (slackMentionGroupId == null || slackMentionGroupId.isBlank())) {
+            throw new IllegalStateException("enums.escalation-teams[" + code + "] has non-Slack group-ref "
+                    + groupRef.canonical()
+                    + " — set 'slack-mention-group-id' to enable Slack mention rendering");
+        }
+        this.label = label;
+        this.code = code;
+        this.groupRef = groupRef;
+        this.slackMentionGroupId = slackMentionGroupId;
     }
 
     public EscalationTeam(String label, String code, GroupRef groupRef) {
@@ -29,17 +39,12 @@ public record EscalationTeam(
 
     /**
      * Returns the raw Slack subteam ID for {@code <!subteam^...>} mention rendering.
-     * Falls back to the {@link GroupRef.Slack} id when {@code slackMentionGroupId} is unset.
-     * Throws when the team has a non-Slack {@code groupRef} and no explicit mention id is configured.
+     * The compact constructor guarantees one of the two branches is satisfied.
      */
     public String slackMentionId() {
         if (slackMentionGroupId != null) {
             return slackMentionGroupId;
         }
-        if (groupRef instanceof GroupRef.Slack slack) {
-            return slack.id();
-        }
-        throw new IllegalStateException("EscalationTeam '" + code + "' has non-Slack groupRef " + groupRef.canonical()
-                + " — set 'slack-mention-group-id' to enable Slack mentions");
+        return ((GroupRef.Slack) groupRef).id();
     }
 }

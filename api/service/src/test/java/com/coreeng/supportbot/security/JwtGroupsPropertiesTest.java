@@ -10,41 +10,25 @@ import org.junit.jupiter.api.Test;
 class JwtGroupsPropertiesTest {
 
     @Test
-    void mapping_typedGroupRef_matchesAgainstClaimValue() {
-        var mapping = new JwtGroupsProperties.Mapping(new GroupRef.Jwt("developers"), "wow", List.of());
-        assertThat(mapping.matchValues()).containsExactly("developers");
-        assertThat(mapping.usingDeprecatedClaimValues()).isFalse();
-    }
-
-    @Test
-    void mapping_legacyClaimValues_stillSupported_butDeprecated() {
-        var mapping = new JwtGroupsProperties.Mapping(List.of("developers", "Developers"), "wow");
-        assertThat(mapping.matchValues()).containsExactly("developers", "Developers");
-        assertThat(mapping.usingDeprecatedClaimValues()).isTrue();
+    void mapping_typedJwtGroupRef_isAccepted() {
+        var mapping = new JwtGroupsProperties.Mapping(new GroupRef.Jwt("developers"), "wow");
+        assertThat(mapping.groupRef()).isEqualTo(new GroupRef.Jwt("developers"));
+        assertThat(mapping.teamCode()).isEqualTo("wow");
     }
 
     @Test
     @SuppressWarnings("NullAway")
-    void mapping_neitherSet_throws() {
-        GroupRef.Jwt nullRef = null;
-        assertThatThrownBy(() -> new JwtGroupsProperties.Mapping(nullRef, "wow", List.of()))
+    void mapping_nullGroupRef_throws() {
+        GroupRef nullRef = null;
+        assertThatThrownBy(() -> new JwtGroupsProperties.Mapping(nullRef, "wow"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("must specify either")
-                .hasMessageContaining("wow");
-    }
-
-    @Test
-    void mapping_bothSet_throws() {
-        assertThatThrownBy(() ->
-                        new JwtGroupsProperties.Mapping(new GroupRef.Jwt("developers"), "wow", List.of("developers")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("both")
+                .hasMessageContaining("must specify 'group-ref'")
                 .hasMessageContaining("wow");
     }
 
     @Test
     void mapping_nonJwtGroupRef_throws() {
-        assertThatThrownBy(() -> new JwtGroupsProperties.Mapping(new GroupRef.Slack("S08948NBMED"), "wow", List.of()))
+        assertThatThrownBy(() -> new JwtGroupsProperties.Mapping(new GroupRef.Slack("S08948NBMED"), "wow"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must use a 'jwt:' prefixed")
                 .hasMessageContaining("slack:S08948NBMED");
