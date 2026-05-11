@@ -81,6 +81,30 @@ class ExtractConnectorsBlockTests(TempOverlayMixin, unittest.TestCase):
         self.assertIn("- type: ldap", result)
         self.assertIn("# inline comment", result)
 
+    def test_stops_capturing_at_sibling_key_under_config(self) -> None:
+        path = self.write_overlay(
+            "with-sibling.yaml",
+            "config:\n"
+            "  connectors:\n"
+            "    - type: ldap\n"
+            "      id: ldap\n"
+            "  staticClients:\n"
+            "    - id: should-not-appear\n",
+        )
+        result = composer.extract_connectors_block(path)
+        self.assertIn("- type: ldap", result)
+        self.assertNotIn("staticClients", result)
+        self.assertNotIn("should-not-appear", result)
+
+    def test_top_level_connectors_without_config_parent_raises(self) -> None:
+        path = self.write_overlay(
+            "no-config.yaml",
+            "connectors:\n  - type: ldap\n    id: ldap\n",
+        )
+        with self.assertRaises(SystemExit) as ctx:
+            composer.extract_connectors_block(path)
+        self.assertIn("config:", str(ctx.exception))
+
 
 class CollectConnectorIdsTests(unittest.TestCase):
     def test_single_id(self) -> None:

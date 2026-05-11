@@ -50,7 +50,7 @@ is_truthy() {
 # Emit per-backend overlay paths to stdout (one per line) based on DEX_*_ENABLED flags.
 select_connector_overlays() {
 	if is_truthy "${DEX_LDAP_ENABLED:-}"; then
-		if [[ "${DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT:-}" == "true" ]]; then
+		if is_truthy "${DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT:-}"; then
 			echo "${DEX_K8S}/values-integration-ldap-plaintext-ephemeral.yaml"
 		else
 			echo "${DEX_K8S}/values-tls.yaml"
@@ -164,18 +164,18 @@ template)
 	helm_template_combo "ldap-tls"        "${DEX_K8S}/values-tls.yaml"
 	helm_template_combo "ldap-plaintext"  "${DEX_K8S}/values-integration-ldap-plaintext-ephemeral.yaml"
 	helm_template_combo "google"          "${DEX_K8S}/values-google.yaml"
-	helm_template_combo "microsoft"       "${DEX_K8S}/values-microsoft.yaml"
-	helm_template_combo "ldap-tls-google" "${DEX_K8S}/values-tls.yaml" "${DEX_K8S}/values-google.yaml"
+	helm_template_combo "microsoft"        "${DEX_K8S}/values-microsoft.yaml"
+	helm_template_combo "google-microsoft" "${DEX_K8S}/values-google.yaml" "${DEX_K8S}/values-microsoft.yaml"
+	helm_template_combo "ldap-tls-google"  "${DEX_K8S}/values-tls.yaml" "${DEX_K8S}/values-google.yaml"
 	helm_template_combo "all-three-tls"   "${DEX_K8S}/values-tls.yaml" "${DEX_K8S}/values-google.yaml" "${DEX_K8S}/values-microsoft.yaml"
 	helm_template_combo "all-three-plain" "${DEX_K8S}/values-integration-ldap-plaintext-ephemeral.yaml" "${DEX_K8S}/values-google.yaml" "${DEX_K8S}/values-microsoft.yaml"
 	;;
 deploy-integration)
-	if is_truthy "${DEX_LDAP_ENABLED:-}" && [[ "${DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT:-}" != "true" ]]; then
-		echo "Refusing to deploy Dex with plaintext LDAP (insecureNoSSL on port 389)." >&2
-		echo "That connector must only be used on disposable integration namespaces." >&2
-		echo "Set DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true to confirm, or unset DEX_LDAP_ENABLED" >&2
-		echo "and use values-tls.yaml via deploy-prod for LDAP/TLS." >&2
-		echo "Repo Makefile target dex-deploy-integration sets this for integration-test infra." >&2
+	if is_truthy "${DEX_LDAP_ENABLED:-}" && ! is_truthy "${DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT:-}"; then
+		echo "deploy-integration only supports LDAP when DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true." >&2
+		echo "  - Set DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true to confirm plaintext on this ephemeral namespace." >&2
+		echo "  - Or unset DEX_LDAP_ENABLED and use deploy-prod for LDAP over TLS." >&2
+		echo "The repo Makefile target dex-deploy-integration sets the confirmation flag for integration-test infra." >&2
 		echo "See api/k8s/dex/README.md and docs/runbooks/auth-dex-ldap.md." >&2
 		exit 1
 	fi
@@ -209,7 +209,7 @@ deploy-integration)
 		"${extra[@]}"
 	;;
 deploy-prod)
-	if [[ "${DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT:-}" == "true" ]]; then
+	if is_truthy "${DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT:-}"; then
 		echo "deploy-prod refuses DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true. Use values-tls.yaml (DEX_LDAP_ENABLED=true with the plaintext flag unset)." >&2
 		exit 1
 	fi
