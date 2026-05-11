@@ -1,31 +1,29 @@
-import { formatTimeBucketLabel, type TimeBucketResolution } from '@/lib/dateRange'
-import type { IncomingVsResolvedGranularity, IncomingVsResolvedRatePoint } from '@/lib/types/dashboard'
+import { formatTimeBucketLabel, type TimeBucketResolution } from "@/lib/dateRange";
+import type { IncomingVsResolvedGranularity, IncomingVsResolvedRatePoint } from "@/lib/types/dashboard";
 
-export function timeBucketResolutionForIncomingVsResolvedGranularity(
-    granularity?: IncomingVsResolvedGranularity
-): TimeBucketResolution {
-    switch (granularity) {
-        case 'HOUR':
-            return 'hour'
-        case 'WEEK':
-            return 'week'
-        case 'DAY':
-        default:
-            if (granularity !== undefined && granularity !== 'DAY') {
-                console.warn(`Unknown IncomingVsResolvedGranularity: ${granularity}, defaulting to day`)
-            }
-            return 'day'
-    }
+export function timeBucketResolutionForIncomingVsResolvedGranularity(granularity?: IncomingVsResolvedGranularity): TimeBucketResolution {
+  switch (granularity) {
+    case "HOUR":
+      return "hour";
+    case "WEEK":
+      return "week";
+    case "DAY":
+    default:
+      if (granularity !== undefined && granularity !== "DAY") {
+        console.warn(`Unknown IncomingVsResolvedGranularity: ${granularity}, defaulting to day`);
+      }
+      return "day";
+  }
 }
 
 export function formatIncomingVsResolvedSeries(
-    points: IncomingVsResolvedRatePoint[],
-    granularity?: IncomingVsResolvedGranularity
+  points: IncomingVsResolvedRatePoint[],
+  granularity?: IncomingVsResolvedGranularity
 ): IncomingVsResolvedRatePoint[] {
-    const resolution = timeBucketResolutionForIncomingVsResolvedGranularity(granularity)
+  const resolution = timeBucketResolutionForIncomingVsResolvedGranularity(granularity);
 
-    return points.map(point => ({
-        ...point,
-        time: formatTimeBucketLabel(point.time, resolution),
-    }))
+  return points.map((point) => ({
+    ...point,
+    time: formatTimeBucketLabel(point.time, resolution),
+  }));
 }

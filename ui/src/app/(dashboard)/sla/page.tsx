@@ -1,9 +1,12 @@
-'use client'
+"use client";
 
-import DashboardsPage from '@/components/dashboards/dashboards'
-import { RequireDashboardAccess } from '@/components/AccessDenied'
+import { RequireDashboardAccess } from "@/components/AccessDenied";
+import DashboardsPage from "@/components/dashboards/dashboards";
 
 export default function SLA() {
-  return <RequireDashboardAccess><DashboardsPage /></RequireDashboardAccess>
+  return (
+    <RequireDashboardAccess>
+      <DashboardsPage />
+    </RequireDashboardAccess>
+  );
 }
-

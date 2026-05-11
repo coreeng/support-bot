@@ -63,7 +63,7 @@
   --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: #005E33;
+  --primary: #005e33;
   --primary-foreground: oklch(0.97 0.014 254.604);
   --secondary: #46a079;
   --secondary-foreground: oklch(0.97 0.014 254.604);
@@ -81,20 +81,20 @@
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
   --ring: var(--primary);
-  --chart-1: #0088FE;
-  --chart-2: #00C49F;
-  --chart-3: #FFBB28;
-  --chart-4: #A28EFF;
+  --chart-1: #0088fe;
+  --chart-2: #00c49f;
+  --chart-3: #ffbb28;
+  --chart-4: #a28eff;
   --chart-5: var(--color-rose-600);
   --chart-6: var(--color-cyan-600);
   --chart-7: #f97316;
-  --chart-8: #33CC99;
+  --chart-8: #33cc99;
   --chart-9: #7c3aed;
-  --chart-10: #FF6699;
+  --chart-10: #ff6699;
   --chart-11: #84cc16;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary:var(--primary);
+  --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: oklch(0.967 0.001 286.375);
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
@@ -127,16 +127,16 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: var(--primary);
-  --chart-1: #0088FE;
-  --chart-2: #00C49F;
-  --chart-3: #FFBB28;
-  --chart-4: #A28EFF;
+  --chart-1: #0088fe;
+  --chart-2: #00c49f;
+  --chart-3: #ffbb28;
+  --chart-4: #a28eff;
   --chart-5: var(--color-rose-400);
   --chart-6: var(--color-cyan-400);
   --chart-7: #f97316;
-  --chart-8: #33CC99;
+  --chart-8: #33cc99;
   --chart-9: #7c3aed;
-  --chart-10: #FF6699;
+  --chart-10: #ff6699;
   --chart-11: #84cc16;
   --sidebar: oklch(0.21 0.006 285.885);
   --sidebar-foreground: oklch(0.985 0 0);
@@ -159,28 +159,65 @@
 
 /* support-bot animations preserved from previous globals.css */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-.animate-fadeIn { animation: fadeIn 0.3s ease-in-out; }
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-in-out;
+}
 
 @keyframes gradient-xy {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
 }
 @keyframes blob {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
 }
-.animate-gradient-xy { background-size: 400% 400%; animation: gradient-xy 15s ease infinite; }
-.animate-blob { animation: blob 7s infinite; }
-.animation-delay-2000 { animation-delay: 2s; }
-.animation-delay-4000 { animation-delay: 4s; }
-.animate-fade-in { animation: fadeIn 0.8s ease-out; }
+.animate-gradient-xy {
+  background-size: 400% 400%;
+  animation: gradient-xy 15s ease infinite;
+}
+.animate-blob {
+  animation: blob 7s infinite;
+}
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+.animate-fade-in {
+  animation: fadeIn 0.8s ease-out;
+}
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
-.animate-shimmer { animation: shimmer 2s infinite linear; }
+.animate-shimmer {
+  animation: shimmer 2s infinite linear;
+}

@@ -1,8 +1,4 @@
-import {
-  backendFetch,
-  unauthorizedResponse,
-  errorResponse,
-} from "../../_lib/backend-fetch";
+import { backendFetch, errorResponse, unauthorizedResponse } from "../../_lib/backend-fetch";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -12,10 +8,7 @@ export async function GET(request: Request) {
   if (team) params.append("team", team);
   const query = params.toString();
 
-  const response = await backendFetch(
-    request,
-    `/tenant-insights/in-flight-prs${query ? `?${query}` : ""}`
-  );
+  const response = await backendFetch(request, `/tenant-insights/in-flight-prs${query ? `?${query}` : ""}`);
   if (!response) return unauthorizedResponse();
 
   if (!response.ok) {

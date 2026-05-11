@@ -1,8 +1,6 @@
 "use client";
 
-import { Separator } from "@/components/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { ModeToggle } from "@/components/ui/mode-toggle";
+import TeamSelector from "@/components/TeamSelector";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -11,12 +9,14 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import Link from "next/link";
-import React from "react";
-import { usePathname } from "next/navigation";
+import { ModeToggle } from "@/components/ui/mode-toggle";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Home } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import React from "react";
 import { UserDropdown } from "./user-dropdown";
-import TeamSelector from "@/components/TeamSelector";
 
 const SEGMENT_LABELS: Record<string, string> = {
   tickets: "Tickets",

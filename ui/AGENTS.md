@@ -4,15 +4,23 @@
 
 Use **yarn** for all package operations. Do not use npm or pnpm.
 
+## Formatting
+
+**Always run `yarn format` after every UI change.** No exceptions — every edit to anything under `ui/` ends with `yarn format`, even one-line tweaks.
+
+`yarn build` runs `yarn format:check` first and fails fast if any file is not formatted, so unformatted code will not pass CI. Run `yarn format` locally to fix.
+
 ## Validation commands
 
 Run these before committing:
 
-| Command | Purpose |
-|---------|---------|
-| `yarn lint` | ESLint |
-| `yarn test` | Jest |
-| `yarn build` | Next.js production build (catches type errors) |
+| Command             | Purpose                                                     |
+| ------------------- | ----------------------------------------------------------- |
+| `yarn format`       | Prettier (must be run after every change)                   |
+| `yarn format:check` | Prettier check (also runs automatically as part of `build`) |
+| `yarn lint`         | ESLint                                                      |
+| `yarn test`         | Jest                                                        |
+| `yarn build`        | Next.js production build (runs `format:check` + type check) |
 
 ---
 
@@ -39,22 +47,22 @@ Same rule for raw hex (`#3b82f6`, `#22c55e`, etc.) — these break in dark mode.
 
 **Use these tokens instead:**
 
-| Purpose | Token |
-|---|---|
-| Page background | `bg-background` |
-| Card surface | `bg-card` (paired with `border` and `text-card-foreground`) |
-| Subtle surface | `bg-muted` (text on it: `text-muted-foreground`) |
-| Primary text | `text-foreground` |
-| Secondary / helper text | `text-muted-foreground` |
-| Brand color | `bg-primary` / `text-primary` / `text-primary-foreground` |
-| Success | `bg-success` / `text-success` (use `bg-success/10` or `/15` for tints) |
-| Warning | `bg-warning` / `text-warning` |
-| Destructive / error | `bg-destructive` / `text-destructive` |
-| Info | `bg-info` / `text-info` |
-| Border | `border` (uses `--border`) — do NOT add a second `border` class with no side modifier |
-| Input border | `border border-input` |
-| Focus ring | `ring-ring` |
-| Recharts series | `var(--chart-1)` … `var(--chart-11)` (NOT raw hex) |
+| Purpose                 | Token                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------- |
+| Page background         | `bg-background`                                                                       |
+| Card surface            | `bg-card` (paired with `border` and `text-card-foreground`)                           |
+| Subtle surface          | `bg-muted` (text on it: `text-muted-foreground`)                                      |
+| Primary text            | `text-foreground`                                                                     |
+| Secondary / helper text | `text-muted-foreground`                                                               |
+| Brand color             | `bg-primary` / `text-primary` / `text-primary-foreground`                             |
+| Success                 | `bg-success` / `text-success` (use `bg-success/10` or `/15` for tints)                |
+| Warning                 | `bg-warning` / `text-warning`                                                         |
+| Destructive / error     | `bg-destructive` / `text-destructive`                                                 |
+| Info                    | `bg-info` / `text-info`                                                               |
+| Border                  | `border` (uses `--border`) — do NOT add a second `border` class with no side modifier |
+| Input border            | `border border-input`                                                                 |
+| Focus ring              | `ring-ring`                                                                           |
+| Recharts series         | `var(--chart-1)` … `var(--chart-11)` (NOT raw hex)                                    |
 
 For tints use slash opacity: `bg-success/10`, `bg-destructive/15`, etc.
 
@@ -64,15 +72,15 @@ For tints use slash opacity: `bg-success/10`, `bg-destructive/15`, etc.
 
 Native HTML elements styled by hand drift visually. Always reach for the shadcn equivalent:
 
-| Don't use | Use |
-|---|---|
-| `<select>` | `Select` (`@/components/ui/select`) |
-| `<input type="text">` | `Input` (`@/components/ui/input`) |
-| `<button>` | `Button` (`@/components/ui/button`) |
-| Custom flex tabs | `Tabs` / `TabsList` / `TabsTrigger` / `TabsContent` |
-| `<table>` chrome | `Table` / `TableHeader` / `TableBody` / `TableHead` / `TableRow` / `TableCell` |
-| Hand-rolled checklist filter | `MultiSelect` |
-| Hand-rolled single picklist filter | `SingleSelectFilter` |
+| Don't use                          | Use                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| `<select>`                         | `Select` (`@/components/ui/select`)                                            |
+| `<input type="text">`              | `Input` (`@/components/ui/input`)                                              |
+| `<button>`                         | `Button` (`@/components/ui/button`)                                            |
+| Custom flex tabs                   | `Tabs` / `TabsList` / `TabsTrigger` / `TabsContent`                            |
+| `<table>` chrome                   | `Table` / `TableHeader` / `TableBody` / `TableHead` / `TableRow` / `TableCell` |
+| Hand-rolled checklist filter       | `MultiSelect`                                                                  |
+| Hand-rolled single picklist filter | `SingleSelectFilter`                                                           |
 
 `Button` always carries one of: `variant="default" | "outline" | "ghost" | "secondary" | "destructive"` and `size="sm" | "default" | "lg" | "icon"`. Add `cursor-pointer` to anything clickable that's not already a `Button` (e.g. table-header `th` cells used for sort).
 
@@ -125,8 +133,8 @@ Every top-level page renders inside `SidebarInset` (already wired). Inside the p
 Every card is a flat tokenized panel — no gradients, no shadows, no `ring-1`, no hand-picked colors:
 
 ```tsx
-<div className="rounded-xl border bg-card p-6">
-  <h2 className="text-base font-semibold text-foreground mb-4">{Title}</h2>
+<div className="bg-card rounded-xl border p-6">
+  <h2 className="text-foreground mb-4 text-base font-semibold">{Title}</h2>
   {/* body */}
 </div>
 ```
@@ -140,14 +148,12 @@ Every card is a flat tokenized panel — no gradients, no shadows, no `ring-1`, 
 For numeric KPI tiles, the established pattern is:
 
 ```tsx
-<div className="relative overflow-hidden rounded-xl border bg-card p-6">
-  <div className="absolute -top-4 -right-4 w-24 h-24 rounded-full bg-{accent}/15" />
-  <div className="absolute -bottom-6 -right-6 w-20 h-20 rounded-full bg-{accent}/15" />
+<div className="bg-card relative overflow-hidden rounded-xl border p-6">
+  <div className="bg-{accent}/15 absolute -top-4 -right-4 h-24 w-24 rounded-full" />
+  <div className="bg-{accent}/15 absolute -right-6 -bottom-6 h-20 w-20 rounded-full" />
   <div className="relative">
-    <p className="text-sm font-medium text-muted-foreground mb-2">{Label}</p>
-    <p className="font-mono text-3xl font-semibold tracking-tight tabular-nums text-{semanticOrForeground}">
-      {value}
-    </p>
+    <p className="text-muted-foreground mb-2 text-sm font-medium">{Label}</p>
+    <p className="text-{semanticOrForeground} font-mono text-3xl font-semibold tracking-tight tabular-nums">{value}</p>
   </div>
 </div>
 ```
@@ -173,7 +179,7 @@ Use the shadcn `Table` family (`@/components/ui/table`). The base `TableHead` al
 If you can't use `Table` for a specific reason and must drop to a raw `<table>`, the headers MUST still match:
 
 ```tsx
-<th className="px-4 py-2 text-left text-xs font-bold text-foreground uppercase">{Label}</th>
+<th className="text-foreground px-4 py-2 text-left text-xs font-bold uppercase">{Label}</th>
 ```
 
 - Header background: `bg-muted` (on `<thead>` or `TableHeader`).
@@ -230,13 +236,13 @@ Footer buttons: `<DialogFooter>` with `Button` variants (`outline` for cancel, `
 
 ## 11. Spacing rhythm
 
-| Context | Spacing |
-|---|---|
-| Outer page body | `space-y-6` |
-| Tabs wrapper | `space-y-4` |
-| TabsContent | `space-y-6` |
-| Card padding | `p-6` (chart cards), `p-5` rare exception |
-| Card heading → body | `mb-4` (between `<h2>` and the chart/table/value) |
+| Context                  | Spacing                                                                |
+| ------------------------ | ---------------------------------------------------------------------- |
+| Outer page body          | `space-y-6`                                                            |
+| Tabs wrapper             | `space-y-4`                                                            |
+| TabsContent              | `space-y-6`                                                            |
+| Card padding             | `p-6` (chart cards), `p-5` rare exception                              |
+| Card heading → body      | `mb-4` (between `<h2>` and the chart/table/value)                      |
 | Stack of cards in a grid | `gap-4` for `grid-cols-N gap-4`; `gap-6` for prominent two-up sections |
 
 ## 12. Animations
