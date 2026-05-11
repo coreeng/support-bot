@@ -53,6 +53,11 @@ enums:
     - label: Abnormal Behaviour
       code: abnormalBehaviour
 
+# NFT does not exercise PR tracking; opt out so the base config's enabled=true
+# (kept on for sandbox dogfood) doesn't drag NFT into requiring a GitHub token.
+pr-review-tracking:
+  enabled: false
+
 team:
   support:
     name: Core Support
