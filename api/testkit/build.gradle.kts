@@ -43,7 +43,7 @@ dependencies {
 
     // Testing utilities
     api("org.awaitility:awaitility:4.3.+")
-    api("org.assertj:assertj-core:3.27.+")
+    api("org.assertj:assertj-core:3.27.7")
 
     // WireMock
     api("org.wiremock:wiremock:3.13.+")
@@ -51,9 +51,9 @@ dependencies {
     implementation("org.eclipse.jetty:jetty-server:11.0.+")
 
     // Jackson
-    api("com.fasterxml.jackson.core:jackson-databind:2.18.+")
-    api("com.fasterxml.jackson.datatype:jackson-datatype-guava:2.18.+")
-    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.+")
+    api("com.fasterxml.jackson.core:jackson-databind:2.18.6")
+    api("com.fasterxml.jackson.datatype:jackson-datatype-guava:2.18.6")
+    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.6")
 
     // RestAssured
     api("io.rest-assured:rest-assured:5.5.+") {
@@ -67,7 +67,7 @@ dependencies {
     api("net.datafaker:datafaker:2.4.3")
 
     // Spring Boot for config loading
-    implementation("org.springframework.boot:spring-boot:3.5.13")
+    implementation("org.springframework.boot:spring-boot:3.5.14")
 
     // JSpecify for null annotations
     api("org.jspecify:jspecify:1.0.0")

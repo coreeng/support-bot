@@ -18,7 +18,7 @@ plugins {
     checkstyle
 
     id("net.ltgt.errorprone") version "4.3.0"
-    id("org.springframework.boot") version "3.5.13"
+    id("org.springframework.boot") version "3.5.14"
     id("io.spring.dependency-management") version "1.1.7"
 
     id("org.flywaydb.flyway") version "12.0.0"
@@ -62,6 +62,9 @@ repositories {
 extra["byte-buddy.version"] = "1.18.4"
 extra["mockito.version"] = "5.21.0"
 extra["asm.version"] = "9.9.1"
+extra["netty.version"] = "4.1.133.Final"
+extra["postgresql.version"] = "42.7.11"
+extra["spring-framework.version"] = "6.2.18"
 
 val lombokVersion = "1.18.42"
 val errorProneVersion = "2.47.0"
@@ -97,7 +100,7 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("com.microsoft.kiota:microsoft-kiota-http-okHttp:1.8.5")
 
-    jooqCodegen("org.postgresql:postgresql:42.7.5")
+    jooqCodegen("org.postgresql:postgresql:42.7.11")
     jooqCodegen("org.testcontainers:postgresql:1.20.4")
     jooqCodegen("org.jooq:jooq-codegen:3.19.18")
 
@@ -211,7 +214,7 @@ buildscript {
     }
     dependencies {
         classpath("org.flywaydb:flyway-database-postgresql:12.0.0")
-        classpath("org.postgresql:postgresql:42.7.5")
+        classpath("org.postgresql:postgresql:42.7.11")
         classpath("org.testcontainers:postgresql:1.20.4")
         classpath("org.jooq:jooq-codegen:3.19.18")
     }

@@ -15,12 +15,13 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@cucumber/cucumber": "^12.2.0",
+    "@cucumber/cucumber": "12.8.2",
     "glob": "^11.1.0",
-    "minimatch": "^10.2.4"
+    "minimatch": "10.2.5"
   },
   "resolutions": {
     "@isaacs/brace-expansion": "^5.0.1",
-    "minimatch": "^10.2.1"
+    "minimatch": "^10.2.5",
+    "uuid": "11.1.1"
   }
 }
