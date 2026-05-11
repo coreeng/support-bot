@@ -1,10 +1,10 @@
 package com.coreeng.supportbot.prtracking;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
-import com.coreeng.supportbot.github.GitHubApiException;
-import com.coreeng.supportbot.github.GitHubClient;
-import com.coreeng.supportbot.github.GitHubPullRequest;
-import com.coreeng.supportbot.github.GitHubPullRequestReview;
+import com.coreeng.supportbot.prtracking.source.PrMetadata;
+import com.coreeng.supportbot.prtracking.source.PrSourceClients;
+import com.coreeng.supportbot.prtracking.source.PrSourceException;
+import com.coreeng.supportbot.prtracking.source.Review;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import java.util.Comparator;
@@ -24,16 +24,16 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class TeamReviewFilter {
 
-    private final GitHubClient gitHubClient;
+    private final PrSourceClients prSourceClients;
 
     /**
      * Filters reviews to owning team members. Returns all reviews unfiltered when:
      * - team membership could not be resolved (API failure), or
      * - no team is configured and no teams were requested on the PR.
      */
-    public List<GitHubPullRequestReview> filterToOwningTeam(
-            List<GitHubPullRequestReview> reviews,
-            GitHubPullRequest pr,
+    public List<Review> filterToOwningTeam(
+            List<Review> reviews,
+            PrMetadata pr,
             PrTrackingProps.@Nullable Repository repoConfig,
             Map<String, Optional<Set<String>>> cache) {
         Set<String> teamMembers = resolveOwningTeamMembers(pr, repoConfig, cache);
@@ -44,21 +44,19 @@ public class TeamReviewFilter {
     }
 
     /** Returns the most recent APPROVED or CHANGES_REQUESTED review, or null if none. */
-    public @Nullable GitHubPullRequestReview findLatestActionableReview(List<GitHubPullRequestReview> reviews) {
+    public @Nullable Review findLatestActionableReview(List<Review> reviews) {
         return reviews.stream()
                 .filter(r -> r.isApproved() || r.requestsChanges())
-                .max(Comparator.comparing(GitHubPullRequestReview::submittedAt))
+                .max(Comparator.comparing(Review::submittedAt))
                 .orElse(null);
     }
 
     private @Nullable Set<String> resolveOwningTeamMembers(
-            GitHubPullRequest pr,
-            PrTrackingProps.@Nullable Repository repoConfig,
-            Map<String, Optional<Set<String>>> cache) {
+            PrMetadata pr, PrTrackingProps.@Nullable Repository repoConfig, Map<String, Optional<Set<String>>> cache) {
         // Explicit team slug configured — use Teams API
         if (repoConfig != null && repoConfig.githubTeamSlug() != null) {
-            String org = Iterables.get(Splitter.on('/').split(pr.repositoryName()), 0);
-            return resolveTeamReviewers(org, repoConfig.githubTeamSlug(), cache);
+            String org = Iterables.get(Splitter.on('/').split(pr.coord().name()), 0);
+            return resolveTeamReviewers(pr, repoConfig.githubTeamSlug(), org, cache);
         }
         // No slug — use requested team reviewers already fetched with the PR.
         // If empty (no teams requested), all reviews are accepted without filtering.
@@ -67,17 +65,18 @@ public class TeamReviewFilter {
     }
 
     private @Nullable Set<String> resolveTeamReviewers(
-            String org, String teamSlug, Map<String, Optional<Set<String>>> cache) {
+            PrMetadata pr, String teamSlug, String org, Map<String, Optional<Set<String>>> cache) {
         String key = org + "/" + teamSlug;
         if (cache.containsKey(key)) {
             // Optional.empty() = previous fetch failed; Optional.of(set) = members resolved
             return cache.get(key).orElse(null);
         }
         try {
-            Set<String> members = Set.copyOf(gitHubClient.resolveTeamReviewers(org, teamSlug));
+            Set<String> members = Set.copyOf(
+                    prSourceClients.forProvider(pr.coord().provider()).resolveTeamMembers(pr.coord(), teamSlug));
             cache.put(key, Optional.of(members));
             return members;
-        } catch (GitHubApiException e) {
+        } catch (PrSourceException e) {
             log.atWarn()
                     .addArgument(() -> org + "/" + teamSlug)
                     .addArgument(e::getMessage)

@@ -11,10 +11,12 @@ import com.coreeng.supportbot.escalation.CreateEscalationRequest;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
 import com.coreeng.supportbot.escalation.EscalationSource;
-import com.coreeng.supportbot.github.GitHubApiException;
-import com.coreeng.supportbot.github.GitHubClient;
-import com.coreeng.supportbot.github.GitHubPullRequest;
-import com.coreeng.supportbot.github.GitHubPullRequestReview;
+import com.coreeng.supportbot.prtracking.source.PrMetadata;
+import com.coreeng.supportbot.prtracking.source.PrSourceClients;
+import com.coreeng.supportbot.prtracking.source.PrSourceException;
+import com.coreeng.supportbot.prtracking.source.Provider;
+import com.coreeng.supportbot.prtracking.source.RepoCoord;
+import com.coreeng.supportbot.prtracking.source.Review;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.SlackId;
@@ -64,7 +66,7 @@ public class PrDetectionService {
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
     private final GitHubPrUrlParser prUrlParser;
-    private final GitHubClient gitHubClient;
+    private final PrSourceClients prSourceClients;
     private final TeamReviewFilter teamReviewFilter;
     private final PrTrackingRepository prTrackingRepository;
     private final PrTrackingProps prTrackingProps;
@@ -107,10 +109,12 @@ public class PrDetectionService {
                 continue;
             }
 
-            GitHubPullRequest prMetadata;
+            PrMetadata prMetadata;
             try {
-                prMetadata = gitHubClient.getPullRequest(pr.repositoryName(), pr.pullNumber());
-            } catch (GitHubApiException e) {
+                prMetadata = prSourceClients
+                        .forProvider(Provider.GITHUB)
+                        .fetchPullRequest(RepoCoord.github(pr.repositoryName()), pr.pullNumber());
+            } catch (PrSourceException e) {
                 log.atWarn()
                         .addArgument(pr::repositoryName)
                         .addArgument(pr::pullNumber)
@@ -190,10 +194,12 @@ public class PrDetectionService {
         for (DetectedPr pr : detectedPrs) {
             try {
 
-                GitHubPullRequest prMetadata;
+                PrMetadata prMetadata;
                 try {
-                    prMetadata = gitHubClient.getPullRequest(pr.repositoryName(), pr.pullNumber());
-                } catch (GitHubApiException e) {
+                    prMetadata = prSourceClients
+                            .forProvider(Provider.GITHUB)
+                            .fetchPullRequest(RepoCoord.github(pr.repositoryName()), pr.pullNumber());
+                } catch (PrSourceException e) {
                     log.atWarn()
                             .addArgument(pr::repositoryName)
                             .addArgument(pr::pullNumber)
@@ -312,7 +318,7 @@ public class PrDetectionService {
             DetectedPr detectedPr,
             Ticket ticket,
             boolean canAutoCloseTicket,
-            GitHubPullRequest prMetadata,
+            PrMetadata prMetadata,
             Map<String, Optional<Set<String>>> teamReviewerCache,
             List<PendingNotification> notifications,
             List<PendingEscalation> pendingEscalations) {
@@ -357,15 +363,15 @@ public class PrDetectionService {
             Ticket ticket,
             boolean canAutoCloseTicket,
             PrTrackingProps.Repository repoConfig,
-            GitHubPullRequest prMetadata,
+            PrMetadata prMetadata,
             Map<String, Optional<Set<String>>> teamReviewerCache,
             List<PendingNotification> notifications,
             List<PendingEscalation> pendingEscalations) {
 
         Duration sla;
         try {
-            sla = slaLookup.getSla(repoConfig, detectedPr.repositoryName(), detectedPr.pullNumber());
-        } catch (GitHubApiException e) {
+            sla = slaLookup.getSla(repoConfig, RepoCoord.github(detectedPr.repositoryName()), detectedPr.pullNumber());
+        } catch (PrSourceException e) {
             log.atWarn()
                     .addArgument(detectedPr::repositoryName)
                     .addArgument(detectedPr::pullNumber)
@@ -415,9 +421,9 @@ public class PrDetectionService {
         // Note: wall-clock time progresses between the review evaluation and the SLA deadline check
         // below. For deadlines very close to now, remaining duration may go slightly negative;
         // clamping to Duration.ZERO handles this.
-        List<GitHubPullRequestReview> teamReviews =
+        List<Review> teamReviews =
                 teamReviewFilter.filterToOwningTeam(prMetadata.reviews(), prMetadata, repoConfig, teamReviewerCache);
-        GitHubPullRequestReview latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
+        Review latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
 
         if (Instant.now().isAfter(slaDeadline)) {
             if (latestVerdict != null && latestVerdict.requestsChanges()) {
@@ -500,7 +506,7 @@ public class PrDetectionService {
             Ticket ticket,
             boolean canAutoCloseTicket,
             PrTrackingProps.Repository repoConfig,
-            GitHubPullRequest prMetadata,
+            PrMetadata prMetadata,
             Map<String, Optional<Set<String>>> teamReviewerCache,
             List<PendingNotification> notifications) {
 
@@ -542,9 +548,9 @@ public class PrDetectionService {
         // Mirror the SLA branch: inspect reviews already fetched with the PR so that a no-SLA PR
         // detected while already in CHANGES_REQUESTED or APPROVED state transitions correctly on
         // first sight, instead of sitting in OPEN until the poller notices and posts a duplicate.
-        List<GitHubPullRequestReview> teamReviews =
+        List<Review> teamReviews =
                 teamReviewFilter.filterToOwningTeam(prMetadata.reviews(), prMetadata, repoConfig, teamReviewerCache);
-        GitHubPullRequestReview latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
+        Review latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
 
         if (latestVerdict != null && latestVerdict.requestsChanges()) {
             prTrackingRepository.updateStatus(tracking.id(), PrTrackingStatus.CHANGES_REQUESTED, null, null);
@@ -584,7 +590,9 @@ public class PrDetectionService {
         }
 
         try {
-            List<String> prFiles = gitHubClient.listPullRequestFiles(repositoryName, pullNumber);
+            List<String> prFiles = prSourceClients
+                    .forProvider(Provider.GITHUB)
+                    .listChangedFiles(RepoCoord.github(repositoryName), pullNumber);
 
             for (String pattern : paths) {
                 for (String prFile : prFiles) {
@@ -593,7 +601,7 @@ public class PrDetectionService {
                     }
                 }
             }
-        } catch (GitHubApiException e) {
+        } catch (PrSourceException e) {
             log.atError()
                     .addArgument(repositoryName)
                     .addArgument(pullNumber)

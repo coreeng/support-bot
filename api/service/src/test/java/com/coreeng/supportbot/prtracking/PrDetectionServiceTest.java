@@ -12,10 +12,13 @@ import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
-import com.coreeng.supportbot.github.GitHubApiException;
-import com.coreeng.supportbot.github.GitHubClient;
-import com.coreeng.supportbot.github.GitHubPullRequest;
-import com.coreeng.supportbot.github.GitHubPullRequestReview;
+import com.coreeng.supportbot.prtracking.source.PrMetadata;
+import com.coreeng.supportbot.prtracking.source.PrSourceClient;
+import com.coreeng.supportbot.prtracking.source.PrSourceClients;
+import com.coreeng.supportbot.prtracking.source.PrSourceException;
+import com.coreeng.supportbot.prtracking.source.Provider;
+import com.coreeng.supportbot.prtracking.source.RepoCoord;
+import com.coreeng.supportbot.prtracking.source.Review;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackException;
@@ -45,6 +48,7 @@ class PrDetectionServiceTest {
     private static final String CHANNEL_ID = "C_SUPPORT";
     private static final MessageTs QUERY_TS = MessageTs.of("1700000000.000001");
     private static final String REPO = "my-org/my-repo";
+    private static final RepoCoord COORD = RepoCoord.github(REPO);
     private static final int PR_NUMBER = 42;
     private static final String TEAM_CODE = "infra-team";
     private static final String TEAM_LABEL = "Infra Team";
@@ -55,7 +59,10 @@ class PrDetectionServiceTest {
     private GitHubPrUrlParser prUrlParser;
 
     @Mock
-    private GitHubClient gitHubClient;
+    private PrSourceClients prSourceClients;
+
+    @Mock
+    private PrSourceClient prSourceClient;
 
     @Mock
     private PrTrackingRepository prTrackingRepository;
@@ -100,10 +107,11 @@ class PrDetectionServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(prSourceClients.forProvider(Provider.GITHUB)).thenReturn(prSourceClient);
         service = new PrDetectionService(
                 prUrlParser,
-                gitHubClient,
-                new TeamReviewFilter(gitHubClient),
+                prSourceClients,
+                new TeamReviewFilter(prSourceClients),
                 prTrackingRepository,
                 prTrackingProps,
                 escalationTeamsRegistry,
@@ -176,7 +184,7 @@ class PrDetectionServiceTest {
 
             // then
             verifyNoInteractions(
-                    gitHubClient, prTrackingRepository, slackClient, ticketSlackService, escalationProcessingService);
+                    prSourceClient, prTrackingRepository, slackClient, ticketSlackService, escalationProcessingService);
         }
     }
 
@@ -392,13 +400,12 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
@@ -426,7 +433,7 @@ class PrDetectionServiceTest {
 
             // then
             verify(prTrackingRepository, never()).insertIfAbsent(any());
-            verifyNoInteractions(gitHubClient, slackClient);
+            verifyNoInteractions(prSourceClient, slackClient);
         }
     }
 
@@ -443,8 +450,8 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenThrow(new GitHubApiException(404, "PR not found: " + REPO + "#" + PR_NUMBER));
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenThrow(new PrSourceException("PR not found: " + REPO + "#" + PR_NUMBER));
 
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
@@ -464,13 +471,12 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.CLOSED,
-                            null,
+                            PrMetadata.PrState.CLOSED,
                             null,
                             List.of(),
                             List.of()));
@@ -494,13 +500,12 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.MERGED,
-                            null,
+                            PrMetadata.PrState.MERGED,
                             null,
                             List.of(),
                             List.of()));
@@ -525,17 +530,16 @@ class PrDetectionServiceTest {
             when(prTrackingProps.repositories())
                     .thenReturn(
                             List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), sla(SLA_24H))));
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(slaLookup.getSla(any(), eq(REPO), eq(PR_NUMBER))).thenReturn(null);
+            when(slaLookup.getSla(any(), eq(COORD), eq(PR_NUMBER))).thenReturn(null);
 
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
@@ -548,7 +552,7 @@ class PrDetectionServiceTest {
         }
 
         @Test
-        void skipsWhenSlaLookupThrowsGitHubApiException() {
+        void skipsWhenSlaLookupThrowsPrSourceException() {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
@@ -557,23 +561,21 @@ class PrDetectionServiceTest {
             when(prTrackingProps.repositories())
                     .thenReturn(
                             List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), sla(SLA_24H))));
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(slaLookup.getSla(any(), eq(REPO), eq(PR_NUMBER)))
-                    .thenThrow(new GitHubApiException(500, "server error"));
+            when(slaLookup.getSla(any(), eq(COORD), eq(PR_NUMBER))).thenThrow(new PrSourceException("server error"));
 
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
-            // then, GitHubApiException from SLA lookup skips the PR
+            // then, PrSourceException from SLA lookup skips the PR
             verify(prTrackingRepository, never()).insertIfAbsent(any());
             verify(slackClient, never()).addReaction(any());
             verify(slackClient, never()).postMessage(any());
@@ -590,13 +592,12 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
@@ -621,13 +622,12 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
@@ -651,6 +651,7 @@ class PrDetectionServiceTest {
     class NoSlaRepositoryTracking {
 
         private static final String NO_SLA_REPO = "my-org/no-sla-repo";
+        private static final RepoCoord NO_SLA_COORD = RepoCoord.github(NO_SLA_REPO);
         private static final List<String> PATHS = List.of("infra/**");
 
         @Test
@@ -663,17 +664,16 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            NO_SLA_REPO,
+            when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(NO_SLA_REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(prSourceClient.listChangedFiles(NO_SLA_COORD, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
             when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(1L, prCreatedAt, null));
 
             // when
@@ -709,17 +709,16 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            NO_SLA_REPO,
+            when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(NO_SLA_REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(prSourceClient.listChangedFiles(NO_SLA_COORD, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
             when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(1L, prCreatedAt, null));
 
             // when
@@ -749,28 +748,26 @@ class PrDetectionServiceTest {
                             List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER), new DetectedPr(NO_SLA_REPO, prNumber2)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            NO_SLA_REPO,
+            when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(NO_SLA_REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.getPullRequest(NO_SLA_REPO, prNumber2))
-                    .thenReturn(new GitHubPullRequest(
-                            NO_SLA_REPO,
+            when(prSourceClient.fetchPullRequest(NO_SLA_COORD, prNumber2))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(NO_SLA_REPO),
                             prNumber2,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
-            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, prNumber2)).thenReturn(List.of("infra/vars.tf"));
+            when(prSourceClient.listChangedFiles(NO_SLA_COORD, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(prSourceClient.listChangedFiles(NO_SLA_COORD, prNumber2)).thenReturn(List.of("infra/vars.tf"));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(
                             new PrTrackingRecord(
@@ -827,28 +824,26 @@ class PrDetectionServiceTest {
                             List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER), new DetectedPr(NO_SLA_REPO, prNumber2)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            NO_SLA_REPO,
+            when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(NO_SLA_REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.getPullRequest(NO_SLA_REPO, prNumber2))
-                    .thenReturn(new GitHubPullRequest(
-                            NO_SLA_REPO,
+            when(prSourceClient.fetchPullRequest(NO_SLA_COORD, prNumber2))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(NO_SLA_REPO),
                             prNumber2,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
-            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, prNumber2)).thenReturn(List.of("infra/vars.tf"));
+            when(prSourceClient.listChangedFiles(NO_SLA_COORD, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(prSourceClient.listChangedFiles(NO_SLA_COORD, prNumber2)).thenReturn(List.of("infra/vars.tf"));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(
                             new PrTrackingRecord(
@@ -903,20 +898,19 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            NO_SLA_REPO,
+            when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(NO_SLA_REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
-                            List.of(new GitHubPullRequestReview(
+                            List.of(new Review(
                                     "reviewer",
-                                    GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                                    Review.ReviewState.CHANGES_REQUESTED,
                                     Instant.now().minusSeconds(600)))));
-            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(prSourceClient.listChangedFiles(NO_SLA_COORD, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
             when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(1L, prCreatedAt, null));
 
             // when
@@ -941,20 +935,19 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            NO_SLA_REPO,
+            when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(NO_SLA_REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
-                            List.of(new GitHubPullRequestReview(
+                            List.of(new Review(
                                     "reviewer",
-                                    GitHubPullRequestReview.ReviewState.APPROVED,
+                                    Review.ReviewState.APPROVED,
                                     Instant.now().minusSeconds(600)))));
-            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(prSourceClient.listChangedFiles(NO_SLA_COORD, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
             when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(1L, prCreatedAt, null));
 
             // when
@@ -978,17 +971,16 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            NO_SLA_REPO,
+            when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(NO_SLA_REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER))
+            when(prSourceClient.listChangedFiles(NO_SLA_COORD, PR_NUMBER))
                     .thenReturn(List.of("src/main/java/Foo.java")); // does not match "infra/**"
 
             // when
@@ -1010,18 +1002,17 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(NO_SLA_REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            NO_SLA_REPO,
+            when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(NO_SLA_REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.listPullRequestFiles(NO_SLA_REPO, PR_NUMBER))
-                    .thenThrow(new GitHubApiException(500, "server error"));
+            when(prSourceClient.listChangedFiles(NO_SLA_COORD, PR_NUMBER))
+                    .thenThrow(new PrSourceException("server error"));
 
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
@@ -1098,13 +1089,12 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
@@ -1133,18 +1123,17 @@ class PrDetectionServiceTest {
             Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
             stubBreachedPrDetection(prCreatedAt, ticketWithId(5L));
             // Override PR stub to include reviews
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
-                            List.of(new GitHubPullRequestReview(
+                            List.of(new Review(
                                     "reviewer",
-                                    GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                                    Review.ReviewState.CHANGES_REQUESTED,
                                     Instant.now().minusSeconds(3600)))));
 
             // when
@@ -1160,18 +1149,17 @@ class PrDetectionServiceTest {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
             stubBreachedPrDetection(prCreatedAt, ticketWithId(5L));
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
-                            List.of(new GitHubPullRequestReview(
+                            List.of(new Review(
                                     "reviewer",
-                                    GitHubPullRequestReview.ReviewState.APPROVED,
+                                    Review.ReviewState.APPROVED,
                                     Instant.now().minusSeconds(3600)))));
 
             // when
@@ -1187,18 +1175,17 @@ class PrDetectionServiceTest {
             // given
             Instant prCreatedAt = Instant.now().minusSeconds(3600);
             stubNonBreachedPrDetection(prCreatedAt);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
-                            List.of(new GitHubPullRequestReview(
+                            List.of(new Review(
                                     "reviewer",
-                                    GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                                    Review.ReviewState.CHANGES_REQUESTED,
                                     Instant.now().minusSeconds(1800)))));
 
             // when
@@ -1214,18 +1201,17 @@ class PrDetectionServiceTest {
             // given
             Instant prCreatedAt = Instant.now().minusSeconds(3600);
             stubNonBreachedPrDetection(prCreatedAt);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
-                            List.of(new GitHubPullRequestReview(
+                            List.of(new Review(
                                     "reviewer",
-                                    GitHubPullRequestReview.ReviewState.APPROVED,
+                                    Review.ReviewState.APPROVED,
                                     Instant.now().minusSeconds(1800)))));
 
             // when
@@ -1277,23 +1263,22 @@ class PrDetectionServiceTest {
             // given — older APPROVED, newer CHANGES_REQUESTED
             Instant prCreatedAt = Instant.now().minus(Duration.ofDays(2));
             stubBreachedPrDetection(prCreatedAt, ticketWithId(5L));
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of(
-                                    new GitHubPullRequestReview(
+                                    new Review(
                                             "reviewer",
-                                            GitHubPullRequestReview.ReviewState.APPROVED,
+                                            Review.ReviewState.APPROVED,
                                             Instant.now().minusSeconds(3600)),
-                                    new GitHubPullRequestReview(
+                                    new Review(
                                             "reviewer",
-                                            GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                                            Review.ReviewState.CHANGES_REQUESTED,
                                             Instant.now().minusSeconds(60)))));
 
             // when
@@ -1320,26 +1305,25 @@ class PrDetectionServiceTest {
                     .thenReturn(false);
 
             // stub team resolver — "team-member" is in the owning team, "outsider" is not
-            when(gitHubClient.resolveTeamReviewers("my-org", "platform-team")).thenReturn(List.of("team-member"));
+            when(prSourceClient.resolveTeamMembers(COORD, "platform-team")).thenReturn(List.of("team-member"));
 
             // PR has two reviews: outsider APPROVED + team-member CHANGES_REQUESTED
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of(
-                                    new GitHubPullRequestReview(
+                                    new Review(
                                             "outsider",
-                                            GitHubPullRequestReview.ReviewState.APPROVED,
+                                            Review.ReviewState.APPROVED,
                                             Instant.now().minusSeconds(7200)),
-                                    new GitHubPullRequestReview(
+                                    new Review(
                                             "team-member",
-                                            GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                                            Review.ReviewState.CHANGES_REQUESTED,
                                             Instant.now().minusSeconds(3600)))));
             when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, slaDeadline));
 
@@ -1362,13 +1346,12 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
@@ -1386,13 +1369,12 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
@@ -1425,19 +1407,24 @@ class PrDetectionServiceTest {
                     .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(repoB, prB)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             createdAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.getPullRequest(repoB, prB))
-                    .thenReturn(new GitHubPullRequest(
-                            repoB, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(repoB), prB))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(repoB),
+                            prB,
+                            createdAt,
+                            PrMetadata.PrState.OPEN,
+                            null,
+                            List.of(),
+                            List.of()));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(1L, createdAt, createdAt.plus(SLA_24H)))
                     .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
@@ -1474,9 +1461,15 @@ class PrDetectionServiceTest {
                     .thenReturn(true);
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(10L, repoB, prB))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(repoB, prB))
-                    .thenReturn(new GitHubPullRequest(
-                            repoB, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(repoB), prB))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(repoB),
+                            prB,
+                            createdAt,
+                            PrMetadata.PrState.OPEN,
+                            null,
+                            List.of(),
+                            List.of()));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
 
@@ -1507,19 +1500,24 @@ class PrDetectionServiceTest {
                     .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(repoB, prB)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             createdAt,
-                            GitHubPullRequest.PrState.CLOSED,
-                            null,
+                            PrMetadata.PrState.CLOSED,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.getPullRequest(repoB, prB))
-                    .thenReturn(new GitHubPullRequest(
-                            repoB, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(repoB), prB))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(repoB),
+                            prB,
+                            createdAt,
+                            PrMetadata.PrState.OPEN,
+                            null,
+                            List.of(),
+                            List.of()));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
 
@@ -1561,19 +1559,18 @@ class PrDetectionServiceTest {
                     .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(REPO, prB)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             createdAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.getPullRequest(REPO, prB))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
+            when(prSourceClient.fetchPullRequest(COORD, prB))
+                    .thenReturn(
+                            new PrMetadata(COORD, prB, createdAt, PrMetadata.PrState.OPEN, null, List.of(), List.of()));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(1L, createdAt, createdAt.plus(SLA_24H)))
                     .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
@@ -1604,19 +1601,18 @@ class PrDetectionServiceTest {
                     .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(REPO, prB)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             createdAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.getPullRequest(REPO, prB))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
+            when(prSourceClient.fetchPullRequest(COORD, prB))
+                    .thenReturn(
+                            new PrMetadata(COORD, prB, createdAt, PrMetadata.PrState.OPEN, null, List.of(), List.of()));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(1L, createdAt, createdAt.plus(SLA_24H)))
                     .thenReturn(stubTrackingRecord(2L, createdAt, createdAt.plus(SLA_24H)));
@@ -1646,27 +1642,25 @@ class PrDetectionServiceTest {
                     .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(REPO, prB)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            List<GitHubPullRequestReview> changesRequestedReviews = List.of(new GitHubPullRequestReview(
+            List<Review> changesRequestedReviews = List.of(new Review(
                     "reviewer",
-                    GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                    Review.ReviewState.CHANGES_REQUESTED,
                     Instant.now().minusSeconds(60)));
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             createdAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             changesRequestedReviews));
-            when(gitHubClient.getPullRequest(REPO, prB))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, prB))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             prB,
                             createdAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             changesRequestedReviews));
@@ -1704,28 +1698,26 @@ class PrDetectionServiceTest {
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             // PR_NUMBER has no reviews (tracked), prB has changes requested
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             createdAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.getPullRequest(REPO, prB))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, prB))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             prB,
                             createdAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
-                            List.of(new GitHubPullRequestReview(
+                            List.of(new Review(
                                     "reviewer",
-                                    GitHubPullRequestReview.ReviewState.CHANGES_REQUESTED,
+                                    Review.ReviewState.CHANGES_REQUESTED,
                                     Instant.now().minusSeconds(60)))));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(1L, createdAt, createdAt.plus(SLA_24H)))
@@ -1759,13 +1751,12 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             createdAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
@@ -1874,19 +1865,18 @@ class PrDetectionServiceTest {
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), sla(sla))));
-            when(slaLookup.getSla(any(), eq(REPO), eq(PR_NUMBER))).thenReturn(sla);
+            when(slaLookup.getSla(any(), eq(COORD), eq(PR_NUMBER))).thenReturn(sla);
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "slack:SG123"));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             createdAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
@@ -1922,13 +1912,12 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             createdAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
@@ -1956,13 +1945,12 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             createdAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
@@ -2003,13 +1991,12 @@ class PrDetectionServiceTest {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
@@ -2037,13 +2024,12 @@ class PrDetectionServiceTest {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofDays(5));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.MERGED,
-                            null,
+                            PrMetadata.PrState.MERGED,
                             null,
                             List.of(),
                             List.of()));
@@ -2063,8 +2049,8 @@ class PrDetectionServiceTest {
         void doesNotCreateTicketWhenPrFetchFails() {
             // given
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenThrow(new GitHubApiException(404, "PR not found: " + REPO + "#" + PR_NUMBER));
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenThrow(new PrSourceException("PR not found: " + REPO + "#" + PR_NUMBER));
 
             Supplier<Ticket> supplier = mock(Supplier.class);
 
@@ -2082,13 +2068,12 @@ class PrDetectionServiceTest {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             prCreatedAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
@@ -2120,19 +2105,24 @@ class PrDetectionServiceTest {
                             new PrTrackingProps.Repository(repoB, TEAM_CODE, null, List.of(), sla(SLA_24H))));
             when(prUrlParser.parse(any()))
                     .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(repoB, prB)));
-            when(gitHubClient.getPullRequest(REPO, PR_NUMBER))
-                    .thenReturn(new GitHubPullRequest(
-                            REPO,
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
                             PR_NUMBER,
                             createdAt,
-                            GitHubPullRequest.PrState.OPEN,
-                            null,
+                            PrMetadata.PrState.OPEN,
                             null,
                             List.of(),
                             List.of()));
-            when(gitHubClient.getPullRequest(repoB, prB))
-                    .thenReturn(new GitHubPullRequest(
-                            repoB, prB, createdAt, GitHubPullRequest.PrState.OPEN, null, null, List.of(), List.of()));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(repoB), prB))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(repoB),
+                            prB,
+                            createdAt,
+                            PrMetadata.PrState.OPEN,
+                            null,
+                            List.of(),
+                            List.of()));
             when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
                     .thenReturn(false);
             when(prTrackingRepository.insertIfAbsent(any()))

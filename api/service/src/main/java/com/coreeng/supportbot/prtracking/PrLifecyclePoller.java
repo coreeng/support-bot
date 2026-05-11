@@ -10,10 +10,12 @@ import com.coreeng.supportbot.escalation.CreateEscalationRequest;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
 import com.coreeng.supportbot.escalation.EscalationSource;
-import com.coreeng.supportbot.github.GitHubApiException;
-import com.coreeng.supportbot.github.GitHubClient;
-import com.coreeng.supportbot.github.GitHubPullRequest;
-import com.coreeng.supportbot.github.GitHubPullRequestReview;
+import com.coreeng.supportbot.prtracking.source.PrMetadata;
+import com.coreeng.supportbot.prtracking.source.PrSourceClients;
+import com.coreeng.supportbot.prtracking.source.PrSourceException;
+import com.coreeng.supportbot.prtracking.source.Provider;
+import com.coreeng.supportbot.prtracking.source.RepoCoord;
+import com.coreeng.supportbot.prtracking.source.Review;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
 import com.coreeng.supportbot.slack.client.SlackClient;
@@ -46,7 +48,7 @@ import org.springframework.stereotype.Component;
 public class PrLifecyclePoller {
 
     private final PrTrackingRepository prTrackingRepository;
-    private final GitHubClient gitHubClient;
+    private final PrSourceClients prSourceClients;
     private final TeamReviewFilter teamReviewFilter;
     private final TicketRepository ticketRepository;
     private final TicketProcessingService ticketProcessingService;
@@ -78,10 +80,12 @@ public class PrLifecyclePoller {
     }
 
     private void processRecord(PrTrackingRecord record, Map<String, Optional<Set<String>>> teamMemberCache) {
-        GitHubPullRequest pr;
+        PrMetadata pr;
         try {
-            pr = gitHubClient.getPullRequest(record.githubRepo(), record.prNumber());
-        } catch (GitHubApiException e) {
+            pr = prSourceClients
+                    .forProvider(Provider.GITHUB)
+                    .fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber());
+        } catch (PrSourceException e) {
             log.atWarn()
                     .addArgument(record::githubRepo)
                     .addArgument(record::prNumber)
@@ -95,9 +99,9 @@ public class PrLifecyclePoller {
             return;
         }
 
-        List<GitHubPullRequestReview> teamReviews = teamReviewFilter.filterToOwningTeam(
+        List<Review> teamReviews = teamReviewFilter.filterToOwningTeam(
                 pr.reviews(), pr, findRepoConfig(record.githubRepo()), teamMemberCache);
-        GitHubPullRequestReview latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
+        Review latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
 
         switch (record.status()) {
             case OPEN -> processOpenRecord(record, pr, latestVerdict);
@@ -118,8 +122,7 @@ public class PrLifecyclePoller {
     }
 
     // OPEN → CHANGES_REQUESTED | APPROVED | CLOSED (via approved+mergeable) | ESCALATED (SLA breach) | no-op
-    private void processOpenRecord(
-            PrTrackingRecord record, GitHubPullRequest pr, @Nullable GitHubPullRequestReview latestVerdict) {
+    private void processOpenRecord(PrTrackingRecord record, PrMetadata pr, @Nullable Review latestVerdict) {
         if (latestVerdict != null && latestVerdict.requestsChanges()) {
             Duration remaining = computeRemainingDuration(record);
 
@@ -140,8 +143,7 @@ public class PrLifecyclePoller {
     }
 
     // CHANGES_REQUESTED → APPROVED | CLOSED (approved+mergeable) | OPEN (no actionable reviews remain)
-    private void processChangesRequestedRecord(
-            PrTrackingRecord record, GitHubPullRequest pr, @Nullable GitHubPullRequestReview latestVerdict) {
+    private void processChangesRequestedRecord(PrTrackingRecord record, PrMetadata pr, @Nullable Review latestVerdict) {
         if (latestVerdict != null && latestVerdict.isApproved()) {
             handleApproval(record, pr);
         } else if (latestVerdict == null) {
@@ -151,8 +153,7 @@ public class PrLifecyclePoller {
     }
 
     // APPROVED → CLOSED (mergeable, checked first) | CHANGES_REQUESTED (re-review, only if not mergeable) | no-op
-    private void processApprovedRecord(
-            PrTrackingRecord record, GitHubPullRequest pr, @Nullable GitHubPullRequestReview latestVerdict) {
+    private void processApprovedRecord(PrTrackingRecord record, PrMetadata pr, @Nullable Review latestVerdict) {
         if (pr.isMergeable()) {
             handleApprovalClosure(record);
         } else if (latestVerdict != null && latestVerdict.requestsChanges()) {
@@ -165,8 +166,7 @@ public class PrLifecyclePoller {
     }
 
     // ESCALATED → APPROVED | CLOSED (approved+mergeable) | CHANGES_REQUESTED
-    private void processEscalatedRecord(
-            PrTrackingRecord record, GitHubPullRequest pr, @Nullable GitHubPullRequestReview latestVerdict) {
+    private void processEscalatedRecord(PrTrackingRecord record, PrMetadata pr, @Nullable Review latestVerdict) {
         if (latestVerdict != null && latestVerdict.isApproved()) {
             if (pr.isMergeable()) {
                 handleApprovalClosure(record);
@@ -186,7 +186,7 @@ public class PrLifecyclePoller {
 
     // Called from OPEN and CHANGES_REQUESTED. Closes if mergeable; pauses SLA (APPROVED) when OPEN; transitions to
     // APPROVED otherwise.
-    private void handleApproval(PrTrackingRecord record, GitHubPullRequest pr) {
+    private void handleApproval(PrTrackingRecord record, PrMetadata pr) {
         if (pr.isMergeable()) {
             handleApprovalClosure(record);
         } else {
@@ -207,8 +207,8 @@ public class PrLifecyclePoller {
         }
     }
 
-    private void handlePrClosed(PrTrackingRecord record, GitHubPullRequest pr) {
-        boolean isMerged = pr.state() == GitHubPullRequest.PrState.MERGED;
+    private void handlePrClosed(PrTrackingRecord record, PrMetadata pr) {
+        boolean isMerged = pr.state() == PrMetadata.PrState.MERGED;
         MessageEvent event = isMerged ? MessageEvent.MERGED : MessageEvent.CLOSED;
         PrMessageContext ctx = recordContext(record);
         String override = messageRenderer.render(record.githubRepo(), event, ctx);
@@ -329,9 +329,9 @@ public class PrLifecyclePoller {
                 .log("PR {}#{} SLA breached — escalated on ticket {}");
     }
 
-    private void updateActivityTimestamps(PrTrackingRecord record, List<GitHubPullRequestReview> teamReviews) {
+    private void updateActivityTimestamps(PrTrackingRecord record, List<Review> teamReviews) {
         Instant latestReviewAt = teamReviews.stream()
-                .map(GitHubPullRequestReview::submittedAt)
+                .map(Review::submittedAt)
                 .max(Comparator.naturalOrder())
                 .orElse(null);
 

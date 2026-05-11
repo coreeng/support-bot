@@ -3,6 +3,10 @@ package com.coreeng.supportbot.prtracking;
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.github.Hub4jGitHubClient;
+import com.coreeng.supportbot.prtracking.source.GitHubPrSourceClient;
+import com.coreeng.supportbot.prtracking.source.PrSourceClient;
+import com.coreeng.supportbot.prtracking.source.PrSourceClients;
+import com.coreeng.supportbot.prtracking.source.Provider;
 import io.jsonwebtoken.Jwts;
 import java.io.IOException;
 import java.io.StringReader;
@@ -12,6 +16,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Date;
+import java.util.Map;
 import org.bouncycastle.openssl.PEMKeyPair;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
@@ -46,6 +51,16 @@ public class PrTrackingGitHubConfig {
     @Bean
     public GitHubClient gitHubClient(GitHub gitHub) {
         return new Hub4jGitHubClient(gitHub);
+    }
+
+    @Bean
+    public PrSourceClient gitHubPrSourceClient(GitHubClient gitHubClient) {
+        return new GitHubPrSourceClient(gitHubClient);
+    }
+
+    @Bean
+    public PrSourceClients prSourceClients(PrSourceClient gitHubPrSourceClient) {
+        return new PrSourceClients(Map.of(Provider.GITHUB, gitHubPrSourceClient));
     }
 
     private static GitHub buildAppModeClient(PrTrackingProps.GitHub config) throws IOException {
