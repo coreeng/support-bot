@@ -3,7 +3,7 @@ P2P_TENANT_NAME ?= support-bot
 P2P_APP_NAME ?= support-bot
 HELM_CHART_PATH ?= helm-chart
 
-P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui $(P2P_APP_NAME)-ui-functional $(P2P_APP_NAME)-ui-nft
+P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui $(P2P_APP_NAME)-ui-functional $(P2P_APP_NAME)-ui-nft $(P2P_APP_NAME)-dex
 
 # Download and include p2p makefile
 $(shell curl -fsSL "https://raw.githubusercontent.com/coreeng/p2p/v1/p2p.mk" -o ".p2p.mk")
@@ -123,8 +123,12 @@ build-api-app: lint-api ## Build API
 build-ui-app: lint-ui ## Build UI
 	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" --build-arg P2P_VERSION="$(p2p_version)" ui
 
+.PHONY: build-dex-app
+build-dex-app: ## Build Dex (upstream dexidp/dex + Support Bot login theme)
+	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-dex) --tag "$(call p2p_image_tag,$(p2p_app_name)-dex)" dex
+
 .PHONY: build-app
-build-app: build-api-app build-ui-app ## Build all apps
+build-app: build-api-app build-ui-app build-dex-app ## Build all apps
 
 .PHONY: build-api-functional
 build-api-functional: ## Build API functional test docker image
@@ -166,8 +170,12 @@ push-api-app: ## Push API app
 push-ui-app: ## Push UI app
 	docker image push "$(call p2p_image_tag,$(p2p_app_name)-ui)"
 
+.PHONY: push-dex-app
+push-dex-app: ## Push Dex app
+	docker image push "$(call p2p_image_tag,$(p2p_app_name)-dex)"
+
 .PHONY: push-app
-push-app: push-api-app push-ui-app ## Push all apps
+push-app: push-api-app push-ui-app push-dex-app ## Push all apps
 
 .PHONY: push-api-functional
 push-api-functional: ## Push API functional test docker image
