@@ -431,6 +431,186 @@ public class SlackWiremock implements WireMockBackend {
                 .build();
     }
 
+    // ---------------------------------------------------------------------
+    // GitLab v4 API stubs (served by the same wiremock at /api/v4/...)
+    // ---------------------------------------------------------------------
+
+    /**
+     * GitLab project paths are URL-path-segment encoded (slashes become {@code %2F}). This must
+     * match {@code UriUtils.encodePathSegment} on the production side or the stub will not match.
+     */
+    private static String encodeProjectPath(String projectPath) {
+        return projectPath.replace("/", "%2F");
+    }
+
+    /**
+     * Stubs GitLab API GET /api/v4/projects/:project/merge_requests/:iid for MR detection and
+     * lifecycle polling.
+     */
+    public Stub stubGitLabGetMergeRequest(
+            String description,
+            String projectPath,
+            int mrIid,
+            String state,
+            String detailedMergeStatus,
+            String createdAtIso,
+            String updatedAtIso) {
+        String encoded = encodeProjectPath(projectPath);
+        String body = """
+                {"iid":%d,"state":"%s","detailed_merge_status":"%s","created_at":"%s","updated_at":"%s","title":"MR title","author":{"username":"test"}}
+                """.formatted(mrIid, state, detailedMergeStatus, createdAtIso, updatedAtIso);
+        StubMapping stub = givenThat(get("/api/v4/projects/" + encoded + "/merge_requests/" + mrIid)
+                .withName(description)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+        return Stub.builder()
+                .mapping(stub)
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    /**
+     * Stubs GitLab API GET /api/v4/projects/:project/merge_requests/:iid/approvals returning the
+     * given approver usernames.
+     */
+    public Stub stubGitLabGetMergeRequestApprovals(
+            String description, String projectPath, int mrIid, List<String> approverUsernames) {
+        String encoded = encodeProjectPath(projectPath);
+        String approvedByJson =
+                approverUsernames.stream().map(u -> """
+                        {"user":{"username":"%s"}}""".formatted(u)).collect(Collectors.joining(",", "[", "]"));
+        String body = """
+                {"approved_by":%s}
+                """.formatted(approvedByJson);
+        StubMapping stub = givenThat(get("/api/v4/projects/" + encoded + "/merge_requests/" + mrIid + "/approvals")
+                .withName(description)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+        return Stub.builder()
+                .mapping(stub)
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    /**
+     * Stubs GitLab API GET /api/v4/projects/:project to expose the project's default branch (used
+     * before fetching repo files at the raw blob endpoint).
+     */
+    public Stub stubGitLabGetProject(String description, String projectPath, String defaultBranch) {
+        String encoded = encodeProjectPath(projectPath);
+        String body = """
+                {"default_branch":"%s"}
+                """.formatted(defaultBranch);
+        StubMapping stub = givenThat(get("/api/v4/projects/" + encoded)
+                .withName(description)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+        return Stub.builder()
+                .mapping(stub)
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    /**
+     * Stubs GitLab API GET /api/v4/projects/:project/repository/files/:file/raw?ref=:branch
+     * returning the raw file bytes (as text).
+     */
+    public Stub stubGitLabGetFileRaw(
+            String description, String projectPath, String filePath, String branch, String content) {
+        String encodedProject = encodeProjectPath(projectPath);
+        String encodedFile = encodeProjectPath(filePath);
+        StubMapping stub = givenThat(
+                get("/api/v4/projects/" + encodedProject + "/repository/files/" + encodedFile + "/raw?ref=" + branch)
+                        .withName(description)
+                        .willReturn(aResponse()
+                                .withStatus(200)
+                                .withHeader("Content-Type", "text/plain")
+                                .withBody(content)));
+        return Stub.builder()
+                .mapping(stub)
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    /**
+     * Stubs a 404 from GitLab's raw-file endpoint, used to test the missing-file branch of
+     * {@link com.coreeng.supportbot.prtracking.source.GitLabPrSourceClient#fetchFileContents}.
+     */
+    public Stub stubGitLabGetFileRawNotFound(String description, String projectPath, String filePath, String branch) {
+        String encodedProject = encodeProjectPath(projectPath);
+        String encodedFile = encodeProjectPath(filePath);
+        StubMapping stub = givenThat(
+                get("/api/v4/projects/" + encodedProject + "/repository/files/" + encodedFile + "/raw?ref=" + branch)
+                        .withName(description)
+                        .willReturn(aResponse()
+                                .withStatus(404)
+                                .withHeader("Content-Type", "application/json")
+                                .withBody("""
+                                {"message":"404 File Not Found"}
+                                """)));
+        return Stub.builder()
+                .mapping(stub)
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    /**
+     * Stubs GitLab API GET /api/v4/projects/:project/merge_requests/:iid/changes for path-scoped
+     * SLA overrides.
+     */
+    public Stub stubGitLabListChanges(String description, String projectPath, int mrIid, List<String> filenames) {
+        String encoded = encodeProjectPath(projectPath);
+        String changesJson =
+                filenames.stream().map(f -> """
+                        {"new_path":"%s","old_path":"%s"}""".formatted(f, f)).collect(Collectors.joining(",", "[", "]"));
+        String body = """
+                {"changes":%s}
+                """.formatted(changesJson);
+        StubMapping stub = givenThat(get("/api/v4/projects/" + encoded + "/merge_requests/" + mrIid + "/changes")
+                .withName(description)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+        return Stub.builder()
+                .mapping(stub)
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    /**
+     * Stubs GitLab API GET /api/v4/groups/:group/members/all?per_page=100&page=1 returning the
+     * given usernames.
+     */
+    public Stub stubGitLabGetGroupMembers(String description, String groupPath, List<String> usernames) {
+        String encoded = encodeProjectPath(groupPath);
+        String body = usernames.stream().map(u -> """
+                        {"username":"%s"}""".formatted(u)).collect(Collectors.joining(",", "[", "]"));
+        StubMapping stub = givenThat(get("/api/v4/groups/" + encoded + "/members/all?per_page=100&page=1")
+                .withName(description)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+        return Stub.builder()
+                .mapping(stub)
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
     public Stub stubReactionAdd(ReactionAddedExpectation expectation) {
         StubMapping stubMapping = givenThat(post("/api/reactions.add")
                 .withName(expectation.description())

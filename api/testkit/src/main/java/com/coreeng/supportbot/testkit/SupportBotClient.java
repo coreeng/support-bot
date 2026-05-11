@@ -482,6 +482,9 @@ public class SupportBotClient {
     @Jacksonized
     public static class PrTrackingToCreate {
         private long ticketId;
+
+        @Nullable private String provider;
+
         private String githubRepo;
         private int prNumber;
         private Instant prCreatedAt;
