@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class JdbcPrTrackingRepository implements PrTrackingRepository {
 
     private final DSLContext dsl;
+    private final PrUrlResolver urlResolver;
 
     @Override
     public @Nullable PrTrackingRecord insertIfAbsent(NewPrTracking newRecord) {
@@ -246,7 +247,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                     provider,
                     repo,
                     prNumber,
-                    "https://github.com/%s/pull/%d".formatted(repo, prNumber),
+                    urlResolver.publicUrlFor(repo, prNumber),
                     status,
                     waitingOn,
                     checkNotNull(

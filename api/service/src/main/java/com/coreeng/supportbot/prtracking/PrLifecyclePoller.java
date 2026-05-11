@@ -83,8 +83,8 @@ public class PrLifecyclePoller {
         PrMetadata pr;
         try {
             pr = prSourceClients
-                    .forProvider(Provider.GITHUB)
-                    .fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber());
+                    .forProvider(record.provider())
+                    .fetchPullRequest(new RepoCoord(record.provider(), record.repo()), record.prNumber());
         } catch (PrSourceException e) {
             log.atWarn()
                     .addArgument(record::repo)
@@ -99,8 +99,8 @@ public class PrLifecyclePoller {
             return;
         }
 
-        List<Review> teamReviews =
-                teamReviewFilter.filterToOwningTeam(pr.reviews(), pr, findRepoConfig(record.repo()), teamMemberCache);
+        List<Review> teamReviews = teamReviewFilter.filterToOwningTeam(
+                pr.reviews(), pr, findRepoConfig(record.provider(), record.repo()), teamMemberCache);
         Review latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
 
         switch (record.status()) {
@@ -114,9 +114,12 @@ public class PrLifecyclePoller {
         updateActivityTimestamps(record, teamReviews);
     }
 
-    private PrTrackingProps.@Nullable Repository findRepoConfig(String repo) {
+    private PrTrackingProps.@Nullable Repository findRepoConfig(Provider provider, String repo) {
+        // Key on (provider, name) so a hypothetical name collision across providers can't pick
+        // the wrong config — even though PrTrackingProps disallows duplicates today, the lifecycle
+        // poller reads from the database and should not assume that constraint as a safety net.
         return prTrackingProps.repositories().stream()
-                .filter(r -> r.name().equalsIgnoreCase(repo))
+                .filter(r -> r.provider() == provider && r.name().equalsIgnoreCase(repo))
                 .findFirst()
                 .orElse(null);
     }
@@ -214,8 +217,13 @@ public class PrLifecyclePoller {
         String override = messageRenderer.render(record.repo(), event, ctx);
         String message = override != null
                 ? override
-                : "PR `%s#%d` has been %s. :white_check_mark:"
-                        .formatted(record.repo(), record.prNumber(), isMerged ? "merged" : "closed");
+                : "%s `%s%s%d` has been %s. :white_check_mark:"
+                        .formatted(
+                                PrTerminology.noun(record.provider()),
+                                record.repo(),
+                                PrTerminology.separator(record.provider()),
+                                record.prNumber(),
+                                isMerged ? "merged" : "closed");
         closeRecordAndNotify(record, message);
     }
 
@@ -234,8 +242,12 @@ public class PrLifecyclePoller {
         String override = messageRenderer.render(record.repo(), MessageEvent.CHANGES_REQUESTED, ctx);
         String message = override != null
                 ? override
-                : "PR `%s#%d` has been reviewed and changes have been requested."
-                        .formatted(record.repo(), record.prNumber());
+                : "%s `%s%s%d` has been reviewed and changes have been requested."
+                        .formatted(
+                                PrTerminology.noun(record.provider()),
+                                record.repo(),
+                                PrTerminology.separator(record.provider()),
+                                record.prNumber());
         postMessage(message, ticket.channelId(), ticket.queryTs(), record);
     }
 
@@ -244,8 +256,12 @@ public class PrLifecyclePoller {
         String override = messageRenderer.render(record.repo(), MessageEvent.APPROVED, ctx);
         String message = override != null
                 ? override
-                : "PR `%s#%d` has been approved and is ready to merge. :white_check_mark:"
-                        .formatted(record.repo(), record.prNumber());
+                : "%s `%s%s%d` has been approved and is ready to merge. :white_check_mark:"
+                        .formatted(
+                                PrTerminology.noun(record.provider()),
+                                record.repo(),
+                                PrTerminology.separator(record.provider()),
+                                record.prNumber());
         closeRecordAndNotify(record, message);
     }
 
@@ -370,7 +386,12 @@ public class PrLifecyclePoller {
             }
         }
         return new PrMessageContext(
-                record.repo(), record.prNumber(), resolveTeamLabel(record.owningTeam()), sla, slaDeadline);
+                record.provider(),
+                record.repo(),
+                record.prNumber(),
+                resolveTeamLabel(record.owningTeam()),
+                sla,
+                slaDeadline);
     }
 
     private String resolveTeamLabel(String teamCode) {

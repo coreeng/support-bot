@@ -4,6 +4,7 @@ import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.prtracking.source.PrMetadata;
 import com.coreeng.supportbot.prtracking.source.PrSourceClients;
 import com.coreeng.supportbot.prtracking.source.PrSourceException;
+import com.coreeng.supportbot.prtracking.source.Provider;
 import com.coreeng.supportbot.prtracking.source.Review;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
@@ -53,32 +54,47 @@ public class TeamReviewFilter {
 
     private @Nullable Set<String> resolveOwningTeamMembers(
             PrMetadata pr, PrTrackingProps.@Nullable Repository repoConfig, Map<String, Optional<Set<String>>> cache) {
-        // Explicit team slug configured — use Teams API
-        if (repoConfig != null && repoConfig.githubTeamSlug() != null) {
-            String org = Iterables.get(Splitter.on('/').split(pr.coord().name()), 0);
-            return resolveTeamReviewers(pr, repoConfig.githubTeamSlug(), org, cache);
+        if (pr.coord().provider() == Provider.GITLAB) {
+            // GitLab: only an explicit group path triggers filtering. No equivalent to GitHub's
+            // "requested team reviewers" — empty means accept all.
+            if (repoConfig != null && repoConfig.gitlabGroupPath() != null) {
+                return resolveByTeamRef(pr, repoConfig.gitlabGroupPath(), cache);
+            }
+            return Set.of();
         }
-        // No slug — use requested team reviewers already fetched with the PR.
-        // If empty (no teams requested), all reviews are accepted without filtering.
+        // GitHub: explicit team slug configured — use Teams API
+        if (repoConfig != null && repoConfig.githubTeamSlug() != null) {
+            return resolveByTeamRef(pr, repoConfig.githubTeamSlug(), cache);
+        }
+        // GitHub fallback: requested team reviewers already fetched with the PR. Empty list means
+        // no teams were requested, so all reviews are accepted without filtering.
         List<String> requestedMembers = pr.requestedTeamReviewerLogins();
         return requestedMembers.isEmpty() ? Set.of() : Set.copyOf(requestedMembers);
     }
 
-    private @Nullable Set<String> resolveTeamReviewers(
-            PrMetadata pr, String teamSlug, String org, Map<String, Optional<Set<String>>> cache) {
-        String key = org + "/" + teamSlug;
+    /**
+     * Resolves group/team members via {@link com.coreeng.supportbot.prtracking.source.PrSourceClient#resolveTeamMembers}.
+     * Cache key folds in the provider so a GitHub team slug and a GitLab group path that happen to
+     * share a name in the same org/group can't collide.
+     */
+    private @Nullable Set<String> resolveByTeamRef(
+            PrMetadata pr, String teamRef, Map<String, Optional<Set<String>>> cache) {
+        String scope = pr.coord().provider() == Provider.GITHUB
+                ? Iterables.get(Splitter.on('/').split(pr.coord().name()), 0)
+                : pr.coord().name();
+        String key = pr.coord().provider() + ":" + scope + "/" + teamRef;
         if (cache.containsKey(key)) {
             // Optional.empty() = previous fetch failed; Optional.of(set) = members resolved
             return cache.get(key).orElse(null);
         }
         try {
             Set<String> members = Set.copyOf(
-                    prSourceClients.forProvider(pr.coord().provider()).resolveTeamMembers(pr.coord(), teamSlug));
+                    prSourceClients.forProvider(pr.coord().provider()).resolveTeamMembers(pr.coord(), teamRef));
             cache.put(key, Optional.of(members));
             return members;
         } catch (PrSourceException e) {
             log.atWarn()
-                    .addArgument(() -> org + "/" + teamSlug)
+                    .addArgument(() -> key)
                     .addArgument(e::getMessage)
                     .log("Could not fetch team members for {} — skipping team validation: {}");
             cache.put(key, Optional.empty());
