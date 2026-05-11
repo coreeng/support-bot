@@ -178,12 +178,16 @@ pr-review-tracking:
     app-id: ${GITHUB_APP_ID:}
     installation-id: ${GITHUB_APP_INSTALLATION_ID:}
     private-key-pem: ${GITHUB_APP_PRIVATE_KEY_PEM:}
-  # Optional. Required only when any repository has `provider: gitlab`.
+  # Required only when any repository has `provider: gitlab`. The block is declared here with
+  # defaults so adding a GitLab repo (uncommenting one of the entries below) is a single-step
+  # change rather than two. Token defaults to empty — startup validation fires only when an
+  # actual GitLab repo references this block, so leaving GITLAB_TOKEN unset is fine until then.
+  #
   # The api-base-url must NOT end with a trailing slash and MUST include the /api/v4 segment
   # (no auto-append — explicit > magic). Token is resolvable per-repo too (per-repo override wins).
-  # gitlab:
-  #   api-base-url: ${GITLAB_API_BASE_URL:https://gitlab.com/api/v4}
-  #   token: ${GITLAB_TOKEN:}
+  gitlab:
+    api-base-url: ${GITLAB_API_BASE_URL:https://gitlab.com/api/v4}
+    token: ${GITLAB_TOKEN:}
   # Example GitLab repository entries:
   #   - name: my-group/my-project        # supports nested groups: group/subgroup/project
   #     provider: gitlab
