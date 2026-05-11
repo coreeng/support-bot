@@ -77,11 +77,19 @@ public record PrTrackingProps(
             if (isBlank(this.impact)) {
                 throw new IllegalArgumentException("pr-review-tracking.impact must not be blank when enabled");
             }
-            if (github == null) {
-                throw new IllegalArgumentException("pr-review-tracking.github must be configured when enabled");
-            }
             validateRepositories(this.repositories, this.gitlab);
-            validateConfig(this.github);
+            // Only validate the github block when at least one repository uses it. Pure-GitLab
+            // deployments don't need a GitHub token; insisting on one would force operators to
+            // configure a dummy credential they never use. Mirrors the gitlab-side rule (token
+            // required only when any repo uses provider=gitlab).
+            boolean anyGithubRepo = this.repositories.stream().anyMatch(r -> r.provider() == Provider.GITHUB);
+            if (anyGithubRepo) {
+                if (github == null) {
+                    throw new IllegalArgumentException(
+                            "pr-review-tracking.github must be configured when any repo uses provider=github");
+                }
+                validateConfig(this.github);
+            }
         }
     }
 

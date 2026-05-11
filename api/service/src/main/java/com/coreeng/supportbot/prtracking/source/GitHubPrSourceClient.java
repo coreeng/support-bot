@@ -16,6 +16,11 @@ public class GitHubPrSourceClient implements PrSourceClient {
     }
 
     @Override
+    public Provider provider() {
+        return Provider.GITHUB;
+    }
+
+    @Override
     public PrMetadata fetchPullRequest(RepoCoord coord, int prNumber) {
         expectGitHub(coord);
         try {

@@ -13,6 +13,13 @@ import org.jspecify.annotations.Nullable;
 public interface PrSourceClient {
 
     /**
+     * Identifies which provider this adapter speaks for. Used by {@link PrSourceClients} to
+     * auto-register adapters by their provider — adapters that fail to register here will not
+     * be reachable through {@code forProvider}.
+     */
+    Provider provider();
+
+    /**
      * Fetches PR metadata including reviews and requested team reviewers. Adapters
      * are responsible for any provider-specific multi-call assembly.
      */

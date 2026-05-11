@@ -113,7 +113,8 @@ class PrTrackingConfigValidationTest {
                         null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("pr-review-tracking.github must be configured when enabled");
+                .hasMessageContaining(
+                        "pr-review-tracking.github must be configured when any repo uses provider=github");
     }
 
     @Test
@@ -870,6 +871,47 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("gitlab.token must be set");
+    }
+
+    @Test
+    void acceptsGitLabOnlyDeploymentWithoutGithubBlock() {
+        // given — pure-GitLab config: gitlab repo + gitlab block, github block omitted entirely
+        PrTrackingProps.Repository repo = gitlabRepo("my-group/project");
+
+        // when / then — startup succeeds; the github validator is silent because no github repos exist
+        assertThatCode(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(repo),
+                        null,
+                        new PrTrackingProps.Gitlab("https://gitlab.com/api/v4", "glpat-123"),
+                        DEFAULT_SLA_DISCOVERY))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsMixedDeploymentWithBothProviders() {
+        // given — one github repo and one gitlab repo
+        PrTrackingProps.Repository ghRepo = validRepo();
+        PrTrackingProps.Repository glRepo = gitlabRepo("my-group/project");
+
+        // when / then — both top-level blocks present, validation passes
+        assertThatCode(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(ghRepo, glRepo),
+                        validTokenGithub(),
+                        new PrTrackingProps.Gitlab("https://gitlab.com/api/v4", "glpat-123"),
+                        DEFAULT_SLA_DISCOVERY))
+                .doesNotThrowAnyException();
     }
 
     @Test
