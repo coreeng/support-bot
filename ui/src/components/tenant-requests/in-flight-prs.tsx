@@ -350,7 +350,7 @@ export default function InFlightPrsTab() {
  ) : (
  <>
  <div className="overflow-x-auto">
- <table className="min-w-full divide-y">
+ <table className="min-w-full divide-y whitespace-nowrap">
  <thead className="bg-muted">
  <tr>
  <SortHeader label="PR" sortKey="pr" align="left" activeSortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
