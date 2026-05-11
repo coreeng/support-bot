@@ -15,3 +15,7 @@ COPY --chown=1001:1001 web/templates/footer.html   /srv/dex/web/templates/footer
 COPY --chown=1001:1001 web/templates/login.html    /srv/dex/web/templates/login.html
 COPY --chown=1001:1001 web/templates/password.html /srv/dex/web/templates/password.html
 COPY --chown=1001:1001 web/templates/error.html    /srv/dex/web/templates/error.html
+
+# Re-declare the non-root user from upstream (ghcr.io/dexidp/dex sets USER 1001:1001).
+# Inherited from FROM at runtime; explicit here so static analyzers (e.g. Trivy DS-0002) see it.
+USER 1001:1001
