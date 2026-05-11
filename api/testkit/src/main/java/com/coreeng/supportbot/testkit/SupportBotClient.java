@@ -497,7 +497,8 @@ public class SupportBotClient {
     public static class PrTrackingRecordResponse {
         private long id;
         private long ticketId;
-        private String githubRepo;
+        private String provider;
+        private String repo;
         private int prNumber;
         private Instant prCreatedAt;
         private Instant slaDeadline;

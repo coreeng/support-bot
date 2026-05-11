@@ -1,10 +1,17 @@
 package com.coreeng.supportbot.prtracking;
 
+import com.coreeng.supportbot.prtracking.source.Provider;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
 /**
  * API payload for a single in-flight PR row on the tenant-requests dashboard.
+ *
+ * <p>The internal field is named {@code repo} but is serialised as {@code githubRepo} to preserve
+ * the v1 wire format — the frontend's in-flight tab reads {@code pr.githubRepo} unchanged.
+ * Removing the {@code @JsonProperty} would silently blank the repo column in the UI.
  *
  * <p>Deliberately enforces no cross-field invariants on {@code hasSla} × {@code slaDeadline} ×
  * {@code slaRemainingSeconds}. The "healthy" triples are:
@@ -22,7 +29,8 @@ import org.jspecify.annotations.Nullable;
  * /in-flight-prs endpoint, blanking the tab for every user over one bad row.
  */
 public record InFlightPrResponse(
-        String githubRepo,
+        @JsonIgnore Provider provider,
+        @JsonProperty("githubRepo") String repo,
         int prNumber,
         String prUrl,
         String status,
@@ -40,7 +48,8 @@ public record InFlightPrResponse(
 
     public InFlightPrResponse(InFlightPr pr, String owningTeamLabel) {
         this(
-                pr.githubRepo(),
+                pr.provider(),
+                pr.repo(),
                 pr.prNumber(),
                 pr.prUrl(),
                 pr.status(),

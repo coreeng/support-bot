@@ -111,17 +111,17 @@ class PrLifecyclePollerTest {
                 Instant.now().plusSeconds(7200));
 
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(first, second));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(first.githubRepo()), first.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(first.repo()), first.prNumber()))
                 .thenReturn(closedPr(first));
         when(ticketRepository.findTicketById(new TicketId(first.ticketId())))
                 .thenThrow(new RuntimeException("database temporarily unavailable"));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(second.githubRepo()), second.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(second.repo()), second.prNumber()))
                 .thenReturn(openPr(second));
 
         // when / then
         assertDoesNotThrow(poller::poll);
-        verify(prSourceClient).fetchPullRequest(RepoCoord.github(first.githubRepo()), first.prNumber());
-        verify(prSourceClient).fetchPullRequest(RepoCoord.github(second.githubRepo()), second.prNumber());
+        verify(prSourceClient).fetchPullRequest(RepoCoord.github(first.repo()), first.prNumber());
+        verify(prSourceClient).fetchPullRequest(RepoCoord.github(second.repo()), second.prNumber());
     }
 
     @Test
@@ -137,7 +137,7 @@ class PrLifecyclePollerTest {
                 Instant.now().plusSeconds(7200));
         Ticket ticket = ticket(100L);
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(closedPr(record));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket);
         when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
@@ -166,7 +166,7 @@ class PrLifecyclePollerTest {
                 Instant.now().plusSeconds(7200));
         Ticket ticket = ticket(100L);
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(closedPr(record));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket);
         when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
@@ -196,7 +196,7 @@ class PrLifecyclePollerTest {
                 PrTrackingStatus.OPEN,
                 Instant.now().plusSeconds(7200));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(closedPr(record));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
@@ -221,7 +221,7 @@ class PrLifecyclePollerTest {
                 PrTrackingStatus.OPEN,
                 Instant.now().plusSeconds(7200));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(closedPr(record));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(null);
 
@@ -247,7 +247,7 @@ class PrLifecyclePollerTest {
                 PrTrackingStatus.OPEN,
                 Instant.now().minusSeconds(60));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(openPr(record));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(escalationProcessingService.createEscalation(any())).thenReturn(null);
@@ -272,7 +272,7 @@ class PrLifecyclePollerTest {
                 PrTrackingStatus.OPEN,
                 Instant.now().minusSeconds(60));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(openPr(record));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(escalationProcessingService.createEscalation(any()))
@@ -307,7 +307,7 @@ class PrLifecyclePollerTest {
                 PrTrackingStatus.OPEN,
                 Instant.now().minusSeconds(60));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(openPr(record));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(escalationProcessingService.createEscalation(any()))
@@ -340,6 +340,7 @@ class PrLifecyclePollerTest {
         PrTrackingRecord record = new PrTrackingRecord(
                 1L,
                 100L,
+                Provider.GITHUB,
                 "my-org/repo-a",
                 11,
                 Instant.now().minusSeconds(3600),
@@ -353,7 +354,7 @@ class PrLifecyclePollerTest {
                 null,
                 null);
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(closedPr(record));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
 
@@ -377,7 +378,7 @@ class PrLifecyclePollerTest {
                 PrTrackingStatus.OPEN,
                 Instant.now().plusSeconds(7200));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(mergedPr(record));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
@@ -404,7 +405,7 @@ class PrLifecyclePollerTest {
                 PrTrackingStatus.OPEN,
                 Instant.now().plusSeconds(7200));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(closedPr(record));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
@@ -431,7 +432,7 @@ class PrLifecyclePollerTest {
                 PrTrackingStatus.OPEN,
                 Instant.now().plusSeconds(7200));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(mergedPr(record));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
@@ -458,7 +459,7 @@ class PrLifecyclePollerTest {
                 PrTrackingStatus.OPEN,
                 Instant.now().plusSeconds(7200));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(closedPr(record));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
@@ -485,7 +486,7 @@ class PrLifecyclePollerTest {
                 PrTrackingStatus.OPEN,
                 Instant.now().plusSeconds(7200));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(openMergeablePrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
@@ -512,7 +513,7 @@ class PrLifecyclePollerTest {
                 PrTrackingStatus.OPEN,
                 Instant.now().plusSeconds(7200));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
         when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
         when(messageRenderer.render(eq("my-org/repo-a"), eq(MessageEvent.CHANGES_REQUESTED), any()))
@@ -542,7 +543,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
             when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
                     .thenReturn(ticket(100L));
@@ -570,7 +571,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openMergeablePrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
             when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
                     .thenReturn(ticket(100L));
@@ -601,7 +602,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openMergeablePrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
             when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
                     .thenReturn(ticket(100L));
@@ -629,7 +630,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
 
             // when
@@ -651,7 +652,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPr(record));
 
             // when
@@ -670,6 +671,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record = new PrTrackingRecord(
                     1L,
                     100L,
+                    Provider.GITHUB,
                     "my-org/repo-a",
                     11,
                     Instant.now().minusSeconds(3600),
@@ -683,7 +685,7 @@ class PrLifecyclePollerTest {
                     null,
                     null);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPr(record));
 
             // when
@@ -704,6 +706,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord ancientNoSlaRecord = new PrTrackingRecord(
                     1L,
                     100L,
+                    Provider.GITHUB,
                     "my-org/repo-a",
                     11,
                     Instant.now().minus(Duration.ofDays(365)), // a year old, well past any SLA
@@ -718,7 +721,7 @@ class PrLifecyclePollerTest {
                     null);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(ancientNoSlaRecord));
             when(prSourceClient.fetchPullRequest(
-                            RepoCoord.github(ancientNoSlaRecord.githubRepo()), ancientNoSlaRecord.prNumber()))
+                            RepoCoord.github(ancientNoSlaRecord.repo()), ancientNoSlaRecord.prNumber()))
                     .thenReturn(openPr(ancientNoSlaRecord));
 
             poller.poll();
@@ -734,6 +737,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record = new PrTrackingRecord(
                     1L,
                     100L,
+                    Provider.GITHUB,
                     "my-org/repo-a",
                     11,
                     Instant.now().minusSeconds(3600),
@@ -747,7 +751,7 @@ class PrLifecyclePollerTest {
                     null,
                     null);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
             when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
                     .thenReturn(ticket(100L));
@@ -766,7 +770,7 @@ class PrLifecyclePollerTest {
             verify(slackClient).postMessage(captor.capture());
             assertThat(captor.getValue().message().getText())
                     .contains("PR `%s#%d` has been reviewed and changes have been requested."
-                            .formatted(record.githubRepo(), record.prNumber()));
+                            .formatted(record.repo(), record.prNumber()));
         }
 
         @Test
@@ -776,6 +780,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record = new PrTrackingRecord(
                     1L,
                     100L,
+                    Provider.GITHUB,
                     "my-org/repo-a",
                     11,
                     Instant.now().minusSeconds(3600),
@@ -789,7 +794,7 @@ class PrLifecyclePollerTest {
                     null,
                     null);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
 
             // when
@@ -813,7 +818,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.COMMENTED))));
 
             // when
@@ -836,7 +841,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(
                             record,
                             List.of(
@@ -867,7 +872,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record = pausedRecord(
                     1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openMergeablePrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
             when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
                     .thenReturn(ticket(100L));
@@ -892,7 +897,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record = pausedRecord(
                     1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
 
             // when
@@ -911,7 +916,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record = pausedRecord(
                     1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.DISMISSED))));
 
             // when
@@ -928,7 +933,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record = pausedRecord(
                     1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
 
             // when
@@ -953,7 +958,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record =
                     pausedRecord(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.APPROVED, Duration.ofHours(4));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openMergeablePrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
             when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
                     .thenReturn(ticket(100L));
@@ -978,7 +983,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record =
                     pausedRecord(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.APPROVED, Duration.ofHours(4));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
 
             // when
@@ -996,7 +1001,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record =
                     pausedRecord(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.APPROVED, Duration.ofHours(4));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
             when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
                     .thenReturn(ticket(100L));
@@ -1016,7 +1021,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record =
                     pausedRecord(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.APPROVED, Duration.ofHours(4));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(mergedPr(record));
             when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
                     .thenReturn(ticket(100L));
@@ -1049,7 +1054,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.ESCALATED,
                     Instant.now().minusSeconds(60));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openMergeablePrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
             when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
                     .thenReturn(ticket(100L));
@@ -1078,7 +1083,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.ESCALATED,
                     Instant.now().minusSeconds(60));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
 
             // when
@@ -1101,7 +1106,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.ESCALATED,
                     Instant.now().minusSeconds(60));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPr(record));
 
             // when
@@ -1124,7 +1129,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.ESCALATED,
                     Instant.now().minusSeconds(60));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
             when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
                     .thenReturn(ticket(100L));
@@ -1158,7 +1163,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(
                             record,
                             List.of(
@@ -1201,7 +1206,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(new PrTrackingProps.Repository(
@@ -1231,7 +1236,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(new PrTrackingProps.Repository(
@@ -1307,7 +1312,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithRequestedReviewers(
                             record,
                             List.of("auto-reviewer"),
@@ -1343,7 +1348,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
             when(prTrackingProps.repositories()).thenReturn(List.of());
 
@@ -1373,7 +1378,7 @@ class PrLifecyclePollerTest {
                     Instant.now().plusSeconds(7200));
             Instant reviewTime = Instant.parse("2026-03-20T12:00:00Z");
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(
                             record,
                             List.of(
@@ -1399,7 +1404,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPr(record));
 
             // when
@@ -1417,6 +1422,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record = new PrTrackingRecord(
                     1L,
                     100L,
+                    Provider.GITHUB,
                     "my-org/repo-a",
                     11,
                     Instant.now().minusSeconds(3600),
@@ -1430,7 +1436,7 @@ class PrLifecyclePollerTest {
                     existingReviewTime,
                     null);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(
                             record,
                             List.of(review(Review.ReviewState.COMMENTED, existingReviewTime.minusSeconds(60)))));
@@ -1455,6 +1461,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record = new PrTrackingRecord(
                     1L,
                     100L,
+                    Provider.GITHUB,
                     "my-org/repo-a",
                     11,
                     Instant.now().minusSeconds(3600),
@@ -1468,7 +1475,7 @@ class PrLifecyclePollerTest {
                     null,
                     null);
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.DISMISSED))));
 
             // when
@@ -1485,7 +1492,7 @@ class PrLifecyclePollerTest {
             PrTrackingRecord record = pausedRecord(
                     1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(4));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPr(record));
 
             // when
@@ -1507,7 +1514,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.ESCALATED,
                     Instant.now().minusSeconds(60));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(mergedPr(record));
             when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
                     .thenReturn(ticket(100L));
@@ -1534,7 +1541,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().plusSeconds(7200));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
             when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
                     .thenReturn(null);
@@ -1560,7 +1567,7 @@ class PrLifecyclePollerTest {
                     PrTrackingStatus.OPEN,
                     Instant.now().minusSeconds(60));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
-            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber()))
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
             when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
                     .thenReturn(ticket(100L));
@@ -1598,6 +1605,7 @@ class PrLifecyclePollerTest {
         return new PrTrackingRecord(
                 id,
                 ticketId,
+                Provider.GITHUB,
                 repo,
                 prNumber,
                 Instant.now().minusSeconds(3600),
@@ -1617,6 +1625,7 @@ class PrLifecyclePollerTest {
         return new PrTrackingRecord(
                 id,
                 ticketId,
+                Provider.GITHUB,
                 repo,
                 prNumber,
                 Instant.now().minusSeconds(3600),
@@ -1637,7 +1646,7 @@ class PrLifecyclePollerTest {
 
     private static PrMetadata openPrWithReviews(PrTrackingRecord record, List<Review> reviews) {
         return new PrMetadata(
-                RepoCoord.github(record.githubRepo()),
+                RepoCoord.github(record.repo()),
                 record.prNumber(),
                 record.prCreatedAt(),
                 PrMetadata.PrState.OPEN,
@@ -1649,7 +1658,7 @@ class PrLifecyclePollerTest {
     private static PrMetadata openPrWithRequestedReviewers(
             PrTrackingRecord record, List<String> reviewers, List<Review> reviews) {
         return new PrMetadata(
-                RepoCoord.github(record.githubRepo()),
+                RepoCoord.github(record.repo()),
                 record.prNumber(),
                 record.prCreatedAt(),
                 PrMetadata.PrState.OPEN,
@@ -1664,7 +1673,7 @@ class PrLifecyclePollerTest {
 
     private static PrMetadata openMergeablePrWithReviews(PrTrackingRecord record, List<Review> reviews) {
         return new PrMetadata(
-                RepoCoord.github(record.githubRepo()),
+                RepoCoord.github(record.repo()),
                 record.prNumber(),
                 record.prCreatedAt(),
                 PrMetadata.PrState.OPEN,
@@ -1675,7 +1684,7 @@ class PrLifecyclePollerTest {
 
     private static PrMetadata closedPr(PrTrackingRecord record) {
         return new PrMetadata(
-                RepoCoord.github(record.githubRepo()),
+                RepoCoord.github(record.repo()),
                 record.prNumber(),
                 record.prCreatedAt(),
                 PrMetadata.PrState.CLOSED,
@@ -1686,7 +1695,7 @@ class PrLifecyclePollerTest {
 
     private static PrMetadata mergedPr(PrTrackingRecord record) {
         return new PrMetadata(
-                RepoCoord.github(record.githubRepo()),
+                RepoCoord.github(record.repo()),
                 record.prNumber(),
                 record.prCreatedAt(),
                 PrMetadata.PrState.MERGED,

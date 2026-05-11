@@ -219,7 +219,7 @@ class PrDetectionServiceTest {
             verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
             NewPrTracking inserted = newTrackingCaptor.getValue();
             assertThat(inserted.ticketId()).isEqualTo(99L);
-            assertThat(inserted.githubRepo()).isEqualTo(REPO);
+            assertThat(inserted.repo()).isEqualTo(REPO);
             assertThat(inserted.prNumber()).isEqualTo(PR_NUMBER);
             assertThat(inserted.prCreatedAt()).isEqualTo(prCreatedAt);
             assertThat(inserted.slaDeadline()).isEqualTo(prCreatedAt.plus(SLA_24H));
@@ -398,7 +398,7 @@ class PrDetectionServiceTest {
 
         private void setupDetectedPr(Instant prCreatedAt) {
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -425,7 +425,7 @@ class PrDetectionServiceTest {
         void skipsProcessingWhenPrAlreadyTrackedForTicket() {
             // given
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(99L, REPO, PR_NUMBER))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(99L, Provider.GITHUB, REPO, PR_NUMBER))
                     .thenReturn(true);
 
             // when
@@ -448,7 +448,7 @@ class PrDetectionServiceTest {
         void skipsGracefullyWhenGitHubReturnsError() {
             // given
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenThrow(new PrSourceException("PR not found: " + REPO + "#" + PR_NUMBER));
@@ -469,7 +469,7 @@ class PrDetectionServiceTest {
             Instant prCreatedAt = Instant.now().minus(Duration.ofDays(5));
             Ticket ticket = ticketWithId(1L);
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -498,7 +498,7 @@ class PrDetectionServiceTest {
             // given — some hypothetical non-open state
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -525,7 +525,7 @@ class PrDetectionServiceTest {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prTrackingProps.repositories())
                     .thenReturn(
@@ -556,7 +556,7 @@ class PrDetectionServiceTest {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prTrackingProps.repositories())
                     .thenReturn(
@@ -590,7 +590,7 @@ class PrDetectionServiceTest {
                     .thenReturn(
                             List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), sla(SLA_24H))));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -620,7 +620,7 @@ class PrDetectionServiceTest {
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), null)));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -662,7 +662,7 @@ class PrDetectionServiceTest {
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null)));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -684,7 +684,7 @@ class PrDetectionServiceTest {
             verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
             assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
             assertThat(newTrackingCaptor.getValue().hasSla()).isFalse();
-            assertThat(newTrackingCaptor.getValue().githubRepo()).isEqualTo(NO_SLA_REPO);
+            assertThat(newTrackingCaptor.getValue().repo()).isEqualTo(NO_SLA_REPO);
             // Slack: pr emoji reaction + base "eyes" reaction (2 total) + tracking message (no SLA info)
             verify(slackClient, times(2)).addReaction(any());
             verify(slackClient).postMessage(postMessageCaptor.capture());
@@ -707,7 +707,7 @@ class PrDetectionServiceTest {
             when(messageRenderer.render(eq(NO_SLA_REPO), eq(MessageEvent.DETECTED), any()))
                     .thenReturn(customMessage);
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -746,7 +746,7 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any()))
                     .thenReturn(
                             List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER), new DetectedPr(NO_SLA_REPO, prNumber2)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -773,6 +773,7 @@ class PrDetectionServiceTest {
                             new PrTrackingRecord(
                                     1L,
                                     1L,
+                                    Provider.GITHUB,
                                     NO_SLA_REPO,
                                     PR_NUMBER,
                                     prCreatedAt,
@@ -788,6 +789,7 @@ class PrDetectionServiceTest {
                             new PrTrackingRecord(
                                     2L,
                                     1L,
+                                    Provider.GITHUB,
                                     NO_SLA_REPO,
                                     prNumber2,
                                     prCreatedAt,
@@ -822,7 +824,7 @@ class PrDetectionServiceTest {
             when(prUrlParser.parse(any()))
                     .thenReturn(
                             List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER), new DetectedPr(NO_SLA_REPO, prNumber2)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -849,6 +851,7 @@ class PrDetectionServiceTest {
                             new PrTrackingRecord(
                                     1L,
                                     1L,
+                                    Provider.GITHUB,
                                     NO_SLA_REPO,
                                     PR_NUMBER,
                                     prCreatedAt,
@@ -864,6 +867,7 @@ class PrDetectionServiceTest {
                             new PrTrackingRecord(
                                     2L,
                                     1L,
+                                    Provider.GITHUB,
                                     NO_SLA_REPO,
                                     prNumber2,
                                     prCreatedAt,
@@ -896,7 +900,7 @@ class PrDetectionServiceTest {
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null)));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -933,7 +937,7 @@ class PrDetectionServiceTest {
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null)));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -969,7 +973,7 @@ class PrDetectionServiceTest {
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null)));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -1000,7 +1004,7 @@ class PrDetectionServiceTest {
             when(prTrackingProps.repositories())
                     .thenReturn(List.of(new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null)));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(NO_SLA_REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(NO_SLA_COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -1087,7 +1091,7 @@ class PrDetectionServiceTest {
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "slack:SG123"));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -1301,7 +1305,7 @@ class PrDetectionServiceTest {
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "slack:SG123"));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
 
             // stub team resolver — "team-member" is in the owning team, "outsider" is not
@@ -1344,7 +1348,7 @@ class PrDetectionServiceTest {
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "slack:SG123"));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -1367,7 +1371,7 @@ class PrDetectionServiceTest {
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "slack:SG123"));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -1405,7 +1409,7 @@ class PrDetectionServiceTest {
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "slack:SG123"));
             when(prUrlParser.parse(any()))
                     .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(repoB, prB)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -1434,9 +1438,8 @@ class PrDetectionServiceTest {
 
             // then
             verify(prTrackingRepository)
-                    .insertIfAbsent(argThat(r -> REPO.equals(r.githubRepo()) && r.prNumber() == PR_NUMBER));
-            verify(prTrackingRepository)
-                    .insertIfAbsent(argThat(r -> repoB.equals(r.githubRepo()) && r.prNumber() == prB));
+                    .insertIfAbsent(argThat(r -> REPO.equals(r.repo()) && r.prNumber() == PR_NUMBER));
+            verify(prTrackingRepository).insertIfAbsent(argThat(r -> repoB.equals(r.repo()) && r.prNumber() == prB));
             verify(slackClient, org.mockito.Mockito.times(2)).postMessage(any());
             verify(slackClient, org.mockito.Mockito.times(3)).addReaction(any());
         }
@@ -1457,9 +1460,9 @@ class PrDetectionServiceTest {
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "slack:SG123"));
             when(prUrlParser.parse(any()))
                     .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(repoB, prB)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(10L, REPO, PR_NUMBER))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(10L, Provider.GITHUB, REPO, PR_NUMBER))
                     .thenReturn(true);
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(10L, repoB, prB))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(10L, Provider.GITHUB, repoB, prB))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(RepoCoord.github(repoB), prB))
                     .thenReturn(new PrMetadata(
@@ -1498,7 +1501,7 @@ class PrDetectionServiceTest {
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "slack:SG123"));
             when(prUrlParser.parse(any()))
                     .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(repoB, prB)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -1525,8 +1528,7 @@ class PrDetectionServiceTest {
             PrDetectionOutcome outcome = service.handleMessagePosted(messagePostedWith("two PRs"), ticketWithId(10L));
 
             // then — closed PR is ignored while open PR is tracked
-            verify(prTrackingRepository)
-                    .insertIfAbsent(argThat(r -> repoB.equals(r.githubRepo()) && r.prNumber() == prB));
+            verify(prTrackingRepository).insertIfAbsent(argThat(r -> repoB.equals(r.repo()) && r.prNumber() == prB));
             assertThat(outcome.shouldCloseTicket()).isFalse();
         }
     }
@@ -1557,7 +1559,7 @@ class PrDetectionServiceTest {
                     .thenReturn(customMessage);
             when(prUrlParser.parse(any()))
                     .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(REPO, prB)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -1599,7 +1601,7 @@ class PrDetectionServiceTest {
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "slack:SG123"));
             when(prUrlParser.parse(any()))
                     .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(REPO, prB)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -1640,7 +1642,7 @@ class PrDetectionServiceTest {
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "slack:SG123"));
             when(prUrlParser.parse(any()))
                     .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(REPO, prB)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             List<Review> changesRequestedReviews = List.of(new Review(
                     "reviewer",
@@ -1695,7 +1697,7 @@ class PrDetectionServiceTest {
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "slack:SG123"));
             when(prUrlParser.parse(any()))
                     .thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER), new DetectedPr(REPO, prB)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             // PR_NUMBER has no reviews (tracked), prB has changes requested
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
@@ -1749,7 +1751,7 @@ class PrDetectionServiceTest {
 
             Instant createdAt = Instant.now().minus(Duration.ofHours(1));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -1869,7 +1871,7 @@ class PrDetectionServiceTest {
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam(TEAM_LABEL, TEAM_CODE, "slack:SG123"));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -1910,7 +1912,7 @@ class PrDetectionServiceTest {
             when(escalationTeamsRegistry.findEscalationTeamByCode(TEAM_CODE))
                     .thenReturn(new EscalationTeam("Infra Integration", TEAM_CODE, "slack:SG123"));
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -1943,7 +1945,7 @@ class PrDetectionServiceTest {
             when(escalationTeamsRegistry.findEscalationTeamByCode("unknown-team"))
                     .thenReturn(null);
             when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(REPO, PR_NUMBER)));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
                     .thenReturn(new PrMetadata(
@@ -2000,7 +2002,7 @@ class PrDetectionServiceTest {
                             null,
                             List.of(),
                             List.of()));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
@@ -2077,7 +2079,7 @@ class PrDetectionServiceTest {
                             null,
                             List.of(),
                             List.of()));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(100L, REPO, PR_NUMBER))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(100L, Provider.GITHUB, REPO, PR_NUMBER))
                     .thenReturn(true);
 
             Supplier<Ticket> supplier = mock(Supplier.class);
@@ -2123,7 +2125,7 @@ class PrDetectionServiceTest {
                             null,
                             List.of(),
                             List.of()));
-            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), anyInt()))
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
                     .thenReturn(false);
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(1L, createdAt, createdAt.plus(SLA_24H)))
@@ -2177,6 +2179,7 @@ class PrDetectionServiceTest {
         return new PrTrackingRecord(
                 id,
                 1L,
+                Provider.GITHUB,
                 REPO,
                 PR_NUMBER,
                 prCreatedAt,

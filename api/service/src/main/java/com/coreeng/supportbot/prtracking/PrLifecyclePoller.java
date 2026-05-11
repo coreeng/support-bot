@@ -71,7 +71,7 @@ public class PrLifecyclePoller {
                 processRecord(record, teamMemberCache);
             } catch (Exception e) {
                 log.atError()
-                        .addArgument(record::githubRepo)
+                        .addArgument(record::repo)
                         .addArgument(record::prNumber)
                         .setCause(e)
                         .log("Error processing PR tracking record for {}#{}, continuing with next record");
@@ -84,10 +84,10 @@ public class PrLifecyclePoller {
         try {
             pr = prSourceClients
                     .forProvider(Provider.GITHUB)
-                    .fetchPullRequest(RepoCoord.github(record.githubRepo()), record.prNumber());
+                    .fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber());
         } catch (PrSourceException e) {
             log.atWarn()
-                    .addArgument(record::githubRepo)
+                    .addArgument(record::repo)
                     .addArgument(record::prNumber)
                     .addArgument(e::getMessage)
                     .log("Could not fetch PR {}#{}: {}");
@@ -99,8 +99,8 @@ public class PrLifecyclePoller {
             return;
         }
 
-        List<Review> teamReviews = teamReviewFilter.filterToOwningTeam(
-                pr.reviews(), pr, findRepoConfig(record.githubRepo()), teamMemberCache);
+        List<Review> teamReviews =
+                teamReviewFilter.filterToOwningTeam(pr.reviews(), pr, findRepoConfig(record.repo()), teamMemberCache);
         Review latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
 
         switch (record.status()) {
@@ -114,9 +114,9 @@ public class PrLifecyclePoller {
         updateActivityTimestamps(record, teamReviews);
     }
 
-    private PrTrackingProps.@Nullable Repository findRepoConfig(String githubRepo) {
+    private PrTrackingProps.@Nullable Repository findRepoConfig(String repo) {
         return prTrackingProps.repositories().stream()
-                .filter(r -> r.name().equalsIgnoreCase(githubRepo))
+                .filter(r -> r.name().equalsIgnoreCase(repo))
                 .findFirst()
                 .orElse(null);
     }
@@ -173,7 +173,7 @@ public class PrLifecyclePoller {
             } else {
                 prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.APPROVED, null, record.escalationId());
                 log.atInfo()
-                        .addArgument(record::githubRepo)
+                        .addArgument(record::repo)
                         .addArgument(record::prNumber)
                         .log("PR {}#{} approved after escalation — awaiting merge");
             }
@@ -194,13 +194,13 @@ public class PrLifecyclePoller {
             if (record.status() == PrTrackingStatus.OPEN && remaining != null) {
                 prTrackingRepository.pauseSla(record.id(), PrTrackingStatus.APPROVED, remaining);
                 log.atInfo()
-                        .addArgument(record::githubRepo)
+                        .addArgument(record::repo)
                         .addArgument(record::prNumber)
                         .log("PR {}#{} approved — SLA paused, awaiting merge");
             } else {
                 prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.APPROVED, null, record.escalationId());
                 log.atInfo()
-                        .addArgument(record::githubRepo)
+                        .addArgument(record::repo)
                         .addArgument(record::prNumber)
                         .log("PR {}#{} approved — awaiting merge");
             }
@@ -211,19 +211,16 @@ public class PrLifecyclePoller {
         boolean isMerged = pr.state() == PrMetadata.PrState.MERGED;
         MessageEvent event = isMerged ? MessageEvent.MERGED : MessageEvent.CLOSED;
         PrMessageContext ctx = recordContext(record);
-        String override = messageRenderer.render(record.githubRepo(), event, ctx);
+        String override = messageRenderer.render(record.repo(), event, ctx);
         String message = override != null
                 ? override
                 : "PR `%s#%d` has been %s. :white_check_mark:"
-                        .formatted(record.githubRepo(), record.prNumber(), isMerged ? "merged" : "closed");
+                        .formatted(record.repo(), record.prNumber(), isMerged ? "merged" : "closed");
         closeRecordAndNotify(record, message);
     }
 
     private void notifyChangesRequested(PrTrackingRecord record) {
-        log.atInfo()
-                .addArgument(record::githubRepo)
-                .addArgument(record::prNumber)
-                .log("PR {}#{} changes requested");
+        log.atInfo().addArgument(record::repo).addArgument(record::prNumber).log("PR {}#{} changes requested");
 
         Ticket ticket = ticketRepository.findTicketById(new TicketId(record.ticketId()));
         if (ticket == null) {
@@ -234,30 +231,27 @@ public class PrLifecyclePoller {
         }
 
         PrMessageContext ctx = recordContext(record);
-        String override = messageRenderer.render(record.githubRepo(), MessageEvent.CHANGES_REQUESTED, ctx);
+        String override = messageRenderer.render(record.repo(), MessageEvent.CHANGES_REQUESTED, ctx);
         String message = override != null
                 ? override
                 : "PR `%s#%d` has been reviewed and changes have been requested."
-                        .formatted(record.githubRepo(), record.prNumber());
+                        .formatted(record.repo(), record.prNumber());
         postMessage(message, ticket.channelId(), ticket.queryTs(), record);
     }
 
     private void handleApprovalClosure(PrTrackingRecord record) {
         PrMessageContext ctx = recordContext(record);
-        String override = messageRenderer.render(record.githubRepo(), MessageEvent.APPROVED, ctx);
+        String override = messageRenderer.render(record.repo(), MessageEvent.APPROVED, ctx);
         String message = override != null
                 ? override
                 : "PR `%s#%d` has been approved and is ready to merge. :white_check_mark:"
-                        .formatted(record.githubRepo(), record.prNumber());
+                        .formatted(record.repo(), record.prNumber());
         closeRecordAndNotify(record, message);
     }
 
     private void closeRecordAndNotify(PrTrackingRecord record, String message) {
         prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.CLOSED, Instant.now(), record.escalationId());
-        log.atInfo()
-                .addArgument(record::githubRepo)
-                .addArgument(record::prNumber)
-                .log("PR {}#{} marked as CLOSED");
+        log.atInfo().addArgument(record::repo).addArgument(record::prNumber).log("PR {}#{} marked as CLOSED");
 
         Ticket ticket = ticketRepository.findTicketById(new TicketId(record.ticketId()));
         if (ticket == null) {
@@ -296,7 +290,7 @@ public class PrLifecyclePoller {
         // breach text. Do not try to harmonise these without revisiting the spec — the asymmetry is
         // deliberate (poll-time previously posted no tenant-thread text at all, so unset = same as before).
         String escalationOverride =
-                messageRenderer.render(record.githubRepo(), MessageEvent.ESCALATED, recordContext(record));
+                messageRenderer.render(record.repo(), MessageEvent.ESCALATED, recordContext(record));
         if (escalationOverride != null) {
             postMessage(escalationOverride, ticket.channelId(), ticket.queryTs(), record);
         }
@@ -310,7 +304,7 @@ public class PrLifecyclePoller {
 
         if (escalation == null || escalation.id() == null) {
             log.atWarn()
-                    .addArgument(record::githubRepo)
+                    .addArgument(record::repo)
                     .addArgument(record::prNumber)
                     .addArgument(record::ticketId)
                     .log(
@@ -323,7 +317,7 @@ public class PrLifecyclePoller {
         ticketSlackService.markTicketEscalated(ticket.queryRef());
 
         log.atInfo()
-                .addArgument(record::githubRepo)
+                .addArgument(record::repo)
                 .addArgument(record::prNumber)
                 .addArgument(record::ticketId)
                 .log("PR {}#{} SLA breached — escalated on ticket {}");
@@ -348,10 +342,7 @@ public class PrLifecyclePoller {
         }
         Instant newDeadline = Instant.now().plus(record.slaRemaining());
         prTrackingRepository.resumeSla(record.id(), newDeadline);
-        log.atInfo()
-                .addArgument(record::githubRepo)
-                .addArgument(record::prNumber)
-                .log("PR {}#{} — SLA resumed");
+        log.atInfo().addArgument(record::repo).addArgument(record::prNumber).log("PR {}#{} — SLA resumed");
     }
 
     private @Nullable Duration computeRemainingDuration(PrTrackingRecord record) {
@@ -372,14 +363,14 @@ public class PrLifecyclePoller {
                 slaDeadline = record.slaDeadline();
             } else {
                 log.atWarn()
-                        .addArgument(record::githubRepo)
+                        .addArgument(record::repo)
                         .addArgument(record::prNumber)
                         .log(
                                 "PR {}#{} has non-positive computed SLA duration; omitting sla_duration from message context");
             }
         }
         return new PrMessageContext(
-                record.githubRepo(), record.prNumber(), resolveTeamLabel(record.owningTeam()), sla, slaDeadline);
+                record.repo(), record.prNumber(), resolveTeamLabel(record.owningTeam()), sla, slaDeadline);
     }
 
     private String resolveTeamLabel(String teamCode) {
@@ -394,7 +385,7 @@ public class PrLifecyclePoller {
         } catch (Exception e) {
             log.atWarn()
                     .setCause(e)
-                    .addArgument(record::githubRepo)
+                    .addArgument(record::repo)
                     .addArgument(record::prNumber)
                     .addArgument(record::ticketId)
                     .log("Failed to post Slack message for PR {}#{} on ticket {}, continuing");

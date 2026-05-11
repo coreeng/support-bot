@@ -100,7 +100,7 @@ public class PrDetectionService {
 
         for (DetectedPr pr : detectedPrs) {
             if (prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(
-                    ticketId.id(), pr.repositoryName(), pr.pullNumber())) {
+                    ticketId.id(), Provider.GITHUB, pr.repositoryName(), pr.pullNumber())) {
                 log.atInfo()
                         .addArgument(pr::repositoryName)
                         .addArgument(pr::pullNumber)
@@ -223,7 +223,7 @@ public class PrDetectionService {
                 }
 
                 if (prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(
-                        checkNotNull(ticketId).id(), pr.repositoryName(), pr.pullNumber())) {
+                        checkNotNull(ticketId).id(), Provider.GITHUB, pr.repositoryName(), pr.pullNumber())) {
                     log.atInfo()
                             .addArgument(pr::repositoryName)
                             .addArgument(pr::pullNumber)
@@ -392,6 +392,7 @@ public class PrDetectionService {
 
         PrTrackingRecord tracking = prTrackingRepository.insertIfAbsent(new NewPrTracking(
                 ticketId.id(),
+                Provider.GITHUB,
                 detectedPr.repositoryName(),
                 detectedPr.pullNumber(),
                 prMetadata.createdAt(),
@@ -521,6 +522,7 @@ public class PrDetectionService {
         TicketId ticketId = checkNotNull(ticket.id());
         PrTrackingRecord tracking = prTrackingRepository.insertIfAbsent(new NewPrTracking(
                 ticketId.id(),
+                Provider.GITHUB,
                 detectedPr.repositoryName(),
                 detectedPr.pullNumber(),
                 prMetadata.createdAt(),
@@ -666,7 +668,7 @@ public class PrDetectionService {
         Map<String, List<PendingEscalation>> escalationsByRepo = new LinkedHashMap<>();
         for (PendingEscalation e : pendingEscalations) {
             escalationsByRepo
-                    .computeIfAbsent(e.tracking().githubRepo(), k -> new ArrayList<>())
+                    .computeIfAbsent(e.tracking().repo(), k -> new ArrayList<>())
                     .add(e);
         }
 
@@ -697,7 +699,7 @@ public class PrDetectionService {
                 } catch (Exception e) {
                     log.atError()
                             .setCause(e)
-                            .addArgument(esc.tracking()::githubRepo)
+                            .addArgument(esc.tracking()::repo)
                             .addArgument(esc.tracking()::prNumber)
                             .log("Failed to escalate PR {}#{}, continuing");
                 }
@@ -888,7 +890,7 @@ public class PrDetectionService {
 
     private void escalateImmediately(PrTrackingRecord tracking, Ticket ticket, String owningTeam) {
         log.atInfo()
-                .addArgument(tracking::githubRepo)
+                .addArgument(tracking::repo)
                 .addArgument(tracking::prNumber)
                 .log("PR {}#{} SLA already breached at detection time — escalating immediately");
 
@@ -901,7 +903,7 @@ public class PrDetectionService {
 
         if (escalation == null || escalation.id() == null) {
             log.atWarn()
-                    .addArgument(tracking::githubRepo)
+                    .addArgument(tracking::repo)
                     .addArgument(tracking::prNumber)
                     .addArgument(() -> checkNotNull(ticket.id()).id())
                     .log(
