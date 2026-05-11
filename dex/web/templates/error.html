@@ -1,0 +1,9 @@
+{{ template "header.html" . }}
+
+<div class="sb-heading sb-error-page">
+  <h1>{{ .ErrType }}</h1>
+  <hr>
+</div>
+<p>{{ .ErrMsg }}</p>
+
+{{ template "footer.html" . }}
