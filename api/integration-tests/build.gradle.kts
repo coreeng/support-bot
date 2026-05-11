@@ -29,7 +29,7 @@ dependencies {
     testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.6")
     testImplementation("org.slf4j:slf4j-api:2.0.16")
     testRuntimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:2.25.0")
-    testRuntimeOnly("org.apache.logging.log4j:log4j-core:2.25.0")
+    testRuntimeOnly("org.apache.logging.log4j:log4j-core:2.25.4")
     testRuntimeOnly("org.junit.platform:junit-platform-console")
 
     testImplementation("org.awaitility:awaitility:4.3.+")
