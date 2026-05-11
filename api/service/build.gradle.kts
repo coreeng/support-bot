@@ -86,7 +86,7 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
-    implementation("com.nimbusds:nimbus-jose-jwt:9.37")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.37.4")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("org.springframework.boot:spring-boot-starter-cache")
 
@@ -99,7 +99,7 @@ dependencies {
     implementation("org.jooq:jooq-codegen:3.19.18")
 
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-    implementation("com.microsoft.kiota:microsoft-kiota-http-okHttp:1.8.5")
+    implementation("com.microsoft.kiota:microsoft-kiota-http-okHttp:1.9.1")
 
     jooqCodegen("org.postgresql:postgresql:42.7.11")
     jooqCodegen("org.testcontainers:postgresql:1.20.4")
@@ -117,7 +117,7 @@ dependencies {
     implementation("org.glassfish.tyrus.bundles:tyrus-standalone-client:2.2.0")
     implementation("com.google.guava:guava:33.4.0-jre")
     implementation("org.kohsuke:github-api:1.330")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.80")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.84")
     implementation("com.github.ben-manes.caffeine:caffeine")
 
     implementation("io.fabric8:kubernetes-client:7.1.0")
