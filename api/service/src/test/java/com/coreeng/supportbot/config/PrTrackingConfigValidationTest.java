@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .doesNotThrowAnyException();
     }
@@ -46,6 +48,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(repoA, repoB),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("contains duplicates");
@@ -67,6 +70,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         noToken,
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("github.token");
@@ -88,6 +92,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         appNoInstallation,
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("installation-id");
@@ -104,6 +109,7 @@ class PrTrackingConfigValidationTest {
                         "low",
                         DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
+                        null,
                         null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -126,6 +132,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         noAuthMode,
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("github.auth-mode");
@@ -152,6 +159,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         appConfig,
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .doesNotThrowAnyException();
     }
@@ -172,6 +180,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(badName),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("org/repo format");
@@ -193,6 +202,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(zeroSla),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("sla.default must be a positive duration");
@@ -214,6 +224,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(negativeSla),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("sla.default must be a positive duration");
@@ -236,6 +247,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(repo),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("sla.default must be set when sla.file is not configured");
@@ -259,6 +271,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(repo),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("overrides[].sla must be a positive duration");
@@ -282,6 +295,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(repo),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("overrides[].path must not be blank");
@@ -307,6 +321,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(repo),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .doesNotThrowAnyException();
     }
@@ -329,6 +344,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(repo),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .doesNotThrowAnyException();
     }
@@ -360,6 +376,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(noSlaRepo),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("messages.escalated must not be set for no-SLA repositories");
@@ -382,6 +399,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(repo),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .doesNotThrowAnyException();
     }
@@ -398,6 +416,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("tags must not be empty");
@@ -415,6 +434,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(validRepo()),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("impact must not be blank");
@@ -432,6 +452,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("must not be empty");
@@ -453,6 +474,7 @@ class PrTrackingConfigValidationTest {
                         null,
                         List.of(badRepo),
                         PrTrackingProps.GitHub.defaultTokenModeConfig(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .doesNotThrowAnyException();
     }
@@ -473,6 +495,7 @@ class PrTrackingConfigValidationTest {
                 DEFAULT_DURATION_UNIT,
                 List.of(mixedCase),
                 validTokenGithub(),
+                null,
                 DEFAULT_SLA_DISCOVERY);
 
         // then
@@ -498,6 +521,7 @@ class PrTrackingConfigValidationTest {
                         invalidUnit,
                         List.of(validRepo()),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("duration-unit must be one of");
@@ -518,6 +542,7 @@ class PrTrackingConfigValidationTest {
                 noDurationUnit,
                 List.of(validRepo()),
                 validTokenGithub(),
+                null,
                 DEFAULT_SLA_DISCOVERY);
 
         // then it defaults to "days"
@@ -539,6 +564,7 @@ class PrTrackingConfigValidationTest {
                 mixedCaseUnit,
                 List.of(validRepo()),
                 validTokenGithub(),
+                null,
                 DEFAULT_SLA_DISCOVERY);
 
         // then it is normalised to lowercase
@@ -583,6 +609,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(noSlaRepo),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .doesNotThrowAnyException();
     }
@@ -603,6 +630,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(noSlaNoPathsRepo),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("paths must not be empty when sla is not configured");
@@ -624,6 +652,7 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(blankPathRepo),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("paths[] must not be blank");
@@ -647,9 +676,295 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_DURATION_UNIT,
                         List.of(noSlaRepo),
                         validTokenGithub(),
+                        null,
                         DEFAULT_SLA_DISCOVERY))
                 .doesNotThrowAnyException();
     }
+
+    // ---- GitLab provider validation -------------------------------------------------------------
+
+    @Test
+    void defaultsProviderToGithubWhenNotSpecified() {
+        // given — Repository constructed without an explicit provider
+        PrTrackingProps.Repository repo = validRepo();
+
+        // then — provider defaults to GITHUB
+        assertThat(repo.provider()).isEqualTo(Provider.GITHUB);
+    }
+
+    @Test
+    void acceptsGitLabRepoWithNestedGroupName() {
+        // given — GitLab supports group/subgroup/project names
+        PrTrackingProps.Repository repo = gitlabRepo("platform/infra/cluster-config");
+
+        // when / then — nested path passes the relaxed shape check
+        assertThatCode(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(repo),
+                        validTokenGithub(),
+                        new PrTrackingProps.Gitlab("https://gitlab.com/api/v4", "glpat-123"),
+                        DEFAULT_SLA_DISCOVERY))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsGitLabRepoNameWithSlashButBlankSegment() {
+        PrTrackingProps.Repository badName = new PrTrackingProps.Repository(
+                "group//project",
+                "wow",
+                Provider.GITLAB,
+                null,
+                "group/reviewers",
+                List.of(),
+                sla(Duration.ofDays(2)),
+                null,
+                null);
+
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(badName),
+                        validTokenGithub(),
+                        new PrTrackingProps.Gitlab("https://gitlab.com/api/v4", "glpat-123"),
+                        DEFAULT_SLA_DISCOVERY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must contain at least one '/'");
+    }
+
+    @Test
+    void rejectsGitLabRepoNameWithSingleSegmentAtPropsLevel() {
+        PrTrackingProps.Repository badName = new PrTrackingProps.Repository(
+                "no-slash",
+                "wow",
+                Provider.GITLAB,
+                null,
+                "group/reviewers",
+                List.of(),
+                sla(Duration.ofDays(2)),
+                null,
+                null);
+
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(badName),
+                        validTokenGithub(),
+                        new PrTrackingProps.Gitlab("https://gitlab.com/api/v4", "glpat-123"),
+                        DEFAULT_SLA_DISCOVERY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must contain at least one '/'");
+    }
+
+    @Test
+    void rejectsGithubTeamSlugOnGitLabRepo() {
+        assertThatThrownBy(() -> new PrTrackingProps.Repository(
+                        "my-group/project",
+                        "wow",
+                        Provider.GITLAB,
+                        "github-team-slug",
+                        null,
+                        List.of(),
+                        sla(Duration.ofDays(2)),
+                        null,
+                        null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("githubTeamSlug is only valid when provider=github");
+    }
+
+    @Test
+    void rejectsGitlabGroupPathOnGithubRepo() {
+        assertThatThrownBy(() -> new PrTrackingProps.Repository(
+                        "my-org/repo",
+                        "wow",
+                        Provider.GITHUB,
+                        null,
+                        "my-group/reviewers",
+                        List.of(),
+                        sla(Duration.ofDays(2)),
+                        null,
+                        null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("gitlabGroupPath is only valid when provider=gitlab");
+    }
+
+    @Test
+    void rejectsPerRepoGitlabOverrideOnGithubRepo() {
+        PrTrackingProps.Gitlab gitlabBlock = new PrTrackingProps.Gitlab("https://gitlab.com/api/v4", "glpat-xxx");
+        assertThatThrownBy(() -> new PrTrackingProps.Repository(
+                        "my-org/repo",
+                        "wow",
+                        Provider.GITHUB,
+                        null,
+                        null,
+                        List.of(),
+                        sla(Duration.ofDays(2)),
+                        gitlabBlock,
+                        null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("per-repo gitlab override block is only valid when provider=gitlab");
+    }
+
+    @Test
+    void rejectsBlankGitlabGroupPath() {
+        assertThatThrownBy(() -> new PrTrackingProps.Repository(
+                        "my-group/project",
+                        "wow",
+                        Provider.GITLAB,
+                        null,
+                        "  ",
+                        List.of(),
+                        sla(Duration.ofDays(2)),
+                        null,
+                        null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("gitlabGroupPath must not be blank when provided");
+    }
+
+    @Test
+    void rejectsGitLabRepoWhenNoTokenResolvable() {
+        // given — gitlab repo without per-repo override, and no global gitlab block at all
+        PrTrackingProps.Repository repo = gitlabRepo("my-group/project");
+
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(repo),
+                        validTokenGithub(),
+                        null,
+                        DEFAULT_SLA_DISCOVERY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("gitlab.token must be set");
+    }
+
+    @Test
+    void rejectsGitLabRepoWhenGlobalGitlabHasBlankToken() {
+        PrTrackingProps.Repository repo = gitlabRepo("my-group/project");
+
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(repo),
+                        validTokenGithub(),
+                        new PrTrackingProps.Gitlab("https://gitlab.com/api/v4", ""),
+                        DEFAULT_SLA_DISCOVERY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("gitlab.token must be set");
+    }
+
+    @Test
+    void acceptsGitLabRepoWithPerRepoTokenAndNoGlobal() {
+        // given — global gitlab block omitted; per-repo override carries the token
+        PrTrackingProps.Repository repo = new PrTrackingProps.Repository(
+                "my-group/project",
+                "wow",
+                Provider.GITLAB,
+                null,
+                "my-group/reviewers",
+                List.of(),
+                sla(Duration.ofDays(2)),
+                new PrTrackingProps.Gitlab("https://gitlab.internal.example.com/api/v4", "glpat-internal"),
+                null);
+
+        assertThatCode(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(repo),
+                        validTokenGithub(),
+                        null,
+                        DEFAULT_SLA_DISCOVERY))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsGitlabApiBaseUrlWithTrailingSlash() {
+        assertThatThrownBy(() -> new PrTrackingProps.Gitlab("https://gitlab.com/api/v4/", "glpat-123"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must not end with a trailing slash");
+    }
+
+    @Test
+    void rejectsGitlabApiBaseUrlWithoutApiV4Segment() {
+        assertThatThrownBy(() -> new PrTrackingProps.Gitlab("https://gitlab.com", "glpat-123"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must include the /api/v4 segment");
+    }
+
+    @Test
+    void acceptsGitlabApiBaseUrlWithSelfHostedDomain() {
+        assertThatCode(() -> new PrTrackingProps.Gitlab("https://gitlab.internal.example.com/api/v4", "glpat-123"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void gitlabTokenIsRedactedInToString() {
+        // Sanity check: don't surface the token in logs even if a config dump is wired up later.
+        PrTrackingProps.Gitlab gitlab = new PrTrackingProps.Gitlab("https://gitlab.com/api/v4", "glpat-secret");
+        assertThat(gitlab.toString()).contains("REDACTED").doesNotContain("glpat-secret");
+    }
+
+    @Test
+    void detectsDuplicateRepositoryNameAcrossProvidersIgnoringCase() {
+        // The unique constraint on pr_tracking already keys on (ticket_id, provider, repo, pr_number)
+        // so cross-provider collisions are technically allowed by the schema — but in YAML it almost
+        // certainly indicates a misconfig (two entries for what the operator thinks is the same repo).
+        // Keep the current strict check: dedupe on the lowercased name regardless of provider.
+        PrTrackingProps.Repository ghRepo = validRepoWithName("acme/widget");
+        PrTrackingProps.Repository glRepo = gitlabRepo("acme/widget");
+
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(ghRepo, glRepo),
+                        validTokenGithub(),
+                        new PrTrackingProps.Gitlab("https://gitlab.com/api/v4", "glpat-123"),
+                        DEFAULT_SLA_DISCOVERY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contains duplicates");
+    }
+
+    private static PrTrackingProps.Repository gitlabRepo(String name) {
+        return new PrTrackingProps.Repository(
+                name,
+                "wow",
+                Provider.GITLAB,
+                null,
+                "my-group/reviewers",
+                List.of(),
+                sla(Duration.ofDays(2)),
+                null,
+                null);
+    }
+
+    // ---- helpers --------------------------------------------------------------------------------
 
     private static PrTrackingProps.Repository validRepo() {
         return validRepoWithName("my-org/onboarding-repo");

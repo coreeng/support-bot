@@ -56,6 +56,7 @@ class SlaLookupTest {
                         REPO, "wow", null, List.of(), new PrTrackingProps.Sla(null, SLA_48H, null))),
                 new PrTrackingProps.GitHub(
                         PrTrackingProps.AuthMode.TOKEN, "https://api.github.com", "token", "", "", ""),
+                null,
                 null);
         slaLookup = new SlaLookup(prSourceClients, props);
     }
@@ -474,6 +475,7 @@ class SlaLookupTest {
                         REPO, "wow", null, List.of(), new PrTrackingProps.Sla(null, SLA_48H, null))),
                 new PrTrackingProps.GitHub(
                         PrTrackingProps.AuthMode.TOKEN, "https://api.github.com", "token", "", "", ""),
+                null,
                 null);
         return new SlaLookup(prSourceClients, props);
     }

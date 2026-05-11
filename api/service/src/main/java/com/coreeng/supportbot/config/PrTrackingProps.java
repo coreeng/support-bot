@@ -3,6 +3,7 @@ package com.coreeng.supportbot.config;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
@@ -23,6 +24,7 @@ public record PrTrackingProps(
         @Name("duration-unit") String durationUnit,
         List<Repository> repositories,
         GitHub github,
+        @Nullable Gitlab gitlab,
         SlaDiscovery slaDiscovery) {
 
     private static final Set<String> VALID_DURATION_UNITS = Set.of("hours", "days", "weeks");
@@ -36,6 +38,7 @@ public record PrTrackingProps(
             @Nullable @Name("duration-unit") String durationUnit,
             @Nullable List<Repository> repositories,
             @Nullable GitHub github,
+            @Nullable Gitlab gitlab,
             @Nullable SlaDiscovery slaDiscovery) {
         this.enabled = enabled;
         this.pollCron = pollCron;
@@ -49,13 +52,17 @@ public record PrTrackingProps(
                         .map(repository -> new Repository(
                                 normalizeRepositoryName(repository.name()),
                                 repository.owningTeam(),
+                                repository.provider(),
                                 repository.githubTeamSlug(),
+                                repository.gitlabGroupPath(),
                                 repository.paths(),
                                 repository.sla(),
+                                repository.gitlab(),
                                 repository.messages()))
                         .toList();
         this.slaDiscovery = slaDiscovery == null ? new SlaDiscovery(null) : slaDiscovery;
         this.github = github == null ? GitHub.defaultTokenModeConfig() : github;
+        this.gitlab = gitlab;
 
         if (enabled) {
             if (!VALID_DURATION_UNITS.contains(this.durationUnit)) {
@@ -73,12 +80,12 @@ public record PrTrackingProps(
             if (github == null) {
                 throw new IllegalArgumentException("pr-review-tracking.github must be configured when enabled");
             }
-            validateRepositories(this.repositories);
+            validateRepositories(this.repositories, this.gitlab);
             validateConfig(this.github);
         }
     }
 
-    private static void validateRepositories(List<Repository> repositories) {
+    private static void validateRepositories(List<Repository> repositories, @Nullable Gitlab globalGitlab) {
         if (repositories.isEmpty()) {
             throw new IllegalArgumentException("pr-review-tracking.repositories must not be empty when enabled");
         }
@@ -88,9 +95,26 @@ public record PrTrackingProps(
                 throw new IllegalArgumentException("pr-review-tracking.repositories[].name must not be blank");
             }
 
+            // GitHub requires exactly `org/repo`. GitLab permits nested groups
+            // (`group/subgroup/project`), so any 2+ non-blank path segments are valid.
             String[] repositoryParts = repository.name().split("/", -1);
-            if (repositoryParts.length != 2 || repositoryParts[0].isBlank() || repositoryParts[1].isBlank()) {
-                throw new IllegalArgumentException("pr-review-tracking.repositories[].name must be in org/repo format");
+            boolean anyBlank = false;
+            for (String part : repositoryParts) {
+                if (part.isBlank()) {
+                    anyBlank = true;
+                    break;
+                }
+            }
+            if (repository.provider() == Provider.GITHUB) {
+                if (repositoryParts.length != 2 || anyBlank) {
+                    throw new IllegalArgumentException(
+                            "pr-review-tracking.repositories[].name must be in org/repo format for GitHub repos");
+                }
+            } else {
+                if (repositoryParts.length < 2 || anyBlank) {
+                    throw new IllegalArgumentException(
+                            "pr-review-tracking.repositories[].name must contain at least one '/' (group/project or group/subgroup/project) for GitLab repos");
+                }
             }
 
             if (isBlank(repository.owningTeam())) {
@@ -99,6 +123,20 @@ public record PrTrackingProps(
 
             if (repository.messages() != null) {
                 validateMessages(repository.messages(), repository.sla() == null, repository.name());
+            }
+
+            // For each GitLab repo, the token must be resolvable. Resolved as: per-repo gitlab.token
+            // wins; otherwise fall back to global gitlab.token. The api-base-url has the same precedence
+            // but is enforced at use-time (commit 4) — here we only check that the credential is present.
+            if (repository.provider() == Provider.GITLAB) {
+                boolean perRepoToken = repository.gitlab() != null
+                        && !isBlank(repository.gitlab().token());
+                boolean globalToken = globalGitlab != null && !isBlank(globalGitlab.token());
+                if (!perRepoToken && !globalToken) {
+                    throw new IllegalArgumentException(
+                            "pr-review-tracking.gitlab.token must be set (globally or per-repo) when any repo uses provider=gitlab: "
+                                    + repository.name());
+                }
             }
 
             if (repository.sla() == null) {
@@ -193,11 +231,63 @@ public record PrTrackingProps(
     public record Repository(
             String name,
             String owningTeam,
+            Provider provider,
             @Nullable String githubTeamSlug,
+            @Nullable String gitlabGroupPath,
             List<String> paths,
             @Nullable Sla sla,
+            @Nullable Gitlab gitlab,
             @Nullable Messages messages) {
         @ConstructorBinding
+        public Repository(
+                String name,
+                String owningTeam,
+                @Nullable Provider provider,
+                @Nullable String githubTeamSlug,
+                @Nullable String gitlabGroupPath,
+                @Nullable List<String> paths,
+                @Nullable Sla sla,
+                @Nullable Gitlab gitlab,
+                @Nullable Messages messages) {
+            requireNonNull(name, "name must not be null");
+            requireNonNull(owningTeam, "owningTeam must not be null");
+            Provider resolvedProvider = provider == null ? Provider.GITHUB : provider;
+            if (githubTeamSlug != null && githubTeamSlug.isBlank()) {
+                throw new IllegalArgumentException("githubTeamSlug must not be blank when provided");
+            }
+            if (gitlabGroupPath != null && gitlabGroupPath.isBlank()) {
+                throw new IllegalArgumentException("gitlabGroupPath must not be blank when provided");
+            }
+            // Provider-scoped fields fail fast at config-bind time so a misconfigured repo never
+            // makes it through to the adapter, where the mismatch would manifest as a confusing
+            // runtime error (e.g. GitHub adapter receiving a gitlab-group-path).
+            if (resolvedProvider == Provider.GITHUB) {
+                if (gitlabGroupPath != null) {
+                    throw new IllegalArgumentException(
+                            "gitlabGroupPath is only valid when provider=gitlab (repo: " + name + ")");
+                }
+                if (gitlab != null) {
+                    throw new IllegalArgumentException(
+                            "per-repo gitlab override block is only valid when provider=gitlab (repo: " + name + ")");
+                }
+            } else if (resolvedProvider == Provider.GITLAB) {
+                if (githubTeamSlug != null) {
+                    throw new IllegalArgumentException(
+                            "githubTeamSlug is only valid when provider=github (repo: " + name + ")");
+                }
+            }
+            this.name = name;
+            this.owningTeam = owningTeam;
+            this.provider = resolvedProvider;
+            this.githubTeamSlug = githubTeamSlug;
+            this.gitlabGroupPath = gitlabGroupPath;
+            this.paths = paths == null ? List.of() : List.copyOf(paths);
+            this.sla = sla;
+            this.gitlab = gitlab;
+            this.messages = messages;
+        }
+
+        /** Test/legacy convenience: GitHub repo without GitLab fields. */
         public Repository(
                 String name,
                 String owningTeam,
@@ -205,26 +295,17 @@ public record PrTrackingProps(
                 List<String> paths,
                 @Nullable Sla sla,
                 @Nullable Messages messages) {
-            requireNonNull(name, "name must not be null");
-            requireNonNull(owningTeam, "owningTeam must not be null");
-            if (githubTeamSlug != null && githubTeamSlug.isBlank()) {
-                throw new IllegalArgumentException("githubTeamSlug must not be blank when provided");
-            }
-            this.name = name;
-            this.owningTeam = owningTeam;
-            this.githubTeamSlug = githubTeamSlug;
-            this.paths = paths == null ? List.of() : List.copyOf(paths);
-            this.sla = sla;
-            this.messages = messages;
+            this(name, owningTeam, Provider.GITHUB, githubTeamSlug, null, paths, sla, null, messages);
         }
 
+        /** Test/legacy convenience: GitHub repo without messages or GitLab fields. */
         public Repository(
                 String name,
                 String owningTeam,
                 @Nullable String githubTeamSlug,
                 List<String> paths,
                 @Nullable Sla sla) {
-            this(name, owningTeam, githubTeamSlug, paths, sla, null);
+            this(name, owningTeam, Provider.GITHUB, githubTeamSlug, null, paths, sla, null, null);
         }
 
         /** Returns true when this repository has no SLA configured (no-SLA tracking mode). */
@@ -315,6 +396,42 @@ public record PrTrackingProps(
 
         private static String nonNullString(@Nullable String value) {
             return value == null ? "" : value;
+        }
+    }
+
+    /**
+     * GitLab connection settings — usable as the global {@code pr-review-tracking.gitlab} block or
+     * as a per-repo override on {@link Repository#gitlab()}. Per-repo wins when both are set; that
+     * resolution lives in the adapter (commit 4), not here.
+     *
+     * <p>{@code apiBaseUrl} shape is enforced at construction time so a malformed URL (trailing
+     * slash, missing {@code /api/v4}) fails startup rather than surfacing as a confusing 404 on
+     * the first poll.
+     */
+    public record Gitlab(
+            @Nullable String apiBaseUrl, @Nullable String token) {
+
+        public Gitlab(@Nullable String apiBaseUrl, @Nullable String token) {
+            String normalisedApiBaseUrl = apiBaseUrl == null ? "" : apiBaseUrl;
+            String normalisedToken = token == null ? "" : token;
+            if (!normalisedApiBaseUrl.isBlank()) {
+                if (normalisedApiBaseUrl.endsWith("/")) {
+                    throw new IllegalArgumentException(
+                            "gitlab.api-base-url must not end with a trailing slash, got: " + normalisedApiBaseUrl);
+                }
+                if (!normalisedApiBaseUrl.contains("/api/v4")) {
+                    throw new IllegalArgumentException(
+                            "gitlab.api-base-url must include the /api/v4 segment (no auto-append), got: "
+                                    + normalisedApiBaseUrl);
+                }
+            }
+            this.apiBaseUrl = normalisedApiBaseUrl;
+            this.token = normalisedToken;
+        }
+
+        @Override
+        public String toString() {
+            return "Gitlab[apiBaseUrl=" + apiBaseUrl + ", token=REDACTED]";
         }
     }
 }

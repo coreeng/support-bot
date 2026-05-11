@@ -48,7 +48,7 @@ class TenantInsightsControllerTest {
     private static PrTrackingProps propsWithRepos(List<PrTrackingProps.Repository> repos) {
         // Non-enabled config: skips the strict validation but still exposes repositories() to the
         // controller's config-join logic.
-        return new PrTrackingProps(false, "0 * * * * *", null, null, null, null, repos, null, null);
+        return new PrTrackingProps(false, "0 * * * * *", null, null, null, null, repos, null, null, null);
     }
 
     private static PrTrackingProps.Repository slaRepo(String name) {
