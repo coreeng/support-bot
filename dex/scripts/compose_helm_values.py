@@ -27,27 +27,46 @@ import sys
 from pathlib import Path
 
 
-CONNECTORS_LINE = re.compile(r"^\s{0,2}connectors:\s*$")
+CONFIG_LINE = re.compile(r"^config:\s*$")
+CONNECTORS_LINE = re.compile(r"^  connectors:\s*$")
 ID_LINE = re.compile(r"^\s+id:\s*(\S+)\s*$")
 
 
+def _leading_spaces(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
 def extract_connectors_block(path: Path) -> str:
-    """Return the lines under `  connectors:` from a per-backend overlay."""
-    text = path.read_text()
-    lines = text.splitlines()
+    """Return the lines under `  connectors:` from a per-backend overlay.
+
+    Enforces the documented shape: top-level `config:` containing a single
+    `  connectors:` list. Captures stop as soon as indentation returns to
+    the `config:`-child level so sibling keys (e.g. `staticClients:`) never
+    bleed into the merged connectors list.
+    """
+    lines = path.read_text().splitlines()
     captured: list[str] = []
-    found = False
+    state = "outside"
     for line in lines:
-        if found:
+        if state == "outside":
+            if CONFIG_LINE.match(line):
+                state = "in_config"
+        elif state == "in_config":
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            if CONNECTORS_LINE.match(line):
+                state = "in_connectors"
+            elif _leading_spaces(line) == 0:
+                break
+        else:
+            if line.strip() and _leading_spaces(line) <= 2:
+                break
             captured.append(line)
-            continue
-        if CONNECTORS_LINE.match(line):
-            found = True
-    if not found:
-        raise SystemExit(
-            f"{path}: missing 'connectors:' key under 'config:'."
-        )
-    # Strip leading/trailing blank lines but preserve internal indentation.
+
+    if state == "outside":
+        raise SystemExit(f"{path}: missing top-level 'config:' key.")
+    if state == "in_config":
+        raise SystemExit(f"{path}: missing 'connectors:' key under 'config:'.")
     while captured and not captured[0].strip():
         captured.pop(0)
     while captured and not captured[-1].strip():
