@@ -1,4 +1,4 @@
-FROM gradle:9.3.1-jdk25 AS builder
+FROM docker.io/gradle:9.5.0-jdk25-noble AS builder
 WORKDIR /home/gradle/project
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -21,7 +21,7 @@ COPY functional/src functional/src
 # Build runnable fat jar that includes tests and all deps
 RUN ./gradlew :functional:jar --no-daemon
 
-FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24
+FROM docker.io/eclipse-temurin:25-jre-noble
 WORKDIR /app
 
 # Copy tests jar

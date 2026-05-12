@@ -15,15 +15,15 @@ checkstyle {
 }
 
 dependencies {
-    testImplementation(platform("org.junit:junit-bom:5.10.2"))
+    testImplementation(platform("org.junit:junit-bom:6.0.3"))
     testImplementation("org.junit.jupiter:junit-jupiter-api")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testImplementation("io.fabric8:kubernetes-client:6.10.0")
-    testImplementation("io.rest-assured:rest-assured:5.5.+")
+    testImplementation("io.rest-assured:rest-assured:6.0.0")
 
     // Avoiding vulnerability reports from rest-assured
-    testImplementation("org.apache.commons:commons-lang3:3.18.+")
-    testImplementation("commons-codec:commons-codec:1.18.+")
+    testImplementation("org.apache.commons:commons-lang3:3.18.0")
+    testImplementation("commons-codec:commons-codec:1.19.0")
 
     testImplementation("com.fasterxml.jackson.core:jackson-databind:2.18.6")
     testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.6")
@@ -32,7 +32,7 @@ dependencies {
     testRuntimeOnly("org.apache.logging.log4j:log4j-core:2.25.4")
     testRuntimeOnly("org.junit.platform:junit-platform-console")
 
-    testImplementation("org.awaitility:awaitility:4.3.+")
+    testImplementation("org.awaitility:awaitility:4.3.0")
     testImplementation("org.assertj:assertj-core:3.27.7")
 }
 

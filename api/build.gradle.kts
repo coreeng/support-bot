@@ -34,10 +34,10 @@ val safeDependencyVersions =
         "org.eclipse.jetty:jetty-http" to "12.0.35",
         "org.eclipse.jetty:jetty-server" to "12.0.35",
         "org.postgresql:postgresql" to "42.7.11",
-        "org.springframework:spring-context" to "6.2.18",
-        "org.springframework:spring-core" to "6.2.18",
-        "org.springframework:spring-web" to "6.2.18",
-        "org.springframework:spring-webmvc" to "6.2.18",
+        "org.springframework:spring-context" to "7.0.6",
+        "org.springframework:spring-core" to "7.0.6",
+        "org.springframework:spring-web" to "7.0.6",
+        "org.springframework:spring-webmvc" to "7.0.6",
     )
 val safeDependencyCoordinates = safeDependencyVersions.map { (dependency, version) -> "$dependency:$version" }.toTypedArray()
 
