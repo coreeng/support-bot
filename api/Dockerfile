@@ -1,5 +1,5 @@
 ## Build stage
-FROM gradle:9.3.1-jdk25 AS build
+FROM docker.io/gradle:9.5.0-jdk25-noble AS build
 WORKDIR /build
 
 # hadolint ignore=DL3008
@@ -32,7 +32,7 @@ RUN service postgresql start && sleep 6 && \
         :service:jooqCodegen :service:build -Pversion="${P2P_VERSION}" --no-daemon
 
 ## Final stage
-FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24
+FROM docker.io/eclipse-temurin:25-jre-noble
 WORKDIR /app
 COPY --from=build /build/service/build/libs/service.jar /app/service.jar
 COPY service/analysis analysis
