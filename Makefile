@@ -371,8 +371,12 @@ publish-api-prod: login-ghcr ## Publish API container image
 publish-ui-prod: login-ghcr ## Publish UI container image
 	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/$(p2p_app_name)-ui:$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name)-ui:$(p2p_version)"
 
+.PHONY: publish-dex-prod
+publish-dex-prod: login-ghcr ## Publish Dex container image
+	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/$(p2p_app_name)-dex:$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name)-dex:$(p2p_version)"
+
 .PHONY: publish-prod
-publish-prod: publish-api-prod publish-ui-prod ## Publish all container images
+publish-prod: publish-api-prod publish-ui-prod publish-dex-prod ## Publish all container images
 
 .PHONY: publish-chart
 publish-chart: ## Package and publish Helm chart (version aligned to image)
