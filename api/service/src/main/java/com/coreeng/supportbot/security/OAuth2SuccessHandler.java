@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +37,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     public void onAuthenticationSuccess(
             HttpServletRequest request, HttpServletResponse response, Authentication authentication)
             throws IOException {
-        var oauth2User = (OAuth2User) authentication.getPrincipal();
+        var oauth2User = (OAuth2User) Objects.requireNonNull(authentication.getPrincipal());
         var email = extractEmail(oauth2User);
         if (!allowListService.isAllowed(email)) {
             log.warn("Allow-list rejected user during OAuth2 redirect login");

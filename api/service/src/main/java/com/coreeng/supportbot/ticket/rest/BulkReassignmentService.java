@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.ticket.rest;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.String.format;
 
 import com.coreeng.supportbot.config.TicketAssignmentProps;
@@ -17,7 +18,6 @@ import com.coreeng.supportbot.ticket.TicketsQuery;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
-import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.exception.DataAccessException;
@@ -80,7 +80,8 @@ public class BulkReassignmentService {
 
         ImmutableList<Ticket> tickets = ticketRepository.listTickets(query).content();
 
-        return tickets.stream().collect(ImmutableMap.toImmutableMap(Ticket::id, Function.identity()));
+        return tickets.stream()
+                .collect(ImmutableMap.toImmutableMap(ticket -> checkNotNull(ticket.id()), ticket -> ticket));
     }
 
     private void processReassignments(

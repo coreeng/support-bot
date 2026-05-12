@@ -431,8 +431,8 @@ public class JdbcTicketRepository implements TicketRepository {
             if (!query.tags().isEmpty()) {
                 // Tickets that have all selected tags
                 checkNotNull(taggedTicketsCTE);
-                var taggedTicketIds = checkNotNull(taggedTicketsCTE.field("id", Long.class));
-                var taggedTicketTags = checkNotNull(taggedTicketsCTE.field("tags", CLOB.array()));
+                var taggedTicketIds = Objects.requireNonNull(taggedTicketsCTE.field("id", Long.class));
+                var taggedTicketTags = Objects.requireNonNull(taggedTicketsCTE.field("tags", CLOB.array()));
                 tagCondition = tagCondition.or(exists(selectOne()
                         .from(taggedTicketsCTE)
                         .where(TICKET.ID

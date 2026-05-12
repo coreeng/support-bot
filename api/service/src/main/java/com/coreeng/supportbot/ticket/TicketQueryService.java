@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.ticket;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.coreeng.supportbot.escalation.Escalation;
@@ -37,8 +38,9 @@ public class TicketQueryService {
     public Page<DetailedTicket> findDetailedTicketByQuery(TicketsQuery query) {
         Page<Ticket> ticketsPage = repository.listTickets(query);
 
-        ImmutableList<TicketId> ticketIds =
-                ticketsPage.content().stream().map(Ticket::id).collect(toImmutableList());
+        ImmutableList<TicketId> ticketIds = ticketsPage.content().stream()
+                .map(ticket -> checkNotNull(ticket.id()))
+                .collect(toImmutableList());
 
         Page<Escalation> escalationsPage = escalationQueryService.findByQuery(
                 EscalationQuery.builder().ticketIds(ticketIds).unlimited(true).build());
@@ -47,7 +49,8 @@ public class TicketQueryService {
                 Multimaps.index(escalationsPage.content(), Escalation::ticketId);
 
         ImmutableList<DetailedTicket> detailedTickets = ticketsPage.content().stream()
-                .map(ticket -> new DetailedTicket(ticket, ImmutableList.copyOf(escalationsByTicket.get(ticket.id()))))
+                .map(ticket -> new DetailedTicket(
+                        ticket, ImmutableList.copyOf(escalationsByTicket.get(checkNotNull(ticket.id())))))
                 .collect(toImmutableList());
 
         return new Page<>(detailedTickets, ticketsPage.page(), ticketsPage.totalPages(), ticketsPage.totalElements());
