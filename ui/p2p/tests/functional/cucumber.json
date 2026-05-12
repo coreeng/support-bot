@@ -7,11 +7,6 @@
       "snippetInterface": "async-await",
       "colorsEnabled": true
     },
-    "format": [
-      "pretty",
-      ["html", "cucumber-report.html"],
-      ["json", "cucumber-report.json"],
-      ["usage", "cucumber-usage.txt"]
-    ]
+    "format": ["pretty", ["html", "cucumber-report.html"], ["json", "cucumber-report.json"], ["usage", "cucumber-usage.txt"]]
   }
 }
