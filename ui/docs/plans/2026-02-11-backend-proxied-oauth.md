@@ -43,6 +43,7 @@ Browser                          UI Server                         Backend      
 ```
 
 **Key properties:**
+
 - OAuth credentials (CLIENT_ID, CLIENT_SECRET) stay in **backend only**
 - Browser never talks directly to backend
 - UI server proxies all OAuth requests server-to-server
@@ -55,6 +56,7 @@ Browser                          UI Server                         Backend      
 ### Task 1: Create OAuth URL Generation Endpoint
 
 **Files:**
+
 - Modify: `api/service/src/main/java/com/coreeng/supportbot/security/AuthController.java`
 
 **Step 1: Add OAuth URL endpoint**
@@ -105,6 +107,7 @@ git commit -m "wip(api): add OAuth URL endpoint placeholder"
 ### Task 2: Implement OAuth URL Builder Service
 
 **Files:**
+
 - Create: `api/service/src/main/java/com/coreeng/supportbot/security/OAuthUrlService.java`
 - Modify: `api/service/src/main/java/com/coreeng/supportbot/security/AuthController.java`
 
@@ -201,6 +204,7 @@ git commit -m "feat(api): add OAuth URL generation service"
 ### Task 3: Create OAuth Code Exchange Endpoint
 
 **Files:**
+
 - Create: `api/service/src/main/java/com/coreeng/supportbot/security/OAuthExchangeService.java`
 - Modify: `api/service/src/main/java/com/coreeng/supportbot/security/AuthController.java`
 
@@ -448,6 +452,7 @@ git commit -m "feat(api): add OAuth code exchange endpoint"
 ### Task 4: Create Backend OAuth API Functions
 
 **Files:**
+
 - Modify: `ui/src/lib/api/auth-api.ts`
 
 **Step 1: Add functions to call backend OAuth endpoints**
@@ -457,10 +462,7 @@ git commit -m "feat(api): add OAuth code exchange endpoint"
  * Get OAuth authorization URL from backend.
  * Called server-to-server - credentials stay in backend.
  */
-export async function getBackendOAuthUrl(
-  provider: "google" | "azure",
-  redirectUri: string
-): Promise<{ url: string } | null> {
+export async function getBackendOAuthUrl(provider: "google" | "azure", redirectUri: string): Promise<{ url: string } | null> {
   const params = new URLSearchParams({
     provider,
     redirectUri,
@@ -511,6 +513,7 @@ git commit -m "feat(ui): add backend OAuth API functions"
 ### Task 5: Update OAuth Route to Proxy Through Backend
 
 **Files:**
+
 - Modify: `ui/src/app/api/oauth/[provider]/route.ts`
 
 **Step 1: Update route to get URL from backend**
@@ -519,10 +522,7 @@ git commit -m "feat(ui): add backend OAuth API functions"
 import { NextRequest, NextResponse } from "next/server";
 import { getBackendOAuthUrl } from "@/lib/api/auth-api";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ provider: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const { provider } = await params;
 
   if (provider !== "google" && provider !== "azure") {
@@ -530,19 +530,13 @@ export async function GET(
   }
 
   // Build the callback URL for this UI
-  const callbackUrl = new URL(
-    `/api/auth/callback/${provider}`,
-    process.env.NEXTAUTH_URL
-  ).toString();
+  const callbackUrl = new URL(`/api/auth/callback/${provider}`, process.env.NEXTAUTH_URL).toString();
 
   // Get OAuth URL from backend (server-to-server)
   const result = await getBackendOAuthUrl(provider, callbackUrl);
 
   if (!result) {
-    return NextResponse.json(
-      { error: "Failed to get OAuth URL" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to get OAuth URL" }, { status: 500 });
   }
 
   return NextResponse.redirect(result.url);
@@ -561,6 +555,7 @@ git commit -m "feat(ui): proxy OAuth initiation through backend"
 ### Task 6: Create OAuth Callback Route
 
 **Files:**
+
 - Create: `ui/src/app/api/auth/callback/[provider]/route.ts`
 
 **Step 1: Create callback route**
@@ -570,10 +565,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exchangeOAuthCode } from "@/lib/api/auth-api";
 import { signIn } from "next-auth/react";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ provider: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const { provider } = await params;
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
@@ -592,17 +584,10 @@ export async function GET(
   }
 
   // Build the same callback URL used in the authorization request
-  const callbackUrl = new URL(
-    `/api/auth/callback/${provider}`,
-    process.env.NEXTAUTH_URL
-  ).toString();
+  const callbackUrl = new URL(`/api/auth/callback/${provider}`, process.env.NEXTAUTH_URL).toString();
 
   // Exchange code for token via backend (server-to-server)
-  const result = await exchangeOAuthCode(
-    provider as "google" | "azure",
-    code,
-    callbackUrl
-  );
+  const result = await exchangeOAuthCode(provider as "google" | "azure", code, callbackUrl);
 
   if (!result) {
     const loginUrl = new URL("/login", process.env.NEXTAUTH_URL);
@@ -630,6 +615,7 @@ git commit -m "feat(ui): add OAuth callback route for backend exchange"
 ### Task 7: Update Login Page to Handle Token
 
 **Files:**
+
 - Modify: `ui/src/app/login/page.tsx`
 
 **Step 1: Handle token parameter (from callback)**
@@ -682,6 +668,7 @@ git commit -m "feat(ui): handle token from OAuth callback"
 ### Task 8: Add Token-Based Credentials Provider
 
 **Files:**
+
 - Modify: `ui/src/auth.config.ts`
 
 **Step 1: Add backend-token provider**
@@ -739,27 +726,30 @@ git commit -m "feat(ui): add backend-token credentials provider"
 ### What Changed
 
 **Backend:**
+
 - `GET /auth/oauth-url` - Returns OAuth authorization URL (credentials stay in backend)
 - `POST /auth/oauth/exchange` - Exchanges auth code for backend JWT (credentials stay in backend)
 - `OAuthUrlService` - Builds OAuth URLs using Spring's ClientRegistrationRepository
 - `OAuthExchangeService` - Exchanges codes with OAuth providers
 
 **UI:**
+
 - `/api/oauth/[provider]` - Now fetches OAuth URL from backend, then redirects browser
 - `/api/auth/callback/[provider]` - Receives callback, exchanges code via backend
 - `auth.config.ts` - Added `backend-token` provider for direct token auth
 
 ### Properties
 
-| Property | Value |
-|----------|-------|
-| OAuth credentials location | Backend only |
-| Browser talks to backend | Never |
-| Token exchange | Backend to OAuth provider |
-| UI server role | Proxy only |
+| Property                   | Value                     |
+| -------------------------- | ------------------------- |
+| OAuth credentials location | Backend only              |
+| Browser talks to backend   | Never                     |
+| Token exchange             | Backend to OAuth provider |
+| UI server role             | Proxy only                |
 
 ### Environment Variables
 
 No changes needed. OAuth credentials remain in backend's `application.yaml`:
+
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 - `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`

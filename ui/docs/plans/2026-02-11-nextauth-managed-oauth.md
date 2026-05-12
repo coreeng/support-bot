@@ -75,26 +75,27 @@ Browser                          Next.js Server                    Backend API  
 
 ### Existing Endpoints
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/auth/token` | POST | Exchange auth code for JWT (current flow) |
-| `/auth/me` | GET | Get current user info |
-| `/auth/logout` | POST | Logout |
-| `/oauth2/authorization/{provider}` | GET | Spring OAuth2 redirect (to be deprecated) |
+| Endpoint                           | Method | Purpose                                   |
+| ---------------------------------- | ------ | ----------------------------------------- |
+| `/auth/token`                      | POST   | Exchange auth code for JWT (current flow) |
+| `/auth/me`                         | GET    | Get current user info                     |
+| `/auth/logout`                     | POST   | Logout                                    |
+| `/oauth2/authorization/{provider}` | GET    | Spring OAuth2 redirect (to be deprecated) |
 
 ### Key Backend Files
 
-| File | Purpose |
-|------|---------|
-| `api/.../security/AuthController.java` | Auth endpoints |
+| File                                         | Purpose                                                               |
+| -------------------------------------------- | --------------------------------------------------------------------- |
+| `api/.../security/AuthController.java`       | Auth endpoints                                                        |
 | `api/.../security/OAuth2SuccessHandler.java` | Post-OAuth processing (team lookup, role computation, JWT generation) |
-| `api/.../security/JwtService.java` | JWT generation and validation |
-| `api/.../teams/TeamService.java` | Team lookup by email |
-| `api/.../teams/SupportTeamService.java` | Leadership/support membership checks |
+| `api/.../security/JwtService.java`           | JWT generation and validation                                         |
+| `api/.../teams/TeamService.java`             | Team lookup by email                                                  |
+| `api/.../teams/SupportTeamService.java`      | Leadership/support membership checks                                  |
 
 ### Logic to Reuse
 
 The `OAuth2SuccessHandler` contains the core logic we need:
+
 - `extractEmail()` - Extract email from OAuth claims
 - `extractName()` - Extract name from OAuth claims
 - `computeRoles()` - Compute roles based on teams
@@ -108,6 +109,7 @@ The `OAuth2SuccessHandler` contains the core logic we need:
 ### Task 1: Create OIDC Token Exchange Endpoint
 
 **Files:**
+
 - Modify: `api/service/src/main/java/com/coreeng/supportbot/security/AuthController.java`
 - Create: `api/service/src/main/java/com/coreeng/supportbot/security/OidcTokenService.java`
 
@@ -318,6 +320,7 @@ git commit -m "feat(api): add OIDC token exchange endpoint for NextAuth integrat
 ### Task 2: Update Environment Configuration
 
 **Files:**
+
 - Modify: `ui/.env.example`
 - Modify: `ui/src/instrumentation.ts`
 
@@ -359,9 +362,7 @@ Add OAuth provider validation:
 ```typescript
 function validateOAuthProviders(): string | null {
   const hasGoogle = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET;
-  const hasAzure = process.env.AZURE_AD_CLIENT_ID &&
-                   process.env.AZURE_AD_CLIENT_SECRET &&
-                   process.env.AZURE_AD_TENANT_ID;
+  const hasAzure = process.env.AZURE_AD_CLIENT_ID && process.env.AZURE_AD_CLIENT_SECRET && process.env.AZURE_AD_TENANT_ID;
 
   if (!hasGoogle && !hasAzure) {
     return "At least one OAuth provider required (GOOGLE_CLIENT_ID/SECRET or AZURE_AD_*)";
@@ -400,6 +401,7 @@ git commit -m "chore(ui): add OAuth provider env vars configuration"
 ### Task 3: Add OIDC Token Exchange Function
 
 **Files:**
+
 - Modify: `ui/src/lib/api/auth-api.ts`
 
 **Step 1: Add exchangeOidcToken function**
@@ -409,10 +411,7 @@ git commit -m "chore(ui): add OAuth provider env vars configuration"
  * Exchange OAuth provider ID token for backend JWT.
  * Called server-side after NextAuth completes OAuth.
  */
-export async function exchangeOidcToken(
-  provider: "google" | "azure",
-  idToken: string
-): Promise<{ token: string } | null> {
+export async function exchangeOidcToken(provider: "google" | "azure", idToken: string): Promise<{ token: string } | null> {
   const response = await publicFetch("/auth/oidc", {
     method: "POST",
     body: JSON.stringify({ provider, idToken }),
@@ -439,6 +438,7 @@ git commit -m "feat(ui): add OIDC token exchange function"
 ### Task 4: Add NextAuth Google Provider
 
 **Files:**
+
 - Modify: `ui/src/auth.config.ts`
 
 **Step 1: Update auth.config.ts**
@@ -454,12 +454,14 @@ import { exchangeCodeForToken, exchangeOidcToken, fetchUserWithToken } from "@/l
 export const authConfig: NextAuthConfig = {
   providers: [
     // New: Google OAuth handled by NextAuth
-    ...(process.env.GOOGLE_CLIENT_ID ? [
-      Google({
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      }),
-    ] : []),
+    ...(process.env.GOOGLE_CLIENT_ID
+      ? [
+          Google({
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+          }),
+        ]
+      : []),
 
     // Legacy: Backend-managed OAuth (keep during migration)
     Credentials({
@@ -529,6 +531,7 @@ git commit -m "feat(ui): add NextAuth Google provider with backend OIDC exchange
 ### Task 5: Add NextAuth Azure Provider
 
 **Files:**
+
 - Modify: `ui/src/auth.config.ts`
 
 **Step 1: Add Azure provider**
@@ -578,6 +581,7 @@ git commit -m "feat(ui): add NextAuth Azure AD provider"
 ### Task 6: Update Login Page
 
 **Files:**
+
 - Modify: `ui/src/app/login/page.tsx`
 
 **Step 1: Update handleLogin to use NextAuth signIn**
@@ -610,6 +614,7 @@ git commit -m "refactor(ui): use NextAuth signIn for OAuth"
 After confirming the new flow works:
 
 **Files to modify:**
+
 - `ui/src/app/api/oauth/` - Delete directory
 - `ui/src/lib/api/auth-api.ts` - Remove `getOAuthUrl`, `exchangeCodeForToken`
 - `ui/src/auth.config.ts` - Remove `backend-oauth` Credentials provider
@@ -621,10 +626,10 @@ After confirming the new flow works:
 
 Configure in Google Cloud Console / Azure Portal:
 
-| Provider | Development | Production |
-|----------|-------------|------------|
-| Google | `http://localhost:3000/api/auth/callback/google` | `https://ui.example.com/api/auth/callback/google` |
-| Azure | `http://localhost:3000/api/auth/callback/azure-ad` | `https://ui.example.com/api/auth/callback/azure-ad` |
+| Provider | Development                                        | Production                                          |
+| -------- | -------------------------------------------------- | --------------------------------------------------- |
+| Google   | `http://localhost:3000/api/auth/callback/google`   | `https://ui.example.com/api/auth/callback/google`   |
+| Azure    | `http://localhost:3000/api/auth/callback/azure-ad` | `https://ui.example.com/api/auth/callback/azure-ad` |
 
 ---
 
@@ -639,10 +644,10 @@ Configure in Google Cloud Console / Azure Portal:
 
 ## Summary
 
-| Component | Before | After |
-|-----------|--------|-------|
-| **Browser → OAuth** | Via Backend (exposed) | Direct to Google/Azure |
-| **Token Exchange** | Backend OAuth flow | NextAuth + backend `/auth/oidc` |
-| **Backend Exposure** | Public | Internal only |
-| **New Backend Endpoint** | N/A | `POST /auth/oidc` |
-| **New Backend Service** | N/A | `OidcTokenService.java` |
+| Component                | Before                | After                           |
+| ------------------------ | --------------------- | ------------------------------- |
+| **Browser → OAuth**      | Via Backend (exposed) | Direct to Google/Azure          |
+| **Token Exchange**       | Backend OAuth flow    | NextAuth + backend `/auth/oidc` |
+| **Backend Exposure**     | Public                | Internal only                   |
+| **New Backend Endpoint** | N/A                   | `POST /auth/oidc`               |
+| **New Backend Service**  | N/A                   | `OidcTokenService.java`         |

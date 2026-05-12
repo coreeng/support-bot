@@ -1,48 +1,48 @@
 /**
  * Health Dashboard Unit Tests
- * 
+ *
  * Tests the Health dashboard rendering, tabs, and filtering:
  * - Tab navigation (Activity Trends, Ratings, Ticket Workbench)
  * - Status, Rated, and Assignee filters in Ticket Workbench tab
  * - Loading and error states
  */
 
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import HealthPage from '../health';
-import * as hooks from '../../../lib/hooks';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen } from "@testing-library/react";
+import React from "react";
+import * as hooks from "../../../lib/hooks";
+import HealthPage from "../health";
 
 // Mock recharts to avoid rendering errors in tests
-jest.mock('recharts', () => ({
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Line: () => null,
-    Bar: () => null,
-    XAxis: () => null,
-    YAxis: () => null,
-    CartesianGrid: () => null,
-    Tooltip: () => null,
-    Legend: () => null,
-    Cell: () => null,
+jest.mock("recharts", () => ({
+  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Line: () => null,
+  Bar: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  CartesianGrid: () => null,
+  Tooltip: () => null,
+  Legend: () => null,
+  Cell: () => null,
 }));
 
-jest.mock('../../../lib/hooks');
+jest.mock("../../../lib/hooks");
 
 // Mock useUrlParams with a useState-based implementation so tab and filter
 // changes re-render the component correctly, keeping all existing interactions intact.
-jest.mock('../../../lib/hooks/useUrlParams', () => ({
-    ...jest.requireActual('../../../lib/hooks/useUrlParams'),
-    useUrlParams: (defaults: Record<string, string>) => {
-        const { useState } = require('react') as typeof import('react')
-        const [params, setParamsState] = useState<Record<string, string>>(defaults)
-        const setParams = (updates: Record<string, string>) => {
-            setParamsState((prev: Record<string, string>) => ({ ...prev, ...updates }))
-        }
-        return [params, setParams]
-    },
-}))
+jest.mock("../../../lib/hooks/useUrlParams", () => ({
+  ...jest.requireActual("../../../lib/hooks/useUrlParams"),
+  useUrlParams: (defaults: Record<string, string>) => {
+    const { useState } = require("react") as typeof import("react");
+    const [params, setParamsState] = useState<Record<string, string>>(defaults);
+    const setParams = (updates: Record<string, string>) => {
+      setParamsState((prev: Record<string, string>) => ({ ...prev, ...updates }));
+    };
+    return [params, setParams];
+  },
+}));
 
 const mockUseTickets = hooks.useTickets as jest.MockedFunction<typeof hooks.useTickets>;
 const mockUseRatings = hooks.useRatings as jest.MockedFunction<typeof hooks.useRatings>;
@@ -51,659 +51,623 @@ const mockUseSupportMembers = hooks.useSupportMembers as jest.MockedFunction<typ
 const mockUseAssignmentEnabled = hooks.useAssignmentEnabled as jest.MockedFunction<typeof hooks.useAssignmentEnabled>;
 
 const createMockTicket = (id: string, status: string, teamName: string, ratingSubmitted: boolean, escalations: unknown[] = []) => {
-    const now = new Date();
-    const recentDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    return {
-        id,
-        status,
-        team: { name: teamName },
-        impact: 'high',
-        tags: ['bug'],
-        escalations,
-        logs: [{ event: 'opened', date: recentDate.toISOString() }],
-        query: { link: 'https://example.com' },
-        ratingSubmitted
-    };
+  const now = new Date();
+  const recentDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  return {
+    id,
+    status,
+    team: { name: teamName },
+    impact: "high",
+    tags: ["bug"],
+    escalations,
+    logs: [{ event: "opened", date: recentDate.toISOString() }],
+    query: { link: "https://example.com" },
+    ratingSubmitted,
+  };
 };
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => {
-    const queryClient = new QueryClient({
-        defaultOptions: { queries: { retry: false } }
-    });
-    return (
-        <QueryClientProvider client={queryClient}>
-            {children}
-        </QueryClientProvider>
-    );
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 };
 
-describe('HealthPage', () => {
+describe("HealthPage", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockUseRegistry.mockReturnValue({
+      data: {
+        impacts: [{ code: "high", label: "High" }],
+        tags: [{ code: "bug", label: "Bug" }],
+      },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useRegistry>);
+
+    mockUseRatings.mockReturnValue({
+      data: { average: 4.5, count: 10 },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useRatings>);
+
+    mockUseSupportMembers.mockReturnValue({
+      data: [
+        { userId: "U123", displayName: "john@example.com" },
+        { userId: "U456", displayName: "jane@example.com" },
+      ],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useSupportMembers>);
+
+    mockUseAssignmentEnabled.mockReturnValue({
+      data: true,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useAssignmentEnabled>);
+  });
+
+  describe("Loading States", () => {
+    it("shows loading skeleton when tickets are loading", () => {
+      mockUseTickets.mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useTickets>);
+
+      const { container } = render(<HealthPage />, { wrapper: Wrapper });
+
+      expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+    });
+
+    it("shows loading skeleton when ratings are loading", () => {
+      mockUseTickets.mockReturnValue({
+        data: { content: [], page: 0, totalPages: 0, totalElements: 0 },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useTickets>);
+
+      mockUseRatings.mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useRatings>);
+
+      const { container } = render(<HealthPage />, { wrapper: Wrapper });
+
+      expect(container.querySelector(".animate-pulse")).toBeInTheDocument();
+    });
+  });
+
+  describe("Tab Navigation", () => {
     beforeEach(() => {
-        jest.clearAllMocks();
+      mockUseTickets.mockReturnValue({
+        data: { content: [], page: 0, totalPages: 0, totalElements: 0 },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useTickets>);
+    });
 
-        mockUseRegistry.mockReturnValue({
-            data: {
-                impacts: [{ code: 'high', label: 'High' }],
-                tags: [{ code: 'bug', label: 'Bug' }]
-            },
-            isLoading: false,
-            error: null
-        } as unknown as ReturnType<typeof hooks.useRegistry>);
+    it("renders all three tabs", () => {
+      render(<HealthPage />, { wrapper: Wrapper });
 
-        mockUseRatings.mockReturnValue({
-            data: { average: 4.5, count: 10 },
-            isLoading: false,
-            error: null
-        } as unknown as ReturnType<typeof hooks.useRatings>);
+      expect(screen.getByText("Activity Trends")).toBeInTheDocument();
+      expect(screen.getByText("Ratings")).toBeInTheDocument();
+      expect(screen.getByText("Ticket Workbench")).toBeInTheDocument();
+    });
 
-        mockUseSupportMembers.mockReturnValue({
-            data: [
-                { userId: 'U123', displayName: 'john@example.com' },
-                { userId: 'U456', displayName: 'jane@example.com' }
-            ],
-            isLoading: false,
-            error: null
-        } as unknown as ReturnType<typeof hooks.useSupportMembers>);
+    it("defaults to Activity Trends tab", () => {
+      render(<HealthPage />, { wrapper: Wrapper });
 
+      // Should show activity trends tab content (has date filter picklist with "Last Week")
+      expect(screen.getByText(/Last Week/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("Activity Trends - New Dashboards", () => {
+    const createTicketWithDate = (id: string, teamName: string, openedDate: Date, assignedTo?: string, status: string = "opened") => {
+      return {
+        id,
+        status,
+        team: { name: teamName },
+        impact: "high",
+        tags: ["bug"],
+        escalations: [],
+        logs: [{ event: "opened", date: openedDate.toISOString() }],
+        query: { link: "https://example.com" },
+        ratingSubmitted: false,
+        assignedTo,
+      };
+    };
+
+    beforeEach(() => {
+      mockUseTickets.mockReturnValue({
+        data: { content: [], page: 0, totalPages: 0, totalElements: 0 },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useTickets>);
+    });
+
+    describe("Average Ticket Assignments per Support Engineer", () => {
+      it("renders when assignment is enabled and has tickets", () => {
+        const now = new Date();
+        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const tickets = [
+          createTicketWithDate("1", "Team A", yesterday, "john@example.com"),
+          createTicketWithDate("2", "Team B", yesterday, "jane@example.com"),
+          createTicketWithDate("3", "Team A", yesterday, "john@example.com"),
+        ];
+
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 3 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        expect(screen.getByText("Average Ticket Assignments per Support Engineer")).toBeInTheDocument();
+      });
+
+      it("does not render when assignment is disabled", () => {
         mockUseAssignmentEnabled.mockReturnValue({
-            data: true,
-            isLoading: false,
-            error: null
+          data: false,
+          isLoading: false,
+          error: null,
         } as unknown as ReturnType<typeof hooks.useAssignmentEnabled>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        expect(screen.queryByText("Average Ticket Assignments per Support Engineer")).not.toBeInTheDocument();
+      });
     });
 
-    describe('Loading States', () => {
-        it('shows loading skeleton when tickets are loading', () => {
-            mockUseTickets.mockReturnValue({
-                data: undefined,
-                isLoading: true,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
+    describe("Tickets Opened by Requesting Team (Top 10)", () => {
+      it("renders team breakdown chart", () => {
+        const now = new Date();
+        const tickets = [
+          createTicketWithDate("1", "Team A", now),
+          createTicketWithDate("2", "Team B", now),
+          createTicketWithDate("3", "Team A", now),
+        ];
 
-            const { container } = render(<HealthPage />, { wrapper: Wrapper });
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 3 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
 
-            expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
-        });
+        render(<HealthPage />, { wrapper: Wrapper });
 
-        it('shows loading skeleton when ratings are loading', () => {
-            mockUseTickets.mockReturnValue({
-                data: { content: [], page: 0, totalPages: 0, totalElements: 0 },
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
+        expect(screen.getByText("Tickets Opened by Requesting Team (Top 10)")).toBeInTheDocument();
+      });
 
-            mockUseRatings.mockReturnValue({
-                data: undefined,
-                isLoading: true,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useRatings>);
+      it("limits to top 10 teams", () => {
+        const now = new Date();
+        const tickets = Array.from({ length: 15 }, (_, i) => createTicketWithDate(`ticket-${i}`, `Team ${i}`, now));
 
-            const { container } = render(<HealthPage />, { wrapper: Wrapper });
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 15 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
 
-            expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
-        });
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        expect(screen.getByText("Tickets Opened by Requesting Team (Top 10)")).toBeInTheDocument();
+      });
     });
 
-    describe('Tab Navigation', () => {
-        beforeEach(() => {
-            mockUseTickets.mockReturnValue({
-                data: { content: [], page: 0, totalPages: 0, totalElements: 0 },
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
-        });
+    describe("Current Active Tickets per Engineer", () => {
+      it("renders when assignment is enabled", () => {
+        const now = new Date();
+        const tickets = [
+          createTicketWithDate("1", "Team A", now, "john@example.com", "opened"),
+          createTicketWithDate("2", "Team B", now, "jane@example.com", "opened"),
+        ];
 
-        it('renders all three tabs', () => {
-            render(<HealthPage />, { wrapper: Wrapper });
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 2 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
 
-            expect(screen.getByText('Activity Trends')).toBeInTheDocument();
-            expect(screen.getByText('Ratings')).toBeInTheDocument();
-            expect(screen.getByText('Ticket Workbench')).toBeInTheDocument();
-        });
+        render(<HealthPage />, { wrapper: Wrapper });
 
-        it('defaults to Activity Trends tab', () => {
-            render(<HealthPage />, { wrapper: Wrapper });
+        expect(screen.getByText("Current Active Tickets per Engineer")).toBeInTheDocument();
+      });
 
-            // Should show activity trends tab content (has date filter picklist with "Last Week")
-            expect(screen.getByText(/Last Week/i)).toBeInTheDocument();
-        });
+      it("does not render when assignment is disabled", () => {
+        mockUseAssignmentEnabled.mockReturnValue({
+          data: false,
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useAssignmentEnabled>);
 
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        expect(screen.queryByText("Current Active Tickets per Engineer")).not.toBeInTheDocument();
+      });
+
+      it("only counts opened tickets", () => {
+        const now = new Date();
+        const tickets = [
+          createTicketWithDate("1", "Team A", now, "john@example.com", "opened"),
+          createTicketWithDate("2", "Team B", now, "john@example.com", "closed"),
+          createTicketWithDate("3", "Team A", now, "jane@example.com", "opened"),
+        ];
+
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 3 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        expect(screen.getByText("Current Active Tickets per Engineer")).toBeInTheDocument();
+      });
     });
 
-
-    describe('Activity Trends - New Dashboards', () => {
-        const createTicketWithDate = (id: string, teamName: string, openedDate: Date, assignedTo?: string, status: string = 'opened') => {
-            return {
-                id,
-                status,
-                team: { name: teamName },
-                impact: 'high',
-                tags: ['bug'],
-                escalations: [],
-                logs: [{ event: 'opened', date: openedDate.toISOString() }],
-                query: { link: 'https://example.com' },
-                ratingSubmitted: false,
-                assignedTo
-            };
-        };
-
-        beforeEach(() => {
-            mockUseTickets.mockReturnValue({
-                data: { content: [], page: 0, totalPages: 0, totalElements: 0 },
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
-        });
-
-        describe('Average Ticket Assignments per Support Engineer', () => {
-            it('renders when assignment is enabled and has tickets', () => {
-                const now = new Date();
-                const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', yesterday, 'john@example.com'),
-                    createTicketWithDate('2', 'Team B', yesterday, 'jane@example.com'),
-                    createTicketWithDate('3', 'Team A', yesterday, 'john@example.com'),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 3 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.getByText('Average Ticket Assignments per Support Engineer')).toBeInTheDocument();
-            });
-
-            it('does not render when assignment is disabled', () => {
-                mockUseAssignmentEnabled.mockReturnValue({
-                    data: false,
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useAssignmentEnabled>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.queryByText('Average Ticket Assignments per Support Engineer')).not.toBeInTheDocument();
-            });
-        });
-
-        describe('Tickets Opened by Requesting Team (Top 10)', () => {
-            it('renders team breakdown chart', () => {
-                const now = new Date();
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', now),
-                    createTicketWithDate('2', 'Team B', now),
-                    createTicketWithDate('3', 'Team A', now),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 3 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.getByText('Tickets Opened by Requesting Team (Top 10)')).toBeInTheDocument();
-            });
-
-            it('limits to top 10 teams', () => {
-                const now = new Date();
-                const tickets = Array.from({ length: 15 }, (_, i) => 
-                    createTicketWithDate(`ticket-${i}`, `Team ${i}`, now)
-                );
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 15 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.getByText('Tickets Opened by Requesting Team (Top 10)')).toBeInTheDocument();
-            });
-        });
-
-        describe('Current Active Tickets per Engineer', () => {
-            it('renders when assignment is enabled', () => {
-                const now = new Date();
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', now, 'john@example.com', 'opened'),
-                    createTicketWithDate('2', 'Team B', now, 'jane@example.com', 'opened'),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 2 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.getByText('Current Active Tickets per Engineer')).toBeInTheDocument();
-            });
-
-            it('does not render when assignment is disabled', () => {
-                mockUseAssignmentEnabled.mockReturnValue({
-                    data: false,
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useAssignmentEnabled>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.queryByText('Current Active Tickets per Engineer')).not.toBeInTheDocument();
-            });
-
-            it('only counts opened tickets', () => {
-                const now = new Date();
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', now, 'john@example.com', 'opened'),
-                    createTicketWithDate('2', 'Team B', now, 'john@example.com', 'closed'),
-                    createTicketWithDate('3', 'Team A', now, 'jane@example.com', 'opened'),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 3 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.getByText('Current Active Tickets per Engineer')).toBeInTheDocument();
-            });
-        });
-
-        describe('Tickets Opened by Hour of Day', () => {
-            it('renders hour breakdown chart', () => {
-                const now = new Date();
-                now.setHours(10, 0, 0, 0); // 10 AM
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', now),
-                    createTicketWithDate('2', 'Team B', now),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 2 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.getByText('Tickets Opened by Hour of Day')).toBeInTheDocument();
-            });
-
-            it('only includes hours between 7AM and 7PM', () => {
-                const now = new Date();
-                // Create tickets at different hours
-                const earlyMorning = new Date(now);
-                earlyMorning.setHours(6, 0, 0, 0); // 6 AM - should be excluded
-                const businessHour = new Date(now);
-                businessHour.setHours(10, 0, 0, 0); // 10 AM - should be included
-                const evening = new Date(now);
-                evening.setHours(20, 0, 0, 0); // 8 PM - should be excluded
-
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', earlyMorning),
-                    createTicketWithDate('2', 'Team B', businessHour),
-                    createTicketWithDate('3', 'Team C', evening),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 3 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.getByText('Tickets Opened by Hour of Day')).toBeInTheDocument();
-            });
-        });
-
-        describe('Busiest Periods Heatmap', () => {
-            it('renders heatmap for weekdays only', () => {
-                const monday = new Date('2024-01-01T10:00:00Z'); // Monday
-                const sunday = new Date('2023-12-31T10:00:00Z'); // Sunday - should be excluded
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', monday),
-                    createTicketWithDate('2', 'Team B', sunday),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 2 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.getByText('Busiest Periods Heatmap')).toBeInTheDocument();
-            });
-
-            it('only includes hours between 7AM and 7PM', () => {
-                const monday = new Date('2024-01-01T10:00:00Z'); // Monday 10 AM
-                const tickets = [createTicketWithDate('1', 'Team A', monday)];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.getByText('Busiest Periods Heatmap')).toBeInTheDocument();
-            });
-        });
-
-        describe('Capacity vs Demand', () => {
-            it('renders when assignment is enabled', () => {
-                const now = new Date();
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', now, 'john@example.com', 'opened'),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.getByText('Capacity vs Demand')).toBeInTheDocument();
-                expect(screen.getByText('Engineers on Rota')).toBeInTheDocument();
-                expect(screen.getByText('Tickets per Engineer Capacity')).toBeInTheDocument();
-            });
-
-            it('renders even when assignment is disabled', () => {
-                mockUseAssignmentEnabled.mockReturnValue({
-                    data: false,
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useAssignmentEnabled>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.getByText('Capacity vs Demand')).toBeInTheDocument();
-            });
-
-            it('allows changing engineers on rota', () => {
-                const now = new Date();
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', now, 'john@example.com', 'opened'),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                const inputs = screen.getAllByRole('spinbutton');
-                const engineersInput = inputs.find(input => 
-                    input.getAttribute('min') === '1' && 
-                    input.getAttribute('max') && 
-                    parseInt(input.getAttribute('max') || '0') > 0
-                );
-
-                expect(engineersInput).toBeInTheDocument();
-                if (engineersInput) {
-                    fireEvent.change(engineersInput, { target: { value: '3' } });
-                }
-            });
-
-            it('allows changing tickets per engineer capacity', () => {
-                const now = new Date();
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', now, 'john@example.com', 'opened'),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                const inputs = screen.getAllByRole('spinbutton');
-                const capacityInput = inputs.find(input => 
-                    input.getAttribute('min') === '1' && 
-                    input.getAttribute('max') === '50'
-                );
-
-                expect(capacityInput).toBeInTheDocument();
-                if (capacityInput) {
-                    fireEvent.change(capacityInput, { target: { value: '8' } });
-                }
-            });
-
-            it('calculates capacity utilization correctly', () => {
-                const now = new Date();
-                // Create 15 opened tickets
-                const tickets = Array.from({ length: 15 }, (_, i) => 
-                    createTicketWithDate(`ticket-${i}`, 'Team A', now, 'john@example.com', 'opened')
-                );
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 15 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                // With default 2 engineers × 5 capacity = 10 total capacity
-                // 15 tickets / 10 capacity = 150% utilization
-                expect(screen.getByText('Capacity vs Demand')).toBeInTheDocument();
-                expect(screen.getByText(/Capacity Utilization/i)).toBeInTheDocument();
-            });
-
-            it('shows over capacity warning when utilization exceeds 100%', () => {
-                const now = new Date();
-                // Create 15 opened tickets (exceeds default capacity of 10)
-                const tickets = Array.from({ length: 15 }, (_, i) => 
-                    createTicketWithDate(`ticket-${i}`, 'Team A', now, 'john@example.com', 'opened')
-                );
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 15 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                // Should show over capacity warning (multiple instances exist)
-                const overCapacityTexts = screen.getAllByText(/Over Capacity/i);
-                expect(overCapacityTexts.length).toBeGreaterThan(0);
-            });
-        });
-
-        describe('Capacity Insights by Time Block', () => {
-            it('renders when assignment is enabled and has data', () => {
-                const monday = new Date('2024-01-01T10:00:00Z'); // Monday 10 AM
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', monday, 'john@example.com', 'opened'),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                // Should show collapsible section
-                expect(screen.getByText('Capacity Insights by Time Block')).toBeInTheDocument();
-            });
-
-            it('is collapsible', () => {
-                const monday = new Date('2024-01-01T10:00:00Z'); // Monday 10 AM
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', monday, 'john@example.com', 'opened'),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                const header = screen.getByText('Capacity Insights by Time Block').closest('button');
-                expect(header).toBeInTheDocument();
-                
-                if (header) {
-                    fireEvent.click(header);
-                    // After clicking, content should be visible
-                    expect(screen.getByText(/Total tickets per 2-hour block/i)).toBeInTheDocument();
-                }
-            });
-
-            it('renders even when assignment is disabled', () => {
-                mockUseAssignmentEnabled.mockReturnValue({
-                    data: false,
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useAssignmentEnabled>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                expect(screen.getByText('Capacity Insights by Time Block')).toBeInTheDocument();
-            });
-
-            it('groups hours into 2-hour blocks', () => {
-                const monday = new Date('2024-01-01T10:00:00Z'); // Monday 10 AM
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', monday, 'john@example.com', 'opened'),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                const header = screen.getByText('Capacity Insights by Time Block').closest('button');
-                if (header) {
-                    fireEvent.click(header);
-                    // Should show time blocks like "9 AM - 11 AM", "11 AM - 1 PM", etc.
-                    expect(screen.getByText(/Total tickets per 2-hour block/i)).toBeInTheDocument();
-                }
-            });
-
-            it('calculates utilization and recommendations correctly', () => {
-                const monday = new Date('2024-01-01T10:00:00Z'); // Monday 10 AM
-                const tickets = [
-                    createTicketWithDate('1', 'Team A', monday, 'john@example.com', 'opened'),
-                ];
-
-                mockUseTickets.mockReturnValue({
-                    data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
-                    isLoading: false,
-                    error: null
-                } as unknown as ReturnType<typeof hooks.useTickets>);
-
-                render(<HealthPage />, { wrapper: Wrapper });
-
-                const header = screen.getByText('Capacity Insights by Time Block').closest('button');
-                if (header) {
-                    fireEvent.click(header);
-                    // Should show utilization and recommended engineers (multiple instances exist)
-                    const utilizationTexts = screen.getAllByText(/Utilization:/i);
-                    expect(utilizationTexts.length).toBeGreaterThan(0);
-                    const recommendedTexts = screen.getAllByText(/Recommended:/i);
-                    expect(recommendedTexts.length).toBeGreaterThan(0);
-                }
-            });
-        });
+    describe("Tickets Opened by Hour of Day", () => {
+      it("renders hour breakdown chart", () => {
+        const now = new Date();
+        now.setHours(10, 0, 0, 0); // 10 AM
+        const tickets = [createTicketWithDate("1", "Team A", now), createTicketWithDate("2", "Team B", now)];
+
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 2 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        expect(screen.getByText("Tickets Opened by Hour of Day")).toBeInTheDocument();
+      });
+
+      it("only includes hours between 7AM and 7PM", () => {
+        const now = new Date();
+        // Create tickets at different hours
+        const earlyMorning = new Date(now);
+        earlyMorning.setHours(6, 0, 0, 0); // 6 AM - should be excluded
+        const businessHour = new Date(now);
+        businessHour.setHours(10, 0, 0, 0); // 10 AM - should be included
+        const evening = new Date(now);
+        evening.setHours(20, 0, 0, 0); // 8 PM - should be excluded
+
+        const tickets = [
+          createTicketWithDate("1", "Team A", earlyMorning),
+          createTicketWithDate("2", "Team B", businessHour),
+          createTicketWithDate("3", "Team C", evening),
+        ];
+
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 3 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        expect(screen.getByText("Tickets Opened by Hour of Day")).toBeInTheDocument();
+      });
     });
 
-    describe('Ticket Workbench Pagination', () => {
-        it('does not show pagination for a single page', () => {
-            const mockTickets = Array.from({ length: 5 }, (_, i) =>
-                createMockTicket(`${i}`, 'opened', 'Team A', false)
-            );
+    describe("Busiest Periods Heatmap", () => {
+      it("renders heatmap for weekdays only", () => {
+        const monday = new Date("2024-01-01T10:00:00Z"); // Monday
+        const sunday = new Date("2023-12-31T10:00:00Z"); // Sunday - should be excluded
+        const tickets = [createTicketWithDate("1", "Team A", monday), createTicketWithDate("2", "Team B", sunday)];
 
-            mockUseTickets.mockReturnValue({
-                data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 5 },
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 2 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
 
-            render(<HealthPage />, { wrapper: Wrapper });
-            fireEvent.click(screen.getByText('Ticket Workbench'));
+        render(<HealthPage />, { wrapper: Wrapper });
 
-            expect(screen.queryByText('Previous')).not.toBeInTheDocument();
-            expect(screen.queryByText('Next')).not.toBeInTheDocument();
-        });
+        expect(screen.getByText("Busiest Periods Heatmap")).toBeInTheDocument();
+      });
+
+      it("only includes hours between 7AM and 7PM", () => {
+        const monday = new Date("2024-01-01T10:00:00Z"); // Monday 10 AM
+        const tickets = [createTicketWithDate("1", "Team A", monday)];
+
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        expect(screen.getByText("Busiest Periods Heatmap")).toBeInTheDocument();
+      });
     });
 
-    describe('Date Filter - Custom Range Logic', () => {
-        beforeEach(() => {
-            mockUseTickets.mockReturnValue({
-                data: { content: [], page: 0, totalPages: 1, totalElements: 0 },
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useTickets>);
+    describe("Capacity vs Demand", () => {
+      it("renders when assignment is enabled", () => {
+        const now = new Date();
+        const tickets = [createTicketWithDate("1", "Team A", now, "john@example.com", "opened")];
 
-            mockUseRatings.mockReturnValue({
-                data: { average: null, count: null },
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useRatings>);
-        });
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
 
-        it('should preserve date range when switching to custom mode without valid dates', () => {
-            render(<HealthPage />, { wrapper: Wrapper });
+        render(<HealthPage />, { wrapper: Wrapper });
 
-            // Switch to custom mode via the date filter picklist
-            const dateSelect = screen.getByTestId('health-date-filter');
-            fireEvent.change(dateSelect, { target: { value: 'custom' } });
+        expect(screen.getByText("Capacity vs Demand")).toBeInTheDocument();
+        expect(screen.getByText("Engineers on Rota")).toBeInTheDocument();
+        expect(screen.getByText("Tickets per Engineer Capacity")).toBeInTheDocument();
+      });
 
-            // Verify useTickets was called with valid dates (not undefined)
-            const calls = mockUseTickets.mock.calls;
-            if (calls.length > 0) {
-                const lastCall = calls[calls.length - 1];
-                const [, , from, to] = lastCall;
-                // Should have valid dates (preserved from previous filter), not undefined
-                expect(from).toBeDefined();
-                expect(to).toBeDefined();
-                expect(from).not.toBe('');
-                expect(to).not.toBe('');
-            }
-        });
+      it("renders even when assignment is disabled", () => {
+        mockUseAssignmentEnabled.mockReturnValue({
+          data: false,
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useAssignmentEnabled>);
 
-        it('should not fetch all tickets when custom mode is selected with invalid dates', () => {
-            render(<HealthPage />, { wrapper: Wrapper });
+        render(<HealthPage />, { wrapper: Wrapper });
 
-            const dateSelect = screen.getByTestId('health-date-filter');
-            fireEvent.change(dateSelect, { target: { value: 'custom' } });
+        expect(screen.getByText("Capacity vs Demand")).toBeInTheDocument();
+      });
 
-            // Even with invalid dates, should preserve a valid range
-            const calls = mockUseTickets.mock.calls;
-            if (calls.length > 0) {
-                const lastCall = calls[calls.length - 1];
-                const [, , from, to] = lastCall;
-                // Should have valid dates, not undefined (which would fetch all tickets)
-                expect(from).toBeDefined();
-                expect(to).toBeDefined();
-            }
-        });
+      it("allows changing engineers on rota", () => {
+        const now = new Date();
+        const tickets = [createTicketWithDate("1", "Team A", now, "john@example.com", "opened")];
+
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        const inputs = screen.getAllByRole("spinbutton");
+        const engineersInput = inputs.find(
+          (input) => input.getAttribute("min") === "1" && input.getAttribute("max") && parseInt(input.getAttribute("max") || "0") > 0
+        );
+
+        expect(engineersInput).toBeInTheDocument();
+        if (engineersInput) {
+          fireEvent.change(engineersInput, { target: { value: "3" } });
+        }
+      });
+
+      it("allows changing tickets per engineer capacity", () => {
+        const now = new Date();
+        const tickets = [createTicketWithDate("1", "Team A", now, "john@example.com", "opened")];
+
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        const inputs = screen.getAllByRole("spinbutton");
+        const capacityInput = inputs.find((input) => input.getAttribute("min") === "1" && input.getAttribute("max") === "50");
+
+        expect(capacityInput).toBeInTheDocument();
+        if (capacityInput) {
+          fireEvent.change(capacityInput, { target: { value: "8" } });
+        }
+      });
+
+      it("calculates capacity utilization correctly", () => {
+        const now = new Date();
+        // Create 15 opened tickets
+        const tickets = Array.from({ length: 15 }, (_, i) =>
+          createTicketWithDate(`ticket-${i}`, "Team A", now, "john@example.com", "opened")
+        );
+
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 15 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        // With default 2 engineers × 5 capacity = 10 total capacity
+        // 15 tickets / 10 capacity = 150% utilization
+        expect(screen.getByText("Capacity vs Demand")).toBeInTheDocument();
+        expect(screen.getByText(/Capacity Utilization/i)).toBeInTheDocument();
+      });
+
+      it("shows over capacity warning when utilization exceeds 100%", () => {
+        const now = new Date();
+        // Create 15 opened tickets (exceeds default capacity of 10)
+        const tickets = Array.from({ length: 15 }, (_, i) =>
+          createTicketWithDate(`ticket-${i}`, "Team A", now, "john@example.com", "opened")
+        );
+
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 15 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        // Should show over capacity warning (multiple instances exist)
+        const overCapacityTexts = screen.getAllByText(/Over Capacity/i);
+        expect(overCapacityTexts.length).toBeGreaterThan(0);
+      });
     });
+
+    describe("Capacity Insights by Time Block", () => {
+      it("renders when assignment is enabled and has data", () => {
+        const monday = new Date("2024-01-01T10:00:00Z"); // Monday 10 AM
+        const tickets = [createTicketWithDate("1", "Team A", monday, "john@example.com", "opened")];
+
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        // Should show collapsible section
+        expect(screen.getByText("Capacity Insights by Time Block")).toBeInTheDocument();
+      });
+
+      it("is collapsible", () => {
+        const monday = new Date("2024-01-01T10:00:00Z"); // Monday 10 AM
+        const tickets = [createTicketWithDate("1", "Team A", monday, "john@example.com", "opened")];
+
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        const header = screen.getByText("Capacity Insights by Time Block").closest("button");
+        expect(header).toBeInTheDocument();
+
+        if (header) {
+          fireEvent.click(header);
+          // After clicking, content should be visible
+          expect(screen.getByText(/Total tickets per 2-hour block/i)).toBeInTheDocument();
+        }
+      });
+
+      it("renders even when assignment is disabled", () => {
+        mockUseAssignmentEnabled.mockReturnValue({
+          data: false,
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useAssignmentEnabled>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        expect(screen.getByText("Capacity Insights by Time Block")).toBeInTheDocument();
+      });
+
+      it("groups hours into 2-hour blocks", () => {
+        const monday = new Date("2024-01-01T10:00:00Z"); // Monday 10 AM
+        const tickets = [createTicketWithDate("1", "Team A", monday, "john@example.com", "opened")];
+
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        const header = screen.getByText("Capacity Insights by Time Block").closest("button");
+        if (header) {
+          fireEvent.click(header);
+          // Should show time blocks like "9 AM - 11 AM", "11 AM - 1 PM", etc.
+          expect(screen.getByText(/Total tickets per 2-hour block/i)).toBeInTheDocument();
+        }
+      });
+
+      it("calculates utilization and recommendations correctly", () => {
+        const monday = new Date("2024-01-01T10:00:00Z"); // Monday 10 AM
+        const tickets = [createTicketWithDate("1", "Team A", monday, "john@example.com", "opened")];
+
+        mockUseTickets.mockReturnValue({
+          data: { content: tickets, page: 0, totalPages: 1, totalElements: 1 },
+          isLoading: false,
+          error: null,
+        } as unknown as ReturnType<typeof hooks.useTickets>);
+
+        render(<HealthPage />, { wrapper: Wrapper });
+
+        const header = screen.getByText("Capacity Insights by Time Block").closest("button");
+        if (header) {
+          fireEvent.click(header);
+          // Should show utilization and recommended engineers (multiple instances exist)
+          const utilizationTexts = screen.getAllByText(/Utilization:/i);
+          expect(utilizationTexts.length).toBeGreaterThan(0);
+          const recommendedTexts = screen.getAllByText(/Recommended:/i);
+          expect(recommendedTexts.length).toBeGreaterThan(0);
+        }
+      });
+    });
+  });
+
+  describe("Ticket Workbench Pagination", () => {
+    it("does not show pagination for a single page", () => {
+      const mockTickets = Array.from({ length: 5 }, (_, i) => createMockTicket(`${i}`, "opened", "Team A", false));
+
+      mockUseTickets.mockReturnValue({
+        data: { content: mockTickets, page: 0, totalPages: 1, totalElements: 5 },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useTickets>);
+
+      render(<HealthPage />, { wrapper: Wrapper });
+      fireEvent.click(screen.getByText("Ticket Workbench"));
+
+      expect(screen.queryByText("Previous")).not.toBeInTheDocument();
+      expect(screen.queryByText("Next")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Date Filter - Custom Range Logic", () => {
+    beforeEach(() => {
+      mockUseTickets.mockReturnValue({
+        data: { content: [], page: 0, totalPages: 1, totalElements: 0 },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useTickets>);
+
+      mockUseRatings.mockReturnValue({
+        data: { average: null, count: null },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useRatings>);
+    });
+
+    it("should preserve date range when switching to custom mode without valid dates", () => {
+      render(<HealthPage />, { wrapper: Wrapper });
+
+      // Switch to custom mode via the date filter picklist
+      const dateSelect = screen.getByTestId("health-date-filter");
+      fireEvent.change(dateSelect, { target: { value: "custom" } });
+
+      // Verify useTickets was called with valid dates (not undefined)
+      const calls = mockUseTickets.mock.calls;
+      if (calls.length > 0) {
+        const lastCall = calls[calls.length - 1];
+        const [, , from, to] = lastCall;
+        // Should have valid dates (preserved from previous filter), not undefined
+        expect(from).toBeDefined();
+        expect(to).toBeDefined();
+        expect(from).not.toBe("");
+        expect(to).not.toBe("");
+      }
+    });
+
+    it("should not fetch all tickets when custom mode is selected with invalid dates", () => {
+      render(<HealthPage />, { wrapper: Wrapper });
+
+      const dateSelect = screen.getByTestId("health-date-filter");
+      fireEvent.change(dateSelect, { target: { value: "custom" } });
+
+      // Even with invalid dates, should preserve a valid range
+      const calls = mockUseTickets.mock.calls;
+      if (calls.length > 0) {
+        const lastCall = calls[calls.length - 1];
+        const [, , from, to] = lastCall;
+        // Should have valid dates, not undefined (which would fetch all tickets)
+        expect(from).toBeDefined();
+        expect(to).toBeDefined();
+      }
+    });
+  });
 });
-

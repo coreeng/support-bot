@@ -40,7 +40,7 @@ data:
         ]
       }
     }
-  
+
   # /team?type=TENANT - Tenant teams
   "02-team-tenant.json": |
     {
@@ -73,7 +73,7 @@ data:
         ]
       }
     }
-  
+
   # /team/leadership/members
   "team-leadership-members.json": |
     {
@@ -89,7 +89,7 @@ data:
         "jsonBody": []
       }
     }
-  
+
   # /team/support/members
   "team-support-members.json": |
     {
@@ -105,7 +105,7 @@ data:
         "jsonBody": []
       }
     }
-  
+
   # /user/support - Get support members list (for assignee dropdown)
   "user-support.json": |
     {
@@ -135,7 +135,7 @@ data:
         ]
       }
     }
-  
+
   # /assignment/enabled - Check if assignment feature is enabled
   "assignment-enabled.json": |
     {
@@ -154,7 +154,7 @@ data:
         }
       }
     }
-  
+
   # POST /assignment/bulk-reassign - Bulk reassign tickets
   "assignment-bulk-reassign.json": |
     {
@@ -175,7 +175,7 @@ data:
         }
       }
     }
-  
+
   # /user?email=... - Get user teams (called server-side by NextAuth)
   # Returns teams for escalation users, empty for others
   # Using urlPattern to match query params (matches any email - intentional for tests)
@@ -203,7 +203,7 @@ data:
         }
       }
     }
-  
+
   # /ticket/{id} - Get single ticket by ID (MUST come before /ticket list)
   "ticket-single.json": |
     {
@@ -248,7 +248,7 @@ data:
         }
       }
     }
-  
+
   # PATCH /ticket/{id} - Update ticket
   "ticket-update.json": |
     {
@@ -296,7 +296,7 @@ data:
         }
       }
     }
-  
+
   # /ticket - List tickets with sample data
   "ticket-list.json": |
     {
@@ -350,7 +350,7 @@ data:
         }
       }
     }
-  
+
   # /escalation - List escalations with sample data for escalation tests
   "escalation-list.json": |
     {
@@ -404,7 +404,7 @@ data:
         }
       }
     }
-  
+
   # /registry/impact - Impact codes used in filters
   "registry-impact.json": |
     {
@@ -433,8 +433,8 @@ data:
         ]
       }
     }
-  
-  # /registry/tag - Tag codes used in filters  
+
+  # /registry/tag - Tag codes used in filters
   "registry-tag.json": |
     {
       "request": {
@@ -466,7 +466,7 @@ data:
         ]
       }
     }
-  
+
   # /stats - Stats aggregation endpoint
   "stats.json": |
     {
@@ -488,7 +488,7 @@ data:
         }
       }
     }
-  
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -513,55 +513,55 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-      - name: wiremock
-        image: wiremock/wiremock:3.3.1
-        args:
-          - --port=8080
-          - --global-response-templating
-          - --verbose
-          - --enable-browser-proxying=false
-        ports:
-        - containerPort: 8080
-          name: http
-        securityContext:
-          readOnlyRootFilesystem: true
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-        volumeMounts:
-        - name: mappings
-          mountPath: /home/wiremock/mappings
-        - name: tmp
-          mountPath: /tmp
-        resources:
-          requests:
-            cpu: 200m
-            memory: 300Mi
-          limits:
-            memory: 300Mi
-        livenessProbe:
-          httpGet:
-            path: /__admin/health
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 15
-          timeoutSeconds: 5
-          failureThreshold: 5
-        readinessProbe:
-          httpGet:
-            path: /__admin/health
-            port: 8080
-          initialDelaySeconds: 15
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
+        - name: wiremock
+          image: wiremock/wiremock:3.3.1
+          args:
+            - --port=8080
+            - --global-response-templating
+            - --verbose
+            - --enable-browser-proxying=false
+          ports:
+            - containerPort: 8080
+              name: http
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: mappings
+              mountPath: /home/wiremock/mappings
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 200m
+              memory: 300Mi
+            limits:
+              memory: 300Mi
+          livenessProbe:
+            httpGet:
+              path: /__admin/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /__admin/health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
       volumes:
-      - name: mappings
-        configMap:
-          name: wiremock-mappings
-      - name: tmp
-        emptyDir: {}
+        - name: mappings
+          configMap:
+            name: wiremock-mappings
+        - name: tmp
+          emptyDir: {}
 
 ---
 apiVersion: v1
@@ -575,8 +575,7 @@ spec:
   selector:
     app: mock-backend
   ports:
-  - port: 8080
-    targetPort: 8080
-    protocol: TCP
-    name: http
-
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http

@@ -1,8 +1,8 @@
 "use client";
 
+import type { AuthTeam, AuthUser } from "@/auth.config";
 import { signOut, useSession } from "next-auth/react";
 import { useMemo } from "react";
-import type { AuthTeam, AuthUser } from "@/auth.config";
 
 interface UseAuthReturn {
   user: AuthUser | null;
@@ -28,9 +28,7 @@ export function useAuth(): UseAuthReturn {
 
   const actualEscalationTeams = useMemo(() => {
     if (!user || !isEscalationTeam) return [];
-    return user.teams
-      .filter((t: AuthTeam) => t.types.some((type: string) => /escalation/i.test(type)))
-      .map((t: AuthTeam) => t.name);
+    return user.teams.filter((t: AuthTeam) => t.types.some((type: string) => /escalation/i.test(type))).map((t: AuthTeam) => t.name);
   }, [user, isEscalationTeam]);
 
   const logout = async () => {

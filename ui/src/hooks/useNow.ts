@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef } from "react";
 
 /**
  * Returns a stable timestamp that is captured once per render cycle.
@@ -6,15 +6,15 @@ import { useRef } from 'react'
  * violates React's purity rules.
  */
 export function useNow(): number {
-    const ref = useRef<number | null>(null)
+  const ref = useRef<number | null>(null);
 
-    if (ref.current === null) {
-        // eslint-disable-next-line react-hooks/purity -- Intentional: this is the single controlled point of impurity
-        ref.current = Date.now()
-    }
+  if (ref.current === null) {
+    // eslint-disable-next-line react-hooks/purity -- Intentional: this is the single controlled point of impurity
+    ref.current = Date.now();
+  }
 
-    const now = ref.current
-    ref.current = null
+  const now = ref.current;
+  ref.current = null;
 
-    return now
+  return now;
 }

@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { sanitizeCallbackUrl } from "@/lib/utils/url";
 import { resolvePublicOrigin } from "@/lib/server/resolve-public-origin";
+import { sanitizeCallbackUrl } from "@/lib/utils/url";
+import { NextResponse } from "next/server";
 
 function logNextAuthUrlMisconfiguration(e: unknown): void {
   const msg = e instanceof Error ? e.message : String(e);
@@ -15,9 +15,7 @@ function logNextAuthUrlMisconfiguration(e: unknown): void {
 export function resolvePublicOriginOrConfigurationLoginRedirect(
   requestOrigin: string,
   callbackPathname: string
-):
-  | { ok: true; origin: string }
-  | { ok: false; response: NextResponse } {
+): { ok: true; origin: string } | { ok: false; response: NextResponse } {
   try {
     return { ok: true, origin: resolvePublicOrigin() };
   } catch (e) {
@@ -36,8 +34,6 @@ export function resolvePublicOriginOrConfigurationLoginRedirect(
 export function tryResolvePublicOrigin(
   requestOrigin: string,
   callbackPathname: string
-):
-  | { ok: true; origin: string }
-  | { ok: false; response: NextResponse } {
+): { ok: true; origin: string } | { ok: false; response: NextResponse } {
   return resolvePublicOriginOrConfigurationLoginRedirect(requestOrigin, callbackPathname);
 }

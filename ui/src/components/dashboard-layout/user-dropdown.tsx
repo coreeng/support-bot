@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,8 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
+import { LogOut } from "lucide-react";
 
 export function UserDropdown() {
   const { user, logout } = useAuth();
@@ -27,18 +27,15 @@ export function UserDropdown() {
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="w-max min-w-[12rem] max-w-[min(32rem,calc(100vw-2rem))]"
-      >
+      <DropdownMenuContent align="end" className="w-max max-w-[min(32rem,calc(100vw-2rem))] min-w-[12rem]">
         <div className="flex items-center gap-2 p-2">
           <Avatar className="h-8 w-8 rounded-lg">
             <AvatarFallback className="rounded-lg">{initial}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none break-words">{user.email}</p>
+            <p className="text-sm leading-none font-medium break-words">{user.email}</p>
             {user.teams?.length ? (
-              <p className="text-xs leading-none text-muted-foreground break-all">
+              <p className="text-muted-foreground text-xs leading-none break-all">
                 {user.teams.length} {user.teams.length === 1 ? "team" : "teams"}
               </p>
             ) : null}

@@ -1,6 +1,6 @@
-import {NextRequest, NextResponse} from "next/server";
-import {tryResolvePublicOrigin} from "@/lib/server/resolve-public-origin-response";
-import {sanitizeCallbackUrl} from "@/lib/utils/url";
+import { tryResolvePublicOrigin } from "@/lib/server/resolve-public-origin-response";
+import { sanitizeCallbackUrl } from "@/lib/utils/url";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -8,10 +8,7 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get("error");
   const returnedState = searchParams.get("state");
 
-  const resolved = tryResolvePublicOrigin(
-    request.nextUrl.origin,
-    sanitizeCallbackUrl(request.cookies.get("oauth-callback-url")?.value)
-  );
+  const resolved = tryResolvePublicOrigin(request.nextUrl.origin, sanitizeCallbackUrl(request.cookies.get("oauth-callback-url")?.value));
   if (!resolved.ok) {
     return resolved.response;
   }

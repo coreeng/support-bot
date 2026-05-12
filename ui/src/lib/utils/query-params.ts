@@ -10,9 +10,8 @@
  * buildDateQuery() // ""
  */
 export function buildDateQuery(dateFrom?: string, dateTo?: string): string {
-    const params = new URLSearchParams()
-    if (dateFrom) params.append('dateFrom', dateFrom)
-    if (dateTo) params.append('dateTo', dateTo)
-    return params.toString() ? `?${params.toString()}` : ''
+  const params = new URLSearchParams();
+  if (dateFrom) params.append("dateFrom", dateFrom);
+  if (dateTo) params.append("dateTo", dateTo);
+  return params.toString() ? `?${params.toString()}` : "";
 }
-

@@ -1,9 +1,5 @@
 import { NextRequest } from "next/server";
-import {
-  backendFetch,
-  unauthorizedResponse,
-  errorResponse,
-} from "../../_lib/backend-fetch";
+import { backendFetch, errorResponse, unauthorizedResponse } from "../../_lib/backend-fetch";
 
 export async function POST(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams.toString();

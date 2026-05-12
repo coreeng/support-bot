@@ -2,16 +2,14 @@
  * Consolidated hooks for client-side data fetching.
  * All hooks use React Query and call the Next.js API routes.
  */
-import { useQuery } from "@tanstack/react-query";
-import { signOut, getCsrfToken } from "next-auth/react";
 import type {
-  PaginatedTickets,
-  PaginatedEscalations,
+  AnalysisData,
   EscalationTeam,
+  KnowledgeGapsStatus,
+  PaginatedEscalations,
+  PaginatedTickets,
   SupportMember,
   TicketWithLogs,
-  KnowledgeGapsStatus,
-  AnalysisData,
 } from "@/lib/types";
 import type {
   EscalationBreakdown,
@@ -20,6 +18,8 @@ import type {
   IncomingVsResolvedRequestGranularity,
   RepoInsights,
 } from "@/lib/types/dashboard";
+import { useQuery } from "@tanstack/react-query";
+import { getCsrfToken, signOut } from "next-auth/react";
 
 // ===== Shared API Helper =====
 
@@ -41,7 +41,7 @@ async function handle401(): Promise<never> {
       await signOut({ redirect: false });
     } catch (e) {
       // Ignore errors from signOut (session might already be expired)
-      console.log('SignOut error (expected if session expired):', e);
+      console.log("SignOut error (expected if session expired):", e);
     }
     // Redirect to login with the current page as callback
     window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`;
@@ -72,16 +72,13 @@ async function apiGet<T>(path: string): Promise<T> {
  * @param options - Fetch options (method, body, etc.)
  * @returns Response object
  */
-export async function apiFetch(
-  path: string,
-  options?: RequestInit
-): Promise<Response> {
+export async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
   const csrfToken = await getCsrfToken();
 
   const response = await fetch(path, {
     ...options,
     headers: {
-      'X-CSRF-Token': csrfToken || '',
+      "X-CSRF-Token": csrfToken || "",
       ...options?.headers,
     },
   });
@@ -111,20 +108,14 @@ type NormalizedIncomingVsResolvedRateOptions = IncomingVsResolvedRateOptions & {
   teams: string[];
 };
 
-function normalizeIncomingVsResolvedOptions(
-  options: IncomingVsResolvedRateOptions = {}
-): NormalizedIncomingVsResolvedRateOptions {
+function normalizeIncomingVsResolvedOptions(options: IncomingVsResolvedRateOptions = {}): NormalizedIncomingVsResolvedRateOptions {
   return {
     ...options,
     teams: options.teams?.filter(Boolean) ?? [],
   };
 }
 
-function buildIncomingVsResolvedParams(
-  dateFrom?: string,
-  dateTo?: string,
-  options: IncomingVsResolvedRateOptions = {}
-): string {
+function buildIncomingVsResolvedParams(dateFrom?: string, dateTo?: string, options: IncomingVsResolvedRateOptions = {}): string {
   const params = new URLSearchParams();
   if (dateFrom) params.append("dateFrom", dateFrom);
   if (dateTo) params.append("dateTo", dateTo);
@@ -137,12 +128,7 @@ function buildIncomingVsResolvedParams(
 
 // ===== Ticket Hooks =====
 
-export function useTickets(
-  page: number = 0,
-  pageSize: number = 50,
-  from?: string,
-  to?: string
-) {
+export function useTickets(page: number = 0, pageSize: number = 50, from?: string, to?: string) {
   return useQuery<PaginatedTickets>({
     queryKey: ["tickets", page, pageSize, from, to],
     queryFn: async () => {
@@ -157,12 +143,7 @@ export function useTickets(
   });
 }
 
-export function useAllTickets(
-  pageSize: number = 200,
-  from?: string,
-  to?: string,
-  enabled = true
-) {
+export function useAllTickets(pageSize: number = 200, from?: string, to?: string, enabled = true) {
   return useQuery<PaginatedTickets>({
     queryKey: ["tickets", "all", pageSize, from, to],
     enabled,
@@ -191,10 +172,7 @@ export function useAllTickets(
       }
 
       const rest = await Promise.all(pagesToFetch);
-      const allContent = [
-        ...(first.content || []),
-        ...rest.flatMap((res) => res.content || []),
-      ] as TicketWithLogs[];
+      const allContent = [...(first.content || []), ...rest.flatMap((res) => res.content || [])] as TicketWithLogs[];
 
       return {
         page: 0,
@@ -276,27 +254,18 @@ export function useEscalations(pageSize: number = 50) {
   return useQuery<PaginatedEscalations>({
     queryKey: ["escalations", pageSize],
     queryFn: async () => {
-      const first = await apiGet<PaginatedEscalations>(
-        `/escalations?page=0&pageSize=${pageSize}`
-      );
+      const first = await apiGet<PaginatedEscalations>(`/escalations?page=0&pageSize=${pageSize}`);
       const totalPages = first.totalPages ?? 1;
 
       if (totalPages <= 1) return first;
 
       const pagesToFetch = [];
       for (let p = 1; p < totalPages; p++) {
-        pagesToFetch.push(
-          apiGet<PaginatedEscalations>(
-            `/escalations?page=${p}&pageSize=${pageSize}`
-          )
-        );
+        pagesToFetch.push(apiGet<PaginatedEscalations>(`/escalations?page=${p}&pageSize=${pageSize}`));
       }
 
       const rest = await Promise.all(pagesToFetch);
-      const allContent = [
-        ...(first.content || []),
-        ...rest.flatMap((res) => res.content || []),
-      ];
+      const allContent = [...(first.content || []), ...rest.flatMap((res) => res.content || [])];
 
       return {
         page: 0,
@@ -348,41 +317,26 @@ export function useRegistry() {
 
 // ===== Dashboard / SLA Hooks =====
 
-export function useFirstResponseDurationDistribution(
-  enabled = true,
-  dateFrom?: string,
-  dateTo?: string
-) {
+export function useFirstResponseDurationDistribution(enabled = true, dateFrom?: string, dateTo?: string) {
   return useQuery<number[]>({
     queryKey: ["firstResponseDurationDistribution", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/dashboard/first-response-distribution${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/dashboard/first-response-distribution${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useFirstResponsePercentiles(
-  enabled = true,
-  dateFrom?: string,
-  dateTo?: string
-) {
+export function useFirstResponsePercentiles(enabled = true, dateFrom?: string, dateTo?: string) {
   return useQuery<{ p50: number; p90: number }>({
     queryKey: ["firstResponsePercentiles", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/dashboard/first-response-percentiles${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/dashboard/first-response-percentiles${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useUnattendedQueriesCount(
-  enabled = true,
-  dateFrom?: string,
-  dateTo?: string
-) {
+export function useUnattendedQueriesCount(enabled = true, dateFrom?: string, dateTo?: string) {
   return useQuery<{ count: number }>({
     queryKey: ["unattendedQueriesCount", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/dashboard/unattended-queries-count${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/dashboard/unattended-queries-count${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
@@ -394,149 +348,90 @@ export type ResolutionDurationBucket = {
   maxMinutes: number;
 };
 
-export function useTicketResolutionPercentiles(
-  enabled = true,
-  dateFrom?: string,
-  dateTo?: string
-) {
+export function useTicketResolutionPercentiles(enabled = true, dateFrom?: string, dateTo?: string) {
   return useQuery<{ p50: number; p75: number; p90: number }>({
     queryKey: ["ticketResolutionPercentiles", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/dashboard/resolution-percentiles${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/dashboard/resolution-percentiles${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useTicketResolutionDurationDistribution(
-  enabled = true,
-  dateFrom?: string,
-  dateTo?: string
-) {
+export function useTicketResolutionDurationDistribution(enabled = true, dateFrom?: string, dateTo?: string) {
   return useQuery<ResolutionDurationBucket[], Error>({
     queryKey: ["ticketResolutionDurationDistribution", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/dashboard/resolution-duration-distribution${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/dashboard/resolution-duration-distribution${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useResolutionTimesByWeek(
-  enabled = true,
-  dateFrom?: string,
-  dateTo?: string
-) {
+export function useResolutionTimesByWeek(enabled = true, dateFrom?: string, dateTo?: string) {
   return useQuery<{ week: string; p50: number; p75: number; p90: number }[]>({
     queryKey: ["resolutionTimesByWeek", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/dashboard/resolution-times-by-week${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/dashboard/resolution-times-by-week${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useUnresolvedTicketAges(
-  enabled = true,
-  dateFrom?: string,
-  dateTo?: string
-) {
+export function useUnresolvedTicketAges(enabled = true, dateFrom?: string, dateTo?: string) {
   return useQuery<{ p50: string; p90: string }>({
     queryKey: ["unresolvedTicketAges", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/dashboard/unresolved-ticket-ages${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/dashboard/unresolved-ticket-ages${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useIncomingVsResolvedRate(
-  enabled = true,
-  dateFrom?: string,
-  dateTo?: string,
-  options: IncomingVsResolvedRateOptions = {}
-) {
+export function useIncomingVsResolvedRate(enabled = true, dateFrom?: string, dateTo?: string, options: IncomingVsResolvedRateOptions = {}) {
   const normalizedOptions = normalizeIncomingVsResolvedOptions(options);
 
   return useQuery<IncomingVsResolvedRate>({
     queryKey: ["incomingVsResolvedRate", dateFrom, dateTo, normalizedOptions],
-    queryFn: () =>
-      apiGet(
-        `/dashboard/incoming-vs-resolved-rate${buildIncomingVsResolvedParams(
-          dateFrom,
-          dateTo,
-          normalizedOptions
-        )}`
-      ),
+    queryFn: () => apiGet(`/dashboard/incoming-vs-resolved-rate${buildIncomingVsResolvedParams(dateFrom, dateTo, normalizedOptions)}`),
     enabled,
   });
 }
 
-export function useAvgEscalationDurationByTag(
-  enabled = true,
-  dateFrom?: string,
-  dateTo?: string
-) {
+export function useAvgEscalationDurationByTag(enabled = true, dateFrom?: string, dateTo?: string) {
   return useQuery<{ tag: string; avgDuration: number }[]>({
     queryKey: ["avgEscalationDurationByTag", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/dashboard/avg-escalation-duration-by-tag${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/dashboard/avg-escalation-duration-by-tag${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useEscalationPercentageByTag(
-  enabled = true,
-  dateFrom?: string,
-  dateTo?: string
-) {
+export function useEscalationPercentageByTag(enabled = true, dateFrom?: string, dateTo?: string) {
   return useQuery<{ tag: string; count: number }[]>({
     queryKey: ["escalationPercentageByTag", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/dashboard/escalation-percentage-by-tag${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/dashboard/escalation-percentage-by-tag${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useEscalationTrendsByDate(
-  enabled = true,
-  dateFrom?: string,
-  dateTo?: string
-) {
+export function useEscalationTrendsByDate(enabled = true, dateFrom?: string, dateTo?: string) {
   return useQuery<{ date: string; escalations: number }[]>({
     queryKey: ["escalationTrendsByDate", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/dashboard/escalation-trends-by-date${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/dashboard/escalation-trends-by-date${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useEscalationsByTeam(
-  enabled = true,
-  dateFrom?: string,
-  dateTo?: string
-) {
+export function useEscalationsByTeam(enabled = true, dateFrom?: string, dateTo?: string) {
   return useQuery<{ assigneeName: string; totalEscalations: number }[]>({
     queryKey: ["escalationsByTeam", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/dashboard/escalations-by-team${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/dashboard/escalations-by-team${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
-export function useEscalationsByImpact(
-  enabled = true,
-  dateFrom?: string,
-  dateTo?: string
-) {
+export function useEscalationsByImpact(enabled = true, dateFrom?: string, dateTo?: string) {
   return useQuery<{ impactLevel: string; totalEscalations: number }[]>({
     queryKey: ["escalationsByImpact", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/dashboard/escalations-by-impact${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/dashboard/escalations-by-impact${buildParams(dateFrom, dateTo)}`),
     enabled,
   });
 }
 
 export function useWeeklyTicketCounts(enabled = true) {
-  return useQuery<
-    { week: string; opened: number; closed: number; escalated: number; stale: number }[]
-  >({
+  return useQuery<{ week: string; opened: number; closed: number; escalated: number; stale: number }[]>({
     queryKey: ["weeklyTicketCounts"],
     queryFn: () => apiGet("/dashboard/weekly-ticket-counts"),
     enabled,
@@ -544,9 +439,7 @@ export function useWeeklyTicketCounts(enabled = true) {
 }
 
 export function useWeeklyComparison(enabled = true) {
-  return useQuery<
-    { label: string; thisWeek: number; lastWeek: number; change: number }[]
-  >({
+  return useQuery<{ label: string; thisWeek: number; lastWeek: number; change: number }[]>({
     queryKey: ["weeklyComparison"],
     queryFn: () => apiGet("/dashboard/weekly-comparison"),
     enabled,
@@ -561,15 +454,10 @@ export function useTopEscalatedTagsThisWeek(enabled = true) {
   });
 }
 
-export function useResolutionTimeByTag(
-  enabled = true,
-  startDate?: string,
-  endDate?: string
-) {
+export function useResolutionTimeByTag(enabled = true, startDate?: string, endDate?: string) {
   return useQuery<{ tag: string; p50: number; p90: number }[]>({
     queryKey: ["resolutionTimeByTag", startDate, endDate],
-    queryFn: () =>
-      apiGet(`/dashboard/resolution-time-by-tag${buildParams(startDate, endDate)}`),
+    queryFn: () => apiGet(`/dashboard/resolution-time-by-tag${buildParams(startDate, endDate)}`),
     enabled,
   });
 }
@@ -580,9 +468,7 @@ export function useKnowledgeGapsEnabled() {
   return useQuery<boolean>({
     queryKey: ["knowledge-gaps", "enabled"],
     queryFn: async () => {
-      const response = await apiGet<KnowledgeGapsStatus>(
-        "/knowledge-gaps/enabled"
-      );
+      const response = await apiGet<KnowledgeGapsStatus>("/knowledge-gaps/enabled");
       return response.enabled;
     },
     staleTime: 5 * 60 * 1000,
@@ -601,9 +487,7 @@ export function useTenantInsightsEnabled() {
   return useQuery<boolean>({
     queryKey: ["tenant-insights", "enabled"],
     queryFn: async () => {
-      const response = await apiGet<{ enabled: boolean }>(
-        "/tenant-insights/enabled"
-      );
+      const response = await apiGet<{ enabled: boolean }>("/tenant-insights/enabled");
       return response.enabled;
     },
     staleTime: 5 * 60 * 1000,
@@ -613,8 +497,7 @@ export function useTenantInsightsEnabled() {
 export function useTenantInsightsStats(dateFrom?: string, dateTo?: string, enabled = true) {
   return useQuery<RepoInsights[]>({
     queryKey: ["tenant-insights", "stats", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/tenant-insights/stats${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/tenant-insights/stats${buildParams(dateFrom, dateTo)}`),
     enabled,
     staleTime: 5 * 60 * 1000,
   });
@@ -623,8 +506,7 @@ export function useTenantInsightsStats(dateFrom?: string, dateTo?: string, enabl
 export function useEscalationBreakdown(dateFrom?: string, dateTo?: string, enabled = true) {
   return useQuery<EscalationBreakdown>({
     queryKey: ["tenant-insights", "escalation-breakdown", dateFrom, dateTo],
-    queryFn: () =>
-      apiGet(`/tenant-insights/escalation-breakdown${buildParams(dateFrom, dateTo)}`),
+    queryFn: () => apiGet(`/tenant-insights/escalation-breakdown${buildParams(dateFrom, dateTo)}`),
     enabled,
     staleTime: 5 * 60 * 1000,
   });
@@ -636,8 +518,7 @@ export function useInFlightPrs(team?: string) {
   const query = params.toString();
   return useQuery<InFlightPr[]>({
     queryKey: ["tenant-insights", "in-flight-prs", team],
-    queryFn: () =>
-      apiGet(`/tenant-insights/in-flight-prs${query ? `?${query}` : ""}`),
+    queryFn: () => apiGet(`/tenant-insights/in-flight-prs${query ? `?${query}` : ""}`),
     staleTime: 60 * 1000,
   });
 }

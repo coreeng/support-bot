@@ -1,153 +1,152 @@
 // lib/types.ts
 
 // Re-export dashboard types
-export * from './types/dashboard'
+export * from "./types/dashboard";
 
 interface RawEscalation {
-    id: number | { id: number }
-    ticketId: number | { id: number }
-    hasThread: boolean
-    openedAt: string
-    resolvedAt: string | null
-    escalatingTeam: string
-    team: {
-        name: string
-        types: string[]
-    } | null
-    tags?: string[]
-    impact?: string | null
+  id: number | { id: number };
+  ticketId: number | { id: number };
+  hasThread: boolean;
+  openedAt: string;
+  resolvedAt: string | null;
+  escalatingTeam: string;
+  team: {
+    name: string;
+    types: string[];
+  } | null;
+  tags?: string[];
+  impact?: string | null;
 }
 
 export interface RawPaginatedEscalations {
-    content: RawEscalation[]
-    page: number
-    totalPages: number
-    totalElements: number
+  content: RawEscalation[];
+  page: number;
+  totalPages: number;
+  totalElements: number;
 }
 
-
 export interface Escalation {
-    id: string   // stringify the EscalationId
-    ticketId: string
-    hasThread: boolean
-    openedAt: string
-    resolvedAt: string | null
-    team: { name: string } | null
-    escalatingTeam: string
-    tags: string[]
-    impact: string | null
+  id: string; // stringify the EscalationId
+  ticketId: string;
+  hasThread: boolean;
+  openedAt: string;
+  resolvedAt: string | null;
+  team: { name: string } | null;
+  escalatingTeam: string;
+  tags: string[];
+  impact: string | null;
 }
 
 export interface PaginatedEscalations {
-    content: Escalation[]
-    page: number
-    totalPages: number
-    totalElements: number
+  content: Escalation[];
+  page: number;
+  totalPages: number;
+  totalElements: number;
 }
 
 export type TicketLog = {
-    date: string
-    event: string
-}
+  date: string;
+  event: string;
+};
 
 export interface ParsedTicketLog extends TicketLog {
-    parsedDate: Date
+  parsedDate: Date;
 }
 
 export type TicketWithLogs = {
-    id: string
-    status: string
-    team?: { name: string } | null
-    query?: {
-        link?: string
-        text?: string
-        date?: string
-    }
-    summary?: string | null
-    impact: string
-    tags?: string[]
-    escalations?: Escalation[]
-    logs?: TicketLog[]
-    ratingSubmitted?: boolean
-    assignedTo?: string | null
-}
+  id: string;
+  status: string;
+  team?: { name: string } | null;
+  query?: {
+    link?: string;
+    text?: string;
+    date?: string;
+  };
+  summary?: string | null;
+  impact: string;
+  tags?: string[];
+  escalations?: Escalation[];
+  logs?: TicketLog[];
+  ratingSubmitted?: boolean;
+  assignedTo?: string | null;
+};
 
 export type TicketTeam = {
-    name: string
-}
+  name: string;
+};
 
 export interface EscalationTeam extends TicketTeam {
-    types: string[]
+  types: string[];
 }
 
 export type TicketImpact = {
-    code: string
-    label: string
-}
+  code: string;
+  label: string;
+};
 
 export type TicketTag = {
-    code: string
-    label: string
-}
+  code: string;
+  label: string;
+};
 
 export interface PaginatedTickets {
-    content: TicketWithLogs[]
-    page: number
-    totalPages: number
-    totalElements: number
+  content: TicketWithLogs[];
+  page: number;
+  totalPages: number;
+  totalElements: number;
 }
-export type TimelineFilter = 'all' | 'year' | 'month' | 'week' | 'today'
+export type TimelineFilter = "all" | "year" | "month" | "week" | "today";
 
 export interface AggregatedTicketStats {
-    date: string
-    opened: number
-    closed: number
-    escalated: number
+  date: string;
+  opened: number;
+  closed: number;
+  escalated: number;
 }
 
 export type RatingStats = {
-  average: number
-  count: number
-}
+  average: number;
+  count: number;
+};
 
 export interface SupportMember {
-    userId: string      // Slack user ID (used as value in API calls)
-    displayName: string // Email (used for display in UI)
+  userId: string; // Slack user ID (used as value in API calls)
+  displayName: string; // Email (used for display in UI)
 }
 
 export interface AssignmentStatus {
-    enabled: boolean
+  enabled: boolean;
 }
 
 export interface KnowledgeGapsStatus {
-    enabled: boolean
+  enabled: boolean;
 }
 
 export interface QuerySummary {
-    text: string
-    timestamp: string
-    ticketId: string
+  text: string;
+  timestamp: string;
+  ticketId: string;
 }
 
 export interface DimensionSummary {
-    name: string
-    coveragePercentage: number
-    queryCount: number
-    queries: QuerySummary[]
+  name: string;
+  coveragePercentage: number;
+  queryCount: number;
+  queries: QuerySummary[];
 }
 
 export interface AnalysisData {
-    knowledgeGaps: DimensionSummary[]
-    supportAreas: DimensionSummary[]
+  knowledgeGaps: DimensionSummary[];
+  supportAreas: DimensionSummary[];
 }
 
 export interface BulkReassignRequest {
-    ticketIds: string[]  // Array of ticket IDs
-    assignedTo: string    // Slack user ID
+  ticketIds: string[]; // Array of ticket IDs
+  assignedTo: string; // Slack user ID
 }
 
 export interface BulkReassignResult {
-    successCount: number
-    successfulTicketIds: string[]
-    message: string
+  successCount: number;
+  successfulTicketIds: string[];
+  message: string;
 }

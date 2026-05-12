@@ -1,8 +1,4 @@
-import {
-  backendFetch,
-  unauthorizedResponse,
-  errorResponse,
-} from "../../_lib/backend-fetch";
+import { backendFetch, errorResponse, unauthorizedResponse } from "../../_lib/backend-fetch";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -14,10 +10,7 @@ export async function GET(request: Request) {
   if (dateTo) params.append("dateTo", dateTo);
   const query = params.toString();
 
-  const response = await backendFetch(
-    request,
-    `/tenant-insights/pr-stats${query ? `?${query}` : ""}`
-  );
+  const response = await backendFetch(request, `/tenant-insights/pr-stats${query ? `?${query}` : ""}`);
   if (!response) return unauthorizedResponse();
 
   if (!response.ok) {
