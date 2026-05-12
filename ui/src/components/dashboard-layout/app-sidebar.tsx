@@ -1,19 +1,10 @@
 "use client";
 
-import * as React from "react";
-import {
-  type LucideIcon,
-  AlertCircle,
-  Activity,
-  BookOpen,
-  GaugeCircle,
-  GitPullRequest,
-  Home,
-  Ticket,
-} from "lucide-react";
-import { usePathname } from "next/navigation";
-import Link from "next/link";
+import { type LucideIcon, Activity, AlertCircle, BookOpen, GaugeCircle, GitPullRequest, Home, Ticket } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import * as React from "react";
 
 import { NavMain } from "@/components/dashboard-layout/nav-main";
 import {
@@ -118,22 +109,8 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
                   <Image src="/favicon.ico" alt="Core Community" width={20} height={20} priority />
                 ) : (
                   <>
-                    <Image
-                      src="/logo-dark.png"
-                      className="hidden dark:block"
-                      alt="Core Community"
-                      width={170}
-                      height={20}
-                      priority
-                    />
-                    <Image
-                      src="/logo.png"
-                      className="block dark:hidden"
-                      alt="Core Community"
-                      width={170}
-                      height={20}
-                      priority
-                    />
+                    <Image src="/logo-dark.png" className="hidden dark:block" alt="Core Community" width={170} height={20} priority />
+                    <Image src="/logo.png" className="block dark:hidden" alt="Core Community" width={170} height={20} priority />
                   </>
                 )}
               </Link>

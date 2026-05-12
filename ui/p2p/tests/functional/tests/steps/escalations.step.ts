@@ -1,25 +1,27 @@
-import { Given, When, Then } from '@cucumber/cucumber';
-import { expect, Route, Page } from '@playwright/test';
-import { CustomWorld } from './custom-world';
-import { mockAuthorizationEndpoints } from '../helpers/auth-mocks';
-import { selectShadcnOption, selectDropdownMenuItem, readSortDirection } from '../helpers/shadcn';
+import { Given, Then, When } from "@cucumber/cucumber";
+import { expect, Page, Route } from "@playwright/test";
+import { mockAuthorizationEndpoints } from "../helpers/auth-mocks";
+import { readSortDirection, selectDropdownMenuItem, selectShadcnOption } from "../helpers/shadcn";
+import { CustomWorld } from "./custom-world";
 
 const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
 const setEscalations = async (page: Page, content: any[]) => {
-    try { await page.unroute('**/api/escalations*'); } catch {}
-    await page.route('**/api/escalations*', async (route: Route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                content,
-                page: 0,
-                totalPages: 1,
-                totalElements: content.length
-            })
-        })
-    })
+  try {
+    await page.unroute("**/api/escalations*");
+  } catch {}
+  await page.route("**/api/escalations*", async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        content,
+        page: 0,
+        totalPages: 1,
+        totalElements: content.length,
+      }),
+    });
+  });
 };
 
 // Targets the main "All Escalations" table section specifically.
@@ -27,516 +29,535 @@ const setEscalations = async (page: Page, content: any[]) => {
 // in the DOM, so we use a data-testid to avoid ambiguity.
 const getMainEscalationsSection = (page: Page) => page.locator('[data-testid="escalations-main-section"]');
 const clearEscalationsDateFilter = async (page: Page) => {
-    const dateFilter = page.locator('[data-testid="escalations-date-filter"]');
-    if (await dateFilter.isVisible().catch(() => false)) {
-        await selectShadcnOption(page, dateFilter, /Any Date/i);
-        await page.waitForTimeout(300);
-    }
+  const dateFilter = page.locator('[data-testid="escalations-date-filter"]');
+  if (await dateFilter.isVisible().catch(() => false)) {
+    await selectShadcnOption(page, dateFilter, /Any Date/i);
+    await page.waitForTimeout(300);
+  }
 };
 
 // Setup: Mock escalation data (default)
-Given('the backend has escalation data', async function (this: CustomWorld) {
-    await setEscalations(this.page, [
-        {
-            id: 'esc-1',
-            ticketId: 'ticket-1',
-            team: { name: 'Core-platform' },
-            escalatingTeam: 'Team A',
-            resolvedAt: null,
-            impact: 'high',
-            tags: ['bug'],
-            hasThread: true,
-            openedAt: '2024-01-01T10:00:00Z'
-        },
-        {
-            id: 'esc-2',
-            ticketId: 'ticket-2',
-            team: { name: 'Core-platform' },
-            escalatingTeam: 'Team B',
-            resolvedAt: '2024-01-02T12:00:00Z',
-            impact: 'medium',
-            tags: ['feature'],
-            hasThread: true,
-            openedAt: '2024-01-01T11:00:00Z'
-        },
-        {
-            id: 'esc-3',
-            ticketId: 'ticket-3',
-            team: { name: 'Other-team' },
-            escalatingTeam: 'Team C',
-            resolvedAt: null,
-            impact: 'low',
-            tags: ['question'],
-            hasThread: true,
-            openedAt: '2024-01-01T12:00:00Z'
-        }
-    ]);
+Given("the backend has escalation data", async function (this: CustomWorld) {
+  await setEscalations(this.page, [
+    {
+      id: "esc-1",
+      ticketId: "ticket-1",
+      team: { name: "Core-platform" },
+      escalatingTeam: "Team A",
+      resolvedAt: null,
+      impact: "high",
+      tags: ["bug"],
+      hasThread: true,
+      openedAt: "2024-01-01T10:00:00Z",
+    },
+    {
+      id: "esc-2",
+      ticketId: "ticket-2",
+      team: { name: "Core-platform" },
+      escalatingTeam: "Team B",
+      resolvedAt: "2024-01-02T12:00:00Z",
+      impact: "medium",
+      tags: ["feature"],
+      hasThread: true,
+      openedAt: "2024-01-01T11:00:00Z",
+    },
+    {
+      id: "esc-3",
+      ticketId: "ticket-3",
+      team: { name: "Other-team" },
+      escalatingTeam: "Team C",
+      resolvedAt: null,
+      impact: "low",
+      tags: ["question"],
+      hasThread: true,
+      openedAt: "2024-01-01T12:00:00Z",
+    },
+  ]);
 });
 
 // Escalation Data Setup overrides
-Given('there are escalations for {string} and {string}', async function (this: CustomWorld, team1: string, team2: string) {
-    await setEscalations(this.page, [
-        {
-            id: 'esc-1',
-            ticketId: 'ticket-1',
-            team: { name: team1 },
-            escalatingTeam: 'Team X',
-            resolvedAt: null,
-            impact: 'high',
-            tags: ['bug'],
-            hasThread: true,
-            openedAt: '2024-01-01T10:00:00Z'
-        },
-        {
-            id: 'esc-2',
-            ticketId: 'ticket-2',
-            team: { name: team2 },
-            escalatingTeam: 'Team Y',
-            resolvedAt: null,
-            impact: 'medium',
-            tags: ['feature'],
-            hasThread: true,
-            openedAt: '2024-01-02T10:00:00Z'
-        }
-    ]);
+Given("there are escalations for {string} and {string}", async function (this: CustomWorld, team1: string, team2: string) {
+  await setEscalations(this.page, [
+    {
+      id: "esc-1",
+      ticketId: "ticket-1",
+      team: { name: team1 },
+      escalatingTeam: "Team X",
+      resolvedAt: null,
+      impact: "high",
+      tags: ["bug"],
+      hasThread: true,
+      openedAt: "2024-01-01T10:00:00Z",
+    },
+    {
+      id: "esc-2",
+      ticketId: "ticket-2",
+      team: { name: team2 },
+      escalatingTeam: "Team Y",
+      resolvedAt: null,
+      impact: "medium",
+      tags: ["feature"],
+      hasThread: true,
+      openedAt: "2024-01-02T10:00:00Z",
+    },
+  ]);
 });
 
-Given('there are ongoing and resolved escalations for {string}', async function (this: CustomWorld, teamName: string) {
+Given("there are ongoing and resolved escalations for {string}", async function (this: CustomWorld, teamName: string) {
+  // Use recent dates so the records are visible under the default "last week" date filter.
+  const now = new Date().toISOString();
+  await setEscalations(this.page, [
+    {
+      id: "esc-1",
+      ticketId: "ticket-1",
+      team: { name: teamName },
+      escalatingTeam: teamName,
+      resolvedAt: null,
+      impact: "high",
+      tags: ["bug"],
+      hasThread: true,
+      openedAt: now,
+    },
+    {
+      id: "esc-2",
+      ticketId: "ticket-2",
+      team: { name: teamName },
+      escalatingTeam: teamName,
+      resolvedAt: now,
+      impact: "medium",
+      tags: ["feature"],
+      hasThread: true,
+      openedAt: now,
+    },
+  ]);
+});
+
+Given("there are high and medium impact escalations for {string}", async function (this: CustomWorld, teamName: string) {
+  // Use recent dates so the records are visible under the default "last week" date filter.
+  const now = new Date().toISOString();
+  await setEscalations(this.page, [
+    {
+      id: "esc-1",
+      ticketId: "ticket-1",
+      team: { name: teamName },
+      escalatingTeam: teamName,
+      resolvedAt: null,
+      impact: "high",
+      tags: ["bug"],
+      hasThread: true,
+      openedAt: now,
+    },
+    {
+      id: "esc-2",
+      ticketId: "ticket-2",
+      team: { name: teamName },
+      escalatingTeam: teamName,
+      resolvedAt: null,
+      impact: "medium",
+      tags: ["feature"],
+      hasThread: true,
+      openedAt: now,
+    },
+  ]);
+});
+
+Given(
+  "there are escalations with tags {string} and {string} for {string}",
+  async function (this: CustomWorld, tagA: string, tagB: string, teamName: string) {
     // Use recent dates so the records are visible under the default "last week" date filter.
     const now = new Date().toISOString();
     await setEscalations(this.page, [
-        {
-            id: 'esc-1',
-            ticketId: 'ticket-1',
-            team: { name: teamName },
-            escalatingTeam: teamName,
-            resolvedAt: null,
-            impact: 'high',
-            tags: ['bug'],
-            hasThread: true,
-            openedAt: now
-        },
-        {
-            id: 'esc-2',
-            ticketId: 'ticket-2',
-            team: { name: teamName },
-            escalatingTeam: teamName,
-            resolvedAt: now,
-            impact: 'medium',
-            tags: ['feature'],
-            hasThread: true,
-            openedAt: now
-        }
+      {
+        id: "esc-tag-1",
+        ticketId: "ticket-tag-1",
+        team: { name: teamName },
+        escalatingTeam: teamName,
+        resolvedAt: null,
+        impact: "high",
+        tags: [tagA],
+        hasThread: true,
+        openedAt: now,
+      },
+      {
+        id: "esc-tag-2",
+        ticketId: "ticket-tag-2",
+        team: { name: teamName },
+        escalatingTeam: teamName,
+        resolvedAt: null,
+        impact: "medium",
+        tags: [tagB],
+        hasThread: true,
+        openedAt: now,
+      },
     ]);
-});
-
-Given('there are high and medium impact escalations for {string}', async function (this: CustomWorld, teamName: string) {
-    // Use recent dates so the records are visible under the default "last week" date filter.
-    const now = new Date().toISOString();
-    await setEscalations(this.page, [
-        {
-            id: 'esc-1',
-            ticketId: 'ticket-1',
-            team: { name: teamName },
-            escalatingTeam: teamName,
-            resolvedAt: null,
-            impact: 'high',
-            tags: ['bug'],
-            hasThread: true,
-            openedAt: now
-        },
-        {
-            id: 'esc-2',
-            ticketId: 'ticket-2',
-            team: { name: teamName },
-            escalatingTeam: teamName,
-            resolvedAt: null,
-            impact: 'medium',
-            tags: ['feature'],
-            hasThread: true,
-            openedAt: now
-        }
-    ]);
-});
-
-Given('there are escalations with tags {string} and {string} for {string}', async function (this: CustomWorld, tagA: string, tagB: string, teamName: string) {
-    // Use recent dates so the records are visible under the default "last week" date filter.
-    const now = new Date().toISOString();
-    await setEscalations(this.page, [
-        {
-            id: 'esc-tag-1',
-            ticketId: 'ticket-tag-1',
-            team: { name: teamName },
-            escalatingTeam: teamName,
-            resolvedAt: null,
-            impact: 'high',
-            tags: [tagA],
-            hasThread: true,
-            openedAt: now
-        },
-        {
-            id: 'esc-tag-2',
-            ticketId: 'ticket-tag-2',
-            team: { name: teamName },
-            escalatingTeam: teamName,
-            resolvedAt: null,
-            impact: 'medium',
-            tags: [tagB],
-            hasThread: true,
-            openedAt: now
-        }
-    ]);
-});
+  }
+);
 
 // User Setup: Escalation team member
-Given('user is an escalation team member for {string}', async function (this: CustomWorld, escalationTeam: string) {
-    this.testContext = this.testContext || {};
-    this.testContext.userEmail = 'escalation@example.com';
-    this.testContext.userTeams = [
-        { name: escalationTeam, groupRefs: [], types: ['escalation'] }
-    ];
-    this.testContext.isEscalation = true;
-    this.testContext.l2Teams = [
-        { label: escalationTeam, code: escalationTeam, types: ['escalation'] }
-    ];
+Given("user is an escalation team member for {string}", async function (this: CustomWorld, escalationTeam: string) {
+  this.testContext = this.testContext || {};
+  this.testContext.userEmail = "escalation@example.com";
+  this.testContext.userTeams = [{ name: escalationTeam, groupRefs: [], types: ["escalation"] }];
+  this.testContext.isEscalation = true;
+  this.testContext.l2Teams = [{ label: escalationTeam, code: escalationTeam, types: ["escalation"] }];
 });
 
-Given('user is a regular tenant in {string}', async function (this: CustomWorld, teamName: string) {
-    this.testContext = this.testContext || {};
-    this.testContext.userEmail = 'tenant@example.com';
-    this.testContext.userTeams = [
-        { name: teamName, groupRefs: [], types: ['tenant'] }
-    ];
-    this.testContext.isEscalation = false;
-    this.testContext.l2Teams = [];
+Given("user is a regular tenant in {string}", async function (this: CustomWorld, teamName: string) {
+  this.testContext = this.testContext || {};
+  this.testContext.userEmail = "tenant@example.com";
+  this.testContext.userTeams = [{ name: teamName, groupRefs: [], types: ["tenant"] }];
+  this.testContext.isEscalation = false;
+  this.testContext.l2Teams = [];
 });
 
-Given('user is an escalation team member for {string} and also in {string}', async function (this: CustomWorld, escalationTeam: string, regularTeam: string) {
+Given(
+  "user is an escalation team member for {string} and also in {string}",
+  async function (this: CustomWorld, escalationTeam: string, regularTeam: string) {
     this.testContext = this.testContext || {};
-    this.testContext.userEmail = 'escalation@example.com';
+    this.testContext.userEmail = "escalation@example.com";
     this.testContext.userTeams = [
-        { name: escalationTeam, groupRefs: [], types: ['escalation'] },
-        { name: regularTeam, groupRefs: [], types: ['tenant'] }
+      { name: escalationTeam, groupRefs: [], types: ["escalation"] },
+      { name: regularTeam, groupRefs: [], types: ["tenant"] },
     ];
     this.testContext.isEscalation = true;
-    this.testContext.l2Teams = [
-        { label: escalationTeam, code: escalationTeam, types: ['escalation'] }
-    ];
-});
+    this.testContext.l2Teams = [{ label: escalationTeam, code: escalationTeam, types: ["escalation"] }];
+  }
+);
 
-Given('user is both Leadership and escalation team member for {string}', async function (this: CustomWorld, escalationTeam: string) {
-    this.testContext = this.testContext || {};
-    this.testContext.userEmail = 'leader@example.com';
-    this.testContext.userTeams = [
-        { name: 'leadership', groupRefs: [], types: ['leadership'] },
-        { name: escalationTeam, groupRefs: [], types: ['escalation'] }
-    ];
-    this.testContext.isLeadership = true;
-    this.testContext.isEscalation = true;
-    this.testContext.leadershipEmails = ['leader@example.com'];
-    this.testContext.l2Teams = [
-        { label: escalationTeam, code: escalationTeam, types: ['escalation'] }
-    ];
+Given("user is both Leadership and escalation team member for {string}", async function (this: CustomWorld, escalationTeam: string) {
+  this.testContext = this.testContext || {};
+  this.testContext.userEmail = "leader@example.com";
+  this.testContext.userTeams = [
+    { name: "leadership", groupRefs: [], types: ["leadership"] },
+    { name: escalationTeam, groupRefs: [], types: ["escalation"] },
+  ];
+  this.testContext.isLeadership = true;
+  this.testContext.isEscalation = true;
+  this.testContext.leadershipEmails = ["leader@example.com"];
+  this.testContext.l2Teams = [{ label: escalationTeam, code: escalationTeam, types: ["escalation"] }];
 });
 
 // Actions: Login
-When('user logs in', async function (this: CustomWorld) {
-    const testContext = this.testContext || {};
-    
-    // Setup auth mocks
-    await mockAuthorizationEndpoints(this.page, {
-        leadershipEmails: testContext.leadershipEmails || [],
-        supportEmails: testContext.supportEmails || [],
-        l2Teams: testContext.l2Teams || []
+When("user logs in", async function (this: CustomWorld) {
+  const testContext = this.testContext || {};
+
+  // Setup auth mocks
+  await mockAuthorizationEndpoints(this.page, {
+    leadershipEmails: testContext.leadershipEmails || [],
+    supportEmails: testContext.supportEmails || [],
+    l2Teams: testContext.l2Teams || [],
+  });
+
+  // Mock session
+  const userEmail = testContext.userEmail || "test@example.com";
+  const isLeadership = testContext.isLeadership || false;
+  const isSupportEngineer = testContext.isSupportEngineer || false;
+  const isEscalation = testContext.isEscalation || false;
+
+  await this.context.addCookies([
+    {
+      name: "__e2e_auth_bypass",
+      value: "functional-test",
+      url: BASE_URL,
+      httpOnly: false,
+      sameSite: "Lax",
+      secure: false,
+      expires: Math.floor(Date.now() / 1000) + 86400,
+    },
+  ]);
+
+  await this.page.route("**/api/auth/session", async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        user: {
+          id: userEmail,
+          email: userEmail,
+          name: "Test User",
+          teams: (testContext.userTeams || []).map((t: any) => {
+            const hasTypes = Array.isArray(t.types) && t.types.length > 0;
+            const l2TeamNames = (testContext.l2Teams || []).map((lt: any) => lt.label);
+            const inferredTypes = hasTypes ? t.types : l2TeamNames.includes(t.name) ? ["escalation"] : ["tenant"];
+            return {
+              name: t.name || t.code,
+              code: t.code || t.name,
+              label: t.label || t.name || t.code,
+              types: inferredTypes,
+            };
+          }),
+          roles: [
+            "USER",
+            ...(isLeadership ? ["LEADERSHIP"] : []),
+            ...(isSupportEngineer ? ["SUPPORT_ENGINEER"] : []),
+            ...(isEscalation ? ["ESCALATION"] : []),
+          ],
+        },
+        expires: new Date(Date.now() + 86400000).toISOString(),
+      }),
     });
+  });
 
-    // Mock session
-    const userEmail = testContext.userEmail || 'test@example.com';
-    const isLeadership = testContext.isLeadership || false;
-    const isSupportEngineer = testContext.isSupportEngineer || false;
-    const isEscalation = testContext.isEscalation || false;
+  // Navigate and wait for minimal load; avoid long waits that can hang
+  await this.page.goto(BASE_URL, { waitUntil: "domcontentloaded", timeout: 10000 });
 
-    await this.context.addCookies([
-        {
-            name: '__e2e_auth_bypass',
-            value: 'functional-test',
-            url: BASE_URL,
-            httpOnly: false,
-            sameSite: 'Lax',
-            secure: false,
-            expires: Math.floor(Date.now() / 1000) + 86400
-        }
-    ]);
+  await this.page
+    .getByRole("link", { name: /^Tickets$/i })
+    .first()
+    .waitFor({ state: "visible", timeout: 5000 });
+});
 
-    await this.page.route('**/api/auth/session', async (route: Route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                user: {
-                    id: userEmail,
-                    email: userEmail,
-                    name: 'Test User',
-                    teams: (testContext.userTeams || []).map((t: any) => {
-                        const hasTypes = Array.isArray(t.types) && t.types.length > 0
-                        const l2TeamNames = (testContext.l2Teams || []).map((lt: any) => lt.label)
-                        const inferredTypes = hasTypes
-                            ? t.types
-                            : l2TeamNames.includes(t.name)
-                                ? ['escalation']
-                                : ['tenant']
-                        return {
-                            name: t.name || t.code,
-                            code: t.code || t.name,
-                            label: t.label || t.name || t.code,
-                            types: inferredTypes
-                        }
-                    }),
-                    roles: [
-                        'USER',
-                        ...(isLeadership ? ['LEADERSHIP'] : []),
-                        ...(isSupportEngineer ? ['SUPPORT_ENGINEER'] : []),
-                        ...(isEscalation ? ['ESCALATION'] : []),
-                    ]
-                },
-                expires: new Date(Date.now() + 86400000).toISOString()
-            })
-        });
+When("user logs in and selects {string} from dropdown", async function (this: CustomWorld, teamName: string) {
+  const testContext = this.testContext || {};
+
+  // Remove default session route from hooks to allow scenario-specific session
+  try {
+    await this.page.unroute("**/api/auth/session");
+  } catch {}
+  await this.context.clearCookies();
+
+  // Setup auth mocks
+  await mockAuthorizationEndpoints(this.page, {
+    leadershipEmails: testContext.leadershipEmails || [],
+    supportEmails: testContext.supportEmails || [],
+    l2Teams: testContext.l2Teams || [],
+  });
+
+  // Mock session
+  const userEmail = testContext.userEmail || "test@example.com";
+  const isLeadership = testContext.isLeadership || false;
+  const isSupportEngineer = testContext.isSupportEngineer || false;
+  const isEscalation = testContext.isEscalation || false;
+
+  await this.context.addCookies([
+    {
+      name: "__e2e_auth_bypass",
+      value: "functional-test",
+      url: BASE_URL,
+      httpOnly: false,
+      sameSite: "Lax",
+      secure: false,
+      expires: Math.floor(Date.now() / 1000) + 86400,
+    },
+  ]);
+
+  await this.page.route("**/api/auth/session", async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        user: {
+          id: userEmail,
+          email: userEmail,
+          name: "Test User",
+          teams: (testContext.userTeams || []).map((t: any) => ({
+            name: t.name || t.code,
+            code: t.code || t.name,
+            label: t.label || t.name || t.code,
+            types: Array.isArray(t.types) ? t.types : ["tenant"],
+          })),
+          roles: [
+            "USER",
+            ...(isLeadership ? ["LEADERSHIP"] : []),
+            ...(isSupportEngineer ? ["SUPPORT_ENGINEER"] : []),
+            ...(isEscalation ? ["ESCALATION"] : []),
+          ],
+        },
+        expires: new Date(Date.now() + 86400000).toISOString(),
+      }),
     });
+  });
 
-    // Navigate and wait for minimal load; avoid long waits that can hang
-    await this.page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 });
-    
-    await this.page.getByRole('link', { name: /^Tickets$/i }).first().waitFor({ state: 'visible', timeout: 5000 });
-});
+  // Navigate and wait for load
+  await this.page.goto(BASE_URL, { waitUntil: "domcontentloaded", timeout: 10000 });
 
-When('user logs in and selects {string} from dropdown', async function (this: CustomWorld, teamName: string) {
-    const testContext = this.testContext || {};
-    
-    // Remove default session route from hooks to allow scenario-specific session
-    try { await this.page.unroute('**/api/auth/session'); } catch {}
-    await this.context.clearCookies();
+  await this.page
+    .getByRole("link", { name: /^Tickets$/i })
+    .first()
+    .waitFor({ state: "visible", timeout: 10000 });
 
-    // Setup auth mocks
-    await mockAuthorizationEndpoints(this.page, {
-        leadershipEmails: testContext.leadershipEmails || [],
-        supportEmails: testContext.supportEmails || [],
-        l2Teams: testContext.l2Teams || []
-    });
-
-    // Mock session
-    const userEmail = testContext.userEmail || 'test@example.com';
-    const isLeadership = testContext.isLeadership || false;
-    const isSupportEngineer = testContext.isSupportEngineer || false;
-    const isEscalation = testContext.isEscalation || false;
-
-    await this.context.addCookies([
-        {
-            name: '__e2e_auth_bypass',
-            value: 'functional-test',
-            url: BASE_URL,
-            httpOnly: false,
-            sameSite: 'Lax',
-            secure: false,
-            expires: Math.floor(Date.now() / 1000) + 86400
-        }
-    ]);
-
-    await this.page.route('**/api/auth/session', async (route: Route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                user: {
-                    id: userEmail,
-                    email: userEmail,
-                    name: 'Test User',
-                    teams: (testContext.userTeams || []).map((t: any) => ({
-                        name: t.name || t.code,
-                        code: t.code || t.name,
-                        label: t.label || t.name || t.code,
-                        types: Array.isArray(t.types) ? t.types : ['tenant']
-                    })),
-                    roles: [
-                        'USER',
-                        ...(isLeadership ? ['LEADERSHIP'] : []),
-                        ...(isSupportEngineer ? ['SUPPORT_ENGINEER'] : []),
-                        ...(isEscalation ? ['ESCALATION'] : []),
-                    ]
-                },
-                expires: new Date(Date.now() + 86400000).toISOString()
-            })
-        });
-    });
-
-    // Navigate and wait for load
-    await this.page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 10000 });
-    
-    await this.page.getByRole('link', { name: /^Tickets$/i }).first().waitFor({ state: 'visible', timeout: 10000 });
-
-    // The team selector is now a Radix DropdownMenu rendered as a Button.
-    const dropdown = this.page.locator('[data-testid="team-selector-trigger"]');
-    if (await dropdown.isVisible().catch(() => false)) {
-        await selectDropdownMenuItem(this.page, dropdown, new RegExp(teamName, 'i'));
-        await this.page.waitForTimeout(500);
-    }
-});
-
-When('user switches to {string} from dropdown', async function (this: CustomWorld, teamName: string) {
-    const dropdown = this.page.locator('[data-testid="team-selector-trigger"]');
-    await selectDropdownMenuItem(this.page, dropdown, new RegExp(teamName, 'i'));
+  // The team selector is now a Radix DropdownMenu rendered as a Button.
+  const dropdown = this.page.locator('[data-testid="team-selector-trigger"]');
+  if (await dropdown.isVisible().catch(() => false)) {
+    await selectDropdownMenuItem(this.page, dropdown, new RegExp(teamName, "i"));
     await this.page.waitForTimeout(500);
+  }
 });
 
-When('user navigates to the {string} tab', async function (this: CustomWorld, tabName: string) {
-    // Navigation items (Home, Tickets, Escalations, etc.) are now links, not buttons
-    const navLink = this.page.getByRole('link', { name: new RegExp(tabName, 'i') });
-    await navLink.waitFor({ state: 'visible', timeout: 5000 });
-    await navLink.click();
-
-    // Wait for any loading states to complete
-    await this.page.waitForTimeout(1500);
-    
-    // Wait for the page to stabilize (no more network requests)
-    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
-        // Ignore timeout - page might still be making background requests
-    });
+When("user switches to {string} from dropdown", async function (this: CustomWorld, teamName: string) {
+  const dropdown = this.page.locator('[data-testid="team-selector-trigger"]');
+  await selectDropdownMenuItem(this.page, dropdown, new RegExp(teamName, "i"));
+  await this.page.waitForTimeout(500);
 });
 
-When('user views the {string} dashboard', async function (this: CustomWorld, dashboardName: string) {
-    // Dashboard should already be visible after navigation
-    await this.page.waitForTimeout(300);
+When("user navigates to the {string} tab", async function (this: CustomWorld, tabName: string) {
+  // Navigation items (Home, Tickets, Escalations, etc.) are now links, not buttons
+  const navLink = this.page.getByRole("link", { name: new RegExp(tabName, "i") });
+  await navLink.waitFor({ state: "visible", timeout: 5000 });
+  await navLink.click();
+
+  // Wait for any loading states to complete
+  await this.page.waitForTimeout(1500);
+
+  // Wait for the page to stabilize (no more network requests)
+  await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {
+    // Ignore timeout - page might still be making background requests
+  });
 });
 
-When('user filters escalations by status {string}', async function (this: CustomWorld, status: string) {
-    const trigger = getMainEscalationsSection(this.page).getByRole('button', { name: /Status/i }).first();
-    await selectShadcnOption(this.page, trigger, new RegExp(status, 'i'));
-    await this.page.waitForTimeout(500);
+When("user views the {string} dashboard", async function (this: CustomWorld, dashboardName: string) {
+  // Dashboard should already be visible after navigation
+  await this.page.waitForTimeout(300);
 });
 
-When('user filters escalations by impact {string}', async function (this: CustomWorld, impact: string) {
-    const trigger = getMainEscalationsSection(this.page).getByRole('button', { name: /Impact/i }).first();
-    await selectShadcnOption(this.page, trigger, new RegExp(impact, 'i'));
-    await this.page.waitForTimeout(500);
+When("user filters escalations by status {string}", async function (this: CustomWorld, status: string) {
+  const trigger = getMainEscalationsSection(this.page)
+    .getByRole("button", { name: /Status/i })
+    .first();
+  await selectShadcnOption(this.page, trigger, new RegExp(status, "i"));
+  await this.page.waitForTimeout(500);
 });
 
-When('user filters escalations by team {string}', async function (this: CustomWorld, teamName: string) {
-    const trigger = getMainEscalationsSection(this.page).getByRole('button', { name: /Team/i }).first();
-    await selectShadcnOption(this.page, trigger, new RegExp(teamName, 'i'));
-    await this.page.waitForTimeout(500);
+When("user filters escalations by impact {string}", async function (this: CustomWorld, impact: string) {
+  const trigger = getMainEscalationsSection(this.page)
+    .getByRole("button", { name: /Impact/i })
+    .first();
+  await selectShadcnOption(this.page, trigger, new RegExp(impact, "i"));
+  await this.page.waitForTimeout(500);
 });
 
-When('user filters escalations by tag {string}', async function (this: CustomWorld, tag: string) {
-    const trigger = getMainEscalationsSection(this.page).getByRole('button', { name: /Tag/i }).first();
-    await selectShadcnOption(this.page, trigger, new RegExp(tag, 'i'));
-    await this.page.waitForTimeout(500);
+When("user filters escalations by team {string}", async function (this: CustomWorld, teamName: string) {
+  const trigger = getMainEscalationsSection(this.page).getByRole("button", { name: /Team/i }).first();
+  await selectShadcnOption(this.page, trigger, new RegExp(teamName, "i"));
+  await this.page.waitForTimeout(500);
 });
 
-When('user sorts escalations by {string}', async function (this: CustomWorld, columnName: string) {
-    const header = getMainEscalationsSection(this.page).locator('thead th').filter({ hasText: new RegExp(`^${columnName}\\b`, 'i') }).first();
-    await header.waitFor({ state: 'visible', timeout: 5000 });
-    if ((await readSortDirection(header)) !== 'desc') {
-        await header.click();
-        await this.page.waitForTimeout(400);
-    }
+When("user filters escalations by tag {string}", async function (this: CustomWorld, tag: string) {
+  const trigger = getMainEscalationsSection(this.page).getByRole("button", { name: /Tag/i }).first();
+  await selectShadcnOption(this.page, trigger, new RegExp(tag, "i"));
+  await this.page.waitForTimeout(500);
 });
 
-When('user toggles escalations sort by {string}', async function (this: CustomWorld, columnName: string) {
-    const header = getMainEscalationsSection(this.page).locator('thead th').filter({ hasText: new RegExp(`^${columnName}\\b`, 'i') }).first();
-    await header.waitFor({ state: 'visible', timeout: 5000 });
+When("user sorts escalations by {string}", async function (this: CustomWorld, columnName: string) {
+  const header = getMainEscalationsSection(this.page)
+    .locator("thead th")
+    .filter({ hasText: new RegExp(`^${columnName}\\b`, "i") })
+    .first();
+  await header.waitFor({ state: "visible", timeout: 5000 });
+  if ((await readSortDirection(header)) !== "desc") {
     await header.click();
     await this.page.waitForTimeout(400);
+  }
+});
+
+When("user toggles escalations sort by {string}", async function (this: CustomWorld, columnName: string) {
+  const header = getMainEscalationsSection(this.page)
+    .locator("thead th")
+    .filter({ hasText: new RegExp(`^${columnName}\\b`, "i") })
+    .first();
+  await header.waitFor({ state: "visible", timeout: 5000 });
+  await header.click();
+  await this.page.waitForTimeout(400);
 });
 
 // Assertions: Visibility
 // Note: "user should see X section" and "user should NOT see X section" steps are defined in authorization.step.ts
 
-Then('user should see {string} dashboard', async function (this: CustomWorld, dashboardName: string) {
-    const dashboard = this.page.getByText(dashboardName);
-    await expect(dashboard).toBeVisible({ timeout: 5000 });
+Then("user should see {string} dashboard", async function (this: CustomWorld, dashboardName: string) {
+  const dashboard = this.page.getByText(dashboardName);
+  await expect(dashboard).toBeVisible({ timeout: 5000 });
 });
 
-Then('user should see escalation metrics in the handling section', async function (this: CustomWorld) {
-    // Check for common escalation metric labels
-    const metrics = this.page.getByText(/Total Received|Active|Resolved/i);
-    await expect(metrics.first()).toBeVisible({ timeout: 5000 });
+Then("user should see escalation metrics in the handling section", async function (this: CustomWorld) {
+  // Check for common escalation metric labels
+  const metrics = this.page.getByText(/Total Received|Active|Resolved/i);
+  await expect(metrics.first()).toBeVisible({ timeout: 5000 });
 });
 
-Then('user should see status filter for escalations', async function (this: CustomWorld) {
-    const trigger = getMainEscalationsSection(this.page).getByRole('button', { name: /Status/i }).first();
-    await expect(trigger).toBeVisible({ timeout: 5000 });
+Then("user should see status filter for escalations", async function (this: CustomWorld) {
+  const trigger = getMainEscalationsSection(this.page)
+    .getByRole("button", { name: /Status/i })
+    .first();
+  await expect(trigger).toBeVisible({ timeout: 5000 });
 });
 
-Then('user should see impact filter for escalations', async function (this: CustomWorld) {
-    const trigger = getMainEscalationsSection(this.page).getByRole('button', { name: /Impact/i }).first();
-    await expect(trigger).toBeVisible({ timeout: 5000 });
+Then("user should see impact filter for escalations", async function (this: CustomWorld) {
+  const trigger = getMainEscalationsSection(this.page)
+    .getByRole("button", { name: /Impact/i })
+    .first();
+  await expect(trigger).toBeVisible({ timeout: 5000 });
 });
 
-Then('user should only see regular home dashboard', async function (this: CustomWorld) {
-    const totalTickets = this.page.getByText(/Total Tickets/i);
-    await expect(totalTickets).toBeVisible({ timeout: 5000 });
+Then("user should only see regular home dashboard", async function (this: CustomWorld) {
+  const totalTickets = this.page.getByText(/Total Tickets/i);
+  await expect(totalTickets).toBeVisible({ timeout: 5000 });
 });
 
-Then('user should only see escalations for {string}', async function (this: CustomWorld, teamName: string) {
-    // Verify the dashboard is filtered to the team
-    await this.page.waitForTimeout(500);
-    // The filtering is implicit - we just verify the dashboard renders
-    const dashboard = this.page.getByText(/Escalated to My Team/i);
-    await expect(dashboard).toBeVisible();
+Then("user should only see escalations for {string}", async function (this: CustomWorld, teamName: string) {
+  // Verify the dashboard is filtered to the team
+  await this.page.waitForTimeout(500);
+  // The filtering is implicit - we just verify the dashboard renders
+  const dashboard = this.page.getByText(/Escalated to My Team/i);
+  await expect(dashboard).toBeVisible();
 });
 
-Then('user should NOT see escalations for {string}', async function (this: CustomWorld, teamName: string) {
-    // This is tested by only seeing escalations for the selected team
-    // Filtering logic is tested in unit tests
-    await this.page.waitForTimeout(300);
+Then("user should NOT see escalations for {string}", async function (this: CustomWorld, teamName: string) {
+  // This is tested by only seeing escalations for the selected team
+  // Filtering logic is tested in unit tests
+  await this.page.waitForTimeout(300);
 });
 
-Then('user should only see ongoing escalations', async function (this: CustomWorld) {
-    // Verify filter is applied (filtering logic tested in unit tests)
-    await this.page.waitForTimeout(500);
-    const dashboard = this.page.getByText(/Escalated to My Team/i);
-    await expect(dashboard).toBeVisible();
+Then("user should only see ongoing escalations", async function (this: CustomWorld) {
+  // Verify filter is applied (filtering logic tested in unit tests)
+  await this.page.waitForTimeout(500);
+  const dashboard = this.page.getByText(/Escalated to My Team/i);
+  await expect(dashboard).toBeVisible();
 });
 
-Then('user should only see resolved escalations', async function (this: CustomWorld) {
-    // Mock data uses recent dates, so the default "last week" filter lets them through.
-    // clearEscalationsDateFilter is NOT called — it could race with the preceding status
-    // filter URL update and inadvertently reset the status param.
-    // Use Playwright's retrying assertions so we don't rely on a fixed timeout.
-    const tbody = getMainEscalationsSection(this.page).locator('tbody').first();
-    await expect(tbody).toContainText('Resolved', { ignoreCase: true, timeout: 8000 });
-    await expect(tbody).not.toContainText('Ongoing', { ignoreCase: true, timeout: 8000 });
+Then("user should only see resolved escalations", async function (this: CustomWorld) {
+  // Mock data uses recent dates, so the default "last week" filter lets them through.
+  // clearEscalationsDateFilter is NOT called — it could race with the preceding status
+  // filter URL update and inadvertently reset the status param.
+  // Use Playwright's retrying assertions so we don't rely on a fixed timeout.
+  const tbody = getMainEscalationsSection(this.page).locator("tbody").first();
+  await expect(tbody).toContainText("Resolved", { ignoreCase: true, timeout: 8000 });
+  await expect(tbody).not.toContainText("Ongoing", { ignoreCase: true, timeout: 8000 });
 });
 
-Then('user should only see high impact escalations', async function (this: CustomWorld) {
-    const tbody = getMainEscalationsSection(this.page).locator('tbody').first();
-    await expect(tbody).toContainText('high', { ignoreCase: true, timeout: 8000 });
-    await expect(tbody).not.toContainText('medium', { ignoreCase: true, timeout: 8000 });
+Then("user should only see high impact escalations", async function (this: CustomWorld) {
+  const tbody = getMainEscalationsSection(this.page).locator("tbody").first();
+  await expect(tbody).toContainText("high", { ignoreCase: true, timeout: 8000 });
+  await expect(tbody).not.toContainText("medium", { ignoreCase: true, timeout: 8000 });
 });
 
-Then('user should only see escalations for selected team {string}', async function (this: CustomWorld, teamName: string) {
-    const tbody = getMainEscalationsSection(this.page).locator('tbody').first();
-    await expect(tbody).toContainText(teamName, { timeout: 8000 });
-    const nonMatching = teamName.toLowerCase().includes('core') ? 'Other-team' : 'Core-platform';
-    await expect(tbody).not.toContainText(nonMatching, { timeout: 8000 });
+Then("user should only see escalations for selected team {string}", async function (this: CustomWorld, teamName: string) {
+  const tbody = getMainEscalationsSection(this.page).locator("tbody").first();
+  await expect(tbody).toContainText(teamName, { timeout: 8000 });
+  const nonMatching = teamName.toLowerCase().includes("core") ? "Other-team" : "Core-platform";
+  await expect(tbody).not.toContainText(nonMatching, { timeout: 8000 });
 });
 
-Then('user should only see escalations with tag {string}', async function (this: CustomWorld, tag: string) {
-    const tbody = getMainEscalationsSection(this.page).locator('tbody').first();
-    await expect(tbody).toContainText(tag, { ignoreCase: true, timeout: 8000 });
-    const nonMatching = tag.toLowerCase() === 'bug' ? 'feature' : 'bug';
-    await expect(tbody).not.toContainText(nonMatching, { ignoreCase: true, timeout: 8000 });
+Then("user should only see escalations with tag {string}", async function (this: CustomWorld, tag: string) {
+  const tbody = getMainEscalationsSection(this.page).locator("tbody").first();
+  await expect(tbody).toContainText(tag, { ignoreCase: true, timeout: 8000 });
+  const nonMatching = tag.toLowerCase() === "bug" ? "feature" : "bug";
+  await expect(tbody).not.toContainText(nonMatching, { ignoreCase: true, timeout: 8000 });
 });
 
-Then('escalations should be sorted by {string} in {string} order', async function (this: CustomWorld, columnName: string, direction: string) {
-    const header = getMainEscalationsSection(this.page).locator('thead th').filter({ hasText: new RegExp(`^${columnName}\\b`, 'i') }).first();
-    await header.waitFor({ state: 'visible', timeout: 5000 });
+Then(
+  "escalations should be sorted by {string} in {string} order",
+  async function (this: CustomWorld, columnName: string, direction: string) {
+    const header = getMainEscalationsSection(this.page)
+      .locator("thead th")
+      .filter({ hasText: new RegExp(`^${columnName}\\b`, "i") })
+      .first();
+    await header.waitFor({ state: "visible", timeout: 5000 });
     expect(await readSortDirection(header)).toBe(direction.toLowerCase());
-});
+  }
+);
 
-Then('user should have full access to all teams', async function (this: CustomWorld) {
-    // Verify leadership has access to all features
-    // This would be shown by having SLA and Health dashboards visible
-    await this.page.waitForTimeout(300);
+Then("user should have full access to all teams", async function (this: CustomWorld) {
+  // Verify leadership has access to all features
+  // This would be shown by having SLA and Health dashboards visible
+  await this.page.waitForTimeout(300);
 });
-

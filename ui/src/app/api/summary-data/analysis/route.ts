@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { backendAccessToken, unauthorizedResponse, errorResponse } from "../../_lib/backend-fetch";
+import { backendAccessToken, errorResponse, unauthorizedResponse } from "../../_lib/backend-fetch";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 
@@ -12,9 +12,7 @@ export async function GET(request: NextRequest) {
 
   // Validate CSRF token for GET request that downloads the analysis bundle
   const csrfTokenFromHeader = request.headers.get("X-CSRF-Token");
-  const csrfCookieName = process.env.NODE_ENV === "production"
-    ? "__Host-authjs.csrf-token"
-    : "authjs.csrf-token";
+  const csrfCookieName = process.env.NODE_ENV === "production" ? "__Host-authjs.csrf-token" : "authjs.csrf-token";
   const csrfCookieValue = request.cookies.get(csrfCookieName)?.value;
 
   if (!csrfTokenFromHeader || !csrfCookieValue) {

@@ -1,5 +1,5 @@
-import { When, Then } from "@cucumber/cucumber";
-import { expect, request, APIResponse } from "@playwright/test";
+import { Then, When } from "@cucumber/cucumber";
+import { APIResponse, expect, request } from "@playwright/test";
 
 let response: APIResponse;
 let responseBody: string;

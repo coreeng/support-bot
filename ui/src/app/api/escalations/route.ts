@@ -1,9 +1,5 @@
 import { NextRequest } from "next/server";
-import {
-  backendFetch,
-  unauthorizedResponse,
-  errorResponse,
-} from "../_lib/backend-fetch";
+import { backendFetch, errorResponse, unauthorizedResponse } from "../_lib/backend-fetch";
 
 interface BackendTeam {
   label?: string;
@@ -15,10 +11,7 @@ export async function GET(request: NextRequest) {
   const page = searchParams.get("page") ?? "0";
   const pageSize = searchParams.get("pageSize") ?? "50";
 
-  const response = await backendFetch(
-    request,
-    `/escalation?page=${page}&pageSize=${pageSize}&escalated=true`
-  );
+  const response = await backendFetch(request, `/escalation?page=${page}&pageSize=${pageSize}&escalated=true`);
   if (!response) return unauthorizedResponse();
 
   if (!response.ok) {
@@ -31,10 +24,7 @@ export async function GET(request: NextRequest) {
   const content = data.content.map((e: Record<string, unknown>) => {
     const team = e.team as BackendTeam | null;
     const id = typeof e.id === "object" ? (e.id as { id: unknown }).id : e.id;
-    const ticketId =
-      typeof e.ticketId === "object"
-        ? (e.ticketId as { id: unknown }).id
-        : e.ticketId;
+    const ticketId = typeof e.ticketId === "object" ? (e.ticketId as { id: unknown }).id : e.ticketId;
 
     return {
       id: String(id),

@@ -19,7 +19,5 @@ export function resolvePublicOrigin(): string {
       /* fall through */
     }
   }
-  throw new Error(
-    "NEXTAUTH_URL is not set or invalid — required for OAuth redirect_uri"
-  );
+  throw new Error("NEXTAUTH_URL is not set or invalid — required for OAuth redirect_uri");
 }

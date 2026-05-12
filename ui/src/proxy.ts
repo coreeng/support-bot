@@ -15,10 +15,7 @@ const protectedProxy = auth((req) => {
   const { pathname } = nextUrl;
 
   if (!isLoggedIn) {
-    const resolved = resolvePublicOriginOrConfigurationLoginRedirect(
-      nextUrl.origin,
-      pathname
-    );
+    const resolved = resolvePublicOriginOrConfigurationLoginRedirect(nextUrl.origin, pathname);
     if (!resolved.ok) {
       return resolved.response;
     }
@@ -61,9 +58,7 @@ export function proxy(request: NextRequest) {
 
   // NextAuth's `auth` wrapper has overloaded signatures; in proxy context
   // we only pass the request object.
-  const proxyHandler = protectedProxy as (
-    req: NextRequest
-  ) => ReturnType<typeof NextResponse.next>;
+  const proxyHandler = protectedProxy as (req: NextRequest) => ReturnType<typeof NextResponse.next>;
   return proxyHandler(request);
 }
 

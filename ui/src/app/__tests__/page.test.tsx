@@ -1,82 +1,82 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import { useRouter } from 'next/navigation'
-import Dashboard from '../(dashboard)/page'
-import DashboardLayoutComponent from '../(dashboard)/layout'
-import { useAuth } from '@/hooks/useAuth'
-import { useTeamFilter } from '@/contexts/TeamFilterContext'
-import { useKnowledgeGapsEnabled } from '@/lib/hooks'
+import { useTeamFilter } from "@/contexts/TeamFilterContext";
+import { useAuth } from "@/hooks/useAuth";
+import { useKnowledgeGapsEnabled } from "@/lib/hooks";
+import { render, screen, waitFor } from "@testing-library/react";
+import { useRouter } from "next/navigation";
+import DashboardLayoutComponent from "../(dashboard)/layout";
+import Dashboard from "../(dashboard)/page";
 
-jest.mock('next/navigation', () => ({
+jest.mock("next/navigation", () => ({
   useRouter: jest.fn(),
-  usePathname: jest.fn(() => '/'),
+  usePathname: jest.fn(() => "/"),
   useSearchParams: jest.fn(() => new URLSearchParams()),
-}))
+}));
 
-jest.mock('../../hooks/useAuth', () => ({
+jest.mock("../../hooks/useAuth", () => ({
   useAuth: jest.fn(),
-}))
+}));
 
-jest.mock('../../contexts/TeamFilterContext', () => ({
+jest.mock("../../contexts/TeamFilterContext", () => ({
   useTeamFilter: jest.fn(),
-}))
+}));
 
-jest.mock('../../lib/hooks', () => ({
+jest.mock("../../lib/hooks", () => ({
   useKnowledgeGapsEnabled: jest.fn(),
   useTenantInsightsEnabled: jest.fn(() => ({ data: false, isLoading: false, error: null })),
-}))
+}));
 
 // Mock all the page components
-jest.mock('../../components/stats/stats', () => ({
+jest.mock("../../components/stats/stats", () => ({
   __esModule: true,
   default: () => <div>Stats Page</div>,
-}))
+}));
 
-jest.mock('../../components/tickets/tickets', () => ({
+jest.mock("../../components/tickets/tickets", () => ({
   __esModule: true,
   default: () => <div>Tickets Page</div>,
-}))
+}));
 
-jest.mock('../../components/escalations/escalations', () => ({
+jest.mock("../../components/escalations/escalations", () => ({
   __esModule: true,
   default: () => <div>Escalations Page</div>,
-}))
+}));
 
-jest.mock('../../components/health/health', () => ({
+jest.mock("../../components/health/health", () => ({
   __esModule: true,
   default: () => <div>Health Page</div>,
-}))
+}));
 
-jest.mock('../../components/dashboards/dashboards', () => ({
+jest.mock("../../components/dashboards/dashboards", () => ({
   __esModule: true,
   default: () => <div>Dashboards Page</div>,
-}))
+}));
 
-jest.mock('../../components/knowledgegaps/knowledge-gaps', () => ({
+jest.mock("../../components/knowledgegaps/knowledge-gaps", () => ({
   __esModule: true,
   default: () => <div>Knowledge Gaps Page</div>,
-}))
+}));
 
-jest.mock('../../components/TeamSelector', () => ({
+jest.mock("../../components/TeamSelector", () => ({
   __esModule: true,
   default: () => <div>Team Selector</div>,
-}))
+}));
 
-jest.mock('next/image', () => ({
+jest.mock("next/image", () => ({
   __esModule: true,
   default: (props: any) => {
     // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
-    return <img {...props} />
+    return <img {...props} />;
   },
-}))
+}));
 
 const mockRouter = {
   push: jest.fn(),
-}
+};
 
-const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>
-const mockUseTeamFilter = useTeamFilter as jest.MockedFunction<typeof useTeamFilter>
-const mockUseKnowledgeGapsEnabled = useKnowledgeGapsEnabled as jest.MockedFunction<typeof useKnowledgeGapsEnabled>
-const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>
+const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockUseTeamFilter = useTeamFilter as jest.MockedFunction<typeof useTeamFilter>;
+const mockUseKnowledgeGapsEnabled = useKnowledgeGapsEnabled as jest.MockedFunction<typeof useKnowledgeGapsEnabled>;
+const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
 
 // Helper to render Dashboard with Layout (simulating the route group structure)
 const renderDashboard = () => {
@@ -84,13 +84,13 @@ const renderDashboard = () => {
     <DashboardLayoutComponent>
       <Dashboard />
     </DashboardLayoutComponent>
-  )
-}
+  );
+};
 
-describe('Dashboard - Support Area Summary visibility', () => {
+describe("Dashboard - Support Area Summary visibility", () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    mockUseRouter.mockReturnValue(mockRouter as any)
+    jest.clearAllMocks();
+    mockUseRouter.mockReturnValue(mockRouter as any);
     mockUseTeamFilter.mockReturnValue({
       hasFullAccess: true,
       selectedTeam: null,
@@ -98,20 +98,20 @@ describe('Dashboard - Support Area Summary visibility', () => {
       effectiveTeams: [],
       allTeams: [],
       initialized: true,
-      teamScope: { mode: 'uninitialized' as const },
+      teamScope: { mode: "uninitialized" as const },
       hasNoTeamScope: false,
       isViewingAllTeams: false,
       isViewingAsEscalationTeam: false,
-    })
-  })
+    });
+  });
 
-  describe('when feature is enabled and hasFullAccess is true', () => {
+  describe("when feature is enabled and hasFullAccess is true", () => {
     beforeEach(() => {
       mockUseKnowledgeGapsEnabled.mockReturnValue({
         data: true,
         isLoading: false,
         error: null,
-      } as any)
+      } as any);
       mockUseTeamFilter.mockReturnValue({
         hasFullAccess: true,
         selectedTeam: null,
@@ -119,20 +119,20 @@ describe('Dashboard - Support Area Summary visibility', () => {
         effectiveTeams: [],
         allTeams: [],
         initialized: true,
-        teamScope: { mode: 'uninitialized' as const },
+        teamScope: { mode: "uninitialized" as const },
         hasNoTeamScope: false,
         isViewingAllTeams: false,
         isViewingAsEscalationTeam: false,
-      })
-    })
+      });
+    });
 
-    it('shows Support Area Summary when leadership/support team is selected', async () => {
+    it("shows Support Area Summary when leadership/support team is selected", async () => {
       mockUseAuth.mockReturnValue({
         user: {
-          id: 'user@example.com',
-          name: 'User',
-          email: 'user@example.com',
-          roles: ['supportEngineer'],
+          id: "user@example.com",
+          name: "User",
+          email: "user@example.com",
+          roles: ["supportEngineer"],
           teams: [],
         },
         isLoading: false,
@@ -142,44 +142,44 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isEscalationTeam: false,
         isSupportEngineer: true,
         actualEscalationTeams: [],
-      })
+      });
 
-      renderDashboard()
+      renderDashboard();
 
       await waitFor(() => {
-        expect(screen.getByText('Support Area Summary')).toBeInTheDocument()
-      })
-    })
-  })
+        expect(screen.getByText("Support Area Summary")).toBeInTheDocument();
+      });
+    });
+  });
 
-  describe('when feature is enabled but hasFullAccess is false', () => {
+  describe("when feature is enabled but hasFullAccess is false", () => {
     beforeEach(() => {
       mockUseKnowledgeGapsEnabled.mockReturnValue({
         data: true,
         isLoading: false,
         error: null,
-      } as any)
+      } as any);
       mockUseTeamFilter.mockReturnValue({
         hasFullAccess: false,
-        selectedTeam: 'tenant-team',
+        selectedTeam: "tenant-team",
         setSelectedTeam: jest.fn(),
-        effectiveTeams: ['tenant-team'],
-        allTeams: ['tenant-team'],
+        effectiveTeams: ["tenant-team"],
+        allTeams: ["tenant-team"],
         initialized: true,
-        teamScope: { mode: 'selected_teams' as const, teams: ['tenant-team'] },
+        teamScope: { mode: "selected_teams" as const, teams: ["tenant-team"] },
         hasNoTeamScope: false,
         isViewingAllTeams: false,
         isViewingAsEscalationTeam: false,
-      })
-    })
+      });
+    });
 
-    it('does NOT show Support Area Summary when tenant team is selected', async () => {
+    it("does NOT show Support Area Summary when tenant team is selected", async () => {
       mockUseAuth.mockReturnValue({
         user: {
-          id: 'support@example.com',
-          name: 'Support User',
-          email: 'support@example.com',
-          roles: ['supportEngineer'],
+          id: "support@example.com",
+          name: "Support User",
+          email: "support@example.com",
+          roles: ["supportEngineer"],
           teams: [],
         },
         isLoading: false,
@@ -189,22 +189,22 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isEscalationTeam: false,
         isSupportEngineer: true,
         actualEscalationTeams: [],
-      })
+      });
 
-      renderDashboard()
+      renderDashboard();
 
       await waitFor(() => {
-        expect(screen.queryByText('Support Area Summary')).not.toBeInTheDocument()
-      })
-    })
+        expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
+      });
+    });
 
-    it('does NOT show Support Area Summary when escalation team is selected', async () => {
+    it("does NOT show Support Area Summary when escalation team is selected", async () => {
       mockUseAuth.mockReturnValue({
         user: {
-          id: 'leader@example.com',
-          name: 'Leadership User',
-          email: 'leader@example.com',
-          roles: ['leadership'],
+          id: "leader@example.com",
+          name: "Leadership User",
+          email: "leader@example.com",
+          roles: ["leadership"],
           teams: [],
         },
         isLoading: false,
@@ -214,27 +214,27 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isEscalationTeam: false,
         isSupportEngineer: false,
         actualEscalationTeams: [],
-      })
+      });
 
-      renderDashboard()
+      renderDashboard();
 
       await waitFor(() => {
-        expect(screen.queryByText('Support Area Summary')).not.toBeInTheDocument()
-      })
+        expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
+      });
 
       // Verify basic tabs are still visible
-      expect(screen.getByText('Home')).toBeInTheDocument()
-      expect(screen.getByText('Tickets')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText("Home")).toBeInTheDocument();
+      expect(screen.getByText("Tickets")).toBeInTheDocument();
+    });
+  });
 
-  describe('when feature is disabled', () => {
+  describe("when feature is disabled", () => {
     beforeEach(() => {
       mockUseKnowledgeGapsEnabled.mockReturnValue({
         data: false,
         isLoading: false,
         error: null,
-      } as any)
+      } as any);
       mockUseTeamFilter.mockReturnValue({
         hasFullAccess: true,
         selectedTeam: null,
@@ -242,20 +242,20 @@ describe('Dashboard - Support Area Summary visibility', () => {
         effectiveTeams: [],
         allTeams: [],
         initialized: true,
-        teamScope: { mode: 'uninitialized' as const },
+        teamScope: { mode: "uninitialized" as const },
         hasNoTeamScope: false,
         isViewingAllTeams: false,
         isViewingAsEscalationTeam: false,
-      })
-    })
+      });
+    });
 
-    it('does NOT show Support Area Summary even with full access when feature is disabled', async () => {
+    it("does NOT show Support Area Summary even with full access when feature is disabled", async () => {
       mockUseAuth.mockReturnValue({
         user: {
-          id: 'user@example.com',
-          name: 'User',
-          email: 'user@example.com',
-          roles: ['supportEngineer'],
+          id: "user@example.com",
+          name: "User",
+          email: "user@example.com",
+          roles: ["supportEngineer"],
           teams: [],
         },
         isLoading: false,
@@ -265,23 +265,23 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isEscalationTeam: false,
         isSupportEngineer: true,
         actualEscalationTeams: [],
-      })
+      });
 
-      renderDashboard()
+      renderDashboard();
 
       await waitFor(() => {
-        expect(screen.queryByText('Support Area Summary')).not.toBeInTheDocument()
-      })
-    })
-  })
+        expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
+      });
+    });
+  });
 
-  describe('when feature status is loading', () => {
+  describe("when feature status is loading", () => {
     beforeEach(() => {
       mockUseKnowledgeGapsEnabled.mockReturnValue({
         data: undefined,
         isLoading: true,
         error: null,
-      } as any)
+      } as any);
       mockUseTeamFilter.mockReturnValue({
         hasFullAccess: true,
         selectedTeam: null,
@@ -289,20 +289,20 @@ describe('Dashboard - Support Area Summary visibility', () => {
         effectiveTeams: [],
         allTeams: [],
         initialized: true,
-        teamScope: { mode: 'uninitialized' as const },
+        teamScope: { mode: "uninitialized" as const },
         hasNoTeamScope: false,
         isViewingAllTeams: false,
         isViewingAsEscalationTeam: false,
-      })
-    })
+      });
+    });
 
-    it('does NOT show Support Area Summary while loading even with full access', async () => {
+    it("does NOT show Support Area Summary while loading even with full access", async () => {
       mockUseAuth.mockReturnValue({
         user: {
-          id: 'user@example.com',
-          name: 'User',
-          email: 'user@example.com',
-          roles: ['supportEngineer'],
+          id: "user@example.com",
+          name: "User",
+          email: "user@example.com",
+          roles: ["supportEngineer"],
           teams: [],
         },
         isLoading: false,
@@ -312,45 +312,45 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isEscalationTeam: false,
         isSupportEngineer: true,
         actualEscalationTeams: [],
-      })
+      });
 
-      renderDashboard()
+      renderDashboard();
 
       await waitFor(() => {
-        expect(screen.queryByText('Support Area Summary')).not.toBeInTheDocument()
-      })
-    })
-  })
+        expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
+      });
+    });
+  });
 
-  describe('restricted tabs visibility', () => {
+  describe("restricted tabs visibility", () => {
     beforeEach(() => {
       mockUseKnowledgeGapsEnabled.mockReturnValue({
         data: true,
         isLoading: false,
         error: null,
-      } as any)
-    })
+      } as any);
+    });
 
-    it('hides all restricted tabs (Analytics, SLA, Support Area Summary) when hasFullAccess is false', async () => {
+    it("hides all restricted tabs (Analytics, SLA, Support Area Summary) when hasFullAccess is false", async () => {
       mockUseTeamFilter.mockReturnValue({
         hasFullAccess: false,
-        selectedTeam: 'tenant-team',
+        selectedTeam: "tenant-team",
         setSelectedTeam: jest.fn(),
-        effectiveTeams: ['tenant-team'],
-        allTeams: ['tenant-team'],
+        effectiveTeams: ["tenant-team"],
+        allTeams: ["tenant-team"],
         initialized: true,
-        teamScope: { mode: 'selected_teams' as const, teams: ['tenant-team'] },
+        teamScope: { mode: "selected_teams" as const, teams: ["tenant-team"] },
         hasNoTeamScope: false,
         isViewingAllTeams: false,
         isViewingAsEscalationTeam: false,
-      })
+      });
 
       mockUseAuth.mockReturnValue({
         user: {
-          id: 'user@example.com',
-          name: 'User',
-          email: 'user@example.com',
-          roles: ['user'],
+          id: "user@example.com",
+          name: "User",
+          email: "user@example.com",
+          roles: ["user"],
           teams: [],
         },
         isLoading: false,
@@ -360,23 +360,23 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isEscalationTeam: false,
         isSupportEngineer: false,
         actualEscalationTeams: [],
-      })
+      });
 
-      renderDashboard()
+      renderDashboard();
 
       await waitFor(() => {
-        expect(screen.queryByText('Analytics & Operations')).not.toBeInTheDocument()
-        expect(screen.queryByText('SLA Dashboard')).not.toBeInTheDocument()
-        expect(screen.queryByText('Support Area Summary')).not.toBeInTheDocument()
-      })
-    })
+        expect(screen.queryByText("Analytics & Operations")).not.toBeInTheDocument();
+        expect(screen.queryByText("SLA Dashboard")).not.toBeInTheDocument();
+        expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
+      });
+    });
 
-    it('shows all restricted tabs (except Support Area Summary) when hasFullAccess is true and feature disabled', async () => {
+    it("shows all restricted tabs (except Support Area Summary) when hasFullAccess is true and feature disabled", async () => {
       mockUseKnowledgeGapsEnabled.mockReturnValue({
         data: false,
         isLoading: false,
         error: null,
-      } as any)
+      } as any);
 
       mockUseTeamFilter.mockReturnValue({
         hasFullAccess: true,
@@ -385,18 +385,18 @@ describe('Dashboard - Support Area Summary visibility', () => {
         effectiveTeams: [],
         allTeams: [],
         initialized: true,
-        teamScope: { mode: 'uninitialized' as const },
+        teamScope: { mode: "uninitialized" as const },
         hasNoTeamScope: false,
         isViewingAllTeams: false,
         isViewingAsEscalationTeam: false,
-      })
+      });
 
       mockUseAuth.mockReturnValue({
         user: {
-          id: 'user@example.com',
-          name: 'User',
-          email: 'user@example.com',
-          roles: ['supportEngineer'],
+          id: "user@example.com",
+          name: "User",
+          email: "user@example.com",
+          roles: ["supportEngineer"],
           teams: [],
         },
         isLoading: false,
@@ -406,37 +406,37 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isEscalationTeam: false,
         isSupportEngineer: true,
         actualEscalationTeams: [],
-      })
+      });
 
-      renderDashboard()
+      renderDashboard();
 
       await waitFor(() => {
-        expect(screen.getByText('Analytics & Operations')).toBeInTheDocument()
-        expect(screen.getByText('SLA Dashboard')).toBeInTheDocument()
-        expect(screen.queryByText('Support Area Summary')).not.toBeInTheDocument()
-      })
-    })
+        expect(screen.getByText("Analytics & Operations")).toBeInTheDocument();
+        expect(screen.getByText("SLA Dashboard")).toBeInTheDocument();
+        expect(screen.queryByText("Support Area Summary")).not.toBeInTheDocument();
+      });
+    });
 
-    it('shows all basic tabs for any authenticated user', async () => {
+    it("shows all basic tabs for any authenticated user", async () => {
       mockUseTeamFilter.mockReturnValue({
         hasFullAccess: false,
-        selectedTeam: 'tenant-team',
+        selectedTeam: "tenant-team",
         setSelectedTeam: jest.fn(),
-        effectiveTeams: ['tenant-team'],
-        allTeams: ['tenant-team'],
+        effectiveTeams: ["tenant-team"],
+        allTeams: ["tenant-team"],
         initialized: true,
-        teamScope: { mode: 'selected_teams' as const, teams: ['tenant-team'] },
+        teamScope: { mode: "selected_teams" as const, teams: ["tenant-team"] },
         hasNoTeamScope: false,
         isViewingAllTeams: false,
         isViewingAsEscalationTeam: false,
-      })
+      });
 
       mockUseAuth.mockReturnValue({
         user: {
-          id: 'user@example.com',
-          name: 'User',
-          email: 'user@example.com',
-          roles: ['user'],
+          id: "user@example.com",
+          name: "User",
+          email: "user@example.com",
+          roles: ["user"],
           teams: [],
         },
         isLoading: false,
@@ -446,15 +446,15 @@ describe('Dashboard - Support Area Summary visibility', () => {
         isEscalationTeam: false,
         isSupportEngineer: false,
         actualEscalationTeams: [],
-      })
+      });
 
-      renderDashboard()
+      renderDashboard();
 
       await waitFor(() => {
-        expect(screen.getByText('Home')).toBeInTheDocument()
-        expect(screen.getByText('Tickets')).toBeInTheDocument()
-        expect(screen.getByText('Escalations')).toBeInTheDocument()
-      })
-    })
-  })
-})
+        expect(screen.getByText("Home")).toBeInTheDocument();
+        expect(screen.getByText("Tickets")).toBeInTheDocument();
+        expect(screen.getByText("Escalations")).toBeInTheDocument();
+      });
+    });
+  });
+});

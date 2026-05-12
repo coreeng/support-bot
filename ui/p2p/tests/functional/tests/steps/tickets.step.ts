@@ -1,785 +1,770 @@
-import { Given, When, Then } from "@cucumber/cucumber";
+import { Given, Then, When } from "@cucumber/cucumber";
 import { expect } from "@playwright/test";
+import { readSortDirection, selectShadcnOption } from "../helpers/shadcn";
 import { CustomWorld } from "./custom-world";
-import { selectShadcnOption, readSortDirection } from "../helpers/shadcn";
 
 const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
 // Simple mock data
 const mockTicket = (id: string, status: string, team: string, impact: string) => ({
-    id,
-    status,
-    team: { name: team },
-    impact,
-    tags: [{ code: 'bug', label: 'Bug' }],
-    escalations: [],
-    logs: [
-        { event: 'opened', date: '2025-01-01T10:00:00Z' }
-    ],
-    query: { link: `https://slack.com/thread${id}` },
-    assignedTo: 'support-engineer-1@example.com'
+  id,
+  status,
+  team: { name: team },
+  impact,
+  tags: [{ code: "bug", label: "Bug" }],
+  escalations: [],
+  logs: [{ event: "opened", date: "2025-01-01T10:00:00Z" }],
+  query: { link: `https://slack.com/thread${id}` },
+  assignedTo: "support-engineer-1@example.com",
 });
 
 const mockTicketsData = {
-    content: [
-        mockTicket('1', 'opened', 'engineering', 'high'),
-        mockTicket('2', 'opened', 'support', 'medium'),
-        mockTicket('3', 'closed', 'engineering', 'low')
-    ],
-    page: 0,
-    totalPages: 1,
-    totalElements: 3
+  content: [
+    mockTicket("1", "opened", "engineering", "high"),
+    mockTicket("2", "opened", "support", "medium"),
+    mockTicket("3", "closed", "engineering", "low"),
+  ],
+  page: 0,
+  totalPages: 1,
+  totalElements: 3,
 };
 
 const mockTicketsMixedStatus = {
-    content: [
-        mockTicket('1', 'opened', 'engineering', 'high'),
-        mockTicket('2', 'opened', 'support', 'medium'),
-        mockTicket('3', 'closed', 'engineering', 'low'),
-        mockTicket('4', 'closed', 'support', 'low')
-    ],
-    page: 0,
-    totalPages: 1,
-    totalElements: 4
+  content: [
+    mockTicket("1", "opened", "engineering", "high"),
+    mockTicket("2", "opened", "support", "medium"),
+    mockTicket("3", "closed", "engineering", "low"),
+    mockTicket("4", "closed", "support", "low"),
+  ],
+  page: 0,
+  totalPages: 1,
+  totalElements: 4,
 };
 
 const mockTicketsEscalationsAndDates = {
-    content: [
-        {
-            ...mockTicket('1', 'closed', 'engineering', 'high'),
-            tags: ['bug'],
-            escalations: [{ id: 'esc-1', team: { name: 'Support Team' } }],
-            logs: [
-                { event: 'opened', date: '2025-01-01T10:00:00Z' },
-                { event: 'closed', date: '2025-01-03T10:00:00Z' }
-            ]
-        },
-        {
-            ...mockTicket('2', 'closed', 'support', 'medium'),
-            tags: ['urgent'],
-            escalations: [{ id: 'esc-2', team: { name: 'Platform Team' } }],
-            logs: [
-                { event: 'opened', date: '2025-01-02T10:00:00Z' },
-                { event: 'closed', date: '2025-01-04T10:00:00Z' }
-            ]
-        },
-        {
-            ...mockTicket('3', 'opened', 'qa', 'low'),
-            tags: ['doc'],
-            escalations: [{ id: 'esc-3', team: { name: 'Support Team' } }],
-            logs: [
-                { event: 'opened', date: '2025-01-03T10:00:00Z' }
-            ]
-        }
-    ],
-    page: 0,
-    totalPages: 1,
-    totalElements: 3
+  content: [
+    {
+      ...mockTicket("1", "closed", "engineering", "high"),
+      tags: ["bug"],
+      escalations: [{ id: "esc-1", team: { name: "Support Team" } }],
+      logs: [
+        { event: "opened", date: "2025-01-01T10:00:00Z" },
+        { event: "closed", date: "2025-01-03T10:00:00Z" },
+      ],
+    },
+    {
+      ...mockTicket("2", "closed", "support", "medium"),
+      tags: ["urgent"],
+      escalations: [{ id: "esc-2", team: { name: "Platform Team" } }],
+      logs: [
+        { event: "opened", date: "2025-01-02T10:00:00Z" },
+        { event: "closed", date: "2025-01-04T10:00:00Z" },
+      ],
+    },
+    {
+      ...mockTicket("3", "opened", "qa", "low"),
+      tags: ["doc"],
+      escalations: [{ id: "esc-3", team: { name: "Support Team" } }],
+      logs: [{ event: "opened", date: "2025-01-03T10:00:00Z" }],
+    },
+  ],
+  page: 0,
+  totalPages: 1,
+  totalElements: 3,
 };
 
 const mockTeamsData = [
-    { name: 'engineering', code: 'engineering', label: 'Engineering', types: ['tenant'] },
-    { name: 'support', code: 'support', label: 'Support', types: ['tenant'] }
+  { name: "engineering", code: "engineering", label: "Engineering", types: ["tenant"] },
+  { name: "support", code: "support", label: "Support", types: ["tenant"] },
 ];
 
 const mockTeamSuggestionsData = {
-    suggestedTeams: ['engineering'],
-    otherTeams: ['support']
+  suggestedTeams: ["engineering"],
+  otherTeams: ["support"],
 };
 
 const mockTicketsWithSummaries = {
-    content: [
-        {
-            ...mockTicket('1', 'opened', 'engineering', 'high'),
-            summary: 'Cache invalidation issue causing stale data in production'
-        },
-        {
-            ...mockTicket('2', 'closed', 'support', 'medium'),
-            summary: null
-        },
-        {
-            ...mockTicket('3', 'opened', 'qa', 'low'),
-            summary: 'Flaky integration test in CI pipeline needs retry logic'
-        }
-    ],
-    page: 0,
-    totalPages: 1,
-    totalElements: 3
+  content: [
+    {
+      ...mockTicket("1", "opened", "engineering", "high"),
+      summary: "Cache invalidation issue causing stale data in production",
+    },
+    {
+      ...mockTicket("2", "closed", "support", "medium"),
+      summary: null,
+    },
+    {
+      ...mockTicket("3", "opened", "qa", "low"),
+      summary: "Flaky integration test in CI pipeline needs retry logic",
+    },
+  ],
+  page: 0,
+  totalPages: 1,
+  totalElements: 3,
 };
 
 const mockTicketDetailsWithSummary = {
-    id: '1',
-    status: 'opened',
-    team: { name: 'engineering' },
-    impact: 'high',
-    tags: ['bug'],
-    escalations: [],
-    logs: [
-        { event: 'ticket opened', date: '2025-01-01T10:00:00Z' }
-    ],
-    query: { link: 'https://slack.com/thread1', text: 'Original slack message about cache issue' },
-    assignedTo: 'support-engineer-1@example.com',
-    summary: 'Cache invalidation issue causing stale data in production'
+  id: "1",
+  status: "opened",
+  team: { name: "engineering" },
+  impact: "high",
+  tags: ["bug"],
+  escalations: [],
+  logs: [{ event: "ticket opened", date: "2025-01-01T10:00:00Z" }],
+  query: { link: "https://slack.com/thread1", text: "Original slack message about cache issue" },
+  assignedTo: "support-engineer-1@example.com",
+  summary: "Cache invalidation issue causing stale data in production",
 };
 
 const mockTicketDetailsWithoutSummary = {
-    id: '2',
-    status: 'closed',
-    team: { name: 'support' },
-    impact: 'medium',
-    tags: ['bug'],
-    escalations: [],
-    logs: [
-        { event: 'ticket opened', date: '2025-01-01T10:00:00Z' }
-    ],
-    query: { link: 'https://slack.com/thread2' },
-    assignedTo: 'support-engineer-1@example.com',
-    summary: null
+  id: "2",
+  status: "closed",
+  team: { name: "support" },
+  impact: "medium",
+  tags: ["bug"],
+  escalations: [],
+  logs: [{ event: "ticket opened", date: "2025-01-01T10:00:00Z" }],
+  query: { link: "https://slack.com/thread2" },
+  assignedTo: "support-engineer-1@example.com",
+  summary: null,
 };
 
 const mockRegistryData = {
-    impacts: [
-        { code: 'high', label: 'High Impact' },
-        { code: 'medium', label: 'Medium Impact' },
-        { code: 'low', label: 'Low Impact' }
-    ],
-    tags: [
-        { code: 'bug', label: 'Bug' },
-        { code: 'urgent', label: 'Urgent' }
-    ]
+  impacts: [
+    { code: "high", label: "High Impact" },
+    { code: "medium", label: "Medium Impact" },
+    { code: "low", label: "Low Impact" },
+  ],
+  tags: [
+    { code: "bug", label: "Bug" },
+    { code: "urgent", label: "Urgent" },
+  ],
 };
 
 const mockTicketDetails = {
-    id: '1',
-    status: 'opened',
-    team: { name: 'engineering' },
-    impact: 'high',
-    tags: ['bug'],
-    escalations: [],
-    logs: [
-        { event: 'ticket opened', date: '2025-01-01T10:00:00Z' }
-    ],
-    query: { link: 'https://slack.com/thread1' },
-    assignedTo: 'support-engineer-1@example.com'
+  id: "1",
+  status: "opened",
+  team: { name: "engineering" },
+  impact: "high",
+  tags: ["bug"],
+  escalations: [],
+  logs: [{ event: "ticket opened", date: "2025-01-01T10:00:00Z" }],
+  query: { link: "https://slack.com/thread1" },
+  assignedTo: "support-engineer-1@example.com",
 };
 
 // Setup mocks
 Given("Tickets API endpoints are mocked", async function (this: CustomWorld) {
-    await this.page.route("**/api/tickets**", (route) => {
-        const url = route.request().url();
-        if (url.includes('/team-suggestions')) {
-            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamSuggestionsData) });
-            return;
-        }
-        if (url.includes('/tickets/1')) {
-            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketDetails) });
-        } else {
-            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketsData) });
-        }
-    });
+  await this.page.route("**/api/tickets**", (route) => {
+    const url = route.request().url();
+    if (url.includes("/team-suggestions")) {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTeamSuggestionsData) });
+      return;
+    }
+    if (url.includes("/tickets/1")) {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTicketDetails) });
+    } else {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTicketsData) });
+    }
+  });
 
-    await this.page.route("**/api/teams?type=TENANT*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
-    );
+  await this.page.route("**/api/teams?type=TENANT*", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTeamsData) })
+  );
 
-    await this.page.route("**/api/registry*", (route) =>
-        route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
-        })
-    );
+  await this.page.route("**/api/registry*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags }),
+    })
+  );
 });
 
 Given("Tickets API endpoints are mocked with sample data", async function (this: CustomWorld) {
-    await this.page.route("**/api/tickets**", (route) => {
-        const url = route.request().url();
-        const method = route.request().method();
+  await this.page.route("**/api/tickets**", (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
 
-        if (method === 'PATCH') {
-            const updatedTicket = {
-                ...mockTicketDetails,
-                status: 'closed',
-                tags: ['bug', 'urgent']
-            };
-            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(updatedTicket) });
-            return;
-        }
+    if (method === "PATCH") {
+      const updatedTicket = {
+        ...mockTicketDetails,
+        status: "closed",
+        tags: ["bug", "urgent"],
+      };
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(updatedTicket) });
+      return;
+    }
 
-        if (url.includes('/team-suggestions')) {
-            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamSuggestionsData) });
-            return;
-        }
+    if (url.includes("/team-suggestions")) {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTeamSuggestionsData) });
+      return;
+    }
 
-        if (url.includes('/tickets/1')) {
-            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketDetails) });
-        } else {
-            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketsData) });
-        }
-    });
+    if (url.includes("/tickets/1")) {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTicketDetails) });
+    } else {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTicketsData) });
+    }
+  });
 
-    await this.page.route("**/api/teams?type=TENANT*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
-    );
+  await this.page.route("**/api/teams?type=TENANT*", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTeamsData) })
+  );
 
-    await this.page.route("**/api/registry*", (route) =>
-        route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
-        })
-    );
+  await this.page.route("**/api/registry*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags }),
+    })
+  );
 });
 
 Given("Tickets API endpoints are mocked with mixed statuses", async function (this: CustomWorld) {
-    await this.page.route("**/api/tickets?*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketsMixedStatus) })
-    );
-    await this.page.route("**/api/teams?type=TENANT*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
-    );
-    await this.page.route("**/api/registry*", (route) =>
-        route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
-        })
-    );
+  await this.page.route("**/api/tickets?*", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTicketsMixedStatus) })
+  );
+  await this.page.route("**/api/teams?type=TENANT*", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTeamsData) })
+  );
+  await this.page.route("**/api/registry*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags }),
+    })
+  );
 });
 
 Given("Tickets API returns empty list", async function (this: CustomWorld) {
-    await this.page.route("**/api/tickets?*", (route) =>
-        route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ content: [], page: 0, totalPages: 0, totalElements: 0 })
-        })
-    );
-    await this.page.route("**/api/teams?type=TENANT*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
-    );
-    await this.page.route("**/api/registry*", (route) =>
-        route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
-        })
-    );
+  await this.page.route("**/api/tickets?*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ content: [], page: 0, totalPages: 0, totalElements: 0 }),
+    })
+  );
+  await this.page.route("**/api/teams?type=TENANT*", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTeamsData) })
+  );
+  await this.page.route("**/api/registry*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags }),
+    })
+  );
 });
 
 Given("Tickets API endpoints are mocked with escalations and varied dates", async function (this: CustomWorld) {
-    await this.page.route("**/api/tickets**", (route) =>
-        route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(mockTicketsEscalationsAndDates)
-        })
-    );
+  await this.page.route("**/api/tickets**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(mockTicketsEscalationsAndDates),
+    })
+  );
 
-    await this.page.route("**/api/teams?type=TENANT*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
-    );
+  await this.page.route("**/api/teams?type=TENANT*", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTeamsData) })
+  );
 
-    await this.page.route("**/api/registry*", (route) =>
-        route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
-        })
-    );
+  await this.page.route("**/api/registry*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags }),
+    })
+  );
 });
 
 Given("Tickets API endpoints are mocked with summaries", async function (this: CustomWorld) {
-    await this.page.route("**/api/tickets**", (route) => {
-        const url = route.request().url();
-        if (url.includes('/team-suggestions')) {
-            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamSuggestionsData) });
-            return;
-        }
-        if (url.includes('/tickets/1')) {
-            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketDetailsWithSummary) });
-        } else if (url.includes('/tickets/2')) {
-            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketDetailsWithoutSummary) });
-        } else {
-            route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTicketsWithSummaries) });
-        }
-    });
+  await this.page.route("**/api/tickets**", (route) => {
+    const url = route.request().url();
+    if (url.includes("/team-suggestions")) {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTeamSuggestionsData) });
+      return;
+    }
+    if (url.includes("/tickets/1")) {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTicketDetailsWithSummary) });
+    } else if (url.includes("/tickets/2")) {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTicketDetailsWithoutSummary) });
+    } else {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTicketsWithSummaries) });
+    }
+  });
 
-    await this.page.route("**/api/teams?type=TENANT*", (route) =>
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mockTeamsData) })
-    );
+  await this.page.route("**/api/teams?type=TENANT*", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(mockTeamsData) })
+  );
 
-    await this.page.route("**/api/registry*", (route) =>
-        route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags })
-        })
-    );
+  await this.page.route("**/api/registry*", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ impacts: mockRegistryData.impacts, tags: mockRegistryData.tags }),
+    })
+  );
 });
 
 // Navigation
 When("User navigates to the tickets page", async function (this: CustomWorld) {
-    await this.page.goto(`${BASE_URL}/`, {
-        waitUntil: 'domcontentloaded',
-        timeout: 10000
-    });
+  await this.page.goto(`${BASE_URL}/`, {
+    waitUntil: "domcontentloaded",
+    timeout: 10000,
+  });
 
-    // Sidebar hydration sentinel: the Tickets nav link is always rendered.
-    const ticketsNav = this.page.getByRole('link', { name: /^Tickets$/i });
-    await ticketsNav.waitFor({ state: 'visible', timeout: 5000 });
-    await ticketsNav.click();
+  // Sidebar hydration sentinel: the Tickets nav link is always rendered.
+  const ticketsNav = this.page.getByRole("link", { name: /^Tickets$/i });
+  await ticketsNav.waitFor({ state: "visible", timeout: 5000 });
+  await ticketsNav.click();
 
-    // Wait for page to load
-    await this.page.waitForTimeout(500);
+  // Wait for page to load
+  await this.page.waitForTimeout(500);
 });
 
 // Actions
 When("User selects {string} from status filter", async function (this: CustomWorld, status: string) {
-    await this.page.locator('table').waitFor({ state: 'visible', timeout: 5000 });
-    await this.page.waitForTimeout(500); // React hydration
+  await this.page.locator("table").waitFor({ state: "visible", timeout: 5000 });
+  await this.page.waitForTimeout(500); // React hydration
 
-    // SingleSelectFilter renders a button trigger labelled "Status".
-    const statusFilter = this.page.getByRole('button', { name: /Status/i }).first();
-    // Map the legacy values opened/closed to the labels the new picker shows.
-    const optionLabel = status.toLowerCase() === 'opened' ? /Opened/i
-        : status.toLowerCase() === 'closed' ? /Closed/i
-        : new RegExp(status, 'i');
-    await selectShadcnOption(this.page, statusFilter, optionLabel);
-    await this.page.waitForTimeout(2000);
+  // SingleSelectFilter renders a button trigger labelled "Status".
+  const statusFilter = this.page.getByRole("button", { name: /Status/i }).first();
+  // Map the legacy values opened/closed to the labels the new picker shows.
+  const optionLabel =
+    status.toLowerCase() === "opened" ? /Opened/i : status.toLowerCase() === "closed" ? /Closed/i : new RegExp(status, "i");
+  await selectShadcnOption(this.page, statusFilter, optionLabel);
+  await this.page.waitForTimeout(2000);
 });
 
 When("User clicks on the first ticket", async function (this: CustomWorld) {
-    const firstRow = this.page.locator('tbody tr').first();
-    await expect(firstRow).toBeVisible({ timeout: 5000 });
-    await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+  const firstRow = this.page.locator("tbody tr").first();
+  await expect(firstRow).toBeVisible({ timeout: 5000 });
+  await this.page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
 
-    // Click and wait for modal
-    await firstRow.click({ force: true });
+  // Click and wait for modal
+  await firstRow.click({ force: true });
 
-    // Wait for modal to appear and ticket data to load
-    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    const loading = this.page.locator('text=/Loading ticket details/i');
-    await Promise.race([
-        modal.waitFor({ state: 'visible', timeout: 10000 }),
-        loading.waitFor({ state: 'visible', timeout: 10000 })
-    ]);
-    // Ensure modal is visible (even if still loading)
-    await expect(modal).toBeVisible({ timeout: 10000 });
-    // Give a brief moment for hydration
-    await this.page.waitForTimeout(300);
+  // Wait for modal to appear and ticket data to load
+  const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+  const loading = this.page.locator("text=/Loading ticket details/i");
+  await Promise.race([modal.waitFor({ state: "visible", timeout: 10000 }), loading.waitFor({ state: "visible", timeout: 10000 })]);
+  // Ensure modal is visible (even if still loading)
+  await expect(modal).toBeVisible({ timeout: 10000 });
+  // Give a brief moment for hydration
+  await this.page.waitForTimeout(300);
 });
 
 When("User selects {string} from escalated to filter", async function (this: CustomWorld, teamName: string) {
-    await this.page.locator('table').waitFor({ state: 'visible', timeout: 5000 });
-    const escalatedToFilter = this.page.getByRole('button', { name: /Escalated To/i }).first();
-    await selectShadcnOption(this.page, escalatedToFilter, new RegExp(teamName, 'i'));
-    await this.page.waitForTimeout(800);
+  await this.page.locator("table").waitFor({ state: "visible", timeout: 5000 });
+  const escalatedToFilter = this.page.getByRole("button", { name: /Escalated To/i }).first();
+  await selectShadcnOption(this.page, escalatedToFilter, new RegExp(teamName, "i"));
+  await this.page.waitForTimeout(800);
 });
 
 When("User sorts tickets by opened at", async function (this: CustomWorld) {
-    await this.page.locator('table').waitFor({ state: 'visible', timeout: 5000 });
-    const openedHeader = this.page.locator('thead th', { hasText: 'Opened At' });
-    if ((await readSortDirection(openedHeader)) !== 'desc') {
-        await openedHeader.click();
-    }
-    await this.page.waitForTimeout(500);
+  await this.page.locator("table").waitFor({ state: "visible", timeout: 5000 });
+  const openedHeader = this.page.locator("thead th", { hasText: "Opened At" });
+  if ((await readSortDirection(openedHeader)) !== "desc") {
+    await openedHeader.click();
+  }
+  await this.page.waitForTimeout(500);
 });
 
 When("User toggles opened at sort", async function (this: CustomWorld) {
-    await this.page.locator('thead th', { hasText: 'Opened At' }).click();
-    await this.page.waitForTimeout(500);
+  await this.page.locator("thead th", { hasText: "Opened At" }).click();
+  await this.page.waitForTimeout(500);
 });
 
 When("User sorts tickets by closed at", async function (this: CustomWorld) {
-    const closedHeader = this.page.locator('thead th', { hasText: 'Closed At' });
-    if ((await readSortDirection(closedHeader)) !== 'desc') {
-        await closedHeader.click();
-    }
-    await this.page.waitForTimeout(500);
+  const closedHeader = this.page.locator("thead th", { hasText: "Closed At" });
+  if ((await readSortDirection(closedHeader)) !== "desc") {
+    await closedHeader.click();
+  }
+  await this.page.waitForTimeout(500);
 });
 
 // Assertions
 Then("Tickets table should be visible", async function (this: CustomWorld) {
-    const table = this.page.locator('table');
-    await expect(table).toBeVisible({ timeout: 5000 });
+  const table = this.page.locator("table");
+  await expect(table).toBeVisible({ timeout: 5000 });
 });
 
 Then("Tickets table should have required headers", async function (this: CustomWorld) {
-    await expect(this.page.locator('thead th', { hasText: 'Status' })).toBeVisible();
-    await expect(this.page.locator('thead th', { hasText: 'Team' })).toBeVisible();
-    await expect(this.page.locator('thead th', { hasText: 'Impact' })).toBeVisible();
-    await expect(this.page.locator('thead th', { hasText: 'Tags' })).toBeVisible();
-    await expect(this.page.locator('thead th', { hasText: 'Escalated To' })).toBeVisible();
+  await expect(this.page.locator("thead th", { hasText: "Status" })).toBeVisible();
+  await expect(this.page.locator("thead th", { hasText: "Team" })).toBeVisible();
+  await expect(this.page.locator("thead th", { hasText: "Impact" })).toBeVisible();
+  await expect(this.page.locator("thead th", { hasText: "Tags" })).toBeVisible();
+  await expect(this.page.locator("thead th", { hasText: "Escalated To" })).toBeVisible();
 });
 
 Then("Tickets should display status information", async function (this: CustomWorld) {
-    // Check that status text is visible in the first column
-    const firstStatusCell = this.page.locator('tbody tr td').first();
-    await expect(firstStatusCell).toBeVisible({ timeout: 5000 });
-    // Verify it contains a status value
-    const text = await firstStatusCell.textContent();
-    expect(text).toBeTruthy();
+  // Check that status text is visible in the first column
+  const firstStatusCell = this.page.locator("tbody tr td").first();
+  await expect(firstStatusCell).toBeVisible({ timeout: 5000 });
+  // Verify it contains a status value
+  const text = await firstStatusCell.textContent();
+  expect(text).toBeTruthy();
 });
 
 Then("Tickets should display team information", async function (this: CustomWorld) {
-    // Just verify table has rows with data
-    const rows = this.page.locator('tbody tr');
-    await expect(rows.first()).toBeVisible({ timeout: 5000 });
+  // Just verify table has rows with data
+  const rows = this.page.locator("tbody tr");
+  await expect(rows.first()).toBeVisible({ timeout: 5000 });
 });
 
 Then("Tickets should display impact information", async function (this: CustomWorld) {
-    // Just verify rows are visible with content
-    const rows = this.page.locator('tbody tr');
-    const count = await rows.count();
-    expect(count).toBeGreaterThan(0);
+  // Just verify rows are visible with content
+  const rows = this.page.locator("tbody tr");
+  const count = await rows.count();
+  expect(count).toBeGreaterThan(0);
 });
 
 Then("Tickets should display tags information", async function (this: CustomWorld) {
-    const bodyText = await this.page.locator('tbody').textContent();
-    expect(bodyText).toBeTruthy();
-    expect(bodyText).toMatch(/bug|urgent|doc/i);
+  const bodyText = await this.page.locator("tbody").textContent();
+  expect(bodyText).toBeTruthy();
+  expect(bodyText).toMatch(/bug|urgent|doc/i);
 });
 
 Then("Tickets should display escalated to information", async function (this: CustomWorld) {
-    await expect(this.page.locator('thead th', { hasText: 'Escalated To' })).toBeVisible();
-    const firstEscalatedToCell = this.page.locator('tbody tr td').nth(6);
-    await expect(firstEscalatedToCell).toBeVisible();
-    const cellText = (await firstEscalatedToCell.textContent()) || '';
-    expect(cellText.trim().length).toBeGreaterThan(0);
+  await expect(this.page.locator("thead th", { hasText: "Escalated To" })).toBeVisible();
+  const firstEscalatedToCell = this.page.locator("tbody tr td").nth(6);
+  await expect(firstEscalatedToCell).toBeVisible();
+  const cellText = (await firstEscalatedToCell.textContent()) || "";
+  expect(cellText.trim().length).toBeGreaterThan(0);
 });
 
 Then("Only opened tickets should be displayed", async function (this: CustomWorld) {
-    // Wait for pagination to settle
-    await this.page.waitForTimeout(500);
+  // Wait for pagination to settle
+  await this.page.waitForTimeout(500);
 
-    // The key test: verify NO closed tickets are visible
-    const allText = await this.page.locator('tbody').textContent();
-    expect(allText).not.toContain('closed');
+  // The key test: verify NO closed tickets are visible
+  const allText = await this.page.locator("tbody").textContent();
+  expect(allText).not.toContain("closed");
 
-    // And verify we have at least some tickets showing
-    const rows = this.page.locator('tbody tr');
-    const count = await rows.count();
-    expect(count).toBeGreaterThan(0);
+  // And verify we have at least some tickets showing
+  const rows = this.page.locator("tbody tr");
+  const count = await rows.count();
+  expect(count).toBeGreaterThan(0);
 });
 
 Then("Only tickets escalated to {string} should be displayed", async function (this: CustomWorld, teamName: string) {
-    const bodyText = await this.page.locator('tbody').textContent();
-    expect(bodyText).toContain(teamName);
+  const bodyText = await this.page.locator("tbody").textContent();
+  expect(bodyText).toContain(teamName);
 
-    const nonMatching = teamName === 'Support Team' ? 'Platform Team' : 'Support Team';
-    expect(bodyText).not.toContain(nonMatching);
+  const nonMatching = teamName === "Support Team" ? "Platform Team" : "Support Team";
+  expect(bodyText).not.toContain(nonMatching);
 });
 
 Then("Tickets should be sorted by opened at descending", async function (this: CustomWorld) {
-    const firstTeamCellText = await this.page.locator('tbody tr').first().locator('td').nth(2).textContent();
-    expect((firstTeamCellText || '').trim().toLowerCase()).toBe('qa');
+  const firstTeamCellText = await this.page.locator("tbody tr").first().locator("td").nth(2).textContent();
+  expect((firstTeamCellText || "").trim().toLowerCase()).toBe("qa");
 });
 
 Then("Tickets should be sorted by opened at ascending", async function (this: CustomWorld) {
-    const firstTeamCellText = await this.page.locator('tbody tr').first().locator('td').nth(2).textContent();
-    expect((firstTeamCellText || '').trim().toLowerCase()).toBe('engineering');
+  const firstTeamCellText = await this.page.locator("tbody tr").first().locator("td").nth(2).textContent();
+  expect((firstTeamCellText || "").trim().toLowerCase()).toBe("engineering");
 });
 
 Then("Tickets should be sorted by closed at descending", async function (this: CustomWorld) {
-    const firstTeamCellText = await this.page.locator('tbody tr').first().locator('td').nth(2).textContent();
-    expect((firstTeamCellText || '').trim().toLowerCase()).toBe('support');
+  const firstTeamCellText = await this.page.locator("tbody tr").first().locator("td").nth(2).textContent();
+  expect((firstTeamCellText || "").trim().toLowerCase()).toBe("support");
 });
 
 Then("Ticket details panel should appear", async function (this: CustomWorld) {
-    // Check that the modal appears when ticket is clicked
-    // The modal should be visible with ticket details
-    const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
-    await expect(modal).toBeVisible({ timeout: 5000 });
+  // Check that the modal appears when ticket is clicked
+  // The modal should be visible with ticket details
+  const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
+  await expect(modal).toBeVisible({ timeout: 5000 });
 
-    // Verify the table is still visible in the background
-    const table = this.page.locator('table');
-    await expect(table).toBeVisible();
+  // Verify the table is still visible in the background
+  const table = this.page.locator("table");
+  await expect(table).toBeVisible();
 });
 
 Then("Ticket details should show the ticket ID", async function (this: CustomWorld) {
-    // The modal should display the ticket ID
-    const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
-    await expect(modal).toBeVisible({ timeout: 5000 });
+  // The modal should display the ticket ID
+  const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
+  await expect(modal).toBeVisible({ timeout: 5000 });
 
-    // Check for ticket ID in the modal (format: "Ticket #123" or similar)
-    const ticketIdPattern = /Ticket\s*#?\s*\d+/i;
-    const modalText = await modal.textContent();
-    expect(modalText).toMatch(ticketIdPattern);
+  // Check for ticket ID in the modal (format: "Ticket #123" or similar)
+  const ticketIdPattern = /Ticket\s*#?\s*\d+/i;
+  const modalText = await modal.textContent();
+  expect(modalText).toMatch(ticketIdPattern);
 });
 
 // Edit ticket functionality steps
 Given("User is a support engineer", async function (this: CustomWorld) {
-    // Override the default session from hooks.ts to be support engineer only
-    try { await this.page.unroute('**/api/auth/session'); } catch {}
+  // Override the default session from hooks.ts to be support engineer only
+  try {
+    await this.page.unroute("**/api/auth/session");
+  } catch {}
 
-    // Ensure middleware bypass cookie exists for functional tests
-    const baseUrl = process.env.SERVICE_ENDPOINT || 'http://localhost:3000';
+  // Ensure middleware bypass cookie exists for functional tests
+  const baseUrl = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
-    await this.context.addCookies([
-        {
-            name: '__e2e_auth_bypass',
-            value: 'functional-test',
-            url: baseUrl,
-            httpOnly: false,
-            secure: false,
-            sameSite: 'Lax'
-        }
-    ]);
+  await this.context.addCookies([
+    {
+      name: "__e2e_auth_bypass",
+      value: "functional-test",
+      url: baseUrl,
+      httpOnly: false,
+      secure: false,
+      sameSite: "Lax",
+    },
+  ]);
 
-    await this.page.route('**/api/auth/session', async (route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                user: {
-                    id: "support@example.com",
-                    email: "support@example.com",
-                    name: "Support Engineer",
-                    teams: [
-                        { name: "support-engineers", code: "support-engineers", label: "Support Engineers", types: ["support"] }
-                    ],
-                    roles: ["USER", "SUPPORT_ENGINEER"],
-                },
-                expires: new Date(Date.now() + 86400000).toISOString()
-            })
-        });
+  await this.page.route("**/api/auth/session", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        user: {
+          id: "support@example.com",
+          email: "support@example.com",
+          name: "Support Engineer",
+          teams: [{ name: "support-engineers", code: "support-engineers", label: "Support Engineers", types: ["support"] }],
+          roles: ["USER", "SUPPORT_ENGINEER"],
+        },
+        expires: new Date(Date.now() + 86400000).toISOString(),
+      }),
     });
+  });
 
-    // Navigate to trigger session reload
-    await this.page.goto(BASE_URL);
-    await this.page.waitForTimeout(2000);
+  // Navigate to trigger session reload
+  await this.page.goto(BASE_URL);
+  await this.page.waitForTimeout(2000);
 });
 
 Given("User is not a support engineer", async function (this: CustomWorld) {
-    // Override the default session from hooks.ts to be non-support engineer
-    try { await this.page.unroute('**/api/auth/session'); } catch {}
+  // Override the default session from hooks.ts to be non-support engineer
+  try {
+    await this.page.unroute("**/api/auth/session");
+  } catch {}
 
-    // Ensure middleware bypass cookie exists for functional tests
-    const baseUrl = process.env.SERVICE_ENDPOINT || 'http://localhost:3000';
+  // Ensure middleware bypass cookie exists for functional tests
+  const baseUrl = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
-    await this.context.addCookies([
-        {
-            name: '__e2e_auth_bypass',
-            value: 'functional-test',
-            url: baseUrl,
-            httpOnly: false,
-            secure: false,
-            sameSite: 'Lax'
-        }
-    ]);
+  await this.context.addCookies([
+    {
+      name: "__e2e_auth_bypass",
+      value: "functional-test",
+      url: baseUrl,
+      httpOnly: false,
+      secure: false,
+      sameSite: "Lax",
+    },
+  ]);
 
-    await this.page.route('**/api/auth/session', async (route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-                user: {
-                    id: "user@example.com",
-                    email: "user@example.com",
-                    name: "Regular User",
-                    teams: [
-                        { name: "engineering", code: "engineering", label: "Engineering", types: ["tenant"] }
-                    ],
-                    roles: ["USER"],
-                },
-                expires: new Date(Date.now() + 86400000).toISOString()
-            })
-        });
+  await this.page.route("**/api/auth/session", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        user: {
+          id: "user@example.com",
+          email: "user@example.com",
+          name: "Regular User",
+          teams: [{ name: "engineering", code: "engineering", label: "Engineering", types: ["tenant"] }],
+          roles: ["USER"],
+        },
+        expires: new Date(Date.now() + 86400000).toISOString(),
+      }),
     });
+  });
 
-    // Navigate to trigger session reload
-    await this.page.goto(BASE_URL);
-    await this.page.waitForTimeout(2000);
+  // Navigate to trigger session reload
+  await this.page.goto(BASE_URL);
+  await this.page.waitForTimeout(2000);
 });
 
 Then("Ticket edit modal should appear", async function (this: CustomWorld) {
-    // Wait for modal to appear - it might take a moment after clicking
-    await this.page.waitForTimeout(1000);
+  // Wait for modal to appear - it might take a moment after clicking
+  await this.page.waitForTimeout(1000);
 
-    // Try multiple selectors for the modal
-    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+  // Try multiple selectors for the modal
+  const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
 
-    await expect(modal).toBeVisible({ timeout: 15000 });
+  await expect(modal).toBeVisible({ timeout: 15000 });
 
-    // Wait for loading to complete if present
-    const loadingText = modal.locator('text=/Loading ticket details/i');
-    if (await loadingText.count() > 0) {
-        await expect(loadingText).not.toBeVisible({ timeout: 15000 });
-    }
+  // Wait for loading to complete if present
+  const loadingText = modal.locator("text=/Loading ticket details/i");
+  if ((await loadingText.count()) > 0) {
+    await expect(loadingText).not.toBeVisible({ timeout: 15000 });
+  }
 
-    // Verify modal has content - wait for ticket ID to appear
-    await expect(modal.locator('text=/Ticket #/i')).toBeVisible({ timeout: 10000 });
+  // Verify modal has content - wait for ticket ID to appear
+  await expect(modal.locator("text=/Ticket #/i")).toBeVisible({ timeout: 10000 });
 });
 
 Then("Modal should show editable fields", async function (this: CustomWorld) {
-    // Wait for modal to be stable
-    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    await expect(modal).toBeVisible({ timeout: 15000 });
+  // Wait for modal to be stable
+  const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+  await expect(modal).toBeVisible({ timeout: 15000 });
 
-    // Wait for content to load - check for ticket ID first
-    await expect(modal.locator('text=/Ticket #/i')).toBeVisible({ timeout: 10000 });
+  // Wait for content to load - check for ticket ID first
+  await expect(modal.locator("text=/Ticket #/i")).toBeVisible({ timeout: 10000 });
 
-    // Wait for loading to complete - check that "Loading ticket details" is not visible
-    const loadingIndicator = modal.locator('text=/Loading ticket details/i');
-    if (await loadingIndicator.count() > 0) {
-        await expect(loadingIndicator).not.toBeVisible({ timeout: 15000 });
-    }
+  // Wait for loading to complete - check that "Loading ticket details" is not visible
+  const loadingIndicator = modal.locator("text=/Loading ticket details/i");
+  if ((await loadingIndicator.count()) > 0) {
+    await expect(loadingIndicator).not.toBeVisible({ timeout: 15000 });
+  }
 
-    // Wait a bit more for all content to render
-    await this.page.waitForTimeout(800);
+  // Wait a bit more for all content to render
+  await this.page.waitForTimeout(800);
 
-    // Verify modal is still visible
-    await expect(modal).toBeVisible();
+  // Verify modal is still visible
+  await expect(modal).toBeVisible();
 
-    // Check for Save Changes button (implies edit mode rendered)
-    const saveButton = modal.locator('button:has-text("Save Changes")');
-    await expect(saveButton).toBeVisible({ timeout: 5000 });
+  // Check for Save Changes button (implies edit mode rendered)
+  const saveButton = modal.locator('button:has-text("Save Changes")');
+  await expect(saveButton).toBeVisible({ timeout: 5000 });
 });
 
 Then("Modal should show read-only view", async function (this: CustomWorld) {
-    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    await expect(modal).toBeVisible({ timeout: 5000 });
+  const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+  await expect(modal).toBeVisible({ timeout: 5000 });
 
-    // Check for read-only indicator - it's in the title
-    const readOnlyText = modal.locator('text=/Read-only/i');
-    await expect(readOnlyText).toBeVisible({ timeout: 5000 });
+  // Check for read-only indicator - it's in the title
+  const readOnlyText = modal.locator("text=/Read-only/i");
+  await expect(readOnlyText).toBeVisible({ timeout: 5000 });
 
-    // Should not have editable selects
-    const selects = modal.locator('select');
-    const count = await selects.count();
-    expect(count).toBe(0);
+  // Should not have editable selects
+  const selects = modal.locator("select");
+  const count = await selects.count();
+  expect(count).toBe(0);
 });
 
 Then('"Save Changes" button should not be visible', async function (this: CustomWorld) {
-    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    const saveButton = modal.locator('button:has-text("Save Changes")');
-    await expect(saveButton).not.toBeVisible();
+  const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+  const saveButton = modal.locator('button:has-text("Save Changes")');
+  await expect(saveButton).not.toBeVisible();
 });
 
 Then('"Close" button should be visible', async function (this: CustomWorld) {
-    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    const closeButton = modal.locator('button:has-text("Close")').first();
-    await expect(closeButton).toBeVisible();
+  const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+  const closeButton = modal.locator('button:has-text("Close")').first();
+  await expect(closeButton).toBeVisible();
 });
 
-When('User changes ticket status to {string}', async function (this: CustomWorld, status: string) {
-    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    await expect(modal).toBeVisible({ timeout: 5000 });
+When("User changes ticket status to {string}", async function (this: CustomWorld, status: string) {
+  const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+  await expect(modal).toBeVisible({ timeout: 5000 });
 
-    const statusTrigger = modal.locator('#status-select');
-    await selectShadcnOption(this.page, statusTrigger, new RegExp(status, 'i'));
+  const statusTrigger = modal.locator("#status-select");
+  await selectShadcnOption(this.page, statusTrigger, new RegExp(status, "i"));
 });
 
-When('User selects impact {string}', async function (this: CustomWorld, impact: string) {
-    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    const impactTrigger = modal.locator('#impact-select');
-    await selectShadcnOption(this.page, impactTrigger, new RegExp(impact, 'i'));
+When("User selects impact {string}", async function (this: CustomWorld, impact: string) {
+  const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+  const impactTrigger = modal.locator("#impact-select");
+  await selectShadcnOption(this.page, impactTrigger, new RegExp(impact, "i"));
 });
 
-When('User selects team {string}', async function (this: CustomWorld, team: string) {
-    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    const teamTrigger = modal.locator('#team-select');
-    await selectShadcnOption(this.page, teamTrigger, new RegExp(team, 'i'));
+When("User selects team {string}", async function (this: CustomWorld, team: string) {
+  const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+  const teamTrigger = modal.locator("#team-select");
+  await selectShadcnOption(this.page, teamTrigger, new RegExp(team, "i"));
 });
 
-When('User adds tag {string}', async function (this: CustomWorld, tag: string) {
-    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    const tagsTrigger = modal.locator('#tags-select');
-    await expect(tagsTrigger).toBeVisible({ timeout: 5000 });
-    await this.page.waitForTimeout(500);
-    // MultiSelect opens a popover with checkbox options on click.
-    await tagsTrigger.click();
-    const option = this.page.getByRole('option', { name: new RegExp(tag, 'i') });
-    await option.first().waitFor({ state: 'visible', timeout: 5000 });
-    await option.first().click();
-    // Close the popover so the next click target is reachable.
-    await this.page.keyboard.press('Escape');
+When("User adds tag {string}", async function (this: CustomWorld, tag: string) {
+  const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+  const tagsTrigger = modal.locator("#tags-select");
+  await expect(tagsTrigger).toBeVisible({ timeout: 5000 });
+  await this.page.waitForTimeout(500);
+  // MultiSelect opens a popover with checkbox options on click.
+  await tagsTrigger.click();
+  const option = this.page.getByRole("option", { name: new RegExp(tag, "i") });
+  await option.first().waitFor({ state: "visible", timeout: 5000 });
+  await option.first().click();
+  // Close the popover so the next click target is reachable.
+  await this.page.keyboard.press("Escape");
 });
 
-When('User clicks {string}', async function (this: CustomWorld, buttonText: string) {
-    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    const button = modal.locator(`button:has-text("${buttonText}")`);
-    await button.click();
+When("User clicks {string}", async function (this: CustomWorld, buttonText: string) {
+  const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+  const button = modal.locator(`button:has-text("${buttonText}")`);
+  await button.click();
 });
 
 Then("Ticket should be updated successfully", async function (this: CustomWorld) {
-    // Wait for the save operation to complete
-    await this.page.waitForTimeout(2000);
+  // Wait for the save operation to complete
+  await this.page.waitForTimeout(2000);
 
-    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    const closeButton = modal.locator('button').filter({ hasText: 'Close' }).first();
+  const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+  const closeButton = modal.locator("button").filter({ hasText: "Close" }).first();
 
-    // Some flows close the modal automatically after save; others keep it open.
-    // Accept either behavior, but ensure we end with the modal closed.
-    if (await closeButton.isVisible().catch(() => false)) {
-        await closeButton.click();
-    }
-    await expect(modal).not.toBeVisible({ timeout: 5000 });
+  // Some flows close the modal automatically after save; others keep it open.
+  // Accept either behavior, but ensure we end with the modal closed.
+  if (await closeButton.isVisible().catch(() => false)) {
+    await closeButton.click();
+  }
+  await expect(modal).not.toBeVisible({ timeout: 5000 });
 });
 
 Then("Modal should close", async function (this: CustomWorld) {
-    const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
-    await expect(modal).not.toBeVisible({ timeout: 3000 });
+  const modal = this.page.locator('[data-testid="edit-ticket-modal"], [role="dialog"]').first();
+  await expect(modal).not.toBeVisible({ timeout: 3000 });
 });
 
 Then("Empty state message should be visible", async function (this: CustomWorld) {
-    const emptyMessage = this.page.locator('text=No tickets found');
-    await expect(emptyMessage).toBeVisible({ timeout: 5000 });
+  const emptyMessage = this.page.locator("text=No tickets found");
+  await expect(emptyMessage).toBeVisible({ timeout: 5000 });
 });
-
 
 // Summary column and modal steps
 
 Then("Tickets table should have a Summary header", async function (this: CustomWorld) {
-    await expect(this.page.locator('thead th', { hasText: 'Summary' })).toBeVisible({ timeout: 5000 });
+  await expect(this.page.locator("thead th", { hasText: "Summary" })).toBeVisible({ timeout: 5000 });
 });
 
 Then("Tickets with a summary should display the summary text", async function (this: CustomWorld) {
-    const bodyText = await this.page.locator('tbody').textContent();
-    expect(bodyText).toContain('Cache invalidation issue');
+  const bodyText = await this.page.locator("tbody").textContent();
+  expect(bodyText).toContain("Cache invalidation issue");
 });
 
 Then("Tickets without a summary should display an em dash", async function (this: CustomWorld) {
-    // The second row (ticket without summary) should have an em dash in the summary column (td index 1)
-    const summaryCell = this.page.locator('tbody tr').nth(1).locator('td').nth(1);
-    const cellText = await summaryCell.textContent();
-    expect((cellText || '').trim()).toBe('—');
+  // The second row (ticket without summary) should have an em dash in the summary column (td index 1)
+  const summaryCell = this.page.locator("tbody tr").nth(1).locator("td").nth(1);
+  const cellText = await summaryCell.textContent();
+  expect((cellText || "").trim()).toBe("—");
 });
 
 When("User clicks on a ticket that has a summary", async function (this: CustomWorld) {
-    // Click the first row which has a summary
-    const firstRow = this.page.locator('tbody tr').first();
-    await expect(firstRow).toBeVisible({ timeout: 5000 });
-    await firstRow.click({ force: true });
-    await this.page.waitForTimeout(800);
+  // Click the first row which has a summary
+  const firstRow = this.page.locator("tbody tr").first();
+  await expect(firstRow).toBeVisible({ timeout: 5000 });
+  await firstRow.click({ force: true });
+  await this.page.waitForTimeout(800);
 });
 
 When("User clicks on a ticket without a summary", async function (this: CustomWorld) {
-    // Click the second row which has no summary
-    const secondRow = this.page.locator('tbody tr').nth(1);
-    await expect(secondRow).toBeVisible({ timeout: 5000 });
-    await secondRow.click({ force: true });
-    await this.page.waitForTimeout(800);
+  // Click the second row which has no summary
+  const secondRow = this.page.locator("tbody tr").nth(1);
+  await expect(secondRow).toBeVisible({ timeout: 5000 });
+  await secondRow.click({ force: true });
+  await this.page.waitForTimeout(800);
 });
 
 Then("Modal should show AI Summary section", async function (this: CustomWorld) {
-    const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
-    await expect(modal).toBeVisible({ timeout: 5000 });
-    await expect(modal.locator('text=AI Summary')).toBeVisible({ timeout: 5000 });
+  const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
+  await expect(modal).toBeVisible({ timeout: 5000 });
+  await expect(modal.locator("text=AI Summary")).toBeVisible({ timeout: 5000 });
 });
 
 Then("AI Summary should contain the summary text", async function (this: CustomWorld) {
-    const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
-    const modalText = await modal.textContent();
-    expect(modalText).toContain('Cache invalidation issue causing stale data in production');
+  const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
+  const modalText = await modal.textContent();
+  expect(modalText).toContain("Cache invalidation issue causing stale data in production");
 });
 
 Then("Modal should not show AI Summary section", async function (this: CustomWorld) {
-    const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
-    await expect(modal).toBeVisible({ timeout: 5000 });
-    // Wait for content to load
-    await expect(modal.locator('text=/Ticket #/i')).toBeVisible({ timeout: 10000 });
-    await this.page.waitForTimeout(500);
-    await expect(modal.locator('text=AI Summary')).not.toBeVisible();
+  const modal = this.page.locator('[role="dialog"], [data-testid="edit-ticket-modal"]').first();
+  await expect(modal).toBeVisible({ timeout: 5000 });
+  // Wait for content to load
+  await expect(modal.locator("text=/Ticket #/i")).toBeVisible({ timeout: 10000 });
+  await this.page.waitForTimeout(500);
+  await expect(modal.locator("text=AI Summary")).not.toBeVisible();
 });

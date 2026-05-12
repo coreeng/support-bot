@@ -8,17 +8,13 @@
  * buildHref('/tickets', { team: null })          // '/tickets'
  * buildHref('/tickets', { team: 'a', page: '2' }) // '/tickets?team=a&page=2'
  */
-export function buildHref(
-  path: string,
-  params: Record<string, string | null | undefined>,
-): string {
-  const qs = new URLSearchParams()
+export function buildHref(path: string, params: Record<string, string | null | undefined>): string {
+  const qs = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== null && value !== undefined && value !== '') {
-      qs.set(key, value)
+    if (value !== null && value !== undefined && value !== "") {
+      qs.set(key, value);
     }
   }
-  const queryString = qs.toString()
-  return queryString ? `${path}?${queryString}` : path
+  const queryString = qs.toString();
+  return queryString ? `${path}?${queryString}` : path;
 }
-

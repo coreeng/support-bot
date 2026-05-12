@@ -6,9 +6,7 @@ interface BackendTeam {
 
 export function mapTicket(ticket: Record<string, unknown>) {
   const team = ticket.team as BackendTeam | null;
-  const escalations = ticket.escalations as
-    | Array<{ team?: BackendTeam; [key: string]: unknown }>
-    | undefined;
+  const escalations = ticket.escalations as Array<{ team?: BackendTeam; [key: string]: unknown }> | undefined;
 
   return {
     ...ticket,

@@ -9,8 +9,9 @@ End-to-end functional tests for the Support UI using Cucumber.js and Playwright.
 ## Running Tests
 
 - Support Bot Backend needs to run. Otherwise, if you'd like to run
-with a WireMock backend, you can:
-`cd` to the `support-ui` directory, and execute:
+  with a WireMock backend, you can:
+  `cd` to the `support-ui` directory, and execute:
+
 ```
 source .venv-wiremock/bin/activate  # or create/activate your venv
 python3 - <<'PY'
@@ -38,12 +39,14 @@ docker run --rm -it -p 8080:8080 \
 **Note:** All commands below assume you're in the `p2p/tests/functional` directory.
 
 ### Install Dependencies
+
 ```bash
 cd p2p/tests/functional
 yarn install
 ```
 
 ### Run All Tests (Parallel Mode - Fast!)
+
 ```bash
 # Runs tests in parallel (3 workers)
 yarn test:cucumber
@@ -53,25 +56,29 @@ yarn test:cucumber:fast
 ```
 
 ### Run a Specific Feature File
+
 ```bash
 NODE_ENV=test npx cucumber-js tests/features/dashboards.feature
 NODE_ENV=test npx cucumber-js tests/features/tickets.feature
 ```
 
 ### Run a Specific Scenario (by line number)
+
 ```bash
 npx cucumber-js tests/features/dashboards.feature:6
 npx cucumber-js tests/features/tickets.feature:15
 ```
 
 ### Run from Project Root
+
 ```bash
 npx cucumber-js p2p/tests/functional/tests/features/
 ```
 
 ### Debug Mode
+
 Set `PWDEBUG=1` to run in headed mode with Playwright Inspector:
+
 ```bash
 NODE_ENV=test PWDEBUG=1 yarn test:cucumber
 ```
-

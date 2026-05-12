@@ -8,17 +8,13 @@ jest.mock("next/server", () => ({
     redirect: (url: string | URL, init?: number | { status?: number }) => {
       const h = new Headers();
       h.set("Location", url instanceof URL ? url.toString() : String(url));
-      const status =
-        typeof init === "number" ? init : (init && "status" in init ? init.status : undefined) ?? 307;
+      const status = typeof init === "number" ? init : ((init && "status" in init ? init.status : undefined) ?? 307);
       return { status, headers: h };
     },
   },
 }));
 
-import {
-  resolvePublicOriginOrConfigurationLoginRedirect,
-  tryResolvePublicOrigin,
-} from "../resolve-public-origin-response";
+import { resolvePublicOriginOrConfigurationLoginRedirect, tryResolvePublicOrigin } from "../resolve-public-origin-response";
 
 describe("tryResolvePublicOrigin", () => {
   const originalEnv = process.env;
@@ -77,19 +73,13 @@ describe("resolvePublicOriginOrConfigurationLoginRedirect", () => {
 
   it("returns origin when NEXTAUTH_URL is valid", () => {
     process.env.NEXTAUTH_URL = "https://configured.example/path";
-    const r = resolvePublicOriginOrConfigurationLoginRedirect(
-      "https://request.example",
-      "/dashboard"
-    );
+    const r = resolvePublicOriginOrConfigurationLoginRedirect("https://request.example", "/dashboard");
     expect(r).toEqual({ ok: true, origin: "https://configured.example" });
   });
 
   it("returns redirect to login on request origin when NEXTAUTH_URL is unset", () => {
     delete process.env.NEXTAUTH_URL;
-    const r = resolvePublicOriginOrConfigurationLoginRedirect(
-      "https://request.example",
-      "/dashboard"
-    );
+    const r = resolvePublicOriginOrConfigurationLoginRedirect("https://request.example", "/dashboard");
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.response.status).toBe(302);

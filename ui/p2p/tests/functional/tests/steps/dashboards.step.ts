@@ -1,49 +1,51 @@
-import { Then, Given, When } from "@cucumber/cucumber";
+import { Given, Then, When } from "@cucumber/cucumber";
 import { expect } from "@playwright/test";
+import { expectShadcnSelectValue, selectShadcnOption } from "../helpers/shadcn";
 import { CustomWorld } from "./custom-world";
-import { selectShadcnOption, expectShadcnSelectValue, clickTab } from "../helpers/shadcn";
 
 const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
 // Maps human-readable filter labels to the <select> option values used by the
 // SLA dashboard's date-filter picklist.
 const filterNameToValue = (name: string): string =>
-  ({
-    "Last Week":    "lastWeek",
-    "Last 2 Weeks": "last2Weeks",
-    "Last Month":   "lastMonth",
-    "Last Year":    "lastYear",
-    "Custom":       "custom",
-  } as Record<string, string>)[name] ?? name;
+  (
+    ({
+      "Last Week": "lastWeek",
+      "Last 2 Weeks": "last2Weeks",
+      "Last Month": "lastMonth",
+      "Last Year": "lastYear",
+      Custom: "custom",
+    }) as Record<string, string>
+  )[name] ?? name;
 
 // Helper to create mock dashboard responses
 const mockDashboardData = {
   firstResponsePercentiles: { p50: 300, p90: 600 },
   // Bucketed distribution shape expected by UI
   durationDistribution: [
-    { label: '< 15 min', count: 2, minMinutes: 0, maxMinutes: 15 },
-    { label: '15-30 min', count: 1, minMinutes: 15, maxMinutes: 30 },
-    { label: '30-60 min', count: 1, minMinutes: 30, maxMinutes: 60 },
-    { label: '1-2 hours', count: 1, minMinutes: 60, maxMinutes: 120 },
+    { label: "< 15 min", count: 2, minMinutes: 0, maxMinutes: 15 },
+    { label: "15-30 min", count: 1, minMinutes: 15, maxMinutes: 30 },
+    { label: "30-60 min", count: 1, minMinutes: 30, maxMinutes: 60 },
+    { label: "1-2 hours", count: 1, minMinutes: 60, maxMinutes: 120 },
   ],
   unattendedQueries: { count: 5 },
   resolutionPercentiles: { p50: 3600, p75: 7200, p90: 10800 },
   incomingVsResolvedRate: {
-    granularity: 'DAY',
+    granularity: "DAY",
     data: [
-      { time: '2025-01-01T00:00:00Z', incoming: 3, resolved: 2 },
-      { time: '2025-01-02T00:00:00Z', incoming: 4, resolved: 5 },
+      { time: "2025-01-01T00:00:00Z", incoming: 3, resolved: 2 },
+      { time: "2025-01-02T00:00:00Z", incoming: 4, resolved: 5 },
     ],
   },
   emptyIncomingVsResolvedRate: {
-    granularity: 'DAY',
+    granularity: "DAY",
     data: [],
   },
-  emptyData: []
+  emptyData: [],
 };
 
 function getEmptyDashboardResponse(url: string): unknown {
-  if (url.includes('incoming-vs-resolved-rate')) {
+  if (url.includes("incoming-vs-resolved-rate")) {
     return mockDashboardData.emptyIncomingVsResolvedRate;
   }
 
@@ -51,19 +53,19 @@ function getEmptyDashboardResponse(url: string): unknown {
 }
 
 function getDelayedDashboardResponse(url: string): unknown {
-  if (url.includes('distribution')) {
+  if (url.includes("distribution")) {
     return mockDashboardData.durationDistribution;
   }
 
-  if (url.includes('percentile')) {
+  if (url.includes("percentile")) {
     return mockDashboardData.firstResponsePercentiles;
   }
 
-  if (url.includes('count')) {
+  if (url.includes("count")) {
     return mockDashboardData.unattendedQueries;
   }
 
-  if (url.includes('incoming-vs-resolved-rate')) {
+  if (url.includes("incoming-vs-resolved-rate")) {
     return mockDashboardData.incomingVsResolvedRate;
   }
 
@@ -93,17 +95,13 @@ Given("Dashboard API endpoints are mocked", async function (this: CustomWorld) {
     route.fulfill({ status: 200, body: JSON.stringify(mockDashboardData.durationDistribution) })
   );
 
-  await this.page.route("**/api/dashboard/resolution-times-by-week*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify([]) })
-  );
+  await this.page.route("**/api/dashboard/resolution-times-by-week*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
 
   await this.page.route("**/api/dashboard/unresolved-ticket-ages*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify({ p50: "1 day", p90: "3 days" }) })
   );
 
-  await this.page.route("**/api/dashboard/resolution-time-by-tag*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify([]) })
-  );
+  await this.page.route("**/api/dashboard/resolution-time-by-tag*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
 
   await this.page.route("**/api/dashboard/avg-escalation-duration-by-tag*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify([]) })
@@ -113,21 +111,13 @@ Given("Dashboard API endpoints are mocked", async function (this: CustomWorld) {
     route.fulfill({ status: 200, body: JSON.stringify([]) })
   );
 
-  await this.page.route("**/api/dashboard/escalation-trends-by-date*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify([]) })
-  );
+  await this.page.route("**/api/dashboard/escalation-trends-by-date*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
 
-  await this.page.route("**/api/dashboard/escalations-by-team*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify([]) })
-  );
+  await this.page.route("**/api/dashboard/escalations-by-team*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
 
-  await this.page.route("**/api/dashboard/escalations-by-impact*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify([]) })
-  );
+  await this.page.route("**/api/dashboard/escalations-by-impact*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
 
-  await this.page.route("**/api/dashboard/weekly-ticket-counts*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify([]) })
-  );
+  await this.page.route("**/api/dashboard/weekly-ticket-counts*", (route) => route.fulfill({ status: 200, body: JSON.stringify([]) }));
 
   await this.page.route("**/api/dashboard/weekly-comparison*", (route) =>
     route.fulfill({ status: 200, body: JSON.stringify({ opened: 10, closed: 8, stale: 2, escalated: 1 }) })
@@ -156,12 +146,12 @@ Given("Dashboard API has delayed responses", async function (this: CustomWorld) 
   // Add delay to simulate slow API
   await this.page.route("**/api/dashboard/**", async (route) => {
     const url = route.request().url();
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     const responseData = getDelayedDashboardResponse(url);
 
     await route.fulfill({
       status: 200,
-      body: JSON.stringify(responseData)
+      body: JSON.stringify(responseData),
     });
   });
 });
@@ -169,18 +159,18 @@ Given("Dashboard API has delayed responses", async function (this: CustomWorld) 
 // Navigation
 Given("User navigates to the dashboards page", async function (this: CustomWorld) {
   await this.page.goto(`${BASE_URL}/`, {
-    waitUntil: 'domcontentloaded',
-    timeout: 10000
+    waitUntil: "domcontentloaded",
+    timeout: 10000,
   });
 
   // Sidebar hydration sentinel: the Tickets nav link is always rendered.
-  await expect(this.page.getByRole('link', { name: /^Tickets$/i }).first()).toBeVisible({ timeout: 5000 });
+  await expect(this.page.getByRole("link", { name: /^Tickets$/i }).first()).toBeVisible({ timeout: 5000 });
 
-  const slaDashboardButton = this.page.getByRole('link', { name: /SLA Dashboard/i }).first();
+  const slaDashboardButton = this.page.getByRole("link", { name: /SLA Dashboard/i }).first();
   await expect(slaDashboardButton).toBeVisible({ timeout: 5000 });
   await slaDashboardButton.click();
 
-  const responseSLATab = this.page.getByRole('tab', { name: /Response SLAs/i }).first();
+  const responseSLATab = this.page.getByRole("tab", { name: /Response SLAs/i }).first();
   await expect(responseSLATab).toBeVisible({ timeout: 8000 });
 });
 
@@ -191,7 +181,7 @@ Then("The page title should be {string}", async function (this: CustomWorld, exp
 });
 
 Then("The page subtitle should contain {string}", async function (this: CustomWorld, expectedText: string) {
-  const subtitle = this.page.locator('p').filter({ hasText: expectedText });
+  const subtitle = this.page.locator("p").filter({ hasText: expectedText });
   await expect(subtitle).toBeVisible({ timeout: 15000 });
 });
 
@@ -202,17 +192,17 @@ Then("Date filter options should be visible", async function (this: CustomWorld)
   await expect(dateSelect).toBeVisible({ timeout: 15000 });
   // Open the Radix Select once and verify the expected options render in the listbox.
   await dateSelect.click();
-  for (const label of ['Last Week', 'Last Month', 'Last Year', 'Custom']) {
-    await expect(this.page.getByRole('option', { name: new RegExp(label, 'i') })).toBeVisible({ timeout: 5000 });
+  for (const label of ["Last Week", "Last Month", "Last Year", "Custom"]) {
+    await expect(this.page.getByRole("option", { name: new RegExp(label, "i") })).toBeVisible({ timeout: 5000 });
   }
-  await this.page.keyboard.press('Escape');
+  await this.page.keyboard.press("Escape");
 });
 
 Then("Date filter option {string} should be available", async function (this: CustomWorld, filterName: string) {
   const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
   await dateSelect.click();
-  await expect(this.page.getByRole('option', { name: new RegExp(filterName, 'i') })).toBeVisible({ timeout: 5000 });
-  await this.page.keyboard.press('Escape');
+  await expect(this.page.getByRole("option", { name: new RegExp(filterName, "i") })).toBeVisible({ timeout: 5000 });
+  await this.page.keyboard.press("Escape");
 });
 
 Then("Date range inputs should be visible", async function (this: CustomWorld) {
@@ -225,10 +215,10 @@ Then("Date range inputs should be visible", async function (this: CustomWorld) {
 // Tab assertions
 Then("All tab sections should be visible", async function (this: CustomWorld) {
   // Check that all tab buttons are visible
-  const responseSLATab = this.page.getByRole('tab', { name: /Response SLAs/i });
-  const resolutionSLATab = this.page.getByRole('tab', { name: /Resolution SLAs/i });
-  const escalationSLATab = this.page.getByRole('tab', { name: /Escalation SLAs/i });
-  const weeklyTrendsTab = this.page.getByRole('tab', { name: /Weekly Trends/i });
+  const responseSLATab = this.page.getByRole("tab", { name: /Response SLAs/i });
+  const resolutionSLATab = this.page.getByRole("tab", { name: /Resolution SLAs/i });
+  const escalationSLATab = this.page.getByRole("tab", { name: /Escalation SLAs/i });
+  const weeklyTrendsTab = this.page.getByRole("tab", { name: /Weekly Trends/i });
 
   await expect(responseSLATab).toBeVisible({ timeout: 15000 });
   await expect(resolutionSLATab).toBeVisible({ timeout: 15000 });
@@ -237,54 +227,55 @@ Then("All tab sections should be visible", async function (this: CustomWorld) {
 });
 
 Then("Response SLAs tab should be visible", async function (this: CustomWorld) {
-  const tab = this.page.getByRole('tab', { name: /Response SLAs/i });
+  const tab = this.page.getByRole("tab", { name: /Response SLAs/i });
   await expect(tab).toBeVisible({ timeout: 15000 });
 });
 
 Then("Resolution SLAs tab should be visible", async function (this: CustomWorld) {
-  const tab = this.page.getByRole('tab', { name: /Resolution SLAs/i });
+  const tab = this.page.getByRole("tab", { name: /Resolution SLAs/i });
   await expect(tab).toBeVisible({ timeout: 15000 });
 });
 
 Then("Escalation SLAs tab should be visible", async function (this: CustomWorld) {
-  const tab = this.page.getByRole('tab', { name: /Escalation SLAs/i });
+  const tab = this.page.getByRole("tab", { name: /Escalation SLAs/i });
   await expect(tab).toBeVisible({ timeout: 15000 });
 });
 
 Then("Weekly Trends tab should be visible", async function (this: CustomWorld) {
-  const tab = this.page.getByRole('tab', { name: /Weekly Trends/i });
+  const tab = this.page.getByRole("tab", { name: /Weekly Trends/i });
   await expect(tab).toBeVisible({ timeout: 15000 });
 });
 
 // Tab interactions
 Given("Response SLAs tab is active by default", async function (this: CustomWorld) {
   // The first tab (Response SLAs) should be active by default
-  const responseTab = this.page.getByRole('tab', { name: /Response SLAs/i });
+  const responseTab = this.page.getByRole("tab", { name: /Response SLAs/i });
   await expect(responseTab).toBeVisible({ timeout: 15000 });
 });
 
 When("User clicks on {string} tab", async function (this: CustomWorld, tabName: string) {
   // Page-level navigation tabs are now sidebar links; SLA section tabs are Radix Tabs (role="tab").
-  const sectionTab = this.page.getByRole('tab', { name: new RegExp(tabName, 'i') });
+  const sectionTab = this.page.getByRole("tab", { name: new RegExp(tabName, "i") });
   if ((await sectionTab.count()) > 0) {
     await sectionTab.click({ timeout: 10000 });
   } else {
-    const navLink = this.page.getByRole('link', { name: new RegExp(tabName, 'i') });
+    const navLink = this.page.getByRole("link", { name: new RegExp(tabName, "i") });
     await navLink.click({ timeout: 10000 });
   }
   await this.page.waitForTimeout(3500);
 });
 
 Then("{string} tab should be active", async function (this: CustomWorld, sectionName: string) {
-
   // Check if content is now visible based on section name
-  if (sectionName.includes('Response')) {
+  if (sectionName.includes("Response")) {
     // Look for any content in Response SLAs - be more lenient with the text
-    const content = this.page.locator('text=Time to First Response').first();
+    const content = this.page.locator("text=Time to First Response").first();
     await expect(content).toBeVisible({ timeout: 15000 });
-  } else if (sectionName.includes('Resolution')) {
+  } else if (sectionName.includes("Resolution")) {
     // Check multiple known titles to avoid brittleness
-    const content = this.page.getByText(/Resolution Performance|Ticket Resolution Duration Distribution|Ticket Resolution Durations/i).first();
+    const content = this.page
+      .getByText(/Resolution Performance|Ticket Resolution Duration Distribution|Ticket Resolution Durations/i)
+      .first();
     await expect(content).toBeVisible({ timeout: 20000 });
   }
 });
@@ -299,7 +290,7 @@ Then("Section metric titles should be visible", async function (this: CustomWorl
   // Just check that the section has rendered - tabs always show content
   await this.page.waitForTimeout(500);
   // Look for any heading or title elements
-  const titles = this.page.locator('h2, h3');
+  const titles = this.page.locator("h2, h3");
   const count = await titles.count();
   expect(count).toBeGreaterThan(0);
 });
@@ -313,18 +304,18 @@ Then("Refresh button should be visible in the section", async function (this: Cu
 Then("Loading indicators should be visible", async function (this: CustomWorld) {
   // Check for loading text or spinners
   const loadingText = this.page.getByText(/loading/i);
-  const hasLoading = await loadingText.count() > 0;
+  const hasLoading = (await loadingText.count()) > 0;
 
   // Test passes if we detect loading state (may be too fast to catch)
   // We check but don't fail if loading is too fast
-  expect(typeof hasLoading).toBe('boolean');
+  expect(typeof hasLoading).toBe("boolean");
 });
 
 Then("Content should appear after loading completes", async function (this: CustomWorld) {
   // Wait for loading indicators to disappear and content to appear
   // The delayed response is 2s, so wait up to 10s for content
   // Use .first() to handle multiple matches (card title + chart title)
-  const content = this.page.locator('text=Time to First Response').first();
+  const content = this.page.locator("text=Time to First Response").first();
   await expect(content).toBeVisible({ timeout: 10000 });
 });
 
@@ -334,7 +325,7 @@ Then("Empty state or zero values should be displayed", async function (this: Cus
 
   // Check for "No data" messages or zero values
   const noDataText = this.page.getByText(/no data|no.*available|0/i);
-  const hasEmptyState = await noDataText.count() > 0;
+  const hasEmptyState = (await noDataText.count()) > 0;
 
   expect(hasEmptyState).toBeTruthy();
 });
@@ -344,9 +335,9 @@ Then("Dashboard content should be visible or show loading state", async function
   await this.page.waitForTimeout(1000);
 
   // Check for any dashboard content (percentile cards, charts, or loading states)
-  const hasPercentileCard = await this.page.locator('text=P50').count() > 0;
-  const hasChart = await this.page.locator('svg').count() > 0;
-  const hasLoading = await this.page.locator('text=Loading').count() > 0;
+  const hasPercentileCard = (await this.page.locator("text=P50").count()) > 0;
+  const hasChart = (await this.page.locator("svg").count()) > 0;
+  const hasLoading = (await this.page.locator("text=Loading").count()) > 0;
 
   expect(hasPercentileCard || hasChart || hasLoading).toBeTruthy();
 });
@@ -356,13 +347,13 @@ Then("Dashboard content should be visible or show loading state", async function
 // the matching option via filterNameToValue.
 When("User selects {string} date filter", async function (this: CustomWorld, filterName: string) {
   const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
-  await selectShadcnOption(this.page, dateSelect, new RegExp(filterName, 'i'));
+  await selectShadcnOption(this.page, dateSelect, new RegExp(filterName, "i"));
   await this.page.waitForTimeout(500);
 });
 
 Then("{string} should be the selected date filter", async function (this: CustomWorld, buttonName: string) {
   const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
-  await expectShadcnSelectValue(dateSelect, new RegExp(buttonName, 'i'));
+  await expectShadcnSelectValue(dateSelect, new RegExp(buttonName, "i"));
 });
 
 Then("Other date filter options should not be selected", async function (this: CustomWorld) {
@@ -371,7 +362,7 @@ Then("Other date filter options should not be selected", async function (this: C
 
 Then("{string} should not be the selected date filter", async function (this: CustomWorld, buttonName: string) {
   const dateSelect = this.page.locator('[data-testid="sla-date-filter"]');
-  await expect(dateSelect).not.toContainText(new RegExp(buttonName, 'i'));
+  await expect(dateSelect).not.toContainText(new RegExp(buttonName, "i"));
 });
 
 When("User sets start date to {string}", async function (this: CustomWorld, date: string) {
@@ -424,7 +415,7 @@ Then("Refresh button should show loading state", async function (this: CustomWor
 
   // It might already be done loading, so we check if it was disabled or has loader
   // We check but don't fail if loading is too fast
-  expect(typeof isDisabled).toBe('boolean');
+  expect(typeof isDisabled).toBe("boolean");
 });
 
 Then("Refresh button should become enabled again", async function (this: CustomWorld) {
@@ -434,15 +425,15 @@ Then("Refresh button should become enabled again", async function (this: CustomW
 });
 
 // Tab switching - only one section visible at a time
-Then('Only {} content should be visible', async function (this: CustomWorld, sectionName: string) {
+Then("Only {} content should be visible", async function (this: CustomWorld, sectionName: string) {
   await this.page.waitForTimeout(500);
 
   // Check that the active tab content is visible
-  if (sectionName.includes('Resolution')) {
-    const content = this.page.locator('text=Ticket Resolution Durations');
+  if (sectionName.includes("Resolution")) {
+    const content = this.page.locator("text=Ticket Resolution Durations");
     await expect(content).toBeVisible();
-  } else if (sectionName.includes('Escalation')) {
-    const content = this.page.locator('text=Average Escalation Duration');
+  } else if (sectionName.includes("Escalation")) {
+    const content = this.page.locator("text=Average Escalation Duration");
     await expect(content).toBeVisible();
   }
 });
@@ -472,18 +463,17 @@ Then("API calls for Response SLAs should be triggered", async function (this: Cu
 // Navigation
 Then("{string} navigation tab should be active", async function (this: CustomWorld, tabName: string) {
   // Check if navigation tab is highlighted (in the sidebar)
-  const navTab = this.page.getByRole("button", { name: new RegExp(tabName, 'i') });
+  const navTab = this.page.getByRole("button", { name: new RegExp(tabName, "i") });
   await expect(navTab).toBeVisible();
 });
 
 When("User clicks on {string} navigation tab", async function (this: CustomWorld, tabName: string) {
-  const navLink = this.page.getByRole("link", { name: new RegExp(tabName, 'i') });
+  const navLink = this.page.getByRole("link", { name: new RegExp(tabName, "i") });
   await navLink.click();
 });
 
 Then("User should be redirected to home page", async function (this: CustomWorld) {
   await this.page.waitForTimeout(1000);
   const currentUrl = this.page.url();
-  expect(currentUrl).not.toContain('/dashboards');
+  expect(currentUrl).not.toContain("/dashboards");
 });
-

@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import EscalationsPage from '@/components/escalations/escalations'
+import EscalationsPage from "@/components/escalations/escalations";
 
 export default function Escalations() {
-    return <EscalationsPage />
+  return <EscalationsPage />;
 }

@@ -1,9 +1,5 @@
 import { NextRequest } from "next/server";
-import {
-  backendFetch,
-  unauthorizedResponse,
-  errorResponse,
-} from "../_lib/backend-fetch";
+import { backendFetch, errorResponse, unauthorizedResponse } from "../_lib/backend-fetch";
 import { mapTicket } from "./_lib/map-ticket";
 
 export async function GET(request: NextRequest) {

@@ -1,15 +1,8 @@
 import { NextRequest } from "next/server";
-import {
-  backendFetch,
-  unauthorizedResponse,
-  errorResponse,
-} from "../../_lib/backend-fetch";
+import { backendFetch, errorResponse, unauthorizedResponse } from "../../_lib/backend-fetch";
 import { mapTicket } from "../_lib/map-ticket";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
   const response = await backendFetch(request, `/ticket/${id}`);
@@ -23,10 +16,7 @@ export async function GET(
   return Response.json(mapTicket(data));
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await request.json();
 

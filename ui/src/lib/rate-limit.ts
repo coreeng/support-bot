@@ -3,47 +3,50 @@
  * For production, consider using Redis or a dedicated rate limiting service
  */
 
-import { NextRequest } from 'next/server'
+import { NextRequest } from "next/server";
 
 interface RateLimitEntry {
-  count: number
-  resetAt: number
+  count: number;
+  resetAt: number;
 }
 
 // In-memory store for rate limit data
 // Key format: "email:endpoint" or "ip:endpoint"
-const limitStore = new Map<string, RateLimitEntry>()
+const limitStore = new Map<string, RateLimitEntry>();
 
 // Clean up expired entries every 5 minutes
-setInterval(() => {
-  const now = Date.now()
-  for (const [key, entry] of limitStore.entries()) {
-    if (entry.resetAt < now) {
-      limitStore.delete(key)
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [key, entry] of limitStore.entries()) {
+      if (entry.resetAt < now) {
+        limitStore.delete(key);
+      }
     }
-  }
-}, 5 * 60 * 1000)
+  },
+  5 * 60 * 1000
+);
 
 export interface RateLimitConfig {
   /**
    * Time window in milliseconds (default: 60000 = 1 minute)
    */
-  windowMs?: number
+  windowMs?: number;
   /**
    * Maximum number of requests per window (default: 100)
    */
-  max?: number
+  max?: number;
   /**
    * Identifier for this rate limit (default: 'default')
    */
-  id?: string
+  id?: string;
 }
 
 export interface RateLimitResult {
-  allowed: boolean
-  limit: number
-  remaining: number
-  reset: number
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  reset: number;
 }
 
 /**
@@ -52,36 +55,33 @@ export interface RateLimitResult {
  * @param config - Rate limit configuration
  * @returns Rate limit result with allowed status and metadata
  */
-export function checkRateLimit(
-  identifier: string,
-  config: RateLimitConfig = {}
-): RateLimitResult {
+export function checkRateLimit(identifier: string, config: RateLimitConfig = {}): RateLimitResult {
   const {
     windowMs = 60 * 1000, // 1 minute default
     max = 100, // 100 requests per minute default
-    id = 'default',
-  } = config
+    id = "default",
+  } = config;
 
-  const key = `${identifier}:${id}`
-  const now = Date.now()
-  const entry = limitStore.get(key)
+  const key = `${identifier}:${id}`;
+  const now = Date.now();
+  const entry = limitStore.get(key);
 
   // No entry or expired entry - create new
   if (!entry || entry.resetAt < now) {
     limitStore.set(key, {
       count: 1,
       resetAt: now + windowMs,
-    })
+    });
     return {
       allowed: true,
       limit: max,
       remaining: max - 1,
       reset: now + windowMs,
-    }
+    };
   }
 
   // Entry exists and not expired - increment count
-  entry.count++
+  entry.count++;
 
   // Check if limit exceeded
   if (entry.count > max) {
@@ -90,7 +90,7 @@ export function checkRateLimit(
       limit: max,
       remaining: 0,
       reset: entry.resetAt,
-    }
+    };
   }
 
   return {
@@ -98,7 +98,7 @@ export function checkRateLimit(
     limit: max,
     remaining: max - entry.count,
     reset: entry.resetAt,
-  }
+  };
 }
 
 /**
@@ -109,30 +109,30 @@ export const RATE_LIMITS = {
   AUTH: {
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 5, // 5 attempts per 15 minutes
-    id: 'auth',
+    id: "auth",
   },
   // Standard limit for API endpoints
   API: {
     windowMs: 60 * 1000, // 1 minute
     max: 100, // 100 requests per minute
-    id: 'api',
+    id: "api",
   },
   // Stricter limit for expensive operations (dashboards, reports)
   DASHBOARD: {
     windowMs: 60 * 1000, // 1 minute
     max: 40, // 30 requests per minute
-    id: 'dashboard',
+    id: "dashboard",
   },
-} as const
+} as const;
 
 /**
  * Extract a unique identifier from the request for rate limiting
  * Uses IP address as identifier (server-side routes don't have auth tokens)
  */
 function getIdentifier(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for')
-  const ip = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
-  return ip
+  const forwarded = request.headers.get("x-forwarded-for");
+  const ip = forwarded ? forwarded.split(",")[0].trim() : request.headers.get("x-real-ip") || "unknown";
+  return ip;
 }
 
 /**
@@ -141,11 +141,7 @@ function getIdentifier(request: NextRequest): string {
  * @param config - Rate limit configuration
  * @returns Rate limit result
  */
-export function rateLimit(
-  request: NextRequest,
-  config: RateLimitConfig = {}
-): RateLimitResult {
-  const identifier = getIdentifier(request)
-  return checkRateLimit(identifier, config)
+export function rateLimit(request: NextRequest, config: RateLimitConfig = {}): RateLimitResult {
+  const identifier = getIdentifier(request);
+  return checkRateLimit(identifier, config);
 }
-

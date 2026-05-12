@@ -1,17 +1,13 @@
-import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import type { NextRequest } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 
 function sessionCookieName(): string {
-  return process.env.NODE_ENV === "production"
-    ? "__Secure-authjs.session-token"
-    : "authjs.session-token";
+  return process.env.NODE_ENV === "production" ? "__Secure-authjs.session-token" : "authjs.session-token";
 }
 
-export async function backendAccessToken(
-  request: Request | NextRequest
-): Promise<string | null> {
+export async function backendAccessToken(request: Request | NextRequest): Promise<string | null> {
   const cookieName = sessionCookieName();
   const token = await getToken({
     req: request,
@@ -29,12 +25,7 @@ export async function backendAccessToken(
  * Set PROXY_LOGGING=true to also log successful requests.
  * Returns a 502 on network failure instead of throwing.
  */
-export async function proxyFetch(
-  tag: string,
-  path: string,
-  url: string,
-  options: RequestInit
-): Promise<Response> {
+export async function proxyFetch(tag: string, path: string, url: string, options: RequestInit): Promise<Response> {
   const method = options.method?.toUpperCase() || "GET";
   const start = Date.now();
 
@@ -56,11 +47,7 @@ export async function proxyFetch(
  * Authenticated fetch to backend API.
  * Returns null if user is not authenticated (caller should handle 401).
  */
-export async function backendFetch(
-  request: Request | NextRequest,
-  path: string,
-  options: RequestInit = {}
-): Promise<Response | null> {
+export async function backendFetch(request: Request | NextRequest, path: string, options: RequestInit = {}): Promise<Response | null> {
   const accessToken = await backendAccessToken(request);
 
   if (!accessToken) {

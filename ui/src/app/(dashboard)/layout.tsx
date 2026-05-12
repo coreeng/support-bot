@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import { Suspense } from 'react'
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Suspense } from "react";
 
 /**
  * Shared layout for all dashboard pages.
@@ -17,6 +17,5 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <Suspense fallback={<div className="flex h-screen items-center justify-center">Loading…</div>}>
       <DashboardLayout>{children}</DashboardLayout>
     </Suspense>
-  )
+  );
 }
-

@@ -1,9 +1,5 @@
 import { NextRequest } from "next/server";
-import {
-  backendFetch,
-  unauthorizedResponse,
-  errorResponse,
-} from "../../_lib/backend-fetch";
+import { backendFetch, errorResponse, unauthorizedResponse } from "../../_lib/backend-fetch";
 
 const FORWARDED_QUERY_PARAMS = ["dateFrom", "dateTo", "allTime", "granularity"] as const;
 
@@ -28,10 +24,7 @@ const VALID_ENDPOINTS = new Set([
   "resolution-time-by-tag",
 ]);
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ endpoint: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ endpoint: string }> }) {
   const { endpoint } = await params;
 
   if (!VALID_ENDPOINTS.has(endpoint)) {

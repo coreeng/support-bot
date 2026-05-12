@@ -1,44 +1,42 @@
-import React from 'react';
-import { render } from '@testing-library/react';
-import LoadingSkeleton from '../LoadingSkeleton';
+import { render } from "@testing-library/react";
+import LoadingSkeleton from "../LoadingSkeleton";
 
-describe('LoadingSkeleton', () => {
-    it('renders skeleton with pulse animation', () => {
-        const { container } = render(<LoadingSkeleton />);
-        
-        const pulseElement = container.querySelector('.animate-pulse');
-        expect(pulseElement).toBeInTheDocument();
-    });
+describe("LoadingSkeleton", () => {
+  it("renders skeleton with pulse animation", () => {
+    const { container } = render(<LoadingSkeleton />);
 
-    it('renders skeleton header', () => {
-        const { container } = render(<LoadingSkeleton />);
-        
-        // Should have a header skeleton (h-8)
-        const headerSkeleton = container.querySelector('.h-8');
-        expect(headerSkeleton).toBeInTheDocument();
-    });
+    const pulseElement = container.querySelector(".animate-pulse");
+    expect(pulseElement).toBeInTheDocument();
+  });
 
-    it('renders 4 card skeletons', () => {
-        const { container } = render(<LoadingSkeleton />);
-        
-        // Grid should have 4 cards
-        const cards = container.querySelectorAll('.grid.grid-cols-1.md\\:grid-cols-2.lg\\:grid-cols-4 > div');
-        expect(cards.length).toBe(4);
-    });
+  it("renders skeleton header", () => {
+    const { container } = render(<LoadingSkeleton />);
 
-    it('renders chart skeleton section', () => {
-        const { container } = render(<LoadingSkeleton />);
-        
-        // Should have chart placeholders section (large rectangular skeletons)
-        const largeSkeletons = container.querySelectorAll('.h-64');
-        expect(largeSkeletons.length).toBeGreaterThanOrEqual(2);
-    });
+    // Should have a header skeleton (h-8)
+    const headerSkeleton = container.querySelector(".h-8");
+    expect(headerSkeleton).toBeInTheDocument();
+  });
 
-    it('applies pulse animation to skeleton elements', () => {
-        const { container } = render(<LoadingSkeleton />);
+  it("renders 4 card skeletons", () => {
+    const { container } = render(<LoadingSkeleton />);
 
-        const pulseElements = container.querySelectorAll('.animate-pulse');
-        expect(pulseElements.length).toBeGreaterThan(0);
-    });
+    // Grid should have 4 cards
+    const cards = container.querySelectorAll(".grid.grid-cols-1.md\\:grid-cols-2.lg\\:grid-cols-4 > div");
+    expect(cards.length).toBe(4);
+  });
+
+  it("renders chart skeleton section", () => {
+    const { container } = render(<LoadingSkeleton />);
+
+    // Should have chart placeholders section (large rectangular skeletons)
+    const largeSkeletons = container.querySelectorAll(".h-64");
+    expect(largeSkeletons.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("applies pulse animation to skeleton elements", () => {
+    const { container } = render(<LoadingSkeleton />);
+
+    const pulseElements = container.querySelectorAll(".animate-pulse");
+    expect(pulseElements.length).toBeGreaterThan(0);
+  });
 });
-
