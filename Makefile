@@ -128,7 +128,8 @@ build-dex-app: ## Build Dex (upstream dexidp/dex + Support Bot login theme)
 	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-dex) --tag "$(call p2p_image_tag,$(p2p_app_name)-dex)" dex
 
 .PHONY: build-app
-build-app: build-api-app build-ui-app build-dex-app ## Build all apps
+build-app: ## Build all apps (API, UI, and Dex in parallel)
+	$(MAKE) -j 3 build-api-app build-ui-app build-dex-app
 
 .PHONY: build-api-functional
 build-api-functional: ## Build API functional test docker image
@@ -139,7 +140,8 @@ build-ui-functional: ## Build UI functional test docker image
 	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" ui/p2p/tests/functional/
 
 .PHONY: build-functional
-build-functional: build-api-functional build-ui-functional ## Build functional test docker images
+build-functional: ## Build functional test docker images (API and UI in parallel)
+	$(MAKE) -j 2 build-api-functional build-ui-functional
 
 .PHONY: build-api-nft
 build-api-nft: ## Build API nft test docker image
@@ -150,7 +152,8 @@ build-ui-nft: ## Build UI nft test docker image
 	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" ui/p2p/tests/nft/
 
 .PHONY: build-nft
-build-nft: build-api-nft build-ui-nft ## Build nft test docker images
+build-nft: ## Build nft test docker images (API and UI in parallel)
+	$(MAKE) -j 2 build-api-nft build-ui-nft
 
 .PHONY: build-integration
 build-integration:
