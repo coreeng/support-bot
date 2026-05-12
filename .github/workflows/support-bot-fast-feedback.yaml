@@ -37,7 +37,7 @@ jobs:
 
   fastfeedback:
     needs: [version]
-    uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@v1
+    uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@feature/secret-scanning
     secrets:
       env_vars: |
         SLACK_TOKEN=${{ secrets.SLACK_TOKEN_INTEGRATION }}
