@@ -129,7 +129,7 @@ dependencies {
     implementation("com.google.apis:google-api-services-cloudidentity:v1-rev20241208-2.0.0")
 
     implementation("com.microsoft.graph:microsoft-graph:6.36.0")
-    implementation("com.azure.spring:spring-cloud-azure-starter:5.22.0")
+    implementation("com.azure.spring:spring-cloud-azure-starter:7.2.0")
 
     implementation("dev.langchain4j:langchain4j-vertex-ai-gemini:0.36.2")
     implementation("dev.langchain4j:langchain4j:0.36.2")

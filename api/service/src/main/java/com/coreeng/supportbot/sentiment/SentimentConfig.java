@@ -6,7 +6,6 @@ import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.ticket.TicketQueryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
@@ -34,11 +33,13 @@ public class SentimentConfig {
     }
 
     @Bean
+    @SuppressWarnings("removal")
     public RestClient sentimentRestClient() {
         return RestClient.builder()
                 .baseUrl("http://localhost:8081")
                 .requestFactory(requestFactory())
-                .messageConverters(ImmutableList.of(new MappingJackson2HttpMessageConverter(objectMapper)))
+                .configureMessageConverters(converters ->
+                        converters.withJsonConverter(new MappingJackson2HttpMessageConverter(objectMapper)))
                 .build();
     }
 
