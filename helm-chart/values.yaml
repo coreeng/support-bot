@@ -221,3 +221,115 @@ ui:
       limits:
         memory: 1536Mi
 
+# Bundled Dex (dex/dex subchart from charts.dexidp.io). Default on.
+# Two ways to wire authentication when dex.enabled=true:
+#   (a) external IdP — set dex.config.connectors (Google / Microsoft / LDAP / generic OIDC)
+#   (b) static users — leave connectors empty and enable bundled.staticUsers below
+#
+# To opt out (e.g. you deploy Dex separately), set dex.enabled: false.
+#
+# Notes:
+#   - rbac.createClusterScoped is false because Dex uses sqlite storage here and never
+#     touches CRDs; matches api/k8s/dex/values-dexidp.yaml so installs work on tenant-scoped
+#     service accounts (see api/k8s/dex/README.md).
+#   - configSecret.create is false. The support-bot chart renders the Dex config.yaml itself
+#     into a Secret named "<release>-dex-config" so it can fan bundled.staticUsers into Dex
+#     without the user duplicating the four entries under dex.config.staticPasswords.
+#     Edit dex.config.connectors / staticClients / issuer normally — those keys are read by
+#     the support-bot chart's renderer, not the dex subchart.
+dex:
+  enabled: true
+  fullnameOverride: "support-bot-dex"
+  replicaCount: 1
+  rbac:
+    create: true
+    createClusterScoped: false
+  image:
+    repository: ghcr.io/dexidp/dex
+    pullPolicy: IfNotPresent
+    tag: v2.44.0
+  configSecret:
+    create: false
+    name: "support-bot-dex-config"
+  volumes:
+    - name: dex-data
+      emptyDir: {}
+  volumeMounts:
+    - name: dex-data
+      mountPath: /var/dex
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts: []
+    tls: []
+  # Read by the support-bot chart's dex-config-secret.yaml renderer (not the dex subchart).
+  config:
+    # Required when dex.enabled=true: the OIDC issuer URL the API and UI should trust.
+    # In-cluster default points at the bundled Dex Service. Set to a public URL when exposing
+    # Dex via Ingress, e.g. https://dex.example.com.
+    issuer: "http://support-bot-dex.default.svc.cluster.local:5556"
+    storage:
+      type: sqlite3
+      config:
+        file: /var/dex/dex.db
+    web:
+      http: 0.0.0.0:5556
+    telemetry:
+      http: 0.0.0.0:5558
+    oauth2:
+      skipApprovalScreen: true
+    enablePasswordDB: false
+    # Populated by bundled.staticUsers when that block is enabled — leave empty.
+    staticPasswords: []
+    # Mode (a): populate this list with your IdP connector(s).
+    connectors: []
+    staticClients:
+      - id: support-bot
+        name: Support Bot
+        # Required when dex.enabled=true; consumed by both Dex (login) and the API
+        # (DEX_CLIENT_SECRET env). No default — explicit-only, same posture as bundled passwordHash.
+        # Generate: openssl rand -hex 32
+        secret: ""
+        # Defaults to publicWebOrigin-derived URIs when empty (see _bundled.tpl).
+        redirectURIs: []
+
+# Mode (b): pre-seed four users so login → role works without an external IdP.
+# When enabled=true, the support-bot chart fans each entry out into:
+#   - the Dex config Secret    (enablePasswordDB: true + staticPasswords[])
+#   - configMap.config.team.support.static.members      → ROLE_SUPPORT_ENGINEER
+#   - configMap.config.team.leadership.static.members   → ROLE_LEADERSHIP
+#   - platform-integration.static-user.users.*          → ROLE_ESCALATION (escalation user)
+#                                                        and tenant team (tenant user)
+#   - platform-integration.teams-scraping.static.teams  → bundled-escalation, bundled-tenant
+#   - enums.escalation-teams                            → concatenated with any user-supplied entries
+#
+# passwordHash MUST be set explicitly per role (no defaults) — bcrypt; generate with:
+#   htpasswd -bnBC 10 "" 'changeme' | tr -d ':\n' | sed 's/^\$2y/\$2a/'
+# (htpasswd ships with Apache httpd — on macOS it's preinstalled; on Linux install apache2-utils / httpd-tools)
+bundled:
+  staticUsers:
+    enabled: false
+    leadership:
+      email: leadership@supportbot.local
+      userID: 11111111-1111-1111-1111-111111111111
+      passwordHash: ""
+    support:
+      email: support@supportbot.local
+      userID: 22222222-2222-2222-2222-222222222222
+      passwordHash: ""
+    escalation:
+      email: escalation@supportbot.local
+      userID: 33333333-3333-3333-3333-333333333333
+      passwordHash: ""
+    tenant:
+      email: tenant@supportbot.local
+      userID: 44444444-4444-4444-4444-444444444444
+      passwordHash: ""
