@@ -2,6 +2,10 @@ serviceAccount:
   annotations:
     iam.gke.io/gcp-service-account: support-bot-ca@core-platform-efb3c84c.iam.gserviceaccount.com
 
+# Extended tests use external auth (Azure/GCP) — no bundled Dex needed.
+dex:
+  enabled: false
+
 env:
   - name: DB_HOST
     valueFrom:

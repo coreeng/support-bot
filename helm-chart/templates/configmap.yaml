@@ -12,7 +12,7 @@ metadata:
 data:
 #trivy:ignore:AVD-KSV-0109 ConfigMap contains placeholder refs; real secrets are provided via K8s Secrets
   application.yaml: |
-    {{- toYaml (.Values.configMap.config | default dict) | nindent 4 }}
+    {{- include "support-bot.configmap.merged" . | nindent 4 }}
     {{- with .Values.sanitisation.patterns }}
     summary-data.sanitisation.patterns:
     {{- range . }}

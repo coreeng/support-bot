@@ -1,4 +1,5 @@
 {{- if .Values.ui.enabled -}}
+{{- include "support-bot.ui.validateAuthSecret" . -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -40,6 +41,14 @@ spec:
             {{- $uiEnv := .Values.ui.env | default list }}
             {{- if .Values.publicWebOrigin }}
             {{- $uiEnv = append $uiEnv (dict "name" "NEXTAUTH_URL" "value" .Values.publicWebOrigin) }}
+            {{- end }}
+            {{- $hasBackendUrl := false }}
+            {{- range $uiEnv }}
+            {{- if eq .name "BACKEND_URL" }}{{- $hasBackendUrl = true }}{{- end }}
+            {{- end }}
+            {{- if not $hasBackendUrl }}
+            {{- $apiSvc := printf "http://%s.%s.svc.cluster.local:%v" (include "support-bot.fullname" .) .Release.Namespace .Values.service.port }}
+            {{- $uiEnv = append $uiEnv (dict "name" "BACKEND_URL" "value" $apiSvc) }}
             {{- end }}
             {{- toYaml $uiEnv | nindent 12 }}
           livenessProbe:

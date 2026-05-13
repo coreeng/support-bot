@@ -45,6 +45,12 @@ spec:
             {{- if .Values.publicWebOrigin }}
             {{- $apiEnv = append $apiEnv (dict "name" "UI_ORIGIN" "value" .Values.publicWebOrigin) }}
             {{- end }}
+            {{- if .Values.dex.enabled }}
+            {{- $apiEnv = append $apiEnv (dict "name" "DEX_CLIENT_ID" "valueFrom" (dict "secretKeyRef" (dict "name" (include "support-bot.dex.clientSecretName" .) "key" "client-id"))) }}
+            {{- $apiEnv = append $apiEnv (dict "name" "DEX_CLIENT_SECRET" "valueFrom" (dict "secretKeyRef" (dict "name" (include "support-bot.dex.clientSecretName" .) "key" "client-secret"))) }}
+            {{- $apiEnv = append $apiEnv (dict "name" "DEX_ISSUER_URI" "value" .Values.dex.config.issuer) }}
+            {{- $apiEnv = append $apiEnv (dict "name" "DEX_INTERNAL_BASE_URL" "value" (include "support-bot.dex.internalBaseURL" .)) }}
+            {{- end }}
             {{- toYaml $apiEnv | nindent 12 }}
             {{- if .Values.analysisBundle.enabled }}
             - name: SUMMARY_DATA_ANALYSIS_BUNDLE_PATH
