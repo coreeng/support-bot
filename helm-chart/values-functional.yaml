@@ -2,6 +2,10 @@ configMap:
   create: false
   enabled: false
 
+# Functional tests don't use Dex; opt out of the support-bot chart's bundled Dex.
+dex:
+  enabled: false
+
 env:
   - name: SPRING_PROFILES_ACTIVE
     value: functionaltests
