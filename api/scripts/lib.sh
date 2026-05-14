@@ -81,18 +81,6 @@ show_job_status() {
   kubectl get pods -n "$ns" -l job-name="$job_name" || log_warning "Could not get pods for job $job_name"
 }
 
-# Print a Grafana Cloud-Logging deep link covering the test run. Mirrors the
-# behaviour of ui/p2p/scripts/helm-test.sh so test pods that have already been
-# cleaned up by `helm uninstall` can still be inspected via GCP Cloud Logging.
-#
-# Required env vars (set by caller before invoking):
-#   INTERNAL_SERVICES_DOMAIN  e.g. gcp-dev.cecg.platform.cecg.io
-#   PROJECT_ID                GCP project id
-#   LOGS_START                unix timestamp (s) captured before the run
-#
-# Args:
-#   $1 namespace
-#   $2 container_name (the test container, e.g. functional-tests / nft-tests)
 print_grafana_logs_url() {
   local ns="$1" container="$2"
   if [[ -z "${INTERNAL_SERVICES_DOMAIN:-}" || -z "${PROJECT_ID:-}" || -z "${LOGS_START:-}" ]]; then
@@ -105,14 +93,6 @@ print_grafana_logs_url() {
   echo "Logs: ${url}"
 }
 
-# Best-effort: dump kubectl logs from a job's pods to a local file BEFORE we
-# uninstall the release. Logs survive the pod even after helm uninstall.
-#
-# Args:
-#   $1 job_release name (matches metadata.name and helm release)
-#   $2 namespace
-#   $3 container name inside the test pod
-#   $4 destination dir (created if missing)
 save_job_logs() {
   local release="$1" ns="$2" container="$3" dest_dir="$4"
   mkdir -p "$dest_dir" 2>/dev/null || return 0
@@ -131,19 +111,12 @@ save_job_logs() {
     local out_file="${dest_dir}/${pod}.log"
     log "Saving logs: pod=${pod} container=${container} -> ${out_file}"
     {
-      echo "=== current container ==="
       kubectl logs -n "$ns" "$pod" -c "$container" --tail=-1 2>&1 || true
-      echo
-      echo "=== previous container instance (if any) ==="
       kubectl logs -n "$ns" "$pod" -c "$container" --previous --tail=-1 2>&1 || true
     } >"$out_file"
   done <<<"$pods"
 }
 
-# Sleep so node log shippers (fluent-bit) get a chance to push pod logs to
-# GCP Cloud Logging before we delete the pods. Default 30s leaves comfortable
-# headroom over fluent-bit's typical 5–15s flush+batch cycle to Cloud Logging.
-# Overridable via LOG_FLUSH_SECONDS (set to 0 to skip in dev).
 sleep_for_log_flush() {
   local secs="${LOG_FLUSH_SECONDS:-30}"
   if [[ "$secs" =~ ^[0-9]+$ ]] && (( secs > 0 )); then

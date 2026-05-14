@@ -1,7 +1,6 @@
 import { After, Before, setDefaultTimeout } from "@cucumber/cucumber";
 import { CustomWorld } from "./custom-world";
 
-// Set default timeout to 30 seconds for all steps to absorb CI jitter
 setDefaultTimeout(30_000);
 
 const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";

@@ -16,22 +16,16 @@ IMAGE_TAG="${IMAGE_TAG:?required argument}"
 SERVICE_IMAGE_REPOSITORY="${SERVICE_IMAGE_REPOSITORY:?required argument}"
 SERVICE_IMAGE_TAG="${SERVICE_IMAGE_TAG:?required argument}"
 CLEANUP="${CLEANUP:-true}"
-# Preserve pods on failure so logs are reachable AND fluent-bit has time to
-# ship them to Cloud Logging. CI can override with KEEP_ON_FAILURE=false.
 KEEP_ON_FAILURE="${KEEP_ON_FAILURE:-true}"
 TEST_LOGS_DIR="${TEST_LOGS_DIR:-${SCRIPT_DIR}/../../reports/integration}"
 
 # shellcheck source=deploy-service.sh
 . "${SCRIPT_DIR}/deploy-service.sh"
 
-# Set to 1 by main() when the integration job did not complete successfully.
 JOB_FAILED=0
 
 cleanup_job() {
-  # Print Grafana deep link first.
   print_grafana_logs_url "$NAMESPACE" "integration-tests" || true
-
-  # Snapshot kubectl logs before uninstall so they survive pod deletion.
   save_job_logs "$RELEASE_NAME" "$NAMESPACE" "integration-tests" "$TEST_LOGS_DIR" || true
 
   if [[ "$JOB_FAILED" == "1" && "$KEEP_ON_FAILURE" == "true" ]]; then
@@ -60,7 +54,6 @@ cleanup_job() {
   fi
 }
 
-# Capture the run start timestamp for the Grafana URL window.
 LOGS_START=$(date +%s)
 export LOGS_START
 

@@ -10,8 +10,6 @@ metadata:
     {{- include "support-bot.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": test
-    # Keep the test pod alive on failure so kubectl logs and the Grafana
-    # deep link from ui/p2p/scripts/helm-test.sh stay useful.
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   backoffLimit: 0

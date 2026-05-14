@@ -33,9 +33,6 @@ export class CustomWorld extends World {
     });
     this.page = await this.context.newPage();
 
-    // Playwright action/wait timeout. Keep below the 30s Cucumber step
-    // timeout so slow CI renders get a chance to retry without starving
-    // the surrounding step.
     this.page.setDefaultTimeout(20_000);
   }
 

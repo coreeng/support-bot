@@ -19,8 +19,6 @@ SERVICE_IMAGE_TAG="${SERVICE_IMAGE_TAG:-}"
 
 TIMEOUT="${TIMEOUT:-1200}"
 CLEANUP="${CLEANUP:-true}"
-# Preserve pods on failure so logs are reachable AND fluent-bit has time to
-# ship them to Cloud Logging. CI can override with KEEP_ON_FAILURE=false.
 KEEP_ON_FAILURE="${KEEP_ON_FAILURE:-true}"
 DEPLOY_SERVICE="${DEPLOY_SERVICE:-true}"
 TEST_LOGS_DIR="${TEST_LOGS_DIR:-${SCRIPT_DIR}/../../reports/nft}"
@@ -28,14 +26,10 @@ TEST_LOGS_DIR="${TEST_LOGS_DIR:-${SCRIPT_DIR}/../../reports/nft}"
 SERVICE_CHART_PATH="${SERVICE_CHART_PATH:-${SCRIPT_DIR}/../../helm-chart}"
 TEST_CHART_PATH="${TEST_CHART_PATH:-${SCRIPT_DIR}/../k8s/nft-tests}"
 
-# Set to 1 by main() when the job did not complete successfully.
 JOB_FAILED=0
 
 cleanup() {
-  # Print Grafana deep link first.
   print_grafana_logs_url "${NAMESPACE}" "nft-tests" || true
-
-  # Snapshot kubectl logs to disk before any uninstall.
   save_job_logs "${JOB_RELEASE}" "${NAMESPACE}" "nft-tests" "${TEST_LOGS_DIR}/job" || true
 
   if [[ "${JOB_FAILED}" == "1" && "${KEEP_ON_FAILURE}" == "true" ]]; then
@@ -52,7 +46,6 @@ cleanup() {
     return
   fi
 
-  # Let fluent-bit flush before deleting pods.
   sleep_for_log_flush
   log "Cleaning up Helm releases in namespace: ${NAMESPACE}"
   helm uninstall "${JOB_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
@@ -60,7 +53,6 @@ cleanup() {
   helm uninstall "${DB_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
 }
 
-# Capture the run start timestamp for the Grafana URL window.
 LOGS_START=$(date +%s)
 export LOGS_START
 

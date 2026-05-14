@@ -22,19 +22,13 @@ CLEAN_DEPLOY_DB="${CLEAN_DEPLOY_DB:-true}" # controls DB deployment via deploy-s
 SERVICE_IMAGE_REPOSITORY="${SERVICE_IMAGE_REPOSITORY:-}"
 SERVICE_IMAGE_TAG="${SERVICE_IMAGE_TAG:-}"
 CLEANUP="${CLEANUP:-true}"
-# Preserve pods on failure so logs are reachable AND fluent-bit has time to
-# ship them to Cloud Logging. CI can override with KEEP_ON_FAILURE=false.
 KEEP_ON_FAILURE="${KEEP_ON_FAILURE:-true}"
 TEST_LOGS_DIR="${TEST_LOGS_DIR:-${SCRIPT_DIR}/../../reports/functional}"
 
-# Set to 1 by main() when wait_for_job_with_logs returns non-zero.
 JOB_FAILED=0
 
 cleanup_all() {
-  # Always print the Grafana deep link, even when we keep the pods.
   print_grafana_logs_url "$NAMESPACE" "functional-tests" || true
-
-  # Best-effort: snapshot kubectl logs to disk BEFORE any potential uninstall.
   save_job_logs "$JOB_RELEASE" "$NAMESPACE" "functional-tests" "$TEST_LOGS_DIR" || true
 
   if [[ "$JOB_FAILED" == "1" && "$KEEP_ON_FAILURE" == "true" ]]; then
@@ -47,8 +41,6 @@ cleanup_all() {
   fi
 
   if [[ "$CLEANUP" == "true" ]]; then
-    # Give node-level log shippers a chance to push to Cloud Logging before
-    # we delete the pods — otherwise the Grafana URL above returns empty.
     sleep_for_log_flush
     log "Cleaning up Helm releases in namespace: $NAMESPACE"
     helm uninstall "$JOB_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
@@ -59,7 +51,6 @@ cleanup_all() {
   fi
 }
 
-# Capture the run start timestamp for the Grafana URL window.
 LOGS_START=$(date +%s)
 export LOGS_START
 
