@@ -6,6 +6,7 @@
       "snippetInterface": "async-await"
     },
     "timeout": 15000,
-    "format": [["html", "cucumber-report.html"], "summary", "progress", "json:./cucumber-report.json"]
+    "forceExit": true,
+    "format": [["html", "cucumber-report.html"], "progress", "json:./cucumber-report.json"]
   }
 }

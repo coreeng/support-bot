@@ -4,6 +4,13 @@ import { Browser, BrowserContext, chromium, Page } from "@playwright/test";
 // Shared browser instance per worker (for parallel execution)
 let sharedBrowser: Browser | null = null;
 
+export async function closeSharedBrowser(): Promise<void> {
+  if (sharedBrowser && sharedBrowser.isConnected()) {
+    await sharedBrowser.close().catch(() => {});
+  }
+  sharedBrowser = null;
+}
+
 export class CustomWorld extends World {
   browser!: Browser;
   context!: BrowserContext;
@@ -43,14 +50,6 @@ export class CustomWorld extends World {
     }
     if (this.context) {
       await this.context.close().catch(() => {});
-    }
-  }
-
-  async closeBrowser() {
-    // Close the shared browser at the end of the worker
-    if (sharedBrowser && sharedBrowser.isConnected()) {
-      await sharedBrowser.close().catch(() => {});
-      sharedBrowser = null;
     }
   }
 }
