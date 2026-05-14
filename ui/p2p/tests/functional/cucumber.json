@@ -10,11 +10,6 @@
       "snippetInterface": "async-await",
       "colorsEnabled": true
     },
-    "format": [
-      "summary",
-      "progress",
-      ["html", "cucumber-report.html"],
-      ["json", "cucumber-report.json"]
-    ]
+    "format": ["summary", "progress", "pretty", ["html", "cucumber-report.html"], ["json", "cucumber-report.json"]]
   }
 }
