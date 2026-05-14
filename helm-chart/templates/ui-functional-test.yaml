@@ -26,4 +26,6 @@ spec:
           env:
             - name: SERVICE_ENDPOINT
               value: "{{ $serviceEndpoint }}"
+          resources:
+            {{- toYaml .Values.ui.functionalTest.resources | nindent 12 }}
 {{- end }}
