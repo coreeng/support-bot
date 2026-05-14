@@ -29,7 +29,7 @@ job:
 
 resources:
   requests:
-    cpu: 500m
+    cpu: 1000m
     memory: 2Gi
   limits:
     memory: 2Gi
