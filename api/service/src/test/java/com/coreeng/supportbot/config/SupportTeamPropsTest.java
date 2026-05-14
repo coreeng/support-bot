@@ -33,4 +33,25 @@ class SupportTeamPropsTest {
                 .hasMessageContaining("slack-group-id")
                 .hasMessageContaining("PT-351");
     }
+
+    @Test
+    void construction_acceptsLegacySlackGroupId_andPromotesToSlackGroupRef() {
+        var props = new SupportTeamProps("Support", "support", null, "S01234LEGACY");
+        assertThat(props.groupRef()).isEqualTo(new GroupRef.Slack("S01234LEGACY"));
+        assertThat(props.slackId()).isEqualTo("S01234LEGACY");
+    }
+
+    @Test
+    void construction_prefersGroupRefWhenBothLegacyAndNewKeysSet() {
+        var props = new SupportTeamProps(
+                "Support", "support", new GroupRef.Slack("S08948NBMED"), "S01234LEGACY");
+        assertThat(props.groupRef()).isEqualTo(new GroupRef.Slack("S08948NBMED"));
+    }
+
+    @Test
+    void construction_treatsBlankLegacySlackGroupIdAsAbsent() {
+        assertThatThrownBy(() -> new SupportTeamProps("Support", "support", null, "  "))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("team.support.group-ref is required");
+    }
 }

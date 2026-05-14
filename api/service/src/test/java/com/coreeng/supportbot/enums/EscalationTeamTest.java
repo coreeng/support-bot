@@ -41,4 +41,35 @@ class EscalationTeamTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("slack-mention-group-id");
     }
+
+    @Test
+    @SuppressWarnings("NullAway")
+    void construction_throwsMigrationHint_whenGroupRefAndLegacySlackGroupIdAreNull() {
+        GroupRef nullRef = null;
+        assertThatThrownBy(() -> new EscalationTeam("WoW", "wow", nullRef, null, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("enums.escalation-teams[wow].group-ref is required")
+                .hasMessageContaining("slack-group-id")
+                .hasMessageContaining("PT-351");
+    }
+
+    @Test
+    void construction_acceptsLegacySlackGroupId_andPromotesToSlackGroupRef() {
+        var team = new EscalationTeam("WoW", "wow", null, null, "S01234LEGACY");
+        assertThat(team.groupRef()).isEqualTo(new GroupRef.Slack("S01234LEGACY"));
+        assertThat(team.slackMentionId()).isEqualTo("S01234LEGACY");
+    }
+
+    @Test
+    void construction_prefersGroupRefWhenBothLegacyAndNewKeysSet() {
+        var team = new EscalationTeam("WoW", "wow", new GroupRef.Slack("S08948NBMED"), null, "S01234LEGACY");
+        assertThat(team.groupRef()).isEqualTo(new GroupRef.Slack("S08948NBMED"));
+    }
+
+    @Test
+    void construction_treatsBlankLegacySlackGroupIdAsAbsent() {
+        assertThatThrownBy(() -> new EscalationTeam("WoW", "wow", null, null, "  "))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("enums.escalation-teams[wow].group-ref is required");
+    }
 }
