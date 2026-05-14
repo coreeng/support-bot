@@ -100,7 +100,10 @@ configMap:
 
 resources:
   requests:
-    cpu: 256m
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 500m
     memory: 1Gi
 
 nodeSelector: {}
