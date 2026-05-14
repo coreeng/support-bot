@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  */
 public interface AnalysisRepository {
+    // test change
 
     /**
      * Gets the top 5 categories for "Knowledge Gap" driver with up to 5 example summaries
