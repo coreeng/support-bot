@@ -58,3 +58,4 @@ jobs:
       artifacts: |
         p2p-nft:
           - reports/nft/**
+      image-scan-upload-sarif: true
