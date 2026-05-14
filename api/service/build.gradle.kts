@@ -280,6 +280,8 @@ jooq {
                 includes = ".*"
                 excludes = "flyway_schema_history"
                 inputSchema = "public"
+                // Emit unqualified table refs so runtime search_path picks the schema.
+                withOutputSchemaToDefault(true)
 
                 forcedTypes {
                     forcedType {

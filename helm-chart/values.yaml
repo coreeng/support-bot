@@ -164,6 +164,8 @@ env:
     value: "supportbot"
   - name: DB_PASSWORD
     value: "supportbotpassword"
+  - name: DB_SCHEMA
+    value: "public"
   - name: SLACK_TOKEN
     valueFrom:
       secretKeyRef:
