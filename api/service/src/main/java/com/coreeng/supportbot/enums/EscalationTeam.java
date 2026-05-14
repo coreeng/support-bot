@@ -12,7 +12,8 @@ public record EscalationTeam(
         String code,
         GroupRef groupRef,
         @Nullable String slackMentionGroupId,
-        @Nullable @Deprecated String slackGroupId) implements EnumerationValue {
+        @Nullable @Deprecated String slackGroupId)
+        implements EnumerationValue {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(EscalationTeam.class);
 

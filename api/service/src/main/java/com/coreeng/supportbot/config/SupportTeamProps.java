@@ -9,13 +9,15 @@ import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 @ConfigurationProperties("team.support")
 public record SupportTeamProps(
-        String name, String code, GroupRef groupRef, @Nullable @Deprecated String slackGroupId) {
+        String name,
+        String code,
+        GroupRef groupRef,
+        @Nullable @Deprecated String slackGroupId) {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SupportTeamProps.class);
 
     @ConstructorBinding
-    public SupportTeamProps(
-            String name, String code, @Nullable GroupRef groupRef, @Nullable String slackGroupId) {
+    public SupportTeamProps(String name, String code, @Nullable GroupRef groupRef, @Nullable String slackGroupId) {
         if (groupRef == null && slackGroupId != null && !slackGroupId.isBlank()) {
             LOGGER.warn(
                     "'team.support.slack-group-id' is deprecated; use 'team.support.group-ref'"
@@ -23,9 +25,8 @@ public record SupportTeamProps(
                     slackGroupId);
             groupRef = new GroupRef.Slack(slackGroupId);
         } else if (groupRef != null && slackGroupId != null && !slackGroupId.isBlank()) {
-            LOGGER.warn(
-                    "Both 'team.support.group-ref' and deprecated 'team.support.slack-group-id' are set;"
-                            + " 'group-ref' takes precedence. Remove 'slack-group-id' (PT-351 migration).");
+            LOGGER.warn("Both 'team.support.group-ref' and deprecated 'team.support.slack-group-id' are set;"
+                    + " 'group-ref' takes precedence. Remove 'slack-group-id' (PT-351 migration).");
         }
         if (groupRef == null) {
             throw new IllegalStateException("team.support.group-ref is required."

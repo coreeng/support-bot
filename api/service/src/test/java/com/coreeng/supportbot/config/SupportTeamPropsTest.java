@@ -43,8 +43,7 @@ class SupportTeamPropsTest {
 
     @Test
     void construction_prefersGroupRefWhenBothLegacyAndNewKeysSet() {
-        var props = new SupportTeamProps(
-                "Support", "support", new GroupRef.Slack("S08948NBMED"), "S01234LEGACY");
+        var props = new SupportTeamProps("Support", "support", new GroupRef.Slack("S08948NBMED"), "S01234LEGACY");
         assertThat(props.groupRef()).isEqualTo(new GroupRef.Slack("S08948NBMED"));
     }
 

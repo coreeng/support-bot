@@ -9,7 +9,10 @@ import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 @ConfigurationProperties("team.leadership")
 public record SupportLeadershipTeamProps(
-        String name, String code, GroupRef groupRef, @Nullable @Deprecated String slackGroupId) {
+        String name,
+        String code,
+        GroupRef groupRef,
+        @Nullable @Deprecated String slackGroupId) {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SupportLeadershipTeamProps.class);
 
@@ -23,9 +26,8 @@ public record SupportLeadershipTeamProps(
                     slackGroupId);
             groupRef = new GroupRef.Slack(slackGroupId);
         } else if (groupRef != null && slackGroupId != null && !slackGroupId.isBlank()) {
-            LOGGER.warn(
-                    "Both 'team.leadership.group-ref' and deprecated 'team.leadership.slack-group-id' are set;"
-                            + " 'group-ref' takes precedence. Remove 'slack-group-id' (PT-351 migration).");
+            LOGGER.warn("Both 'team.leadership.group-ref' and deprecated 'team.leadership.slack-group-id' are set;"
+                    + " 'group-ref' takes precedence. Remove 'slack-group-id' (PT-351 migration).");
         }
         if (groupRef == null) {
             throw new IllegalStateException("team.leadership.group-ref is required."
