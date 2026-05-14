@@ -32,7 +32,6 @@ resources:
     cpu: 500m
     memory: 2Gi
   limits:
-    cpu: 500m
     memory: 2Gi
 
 nodeSelector: {}
