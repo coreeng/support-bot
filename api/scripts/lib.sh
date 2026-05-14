@@ -81,3 +81,74 @@ show_job_status() {
   kubectl get pods -n "$ns" -l job-name="$job_name" || log_warning "Could not get pods for job $job_name"
 }
 
+# Print a Grafana Cloud-Logging deep link covering the test run. Mirrors the
+# behaviour of ui/p2p/scripts/helm-test.sh so test pods that have already been
+# cleaned up by `helm uninstall` can still be inspected via GCP Cloud Logging.
+#
+# Required env vars (set by caller before invoking):
+#   INTERNAL_SERVICES_DOMAIN  e.g. gcp-dev.cecg.platform.cecg.io
+#   PROJECT_ID                GCP project id
+#   LOGS_START                unix timestamp (s) captured before the run
+#
+# Args:
+#   $1 namespace
+#   $2 container_name (the test container, e.g. functional-tests / nft-tests)
+print_grafana_logs_url() {
+  local ns="$1" container="$2"
+  if [[ -z "${INTERNAL_SERVICES_DOMAIN:-}" || -z "${PROJECT_ID:-}" || -z "${LOGS_START:-}" ]]; then
+    return 0
+  fi
+  local now
+  now=$(date +%s)
+  local url
+  url="https://grafana.${INTERNAL_SERVICES_DOMAIN}/explore?orgId=1&left=%7B%22datasource%22:%22CloudLogging%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22queryText%22:%22resource.type%3D%5C%22k8s_container%5C%22%5Cnresource.labels.namespace_name%3D%5C%22${ns}%5C%22%5Cnresource.labels.container_name%3D%5C%22${container}%5C%22%22,%22projectId%22:%22${PROJECT_ID}%22,%22bucketId%22:%22global%2Fbuckets%2F_Default%22,%22viewId%22:%22_AllLogs%22%7D%5D,%22range%22:%7B%22from%22:%22${LOGS_START}000%22,%22to%22:%22${now}000%22%7D%7D"
+  echo "Logs: ${url}"
+}
+
+# Best-effort: dump kubectl logs from a job's pods to a local file BEFORE we
+# uninstall the release. Logs survive the pod even after helm uninstall.
+#
+# Args:
+#   $1 job_release name (matches metadata.name and helm release)
+#   $2 namespace
+#   $3 container name inside the test pod
+#   $4 destination dir (created if missing)
+save_job_logs() {
+  local release="$1" ns="$2" container="$3" dest_dir="$4"
+  mkdir -p "$dest_dir" 2>/dev/null || return 0
+
+  local pods
+  pods=$(kubectl get pods -n "$ns" -l job-name="$release" \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+
+  if [[ -z "$pods" ]]; then
+    log_warning "save_job_logs: no pods found for job ${release} in ${ns}"
+    return 0
+  fi
+
+  while IFS= read -r pod; do
+    [[ -z "$pod" ]] && continue
+    local out_file="${dest_dir}/${pod}.log"
+    log "Saving logs: pod=${pod} container=${container} -> ${out_file}"
+    {
+      echo "=== current container ==="
+      kubectl logs -n "$ns" "$pod" -c "$container" --tail=-1 2>&1 || true
+      echo
+      echo "=== previous container instance (if any) ==="
+      kubectl logs -n "$ns" "$pod" -c "$container" --previous --tail=-1 2>&1 || true
+    } >"$out_file"
+  done <<<"$pods"
+}
+
+# Sleep so node log shippers (fluent-bit) get a chance to push pod logs to
+# GCP Cloud Logging before we delete the pods. Default 30s leaves comfortable
+# headroom over fluent-bit's typical 5–15s flush+batch cycle to Cloud Logging.
+# Overridable via LOG_FLUSH_SECONDS (set to 0 to skip in dev).
+sleep_for_log_flush() {
+  local secs="${LOG_FLUSH_SECONDS:-30}"
+  if [[ "$secs" =~ ^[0-9]+$ ]] && (( secs > 0 )); then
+    log "Sleeping ${secs}s to let fluent-bit ship pod logs to Cloud Logging..."
+    sleep "$secs"
+  fi
+}
+

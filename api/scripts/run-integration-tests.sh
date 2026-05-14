@@ -16,12 +16,35 @@ IMAGE_TAG="${IMAGE_TAG:?required argument}"
 SERVICE_IMAGE_REPOSITORY="${SERVICE_IMAGE_REPOSITORY:?required argument}"
 SERVICE_IMAGE_TAG="${SERVICE_IMAGE_TAG:?required argument}"
 CLEANUP="${CLEANUP:-true}"
+# Preserve pods on failure so logs are reachable AND fluent-bit has time to
+# ship them to Cloud Logging. CI can override with KEEP_ON_FAILURE=false.
+KEEP_ON_FAILURE="${KEEP_ON_FAILURE:-true}"
+TEST_LOGS_DIR="${TEST_LOGS_DIR:-${SCRIPT_DIR}/../../reports/integration}"
 
 # shellcheck source=deploy-service.sh
 . "${SCRIPT_DIR}/deploy-service.sh"
 
+# Set to 1 by main() when the integration job did not complete successfully.
+JOB_FAILED=0
+
 cleanup_job() {
+  # Print Grafana deep link first.
+  print_grafana_logs_url "$NAMESPACE" "integration-tests" || true
+
+  # Snapshot kubectl logs before uninstall so they survive pod deletion.
+  save_job_logs "$RELEASE_NAME" "$NAMESPACE" "integration-tests" "$TEST_LOGS_DIR" || true
+
+  if [[ "$JOB_FAILED" == "1" && "$KEEP_ON_FAILURE" == "true" ]]; then
+    log_warning "Integration tests failed; preserving namespace ${NAMESPACE} so logs stay reachable."
+    log_warning "  Local log snapshot: ${TEST_LOGS_DIR}/"
+    log_warning "  Inspect pods:       kubectl get pods -n ${NAMESPACE}"
+    log_warning "  Tail logs:          kubectl logs -n ${NAMESPACE} -l job-name=${RELEASE_NAME} --tail=-1"
+    log_warning "  Manual cleanup:     helm uninstall ${RELEASE_NAME} support-bot-dex support-bot-ldap support-bot ${DB_RELEASE:-support-bot-db} -n ${NAMESPACE}"
+    return 0
+  fi
+
   if [[ "$CLEANUP" == "true" ]]; then
+    sleep_for_log_flush
     log "Cleaning up Helm releases in namespace: $NAMESPACE"
     helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --ignore-not-found || true
     helm uninstall support-bot-dex -n "$NAMESPACE" --ignore-not-found || true
@@ -36,6 +59,11 @@ cleanup_job() {
     helm uninstall "$DB_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
   fi
 }
+
+# Capture the run start timestamp for the Grafana URL window.
+LOGS_START=$(date +%s)
+export LOGS_START
+
 trap cleanup_job EXIT
 
 deploy_chart() {
@@ -100,6 +128,7 @@ main() {
     log_success "Integration tests passed!"
     exit 0
   else
+    JOB_FAILED=1
     log_error "Integration tests failed!"
     show_job_status "$RELEASE_NAME" "$NAMESPACE"
     exit 1

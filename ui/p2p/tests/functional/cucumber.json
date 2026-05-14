@@ -1,11 +1,20 @@
 {
   "default": {
     "requireModule": ["ts-node/register"],
+    "paths": ["tests/features/"],
     "require": ["tests/steps/*.ts"],
+    "tags": "not @disabled",
+    "timeout": 30000,
+    "retry": 3,
     "formatOptions": {
-      "snippetInterface": "async-await"
+      "snippetInterface": "async-await",
+      "colorsEnabled": true
     },
-    "timeout": 15000,
-    "format": [["html", "cucumber-report.html"], "summary", "progress", "json:./cucumber-report.json"]
+    "format": [
+      "summary",
+      "progress",
+      ["html", "cucumber-report.html"],
+      ["json", "cucumber-report.json"]
+    ]
   }
 }
