@@ -71,8 +71,16 @@ spring:
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
     hikari:
+      connection-init-sql: SET search_path TO "${app.db.schema}"
       data-source-properties:
         reWriteBatchedInserts: true
+  flyway:
+    default-schema: ${app.db.schema}
+    schemas: ${app.db.schema}
+
+app:
+  db:
+    schema: ${DB_SCHEMA:public}
 
 slack:
   mode: socket # socket or http
