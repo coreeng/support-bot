@@ -48,7 +48,7 @@ env:
 
 The chart will:
 - Run Flyway against that schema (including `flyway_schema_history`, so migration state is deterministic).
-- Set `search_path` on every Hikari connection, so jOOQ-generated queries (which are emitted against `public` at codegen time) are rewritten to the configured schema at runtime.
+- Set `search_path` on every Hikari connection, so all queries — jOOQ-generated and raw SQL alike — resolve to the configured schema at runtime.
 
 The schema must exist and the connecting role must be able to create objects in it. Have your DBA run, once, before the first install:
 
