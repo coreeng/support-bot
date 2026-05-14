@@ -15,7 +15,8 @@ public class JooqConfig {
         return cfg -> cfg.settings()
                 .withRenderMapping(new RenderMapping()
                         .withSchemata(new MappedSchema()
-                                // "public" here must match jOOQ codegen's inputSchema in build.gradle.kts — if that changes, change it here too.
+                                // "public" here must match jOOQ codegen's inputSchema in build.gradle.kts — if that
+                                // changes, change it here too.
                                 .withInput("public")
                                 .withOutput(schema)));
     }
