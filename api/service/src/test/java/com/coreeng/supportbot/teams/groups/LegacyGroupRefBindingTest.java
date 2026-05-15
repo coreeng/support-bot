@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.config.SupportTeamProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
+import com.coreeng.supportbot.security.JwtGroupsProperties;
 import com.coreeng.supportbot.teams.SupportLeadershipTeamProps;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,6 +48,28 @@ class LegacyGroupRefBindingTest {
 
         assertThat(bound.groupRef()).isEqualTo(new GroupRef.Slack("S01234LEADER"));
         assertThat(bound.slackId()).isEqualTo("S01234LEADER");
+    }
+
+    @Test
+    void jwtGroupsProperties_bindsLegacyClaimValuesKey() {
+        Map<String, Object> props = new LinkedHashMap<>();
+        props.put("platform-integration.jwt-groups.enabled", "true");
+        props.put("platform-integration.jwt-groups.claim-name", "groups");
+        props.put("platform-integration.jwt-groups.mappings[0].claim-values[0]", "group-a");
+        props.put("platform-integration.jwt-groups.mappings[0].team-code", "team-a");
+        props.put("platform-integration.jwt-groups.mappings[1].claim-values[0]", "group-b");
+        props.put("platform-integration.jwt-groups.mappings[1].team-code", "team-b");
+        props.put("platform-integration.jwt-groups.mappings[2].claim-values[0]", "group-c");
+        props.put("platform-integration.jwt-groups.mappings[2].team-code", "team-c");
+
+        JwtGroupsProperties bound = bind(props, "platform-integration.jwt-groups", JwtGroupsProperties.class);
+
+        assertThat(bound.mappings())
+                .extracting(JwtGroupsProperties.Mapping::teamCode, JwtGroupsProperties.Mapping::groupRef)
+                .containsExactly(
+                        Assertions.tuple("team-a", new GroupRef.Jwt("group-a")),
+                        Assertions.tuple("team-b", new GroupRef.Jwt("group-b")),
+                        Assertions.tuple("team-c", new GroupRef.Jwt("group-c")));
     }
 
     @Test

@@ -47,4 +47,39 @@ class JwtGroupsPropertiesTest {
         var props = new JwtGroupsProperties(true, "  ", List.of());
         assertThat(props.claimName()).isEqualTo("groups");
     }
+
+    @Test
+    void mapping_acceptsLegacyClaimValuesSingleton_andPromotesToJwtGroupRef() {
+        var mapping = new JwtGroupsProperties.Mapping(null, "wow", List.of("developers"));
+        assertThat(mapping.groupRef()).isEqualTo(new GroupRef.Jwt("developers"));
+        assertThat(mapping.teamCode()).isEqualTo("wow");
+    }
+
+    @Test
+    void mapping_acceptsLegacyClaimValuesMultiple_andUsesFirstWithWarning() {
+        var mapping = new JwtGroupsProperties.Mapping(null, "wow", List.of("developers", "contributors"));
+        assertThat(mapping.groupRef()).isEqualTo(new GroupRef.Jwt("developers"));
+    }
+
+    @Test
+    void mapping_prefersGroupRefWhenBothLegacyAndNewKeysSet() {
+        var mapping = new JwtGroupsProperties.Mapping(new GroupRef.Jwt("typed-group"), "wow", List.of("legacy-group"));
+        assertThat(mapping.groupRef()).isEqualTo(new GroupRef.Jwt("typed-group"));
+    }
+
+    @Test
+    void mapping_emptyClaimValuesAndNullGroupRef_throwsMigrationHint() {
+        assertThatThrownBy(() -> new JwtGroupsProperties.Mapping(null, "wow", List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must specify 'group-ref'")
+                .hasMessageContaining("wow");
+    }
+
+    @Test
+    void mapping_blankFirstClaimValue_throws() {
+        assertThatThrownBy(() -> new JwtGroupsProperties.Mapping(null, "wow", List.of("  ")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("blank legacy 'claim-values'")
+                .hasMessageContaining("wow");
+    }
 }

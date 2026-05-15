@@ -3,6 +3,8 @@ package com.coreeng.supportbot.security;
 import com.coreeng.supportbot.teams.groups.GroupRef;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
@@ -22,9 +24,44 @@ public record JwtGroupsProperties(boolean enabled, String claimName, List<Mappin
         this.mappings = mappings == null ? List.of() : mappings;
     }
 
-    public record Mapping(GroupRef groupRef, String teamCode) {
+    public record Mapping(
+            GroupRef groupRef,
+            String teamCode,
+            @Nullable @Deprecated List<String> claimValues) {
+
+        private static final Logger LOGGER = LoggerFactory.getLogger(Mapping.class);
+
         @ConstructorBinding
-        public Mapping(@Nullable GroupRef groupRef, String teamCode) {
+        public Mapping(@Nullable GroupRef groupRef, String teamCode, @Nullable List<String> claimValues) {
+            if (groupRef == null && claimValues != null && !claimValues.isEmpty()) {
+                String first = claimValues.get(0);
+                if (first == null || first.isBlank()) {
+                    throw new IllegalArgumentException(
+                            "jwt-groups mapping for team-code '" + teamCode
+                                    + "' has blank legacy 'claim-values' entry; specify 'group-ref' instead (PT-351 migration).");
+                }
+                LOGGER.warn(
+                        "'platform-integration.jwt-groups.mappings[team-code={}].claim-values' is deprecated;"
+                                + " use 'group-ref: jwt:{}'. Legacy key will be removed in a future release"
+                                + " (PT-351 migration).",
+                        teamCode,
+                        first);
+                if (claimValues.size() > 1) {
+                    LOGGER.warn(
+                            "jwt-groups mapping for team-code '{}' has {} legacy 'claim-values' entries"
+                                    + " — only the first ('{}') is honoured. Split into one mapping per value"
+                                    + " using typed 'group-ref' (PT-351 migration).",
+                            teamCode,
+                            claimValues.size(),
+                            first);
+                }
+                groupRef = new GroupRef.Jwt(first);
+            } else if (groupRef != null && claimValues != null && !claimValues.isEmpty()) {
+                LOGGER.warn(
+                        "jwt-groups mapping for team-code '{}' has both 'group-ref' and deprecated 'claim-values'"
+                                + " set; 'group-ref' takes precedence. Remove 'claim-values' (PT-351 migration).",
+                        teamCode);
+            }
             if (groupRef == null) {
                 throw new IllegalArgumentException(
                         "jwt-groups mapping for team-code '" + teamCode + "' must specify 'group-ref'");
@@ -35,6 +72,11 @@ public record JwtGroupsProperties(boolean enabled, String claimName, List<Mappin
             }
             this.groupRef = groupRef;
             this.teamCode = teamCode;
+            this.claimValues = claimValues;
+        }
+
+        public Mapping(GroupRef groupRef, String teamCode) {
+            this(groupRef, teamCode, null);
         }
     }
 }
