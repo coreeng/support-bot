@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +35,11 @@ public class TenantInsightsFunctionalTests {
 
     @BeforeEach
     void cleanup() {
+        supportBotClient.test().cleanupPrTrackingRecords();
+    }
+
+    @AfterEach
+    void cleanupAfter() {
         supportBotClient.test().cleanupPrTrackingRecords();
     }
 

@@ -22,9 +22,26 @@ CLEAN_DEPLOY_DB="${CLEAN_DEPLOY_DB:-true}" # controls DB deployment via deploy-s
 SERVICE_IMAGE_REPOSITORY="${SERVICE_IMAGE_REPOSITORY:-}"
 SERVICE_IMAGE_TAG="${SERVICE_IMAGE_TAG:-}"
 CLEANUP="${CLEANUP:-true}"
+KEEP_ON_FAILURE="${KEEP_ON_FAILURE:-true}"
+TEST_LOGS_DIR="${TEST_LOGS_DIR:-${SCRIPT_DIR}/../../reports/functional}"
+
+JOB_FAILED=0
 
 cleanup_all() {
+  print_grafana_logs_url "$NAMESPACE" "functional-tests" || true
+  save_job_logs "$JOB_RELEASE" "$NAMESPACE" "functional-tests" "$TEST_LOGS_DIR" || true
+
+  if [[ "$JOB_FAILED" == "1" && "$KEEP_ON_FAILURE" == "true" ]]; then
+    log_warning "Functional tests failed; preserving namespace ${NAMESPACE} so logs stay reachable."
+    log_warning "  Local log snapshot: ${TEST_LOGS_DIR}/"
+    log_warning "  Inspect pods:       kubectl get pods -n ${NAMESPACE}"
+    log_warning "  Tail logs:          kubectl logs -n ${NAMESPACE} -l job-name=${JOB_RELEASE} --tail=-1"
+    log_warning "  Manual cleanup:     helm uninstall ${JOB_RELEASE} ${SERVICE_RELEASE} ${DB_RELEASE} -n ${NAMESPACE}"
+    return 0
+  fi
+
   if [[ "$CLEANUP" == "true" ]]; then
+    sleep_for_log_flush
     log "Cleaning up Helm releases in namespace: $NAMESPACE"
     helm uninstall "$JOB_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
     helm uninstall "$SERVICE_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
@@ -33,6 +50,9 @@ cleanup_all() {
     log_warning "Cleanup disabled. Releases will remain in namespace $NAMESPACE"
   fi
 }
+
+LOGS_START=$(date +%s)
+export LOGS_START
 
 trap cleanup_all EXIT
 
@@ -80,6 +100,7 @@ main() {
     log_success "Functional tests passed!"
     exit 0
   else
+    JOB_FAILED=1
     log_error "Functional tests failed!"
     show_job_status "$JOB_RELEASE" "$NAMESPACE"
     exit 1
