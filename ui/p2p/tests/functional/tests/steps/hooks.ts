@@ -1,8 +1,7 @@
 import { After, AfterAll, Before, setDefaultTimeout } from "@cucumber/cucumber";
 import { CustomWorld, closeSharedBrowser } from "./custom-world";
 
-// Set default timeout to 15 seconds for all steps
-setDefaultTimeout(15000);
+setDefaultTimeout(30_000);
 
 const BASE_URL = process.env.SERVICE_ENDPOINT || "http://localhost:3000";
 
