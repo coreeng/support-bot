@@ -17,9 +17,11 @@ import java.util.Locale;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
 @Slf4j
 public class PrMessageRenderer {
 

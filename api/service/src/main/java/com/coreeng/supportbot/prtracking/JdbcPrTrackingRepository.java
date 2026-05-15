@@ -19,11 +19,13 @@ import org.jooq.types.DayToSecond;
 import org.jooq.types.YearToMonth;
 import org.jooq.types.YearToSecond;
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
+@ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Transactional
 @Slf4j
