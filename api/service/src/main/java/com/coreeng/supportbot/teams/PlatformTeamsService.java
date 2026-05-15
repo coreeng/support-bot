@@ -5,6 +5,8 @@ import static java.util.stream.Collectors.joining;
 
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
+import com.coreeng.supportbot.teams.groups.GroupRef;
+import com.coreeng.supportbot.teams.groups.GroupResolver;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -34,13 +36,13 @@ import org.jspecify.annotations.Nullable;
 @Slf4j
 public class PlatformTeamsService {
     private final PlatformTeamsFetcher teamsFetcher;
-    private final PlatformUsersFetcher usersFetcher;
+    private final GroupResolver groupResolver;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
     private final PlatformTeamsFetchProps fetchProps;
 
     private final Map<String, PlatformUser> usersByEmail = new HashMap<>();
     private final Map<String, PlatformTeam> teamByName = new HashMap<>();
-    private final Map<String, List<PlatformUser>> groupIdToUsers = new HashMap<>();
+    private final Map<GroupRef, List<PlatformUser>> groupRefToUsers = new HashMap<>();
 
     @PostConstruct
     void init() {
@@ -55,20 +57,20 @@ public class PlatformTeamsService {
             team.groupRefs().add(t.groupRef());
         }
 
-        Set<String> uniqueGroupRefs = teams.stream()
+        Set<GroupRef> uniqueGroupRefs = teams.stream()
                 .map(PlatformTeamsFetcher.TeamAndGroupTuple::groupRef)
                 .collect(Collectors.toSet());
 
         int maxConcurrency = Math.max(1, fetchProps.maxConcurrency());
         Duration timeout = fetchProps.timeout();
 
-        Map<String, List<PlatformUsersFetcher.Membership>> membershipsByGroupRef =
+        Map<GroupRef, List<PlatformUsersFetcher.Membership>> membershipsByGroupRef =
                 fetchMembershipsInParallel(uniqueGroupRefs, maxConcurrency, timeout);
 
         // Materialize users and relations on the main thread
-        Map<String, List<PlatformUser>> fetchedGroupUsers = new HashMap<>();
-        for (Map.Entry<String, List<PlatformUsersFetcher.Membership>> e : membershipsByGroupRef.entrySet()) {
-            String groupRef = e.getKey();
+        Map<GroupRef, List<PlatformUser>> fetchedGroupUsers = new HashMap<>();
+        for (Map.Entry<GroupRef, List<PlatformUsersFetcher.Membership>> e : membershipsByGroupRef.entrySet()) {
+            GroupRef groupRef = e.getKey();
             List<PlatformUsersFetcher.Membership> memberships = e.getValue();
             List<PlatformUser> users = new ArrayList<>(memberships.size());
             for (PlatformUsersFetcher.Membership m : memberships) {
@@ -80,10 +82,10 @@ public class PlatformTeamsService {
             fetchedGroupUsers.put(groupRef, users);
         }
 
-        groupIdToUsers.putAll(fetchedGroupUsers);
+        groupRefToUsers.putAll(fetchedGroupUsers);
         for (PlatformTeam team : teamByName.values()) {
-            for (String groupRef : team.groupRefs()) {
-                List<PlatformUser> users = groupIdToUsers.getOrDefault(groupRef, List.of());
+            for (GroupRef groupRef : team.groupRefs()) {
+                List<PlatformUser> users = groupRefToUsers.getOrDefault(groupRef, List.of());
                 team.users().addAll(users);
                 for (PlatformUser user : users) {
                     user.teams().add(team);
@@ -93,38 +95,38 @@ public class PlatformTeamsService {
 
         log.atInfo()
                 .addArgument(teamByName::size)
-                .addArgument(groupIdToUsers::size)
+                .addArgument(groupRefToUsers::size)
                 .addArgument(usersByEmail::size)
                 .addArgument(() -> Duration.between(start, Instant.now()))
                 .log("Finished fetching teams info. Teams({}), Groups({}), Users({}), Elapsed({})");
     }
 
-    private Map<String, List<PlatformUsersFetcher.Membership>> fetchMembershipsInParallel(
-            Set<String> groupRefs, int maxConcurrency, @Nullable Duration timeout) {
+    private Map<GroupRef, List<PlatformUsersFetcher.Membership>> fetchMembershipsInParallel(
+            Set<GroupRef> groupRefs, int maxConcurrency, @Nullable Duration timeout) {
         if (groupRefs.isEmpty()) {
             log.warn("No groupRefs to fetch, possibly a configuration issue.");
             return ImmutableMap.of();
         }
 
-        Map<String, CompletableFuture<List<PlatformUsersFetcher.Membership>>> futures = new HashMap<>();
+        Map<GroupRef, CompletableFuture<List<PlatformUsersFetcher.Membership>>> futures = new HashMap<>();
 
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             Semaphore gate = new Semaphore(maxConcurrency);
-            for (String groupRef : groupRefs) {
+            for (GroupRef groupRef : groupRefs) {
                 CompletableFuture<List<PlatformUsersFetcher.Membership>> future = CompletableFuture.supplyAsync(
                         () -> {
                             boolean acquired = false;
                             try {
                                 gate.acquire();
                                 acquired = true;
-                                return usersFetcher.fetchMembershipsByGroupRef(groupRef);
+                                return groupResolver.resolveMembers(groupRef);
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                                 throw new RuntimeException(e);
                             } catch (Exception e) {
                                 log.atWarn()
                                         .setCause(e)
-                                        .addKeyValue("groupRef", groupRef)
+                                        .addKeyValue("groupRef", groupRef.canonical())
                                         .log("Failed to fetch group members");
                                 return ImmutableList.of();
                             } finally {
@@ -158,8 +160,8 @@ public class PlatformTeamsService {
             }
         }
 
-        ImmutableMap.Builder<String, List<PlatformUsersFetcher.Membership>> result = ImmutableMap.builder();
-        for (Map.Entry<String, CompletableFuture<List<PlatformUsersFetcher.Membership>>> e : futures.entrySet()) {
+        ImmutableMap.Builder<GroupRef, List<PlatformUsersFetcher.Membership>> result = ImmutableMap.builder();
+        for (Map.Entry<GroupRef, CompletableFuture<List<PlatformUsersFetcher.Membership>>> e : futures.entrySet()) {
             result.put(e.getKey(), e.getValue().join());
         }
         return result.build();

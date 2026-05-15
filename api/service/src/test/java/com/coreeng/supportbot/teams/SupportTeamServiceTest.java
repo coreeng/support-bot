@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import com.coreeng.supportbot.config.SupportTeamProps;
 import com.coreeng.supportbot.slack.SlackId;
+import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,8 +21,9 @@ class SupportTeamServiceTest {
 
     @BeforeEach
     void setUp() {
-        supportProps = new SupportTeamProps("Support Team", "support", "SUPPORT_ID");
-        leadershipProps = new SupportLeadershipTeamProps("Leadership Team", "leadership", "LEADERSHIP_ID");
+        supportProps = new SupportTeamProps("Support Team", "support", new GroupRef.Slack("SUPPORT_ID"));
+        leadershipProps =
+                new SupportLeadershipTeamProps("Leadership Team", "leadership", new GroupRef.Slack("LEADERSHIP_ID"));
         supportMemberFetcher = mock(TeamMemberFetcher.class);
         leadershipMemberFetcher = mock(TeamMemberFetcher.class);
 

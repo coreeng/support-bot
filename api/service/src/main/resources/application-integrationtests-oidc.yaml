@@ -14,5 +14,4 @@ platform-integration:
     claim-name: groups
     mappings:
       - team-code: core
-        claim-values:
-          - developers
+        group-ref: "jwt:developers"

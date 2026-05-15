@@ -14,8 +14,8 @@ class TicketEscalationValidatorTest {
 
     @BeforeEach
     void setUp() {
-        validator = new TicketEscalationValidator(
-                new FakeEscalationTeamsRegistry(List.of(new EscalationTeam("Core Support", "core-support", "S123"))));
+        validator = new TicketEscalationValidator(new FakeEscalationTeamsRegistry(
+                List.of(new EscalationTeam("Core Support", "core-support", "slack:S123"))));
     }
 
     @Test

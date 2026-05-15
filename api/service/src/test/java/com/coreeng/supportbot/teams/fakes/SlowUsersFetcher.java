@@ -1,13 +1,14 @@
 package com.coreeng.supportbot.teams.fakes;
 
 import com.coreeng.supportbot.teams.PlatformUsersFetcher;
+import com.coreeng.supportbot.teams.groups.GroupRef;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
-public class SlowUsersFetcher implements PlatformUsersFetcher {
+public class SlowUsersFetcher implements PlatformUsersFetcher<GroupRef.Static> {
     private final Duration delay;
     private final Function<String, List<Membership>> getResultFn;
 
@@ -24,7 +25,7 @@ public class SlowUsersFetcher implements PlatformUsersFetcher {
     }
 
     @Override
-    public List<Membership> fetchMembershipsByGroupRef(String groupRef) {
+    public List<Membership> fetchMembershipsByGroupRef(GroupRef.Static groupRef) {
         int now = inFlight.incrementAndGet();
         maxObserved.getAndAccumulate(now, Math::max);
         try {
@@ -35,7 +36,7 @@ public class SlowUsersFetcher implements PlatformUsersFetcher {
         } finally {
             inFlight.decrementAndGet();
         }
-        return getResultFn.apply(groupRef);
+        return getResultFn.apply(groupRef.value());
     }
 
     public int maxObservedAtSameTime() {

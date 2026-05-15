@@ -18,8 +18,8 @@ class TeamServiceTest {
         // given
         PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
         EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of(
-                new EscalationTeam("Escalation Only 1", "escalation-only-1", "SLACK1"),
-                new EscalationTeam("Escalation Only 2", "escalation-only-2", "SLACK2")));
+                new EscalationTeam("Escalation Only 1", "escalation-only-1", "slack:SLACK1"),
+                new EscalationTeam("Escalation Only 2", "escalation-only-2", "slack:SLACK2")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
         PlatformTeam platformTeam1 = new PlatformTeam("team1", Set.of(), Set.of());
@@ -50,8 +50,8 @@ class TeamServiceTest {
         when(platformTeamsService.findTeamByName(anyString())).thenReturn(null);
 
         EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of(
-                new EscalationTeam("Escalation Team 1", "esc1", "SLACK1"),
-                new EscalationTeam("Escalation Team 2", "esc2", "SLACK2")));
+                new EscalationTeam("Escalation Team 1", "esc1", "slack:SLACK1"),
+                new EscalationTeam("Escalation Team 2", "esc2", "slack:SLACK2")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
         TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
@@ -83,8 +83,8 @@ class TeamServiceTest {
         when(platformTeamsService.findTeamByName("platform-only-noise")).thenReturn(platformOnlyTeam);
 
         EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of(
-                new EscalationTeam("Escalation Team 1", "esc1", "SLACK1"),
-                new EscalationTeam("Escalation Team 2", "esc2", "SLACK2")));
+                new EscalationTeam("Escalation Team 1", "esc1", "slack:SLACK1"),
+                new EscalationTeam("Escalation Team 2", "esc2", "slack:SLACK2")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
         TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
@@ -192,8 +192,8 @@ class TeamServiceTest {
 
         // Add noise: escalation teams with different codes
         EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of(
-                new EscalationTeam("Escalation Noise 1", "escalation-noise-1", "SLACK1"),
-                new EscalationTeam("Escalation Noise 2", "escalation-noise-2", "SLACK2")));
+                new EscalationTeam("Escalation Noise 1", "escalation-noise-1", "slack:SLACK1"),
+                new EscalationTeam("Escalation Noise 2", "escalation-noise-2", "slack:SLACK2")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
         TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
@@ -217,8 +217,8 @@ class TeamServiceTest {
         when(platformTeamsService.findTeamByName("other-team")).thenReturn(null);
 
         EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of(
-                new EscalationTeam("Team 1", "team1", "SLACK1"),
-                new EscalationTeam("Other Team", "other-team", "SLACK2")));
+                new EscalationTeam("Team 1", "team1", "slack:SLACK1"),
+                new EscalationTeam("Other Team", "other-team", "slack:SLACK2")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
         TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
@@ -244,8 +244,8 @@ class TeamServiceTest {
         when(platformTeamsService.findTeamByName("platform-noise")).thenReturn(platformOnlyNoise);
 
         EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of(
-                new EscalationTeam("Escalation Team 1", "esc1", "SLACK1"),
-                new EscalationTeam("Escalation Team 2", "esc2", "SLACK2")));
+                new EscalationTeam("Escalation Team 1", "esc1", "slack:SLACK1"),
+                new EscalationTeam("Escalation Team 2", "esc2", "slack:SLACK2")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
         TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
@@ -287,7 +287,7 @@ class TeamServiceTest {
         when(platformTeamsService.listTeams()).thenReturn(ImmutableList.of(platformOnlyTeam, bothTypesTeam));
 
         EscalationTeamsRegistry escalationTeamsRegistry =
-                new FakeEscalationTeamsRegistry(List.of(new EscalationTeam("Both Team", "both1", "SLACK1")));
+                new FakeEscalationTeamsRegistry(List.of(new EscalationTeam("Both Team", "both1", "slack:SLACK1")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
         TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
@@ -446,7 +446,7 @@ class TeamServiceTest {
         when(platformTeamsService.findTeamByName("team1")).thenReturn(platformTeam);
 
         EscalationTeamsRegistry escalationTeamsRegistry =
-                new FakeEscalationTeamsRegistry(List.of(new EscalationTeam("Team 1", "team1", "SLACK1")));
+                new FakeEscalationTeamsRegistry(List.of(new EscalationTeam("Team 1", "team1", "slack:SLACK1")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
         TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
@@ -490,7 +490,7 @@ class TeamServiceTest {
         when(platformTeamsService.findTeamByName("esc1")).thenReturn(null);
 
         EscalationTeamsRegistry escalationTeamsRegistry =
-                new FakeEscalationTeamsRegistry(List.of(new EscalationTeam("Escalation Only", "esc1", "SLACK1")));
+                new FakeEscalationTeamsRegistry(List.of(new EscalationTeam("Escalation Only", "esc1", "slack:SLACK1")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
         TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);

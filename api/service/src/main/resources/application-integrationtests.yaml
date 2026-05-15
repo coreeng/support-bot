@@ -14,7 +14,7 @@ enums:
   escalation-teams:
     - label: core
       code: core
-      slack-group-id: S08948NBMED
+      group-ref: "slack:S08948NBMED"
 platform-integration:
   enabled: true
   azure:

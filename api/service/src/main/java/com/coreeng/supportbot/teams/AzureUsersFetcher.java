@@ -3,6 +3,7 @@ package com.coreeng.supportbot.teams;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.microsoft.graph.models.User;
 import com.microsoft.graph.models.UserCollectionResponse;
 import com.microsoft.graph.serviceclient.GraphServiceClient;
@@ -16,14 +17,14 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @RequiredArgsConstructor
-public class AzureUsersFetcher implements PlatformUsersFetcher {
+public class AzureUsersFetcher implements PlatformUsersFetcher<GroupRef.Azure> {
     private final GraphServiceClient graphClient;
 
     @Override
-    public List<Membership> fetchMembershipsByGroupRef(String groupRef) {
+    public List<Membership> fetchMembershipsByGroupRef(GroupRef.Azure groupRef) {
         UserCollectionResponse response = graphClient
                 .groups()
-                .byGroupId(groupRef)
+                .byGroupId(groupRef.objectId())
                 .transitiveMembers()
                 .graphUser()
                 .get(req -> {

@@ -104,7 +104,7 @@ class EscalationProcessingServiceTest {
         when(slackClient.postMessage(any())).thenReturn(chatPostMessageResponse);
         when(escalationRepository.update(any(Escalation.class))).thenReturn(expectedEscalation);
         when(escalationTeamsRegistry.findEscalationTeamByCode("some-team"))
-                .thenReturn(new EscalationTeam("some-team", "someTeam", "id"));
+                .thenReturn(new EscalationTeam("some-team", "someTeam", "slack:id"));
 
         // when
         Escalation escalation = requireNonNull(processingService.createEscalation(escalationRequest));

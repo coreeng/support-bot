@@ -362,7 +362,7 @@ public class TicketProcessingService {
 
     StalenessTagTarget resolveStalenessTarget(Ticket ticket) {
         if (ticket.queryRef().ts().mocked()) {
-            return new StalenessTagTarget.Squad(supportTeamProps.slackGroupId());
+            return new StalenessTagTarget.Squad(supportTeamProps.slackId());
         }
 
         if (assignmentProps.enabled() && ticket.assignedTo() != null) {
@@ -387,7 +387,7 @@ public class TicketProcessingService {
                     .log("Slack API error resolving staleness tag target, falling back to squad");
         }
 
-        return new StalenessTagTarget.Squad(supportTeamProps.slackGroupId());
+        return new StalenessTagTarget.Squad(supportTeamProps.slackId());
     }
 
     @NonNull private Ticket onStatusUpdate(Ticket ticket) {

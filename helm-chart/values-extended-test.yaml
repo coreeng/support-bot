@@ -101,22 +101,22 @@ configMap:
       escalationTeams:
         - code: core-platform
           label: Core Platform
-          slack-group-id: S0A2CEZ0QMT
+          group-ref: "slack:S0A2CEZ0QMT"
         - code: core-elevate
           label: Core Elevate
-          slack-group-id: S0A2CF78M3P
+          group-ref: "slack:S0A2CF78M3P"
         - code: core-community
           label: Core Community
-          slack-group-id: S0A2DSQGQ6A
+          group-ref: "slack:S0A2DSQGQ6A"
         - label: Core Platform Escalations
           code: core-platform-escalations
-          slack-group-id: S0A2CEZ0QMT
+          group-ref: "slack:S0A2CEZ0QMT"
         - label: Core Community Escalations
           code: core-community-escalations
-          slack-group-id: S0A2DSQGQ6A
+          group-ref: "slack:S0A2DSQGQ6A"
         - label: Core General Escalations
           code: core-general-escalations
-          slack-group-id: S0A2CF78M3P
+          group-ref: "slack:S0A2CF78M3P"
       tags:
         - label: Alerting/Callouts
           code: alerting-callouts
@@ -209,13 +209,13 @@ configMap:
       support:
         name: Core Support
         code: core-support
-        slack-group-id: S08948NBMED
+        group-ref: "slack:S08948NBMED"
         static:
           enabled: false
       leadership:
         name: Support Leadership
         code: support-leadership
-        slack-group-id: S0A2CQB5YE9
+        group-ref: "slack:S0A2CQB5YE9"
         static:
           enabled: false
 

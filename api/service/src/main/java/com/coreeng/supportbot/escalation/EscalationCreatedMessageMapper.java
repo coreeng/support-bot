@@ -25,7 +25,7 @@ public class EscalationCreatedMessageMapper {
 
     private ImmutableList<LayoutBlock> renderBlocks(EscalationCreatedMessage message) {
         String str = "\nEscalated to team: " + message.team().label() + "(" + "<!subteam^"
-                + message.team().slackGroupId() + ">)";
+                + message.team().slackMentionId() + ">)";
         return ImmutableList.of(section(s -> s.text(markdownText(str))));
     }
 

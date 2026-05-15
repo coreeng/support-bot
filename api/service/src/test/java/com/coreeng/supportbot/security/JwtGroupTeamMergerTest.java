@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
+import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
@@ -32,9 +33,9 @@ class JwtGroupTeamMergerTest {
     }
 
     @Test
-    void merge_addsMappedTeam() {
+    void merge_addsMappedTeam_caseInsensitive() {
         var props = new JwtGroupsProperties(
-                true, "groups", List.of(new JwtGroupsProperties.Mapping(List.of("developers", "Developers"), "wow")));
+                true, "groups", List.of(new JwtGroupsProperties.Mapping(new GroupRef.Jwt("developers"), "wow")));
         var merger = new JwtGroupTeamMerger(props, teamService);
         when(teamService.findTeamByCode("wow")).thenReturn(tenant("wow"));
 
@@ -47,7 +48,7 @@ class JwtGroupTeamMergerTest {
     @Test
     void merge_preservesExistingTeams_dedupes() {
         var props = new JwtGroupsProperties(
-                true, "groups", List.of(new JwtGroupsProperties.Mapping(List.of("developers"), "wow")));
+                true, "groups", List.of(new JwtGroupsProperties.Mapping(new GroupRef.Jwt("developers"), "wow")));
         var merger = new JwtGroupTeamMerger(props, teamService);
         var existing = ImmutableList.of(tenant("wow"));
         when(teamService.findTeamByCode("wow")).thenReturn(tenant("wow"));
@@ -63,8 +64,8 @@ class JwtGroupTeamMergerTest {
                 true,
                 "groups",
                 List.of(
-                        new JwtGroupsProperties.Mapping(List.of("developers"), "unknown-team"),
-                        new JwtGroupsProperties.Mapping(List.of("developers"), "core")));
+                        new JwtGroupsProperties.Mapping(new GroupRef.Jwt("developers"), "unknown-team"),
+                        new JwtGroupsProperties.Mapping(new GroupRef.Jwt("developers"), "core")));
         var merger = new JwtGroupTeamMerger(props, teamService);
         when(teamService.findTeamByCode("unknown-team")).thenReturn(null);
         when(teamService.findTeamByCode("core")).thenReturn(tenant("core"));
