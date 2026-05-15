@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.teams;
 
+import com.coreeng.supportbot.teams.groups.GroupRef;
+import com.coreeng.supportbot.teams.groups.GroupRefParseException;
 import com.google.common.collect.ImmutableList;
 import io.fabric8.kubernetes.api.model.Namespace;
 import io.fabric8.kubernetes.api.model.NamespaceList;
@@ -82,7 +84,17 @@ public class CorePlatformTeamsFetcher implements PlatformTeamsFetcher {
                 .findFirst()
                 .orElse(null);
         if (saSubject != null && groupSubject != null) {
-            return Optional.of(new TeamAndGroupTuple(nsName, groupSubject.getName()));
+            try {
+                return Optional.of(new TeamAndGroupTuple(nsName, GroupRef.parse(groupSubject.getName())));
+            } catch (GroupRefParseException e) {
+                log.atWarn()
+                        .setCause(e)
+                        .addKeyValue("namespace", nsName)
+                        .addKeyValue("rolebinding", rbName)
+                        .addKeyValue("groupSubject", groupSubject.getName())
+                        .log("Malformed group subject in rolebinding; skipping team");
+                return Optional.empty();
+            }
         }
         return Optional.empty();
     }

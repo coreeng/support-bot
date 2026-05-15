@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.teams;
 
+import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.cloudidentity.v1.CloudIdentity;
 import com.google.common.collect.ImmutableList;
@@ -10,20 +11,23 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RequiredArgsConstructor
-public class GcpUsersFetcher implements PlatformUsersFetcher {
+public class GcpUsersFetcher implements PlatformUsersFetcher<GroupRef.Google> {
     private final CloudIdentity cloudIdentity;
 
     @Override
-    public List<Membership> fetchMembershipsByGroupRef(String groupRef) {
+    public List<Membership> fetchMembershipsByGroupRef(GroupRef.Google groupRef) {
         ImmutableList.Builder<Membership> result = ImmutableList.builder();
         String groupId;
         try {
-            var lookupResp =
-                    cloudIdentity.groups().lookup().setGroupKeyId(groupRef).execute();
+            var lookupResp = cloudIdentity
+                    .groups()
+                    .lookup()
+                    .setGroupKeyId(groupRef.key())
+                    .execute();
             groupId = lookupResp.getName();
         } catch (GoogleJsonResponseException e) {
             if (e.getStatusCode() == 403) {
-                log.warn("Group is not found or not accessible: {}", groupRef);
+                log.warn("Group is not found or not accessible: {}", groupRef.canonical());
                 return ImmutableList.of();
             }
             throw new RuntimeException(e);

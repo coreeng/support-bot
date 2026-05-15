@@ -1,5 +1,5 @@
-import { After, Before, setDefaultTimeout } from "@cucumber/cucumber";
-import { CustomWorld } from "./custom-world";
+import { After, AfterAll, Before, setDefaultTimeout } from "@cucumber/cucumber";
+import { CustomWorld, closeSharedBrowser } from "./custom-world";
 
 setDefaultTimeout(30_000);
 
@@ -230,4 +230,8 @@ Before(async function (this: CustomWorld) {
 After(async function (this: CustomWorld) {
   // Only close the page, browser stays open for next scenario
   await this.closePage();
+});
+
+AfterAll(async function () {
+  await closeSharedBrowser();
 });

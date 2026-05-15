@@ -101,7 +101,7 @@ public class TicketSummaryService {
                 .map(e -> TicketSummaryView.EscalationView.of(
                         e,
                         checkNotNull(escalationTeamsRegistry.findEscalationTeamByCode(checkNotNull(e.team())))
-                                .slackGroupId()))
+                                .slackMentionId()))
                 .collect(toImmutableList());
     }
 
