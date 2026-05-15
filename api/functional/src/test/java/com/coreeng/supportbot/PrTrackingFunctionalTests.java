@@ -758,21 +758,22 @@ public class PrTrackingFunctionalTests {
      * GitLab MR detection mirrors the GitHub detection flow but routes via the GitLab adapter.
      *
      * <p>Wiremock serves both GitHub stubs (under {@code /repos/...}) and GitLab stubs (under
-     * {@code /api/v4/...}) on the same port. The functional config strips {@code /api/v4} from the
-     * GitLab apiBaseUrl to derive the public host allow-list — so MR URLs in tests must use
-     * {@code localhost:8000} as the host, not {@code gitlab.com}.
+     * {@code /api/v4/...}) on the same port. The bot's URL allow-list is derived from its
+     * configured {@code gitlab.api-base-url} (the wiremock service URL in K8s), so MR URLs the
+     * test posts must use that same host — not {@code gitlab.com} or {@code localhost}.
      */
     @Nested
     public class GitLab {
 
+        private static final String GITLAB_HOST = "support-bot-functional-tests-wiremock:8000";
         private static final String MR_REPO = "gitlab-org/gitlab-pr-test-repo";
-        private static final String MR_LINK_42 = "https://localhost:8000/" + MR_REPO + "/-/merge_requests/42";
+        private static final String MR_LINK_42 = "http://" + GITLAB_HOST + "/" + MR_REPO + "/-/merge_requests/42";
         private static final String SLA_FILE_MR_REPO = "gitlab-org/gitlab-pr-sla-file-repo";
         private static final String SLA_FILE_MR_LINK =
-                "https://localhost:8000/" + SLA_FILE_MR_REPO + "/-/merge_requests/101";
+                "http://" + GITLAB_HOST + "/" + SLA_FILE_MR_REPO + "/-/merge_requests/101";
         private static final String ESCALATION_MR_REPO = "gitlab-org/gitlab-pr-escalation-message-repo";
         private static final String ESCALATION_MR_LINK =
-                "https://localhost:8000/" + ESCALATION_MR_REPO + "/-/merge_requests/301";
+                "http://" + GITLAB_HOST + "/" + ESCALATION_MR_REPO + "/-/merge_requests/301";
 
         @Test
         public void whenGitLabMrUrlIsPostedAsReply_itIsTrackedAndSlaReplyPosted() {
