@@ -2,14 +2,6 @@ configMap:
   create: false
   enabled: false
 
-resources:
-  requests:
-    cpu: 0.5
-    memory: 512Mi
-  limits:
-    memory: 750Mi
-
-
 env:
   - name: JAVA_OPTS
     value: "-Xms512m -Xmx512m"
