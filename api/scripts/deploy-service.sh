@@ -55,6 +55,7 @@ deploy_db() {
     --set global.postgresql.auth.database=supportbot \
     --set primary.pdb.create=false \
     --set primary.networkPolicy.enabled=false \
+    --set primary.resourcesPreset=small \
     --set serviceAccount.create=false \
     --wait --atomic --timeout=3m
   log_success "PostgreSQL deployed"
