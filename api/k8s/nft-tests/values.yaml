@@ -29,10 +29,10 @@ job:
 
 resources:
   requests:
-    cpu: 0.5
-    memory: 2250Mi
+    cpu: 1000m
+    memory: 2Gi
   limits:
-    memory: 2500Mi
+    memory: 2Gi
 
 nodeSelector: {}
 

@@ -19,22 +19,42 @@ SERVICE_IMAGE_TAG="${SERVICE_IMAGE_TAG:-}"
 
 TIMEOUT="${TIMEOUT:-1200}"
 CLEANUP="${CLEANUP:-true}"
+KEEP_ON_FAILURE="${KEEP_ON_FAILURE:-true}"
 DEPLOY_SERVICE="${DEPLOY_SERVICE:-true}"
+TEST_LOGS_DIR="${TEST_LOGS_DIR:-${SCRIPT_DIR}/../../reports/nft}"
 
 SERVICE_CHART_PATH="${SERVICE_CHART_PATH:-${SCRIPT_DIR}/../../helm-chart}"
 TEST_CHART_PATH="${TEST_CHART_PATH:-${SCRIPT_DIR}/../k8s/nft-tests}"
 
+JOB_FAILED=0
+
 cleanup() {
+  print_grafana_logs_url "${NAMESPACE}" "nft-tests" || true
+  save_job_logs "${JOB_RELEASE}" "${NAMESPACE}" "nft-tests" "${TEST_LOGS_DIR}/job" || true
+
+  if [[ "${JOB_FAILED}" == "1" && "${KEEP_ON_FAILURE}" == "true" ]]; then
+    log_warning "NFT tests failed; preserving namespace ${NAMESPACE} so logs stay reachable."
+    log_warning "  Local log snapshot: ${TEST_LOGS_DIR}/"
+    log_warning "  Inspect pods:       kubectl get pods -n ${NAMESPACE}"
+    log_warning "  Tail logs:          kubectl logs -n ${NAMESPACE} -l job-name=${JOB_RELEASE} --tail=-1"
+    log_warning "  Manual cleanup:     helm uninstall ${JOB_RELEASE} ${SERVICE_RELEASE} ${DB_RELEASE} -n ${NAMESPACE}"
+    return
+  fi
+
   if [[ "${CLEANUP}" != "true" ]]; then
     log_warning "CLEANUP=false - leaving resources in place"
     return
   fi
 
+  sleep_for_log_flush
   log "Cleaning up Helm releases in namespace: ${NAMESPACE}"
   helm uninstall "${JOB_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
   helm uninstall "${SERVICE_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
   helm uninstall "${DB_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
 }
+
+LOGS_START=$(date +%s)
+export LOGS_START
 
 trap cleanup EXIT
 
@@ -169,6 +189,7 @@ main() {
 	  local job_exit_code=0
 	  if ! wait_for_job_with_logs "${JOB_RELEASE}" "${NAMESPACE}" "${TIMEOUT}" "nft-tests"; then
 	    job_exit_code=1
+	    JOB_FAILED=1
 	    show_job_status "${JOB_RELEASE}" "${NAMESPACE}"
 	  fi
 

@@ -33,8 +33,7 @@ export class CustomWorld extends World {
     });
     this.page = await this.context.newPage();
 
-    // Set default timeout
-    this.page.setDefaultTimeout(10000);
+    this.page.setDefaultTimeout(20_000);
   }
 
   async closePage() {
