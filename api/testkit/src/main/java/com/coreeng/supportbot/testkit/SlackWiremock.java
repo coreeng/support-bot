@@ -155,6 +155,14 @@ public class SlackWiremock implements WireMockBackend {
                 .withName("GitHub repo metadata catch-all")
                 .willReturn(okJson("{\"id\":1,\"name\":\"catchall\",\"full_name\":\"catchall/catchall\","
                         + "\"owner\":{\"login\":\"catchall\"},\"private\":false}")));
+        // GitLab group members catch-all: the bot caches results from /groups/<path>/members/all
+        // for sla-discovery.cache (5 min in functional tests), so we can't rely on per-test stubs —
+        // the first test populates the cache and subsequent tests would never reach their stub.
+        // An empty list makes TeamReviewFilter fall back to "accept all reviews", which matches
+        // what the detection-path tests expect and is harmless for the poller tests.
+        givenThat(get(urlMatching("/api/v4/groups/[^/]+/members/all.*"))
+                .withName("GitLab group members catch-all")
+                .willReturn(okJson("[]")));
     }
 
     private void capturePermanentStubs() {

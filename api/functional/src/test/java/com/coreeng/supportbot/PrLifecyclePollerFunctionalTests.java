@@ -1098,11 +1098,8 @@ public class PrLifecyclePollerFunctionalTests {
             var approvalsStub = testKit.slack()
                     .wiremock()
                     .stubGitLabGetMergeRequestApprovals("MR !42 approvals", MR_REPO, 42, List.of("reviewer"));
-            // The team-reviewer cache pulls the gitlab-group-path members; gitlab-org includes
-            // "reviewer" so the approval counts as a team review.
-            var groupStub = testKit.slack()
-                    .wiremock()
-                    .stubGitLabGetGroupMembers("gitlab-org group members", "gitlab-org", List.of("reviewer"));
+            // Group members served by the permanent catch-all stub (empty list) — TeamReviewFilter
+            // then falls back to "accept all reviews" so the reviewer approval still counts.
             var closeMessageStub =
                     testKit.slack().wiremock().stubChatPostMessage("approved + mergeable notification", channelId);
 
@@ -1111,7 +1108,6 @@ public class PrLifecyclePollerFunctionalTests {
             await().atMost(Duration.ofSeconds(8)).untilAsserted(() -> {
                 mrStub.assertIsCalled();
                 approvalsStub.assertIsCalled();
-                groupStub.assertIsCalled();
                 closeMessageStub.assertIsCalled();
             });
             var result = supportBotClient.test().getPrTrackingRecord(record.id());
