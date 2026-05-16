@@ -798,6 +798,9 @@ public class PrTrackingFunctionalTests {
             var approvalsStub = testKit.slack()
                     .wiremock()
                     .stubGitLabGetMergeRequestApprovals("GitLab MR !42 approvals", MR_REPO, 42, List.of());
+            var groupMembersStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetGroupMembers("gitlab-org group members", "gitlab-org", List.of());
             var prReactionStub = testKit.slack()
                     .wiremock()
                     .stubReactionAdd(ReactionAddedExpectation.builder()
@@ -860,6 +863,9 @@ public class PrTrackingFunctionalTests {
             var approvalsStub = testKit.slack()
                     .wiremock()
                     .stubGitLabGetMergeRequestApprovals("GitLab MR !101 approvals", SLA_FILE_MR_REPO, 101, List.of());
+            testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetGroupMembers("gitlab-org group members", "gitlab-org", List.of());
             // SLA discovery: project metadata (default_branch) then the raw file.
             var projectStub = testKit.slack()
                     .wiremock()
@@ -991,6 +997,9 @@ public class PrTrackingFunctionalTests {
             var approvalsStub = testKit.slack()
                     .wiremock()
                     .stubGitLabGetMergeRequestApprovals("GitLab MR !42 approvals", MR_REPO, 42, List.of());
+            testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetGroupMembers("gitlab-org group members", "gitlab-org", List.of());
             var prReactionStub = testKit.slack()
                     .wiremock()
                     .stubReactionAdd(ReactionAddedExpectation.builder()
@@ -1057,6 +1066,9 @@ public class PrTrackingFunctionalTests {
             var approvalsStub = testKit.slack()
                     .wiremock()
                     .stubGitLabGetMergeRequestApprovals("GitLab MR !301 approvals", ESCALATION_MR_REPO, 301, List.of());
+            testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetGroupMembers("gitlab-org group members", "gitlab-org", List.of());
 
             var prReactionStub = testKit.slack()
                     .wiremock()
