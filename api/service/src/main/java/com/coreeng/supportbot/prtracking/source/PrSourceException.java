@@ -12,7 +12,7 @@ public class PrSourceException extends RuntimeException {
         super(message);
     }
 
-    public PrSourceException(@Nullable String message, Throwable cause) {
+    public PrSourceException(@Nullable String message, @Nullable Throwable cause) {
         super(message, cause);
     }
 }
