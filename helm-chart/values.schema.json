@@ -467,6 +467,20 @@
         "env": {
           "type": "array",
           "items": { "$ref": "#/definitions/envVar" }
+        },
+        "functionalTest": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resources": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "requests": { "$ref": "#/definitions/resourceMap" },
+                "limits": { "$ref": "#/definitions/resourceMap" }
+              }
+            }
+          }
         }
       }
     }
