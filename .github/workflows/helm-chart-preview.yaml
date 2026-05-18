@@ -51,7 +51,9 @@ jobs:
       - name: Verify dex subchart is vendored inside the package
         run: |
           pkg="dist/charts/support-bot-${{ steps.ver.outputs.version }}.tgz"
-          if ! tar -tzf "$pkg" | grep -Eq 'support-bot/charts/dex-[0-9].*\.tgz$'; then
+          # helm may vendor the dep as a tarball (charts/dex-<ver>.tgz) or as
+          # an unpacked directory (charts/dex/Chart.yaml). Accept either.
+          if ! tar -tzf "$pkg" | grep -Eq '^support-bot/charts/(dex-[0-9].*\.tgz|dex/Chart\.yaml)$'; then
             echo "ERROR: dex subchart was not vendored into $pkg"
             tar -tzf "$pkg" | sed 's/^/  /'
             exit 1
