@@ -21,13 +21,13 @@ enums:
   escalation-teams:
     - label: WoW
       code: wow
-      slack-group-id: S01234ESCWW
+      group-ref: "slack:S01234ESCWW"
     - label: Infra Integration
       code: infra-integration
-      slack-group-id: S01234ESCII
+      group-ref: "slack:S01234ESCII"
 #    - label: connected-app
 #      code: connected-app
-#      slack-group-id: S01234ESCCA
+#      group-ref: "slack:S01234ESCCA"
   tags:
     - label: Ingresses
       code: ingresses

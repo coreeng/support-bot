@@ -32,8 +32,30 @@ By default the chart sets environment variables:
 - `DB_URL=jdbc:postgresql://support-bot-db-postgresql:5432/supportbot`
 - `DB_USERNAME=supportbot`
 - `DB_PASSWORD=supportbotpassword`
+- `DB_SCHEMA=public`
 
 Use Secrets for credentials in real environments by overriding the `env` entries (see below).
+
+### Non-`public` schema
+
+To target a schema other than `public` (e.g. when the connecting role's `search_path` is locked down by a DBA, or when you want to isolate Support Bot tables), override `DB_SCHEMA`:
+
+```yaml
+env:
+  - name: DB_SCHEMA
+    value: "supportbot"
+```
+
+The chart will:
+- Run Flyway against that schema (including `flyway_schema_history`, so migration state is deterministic).
+- Set `search_path` on every Hikari connection, so all queries — jOOQ-generated and raw SQL alike — resolve to the configured schema at runtime.
+
+The schema must exist and the connecting role must be able to create objects in it. Have your DBA run, once, before the first install:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS supportbot;
+GRANT CREATE, USAGE ON SCHEMA supportbot TO <support-bot-role>;
+```
 
 ## Required Secrets
 

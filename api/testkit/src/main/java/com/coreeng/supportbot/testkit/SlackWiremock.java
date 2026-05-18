@@ -138,6 +138,23 @@ public class SlackWiremock implements WireMockBackend {
         givenThat(post("/api/conversations.history")
                 .withName("conversations history catch-all")
                 .willReturn(okJson("{\"ok\":true,\"messages\":[],\"has_more\":false}")));
+        // Catch-alls for the PR lifecycle poller: when triggered (manually via the test endpoint
+        // or via Spring's cron) it walks every active pr_tracking row, so stray records from other
+        // tests can land on wiremock without a per-test stub. Returning an "open, no reviews"
+        // shape keeps the poller happy without affecting behaviour for tests that stub explicitly.
+        givenThat(get(urlMatching("/repos/[^/]+/[^/]+/pulls/[0-9]+/reviews"))
+                .withName("GitHub PR reviews catch-all")
+                .willReturn(okJson("[]")));
+        givenThat(get(urlMatching("/repos/[^/]+/[^/]+/pulls/[0-9]+"))
+                .withName("GitHub PR catch-all")
+                .willReturn(okJson("{\"state\":\"open\",\"number\":0,\"requested_teams\":[],"
+                        + "\"mergeable\":false,\"mergeable_state\":\"unknown\","
+                        + "\"created_at\":\"2026-01-01T00:00:00Z\",\"title\":\"\","
+                        + "\"user\":{\"login\":\"test\"}}")));
+        givenThat(get(urlMatching("/repos/[^/]+/[^/]+"))
+                .withName("GitHub repo metadata catch-all")
+                .willReturn(okJson("{\"id\":1,\"name\":\"catchall\",\"full_name\":\"catchall/catchall\","
+                        + "\"owner\":{\"login\":\"catchall\"},\"private\":false}")));
     }
 
     private void capturePermanentStubs() {

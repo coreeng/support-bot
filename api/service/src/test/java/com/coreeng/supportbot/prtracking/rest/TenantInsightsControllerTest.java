@@ -441,7 +441,7 @@ class TenantInsightsControllerTest {
                 true);
         when(prTrackingRepository.findAllInFlight(null)).thenReturn(List.of(pr));
         when(escalationTeamsRegistry.findEscalationTeamByCode("team-foo"))
-                .thenReturn(new EscalationTeam("Foo Team", "team-foo", "SG001"));
+                .thenReturn(new EscalationTeam("Foo Team", "team-foo", "slack:SG001"));
 
         // when
         List<InFlightPrResponse> result = controller.inFlightPrs(null);
@@ -517,7 +517,7 @@ class TenantInsightsControllerTest {
                 true);
         when(prTrackingRepository.findAllInFlight(null)).thenReturn(List.of(pr));
         when(escalationTeamsRegistry.findEscalationTeamByCode("team-foo"))
-                .thenReturn(new EscalationTeam("Foo Team", "team-foo", "SG001"));
+                .thenReturn(new EscalationTeam("Foo Team", "team-foo", "slack:SG001"));
 
         // when
         List<InFlightPrResponse> result = controller.inFlightPrs(null);

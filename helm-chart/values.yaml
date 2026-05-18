@@ -47,8 +47,10 @@ ingress:
 
 resources:
   requests:
-    cpu: 512m
+    cpu: 500m
     memory: 512Mi
+  limits:
+    memory: 1Gi
 
 livenessProbe:
   httpGet:
@@ -164,6 +166,8 @@ env:
     value: "supportbot"
   - name: DB_PASSWORD
     value: "supportbotpassword"
+  - name: DB_SCHEMA
+    value: "public"
   - name: SLACK_TOKEN
     valueFrom:
       secretKeyRef:
@@ -224,11 +228,10 @@ ui:
 
   resources:
     requests:
-      cpu: 250m
-      memory: 256Mi
-    limits:
       cpu: 500m
       memory: 512Mi
+    limits:
+      memory: 1Gi
 
   livenessProbe:
     httpGet:
@@ -269,4 +272,12 @@ ui:
   affinity: {}
 
   env: []
+
+  functionalTest:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        memory: 1536Mi
 
