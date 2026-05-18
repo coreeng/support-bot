@@ -1,21 +1,18 @@
 import { NextRequest } from "next/server";
-import { auth } from "@/auth";
-import { unauthorizedResponse, errorResponse } from "../../_lib/backend-fetch";
+import { backendAccessToken, errorResponse, unauthorizedResponse } from "../../_lib/backend-fetch";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 
 export async function GET(request: NextRequest) {
-  const session = await auth();
+  const accessToken = await backendAccessToken(request);
 
-  if (!session?.accessToken) {
+  if (!accessToken) {
     return unauthorizedResponse();
   }
 
   // Validate CSRF token for GET request that downloads the analysis bundle
   const csrfTokenFromHeader = request.headers.get("X-CSRF-Token");
-  const csrfCookieName = process.env.NODE_ENV === "production"
-    ? "__Host-authjs.csrf-token"
-    : "authjs.csrf-token";
+  const csrfCookieName = process.env.NODE_ENV === "production" ? "__Host-authjs.csrf-token" : "authjs.csrf-token";
   const csrfCookieValue = request.cookies.get(csrfCookieName)?.value;
 
   if (!csrfTokenFromHeader || !csrfCookieValue) {
@@ -35,7 +32,7 @@ export async function GET(request: NextRequest) {
   try {
     const response = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${session.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         Accept: "application/zip",
       },
     });
@@ -57,4 +54,3 @@ export async function GET(request: NextRequest) {
     return errorResponse("Failed to fetch analysis bundle from backend", 502);
   }
 }
-

@@ -1,103 +1,112 @@
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { AccessDenied, RequireDashboardAccess } from '../AccessDenied';
-import * as AuthHook from '../../hooks/useAuth';
+import { fireEvent, render, screen } from "@testing-library/react";
+import * as AuthHook from "../../hooks/useAuth";
+import { AccessDenied, RequireDashboardAccess } from "../AccessDenied";
 
-jest.mock('../../hooks/useAuth');
+jest.mock("../../hooks/useAuth");
 const mockUseAuth = AuthHook.useAuth as jest.MockedFunction<typeof AuthHook.useAuth>;
 
 function mockAuth(overrides: Partial<ReturnType<typeof AuthHook.useAuth>> = {}) {
-    mockUseAuth.mockReturnValue({
-        user: {
-            id: 'user-1',
-            email: 'user@example.com',
-            name: 'Test User',
-            teams: [],
-            roles: [],
-        },
-        isLeadership: false,
-        isSupportEngineer: false,
-        isEscalationTeam: false,
-        actualEscalationTeams: [],
-        isLoading: false,
-        isAuthenticated: true,
-        logout: jest.fn(),
-        ...overrides,
-    });
+  mockUseAuth.mockReturnValue({
+    user: {
+      id: "user-1",
+      email: "user@example.com",
+      name: "Test User",
+      teams: [],
+      roles: [],
+    },
+    isLeadership: false,
+    isSupportEngineer: false,
+    isEscalationTeam: false,
+    actualEscalationTeams: [],
+    isLoading: false,
+    isAuthenticated: true,
+    logout: jest.fn(),
+    ...overrides,
+  });
 }
 
-describe('AccessDenied', () => {
-    it('shows access restricted message with user email', () => {
-        mockAuth({ user: { id: '1', email: 'dev@example.com', name: 'Dev', teams: [], roles: [] } });
-        render(<AccessDenied />);
+describe("AccessDenied", () => {
+  it("shows access restricted message with user email", () => {
+    mockAuth({ user: { id: "1", email: "dev@example.com", name: "Dev", teams: [], roles: [] } });
+    render(<AccessDenied />);
 
-        expect(screen.getByText(/Access Restricted/i)).toBeInTheDocument();
-        expect(screen.getByText(/Support Engineer/)).toBeInTheDocument();
-        expect(screen.getByText(/Leadership/)).toBeInTheDocument();
-        expect(screen.getByText(/dev@example.com/)).toBeInTheDocument();
-    });
+    expect(screen.getByText(/Access Restricted/i)).toBeInTheDocument();
+    expect(screen.getByText(/Support Engineer/)).toBeInTheDocument();
+    expect(screen.getByText(/Leadership/)).toBeInTheDocument();
+    expect(screen.getByText(/dev@example.com/)).toBeInTheDocument();
+  });
 
-    it('calls logout when sign-out button is clicked', () => {
-        const logout = jest.fn();
-        mockAuth({ logout });
-        render(<AccessDenied />);
+  it("calls logout when sign-out button is clicked", () => {
+    const logout = jest.fn();
+    mockAuth({ logout });
+    render(<AccessDenied />);
 
-        fireEvent.click(screen.getByText(/Sign in with a different account/i));
-        expect(logout).toHaveBeenCalled();
-    });
+    fireEvent.click(screen.getByText(/Sign in with a different account/i));
+    expect(logout).toHaveBeenCalled();
+  });
 
-    it('renders nothing while loading', () => {
-        mockAuth({ isLoading: true });
-        const { container } = render(<AccessDenied />);
-        expect(container.firstChild).toBeNull();
-    });
+  it("renders nothing while loading", () => {
+    mockAuth({ isLoading: true });
+    const { container } = render(<AccessDenied />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("sign-out CTA has a distinct hover state from its resting state", () => {
+    mockAuth();
+    render(<AccessDenied />);
+    const button = screen.getByText(/Sign in with a different account/i).closest("button")!;
+    expect(button.className).toContain("bg-muted");
+    expect(button.className).toContain("hover:bg-accent");
+    // Regression guard: the bug had hover:bg-muted, making the button feel inert.
+    expect(button.className).not.toContain("hover:bg-muted");
+  });
 });
 
-describe('RequireDashboardAccess', () => {
-    it('renders children for support engineers', () => {
-        mockAuth({ isSupportEngineer: true });
-        render(
-            <RequireDashboardAccess>
-                <div data-testid="protected-content">Dashboard</div>
-            </RequireDashboardAccess>
-        );
+describe("RequireDashboardAccess", () => {
+  it("renders children for support engineers", () => {
+    mockAuth({ isSupportEngineer: true });
+    render(
+      <RequireDashboardAccess>
+        <div data-testid="protected-content">Dashboard</div>
+      </RequireDashboardAccess>
+    );
 
-        expect(screen.getByTestId('protected-content')).toBeInTheDocument();
-        expect(screen.queryByText(/Access Restricted/i)).not.toBeInTheDocument();
-    });
+    expect(screen.getByTestId("protected-content")).toBeInTheDocument();
+    expect(screen.queryByText(/Access Restricted/i)).not.toBeInTheDocument();
+  });
 
-    it('renders children for leadership', () => {
-        mockAuth({ isLeadership: true });
-        render(
-            <RequireDashboardAccess>
-                <div data-testid="protected-content">Dashboard</div>
-            </RequireDashboardAccess>
-        );
+  it("renders children for leadership", () => {
+    mockAuth({ isLeadership: true });
+    render(
+      <RequireDashboardAccess>
+        <div data-testid="protected-content">Dashboard</div>
+      </RequireDashboardAccess>
+    );
 
-        expect(screen.getByTestId('protected-content')).toBeInTheDocument();
-    });
+    expect(screen.getByTestId("protected-content")).toBeInTheDocument();
+  });
 
-    it('shows access denied for users without required roles', () => {
-        mockAuth({ isLeadership: false, isSupportEngineer: false });
-        render(
-            <RequireDashboardAccess>
-                <div data-testid="protected-content">Dashboard</div>
-            </RequireDashboardAccess>
-        );
+  it("shows access denied for users without required roles", () => {
+    mockAuth({ isLeadership: false, isSupportEngineer: false });
+    render(
+      <RequireDashboardAccess>
+        <div data-testid="protected-content">Dashboard</div>
+      </RequireDashboardAccess>
+    );
 
-        expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
-        expect(screen.getByText(/Access Restricted/i)).toBeInTheDocument();
-    });
+    expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
+    expect(screen.getByText(/Access Restricted/i)).toBeInTheDocument();
+  });
 
-    it('shows loading spinner while auth is loading', () => {
-        mockAuth({ isLoading: true });
-        render(
-            <RequireDashboardAccess>
-                <div data-testid="protected-content">Dashboard</div>
-            </RequireDashboardAccess>
-        );
+  it("shows loading spinner while auth is loading", () => {
+    mockAuth({ isLoading: true });
+    render(
+      <RequireDashboardAccess>
+        <div data-testid="protected-content">Dashboard</div>
+      </RequireDashboardAccess>
+    );
 
-        expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
-        expect(screen.getByText(/Loading/i)).toBeInTheDocument();
-    });
+    expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
+    expect(screen.getByText(/Loading/i)).toBeInTheDocument();
+  });
 });

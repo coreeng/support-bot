@@ -1,15 +1,9 @@
-import {
-  backendFetch,
-  unauthorizedResponse,
-  errorResponse,
-} from "../_lib/backend-fetch";
+import { NextRequest } from "next/server";
+import { backendFetch, errorResponse, unauthorizedResponse } from "../_lib/backend-fetch";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   // Fetch both impacts and tags in parallel
-  const [impactsRes, tagsRes] = await Promise.all([
-    backendFetch("/registry/impact"),
-    backendFetch("/registry/tag"),
-  ]);
+  const [impactsRes, tagsRes] = await Promise.all([backendFetch(request, "/registry/impact"), backendFetch(request, "/registry/tag")]);
 
   if (!impactsRes || !tagsRes) return unauthorizedResponse();
 
@@ -17,10 +11,7 @@ export async function GET() {
     return errorResponse("Failed to fetch registry", 500);
   }
 
-  const [impacts, tags] = await Promise.all([
-    impactsRes.json(),
-    tagsRes.json(),
-  ]);
+  const [impacts, tags] = await Promise.all([impactsRes.json(), tagsRes.json()]);
 
   return Response.json({ impacts, tags });
 }

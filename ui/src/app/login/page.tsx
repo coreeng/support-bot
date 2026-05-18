@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { useAuth } from "@/hooks/useAuth";
 import { sanitizeCallbackUrl } from "@/lib/utils/url";
+import { signIn } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 function isInIframe(): boolean {
   try {
@@ -25,7 +25,6 @@ function LoginContent() {
   const [autoRedirecting, setAutoRedirecting] = useState(false);
 
   const code = searchParams.get("code");
-  const token = searchParams.get("token");
   const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const error = searchParams.get("error");
 
@@ -59,7 +58,7 @@ function LoginContent() {
   useEffect(() => {
     if (isLoading) return;
 
-    // Don't retry if we already attempted authentication with this token/code
+    // Don't retry if we already attempted authentication with this code
     if (authAttemptedRef.current) return;
 
     // Detect if we're in a popup opened by the iframe
@@ -75,10 +74,7 @@ function LoginContent() {
           }
           // Success: different action for popup vs non-popup
           if (isPopup) {
-            window.opener!.postMessage(
-              { type: "auth:success", callbackUrl },
-              window.location.origin
-            );
+            window.opener!.postMessage({ type: "auth:success", callbackUrl }, window.location.origin);
             window.close();
           } else {
             window.location.href = callbackUrl;
@@ -88,12 +84,6 @@ function LoginContent() {
           router.replace(`/login?error=${encodeURIComponent(error)}`);
         });
     };
-
-    if (token) {
-      authAttemptedRef.current = true;
-      performSignIn("backend-token", { token });
-      return;
-    }
 
     if (code) {
       authAttemptedRef.current = true;
@@ -105,22 +95,26 @@ function LoginContent() {
     if (isAuthenticated) {
       router.replace(callbackUrl);
     }
-  }, [code, token, isAuthenticated, isLoading, callbackUrl, router]);
+  }, [code, isAuthenticated, isLoading, callbackUrl, router]);
 
   // Auto-redirect to Dex on mount. Skipped on iframes (popups need a user gesture),
-  // when an in-flight code/token is being completed, or when an error is being shown —
+  // when an in-flight code is being completed, or when an error is being shown —
   // those paths need the page to render so the user sees the message or completes the flow.
   useEffect(() => {
     if (autoRedirectAttempted) return;
     if (isLoading) return;
     if (isAuthenticated) return;
-    if (error || code || token) return;
+    if (error || code) return;
     if (isInIframe()) return;
 
-    setAutoRedirectAttempted(true);
-    setAutoRedirecting(true);
-    window.location.href = `/api/oauth/start/dex?callbackUrl=${encodeURIComponent(callbackUrl)}`;
-  }, [autoRedirectAttempted, isLoading, isAuthenticated, error, code, token, callbackUrl]);
+    const redirectTimer = window.setTimeout(() => {
+      setAutoRedirectAttempted(true);
+      setAutoRedirecting(true);
+      window.location.href = `/api/oauth/start/dex?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+    }, 0);
+
+    return () => window.clearTimeout(redirectTimer);
+  }, [autoRedirectAttempted, isLoading, isAuthenticated, error, code, callbackUrl]);
 
   const handleLogin = () => {
     // OAuth goes through API route - server handles redirect to backend
@@ -137,11 +131,7 @@ function LoginContent() {
     const height = 720;
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
-    const popup = window.open(
-      oauthUrl,
-      "supportbot-auth",
-      `popup=yes,width=${width},height=${height},left=${left},top=${top}`
-    );
+    const popup = window.open(oauthUrl, "supportbot-auth", `popup=yes,width=${width},height=${height},left=${left},top=${top}`);
 
     if (!popup) {
       window.location.href = oauthUrl;
@@ -155,21 +145,19 @@ function LoginContent() {
   // the effect firing, so the SSO button doesn't flicker into view; once the effect has run,
   // `autoRedirectAttempted` flips and only the `autoRedirecting` state controls the spinner —
   // which the bfcache pageshow handler clears when the user pressed Back from Dex.
-  const willAutoRedirectSoon =
-    !autoRedirectAttempted && !isLoading && !isAuthenticated && !error && !code && !token && !isInIframe();
-  const showSpinner = isLoading || autoRedirecting || willAutoRedirectSoon || ((code || token) && !error);
+  const willAutoRedirectSoon = !autoRedirectAttempted && !isLoading && !isAuthenticated && !error && !code && !isInIframe();
+  const showSpinner = isLoading || autoRedirecting || willAutoRedirectSoon || (code && !error);
   if (showSpinner) {
-    const message =
-      code || token
-        ? "Completing authentication..."
-        : autoRedirecting || willAutoRedirectSoon
-          ? "Redirecting to sign-in..."
-          : "Loading...";
+    const message = code
+      ? "Completing authentication..."
+      : autoRedirecting || willAutoRedirectSoon
+        ? "Redirecting to sign-in..."
+        : "Loading...";
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="bg-background flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">{message}</p>
+          <div className="border-foreground mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2"></div>
+          <p className="text-muted-foreground">{message}</p>
         </div>
       </div>
     );
@@ -177,19 +165,14 @@ function LoginContent() {
 
   if (error === "configuration") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-md w-full space-y-8 p-8 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Sign-in unavailable</h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            This deployment is misconfigured: the public app URL (<code className="text-sm">NEXTAUTH_URL</code>)
-            must be set and must match the API&apos;s expected UI origin (<code className="text-sm">UI_ORIGIN</code>).
-            Contact your administrator.
+      <div className="bg-background flex min-h-screen items-center justify-center">
+        <div className="w-full max-w-md space-y-8 p-8 text-center">
+          <h2 className="text-foreground text-2xl font-bold">Sign-in unavailable</h2>
+          <p className="text-muted-foreground">
+            This deployment is misconfigured: the public app URL (<code className="text-sm">NEXTAUTH_URL</code>) must be set and must match
+            the API&apos;s expected UI origin (<code className="text-sm">UI_ORIGIN</code>). Contact your administrator.
           </p>
-          <button
-            type="button"
-            onClick={() => router.replace("/login")}
-            className="text-blue-600 hover:underline"
-          >
+          <button type="button" onClick={() => router.replace("/login")} className="text-primary hover:underline">
             Back to login
           </button>
         </div>
@@ -200,20 +183,14 @@ function LoginContent() {
   // Show not-onboarded message for allow-list rejections
   if (error === "user_not_allowed") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-md w-full space-y-8 p-8 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Access Restricted</h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            You have successfully authenticated but your user has not been
-            onboarded to the Support UI.
+      <div className="bg-background flex min-h-screen items-center justify-center">
+        <div className="w-full max-w-md space-y-8 p-8 text-center">
+          <h2 className="text-foreground text-2xl font-bold">Access Restricted</h2>
+          <p className="text-muted-foreground">
+            You have successfully authenticated but your user has not been onboarded to the Support UI.
           </p>
-          <p className="text-gray-500 dark:text-gray-500 text-sm">
-            Please contact your administrator for access.
-          </p>
-          <button
-            onClick={() => router.replace("/login")}
-            className="text-blue-600 hover:underline"
-          >
+          <p className="text-muted-foreground text-sm">Please contact your administrator for access.</p>
+          <button onClick={() => router.replace("/login")} className="text-primary hover:underline">
             Back to login
           </button>
         </div>
@@ -224,14 +201,11 @@ function LoginContent() {
   // Show error if present
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-md w-full space-y-8 p-8 text-center">
-          <h2 className="text-2xl font-bold text-red-600">Authentication Error</h2>
-          <p className="text-gray-600">{error}</p>
-          <button
-            onClick={() => router.replace("/login")}
-            className="text-blue-600 hover:underline"
-          >
+      <div className="bg-background flex min-h-screen items-center justify-center">
+        <div className="w-full max-w-md space-y-8 p-8 text-center">
+          <h2 className="text-destructive text-2xl font-bold">Authentication Error</h2>
+          <p className="text-muted-foreground">{error}</p>
+          <button onClick={() => router.replace("/login")} className="text-primary hover:underline">
             Try again
           </button>
         </div>
@@ -242,19 +216,17 @@ function LoginContent() {
   // Iframe path (popups need a user gesture) and bfcache fallback (when the user pressed
   // Back from Dex) both render the SSO button so the user can complete login manually.
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-md w-full space-y-8 p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center">
+      <div className="w-full max-w-md space-y-8 p-8">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Sign in</h2>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Choose your authentication method
-          </p>
+          <h2 className="text-foreground text-3xl font-bold">Sign in</h2>
+          <p className="text-muted-foreground mt-2">Choose your authentication method</p>
         </div>
 
         <div className="space-y-4">
           <button
             onClick={handleLogin}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white hover:bg-gray-50 text-gray-700 font-medium transition-colors"
+            className="border-border bg-card hover:bg-accent text-foreground flex w-full items-center justify-center gap-3 rounded-lg border px-4 py-3 font-medium shadow-sm transition-colors"
           >
             Continue with SSO
           </button>
@@ -268,8 +240,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <div className="bg-background flex min-h-screen items-center justify-center">
+          <div className="border-foreground h-8 w-8 animate-spin rounded-full border-b-2"></div>
         </div>
       }
     >

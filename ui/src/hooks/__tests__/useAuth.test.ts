@@ -1,15 +1,15 @@
-import { renderHook, act } from "@testing-library/react";
-import { useSession, signOut } from "next-auth/react";
-import { useAuth } from "../useAuth";
+import { act, renderHook } from "@testing-library/react";
+import { signOut, useSession } from "next-auth/react";
 import {
-  createTestUser,
-  createTestTeam,
   createEscalationTeam,
-  mockLoadingSession,
-  mockUnauthenticatedSession,
+  createTestTeam,
+  createTestUser,
   mockAuthenticatedSession,
   mockAuthenticatedSessionWithoutUser,
+  mockLoadingSession,
+  mockUnauthenticatedSession,
 } from "../../test-utils/auth-mocks";
+import { useAuth } from "../useAuth";
 
 jest.mock("next-auth/react", () => ({
   useSession: jest.fn(),
@@ -167,19 +167,13 @@ describe("useAuth", () => {
 
       const { result } = renderHook(() => useAuth());
 
-      expect(result.current.actualEscalationTeams).toEqual([
-        "platform-team",
-        "infra-team",
-      ]);
+      expect(result.current.actualEscalationTeams).toEqual(["platform-team", "infra-team"]);
     });
 
     it("filters out non-escalation teams", () => {
       const user = createTestUser({
         roles: ["ESCALATION"],
-        teams: [
-          createEscalationTeam({ code: "escalation-team" }),
-          createTestTeam({ code: "support-team", types: ["support"] }),
-        ],
+        teams: [createEscalationTeam({ code: "escalation-team" }), createTestTeam({ code: "support-team", types: ["support"] })],
       });
       mockUseSession.mockReturnValue(mockAuthenticatedSession(user));
 

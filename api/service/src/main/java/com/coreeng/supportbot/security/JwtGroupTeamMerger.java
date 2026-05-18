@@ -41,20 +41,20 @@ public class JwtGroupTeamMerger {
         ImmutableList.Builder<Team> out = ImmutableList.builder();
         out.addAll(emailTeams);
 
-        for (String jwtGroup : rawGroups) {
-            for (JwtGroupsProperties.Mapping mapping : properties.mappings()) {
-                if (mapping.teamCode() == null || mapping.teamCode().isBlank()) {
+        for (JwtGroupsProperties.Mapping mapping : properties.mappings()) {
+            String teamCode = mapping.teamCode();
+            if (teamCode == null || teamCode.isBlank()) {
+                continue;
+            }
+            String expected = mapping.groupRef().value();
+            for (String jwtGroup : rawGroups) {
+                if (!jwtGroup.equalsIgnoreCase(expected)) {
                     continue;
                 }
-                if (!anyClaimValueMatches(mapping.claimValues(), jwtGroup)) {
-                    continue;
-                }
-                Team team = teamService.findTeamByCode(mapping.teamCode());
+                Team team = teamService.findTeamByCode(teamCode);
                 if (team == null) {
-                    log.warn("jwt-groups mapping references unknown team-code {}", mapping.teamCode());
-                    continue;
-                }
-                if (seenCodes.add(team.code())) {
+                    log.warn("jwt-groups mapping references unknown team-code {}", teamCode);
+                } else if (seenCodes.add(team.code())) {
                     out.add(team);
                 }
                 break;
@@ -62,18 +62,6 @@ public class JwtGroupTeamMerger {
         }
 
         return out.build();
-    }
-
-    private static boolean anyClaimValueMatches(List<String> claimValues, String jwtGroup) {
-        for (String expected : claimValues) {
-            if (expected == null || expected.isBlank()) {
-                continue;
-            }
-            if (jwtGroup.equalsIgnoreCase(expected)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static List<String> extractGroupStrings(@Nullable Object claim) {

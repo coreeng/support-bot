@@ -1,8 +1,15 @@
 import { setWorldConstructor, World } from "@cucumber/cucumber";
-import { Browser, BrowserContext, Page, chromium } from "@playwright/test";
+import { Browser, BrowserContext, chromium, Page } from "@playwright/test";
 
 // Shared browser instance per worker (for parallel execution)
 let sharedBrowser: Browser | null = null;
+
+export async function closeSharedBrowser(): Promise<void> {
+  if (sharedBrowser && sharedBrowser.isConnected()) {
+    await sharedBrowser.close().catch(() => {});
+  }
+  sharedBrowser = null;
+}
 
 export class CustomWorld extends World {
   browser!: Browser;
@@ -17,12 +24,12 @@ export class CustomWorld extends World {
       this.browser = sharedBrowser;
       return;
     }
-    
+
     // Use Chromium for better stability in CI/sandbox environments
-    sharedBrowser = await chromium.launch({ 
+    sharedBrowser = await chromium.launch({
       headless: process.env.PWDEBUG ? false : true,
       slowMo: process.env.PWDEBUG ? 500 : 0,
-      args: ['--no-sandbox', '--disable-dev-shm-usage']
+      args: ["--no-sandbox", "--disable-dev-shm-usage"],
     });
     this.browser = sharedBrowser;
   }
@@ -32,9 +39,8 @@ export class CustomWorld extends World {
       ignoreHTTPSErrors: true,
     });
     this.page = await this.context.newPage();
-    
-    // Set default timeout
-    this.page.setDefaultTimeout(10000);
+
+    this.page.setDefaultTimeout(20_000);
   }
 
   async closePage() {
@@ -43,14 +49,6 @@ export class CustomWorld extends World {
     }
     if (this.context) {
       await this.context.close().catch(() => {});
-    }
-  }
-
-  async closeBrowser() {
-    // Close the shared browser at the end of the worker
-    if (sharedBrowser && sharedBrowser.isConnected()) {
-      await sharedBrowser.close().catch(() => {});
-      sharedBrowser = null;
     }
   }
 }

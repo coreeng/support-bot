@@ -12,6 +12,12 @@ services:
       - "5558:5558"
     volumes:
       - ./config/config.yaml:/etc/dex/config.yaml:ro
+      - ./web/themes/supportbot:/srv/dex/web/themes/supportbot:ro
+      - ./web/templates/header.html:/srv/dex/web/templates/header.html:ro
+      - ./web/templates/footer.html:/srv/dex/web/templates/footer.html:ro
+      - ./web/templates/login.html:/srv/dex/web/templates/login.html:ro
+      - ./web/templates/password.html:/srv/dex/web/templates/password.html:ro
+      - ./web/templates/error.html:/srv/dex/web/templates/error.html:ro
       - dex-data:/var/dex
     restart: unless-stopped
     networks:

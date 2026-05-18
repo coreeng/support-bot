@@ -16,17 +16,34 @@ IMAGE_TAG="${IMAGE_TAG:?required argument}"
 SERVICE_IMAGE_REPOSITORY="${SERVICE_IMAGE_REPOSITORY:?required argument}"
 SERVICE_IMAGE_TAG="${SERVICE_IMAGE_TAG:?required argument}"
 CLEANUP="${CLEANUP:-true}"
+KEEP_ON_FAILURE="${KEEP_ON_FAILURE:-true}"
+TEST_LOGS_DIR="${TEST_LOGS_DIR:-${SCRIPT_DIR}/../../reports/integration}"
 
 # shellcheck source=deploy-service.sh
 . "${SCRIPT_DIR}/deploy-service.sh"
 
+JOB_FAILED=0
+
 cleanup_job() {
+  print_grafana_logs_url "$NAMESPACE" "integration-tests" || true
+  save_job_logs "$RELEASE_NAME" "$NAMESPACE" "integration-tests" "$TEST_LOGS_DIR" || true
+
+  if [[ "$JOB_FAILED" == "1" && "$KEEP_ON_FAILURE" == "true" ]]; then
+    log_warning "Integration tests failed; preserving namespace ${NAMESPACE} so logs stay reachable."
+    log_warning "  Local log snapshot: ${TEST_LOGS_DIR}/"
+    log_warning "  Inspect pods:       kubectl get pods -n ${NAMESPACE}"
+    log_warning "  Tail logs:          kubectl logs -n ${NAMESPACE} -l job-name=${RELEASE_NAME} --tail=-1"
+    log_warning "  Manual cleanup:     helm uninstall ${RELEASE_NAME} support-bot-dex support-bot-ldap support-bot ${DB_RELEASE:-support-bot-db} -n ${NAMESPACE}"
+    return 0
+  fi
+
   if [[ "$CLEANUP" == "true" ]]; then
+    sleep_for_log_flush
     log "Cleaning up Helm releases in namespace: $NAMESPACE"
     helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" --ignore-not-found || true
     helm uninstall support-bot-dex -n "$NAMESPACE" --ignore-not-found || true
     helm uninstall support-bot-ldap -n "$NAMESPACE" --ignore-not-found || true
-    kubectl delete deployment support-bot -n "$NAMESPACE" --ignore-not-found || true
+    HELM_DRIVER=configmap helm uninstall support-bot -n "$NAMESPACE" --ignore-not-found || true
   else
     log_warning "Cleanup disabled. Helm releases will remain in namespace $NAMESPACE"
   fi
@@ -36,6 +53,10 @@ cleanup_job() {
     helm uninstall "$DB_RELEASE" -n "$NAMESPACE" --ignore-not-found || true
   fi
 }
+
+LOGS_START=$(date +%s)
+export LOGS_START
+
 trap cleanup_job EXIT
 
 deploy_chart() {
@@ -60,6 +81,22 @@ deploy_chart() {
   log_success "Chart deployed successfully"
 }
 
+ensure_app_k8s_secrets() {
+  log "Ensuring K8s secret support-bot (Slack credentials) in ${NAMESPACE}..."
+  kubectl create secret generic support-bot \
+    --from-literal=SLACK_TOKEN="${SLACK_TOKEN:?Set SLACK_TOKEN}" \
+    --from-literal=SLACK_SOCKET_TOKEN="${SLACK_SOCKET_TOKEN:?Set SLACK_SOCKET_TOKEN}" \
+    --from-literal=SLACK_SIGNING_SECRET="${SLACK_SIGNING_SECRET:?Set SLACK_SIGNING_SECRET}" \
+    -n "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+
+  log "Ensuring K8s secret azure (Azure credentials) in ${NAMESPACE}..."
+  kubectl create secret generic azure \
+    --from-literal=AZURE_TENANT_ID="${AZURE_TENANT_ID:?Set AZURE_TENANT_ID}" \
+    --from-literal=AZURE_CLIENT_ID="${AZURE_CLIENT_ID:?Set AZURE_CLIENT_ID}" \
+    --from-literal=AZURE_CLIENT_SECRET="${AZURE_CLIENT_SECRET:?Set AZURE_CLIENT_SECRET}" \
+    -n "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+}
+
 main() {
   log "Starting integration test deployment and execution"
   log "  Namespace: $NAMESPACE"
@@ -77,12 +114,14 @@ main() {
     log_warning "DEPLOY_DB is false; assuming database already available in $NAMESPACE"
   fi
 
+  ensure_app_k8s_secrets
   deploy_chart
 
   if wait_for_job_with_logs "$RELEASE_NAME" "$NAMESPACE" "$TIMEOUT" "integration-tests"; then
     log_success "Integration tests passed!"
     exit 0
   else
+    JOB_FAILED=1
     log_error "Integration tests failed!"
     show_job_status "$RELEASE_NAME" "$NAMESPACE"
     exit 1

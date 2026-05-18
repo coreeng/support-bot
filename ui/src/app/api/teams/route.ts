@@ -1,9 +1,5 @@
 import { NextRequest } from "next/server";
-import {
-  backendFetch,
-  unauthorizedResponse,
-  errorResponse,
-} from "../_lib/backend-fetch";
+import { backendFetch, errorResponse, unauthorizedResponse } from "../_lib/backend-fetch";
 
 interface BackendTeam {
   label?: string;
@@ -25,7 +21,7 @@ export async function GET(request: NextRequest) {
     return errorResponse("Invalid type parameter", 400);
   }
 
-  const response = await backendFetch(`/team?type=${type}`);
+  const response = await backendFetch(request, `/team?type=${type}`);
   if (!response) return unauthorizedResponse();
 
   if (!response.ok) {

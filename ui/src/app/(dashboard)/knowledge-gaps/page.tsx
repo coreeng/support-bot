@@ -1,9 +1,12 @@
-'use client'
+"use client";
 
-import KnowledgeGapsPage from '@/components/knowledgegaps/knowledge-gaps'
-import { RequireDashboardAccess } from '@/components/AccessDenied'
+import { RequireDashboardAccess } from "@/components/AccessDenied";
+import KnowledgeGapsPage from "@/components/knowledgegaps/knowledge-gaps";
 
 export default function KnowledgeGaps() {
-  return <RequireDashboardAccess><KnowledgeGapsPage /></RequireDashboardAccess>
+  return (
+    <RequireDashboardAccess>
+      <KnowledgeGapsPage />
+    </RequireDashboardAccess>
+  );
 }
-

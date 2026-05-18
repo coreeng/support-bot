@@ -3,7 +3,7 @@ P2P_TENANT_NAME ?= support-bot
 P2P_APP_NAME ?= support-bot
 HELM_CHART_PATH ?= helm-chart
 
-P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui $(P2P_APP_NAME)-ui-functional $(P2P_APP_NAME)-ui-nft
+P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui $(P2P_APP_NAME)-ui-functional $(P2P_APP_NAME)-ui-nft $(P2P_APP_NAME)-dex
 
 # Download and include p2p makefile
 $(shell curl -fsSL "https://raw.githubusercontent.com/coreeng/p2p/v1/p2p.mk" -o ".p2p.mk")
@@ -94,7 +94,7 @@ p2p-build:         build-app           push-app                                 
 p2p-functional:    build-functional    push-functional    deploy-functional    run-functional    ## p2p functional tests
 p2p-nft:           build-nft           push-nft           deploy-nft           run-nft           ## p2p nft tests
 p2p-integration:   build-integration   push-integration   deploy-integration   run-integration   ## p2p integration tests
-p2p-extended-test: build-extended-test push-extended-test deploy-extended-test run-extended-test ## p2p extended tests
+# p2p-extended-test: build-extended-test push-extended-test deploy-extended-test run-extended-test ## p2p extended tests
 p2p-prod:          publish-prod        publish-chart                                             ## p2p release to production
 
 ##@ Lint targets
@@ -174,8 +174,12 @@ build-api-app: lint-api ## Build API
 build-ui-app: lint-ui ## Build UI
 	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-ui) --tag "$(call p2p_image_tag,$(p2p_app_name)-ui)" --build-arg P2P_VERSION="$(p2p_version)" ui
 
+.PHONY: build-dex-app
+build-dex-app: ## Build Dex (upstream dexidp/dex + Support Bot login theme)
+	docker buildx build $(call p2p_image_cache,$(p2p_app_name)-dex) --tag "$(call p2p_image_tag,$(p2p_app_name)-dex)" dex
+
 .PHONY: build-app
-build-app: check-chart build-api-app build-ui-app ## Build all apps
+build-app: check-chart build-api-app build-ui-app build-dex-app ## Build all apps
 
 .PHONY: build-api-functional
 build-api-functional: ## Build API functional test docker image
@@ -217,8 +221,12 @@ push-api-app: ## Push API app
 push-ui-app: ## Push UI app
 	docker image push "$(call p2p_image_tag,$(p2p_app_name)-ui)"
 
+.PHONY: push-dex-app
+push-dex-app: ## Push Dex app
+	docker image push "$(call p2p_image_tag,$(p2p_app_name)-dex)"
+
 .PHONY: push-app
-push-app: push-api-app push-ui-app ## Push all apps
+push-app: push-api-app push-ui-app push-dex-app ## Push all apps
 
 .PHONY: push-api-functional
 push-api-functional: ## Push API functional test docker image
@@ -300,17 +308,6 @@ deploy-api-nft: ## Deploy service and DB for nft tests
 	VALUES_FILE=$(HELM_CHART_PATH)/values-nft.yaml \
 	./api/scripts/deploy-service.sh
 
-.PHONY: deploy-api-extended-test
-deploy-api-extended-test: ## Deploy service and DB for extended test environment
-	NAMESPACE="$(p2p_namespace)" \
-	SERVICE_IMAGE_REPOSITORY="$(p2p_registry)/$(p2p_app_name)" \
-	SERVICE_IMAGE_TAG="$(p2p_version)" \
-	DB_RELEASE="$(p2p_app_name)-db" \
-	SERVICE_RELEASE="$(p2p_app_name)" \
-	ACTION=deploy \
-	VALUES_FILE=$(HELM_CHART_PATH)/values-extended-test.yaml \
-	./api/scripts/deploy-service.sh
-
 .PHONY: deploy-api-functional
 deploy-api-functional: ## Deploy service and DB for functional tests, then run tests
 	NAMESPACE="$(p2p_namespace)" \
@@ -343,7 +340,8 @@ deploy-functional: deploy-api-functional deploy-ui-functional
 deploy-nft: deploy-api-nft deploy-ui-nft
 
 .PHONY: deploy-extended-test
-deploy-extended-test: deploy-api-extended-test deploy-ui-extended-test
+deploy-extended-test:
+	@echo "NOOP"
 ##@ Run targets
 
 .PHONY: run-api-app
@@ -424,8 +422,12 @@ publish-api-prod: login-ghcr ## Publish API container image
 publish-ui-prod: login-ghcr ## Publish UI container image
 	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/$(p2p_app_name)-ui:$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name)-ui:$(p2p_version)"
 
+.PHONY: publish-dex-prod
+publish-dex-prod: login-ghcr ## Publish Dex container image
+	skopeo copy --all --preserve-digests "docker://$(p2p_registry)/$(p2p_app_name)-dex:$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name)-dex:$(p2p_version)"
+
 .PHONY: publish-prod
-publish-prod: publish-api-prod publish-ui-prod ## Publish all container images
+publish-prod: publish-api-prod publish-ui-prod publish-dex-prod ## Publish all container images
 
 .PHONY: publish-chart
 publish-chart: ## Package and publish Helm chart (version aligned to image)
@@ -477,4 +479,3 @@ ldap-template: ## Validate LDAP chart (bitnami + integration + ephemeral plainte
 
 ldap-deploy-integration: ## Deploy LDAP for integration (ephemeral plaintext 389 — opt-in env set here)
 	@$(MAKE) -C ldap deploy-integration LDAP_DEPLOY_INSECURE_PLAINTEXT=true
-

@@ -1,6 +1,6 @@
+import { publicFetch } from "@/app/api/_lib/public-fetch";
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import {publicFetch} from "@/app/api/_lib/public-fetch";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 
@@ -18,9 +18,7 @@ function dexCallbackRedirectUri(): string | null {
 /**
  * Exchange auth code for token (public endpoint, no auth required).
  */
-async function exchangeCodeForToken(
-  code: string
-): Promise<{ token: string } | null> {
+async function exchangeCodeForToken(code: string): Promise<{ token: string } | null> {
   const response = await fetch(`${BACKEND_URL}/auth/token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -37,9 +35,7 @@ async function exchangeCodeForToken(
 /**
  * Fetch user data with token.
  */
-async function fetchUserWithToken(
-  token: string
-): Promise<Record<string, unknown> | null> {
+async function fetchUserWithToken(token: string): Promise<Record<string, unknown> | null> {
   const response = await fetch(`${BACKEND_URL}/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -62,7 +58,6 @@ async function fetchUserWithToken(
  * 5. User data fetched from /auth/me and stored in session
  */
 
-
 export interface AuthTeam {
   label: string;
   code: string;
@@ -81,7 +76,6 @@ export interface AuthUser {
 declare module "next-auth" {
   interface Session {
     user: AuthUser;
-    accessToken: string;
   }
 
   interface User extends AuthUser {
@@ -156,15 +150,13 @@ export const authConfig: NextAuthConfig = {
           try {
             const redirectUri = dexCallbackRedirectUri();
             if (!redirectUri) {
-              console.error(
-                "OAuth exchange: NEXTAUTH_URL is not set — cannot build redirect_uri"
-              );
+              console.error("OAuth exchange: NEXTAUTH_URL is not set — cannot build redirect_uri");
               return null;
             }
 
             const response = await publicFetch("/auth/oauth/exchange", {
               method: "POST",
-              body: JSON.stringify({code, redirectUri}),
+              body: JSON.stringify({ code, redirectUri }),
             });
 
             if (response.ok) {
@@ -208,41 +200,6 @@ export const authConfig: NextAuthConfig = {
         return null;
       }, // authorize()
     }),
-    Credentials({
-      id: "backend-token",
-      name: "Backend Token",
-      credentials: {
-        token: { label: "Token", type: "text" },
-      },
-      async authorize(credentials) {
-        const token = credentials?.token as string;
-        if (!token) return null;
-
-        try {
-          // Token is already a valid backend JWT, just fetch user data
-          const userData = await fetchUserWithToken(token);
-          if (!userData) {
-            console.error("User fetch failed");
-            return null;
-          }
-
-          return {
-            id: userData.email as string,
-            email: userData.email as string,
-            name: userData.name as string,
-            teams: (userData.teams as Array<{ label: string; code: string; types: string[] }>).map((t) => ({
-              ...t,
-              name: t.code || t.label,
-            })),
-            roles: userData.roles as string[],
-            accessToken: token,
-          };
-        } catch (error) {
-          console.error("Authorization error:", error);
-          return null;
-        }
-      },
-    }),
   ],
 
   callbacks: {
@@ -259,7 +216,6 @@ export const authConfig: NextAuthConfig = {
     },
 
     async session({ session, token }) {
-      session.accessToken = token.accessToken as string;
       if (session.user) {
         session.user.id = token.email as string;
         session.user.email = token.email as string;
@@ -287,9 +243,7 @@ export const authConfig: NextAuthConfig = {
   // cookie (for auth checks) and the CSRF cookie (for signOut) need this.
   cookies: {
     sessionToken: {
-      name: process.env.NODE_ENV === "production"
-        ? "__Secure-authjs.session-token"
-        : "authjs.session-token",
+      name: process.env.NODE_ENV === "production" ? "__Secure-authjs.session-token" : "authjs.session-token",
       options: {
         httpOnly: true,
         sameSite: "none" as const,
@@ -298,9 +252,7 @@ export const authConfig: NextAuthConfig = {
       },
     },
     csrfToken: {
-      name: process.env.NODE_ENV === "production"
-        ? "__Host-authjs.csrf-token"
-        : "authjs.csrf-token",
+      name: process.env.NODE_ENV === "production" ? "__Host-authjs.csrf-token" : "authjs.csrf-token",
       options: {
         httpOnly: true,
         sameSite: "none" as const,
@@ -309,9 +261,7 @@ export const authConfig: NextAuthConfig = {
       },
     },
     callbackUrl: {
-      name: process.env.NODE_ENV === "production"
-        ? "__Secure-authjs.callback-url"
-        : "authjs.callback-url",
+      name: process.env.NODE_ENV === "production" ? "__Secure-authjs.callback-url" : "authjs.callback-url",
       options: {
         httpOnly: true,
         sameSite: "none" as const,

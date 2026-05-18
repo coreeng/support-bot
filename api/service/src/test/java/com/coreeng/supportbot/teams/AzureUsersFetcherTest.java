@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.microsoft.graph.groups.GroupsRequestBuilder;
 import com.microsoft.graph.groups.item.GroupItemRequestBuilder;
 import com.microsoft.graph.groups.item.transitivemembers.TransitiveMembersRequestBuilder;
@@ -69,7 +70,8 @@ class AzureUsersFetcherTest {
         AzureUsersFetcher fetcher = new AzureUsersFetcher(mockGraphClient);
 
         // When
-        List<PlatformUsersFetcher.Membership> memberships = fetcher.fetchMembershipsByGroupRef("group-id");
+        List<PlatformUsersFetcher.Membership> memberships =
+                fetcher.fetchMembershipsByGroupRef(new GroupRef.Azure("group-id"));
 
         // Then
         assertEquals(2, memberships.size());

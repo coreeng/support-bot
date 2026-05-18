@@ -5,8 +5,8 @@
  * Use these utilities to avoid `as any` casts and maintain consistency across tests.
  */
 
+import type { AuthTeam, AuthUser } from "@/auth.config";
 import type { Session } from "next-auth";
-import type { AuthUser, AuthTeam } from "@/auth.config";
 
 /**
  * Creates a test team with sensible defaults.
@@ -24,9 +24,7 @@ export function createTestTeam(overrides: Partial<AuthTeam> = {}): AuthTeam {
 /**
  * Creates an escalation team (team with escalation type).
  */
-export function createEscalationTeam(
-  overrides: Partial<AuthTeam> = {}
-): AuthTeam {
+export function createEscalationTeam(overrides: Partial<AuthTeam> = {}): AuthTeam {
   return createTestTeam({
     label: "Escalation Team",
     code: "escalation-team",
@@ -86,14 +84,10 @@ export function mockUnauthenticatedSession(): MockSessionReturn {
 /**
  * Creates an authenticated session state with the provided user.
  */
-export function mockAuthenticatedSession(
-  user: AuthUser,
-  accessToken = "test-token"
-): MockSessionReturn {
+export function mockAuthenticatedSession(user: AuthUser): MockSessionReturn {
   return {
     data: {
       user,
-      accessToken,
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     },
     status: "authenticated",

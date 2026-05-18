@@ -1,21 +1,18 @@
 import { NextRequest } from "next/server";
-import { auth } from "@/auth";
-import { unauthorizedResponse, errorResponse } from "../../_lib/backend-fetch";
+import { backendAccessToken, errorResponse, unauthorizedResponse } from "../../_lib/backend-fetch";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
+  const accessToken = await backendAccessToken(request);
 
-  if (!session?.accessToken) {
+  if (!accessToken) {
     return unauthorizedResponse();
   }
 
   // Validate CSRF token
   const csrfTokenFromHeader = request.headers.get("X-CSRF-Token");
-  const csrfCookieName = process.env.NODE_ENV === "production"
-    ? "__Host-authjs.csrf-token"
-    : "authjs.csrf-token";
+  const csrfCookieName = process.env.NODE_ENV === "production" ? "__Host-authjs.csrf-token" : "authjs.csrf-token";
   const csrfCookieValue = request.cookies.get(csrfCookieName)?.value;
 
   if (!csrfTokenFromHeader || !csrfCookieValue) {
@@ -42,7 +39,7 @@ export async function POST(request: NextRequest) {
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${session.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       body: formData, // Send the FormData directly
     });
@@ -58,4 +55,3 @@ export async function POST(request: NextRequest) {
     return errorResponse("Failed to upload file", 500);
   }
 }
-

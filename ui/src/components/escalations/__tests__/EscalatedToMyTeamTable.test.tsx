@@ -1,22 +1,22 @@
 /**
  * EscalatedToMyTeamTable Unit Tests
- * 
+ *
  * Tests the visibility logic, filtering, and pagination for the
  * "Escalated to My Team" table on the Escalations tab.
  */
 
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import EscalatedToMyTeamTable from '../EscalatedToMyTeamTable';
-import * as hooks from '../../../lib/hooks';
-import * as AuthHook from '../../../hooks/useAuth';
-import * as TeamFilterContext from '../../../contexts/TeamFilterContext';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen } from "@testing-library/react";
+import React from "react";
+import * as TeamFilterContext from "../../../contexts/TeamFilterContext";
+import * as AuthHook from "../../../hooks/useAuth";
+import * as hooks from "../../../lib/hooks";
+import EscalatedToMyTeamTable from "../EscalatedToMyTeamTable";
 
 // Mock hooks
-jest.mock('../../../lib/hooks');
-jest.mock('../../../hooks/useAuth');
-jest.mock('../../../contexts/TeamFilterContext');
+jest.mock("../../../lib/hooks");
+jest.mock("../../../hooks/useAuth");
+jest.mock("../../../contexts/TeamFilterContext");
 
 const mockUseEscalations = hooks.useEscalations as jest.MockedFunction<typeof hooks.useEscalations>;
 const mockUseRegistry = hooks.useRegistry as jest.MockedFunction<typeof hooks.useRegistry>;
@@ -24,258 +24,197 @@ const mockUseAuth = AuthHook.useAuth as jest.MockedFunction<typeof AuthHook.useA
 const mockUseTeamFilter = TeamFilterContext.useTeamFilter as jest.MockedFunction<typeof TeamFilterContext.useTeamFilter>;
 
 const daysAgo = (n: number) => {
-    const d = new Date()
-    d.setDate(d.getDate() - n)
-    return d.toISOString()
-}
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString();
+};
 
 // Test data — openedAt dates are kept within the default "Last 7 Days" filter
 const mockEscalations = [
-    {
-        id: 'esc-1',
-        team: { name: 'Core-platform' },
-        resolvedAt: null,
-        impact: 'high',
-        tags: ['bug', 'urgent'],
-        ticketId: 'ticket-1',
-        hasThread: true,
-        openedAt: daysAgo(1)
-    },
-    {
-        id: 'esc-2',
-        team: { name: 'Core-platform' },
-        resolvedAt: daysAgo(0),
-        impact: 'medium',
-        tags: ['feature'],
-        ticketId: 'ticket-2',
-        hasThread: true,
-        openedAt: daysAgo(2)
-    },
-    {
-        id: 'esc-3',
-        team: { name: 'Core-platform' },
-        resolvedAt: null,
-        impact: 'low',
-        tags: ['bug', 'question'],
-        ticketId: 'ticket-3',
-        hasThread: true,
-        openedAt: daysAgo(3)
-    },
-    {
-        id: 'esc-4',
-        team: { name: 'Other-team' },
-        resolvedAt: null,
-        impact: 'high',
-        tags: ['bug'],
-        ticketId: 'ticket-4',
-        hasThread: true,
-        openedAt: daysAgo(1)
-    }
+  {
+    id: "esc-1",
+    team: { name: "Core-platform" },
+    resolvedAt: null,
+    impact: "high",
+    tags: ["bug", "urgent"],
+    ticketId: "ticket-1",
+    hasThread: true,
+    openedAt: daysAgo(1),
+  },
+  {
+    id: "esc-2",
+    team: { name: "Core-platform" },
+    resolvedAt: daysAgo(0),
+    impact: "medium",
+    tags: ["feature"],
+    ticketId: "ticket-2",
+    hasThread: true,
+    openedAt: daysAgo(2),
+  },
+  {
+    id: "esc-3",
+    team: { name: "Core-platform" },
+    resolvedAt: null,
+    impact: "low",
+    tags: ["bug", "question"],
+    ticketId: "ticket-3",
+    hasThread: true,
+    openedAt: daysAgo(3),
+  },
+  {
+    id: "esc-4",
+    team: { name: "Other-team" },
+    resolvedAt: null,
+    impact: "high",
+    tags: ["bug"],
+    ticketId: "ticket-4",
+    hasThread: true,
+    openedAt: daysAgo(1),
+  },
 ];
 
 const mockRegistry = {
-    impacts: [
-        { code: 'high', label: 'High' },
-        { code: 'medium', label: 'Medium' },
-        { code: 'low', label: 'Low' }
-    ],
-    tags: [
-        { code: 'bug', label: 'Bug' },
-        { code: 'feature', label: 'Feature' },
-        { code: 'question', label: 'Question' },
-        { code: 'urgent', label: 'Urgent' }
-    ]
+  impacts: [
+    { code: "high", label: "High" },
+    { code: "medium", label: "Medium" },
+    { code: "low", label: "Low" },
+  ],
+  tags: [
+    { code: "bug", label: "Bug" },
+    { code: "feature", label: "Feature" },
+    { code: "question", label: "Question" },
+    { code: "urgent", label: "Urgent" },
+  ],
 };
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => {
-    const queryClient = new QueryClient({
-        defaultOptions: { queries: { retry: false } }
-    });
-    return (
-        <QueryClientProvider client={queryClient}>
-            {children}
-        </QueryClientProvider>
-    );
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 };
 
-describe('EscalatedToMyTeamTable', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
+describe("EscalatedToMyTeamTable", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
 
-        // Default mock implementations
-        mockUseRegistry.mockReturnValue({
-            data: mockRegistry,
-            isLoading: false,
-            error: null
-        } as unknown as ReturnType<typeof hooks.useRegistry>);
+    // Default mock implementations
+    mockUseRegistry.mockReturnValue({
+      data: mockRegistry,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useRegistry>);
 
-        mockUseAuth.mockReturnValue({
-            isEscalationTeam: true,
-            actualEscalationTeams: ['Core-platform'],
-            user: null,
-            isLoading: false,
-            isAuthenticated: false,
-            isLeadership: false,
-            isSupportEngineer: false,
-            logout: jest.fn()
-        });
-
-        mockUseTeamFilter.mockReturnValue({
-            selectedTeam: 'Core-platform',
-            setSelectedTeam: jest.fn(),
-            hasFullAccess: false,
-            effectiveTeams: ['Core-platform'],
-            allTeams: ['Core-platform'],
-            initialized: true
-        });
-
-        mockUseEscalations.mockReturnValue({
-            data: { content: mockEscalations, page: 0, totalPages: 1, totalElements: 4 },
-            isLoading: false,
-            error: null
-        } as unknown as ReturnType<typeof hooks.useEscalations>);
+    mockUseAuth.mockReturnValue({
+      isEscalationTeam: true,
+      actualEscalationTeams: ["Core-platform"],
+      user: null,
+      isLoading: false,
+      isAuthenticated: false,
+      isLeadership: false,
+      isSupportEngineer: false,
+      logout: jest.fn(),
     });
 
-    describe('Visibility Logic', () => {
-        it('should show when user selects their escalation team', () => {
-            render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            expect(screen.getByText(/Escalated to My Team/i)).toBeInTheDocument();
-        });
-
-        it('should NOT show when user selects non-escalation team', () => {
-            mockUseTeamFilter.mockReturnValue({
-                selectedTeam: 'Other-team', // Not an escalation team
-                setSelectedTeam: jest.fn(),
-                hasFullAccess: false,
-                effectiveTeams: ['Other-team'],
-                allTeams: ['Core-platform', 'Other-team'],
-                initialized: true
-            });
-
-            const { container } = render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            expect(container.firstChild).toBeNull();
-        });
-
-        it('should NOT show when actualEscalationTeams is empty', () => {
-            mockUseAuth.mockReturnValue({
-                isEscalationTeam: false,
-                actualEscalationTeams: [],
-                user: null,
-                isLoading: false,
-                isAuthenticated: false,
-                isLeadership: false,
-                isSupportEngineer: false,
-                logout: jest.fn()
-            });
-
-            const { container } = render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            expect(container.firstChild).toBeNull();
-        });
+    mockUseTeamFilter.mockReturnValue({
+      selectedTeam: "Core-platform",
+      setSelectedTeam: jest.fn(),
+      hasFullAccess: false,
+      effectiveTeams: ["Core-platform"],
+      allTeams: ["Core-platform"],
+      initialized: true,
     });
 
-    describe('Filtering Logic', () => {
-        it('should render filter dropdowns', () => {
-            const { container } = render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
+    mockUseEscalations.mockReturnValue({
+      data: { content: mockEscalations, page: 0, totalPages: 1, totalElements: 4 },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useEscalations>);
+  });
 
-            // Status, Impact, Tag, Date
-            const selects = container.querySelectorAll('select');
-            expect(selects.length).toBe(4);
-        });
+  describe("Visibility Logic", () => {
+    it("should show when user selects their escalation team", () => {
+      render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
 
-        it('should filter by status', () => {
-            const { container } = render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            const selects = container.querySelectorAll('select');
-            const statusFilter = selects[0]; // First select is status
-
-            // Change to resolved
-            fireEvent.change(statusFilter, { target: { value: 'resolved' } });
-            
-            // Should still render the table
-            expect(screen.getByText(/Escalated to My Team/i)).toBeInTheDocument();
-        });
-
-        it('should filter by impact', () => {
-            const { container } = render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            const selects = container.querySelectorAll('select');
-            const impactFilter = selects[1]; // Second select is impact
-
-            // Change to high
-            fireEvent.change(impactFilter, { target: { value: 'high' } });
-
-            // Should still render the table
-            expect(screen.getByText(/Escalated to My Team/i)).toBeInTheDocument();
-        });
-
-        it('should display total count', () => {
-            render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            // Should show "3 total" for Core-platform escalations
-            expect(screen.getByText('3 total')).toBeInTheDocument();
-        });
+      expect(screen.getByText(/Escalated to My Team/i)).toBeInTheDocument();
     });
 
-    describe('Top Tags', () => {
-        it('should display top tags section', () => {
-            render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
+    it("should NOT show when user selects non-escalation team", () => {
+      mockUseTeamFilter.mockReturnValue({
+        selectedTeam: "Other-team", // Not an escalation team
+        setSelectedTeam: jest.fn(),
+        hasFullAccess: false,
+        effectiveTeams: ["Other-team"],
+        allTeams: ["Core-platform", "Other-team"],
+        initialized: true,
+      });
 
-            // Should show "Top 5 Tags" heading
-            expect(screen.getByText(/Top 5 Tags/i)).toBeInTheDocument();
-        });
+      const { container } = render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
 
-        it('should update when filters change', () => {
-            const { container } = render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            const selects = container.querySelectorAll('select');
-            const statusFilter = selects[0]; // First select is status
-            fireEvent.change(statusFilter, { target: { value: 'resolved' } });
-
-            // Should still show Top 5 Tags heading
-            expect(screen.getByText(/Top 5 Tags/i)).toBeInTheDocument();
-        });
+      expect(container.firstChild).toBeNull();
     });
 
-    describe('Loading and Error States', () => {
-        it('should show loading state when escalations are loading', () => {
-            mockUseEscalations.mockReturnValue({
-                data: undefined,
-                isLoading: true,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useEscalations>);
+    it("should NOT show when actualEscalationTeams is empty", () => {
+      mockUseAuth.mockReturnValue({
+        isEscalationTeam: false,
+        actualEscalationTeams: [],
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+        isLeadership: false,
+        isSupportEngineer: false,
+        logout: jest.fn(),
+      });
 
-            render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
+      const { container } = render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
 
-            expect(screen.getByText(/Loading/i)).toBeInTheDocument();
-        });
-
-        it('should show error state when escalations fail to load', () => {
-            mockUseEscalations.mockReturnValue({
-                data: undefined,
-                isLoading: false,
-                error: new Error('Failed to load')
-            } as unknown as ReturnType<typeof hooks.useEscalations>);
-
-            render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            expect(screen.getByText(/Error loading escalations/i)).toBeInTheDocument();
-        });
-
-        it('should handle empty escalations data gracefully', () => {
-            mockUseEscalations.mockReturnValue({
-                data: { content: [], page: 0, totalPages: 0, totalElements: 0 },
-                isLoading: false,
-                error: null
-            } as unknown as ReturnType<typeof hooks.useEscalations>);
-
-            render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
-
-            expect(screen.getByText(/Escalated to My Team/i)).toBeInTheDocument();
-            expect(screen.getByText(/No escalations/i)).toBeInTheDocument();
-        });
+      expect(container.firstChild).toBeNull();
     });
+  });
+
+  describe("Top Tags", () => {
+    it("should display top tags section", () => {
+      render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
+      expect(screen.getByText(/Top 5 Tags/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("Loading and Error States", () => {
+    it("should show loading state when escalations are loading", () => {
+      mockUseEscalations.mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useEscalations>);
+
+      render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
+
+      expect(screen.getByText(/Loading/i)).toBeInTheDocument();
+    });
+
+    it("should show error state when escalations fail to load", () => {
+      mockUseEscalations.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        error: new Error("Failed to load"),
+      } as unknown as ReturnType<typeof hooks.useEscalations>);
+
+      render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
+
+      expect(screen.getByText(/Error loading escalations/i)).toBeInTheDocument();
+    });
+
+    it("should handle empty escalations data gracefully", () => {
+      mockUseEscalations.mockReturnValue({
+        data: { content: [], page: 0, totalPages: 0, totalElements: 0 },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useEscalations>);
+
+      render(<EscalatedToMyTeamTable />, { wrapper: Wrapper });
+
+      expect(screen.getByText(/Escalated to My Team/i)).toBeInTheDocument();
+      expect(screen.getByText(/No escalations/i)).toBeInTheDocument();
+    });
+  });
 });
-

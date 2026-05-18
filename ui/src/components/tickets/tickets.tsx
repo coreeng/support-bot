@@ -1,559 +1,609 @@
-'use client'
+"use client";
 
-import {useEffect, useMemo, useRef, useState} from 'react'
-import {useAllTickets, useAssignmentEnabled, useRegistry, useTenantTeams, useTickets} from '@/lib/hooks'
-import {useTeamFilter} from '@/contexts/TeamFilterContext'
-import {PaginatedTickets, TicketImpact, TicketTag, TicketWithLogs} from "@/lib/types"
-import LoadingSkeleton from '@/components/LoadingSkeleton'
-import EditTicketModal from './EditTicketModal'
-import {useQueryClient} from '@tanstack/react-query'
-import {TEAM_SCOPE} from '@/lib/constants'
-import {normalizeTeamKey} from '@/lib/teamUtils'
-import {getDateRangeFromFilter, PRESET_DAYS} from '@/lib/dateRange'
-import { enumValidator, isoDateValidator, nonNegativeIntValidator, useUrlParams } from '@/lib/hooks/useUrlParams'
-
+import LoadingSkeleton from "@/components/LoadingSkeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SingleSelectFilter } from "@/components/ui/single-select-filter";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useTeamFilter } from "@/contexts/TeamFilterContext";
+import { TEAM_SCOPE } from "@/lib/constants";
+import { getDateRangeFromFilter, PRESET_DAYS } from "@/lib/dateRange";
+import { useAllTickets, useAssignmentEnabled, useRegistry, useTenantTeams, useTickets } from "@/lib/hooks";
+import { enumValidator, isoDateValidator, nonNegativeIntValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
+import { normalizeTeamKey } from "@/lib/teamUtils";
+import { PaginatedTickets, TicketImpact, TicketTag, TicketWithLogs } from "@/lib/types";
+import { useQueryClient } from "@tanstack/react-query";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import EditTicketModal from "./EditTicketModal";
 
 export default function TicketsPage() {
-    const {
-        effectiveTeams,
-        hasNoTeamScope: contextHasNoTeamScope,
-        isViewingAllTeams: contextIsViewingAllTeams,
-        selectedTeam: teamFilterSelectedTeam
-    } = useTeamFilter()
-    const queryClient = useQueryClient()
-    const {data: isAssignmentEnabled} = useAssignmentEnabled()
-    const SUMMARY_COLUMN_WIDTH = '16rem'
-    const BASE_COLUMN_COUNT = 9
-    const columnCount = isAssignmentEnabled ? BASE_COLUMN_COUNT + 1 : BASE_COLUMN_COUNT
-    const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS)
-    const isViewingAllTeams = contextIsViewingAllTeams ?? (effectiveTeams.length === 0 && !hasNoTeamScope)
-    type TicketDateFilter = '' | 'lastWeek' | 'last2Weeks' | 'lastMonth' | 'custom'
-    type SortColumn = 'openedAt' | 'closedAt'
+  const {
+    effectiveTeams,
+    hasNoTeamScope: contextHasNoTeamScope,
+    isViewingAllTeams: contextIsViewingAllTeams,
+    selectedTeam: teamFilterSelectedTeam,
+  } = useTeamFilter();
+  const queryClient = useQueryClient();
+  const { data: isAssignmentEnabled } = useAssignmentEnabled();
+  const SUMMARY_COLUMN_WIDTH = "16rem";
+  const BASE_COLUMN_COUNT = 9;
+  const columnCount = isAssignmentEnabled ? BASE_COLUMN_COUNT + 1 : BASE_COLUMN_COUNT;
+  const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS);
+  const isViewingAllTeams = contextIsViewingAllTeams ?? (effectiveTeams.length === 0 && !hasNoTeamScope);
+  type TicketDateFilter = "" | "lastWeek" | "last2Weeks" | "lastMonth" | "custom";
+  type SortColumn = "openedAt" | "closedAt";
 
-    // Selected ticket (UI-only — not persisted in the URL)
-    const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
-    const [isModalOpen, setIsModalOpen] = useState(false)
+  // Selected ticket (UI-only — not persisted in the URL)
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const {data: registryData} = useRegistry()
-    const {data: teamsData} = useTenantTeams()
+  const { data: registryData } = useRegistry();
+  const { data: teamsData } = useTenantTeams();
 
   // Persist all filter / sort / page controls in the URL.
-    // Validators guard against invalid URL values and auto-correct the URL.
-    const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS
-    const [params, setParams] = useUrlParams(
-        {
-            dateFilter: 'lastWeek',
-            dateFrom: '',
-            dateTo: '',
-            status: '',
-            teamFilter: '',
-            impact: '',
-            tag: '',
-            escalated: '',
-            escalatedTo: '',
-            sortBy: 'openedAt',
-            sortDir: 'desc',
-            page: '0',
+  // Validators guard against invalid URL values and auto-correct the URL.
+  const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS;
+  const [params, setParams] = useUrlParams(
+    {
+      dateFilter: "lastWeek",
+      dateFrom: "",
+      dateTo: "",
+      status: "",
+      teamFilter: "",
+      impact: "",
+      tag: "",
+      escalated: "",
+      escalatedTo: "",
+      sortBy: "openedAt",
+      sortDir: "desc",
+      page: "0",
+    },
+    {
+      dateFilter: enumValidator(["", "lastWeek", "last2Weeks", "lastMonth", "custom"] as const, "lastWeek"),
+      dateFrom: isoDateValidator,
+      dateTo: isoDateValidator,
+      status: enumValidator(["", "opened", "closed", "stale"] as const, ""),
+      escalated: enumValidator(["", "Yes", "No"] as const, ""),
+      sortBy: enumValidator(["openedAt", "closedAt"] as const, "openedAt"),
+      sortDir: enumValidator(["asc", "desc"] as const, "desc"),
+      page: nonNegativeIntValidator,
+      // impact and tag are intentionally unvalidated: their valid values come from
+      // registryData which loads asynchronously after mount.  useUrlParams captures
+      // validators once at mount time (via useState), so passing registry-dependent
+      // validators would always see undefined and immediately wipe any URL value.
+    }
+  );
+
+  // Type assertions are safe for dateFilter, status, escalated, sortBy, and sortDir —
+  // each has an enumValidator above. page uses nonNegativeIntValidator and is parsed via parseInt
+  // teamFilter, impact, tag, and escalatedTo have no validators and carry raw URL strings.
+  const dateFilter = params.dateFilter as TicketDateFilter;
+  const statusFilter = params.status;
+  const teamFilter = params.teamFilter;
+  const impactFilter = params.impact;
+  const tagFilter = params.tag;
+  const escalatedFilter = params.escalated;
+  const escalatedToFilter = params.escalatedTo;
+  const sortColumn: SortColumn = params.sortBy as SortColumn;
+  const sortDirection: "asc" | "desc" = params.sortDir as "asc" | "desc";
+  const unvalidatedCurrentPage = parseInt(params.page, 10);
+  const pageSize = 15;
+
+  // Correct the URL when custom date range is in an invalid order (dateFrom > dateTo).
+  useEffect(() => {
+    if (params.dateFilter === "custom" && params.dateFrom && params.dateTo && params.dateFrom > params.dateTo) {
+      setParams({ dateFilter: "lastWeek", dateFrom: "", dateTo: "" });
+    }
+  }, [params.dateFilter, params.dateFrom, params.dateTo, setParams]);
+
+  const dateRange = useMemo(
+    () =>
+      getDateRangeFromFilter({
+        dateFilter,
+        customDateRange: { start: params.dateFrom || undefined, end: params.dateTo || undefined },
+        customValue: "custom",
+        fallbackValue: "lastWeek",
+        presetDays: {
+          lastWeek: PRESET_DAYS.lastWeek,
+          last2Weeks: PRESET_DAYS.last2Weeks,
+          lastMonth: PRESET_DAYS.lastMonth,
         },
-        {
-            dateFilter: enumValidator(['', 'lastWeek', 'last2Weeks', 'lastMonth', 'custom'] as const, 'lastWeek'),
-            dateFrom: isoDateValidator,
-            dateTo: isoDateValidator,
-            status: enumValidator(['', 'opened', 'closed', 'stale'] as const, ''),
-            escalated: enumValidator(['', 'Yes', 'No'] as const, ''),
-            sortBy: enumValidator(['openedAt', 'closedAt'] as const, 'openedAt'),
-            sortDir: enumValidator(['asc', 'desc'] as const, 'desc'),
-            page: nonNegativeIntValidator,
-            // impact and tag are intentionally unvalidated: their valid values come from
-            // registryData which loads asynchronously after mount.  useUrlParams captures
-            // validators once at mount time (via useState), so passing registry-dependent
-            // validators would always see undefined and immediately wipe any URL value.
-        },
-    )
-
-    // Type assertions are safe for dateFilter, status, escalated, sortBy, and sortDir —
-    // each has an enumValidator above. page uses nonNegativeIntValidator and is parsed via parseInt
-    // teamFilter, impact, tag, and escalatedTo have no validators and carry raw URL strings.
-    const dateFilter    = params.dateFilter as TicketDateFilter
-    const statusFilter  = params.status
-    const teamFilter    = params.teamFilter
-    const impactFilter  = params.impact
-    const tagFilter     = params.tag
-    const escalatedFilter    = params.escalated
-    const escalatedToFilter  = params.escalatedTo
-    const sortColumn: SortColumn       = params.sortBy as SortColumn
-    const sortDirection: 'asc' | 'desc' = params.sortDir as 'asc' | 'desc'
-    const unvalidatedCurrentPage = parseInt(params.page, 10)
-    const pageSize = 15
-
-    // Correct the URL when custom date range is in an invalid order (dateFrom > dateTo).
-    useEffect(() => {
-        if (params.dateFilter === 'custom' && params.dateFrom && params.dateTo && params.dateFrom > params.dateTo) {
-            setParams({ dateFilter: 'lastWeek', dateFrom: '', dateTo: '' })
-        }
-    }, [params.dateFilter, params.dateFrom, params.dateTo, setParams])
-
-    const dateRange = useMemo(
-        () =>
-            getDateRangeFromFilter({
-                dateFilter,
-                customDateRange: { start: params.dateFrom || undefined, end: params.dateTo || undefined },
-                customValue: 'custom',
-                fallbackValue: 'lastWeek',
-                presetDays: {
-                    lastWeek: PRESET_DAYS.lastWeek,
-                    last2Weeks: PRESET_DAYS.last2Weeks,
-                    lastMonth: PRESET_DAYS.lastMonth,
-                },
-            }),
-        [dateFilter, params.dateFrom, params.dateTo]
-    )
+      }),
+    [dateFilter, params.dateFrom, params.dateTo]
+  );
 
   // Data hooks
-    // - When filters are applied: pull all pages client-side to avoid missing matches on later pages.
-    // - When viewing all teams (no team filter): use backend pagination for efficiency.
-    // - When viewing a specific team: larger single fetch + client-side paginate.
-    const shouldUseAllTickets = useMemo(
-      () => !!(params.status || params.teamFilter || params.impact || params.tag || params.escalated || params.escalatedTo),
-      [params.status, params.teamFilter, params.impact, params.tag, params.escalated, params.escalatedTo]
-    )
-    const useServerPagination = isViewingAllTeams && !shouldUseAllTickets
-    const backendPageSize = useServerPagination ? pageSize : 1000
-    const backendPage = useServerPagination ? unvalidatedCurrentPage : 0
-    const allTicketsQuery = useAllTickets(200, dateRange.from, dateRange.to, shouldUseAllTickets)
-    const pagedTicketsQuery = useTickets(backendPage, backendPageSize, dateRange.from, dateRange.to)
+  // - When filters are applied: pull all pages client-side to avoid missing matches on later pages.
+  // - When viewing all teams (no team filter): use backend pagination for efficiency.
+  // - When viewing a specific team: larger single fetch + client-side paginate.
+  const shouldUseAllTickets = useMemo(
+    () => !!(params.status || params.teamFilter || params.impact || params.tag || params.escalated || params.escalatedTo),
+    [params.status, params.teamFilter, params.impact, params.tag, params.escalated, params.escalatedTo]
+  );
+  const useServerPagination = isViewingAllTeams && !shouldUseAllTickets;
+  const backendPageSize = useServerPagination ? pageSize : 1000;
+  const backendPage = useServerPagination ? unvalidatedCurrentPage : 0;
+  const allTicketsQuery = useAllTickets(200, dateRange.from, dateRange.to, shouldUseAllTickets);
+  const pagedTicketsQuery = useTickets(backendPage, backendPageSize, dateRange.from, dateRange.to);
 
-    const ticketsData = shouldUseAllTickets ? allTicketsQuery.data : pagedTicketsQuery.data
-    const ticketsLoading = shouldUseAllTickets ? allTicketsQuery.isLoading : pagedTicketsQuery.isLoading
-    const ticketsError = shouldUseAllTickets ? allTicketsQuery.error : pagedTicketsQuery.error
+  const ticketsData = shouldUseAllTickets ? allTicketsQuery.data : pagedTicketsQuery.data;
+  const ticketsLoading = shouldUseAllTickets ? allTicketsQuery.isLoading : pagedTicketsQuery.isLoading;
+  const ticketsError = shouldUseAllTickets ? allTicketsQuery.error : pagedTicketsQuery.error;
 
-    const statusColors: Record<string, string> = {
-        opened: 'bg-blue-100 text-blue-800',
-        closed: 'bg-green-100 text-green-800',
+  const statusColors: Record<string, string> = {
+    opened: "bg-info/10 text-info",
+    closed: "bg-success/10 text-success",
+  };
+  // --- Utility functions ---
+  const getOpenedClosed = (ticket: TicketWithLogs) => {
+    if (!ticket.logs?.length) return { opened: null, closed: null };
+
+    const sorted = [...ticket.logs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const opened = sorted[0].date;
+
+    const closedLog = [...sorted].reverse().find((log) => log.event.toLowerCase().includes("closed"));
+
+    const closed = closedLog?.date || null;
+
+    return { opened, closed };
+  };
+
+  const getTagLabel = (tag: unknown): string => {
+    if (typeof tag === "string") return tag;
+    if (tag && typeof tag === "object") {
+      const obj = tag as { label?: string; code?: string };
+      return obj.label || obj.code || "";
     }
-    // --- Utility functions ---
-    const getOpenedClosed = (ticket: TicketWithLogs) => {
-        if (!ticket.logs?.length) return {opened: null, closed: null}
+    return "";
+  };
 
-        const sorted = [...ticket.logs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  // Build team options from both registry list and the data we actually received.
+  // This prevents missing teams (e.g., escalation/legacy teams) from showing 0 results when filtered.
+  const ticketsDataTyped = ticketsData as PaginatedTickets | undefined;
+  const ticketsContent = useMemo(() => (ticketsDataTyped?.content as TicketWithLogs[] | undefined) ?? [], [ticketsDataTyped]);
 
-        const opened = sorted[0].date
+  const teamOptions = useMemo(() => {
+    const fromData = ticketsContent.map((t: TicketWithLogs) => t.team?.name).filter((name): name is string => !!name);
+    const fromRegistry = teamsData?.map((t: { name: string }) => t.name).filter(Boolean) ?? [];
+    return Array.from(new Set([...fromData, ...fromRegistry])).sort();
+  }, [ticketsContent, teamsData]);
 
-        const closedLog = [...sorted].reverse().find(log =>
-            log.event.toLowerCase().includes('closed')
-        )
+  const escalatedToOptions = useMemo(() => {
+    const escalationTeams = ticketsContent.flatMap((t: TicketWithLogs) =>
+      (t.escalations ?? []).map((e) => e.team?.name).filter((name): name is string => !!name)
+    );
+    return Array.from(new Set(escalationTeams)).sort();
+  }, [ticketsContent]);
 
-        const closed = closedLog?.date || null
+  // --- Filter tickets based on superuser/team + UI filters ---
+  // Date filtering is now done server-side
+  const filteredTickets = useMemo(() => {
+    if (!ticketsContent) return [];
 
-        return {opened, closed}
+    if (hasNoTeamScope) {
+      return [];
     }
 
-    const getTagLabel = (tag: unknown): string => {
-        if (typeof tag === 'string') return tag
-        if (tag && typeof tag === 'object') {
-            const obj = tag as { label?: string; code?: string }
-            return obj.label || obj.code || ''
-        }
-        return ''
-    }
+    // Step 1: filter by effective teams (considers team selector).
+    // ALL three branches produce a correctly scoped subset so that Step 2
+    // only needs to apply the remaining UI filters (status, impact, tag, etc.)
+    // on an already-reduced dataset.
+    const visibleTickets =
+      teamFilter === ALL_TEAMS_FILTER
+        ? ticketsContent // explicit page-level override: show all teams
+        : teamFilter
+          ? ticketsContent.filter((t: TicketWithLogs) => {
+              // explicit page-level team selection
+              if (!t.team?.name) return false;
+              return normalizeTeamKey(t.team.name) === normalizeTeamKey(teamFilter);
+            })
+          : effectiveTeams.length === 0
+            ? ticketsContent // role-team view -> show all
+            : ticketsContent.filter((t: TicketWithLogs) => {
+                if (!t.team?.name) return false;
+                const ticketTeam = normalizeTeamKey(t.team.name);
+                return effectiveTeams.some((team) => normalizeTeamKey(team) === ticketTeam);
+              });
 
-    // Build team options from both registry list and the data we actually received.
-    // This prevents missing teams (e.g., escalation/legacy teams) from showing 0 results when filtered.
-    const ticketsDataTyped = ticketsData as PaginatedTickets | undefined
-    const ticketsContent = useMemo(
-        () => (ticketsDataTyped?.content as TicketWithLogs[] | undefined) ?? [],
-        [ticketsDataTyped]
-    )
+    // Step 2: apply remaining UI filters.
+    // Team filtering is already handled by Step 1 — matchesTeam is not needed here.
+    return visibleTickets.filter((t: TicketWithLogs) => {
+      const matchesStatus = statusFilter ? t.status === statusFilter : true;
+      const matchesImpact = impactFilter ? t.impact === impactFilter : true;
+      const matchesTag = tagFilter ? t.tags?.includes(tagFilter) : true;
+      const matchesEscalated = escalatedFilter
+        ? escalatedFilter === "Yes"
+          ? (t.escalations?.length ?? 0) > 0
+          : (t.escalations?.length ?? 0) === 0
+        : true;
+      const matchesEscalatedTo = escalatedToFilter ? (t.escalations ?? []).some((e) => e.team?.name === escalatedToFilter) : true;
 
-    const teamOptions = useMemo(() => {
-        const fromData = ticketsContent
-            .map((t: TicketWithLogs) => t.team?.name)
-            .filter((name): name is string => !!name)
-        const fromRegistry = teamsData?.map((t: { name: string }) => t.name).filter(Boolean) ?? []
-        return Array.from(new Set([...fromData, ...fromRegistry])).sort()
-    }, [ticketsContent, teamsData])
+      return matchesStatus && matchesImpact && matchesTag && matchesEscalated && matchesEscalatedTo;
+    });
+  }, [
+    ticketsContent,
+    hasNoTeamScope,
+    effectiveTeams,
+    statusFilter,
+    teamFilter,
+    impactFilter,
+    tagFilter,
+    escalatedFilter,
+    escalatedToFilter,
+    ALL_TEAMS_FILTER,
+  ]);
 
-    const escalatedToOptions = useMemo(() => {
-        const escalationTeams = ticketsContent.flatMap((t: TicketWithLogs) =>
-            (t.escalations ?? [])
-                .map(e => e.team?.name)
-                .filter((name): name is string => !!name)
-        )
-        return Array.from(new Set(escalationTeams)).sort()
-    }, [ticketsContent])
+  const sortedTickets = useMemo(() => {
+    const toTs = (value: string | null) => (value ? new Date(value).getTime() : null);
+    return [...filteredTickets].sort((a, b) => {
+      const aDates = getOpenedClosed(a);
+      const bDates = getOpenedClosed(b);
+      const aValue = sortColumn === "openedAt" ? toTs(aDates.opened) : toTs(aDates.closed);
+      const bValue = sortColumn === "openedAt" ? toTs(bDates.opened) : toTs(bDates.closed);
 
-    // --- Filter tickets based on superuser/team + UI filters ---
-    // Date filtering is now done server-side
-    const filteredTickets = useMemo(() => {
-        if (!ticketsContent) return []
+      // Keep missing dates last regardless of sort direction
+      if (aValue === null && bValue === null) return 0;
+      if (aValue === null) return 1;
+      if (bValue === null) return -1;
 
-        if (hasNoTeamScope) {
-            return []
-        }
+      const cmp = aValue - bValue;
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
+  }, [filteredTickets, sortColumn, sortDirection]);
 
-        // Step 1: filter by effective teams (considers team selector).
-        // ALL three branches produce a correctly scoped subset so that Step 2
-        // only needs to apply the remaining UI filters (status, impact, tag, etc.)
-        // on an already-reduced dataset.
-        const visibleTickets = teamFilter === ALL_TEAMS_FILTER
-            ? ticketsContent // explicit page-level override: show all teams
-            : teamFilter
-                ? ticketsContent.filter((t: TicketWithLogs) => {  // explicit page-level team selection
-                    if (!t.team?.name) return false
-                    return normalizeTeamKey(t.team.name) === normalizeTeamKey(teamFilter)
-                })
-                : effectiveTeams.length === 0
-                    ? ticketsContent // role-team view -> show all
-                    : ticketsContent.filter((t: TicketWithLogs) => {
-                        if (!t.team?.name) return false
-                        const ticketTeam = normalizeTeamKey(t.team.name)
-                        return effectiveTeams.some(team => normalizeTeamKey(team) === ticketTeam)
-                    })
-
-        // Step 2: apply remaining UI filters.
-        // Team filtering is already handled by Step 1 — matchesTeam is not needed here.
-        return visibleTickets.filter((t: TicketWithLogs) => {
-            const matchesStatus = statusFilter ? t.status === statusFilter : true
-            const matchesImpact = impactFilter ? t.impact === impactFilter : true
-            const matchesTag = tagFilter ? t.tags?.includes(tagFilter) : true
-            const matchesEscalated = escalatedFilter
-                ? escalatedFilter === 'Yes'
-                    ? (t.escalations?.length ?? 0) > 0
-                    : (t.escalations?.length ?? 0) === 0
-                : true
-            const matchesEscalatedTo = escalatedToFilter
-                ? (t.escalations ?? []).some(e => e.team?.name === escalatedToFilter)
-                : true
-
-            return matchesStatus && matchesImpact && matchesTag && matchesEscalated && matchesEscalatedTo
-        })
-    }, [ticketsContent, hasNoTeamScope, effectiveTeams, statusFilter, teamFilter, impactFilter, tagFilter, escalatedFilter, escalatedToFilter, ALL_TEAMS_FILTER])
-
-    const sortedTickets = useMemo(() => {
-        const toTs = (value: string | null) => (value ? new Date(value).getTime() : null)
-        return [...filteredTickets].sort((a, b) => {
-            const aDates = getOpenedClosed(a)
-            const bDates = getOpenedClosed(b)
-            const aValue = sortColumn === 'openedAt' ? toTs(aDates.opened) : toTs(aDates.closed)
-            const bValue = sortColumn === 'openedAt' ? toTs(bDates.opened) : toTs(bDates.closed)
-
-            // Keep missing dates last regardless of sort direction
-            if (aValue === null && bValue === null) return 0
-            if (aValue === null) return 1
-            if (bValue === null) return -1
-
-            const cmp = aValue - bValue
-            return sortDirection === 'asc' ? cmp : -cmp
-        })
-    }, [filteredTickets, sortColumn, sortDirection])
-
-    // Calculate pagination info
-    const totalPages = useServerPagination
-      ? (ticketsDataTyped?.totalPages || 0)
-      : Math.ceil(sortedTickets.length / pageSize)
-    const currentPage = Math.min(unvalidatedCurrentPage, Math.max(0, totalPages -1))
+  // Calculate pagination info
+  const totalPages = useServerPagination ? ticketsDataTyped?.totalPages || 0 : Math.ceil(sortedTickets.length / pageSize);
+  const currentPage = Math.min(unvalidatedCurrentPage, Math.max(0, totalPages - 1));
 
   // Reset page to 0 whenever any filter param changes.
-    // useEffect is required here because setParams calls router.replace (a side effect)
-    // and side effects must not be triggered during render.
-    const filterKey = [
-        params.status, params.teamFilter, params.impact, params.tag,
-        params.escalated, params.escalatedTo, params.dateFilter, params.dateFrom, params.dateTo,
-    ].join('|')
-    const prevFilterKeyRef = useRef<string | undefined>(undefined)
-    useEffect(() => {
-        if (prevFilterKeyRef.current !== undefined && prevFilterKeyRef.current !== filterKey) {
-            // Only write page=0 when the page isn't already 0.
-            // Skipping the setParams call when currentPage===0 avoids a redundant
-            // router.replace (the filter handler already called one), which would
-            // otherwise cause an address-bar flicker on every filter change.
-            if (currentPage !== 0) setParams({ page: '0' })
-        }
-        prevFilterKeyRef.current = filterKey
-    }, [filterKey, setParams, currentPage])
+  // useEffect is required here because setParams calls router.replace (a side effect)
+  // and side effects must not be triggered during render.
+  const filterKey = [
+    params.status,
+    params.teamFilter,
+    params.impact,
+    params.tag,
+    params.escalated,
+    params.escalatedTo,
+    params.dateFilter,
+    params.dateFrom,
+    params.dateTo,
+  ].join("|");
+  const prevFilterKeyRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (prevFilterKeyRef.current !== undefined && prevFilterKeyRef.current !== filterKey) {
+      // Only write page=0 when the page isn't already 0.
+      // Skipping the setParams call when currentPage===0 avoids a redundant
+      // router.replace (the filter handler already called one), which would
+      // otherwise cause an address-bar flicker on every filter change.
+      if (currentPage !== 0) setParams({ page: "0" });
+    }
+    prevFilterKeyRef.current = filterKey;
+  }, [filterKey, setParams, currentPage]);
 
-    // Reset the page-level team filter when the sidebar "View as" scope changes.
-    // The ref starts as `undefined` (sentinel for "not yet seen") so that the
-    // initial context hydration sequence (null → firstTeam, driven by TeamSelector
-    // reading ?team from the URL) is never mistaken for a user-initiated switch.
-    const prevSelectedTeamRef = useRef<string | null | undefined>(undefined)
-    useEffect(() => {
-        const prev = prevSelectedTeamRef.current
-        prevSelectedTeamRef.current = teamFilterSelectedTeam
-        // Skip: first run (undefined) and context hydration (null → firstTeam).
-        // Only reset when transitioning between two known, non-null team values.
-        if (!prev || prev === teamFilterSelectedTeam) return
-        setParams({ teamFilter: '', page: '0' })
-    }, [teamFilterSelectedTeam, setParams])
+  // Reset the page-level team filter when the sidebar "View as" scope changes.
+  // The ref starts as `undefined` (sentinel for "not yet seen") so that the
+  // initial context hydration sequence (null → firstTeam, driven by TeamSelector
+  // reading ?team from the URL) is never mistaken for a user-initiated switch.
+  const prevSelectedTeamRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevSelectedTeamRef.current;
+    prevSelectedTeamRef.current = teamFilterSelectedTeam;
+    // Skip: first run (undefined) and context hydration (null → firstTeam).
+    // Only reset when transitioning between two known, non-null team values.
+    if (!prev || prev === teamFilterSelectedTeam) return;
+    setParams({ teamFilter: "", page: "0" });
+  }, [teamFilterSelectedTeam, setParams]);
 
-    // Server pagination for all-teams without client filters; otherwise client-side pagination.
-    const paginatedTickets = useMemo(() => {
-        if (useServerPagination) {
-            return sortedTickets
-        }
-        const start = currentPage * pageSize
-        return sortedTickets.slice(start, start + pageSize)
-    }, [sortedTickets, currentPage, pageSize, useServerPagination])
+  // Server pagination for all-teams without client filters; otherwise client-side pagination.
+  const paginatedTickets = useMemo(() => {
+    if (useServerPagination) {
+      return sortedTickets;
+    }
+    const start = currentPage * pageSize;
+    return sortedTickets.slice(start, start + pageSize);
+  }, [sortedTickets, currentPage, pageSize, useServerPagination]);
 
-    const totalTickets = useServerPagination
-        ? (ticketsDataTyped?.totalElements || 0)
-        : sortedTickets.length
+  const totalTickets = useServerPagination ? ticketsDataTyped?.totalElements || 0 : sortedTickets.length;
 
-    // --- Render ---
-    return (
-        <div className="p-6 space-y-6">
-            <h1 className="text-3xl font-bold text-gray-800">
-                {hasNoTeamScope
-                    ? 'Tickets Dashboard'
-                    : effectiveTeams.length === 0
-                    ? 'Tickets Dashboard - All Teams'
-                    : `Tickets Dashboard - ${effectiveTeams.join(', ')}`}
-            </h1>
+  // shadcn Select needs non-empty values; "" means "any" sentinel.
+  const ANY = "__any";
+  const fromAny = (v: string) => (v === ANY ? "" : v);
+  const toAny = (v: string) => (v === "" ? ANY : v);
 
-            {hasNoTeamScope && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-900">
-                    <p className="font-semibold">No Team Access</p>
-                    <p className="text-sm mt-1">You are not assigned to any teams, so tickets cannot be displayed.</p>
-                </div>
-            )}
-
-            {/* Filters */}
-            <div className={`grid grid-cols-1 gap-2 mb-4 ${hasNoTeamScope ? 'sm:grid-cols-5' : 'sm:grid-cols-6'}`}>
-                {/* Date Filter - First */}
-                <select value={dateFilter} onChange={e => {
-                    const next = e.target.value as TicketDateFilter
-                    setParams(next !== 'custom'
-                        ? { dateFilter: next, dateFrom: '', dateTo: '' }
-                        : { dateFilter: next })
-                }} className="p-2 border rounded">
-                    <option value="">Any Date</option>
-                    <option value="lastWeek">Last Week</option>
-                    <option value="last2Weeks">Last 2 Weeks</option>
-                    <option value="lastMonth">Last Month</option>
-                    <option value="custom">Custom Range</option>
-                </select>
-
-                <select value={statusFilter} onChange={e => setParams({ status: e.target.value })}
-                        className="p-2 border rounded">
-                    <option value="">All Status</option>
-                    <option value="opened">Opened</option>
-                    <option value="closed">Closed</option>
-                    <option value="stale">Stale</option>
-                </select>
-
-                {!hasNoTeamScope && (
-                    <select value={teamFilter} onChange={e => setParams({ teamFilter: e.target.value })} className="p-2 border rounded">
-                        <option value="">Current Team Scope</option>
-                        {!isViewingAllTeams && <option value={ALL_TEAMS_FILTER}>All Teams</option>}
-                        {teamOptions.map((name: string, index: number) => (
-                            <option key={`team-${index}-${name}`} value={name}>{name}</option>
-                        ))}
-                    </select>
-                )}
-
-                <select value={impactFilter} onChange={e => setParams({ impact: e.target.value })}
-                        className="p-2 border rounded">
-                    <option value="">All Impacts</option>
-                    {registryData?.impacts.map((impact: TicketImpact) => <option key={impact.code} value={impact.code}>{impact.label}</option>)}
-                </select>
-
-                <select value={tagFilter} onChange={e => setParams({ tag: e.target.value })} className="p-2 border rounded">
-                    <option value="">All Tags</option>
-                    {registryData?.tags.map((tag: TicketTag) => <option key={tag.code} value={tag.code}>{tag.label}</option>)}
-                </select>
-
-                <select value={escalatedFilter} onChange={e => setParams({ escalated: e.target.value })}
-                        className="p-2 border rounded">
-                    <option value="">Escalated?</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                </select>
-
-                <select value={escalatedToFilter} onChange={e => setParams({ escalatedTo: e.target.value })}
-                        className="p-2 border rounded">
-                    <option value="">Escalated To</option>
-                    {escalatedToOptions.map((name: string, index: number) => (
-                        <option key={`escalated-to-${index}-${name}`} value={name}>{name}</option>
-                    ))}
-                </select>
-
-                {dateFilter === 'custom' && (
-                    <>
-                        <input type="date" value={params.dateFrom}
-                               onChange={e => setParams({ dateFrom: e.target.value })}
-                               className="p-2 border rounded"/>
-                        <input type="date" value={params.dateTo}
-                               onChange={e => setParams({ dateTo: e.target.value })}
-                               className="p-2 border rounded"/>
-                    </>
-                )}
-            </div>
-
-            {/* Tickets Table */}
-            <div className="overflow-x-auto border rounded shadow-sm mb-6">
-                {ticketsLoading ? <LoadingSkeleton /> :
-                    ticketsError ? (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 m-6">
-                            <p className="font-semibold">Error loading tickets</p>
-                            <p className="text-sm mt-1">Unable to load ticket data. Please try refreshing the page.</p>
-                        </div>
-                    ) :
-                        <table className="min-w-full divide-y table-fixed">
-                            <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                                <th
-                                    className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider"
-                                    style={{ width: SUMMARY_COLUMN_WIDTH }}
-                                >
-                                    Summary
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Team</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Impact</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Tags</th>
-                                {isAssignmentEnabled && (
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Support Engineer</th>
-                                )}
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Escalated</th>
-                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Escalated To</th>
-                                <th
-                                    className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer select-none"
-                                    onClick={() => {
-                                        if (sortColumn === 'openedAt') {
-                                            setParams({ sortDir: sortDirection === 'asc' ? 'desc' : 'asc', page: '0' })
-                                        } else {
-                                            setParams({ sortBy: 'openedAt', sortDir: 'desc', page: '0' })
-                                        }
-                                    }}
-                                >
-                                    Opened At {sortColumn === 'openedAt' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
-                                </th>
-                                <th
-                                    className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer select-none"
-                                    onClick={() => {
-                                        if (sortColumn === 'closedAt') {
-                                            setParams({ sortDir: sortDirection === 'asc' ? 'desc' : 'asc', page: '0' })
-                                        } else {
-                                            setParams({ sortBy: 'closedAt', sortDir: 'desc', page: '0' })
-                                        }
-                                    }}
-                                >
-                                    Closed At {sortColumn === 'closedAt' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
-                                </th>
-                            </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                            {paginatedTickets.map((t: TicketWithLogs) => {
-                                const {opened, closed} = getOpenedClosed(t)
-                                const escalatedTo = Array.from(
-                                    new Set(
-                                        (t.escalations ?? [])
-                                            .map(e => e.team?.name)
-                                            .filter((name): name is string => !!name)
-                                    )
-                                )
-                                return (
-                                    <tr key={t.id}
-                                        onClick={() => {
-                                            setSelectedTicketId(t.id)
-                                            setIsModalOpen(true)
-                                        }}
-                                        className={`cursor-pointer transition-all hover:bg-blue-50 hover:shadow-md border-l-4 border-transparent hover:border-blue-400`}
-                                    >
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm"><span
-                                            className={`px-2 py-1 rounded-full text-xs font-semibold ${statusColors[t.status] || 'bg-gray-100 text-gray-800'}`}>{t.status}</span>
-                                        </td>
-                                        <td
-                                            className="px-4 py-4 text-sm text-gray-700 whitespace-normal break-words align-top"
-                                            style={{ width: SUMMARY_COLUMN_WIDTH, minWidth: SUMMARY_COLUMN_WIDTH }}
-                                        >
-                                            <div
-                                                className="overflow-hidden"
-                                                style={{
-                                                    display: '-webkit-box',
-                                                    WebkitLineClamp: 4,
-                                                    WebkitBoxOrient: 'vertical',
-                                                }}
-                                            >
-                                                {t.summary?.trim() ? t.summary : '—'}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{t.team?.name || '-'}</td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{registryData?.impacts.find((i: TicketImpact) => i.code === t.impact)?.label || t.impact || '-'}</td>
-                                        <td className="px-4 py-4 text-sm text-gray-700">
-                                            {(t.tags?.length ?? 0) > 0
-                                                ? t.tags
-                                                    ?.map(getTagLabel)
-                                                    .filter(Boolean)
-                                                    .map((tag, idx) => (
-                                                        <span key={`${t.id}-tag-${idx}`} className="block w-fit bg-indigo-100 text-indigo-800 text-xs font-semibold px-2 py-0.5 rounded mb-1 last:mb-0">
-                                                            {tag}
-                                                        </span>
-                                                    ))
-                                                : '-'}
-                                        </td>
-                                        {isAssignmentEnabled && (
-                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{t.assignedTo || '-'}</td>
-                                        )}
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{(t.escalations?.length ?? 0) > 0 ? 'Yes' : 'No'}</td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{escalatedTo.length ? escalatedTo.join(', ') : '-'}</td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{opened ? new Date(opened).toLocaleString() : '-'}</td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{closed ? new Date(closed).toLocaleString() : '-'}</td>
-                                    </tr>
-                                )
-                            })}
-                            {filteredTickets.length === 0 && <tr>
-                                <td colSpan={columnCount} className="text-center py-4 text-gray-500">No tickets found</td>
-                            </tr>}
-                            </tbody>
-                        </table>
-                }
-            </div>
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-                <div className="flex justify-center items-center space-x-4 mt-4">
-                    <button
-                        disabled={currentPage === 0}
-                        onClick={() => setParams({ page: String(currentPage - 1) })}
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                        Previous
-                    </button>
-                    <div className="text-sm text-gray-600">
-                        Page {currentPage + 1} of {totalPages}
-                        <span className="ml-2 text-gray-500">
-                            ({paginatedTickets.length}
-                            {params.status || params.teamFilter || params.impact || params.tag || params.escalated || params.escalatedTo || params.dateFilter ? ' matching' : ''}
-                            {' '}on this page, {totalTickets} total)
-                        </span>
-                    </div>
-                    <button
-                        disabled={currentPage >= totalPages - 1}
-                        onClick={() => setParams({ page: String(currentPage + 1) })}
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                        Next
-                    </button>
-                </div>
-            )}
-
-            {/* Edit Ticket Modal */}
-            <EditTicketModal
-                ticketId={selectedTicketId}
-                open={isModalOpen}
-                onOpenChange={(open) => {
-                    setIsModalOpen(open)
-                    if (!open) {
-                        setSelectedTicketId(null)
-                    }
-                }}
-                onSuccess={() => {
-                    // Invalidate queries to refresh ticket data
-                    queryClient.invalidateQueries({ queryKey: ['tickets'] })
-                    queryClient.invalidateQueries({ queryKey: ['ticket', selectedTicketId] })
-                }}
-            />
+  // --- Render ---
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-foreground text-2xl font-bold">Tickets</h1>
+          <p className="text-muted-foreground text-sm">Browse, filter, and update support tickets</p>
         </div>
-    )
+        <div className="flex items-center gap-2">
+          <Select
+            value={toAny(dateFilter)}
+            onValueChange={(v) => {
+              const next = fromAny(v) as TicketDateFilter;
+              setParams(next !== "custom" ? { dateFilter: next, dateFrom: "", dateTo: "" } : { dateFilter: next });
+            }}
+          >
+            <SelectTrigger className="w-[160px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ANY}>Any Date</SelectItem>
+              <SelectItem value="lastWeek">Last Week</SelectItem>
+              <SelectItem value="last2Weeks">Last 2 Weeks</SelectItem>
+              <SelectItem value="lastMonth">Last Month</SelectItem>
+              <SelectItem value="custom">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
+          {dateFilter === "custom" && (
+            <>
+              <Input type="date" value={params.dateFrom} onChange={(e) => setParams({ dateFrom: e.target.value })} className="w-[150px]" />
+              <Input type="date" value={params.dateTo} onChange={(e) => setParams({ dateTo: e.target.value })} className="w-[150px]" />
+            </>
+          )}
+        </div>
+      </div>
+
+      {hasNoTeamScope && (
+        <div className="border-warning/30 bg-warning/10 text-warning rounded-lg border p-4">
+          <p className="font-semibold">No Team Access</p>
+          <p className="mt-1 text-sm">You are not assigned to any teams, so tickets cannot be displayed.</p>
+        </div>
+      )}
+
+      {/* Faceted filters — single-value, modeled on elevate's data-table-faceted-filter */}
+      <div className="flex flex-wrap items-center gap-2">
+        <SingleSelectFilter
+          title="Status"
+          value={statusFilter || undefined}
+          onChange={(v) => setParams({ status: v ?? "" })}
+          options={[
+            { label: "Opened", value: "opened" },
+            { label: "Closed", value: "closed" },
+            { label: "Stale", value: "stale" },
+          ]}
+        />
+        {!hasNoTeamScope && (
+          <SingleSelectFilter
+            title="Team"
+            value={teamFilter || undefined}
+            onChange={(v) => setParams({ teamFilter: v ?? "" })}
+            options={[
+              ...(!isViewingAllTeams ? [{ label: "All Teams", value: ALL_TEAMS_FILTER }] : []),
+              ...teamOptions.map((name: string) => ({ label: name, value: name })),
+            ]}
+          />
+        )}
+        <SingleSelectFilter
+          title="Impact"
+          value={impactFilter || undefined}
+          onChange={(v) => setParams({ impact: v ?? "" })}
+          options={(registryData?.impacts ?? []).map((impact: TicketImpact) => ({
+            label: impact.label,
+            value: impact.code,
+          }))}
+        />
+        <SingleSelectFilter
+          title="Tag"
+          value={tagFilter || undefined}
+          onChange={(v) => setParams({ tag: v ?? "" })}
+          options={(registryData?.tags ?? []).map((tag: TicketTag) => ({
+            label: tag.label,
+            value: tag.code,
+          }))}
+        />
+        <SingleSelectFilter
+          title="Escalated"
+          value={escalatedFilter || undefined}
+          onChange={(v) => setParams({ escalated: v ?? "" })}
+          showSearch={false}
+          options={[
+            { label: "Yes", value: "Yes" },
+            { label: "No", value: "No" },
+          ]}
+        />
+        <SingleSelectFilter
+          title="Escalated To"
+          value={escalatedToFilter || undefined}
+          onChange={(v) => setParams({ escalatedTo: v ?? "" })}
+          options={escalatedToOptions.map((name: string) => ({ label: name, value: name }))}
+        />
+      </div>
+
+      {/* Tickets Table */}
+      <div className="overflow-hidden rounded-lg border">
+        {ticketsLoading ? (
+          <LoadingSkeleton />
+        ) : ticketsError ? (
+          <div className="border-destructive/30 bg-destructive/10 text-destructive m-6 rounded-lg border p-4">
+            <p className="font-semibold">Error loading tickets</p>
+            <p className="mt-1 text-sm">Unable to load ticket data. Please try refreshing the page.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader className="bg-muted z-10">
+              <TableRow>
+                <TableHead>Status</TableHead>
+                <TableHead style={{ width: SUMMARY_COLUMN_WIDTH }}>Summary</TableHead>
+                <TableHead>Team</TableHead>
+                <TableHead>Impact</TableHead>
+                <TableHead>Tags</TableHead>
+                {isAssignmentEnabled && <TableHead>Support Engineer</TableHead>}
+                <TableHead>Escalated</TableHead>
+                <TableHead>Escalated To</TableHead>
+                <TableHead
+                  className="cursor-pointer select-none"
+                  onClick={() => {
+                    if (sortColumn === "openedAt") {
+                      setParams({ sortDir: sortDirection === "asc" ? "desc" : "asc", page: "0" });
+                    } else {
+                      setParams({ sortBy: "openedAt", sortDir: "desc", page: "0" });
+                    }
+                  }}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Opened At
+                    {sortColumn === "openedAt" ? (
+                      sortDirection === "asc" ? (
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      ) : (
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="text-muted-foreground h-3.5 w-3.5" />
+                    )}
+                  </span>
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer select-none"
+                  onClick={() => {
+                    if (sortColumn === "closedAt") {
+                      setParams({ sortDir: sortDirection === "asc" ? "desc" : "asc", page: "0" });
+                    } else {
+                      setParams({ sortBy: "closedAt", sortDir: "desc", page: "0" });
+                    }
+                  }}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Closed At
+                    {sortColumn === "closedAt" ? (
+                      sortDirection === "asc" ? (
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      ) : (
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="text-muted-foreground h-3.5 w-3.5" />
+                    )}
+                  </span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedTickets.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={columnCount} className="text-muted-foreground py-8 text-center">
+                    No tickets found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedTickets.map((t: TicketWithLogs) => {
+                  const { opened, closed } = getOpenedClosed(t);
+                  const escalatedTo = Array.from(
+                    new Set((t.escalations ?? []).map((e) => e.team?.name).filter((name): name is string => !!name))
+                  );
+                  return (
+                    <TableRow
+                      key={t.id}
+                      onClick={() => {
+                        setSelectedTicketId(t.id);
+                        setIsModalOpen(true);
+                      }}
+                      className="hover:bg-accent cursor-pointer"
+                    >
+                      <TableCell>
+                        <span
+                          className={`rounded-full px-2 py-1 text-xs font-semibold ${statusColors[t.status] || "bg-muted text-muted-foreground"}`}
+                        >
+                          {t.status}
+                        </span>
+                      </TableCell>
+                      <TableCell
+                        className="align-top break-words whitespace-normal"
+                        style={{ width: SUMMARY_COLUMN_WIDTH, minWidth: SUMMARY_COLUMN_WIDTH }}
+                      >
+                        <div
+                          className="overflow-hidden"
+                          style={{
+                            display: "-webkit-box",
+                            WebkitLineClamp: 4,
+                            WebkitBoxOrient: "vertical",
+                          }}
+                        >
+                          {t.summary?.trim() ? t.summary : "—"}
+                        </div>
+                      </TableCell>
+                      <TableCell>{t.team?.name || "-"}</TableCell>
+                      <TableCell>
+                        {registryData?.impacts.find((i: TicketImpact) => i.code === t.impact)?.label || t.impact || "-"}
+                      </TableCell>
+                      <TableCell>
+                        {(t.tags?.length ?? 0) > 0
+                          ? t.tags
+                              ?.map(getTagLabel)
+                              .filter(Boolean)
+                              .map((tag, idx) => (
+                                <Badge key={`${t.id}-tag-${idx}`} variant="outline" className="mb-1 block w-fit last:mb-0">
+                                  {tag}
+                                </Badge>
+                              ))
+                          : "-"}
+                      </TableCell>
+                      {isAssignmentEnabled && <TableCell>{t.assignedTo || "-"}</TableCell>}
+                      <TableCell>{(t.escalations?.length ?? 0) > 0 ? "Yes" : "No"}</TableCell>
+                      <TableCell>{escalatedTo.length ? escalatedTo.join(", ") : "-"}</TableCell>
+                      <TableCell>{opened ? new Date(opened).toLocaleString() : "-"}</TableCell>
+                      <TableCell>{closed ? new Date(closed).toLocaleString() : "-"}</TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center space-x-4">
+          <Button variant="outline" disabled={currentPage === 0} onClick={() => setParams({ page: String(currentPage - 1) })}>
+            Previous
+          </Button>
+          <div className="text-muted-foreground text-sm">
+            Page {currentPage + 1} of {totalPages}
+            <span className="ml-2">
+              ({paginatedTickets.length}
+              {params.status ||
+              params.teamFilter ||
+              params.impact ||
+              params.tag ||
+              params.escalated ||
+              params.escalatedTo ||
+              params.dateFilter
+                ? " matching"
+                : ""}{" "}
+              on this page, {totalTickets} total)
+            </span>
+          </div>
+          <Button variant="outline" disabled={currentPage >= totalPages - 1} onClick={() => setParams({ page: String(currentPage + 1) })}>
+            Next
+          </Button>
+        </div>
+      )}
+
+      {/* Edit Ticket Modal */}
+      <EditTicketModal
+        ticketId={selectedTicketId}
+        open={isModalOpen}
+        onOpenChange={(open) => {
+          setIsModalOpen(open);
+          if (!open) {
+            setSelectedTicketId(null);
+          }
+        }}
+        onSuccess={() => {
+          // Invalidate queries to refresh ticket data
+          queryClient.invalidateQueries({ queryKey: ["tickets"] });
+          queryClient.invalidateQueries({ queryKey: ["ticket", selectedTicketId] });
+        }}
+      />
+    </div>
+  );
 }

@@ -1,6 +1,23 @@
-import { auth } from "@/auth";
+import { getToken } from "next-auth/jwt";
+import type { NextRequest } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL!;
+
+function sessionCookieName(): string {
+  return process.env.NODE_ENV === "production" ? "__Secure-authjs.session-token" : "authjs.session-token";
+}
+
+export async function backendAccessToken(request: Request | NextRequest): Promise<string | null> {
+  const cookieName = sessionCookieName();
+  const token = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    cookieName,
+    salt: cookieName,
+  });
+
+  return typeof token?.accessToken === "string" ? token.accessToken : null;
+}
 
 /**
  * Fetch with logging and error handling.
@@ -8,12 +25,7 @@ const BACKEND_URL = process.env.BACKEND_URL!;
  * Set PROXY_LOGGING=true to also log successful requests.
  * Returns a 502 on network failure instead of throwing.
  */
-export async function proxyFetch(
-  tag: string,
-  path: string,
-  url: string,
-  options: RequestInit
-): Promise<Response> {
+export async function proxyFetch(tag: string, path: string, url: string, options: RequestInit): Promise<Response> {
   const method = options.method?.toUpperCase() || "GET";
   const start = Date.now();
 
@@ -35,20 +47,17 @@ export async function proxyFetch(
  * Authenticated fetch to backend API.
  * Returns null if user is not authenticated (caller should handle 401).
  */
-export async function backendFetch(
-  path: string,
-  options: RequestInit = {}
-): Promise<Response | null> {
-  const session = await auth();
+export async function backendFetch(request: Request | NextRequest, path: string, options: RequestInit = {}): Promise<Response | null> {
+  const accessToken = await backendAccessToken(request);
 
-  if (!session?.accessToken) {
+  if (!accessToken) {
     return null;
   }
 
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
   headers.set("Accept", "application/json");
-  headers.set("Authorization", `Bearer ${session.accessToken}`);
+  headers.set("Authorization", `Bearer ${accessToken}`);
 
   const url = path.startsWith("http") ? path : `${BACKEND_URL}${path}`;
   return proxyFetch("proxy", path, url, { ...options, headers });

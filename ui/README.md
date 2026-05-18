@@ -30,11 +30,11 @@ Opens at http://localhost:3000
 
 All environment variables are **required**. The app will not start if any are missing.
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `BACKEND_URL` | Internal backend API URL (server-side only, never exposed to browser) | `http://localhost:8080` |
-| `NEXTAUTH_URL` | This app's public URL (used for OAuth callbacks) | `http://localhost:3000` |
-| `AUTH_SECRET` | Secret for JWT encryption. Generate with `openssl rand -base64 32` | `eQLD+j0kU2rldOUs7wBdQLwuk0AnYbyx+HqklXBn6co=` |
+| Variable       | Description                                                           | Example                                        |
+| -------------- | --------------------------------------------------------------------- | ---------------------------------------------- |
+| `BACKEND_URL`  | Internal backend API URL (server-side only, never exposed to browser) | `http://localhost:8080`                        |
+| `NEXTAUTH_URL` | This app's public URL (used for OAuth callbacks)                      | `http://localhost:3000`                        |
+| `AUTH_SECRET`  | Secret for JWT encryption. Generate with `openssl rand -base64 32`    | `eQLD+j0kU2rldOUs7wBdQLwuk0AnYbyx+HqklXBn6co=` |
 
 ## Architecture
 
@@ -53,14 +53,14 @@ Browser → /api/* routes → Backend API
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `yarn dev` | Start development server with Turbopack |
-| `yarn build` | Production build |
-| `yarn start` | Start production server |
-| `yarn lint` | Run ESLint |
-| `yarn test` | Run tests |
-| `yarn test:watch` | Run tests in watch mode |
+| Command           | Description                             |
+| ----------------- | --------------------------------------- |
+| `yarn dev`        | Start development server with Turbopack |
+| `yarn build`      | Production build                        |
+| `yarn start`      | Start production server                 |
+| `yarn lint`       | Run ESLint                              |
+| `yarn test`       | Run tests                               |
+| `yarn test:watch` | Run tests in watch mode                 |
 
 ## Project Structure
 

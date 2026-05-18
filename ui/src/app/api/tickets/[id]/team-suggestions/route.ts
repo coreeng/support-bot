@@ -1,17 +1,10 @@
 import { NextRequest } from "next/server";
-import {
-  backendFetch,
-  unauthorizedResponse,
-  errorResponse,
-} from "../../../_lib/backend-fetch";
+import { backendFetch, errorResponse, unauthorizedResponse } from "../../../_lib/backend-fetch";
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const response = await backendFetch(`/ticket/${id}/team-suggestions`);
+  const response = await backendFetch(request, `/ticket/${id}/team-suggestions`);
   if (!response) return unauthorizedResponse();
 
   if (!response.ok) {

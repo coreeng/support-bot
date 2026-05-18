@@ -14,9 +14,7 @@ const config: Config = {
   slowTestThreshold: 3,
   silent: true,
   // Transform next-auth since it uses ESM
-  transformIgnorePatterns: [
-    "/node_modules/(?!(next-auth|@auth|@panva)/)",
-  ],
+  transformIgnorePatterns: ["/node_modules/(?!(next-auth|@auth|@panva)/)"],
   // Mock server-only module and auth modules
   moduleNameMapper: {
     "^server-only$": "<rootDir>/__mocks__/server-only.ts",

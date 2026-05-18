@@ -1,9 +1,5 @@
 import { NextRequest } from "next/server";
-import {
-  backendFetch,
-  unauthorizedResponse,
-  errorResponse,
-} from "../../_lib/backend-fetch";
+import { backendFetch, errorResponse, unauthorizedResponse } from "../../_lib/backend-fetch";
 
 interface RatingsResult {
   average: number | null;
@@ -21,7 +17,7 @@ export async function GET(request: NextRequest) {
   if (from) statsRequest.from = from;
   if (to) statsRequest.to = to;
 
-  const response = await backendFetch("/stats", {
+  const response = await backendFetch(request, "/stats", {
     method: "POST",
     body: JSON.stringify([statsRequest]),
   });
@@ -41,11 +37,7 @@ export async function GET(request: NextRequest) {
     return Response.json({
       average: values.average ?? null,
       count: values.count ?? null,
-      weekly: Array.isArray(values.weekly)
-        ? values.weekly
-        : Array.isArray(rootWeekly)
-          ? rootWeekly
-          : undefined,
+      weekly: Array.isArray(values.weekly) ? values.weekly : Array.isArray(rootWeekly) ? rootWeekly : undefined,
     });
   }
 

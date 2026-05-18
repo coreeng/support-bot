@@ -18,7 +18,7 @@ plugins {
     checkstyle
 
     id("net.ltgt.errorprone") version "4.3.0"
-    id("org.springframework.boot") version "3.5.13"
+    id("org.springframework.boot") version "3.5.14"
     id("io.spring.dependency-management") version "1.1.7"
 
     id("org.flywaydb.flyway") version "12.0.0"
@@ -62,6 +62,10 @@ repositories {
 extra["byte-buddy.version"] = "1.18.4"
 extra["mockito.version"] = "5.21.0"
 extra["asm.version"] = "9.9.1"
+extra["commons-lang3.version"] = "3.18.0"
+extra["netty.version"] = "4.1.133.Final"
+extra["postgresql.version"] = "42.7.11"
+extra["spring-framework.version"] = "6.2.18"
 
 val lombokVersion = "1.18.42"
 val errorProneVersion = "2.47.0"
@@ -82,7 +86,7 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
-    implementation("com.nimbusds:nimbus-jose-jwt:9.37")
+    implementation("com.nimbusds:nimbus-jose-jwt:9.37.4")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("org.springframework.boot:spring-boot-starter-cache")
 
@@ -95,9 +99,9 @@ dependencies {
     implementation("org.jooq:jooq-codegen:3.19.18")
 
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-    implementation("com.microsoft.kiota:microsoft-kiota-http-okHttp:1.8.5")
+    implementation("com.microsoft.kiota:microsoft-kiota-http-okHttp:1.9.1")
 
-    jooqCodegen("org.postgresql:postgresql:42.7.5")
+    jooqCodegen("org.postgresql:postgresql:42.7.11")
     jooqCodegen("org.testcontainers:postgresql:1.20.4")
     jooqCodegen("org.jooq:jooq-codegen:3.19.18")
 
@@ -113,7 +117,7 @@ dependencies {
     implementation("org.glassfish.tyrus.bundles:tyrus-standalone-client:2.2.0")
     implementation("com.google.guava:guava:33.4.0-jre")
     implementation("org.kohsuke:github-api:1.330")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.80")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.84")
     implementation("com.github.ben-manes.caffeine:caffeine")
 
     implementation("io.fabric8:kubernetes-client:7.1.0")
@@ -211,7 +215,7 @@ buildscript {
     }
     dependencies {
         classpath("org.flywaydb:flyway-database-postgresql:12.0.0")
-        classpath("org.postgresql:postgresql:42.7.5")
+        classpath("org.postgresql:postgresql:42.7.11")
         classpath("org.testcontainers:postgresql:1.20.4")
         classpath("org.jooq:jooq-codegen:3.19.18")
     }
@@ -276,6 +280,8 @@ jooq {
                 includes = ".*"
                 excludes = "flyway_schema_history"
                 inputSchema = "public"
+                // Emit unqualified table refs so runtime search_path picks the schema.
+                withOutputSchemaToDefault(true)
 
                 forcedTypes {
                     forcedType {

@@ -1,4 +1,4 @@
-import { Then, Given } from "@cucumber/cucumber";
+import { Given, Then } from "@cucumber/cucumber";
 import { expect } from "@playwright/test";
 import { CustomWorld } from "./custom-world";
 
@@ -9,13 +9,13 @@ Given("User navigates to the homepage", async function (this: CustomWorld) {
 });
 
 Then("It should show the banner {string}", async function (this: CustomWorld, expectedAlt: string) {
-    const banner = this.page.getByRole("img", { name: expectedAlt });
-    await expect(banner).toBeVisible();
+  const banner = this.page.getByRole("img", { name: expectedAlt });
+  await expect(banner).toBeVisible();
 });
 
 Then("It should show navigation tabs", async function (this: CustomWorld) {
-    // Sidebar navigation sub-items are now links in the Support section
-    await expect(this.page.getByRole("link", { name: /^Home$/i })).toBeVisible();
-    await expect(this.page.getByRole("link", { name: /^Tickets$/i })).toBeVisible();
-    await expect(this.page.getByRole("link", { name: /^Escalations$/i })).toBeVisible();
+  // Sidebar navigation sub-items are now links in the Support section
+  await expect(this.page.getByRole("link", { name: /^Home$/i })).toBeVisible();
+  await expect(this.page.getByRole("link", { name: /^Tickets$/i })).toBeVisible();
+  await expect(this.page.getByRole("link", { name: /^Escalations$/i })).toBeVisible();
 });

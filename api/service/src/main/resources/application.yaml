@@ -71,8 +71,16 @@ spring:
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
     hikari:
+      connection-init-sql: SET search_path TO "${app.db.schema}"
       data-source-properties:
         reWriteBatchedInserts: true
+  flyway:
+    default-schema: ${app.db.schema}
+    schemas: ${app.db.schema}
+
+app:
+  db:
+    schema: ${DB_SCHEMA:public}
 
 slack:
   mode: socket # socket or http
@@ -154,13 +162,13 @@ enums:
   escalation-teams:
     - label: wow
       code: wow
-      slack-group-id: S08948NBMED
+      group-ref: "slack:S08948NBMED"
     - label: infra-integration
       code: infra-integration
-      slack-group-id: S08948NBMED
+      group-ref: "slack:S08948NBMED"
     - label: connected-app
       code: connected-app
-      slack-group-id: S08948NBMED
+      group-ref: "slack:S08948NBMED"
   tags:
     - label: Ingresses
       code: ingresses
@@ -255,7 +263,7 @@ team:
   support:
     name: Core Support
     code: support
-    slack-group-id: S08948NBMED
+    group-ref: "slack:S08948NBMED"
     static:
       enabled: false
       members:
@@ -268,7 +276,7 @@ team:
   leadership:
     name: Support Leadership
     code: support-leadership
-    slack-group-id: S08948NBMED
+    group-ref: "slack:S08948NBMED"
     static:
       enabled: false
       members:

@@ -2,19 +2,6 @@ SHELL := /bin/bash
 
 DEX_K8S := ../api/k8s/dex
 
-##@ High level p2p targets
-p2p-build: template ## Fast feedback: validate Helm values
-p2p-functional:    
-p2p-nft:           
-p2p-integration: template ## P2P: render then deploy (sets DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT for Dex LDAP overlay)
-	@$(MAKE) deploy-integration DEX_DEPLOY_INSECURE_LDAP_PLAINTEXT=true
-p2p-promote-to-extended-test: ## Delegate image promotion to repo root
-	@$(MAKE) -C .. p2p-promote-to-extended-test
-p2p-promote-to-prod: ## Delegate prod promotion to repo root
-	@$(MAKE) -C .. p2p-promote-to-prod
-p2p-extended-test: 
-p2p-prod:          
-
 ##@ Local Dex (Docker)
 
 .PHONY: render-config

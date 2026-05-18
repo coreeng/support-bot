@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.teams;
 
+import com.coreeng.supportbot.teams.groups.GroupRef;
 import java.util.Set;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -12,6 +13,6 @@ public class PlatformTeam {
     @EqualsAndHashCode.Include
     private final String name;
 
-    private final Set<String> groupRefs;
+    private final Set<GroupRef> groupRefs;
     private final Set<PlatformUser> users;
 }

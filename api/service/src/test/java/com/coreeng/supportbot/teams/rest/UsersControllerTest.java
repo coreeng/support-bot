@@ -13,6 +13,7 @@ import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamMemberFetcher;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
+import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Set;
@@ -51,7 +52,7 @@ class UsersControllerTest {
     void shouldReturnUserWhenFound() {
         // given
         String email = "user@test.com";
-        PlatformTeam platformTeam = new PlatformTeam("team1", Set.of("group-1"), Set.of());
+        PlatformTeam platformTeam = new PlatformTeam("team1", Set.of(GroupRef.parse("group-1")), Set.of());
         PlatformUser user = new PlatformUser(email, Set.of(platformTeam));
 
         Team supportTeam = new Team("Support Team", "support", ImmutableList.of(TeamType.SUPPORT));
