@@ -299,12 +299,10 @@ class TenantInsightsControllerTest {
         // on (provider, name) using each repo's actual provider, otherwise the GITLAB row's lookup
         // key never matches a GITHUB-stamped config entry and hasSla is silently false.
         controller = new TenantInsightsController(
-                prTrackingRepository,
-                escalationTeamsRegistry,
-                propsWithRepos(List.of(slaGitlabRepo("group/project"))));
+                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaGitlabRepo("group/project"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
-                .thenReturn(List.of(
-                        new RepoInsights(Provider.GITLAB, "group/project", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
+                .thenReturn(List.of(new RepoInsights(
+                        Provider.GITLAB, "group/project", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
 
         // when
         List<RepoInsights> response = controller.prStats(null, null);
