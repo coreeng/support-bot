@@ -35,7 +35,10 @@ jobs:
           echo "short_sha=${short_sha}" >> "$GITHUB_OUTPUT"
 
       - name: Vendor subchart deps
-        run: helm dependency build helm-chart
+        run: |
+          helm repo add dex https://charts.dexidp.io
+          helm repo update
+          helm dependency build helm-chart
 
       - name: Package chart
         run: |
