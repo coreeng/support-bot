@@ -60,6 +60,19 @@ class TenantInsightsControllerTest {
         return new PrTrackingProps.Repository(name, "team-foo", null, List.of("src/"), null);
     }
 
+    private static PrTrackingProps.Repository slaGitlabRepo(String name) {
+        return new PrTrackingProps.Repository(
+                name,
+                "team-foo",
+                Provider.GITLAB,
+                null,
+                "group/reviewers",
+                List.of(),
+                new PrTrackingProps.Sla(null, Duration.ofHours(24), null),
+                null,
+                null);
+    }
+
     @Test
     void prStats_returnsInsightsForDateRange() {
         // given a repo with 10 PRs, 2 open, 1 escalated, 3 breached SLA
@@ -278,6 +291,27 @@ class TenantInsightsControllerTest {
         // then — removed from config → hasSla=false (present-day truth wins)
         assertThat(response).singleElement().satisfies(r -> assertThat(r.hasSla())
                 .isFalse());
+    }
+
+    @Test
+    void prStats_hasSlaIsTrueForGitlabRepoInSlaConfig() {
+        // given — a GitLab-backed repo currently in config with an SLA. The config-join must key
+        // on (provider, name) using each repo's actual provider, otherwise the GITLAB row's lookup
+        // key never matches a GITHUB-stamped config entry and hasSla is silently false.
+        controller = new TenantInsightsController(
+                prTrackingRepository,
+                escalationTeamsRegistry,
+                propsWithRepos(List.of(slaGitlabRepo("group/project"))));
+        when(prTrackingRepository.getInsightsByRepo(null, null))
+                .thenReturn(List.of(
+                        new RepoInsights(Provider.GITLAB, "group/project", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
+
+        // when
+        List<RepoInsights> response = controller.prStats(null, null);
+
+        // then — GitLab repo's hasSla is driven by its GitLab config entry
+        assertThat(response).singleElement().satisfies(r -> assertThat(r.hasSla())
+                .isTrue());
     }
 
     @Test

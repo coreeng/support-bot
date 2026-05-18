@@ -63,12 +63,10 @@ public class TenantInsightsController {
         // Config-side names are normalised to lowercase by PrTrackingProps#normalizeRepositoryName,
         // but DB repo values are whatever a historical caller inserted. Compare in lowercase on
         // both sides so a mismatched-case legacy row doesn't silently evade the current-state rule.
-        // Keyed by (provider, name) so the same repo string across providers stays distinct —
-        // until commit 3 adds provider to PrTrackingProps.Repository, all configured repos are
-        // assumed GitHub (matches what's actually in the DB).
+        // Keyed by (provider, name) so the same repo string across providers stays distinct.
         Set<ProviderRepoKey> configuredSlaRepos = prTrackingProps.repositories().stream()
                 .filter(r -> !r.hasNoSla())
-                .map(r -> new ProviderRepoKey(Provider.GITHUB, r.name().toLowerCase(Locale.ROOT)))
+                .map(r -> new ProviderRepoKey(r.provider(), r.name().toLowerCase(Locale.ROOT)))
                 .collect(Collectors.toUnmodifiableSet());
         return insights.stream()
                 .map(i -> i.withHasSla(configuredSlaRepos.contains(
