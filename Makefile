@@ -433,10 +433,19 @@ publish-prod: publish-api-prod publish-ui-prod publish-dex-prod ## Publish all c
 publish-chart: ## Package and publish Helm chart (version aligned to image)
 	@echo "Packaging Helm chart with version $(p2p_version)..."
 	@mkdir -p dist/charts
+	# Vendor the Dex subchart into the package so the published chart is
+	# self-contained (consumers don't need to run `helm dependency update`).
+	@helm repo add dex https://charts.dexidp.io 2>/dev/null || true
+	@helm repo update dex >/dev/null
+	helm dependency build $(HELM_CHART_PATH)
 	helm package $(HELM_CHART_PATH) \
 	  --version "$(p2p_version)" \
 	  --app-version "$(p2p_version)" \
 	  --destination dist/charts
+	@pkg="dist/charts/support-bot-$(p2p_version).tgz"; \
+	 if ! tar -tzf "$$pkg" | grep -Eq '^support-bot/charts/(dex-[0-9].*\.tgz|dex/Chart\.yaml)$$'; then \
+	   echo "ERROR: dex subchart was not vendored into $$pkg"; tar -tzf "$$pkg" | sed 's/^/  /'; exit 1; \
+	 fi
 	@printf "Login to ghcr.io for Helm... "
 	@echo "$(GITHUB_TOKEN)" | helm registry login ghcr.io \
 	  --username "$(or $(GITHUB_ACTOR),anonymous)" --password-stdin
