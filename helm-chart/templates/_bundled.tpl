@@ -62,6 +62,22 @@ passwordHash — explicit only, no defaults.
 {{- end -}}
 
 {{/*
+Validate that Dex has redirectURIs to register when bundled. Either the user
+supplied dex.config.staticClients[0].redirectURIs explicitly, or the chart
+auto-derives them from publicWebOrigin. With neither, the rendered config has
+redirectURIs: [] and Dex rejects every OAuth callback at runtime with
+`Unregistered redirect_uri`.
+*/}}
+{{- define "support-bot.dex.validateRedirectURIs" -}}
+{{- if .Values.dex.enabled -}}
+{{- $client := index .Values.dex.config.staticClients 0 -}}
+{{- if and (not $client.redirectURIs) (not .Values.publicWebOrigin) -}}
+{{- fail "publicWebOrigin is required when dex.enabled=true (it drives Dex staticClients[0].redirectURIs, UI_ORIGIN on the API, and NEXTAUTH_URL on the UI). Set publicWebOrigin to your UI's public URL (e.g. https://support-bot.example.com), or supply dex.config.staticClients[0].redirectURIs explicitly." -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Validate that ui.env declares AUTH_SECRET (or NEXTAUTH_SECRET) when the UI is enabled.
 NextAuth requires the secret at startup; without it the UI crash-loops at runtime.
 Either env-var name is accepted; value can be inline or via valueFrom (we don't inspect).
