@@ -1,0 +1,12 @@
+configMap:
+  config:
+    pr-review-tracking:
+      enabled: true
+      tags:
+        - pr-review
+      impact: prReview
+      repositories:
+        - name: coreeng/docs
+          owning-team: docs-team
+          sla:
+            default: PT24H

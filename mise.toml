@@ -1,3 +1,4 @@
 [tools]
 java = "25"
 yarn = "1"
+helm = "3.20"

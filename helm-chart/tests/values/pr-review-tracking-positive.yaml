@@ -1,0 +1,44 @@
+configMap:
+  config:
+    summary-data:
+      sanitisation:
+        patterns:
+          - secret-[0-9]+
+        exceptions:
+          - public-id
+    security:
+      allow-list:
+        emails:
+          - user@example.com
+        domains:
+          - example.com
+    pr-review-tracking:
+      enabled: true
+      tags:
+        - pr-review
+      impact: prReview
+      repositories:
+        - name: coreeng/docs
+          owning-team: docs-team
+          sla:
+            default: PT24H
+          messages:
+            detected: PR detected
+            escalated: Please escalate
+            approved: Approved
+            changes-requested: Changes requested
+            merged: Merged
+            closed: Closed
+        - name: coreeng/no-sla-repo
+          owning-team: docs-team
+          paths:
+            - docs/**
+      sla-discovery:
+        cache: PT5M
+      github:
+        api-base-url: https://github.example/api
+        auth-mode: app
+        token: ghp-test-token
+        app-id: "12345"
+        installation-id: "67890"
+        private-key-pem: test-private-key

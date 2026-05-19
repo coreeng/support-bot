@@ -1,0 +1,69 @@
+suite: configmap validation
+templates:
+  - templates/configmap.yaml
+tests:
+  - it: renders sanitisation auth and pr review tracking config
+    values:
+      - values/pr-review-tracking-positive.yaml
+    asserts:
+      - notMatchRegex:
+          path: data["application.yaml"]
+          pattern: '^\{\}'
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'summary-data:\n\s+sanitisation:'
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'patterns:\n\s+- secret-\[0-9\]\+'
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'exceptions:\n\s+- public-id'
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'security:\n\s+allow-list:'
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'emails:\n\s+- user@example\.com'
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'domains:\n\s+- example\.com'
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'sla-discovery:\n\s+cache: PT5M'
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'api-base-url: https://github\.example/api'
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'token: ghp-test-token'
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'private-key-pem: test-private-key'
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'messages:\n\s+approved: Approved\n\s+changes-requested: Changes requested\n\s+closed: Closed\n\s+detected: PR detected\n\s+escalated: Please escalate\n\s+merged: Merged'
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'name: coreeng/no-sla-repo\n\s+owning-team: docs-team\n\s+paths:\n\s+- docs/\*\*'
+
+  - it: does not inject extra pr review tracking defaults when omitted from configMap.config
+    values:
+      - values/pr-review-tracking-defaults.yaml
+    asserts:
+      - notMatchRegex:
+          path: data["application.yaml"]
+          pattern: 'github:'
+      - notMatchRegex:
+          path: data["application.yaml"]
+          pattern: 'sla-discovery:'
+      - notMatchRegex:
+          path: data["application.yaml"]
+          pattern: 'poll-cron:'
+
+  - it: renders only the pr review tracking defaults kept in values.yaml
+    values:
+      - values/auth-only.yaml
+    asserts:
+      - matchRegex:
+          path: data["application.yaml"]
+          pattern: 'pr-review-tracking:\n\s+impact: ""\n\s+tags: \[\]'
