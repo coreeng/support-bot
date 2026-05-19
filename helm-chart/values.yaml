@@ -222,12 +222,12 @@ ui:
         memory: 1536Mi
 
 # ============================================================================
-# AUTHENTICATION (Dex is bundled by default)
+# AUTHENTICATION (optional bundled Dex — opt in via dex.enabled: true)
 # ============================================================================
-# Pick ONE of:
+# Dex ships as a subchart but is disabled by default. To use it, set
+# dex.enabled: true and pick ONE of:
 #   (a) External IdP    → populate dex.config.connectors below (Google / Microsoft / LDAP / OIDC)
 #   (b) Static users    → set bundled.staticUsers.enabled: true (further down)
-# Opt out entirely:     → set dex.enabled: false (when Dex is deployed elsewhere)
 #
 # Required regardless of mode (when dex.enabled=true):
 #   - publicWebOrigin (top of file)         drives UI_ORIGIN / NEXTAUTH_URL / Dex redirectURIs
@@ -245,7 +245,7 @@ ui:
 #     chart's renderer, not the dex subchart.
 # ============================================================================
 dex:
-  enabled: true
+  enabled: false
   fullnameOverride: "support-bot-dex"
   replicaCount: 1
   rbac:

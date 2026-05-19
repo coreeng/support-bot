@@ -13,7 +13,7 @@ helm install support-bot oci://ghcr.io/coreeng/charts/support-bot \
 Notes:
 - `image.tag` defaults to the chart `appVersion` when empty which corresponds to the bot version that it was built with.
 - If your image requires credentials, set `imagePullSecrets` (see Configuration).
-- Dex is bundled as a subchart by default — see [Bundled Dex](#bundled-dex) for the two ways to wire authentication, or set `dex.enabled: false` to opt out.
+- Dex ships as an optional subchart for self-contained auth — disabled by default; set `dex.enabled: true` to use it. See [Bundled Dex](#bundled-dex) for the two wiring modes.
 - For a full end-to-end try-out on a local kind cluster (Postgres + API + UI + bundled Dex + four pre-seeded users), see [Local kind end-to-end walkthrough](#local-kind-end-to-end-walkthrough) below.
 
 ## Database
@@ -137,9 +137,7 @@ These values are rendered into the ConfigMap `application.yaml` under `security.
 
 ## Bundled Dex
 
-The chart depends on the upstream [`dex/dex`](https://charts.dexidp.io) subchart and installs it by default. The API's `DEX_CLIENT_ID` / `DEX_CLIENT_SECRET` / `DEX_ISSUER_URI` / `DEX_INTERNAL_BASE_URL` env vars are wired automatically; the UI's `BACKEND_URL` is set to the in-cluster API svc.
-
-To **opt out** (e.g. you deploy Dex separately and don't want a second one), set `dex.enabled: false`.
+The chart depends on the upstream [`dex/dex`](https://charts.dexidp.io) subchart. It's **disabled by default** — set `dex.enabled: true` to use it. When enabled, the API's `DEX_CLIENT_ID` / `DEX_CLIENT_SECRET` / `DEX_ISSUER_URI` / `DEX_INTERNAL_BASE_URL` env vars are wired automatically; the UI's `BACKEND_URL` is set to the in-cluster API svc.
 
 Two ways to wire authentication when `dex.enabled=true`:
 
@@ -151,6 +149,7 @@ Point Dex at your real IdP via [Dex connectors](https://dexidp.io/docs/connector
 publicWebOrigin: https://support-bot.example.com   # one URL → UI_ORIGIN, NEXTAUTH_URL, Dex redirectURIs
 
 dex:
+  enabled: true
   config:
     issuer: https://dex.example.com                # browser-reachable Dex URL
     staticClients:
@@ -177,6 +176,7 @@ Pre-seed four users (one per role) without any external IdP. Useful for demos, l
 publicWebOrigin: http://localhost:3000
 
 dex:
+  enabled: true
   config:
     issuer: http://localhost:5556
     staticClients:
@@ -414,6 +414,7 @@ ui:
 # that's http://localhost:5556. The chart computes DEX_INTERNAL_BASE_URL separately
 # (svc FQDN) for in-cluster server-to-server calls.
 dex:
+  enabled: true
   config:
     issuer: http://localhost:5556
     staticClients:
