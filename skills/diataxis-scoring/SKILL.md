@@ -1,6 +1,6 @@
 ---
 name: diataxis-scoring
-description: Use when reviewing documentation for Diataxis-framework alignment, scoring how well a doc or directory supports a specific user journey for a product, auditing mode-purity (tutorial/how-to/reference/explanation), or measuring doc relevance to a product workflow.
+description: Use when reviewing documentation for Diataxis-framework alignment, scoring how well a doc or directory helps a user achieve one or more product user-journeys, auditing mode-purity (tutorial/how-to/reference/explanation), or measuring doc relevance to product workflows.
 ---
 
 # Documentation scoring
@@ -10,9 +10,9 @@ description: Use when reviewing documentation for Diataxis-framework alignment, 
 Scores documentation along two complementary axes:
 
 1. **Diataxis purity** — does each page hold a single mode (tutorial / how-to / reference / explanation)? Mixing confuses readers. ([Diataxis framework](https://diataxis.fr/).)
-2. **Journey-fit** — given a user journey for a product, does the doc actually get a user through it?
+2. **Journey-fit** — given one or more user journeys for a product, **would this doc help the user achieve the journey?**
 
-Diataxis runs from the doc alone. Journey-fit needs the product and journey from the user.
+Diataxis runs from the doc alone. Journey-fit needs the user to name the product(s) and journey(s).
 
 ## The four Diataxis modes
 
@@ -26,11 +26,11 @@ Diataxis runs from the doc alone. Journey-fit needs the product and journey from
 ## Inputs
 
 - **Always**: a file path, directory, or pasted content.
-- **For journey-fit**: the **product** (e.g., "Insights", "Core Platform") and the **journey** as a single-sentence user goal (e.g., "Submit an insight questionnaire to surface a team's product delivery state").
+- **For journey-fit**: one or more **(product, journey)** pairs. Each journey is a single-sentence user goal (e.g., "Submit an insight questionnaire to surface a team's product delivery state"). The product is the named container the journey belongs to (e.g., "Insights", "Core Platform").
 
-If the user asks for journey-fit (mentions "journey", "user journey", or a product) but doesn't supply both, **ask before scoring**:
+If the user asks for journey-fit (mentions "journey", "user journey", or a product) but doesn't supply both pieces for every journey, **ask before scoring**:
 
-> "To score journey-fit, please give me (1) the product, and (2) the journey as a single-sentence user goal."
+> "To score journey-fit, please give me one or more (product, journey) pairs. Each journey should be a single-sentence user goal, like 'Submit an insight questionnaire to surface a team's product delivery state'."
 
 ## Skip-list (used by both axes)
 
@@ -48,7 +48,9 @@ Blank lines, frontmatter delimiters (`---`), lone heading markers with no conten
 
 ## Journey-fit algorithm
 
-**Single file**:
+The central question per journey: **would this doc help the user achieve this journey?**
+
+**Single file, single journey**:
 1. **Infer 3–7 natural steps** the user must accomplish to complete the journey (e.g., for "Submit an insight questionnaire…": find it, fill it, submit it, see the surfaced state).
 2. Walk every line; classify as **On-journey** (helps perform a step), **Off-journey** (unrelated), or **Skip**.
 3. Compute:
@@ -56,7 +58,9 @@ Blank lines, frontmatter delimiters (`---`), lone heading markers with no conten
    - Coverage = `round(addressed-steps / total-steps × 100)`
 4. Journey-fit = `round((relevance + coverage) / 2)`.
 
-**Collection**: Relevance aggregates line-weighted; Coverage counts a step as addressed if any file addresses it; final = `round((agg-relevance + collection-coverage) / 2)`.
+**Multiple journeys**: score the doc against each journey independently — never combine journeys into one number. Different journeys probe different content.
+
+**Collection**: Relevance aggregates line-weighted across files; Coverage counts a step as addressed if any file addresses it; final = `round((agg-relevance + collection-coverage) / 2)`. Repeat per journey.
 
 ## Output — single file
 
@@ -69,15 +73,17 @@ Always emit the Diataxis block:
 **Chief drift**: lines <a–b> read as <other mode>
 ```
 
-Omit `Chief drift` when no contiguous off-mode block exists. If journey-fit was requested, append:
+Omit `Chief drift` when no contiguous off-mode block exists. If journey-fit was requested, append one block per (product, journey) pair, or — for several journeys — a single table:
 
 ```
-**Journey-fit score**: <N>/100
-**Product**: <product>
-**Journey**: <journey>
-**Relevance**: <N>/100 (<on-journey> on-journey + <off-journey> off-journey)
-**Coverage**: <N>/100 (<addressed> of <total> steps; missing: <step list>)
+**Journey-fit**
+
+| Product | Journey | Score | Relevance | Coverage | Missing steps |
+|---------|---------|-------|-----------|----------|---------------|
+| <product> | <journey> | <N> | <N> | <N> | <step list> |
 ```
+
+Sort rows by Score ascending — weakest journey-fit first.
 
 ## Output — collection
 
@@ -93,16 +99,15 @@ Always emit the Diataxis block:
 | <path> | <mode> | <N> |
 ```
 
-If journey-fit was requested, append a matching block:
+If journey-fit was requested, append — for each (product, journey) pair — a collection-level summary plus a per-file breakdown:
 
 ```
-**Collection journey-fit score**: <N>/100
-**Product**: <product>  **Journey**: <journey>
-**Relevance**: <N>/100  **Coverage**: <N>/100  (missing: <steps>)
+**Collection journey-fit** — <product> · <journey>
+**Score**: <N>/100  **Relevance**: <N>/100  **Coverage**: <N>/100  (missing: <steps>)
 
-| File | Relevance | Coverage |
-|------|-----------|----------|
-| <path> | <N> | <N> |
+| File | Score | Relevance | Coverage |
+|------|-------|-----------|----------|
+| <path> | <N> | <N> | <N> |
 ```
 
-Sort tables by score ascending so weakest pages surface first.
+When several journeys are scored, repeat the block per journey (one per heading). Sort tables by Score ascending so weakest pages surface first.
