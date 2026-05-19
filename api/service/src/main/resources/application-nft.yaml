@@ -1,4 +1,7 @@
 security:
+  jwt:
+    secret: functional-test-jwt-secret-min-256-bits
+    expiration: 24h
   test-bypass:
     enabled: true
 

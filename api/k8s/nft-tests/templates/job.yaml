@@ -26,9 +26,14 @@ spec:
               value: "http://support-bot:8080"
             - name: JAVA_OPTS
               value: "-Xms1500m -Xmx1500m -Djava.util.prefs.userRoot=/tmp/java-prefs"
-          ports:
-            - name: slack
-              containerPort: 8000
+            - name: SLACK_MOCK_MODE
+              value: "remote"
+            - name: SLACK_MOCK_REMOTE_ADMIN_SCHEME
+              value: {{ .Values.wiremock.scheme | quote }}
+            - name: SLACK_MOCK_REMOTE_ADMIN_HOST
+              value: {{ .Values.wiremock.host | quote }}
+            - name: SLACK_MOCK_REMOTE_ADMIN_PORT
+              value: {{ .Values.wiremock.port | quote }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:

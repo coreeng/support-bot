@@ -2,6 +2,10 @@
 mocks:
   slack:
     port: 8000
+    mode: ${SLACK_MOCK_MODE:embedded}
+    remoteAdminScheme: ${SLACK_MOCK_REMOTE_ADMIN_SCHEME:http}
+    remoteAdminHost: ${SLACK_MOCK_REMOTE_ADMIN_HOST:localhost}
+    remoteAdminPort: ${SLACK_MOCK_REMOTE_ADMIN_PORT:8000}
     serverUrl: "https://cecg.slack.com/"
     team: "CECG"
     teamId: T0123456789

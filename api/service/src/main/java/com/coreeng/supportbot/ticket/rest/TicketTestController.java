@@ -2,6 +2,7 @@ package com.coreeng.supportbot.ticket.rest;
 
 import static java.util.Objects.requireNonNull;
 
+import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.ticket.DetailedTicket;
 import com.coreeng.supportbot.ticket.Ticket;
@@ -18,10 +19,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -45,6 +48,17 @@ public class TicketTestController {
         DetailedTicket detailedTicket = queryService.findDetailedById(ticketId);
         String queryText = detailedTicket != null ? queryService.fetchQueryText(detailedTicket.ticket()) : null;
         return mapper.mapToUI(requireNonNull(detailedTicket), queryText);
+    }
+
+    @GetMapping("/by-query")
+    public ResponseEntity<TicketUI> findTicketByQuery(
+            @RequestParam("channelId") String channelId, @RequestParam("messageTs") String messageTs) {
+        DetailedTicket detailedTicket =
+                queryService.findDetailedByQueryRef(new MessageRef(MessageTs.of(messageTs), channelId));
+        if (detailedTicket == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(mapper.mapToUI(detailedTicket));
     }
 
     @PatchMapping("/update")

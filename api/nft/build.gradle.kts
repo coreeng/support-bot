@@ -21,12 +21,20 @@ java {
 val gatlingVersion = "3.14.9"
 
 dependencies {
+    implementation(project(":testkit"))
+    implementation("org.scala-lang:scala-library:2.13.18")
+
     gatlingImplementation(project(":testkit"))
 
     gatlingImplementation("org.scala-lang:scala-library:2.13.18")
 
     gatlingImplementation("io.gatling.highcharts:gatling-charts-highcharts:${gatlingVersion}")
     gatlingImplementation("io.gatling:gatling-core:${gatlingVersion}")
+
+    testImplementation(project(":testkit"))
+    testImplementation("org.scala-lang:scala-library:2.13.18")
+    testImplementation(platform("org.junit:junit-bom:5.13.+"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.13.+")
 }
 
 // Ensure testkit classes are included in Gatling runtime classpath
@@ -97,4 +105,8 @@ tasks.register("warmupGatlingRuntimeClasspath") {
     doLast {
         configurations.named("gatlingRuntimeClasspath").get().files
     }
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
