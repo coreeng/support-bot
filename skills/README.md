@@ -8,7 +8,7 @@ This sits alongside the repo's `AGENTS.md` / `CLAUDE.md` shim convention: a sing
 
 | Skill | Purpose |
 |-------|---------|
-| [`diataxis-scoring/`](./diataxis-scoring/SKILL.md) | Score a doc (or directory of docs) against the [Diataxis](https://diataxis.fr/) framework. Outputs a single 0–100 mode-purity score, the dominant mode, and where the violations sit. |
+| [`diataxis-scoring/`](./diataxis-scoring/SKILL.md) | Score a doc (or directory of docs) along two axes: [Diataxis](https://diataxis.fr/) mode-purity (tutorial / how-to / reference / explanation) and, optionally, journey-fit for a named product user-journey. Outputs 0–100 scores and points to the lines/steps dragging the result. |
 
 ## Wiring per platform
 
