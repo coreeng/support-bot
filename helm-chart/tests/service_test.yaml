@@ -1,0 +1,60 @@
+suite: services and monitoring
+templates:
+  - templates/service.yaml
+  - templates/monitoring-servicemonitor.yaml
+tests:
+  - it: exposes the metrics port on the service by default
+    template: templates/service.yaml
+    asserts:
+      - isKind:
+          of: Service
+      - contains:
+          path: spec.ports
+          content:
+            name: metrics
+            port: 8081
+            protocol: TCP
+            targetPort: metrics
+
+  - it: does not render a ServiceMonitor by default
+    template: templates/monitoring-servicemonitor.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a ServiceMonitor when monitoring is enabled
+    template: templates/monitoring-servicemonitor.yaml
+    set:
+      monitoring.enabled: true
+      monitoring.serviceMonitor.enabled: true
+    asserts:
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: spec.endpoints[0].port
+          value: metrics
+
+  - it: does not expose a metrics port when metrics are disabled
+    template: templates/service.yaml
+    set:
+      metrics.enabled: false
+    asserts:
+      - notContains:
+          path: spec.ports
+          content:
+            name: metrics
+
+  - it: passes through ServiceMonitor namespace and labels
+    template: templates/monitoring-servicemonitor.yaml
+    set:
+      monitoring.enabled: true
+      monitoring.serviceMonitor.enabled: true
+      monitoring.serviceMonitor.namespace: observability
+      monitoring.serviceMonitor.labels.team: support-bot
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: observability
+      - equal:
+          path: metadata.labels.team
+          value: support-bot

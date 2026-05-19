@@ -1,0 +1,43 @@
+suite: ui deployment
+templates:
+  - templates/ui-deployment.yaml
+tests:
+  - it: does not render the UI deployment by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: appends NEXTAUTH_URL when ui and publicWebOrigin are set
+    set:
+      ui.enabled: true
+      publicWebOrigin: "https://support-bot.example"
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NEXTAUTH_URL
+            value: "https://support-bot.example"
+
+  - it: renders the default UI container and cache volume when enabled
+    set:
+      ui.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 3000
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: nextjs-cache
+            emptyDir: {}
+
+  - it: does not append NEXTAUTH_URL without publicWebOrigin
+    set:
+      ui.enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NEXTAUTH_URL

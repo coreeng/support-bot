@@ -1,0 +1,47 @@
+suite: api deployment
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: appends UI_ORIGIN when publicWebOrigin is set
+    set:
+      publicWebOrigin: "https://support-bot.example"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: UI_ORIGIN
+            value: "https://support-bot.example"
+
+  - it: mounts the analysis bundle when enabled
+    set:
+      analysisBundle.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SUMMARY_DATA_ANALYSIS_BUNDLE_PATH
+            value: /app/analysis.zip
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: analysis-bundle
+            configMap:
+              name: analysis-bundle
+
+  - it: mounts the config volume by default
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: config
+            mountPath: /app/config
+
+  - it: omits the config volume when disabled
+    set:
+      configMap.enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: config
+            mountPath: /app/config

@@ -23,14 +23,3 @@ ui:
       value: "nft-test-secret-not-for-production-use"
     - name: NEXTAUTH_URL
       value: "http://support-bot-ui:3000"
-
-# Configure k6 test pod resources (injector)
-tests:
-  nft:
-    resources:
-      requests:
-        cpu: 1000m
-        memory: 3Gi
-      limits:
-        cpu: 1000m
-        memory: 3Gi
