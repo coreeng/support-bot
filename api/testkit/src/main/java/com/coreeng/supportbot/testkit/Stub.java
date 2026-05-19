@@ -2,9 +2,6 @@ package com.coreeng.supportbot.testkit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.github.tomakehurst.wiremock.WireMockServer;
-import com.github.tomakehurst.wiremock.admin.model.GetServeEventsResult;
-import com.github.tomakehurst.wiremock.admin.model.ServeEventQuery;
 import com.github.tomakehurst.wiremock.stubbing.StubMapping;
 import java.util.Collections;
 import java.util.List;
@@ -22,17 +19,18 @@ public class Stub {
 
     @NonNull private final List<StubMapping> extraMappings;
 
-    @NonNull private final WireMockServer wireMockServer;
+    @NonNull private final WireMockBackend wireMockServer;
 
     @NonNull private final String description;
 
     private boolean asserted;
+    private boolean cleanedUp;
 
     @Builder
     public Stub(
             @NonNull StubMapping mapping,
             List<StubMapping> extraMappings,
-            @NonNull WireMockServer wireMockServer,
+            @NonNull WireMockBackend wireMockServer,
             @NonNull String description) {
         this.mapping = mapping;
         this.extraMappings = extraMappings == null ? Collections.emptyList() : extraMappings;
@@ -49,8 +47,8 @@ public class Stub {
             LOGGER.debug("Stub '{}' already asserted, skipping", description);
             return;
         }
-        GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
-        assertThat(serveEvents.getServeEvents())
+        List<?> serveEvents = wireMockServer.getServeEventsFor(mapping);
+        assertThat(serveEvents)
                 .as("%s: stub was called exactly %d times", description, expectedCount)
                 .hasSize(expectedCount);
         asserted = true;
@@ -63,16 +61,20 @@ public class Stub {
             LOGGER.debug("Stub '{}' already asserted, skipping", description);
             return;
         }
-        GetServeEventsResult serveEvents = wireMockServer.getServeEvents(ServeEventQuery.forStubMapping(mapping));
-        assertThat(serveEvents.getServeEvents())
+        assertThat(wireMockServer.getServeEventsFor(mapping))
                 .as("%s: stub should not have been called", description)
                 .isEmpty();
     }
 
     public void cleanUp() {
+        if (cleanedUp) {
+            LOGGER.debug("Stub '{}' already cleaned up, skipping", description);
+            return;
+        }
         wireMockServer.removeStubMapping(mapping);
         for (StubMapping extra : extraMappings) {
             wireMockServer.removeStubMapping(extra);
         }
+        cleanedUp = true;
     }
 }

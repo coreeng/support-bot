@@ -27,6 +27,11 @@ job:
   parallelism: 1
   completions: 1
 
+wiremock:
+  scheme: http
+  host: support-bot-nft-tests-wiremock
+  port: 8000
+
 resources:
   requests:
     cpu: 1000m

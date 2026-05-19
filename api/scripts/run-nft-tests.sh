@@ -10,9 +10,12 @@ NAMESPACE="${NAMESPACE:-support-bot-nft}"
 JOB_RELEASE="${JOB_RELEASE:-support-bot-nft-tests}"
 DB_RELEASE="${DB_RELEASE:-support-bot-db}"
 SERVICE_RELEASE="${SERVICE_RELEASE:-support-bot}"
+WIREMOCK_RELEASE="${WIREMOCK_RELEASE:-support-bot-nft-tests-wiremock}"
 
 JOB_IMAGE_REPOSITORY="${JOB_IMAGE_REPOSITORY:?JOB_IMAGE_REPOSITORY is required}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
+WIREMOCK_IMAGE_REPOSITORY="${WIREMOCK_IMAGE_REPOSITORY:-wiremock/wiremock}"
+WIREMOCK_IMAGE_TAG="${WIREMOCK_IMAGE_TAG:-3.13.2}"
 
 SERVICE_IMAGE_REPOSITORY="${SERVICE_IMAGE_REPOSITORY:-}"
 SERVICE_IMAGE_TAG="${SERVICE_IMAGE_TAG:-}"
@@ -25,6 +28,11 @@ TEST_LOGS_DIR="${TEST_LOGS_DIR:-${SCRIPT_DIR}/../../reports/nft}"
 
 SERVICE_CHART_PATH="${SERVICE_CHART_PATH:-${SCRIPT_DIR}/../../helm-chart}"
 TEST_CHART_PATH="${TEST_CHART_PATH:-${SCRIPT_DIR}/../k8s/nft-tests}"
+WIREMOCK_VALUES_FILE="${WIREMOCK_VALUES_FILE:-${SCRIPT_DIR}/../k8s/wiremock-values.yaml}"
+WIREMOCK_CHART_REPO_NAME="${WIREMOCK_CHART_REPO_NAME:-wiremock}"
+WIREMOCK_CHART_REPO_URL="${WIREMOCK_CHART_REPO_URL:-https://wiremock.github.io/helm-charts}"
+WIREMOCK_CHART_NAME="${WIREMOCK_CHART_NAME:-wiremock}"
+WIREMOCK_CHART_VERSION="${WIREMOCK_CHART_VERSION:-1.11.0}"
 
 JOB_FAILED=0
 
@@ -49,6 +57,7 @@ cleanup() {
   sleep_for_log_flush
   log "Cleaning up Helm releases in namespace: ${NAMESPACE}"
   helm uninstall "${JOB_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
+  helm uninstall "${WIREMOCK_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
   helm uninstall "${SERVICE_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
   helm uninstall "${DB_RELEASE}" -n "${NAMESPACE}" --ignore-not-found || true
 }
@@ -151,12 +160,30 @@ EOF
 main() {
   log "Running NFT tests in namespace ${NAMESPACE}"
   log "Job image: ${JOB_IMAGE_REPOSITORY}:${IMAGE_TAG}"
+  log "WireMock chart: ${WIREMOCK_CHART_REPO_NAME}/${WIREMOCK_CHART_NAME}@${WIREMOCK_CHART_VERSION}"
+  log "WireMock values: ${WIREMOCK_VALUES_FILE}"
+  log "WireMock image: ${WIREMOCK_IMAGE_REPOSITORY}:${WIREMOCK_IMAGE_TAG}"
 
   # Ensure namespace exists
   if ! kubectl get namespace "${NAMESPACE}" >/dev/null 2>&1; then
     log "Namespace ${NAMESPACE} does not exist, creating..."
     kubectl create namespace "${NAMESPACE}"
   fi
+
+  helm_uninstall_if_exists "${WIREMOCK_RELEASE}" "${NAMESPACE}"
+
+  helm repo add "${WIREMOCK_CHART_REPO_NAME}" "${WIREMOCK_CHART_REPO_URL}" 2>/dev/null || true
+  helm repo update "${WIREMOCK_CHART_REPO_NAME}" >/dev/null
+
+  log "Installing NFT WireMock [${WIREMOCK_RELEASE}]"
+  helm upgrade --install "${WIREMOCK_RELEASE}" "${WIREMOCK_CHART_REPO_NAME}/${WIREMOCK_CHART_NAME}" \
+    --namespace "${NAMESPACE}" \
+    --version "${WIREMOCK_CHART_VERSION}" \
+    -f "${WIREMOCK_VALUES_FILE}" \
+    --set fullnameOverride="${WIREMOCK_RELEASE}" \
+    --set image.repository="${WIREMOCK_IMAGE_REPOSITORY}" \
+    --set image.tag="${WIREMOCK_IMAGE_TAG}" \
+    --wait --timeout=3m
 
   # Optionally deploy the support-bot service if image coordinates are provided
   if [[ "${DEPLOY_SERVICE}" == "true" ]]; then
@@ -183,6 +210,7 @@ main() {
     --namespace "${NAMESPACE}" \
     --set image.repository="${JOB_IMAGE_REPOSITORY}" \
     --set image.tag="${IMAGE_TAG}" \
+    --set wiremock.host="${WIREMOCK_RELEASE}" \
     --set job.activeDeadlineSeconds="${TIMEOUT}"
 
 	  # Wait for job completion and stream logs from the nft-tests container

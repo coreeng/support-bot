@@ -2,6 +2,12 @@
 
 This module contains the Gatling-based **non-functional tests** (NFT) for the Support Bot.
 
+### WireMock topology
+
+- **Local**: NFT uses the embedded `SlackWiremock` backend from `:testkit` by default.
+- **Cluster**: `api/scripts/run-nft-tests.sh` deploys a dedicated `support-bot-nft-tests-wiremock` Helm release and the Gatling job seeds/verifies stubs through WireMock's remote admin API.
+- The service deployed with `helm-chart/values-nft.yaml` points Slack/GitHub mock traffic at that dedicated cluster WireMock service.
+
 ### What it does
 - Reuses the shared `:testkit` to talk to the service and Slack stub.
 - Defines the main Gatling simulation `TicketFlowSimulation` that covers:
@@ -9,7 +15,7 @@ This module contains the Gatling-based **non-functional tests** (NFT) for the Su
   - support reacting with the initial emoji to create a ticket,
   - opening the full summary modal,
   - submitting the summary form.
-- Verifies behavior via `RequestJournalVerifier`, which inspects WireMock's request journal instead of poking the DB directly.
+- Verifies Slack-side behavior via `RequestJournalVerifier`; ticket creation uses the service API to recover `ticketId` and form-message `ts` without scanning the full WireMock serve-event journal.
 - Uses an `application-nft.yaml` Spring profile on the service side so test data (teams, tags, users) matches what the simulation expects.
 
 ### How to run locally
