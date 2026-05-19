@@ -62,8 +62,21 @@ deploy_db() {
   reset_db_schema "$ns" "$release"
 }
 
+ensure_chart_deps() {
+  local chart_path="$1"
+  # Chart.yaml declares dex as a subchart dependency. Helm requires the dep to
+  # be present in charts/ before render, even when the active values disable it
+  # via `dex.enabled: false`. `helm dependency build` uses Chart.lock to fetch
+  # the pinned version; the repo must be registered locally first.
+  log "Vendoring chart dependencies for ${chart_path}..."
+  helm repo add dex https://charts.dexidp.io >/dev/null 2>&1 || true
+  helm repo update dex >/dev/null
+  helm dependency build "$chart_path" >/dev/null
+}
+
 deploy_service() {
   local ns="$1" release="$2" chart_path="$3" image_repo="$4" image_tag="$5"
+  ensure_chart_deps "$chart_path"
   log "Installing service [${release}] in ${ns} from ${chart_path}..."
   local args=(upgrade --install "$release" "$chart_path" -n "$ns" \
     --set image.repository="$image_repo" \
