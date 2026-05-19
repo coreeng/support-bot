@@ -47,7 +47,16 @@ spec:
             {{- end }}
             {{- if .Values.dex.enabled }}
             {{- $apiEnv = append $apiEnv (dict "name" "DEX_CLIENT_ID" "valueFrom" (dict "secretKeyRef" (dict "name" (include "support-bot.dex.clientSecretName" .) "key" "client-id"))) }}
+            {{- if eq (include "support-bot.dex.clientSecretMode" .) "external" }}
+            {{- /* Reuse the operator-provided secretKeyRef (or value:) from dex.envVars verbatim. */ -}}
+            {{- range .Values.dex.envVars }}
+            {{- if eq (.name | default "") "DEX_CLIENT_SECRET" }}
+            {{- $apiEnv = append $apiEnv . }}
+            {{- end }}
+            {{- end }}
+            {{- else }}
             {{- $apiEnv = append $apiEnv (dict "name" "DEX_CLIENT_SECRET" "valueFrom" (dict "secretKeyRef" (dict "name" (include "support-bot.dex.clientSecretName" .) "key" "client-secret"))) }}
+            {{- end }}
             {{- $apiEnv = append $apiEnv (dict "name" "DEX_ISSUER_URI" "value" .Values.dex.config.issuer) }}
             {{- $apiEnv = append $apiEnv (dict "name" "DEX_INTERNAL_BASE_URL" "value" (include "support-bot.dex.internalBaseURL" .)) }}
             {{- end }}

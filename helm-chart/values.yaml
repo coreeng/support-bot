@@ -317,12 +317,37 @@ dex:
     staticClients:
       - id: support-bot
         name: Support Bot
-        # Required when dex.enabled=true; consumed by both Dex (login) and the API
-        # (DEX_CLIENT_SECRET env). No default — explicit-only, same posture as bundled passwordHash.
-        # Generate: openssl rand -hex 32
+        # Set ONE of:
+        #   - secret: <plaintext>                               inline; generate with openssl rand -hex 32
+        #   - leave secret empty AND provide a DEX_CLIENT_SECRET entry in dex.envVars below
+        #     pointing at an externally-managed K8s Secret (see "Externalising the client
+        #     secret" example further down). Dex resolves $DEX_CLIENT_SECRET at startup
+        #     via os.ExpandEnv; the API reuses the same valueFrom for its own env.
+        # No default — explicit-only, same posture as bundled passwordHash.
         secret: ""
         # Defaults to publicWebOrigin-derived URIs when empty (see _bundled.tpl).
         redirectURIs: []
+
+  # ----------------------------------------------------------------
+  # Externalising the client secret (no plaintext in values.yaml)
+  # ----------------------------------------------------------------
+  # Operators using sealed-secrets / external-secrets-operator / vault can
+  # leave dex.config.staticClients[0].secret empty and reference an existing
+  # K8s Secret here instead:
+  #
+  #   envVars:
+  #     - name: DEX_CLIENT_SECRET
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: support-bot-dex-creds
+  #           key: client-secret
+  #
+  # When this is set, the chart writes `secret: $DEX_CLIENT_SECRET` into the
+  # rendered Dex config (Dex's expand_env feature, default-true in 2.44.0,
+  # resolves it at startup) and points the API's DEX_CLIENT_SECRET env at the
+  # same valueFrom. Don't set both — the chart will fail-fast with a clear
+  # message.
+  envVars: []
 
 # -------------------- Mode (b): Bundled static users --------------------
 # Set enabled: true to pre-seed four users so login → role works without an

@@ -19,14 +19,44 @@ No defaults — same posture as the Dex client secret. Fails install if any are 
 {{- end -}}
 
 {{/*
-Validate that the Dex OAuth client secret is set when Dex is bundled.
-Symmetrical with bundled.staticUsers passwordHash — explicit only, no defaults.
+Reports how the Dex OAuth client secret is being supplied:
+  - "inline"   plaintext in dex.config.staticClients[0].secret
+  - "external" via a `DEX_CLIENT_SECRET` entry in dex.envVars (operator
+               provides an existing K8s Secret; Dex resolves $DEX_CLIENT_SECRET
+               at startup via its os.ExpandEnv feature; the API reuses the same
+               valueFrom for its own DEX_CLIENT_SECRET env)
+  - "both"    both set — ambiguous, fail-fast
+  - "none"    neither set — fail-fast
+*/}}
+{{- define "support-bot.dex.clientSecretMode" -}}
+{{- $client := index .Values.dex.config.staticClients 0 -}}
+{{- $hasInline := $client.secret -}}
+{{- $hasExternal := false -}}
+{{- range (.Values.dex.envVars | default list) -}}
+{{- if eq (.name | default "") "DEX_CLIENT_SECRET" -}}
+{{- $hasExternal = true -}}
+{{- end -}}
+{{- end -}}
+{{- if and $hasInline $hasExternal -}}both
+{{- else if $hasInline -}}inline
+{{- else if $hasExternal -}}external
+{{- else -}}none
+{{- end -}}
+{{- end -}}
+
+{{/*
+Validate that the Dex OAuth client secret is supplied via one of the two
+supported paths when Dex is bundled. Symmetrical with bundled.staticUsers
+passwordHash — explicit only, no defaults.
 */}}
 {{- define "support-bot.dex.validateClientSecret" -}}
 {{- if .Values.dex.enabled -}}
-{{- $client := index .Values.dex.config.staticClients 0 -}}
-{{- if not $client.secret -}}
-{{- fail "dex.config.staticClients[0].secret is required when dex.enabled=true (generate with: openssl rand -hex 32)" -}}
+{{- $mode := include "support-bot.dex.clientSecretMode" . -}}
+{{- if eq $mode "none" -}}
+{{- fail "dex client secret is required when dex.enabled=true. Set EITHER dex.config.staticClients[0].secret (inline, generate with: openssl rand -hex 32) OR add an entry to dex.envVars named DEX_CLIENT_SECRET with valueFrom.secretKeyRef pointing to your externally-managed Secret." -}}
+{{- end -}}
+{{- if eq $mode "both" -}}
+{{- fail "ambiguous: both dex.config.staticClients[0].secret AND a DEX_CLIENT_SECRET entry in dex.envVars are set. Pick one." -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

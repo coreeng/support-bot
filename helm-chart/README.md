@@ -218,9 +218,38 @@ The chart fails at `helm install` time — not at pod-runtime — if any of thes
 
 | Value | Required when | Error message |
 |---|---|---|
-| `dex.config.staticClients[0].secret` | `dex.enabled=true` | `dex.config.staticClients[0].secret is required when dex.enabled=true (generate with: openssl rand -hex 32)` |
+| `dex.config.staticClients[0].secret` **or** `dex.envVars[DEX_CLIENT_SECRET]` | `dex.enabled=true` | `dex client secret is required when dex.enabled=true. Set EITHER dex.config.staticClients[0].secret (inline, generate with: openssl rand -hex 32) OR add an entry to dex.envVars named DEX_CLIENT_SECRET with valueFrom.secretKeyRef pointing to your externally-managed Secret.` |
 | `bundled.staticUsers.<role>.passwordHash` (×4) | `bundled.staticUsers.enabled=true` | ``bundled.staticUsers.<role>.passwordHash is required when bundled.staticUsers.enabled=true (generate with: htpasswd -bnBC 10 "" PASSWORD \| tr -d ':\n' \| sed 's/^\$2y/\$2a/')`` |
 | `ui.env` includes `AUTH_SECRET` or `NEXTAUTH_SECRET` | `ui.enabled=true` | `ui.env must include AUTH_SECRET (or NEXTAUTH_SECRET) when ui.enabled=true (generate with: openssl rand -base64 32)` |
+
+### Externalising the Dex client secret
+
+For operators using sealed-secrets, external-secrets-operator, vault, etc., the client secret can live in an externally-managed Kubernetes Secret instead of in `values.yaml`. Leave `dex.config.staticClients[0].secret` empty and add an entry to `dex.envVars`:
+
+```yaml
+dex:
+  enabled: true
+  envVars:
+    - name: DEX_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: support-bot-dex-creds   # operator-managed
+          key: client-secret
+  config:
+    issuer: https://dex.example.com
+    staticClients:
+      - id: support-bot
+        name: Support Bot
+        # `secret:` intentionally omitted — sourced from dex.envVars above
+```
+
+When the chart sees the `DEX_CLIENT_SECRET` envVars entry it:
+
+- writes `secret: $DEX_CLIENT_SECRET` into the rendered Dex config Secret (Dex's `expand_env` feature flag is default-true in v2.44.0, so `os.ExpandEnv` resolves the placeholder at pod startup);
+- skips the `client-secret` key in the chart's mirror Secret;
+- points the API container's `DEX_CLIENT_SECRET` env at the *same* `valueFrom` the operator provided — so the operator manages one Secret in one place.
+
+Setting both `dex.config.staticClients[0].secret` **and** a `DEX_CLIENT_SECRET` entry in `dex.envVars` is ambiguous and fails fast.
 
 ### Bundled Dex install steps
 
