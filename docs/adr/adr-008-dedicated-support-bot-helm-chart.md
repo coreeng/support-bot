@@ -8,6 +8,9 @@
 ## Context
 
 We usually deploy applications using the generic `core-platform-app` chart.
+`core-platform-app` is CECG's shared application Helm chart, maintained in
+[`coreeng/core-platform-assets`](https://github.com/coreeng/core-platform-assets/tree/main/charts/core-platform-app),
+and is the default chart used by CECG repositories for internal application deployments.
 
 Support Bot is a different case. It is not only deployed from this repository into our own environments; it is also published as a **product artifact** for downstream installation. This repository already publishes both:
 
@@ -47,11 +50,23 @@ This treats the Helm chart as part of the Support Bot product surface.
 
 It allows the chart to represent Support Bot-specific configuration and to package the product's delivered components together, instead of forcing that shape into a generic chart intended for arbitrary applications.
 
+### Use `core-platform-app` internally and publish the Support Bot chart externally
+
+This would keep this repository's P2P deployments aligned with the usual CECG deployment model by using
+`core-platform-app` for internal environments, while still treating the Support Bot Helm chart as a published OSS
+artifact for downstream consumers.
+
+In that model, the published chart would need its own validation and release gates, either inside the existing P2P flow
+or as a separate delivery unit if API, UI, and Helm are split later.
+
+This is a credible future direction, but it creates two deployment surfaces that must stay semantically aligned.
+
 ---
 
 ## Decision
 
-Support Bot will keep a **dedicated Helm chart** rather than reuse the generic `core-platform-app` chart.
+Support Bot will keep a **dedicated published Helm chart** rather than replace the public chart with the generic
+`core-platform-app` chart.
 
 This is an intentional exception to the normal platform default.
 
@@ -73,4 +88,3 @@ This ADR records the chart strategy only. It does **not** imply any immediate re
 
 - Support Bot owns the maintenance of its chart.
 - This remains an intentional exception to the usual platform-chart reuse pattern.
-
