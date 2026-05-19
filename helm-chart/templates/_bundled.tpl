@@ -78,12 +78,16 @@ redirectURIs: [] and Dex rejects every OAuth callback at runtime with
 {{- end -}}
 
 {{/*
-Validate that ui.env declares AUTH_SECRET (or NEXTAUTH_SECRET) when the UI is enabled.
-NextAuth requires the secret at startup; without it the UI crash-loops at runtime.
-Either env-var name is accepted; value can be inline or via valueFrom (we don't inspect).
+Validate that ui.env declares AUTH_SECRET (or NEXTAUTH_SECRET) when the UI is
+enabled alongside bundled Dex. Scoped to the bundled-auth posture so existing
+standalone-UI installs that inject AUTH_SECRET out-of-band (mutating webhook,
+post-install patch, GitOps overlay) keep working on upgrade. NextAuth still
+requires the secret at startup either way; without it the UI crash-loops.
+Either env-var name is accepted; value can be inline or via valueFrom (we
+don't inspect).
 */}}
 {{- define "support-bot.ui.validateAuthSecret" -}}
-{{- if .Values.ui.enabled -}}
+{{- if and .Values.ui.enabled .Values.dex.enabled -}}
 {{- $found := false -}}
 {{- range .Values.ui.env | default list -}}
 {{- if or (eq .name "AUTH_SECRET") (eq .name "NEXTAUTH_SECRET") -}}
@@ -91,7 +95,7 @@ Either env-var name is accepted; value can be inline or via valueFrom (we don't 
 {{- end -}}
 {{- end -}}
 {{- if not $found -}}
-{{- fail "ui.env must include AUTH_SECRET (or NEXTAUTH_SECRET) when ui.enabled=true (generate with: openssl rand -base64 32)" -}}
+{{- fail "ui.env must include AUTH_SECRET (or NEXTAUTH_SECRET) when ui.enabled=true and dex.enabled=true (generate with: openssl rand -base64 32)" -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

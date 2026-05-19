@@ -50,3 +50,26 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: NEXTAUTH_URL
+
+  - it: renders without AUTH_SECRET in ui.env when dex.enabled=false (operator may inject out-of-band)
+    set:
+      ui.enabled: true
+      ui.env: []
+    asserts:
+      - isKind:
+          of: Deployment
+
+  - it: fails when ui.enabled=true and dex.enabled=true but AUTH_SECRET is missing from ui.env
+    set:
+      ui.enabled: true
+      publicWebOrigin: https://support-bot.example
+      dex.enabled: true
+      dex.config.issuer: https://dex.example
+      dex.config.staticClients:
+        - id: support-bot
+          name: Support Bot
+          secret: inline-test-secret
+      ui.env: []
+    asserts:
+      - failedTemplate:
+          errorPattern: "ui.env must include AUTH_SECRET"
