@@ -113,8 +113,14 @@ lint-ui: ## Lint UI Dockerfiles
 .PHONY: lint-app
 lint-app: lint-api lint-ui ## Lint all Dockerfiles
 
+.PHONY: helm-chart-deps
+helm-chart-deps: ## Vendor the chart's subchart dependencies into helm-chart/charts
+	@helm repo add dex https://charts.dexidp.io >/dev/null 2>&1 || true
+	@helm repo update dex >/dev/null
+	@helm dependency build $(HELM_CHART_PATH) >/dev/null
+
 .PHONY: lint-chart
-lint-chart: ## Lint the Helm chart
+lint-chart: helm-chart-deps ## Lint the Helm chart
 	helm lint $(HELM_CHART_PATH)
 
 .PHONY: ensure-helm-unittest
@@ -142,7 +148,7 @@ test-chart: ensure-helm-unittest ## Run Helm chart unit tests
 	helm unittest $(HELM_CHART_PATH)
 
 .PHONY: validate-chart-values
-validate-chart-values: ## Validate Helm values files against the chart schema by linting and rendering
+validate-chart-values: helm-chart-deps ## Validate Helm values files against the chart schema by linting and rendering
 	@set -eu; \
 	check_values() { \
 		name="$$1"; \

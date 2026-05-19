@@ -11,6 +11,9 @@ tests:
     set:
       ui.enabled: true
       publicWebOrigin: "https://support-bot.example"
+      ui.env:
+        - name: AUTH_SECRET
+          value: test
     asserts:
       - isKind:
           of: Deployment
@@ -23,6 +26,9 @@ tests:
   - it: renders the default UI container and cache volume when enabled
     set:
       ui.enabled: true
+      ui.env:
+        - name: AUTH_SECRET
+          value: test
     asserts:
       - equal:
           path: spec.template.spec.containers[0].ports[0].containerPort
@@ -36,6 +42,9 @@ tests:
   - it: does not append NEXTAUTH_URL without publicWebOrigin
     set:
       ui.enabled: true
+      ui.env:
+        - name: AUTH_SECRET
+          value: test
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].env
