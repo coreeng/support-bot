@@ -1,7 +1,7 @@
 # ADR: Dedicated Support Bot Helm Chart
 
 **Date:** 2026-04-30
-**Status:** Proposed
+**Status:** Accepted
 
 ---
 
