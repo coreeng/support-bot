@@ -65,11 +65,19 @@ deploy_db() {
 ensure_chart_deps() {
   local chart_path="$1"
   # Chart.yaml declares dex as a subchart dependency. Helm requires the dep to
-  # be present in charts/ before render, even when the active values disable it
-  # via `dex.enabled: false`. `helm dependency build` uses Chart.lock to fetch
-  # the pinned version; the repo must be registered locally first.
+  # be present in charts/ before render, even when the active values disable
+  # it via `dex.enabled: false`. Skip the fetch if it's already vendored
+  # (e.g. baked into an image build, which is necessary for pods that run
+  # `helm install` without outbound access to charts.dexidp.io). Helm may
+  # leave the dep as a tarball (charts/dex-<ver>.tgz) or unpacked
+  # (charts/dex/Chart.yaml).
+  if compgen -G "${chart_path}/charts/dex-*.tgz" > /dev/null 2>&1 \
+     || [[ -f "${chart_path}/charts/dex/Chart.yaml" ]]; then
+    log "Chart dependencies already vendored at ${chart_path}/charts"
+    return 0
+  fi
   log "Vendoring chart dependencies for ${chart_path}..."
-  helm repo add dex https://charts.dexidp.io >/dev/null 2>&1 || true
+  helm repo add dex https://charts.dexidp.io >/dev/null
   helm repo update dex >/dev/null
   helm dependency build "$chart_path" >/dev/null
 }

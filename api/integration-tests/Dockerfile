@@ -42,6 +42,12 @@ COPY --from=builder /home/gradle/project/integration-tests/build/libs/integratio
 COPY helm-chart helm-chart
 COPY api/scripts scripts
 
+# Pre-vendor the Dex subchart so `helm install` inside the integration-tests
+# pod doesn't need outbound access to charts.dexidp.io at runtime.
+RUN helm repo add dex https://charts.dexidp.io \
+    && helm dependency build helm-chart \
+    && rm -rf /root/.config/helm /root/.cache/helm
+
 ENV INTEGRATION_TEST_CONFIG=integration-test-docker.yaml
 
 ENTRYPOINT ["java", "-jar", "integration-tests.jar", "execute", "-p", "com.coreeng.supportbot"]
