@@ -358,7 +358,6 @@ dex:
 #   - platform-integration.static-user.users.*            → ROLE_ESCALATION (escalation user) and
 #                                                           tenant team (tenant user, no role)
 #   - platform-integration.teams-scraping.static.teams    → bundled-escalation, bundled-tenant
-#   - enums.escalation-teams                              → concatenated with user-supplied entries
 #
 # passwordHash MUST be set explicitly per role (no defaults) — bcrypt; generate with:
 #   htpasswd -bnBC 10 "" 'changeme' | tr -d ':\n' | sed 's/^\$2y/\$2a/'

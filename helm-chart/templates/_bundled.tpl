@@ -149,7 +149,6 @@ Returns the user's configMap.config merged with bundled.staticUsers fan-out:
   - team.leadership.static.members   ← leadership user
   - platform-integration.static-user.users.bundled-{escalation,tenant}
   - platform-integration.teams-scraping.static.teams (bundled-escalation, bundled-tenant)
-  - enums.escalation-teams           ← CONCAT (user entries + bundled-escalation)
 Returns user's configMap.config unchanged when bundled.staticUsers.enabled=false.
 Emit with toYaml.
 */}}
@@ -199,16 +198,6 @@ Emit with toYaml.
 {{- $_ := set $ts "static" $tsStatic -}}
 {{- $_ := set $pi "teams-scraping" $ts -}}
 {{- $_ := set $cfg "platform-integration" $pi -}}
-
-{{- /* enums.escalation-teams: CONCAT (user entries first, bundled appended). */ -}}
-{{- $enums := index $cfg "enums" | default dict -}}
-{{- $escTeams := index $enums "escalation-teams" | default list -}}
-{{- $escTeams = append $escTeams (dict
-    "label" "Bundled Escalation"
-    "code" "bundled-escalation"
-    "slack-group-id" "") -}}
-{{- $_ := set $enums "escalation-teams" $escTeams -}}
-{{- $_ := set $cfg "enums" $enums -}}
 {{- end -}}
 {{- toYaml $cfg -}}
 {{- end -}}
