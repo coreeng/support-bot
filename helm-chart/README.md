@@ -247,7 +247,7 @@ dex:
 
 When the chart sees the `DEX_CLIENT_SECRET` envVars entry it:
 
-- writes `secret: $DEX_CLIENT_SECRET` into the rendered Dex config Secret (Dex's `expand_env` feature flag is default-true in v2.44.0, so `os.ExpandEnv` resolves the placeholder at pod startup);
+- writes `secretEnv: DEX_CLIENT_SECRET` into the rendered Dex config Secret so Dex reads the secret directly from the env var at runtime (Dex 2.40+ does not env-expand the YAML config by default, so the `$DEX_CLIENT_SECRET` placeholder approach is not viable);
 - skips the `client-secret` key in the chart's mirror Secret;
 - points the API container's `DEX_CLIENT_SECRET` env at the *same* `valueFrom` the operator provided — so the operator manages one Secret in one place.
 
