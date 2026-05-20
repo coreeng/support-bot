@@ -18,7 +18,7 @@ plugins {
     checkstyle
 
     id("net.ltgt.errorprone") version "4.3.0"
-    id("org.springframework.boot") version "3.5.14"
+    id("org.springframework.boot") version "4.0.6"
     id("io.spring.dependency-management") version "1.1.7"
 
     id("org.flywaydb.flyway") version "12.0.0"
@@ -65,9 +65,9 @@ extra["asm.version"] = "9.9.1"
 extra["commons-lang3.version"] = "3.18.0"
 extra["netty.version"] = "4.1.133.Final"
 extra["postgresql.version"] = "42.7.11"
-extra["spring-framework.version"] = "6.2.18"
+extra["spring-framework.version"] = "7.0.6"
 
-val lombokVersion = "1.18.42"
+val lombokVersion = "1.18.46"
 val errorProneVersion = "2.47.0"
 val nullAwayVersion = "0.13.1"
 
@@ -115,7 +115,7 @@ dependencies {
     implementation("com.slack.api:bolt-jakarta-servlet:1.45.4")
     compileOnly("jakarta.websocket:jakarta.websocket-client-api:2.2.0")
     implementation("org.glassfish.tyrus.bundles:tyrus-standalone-client:2.2.0")
-    implementation("com.google.guava:guava:33.4.0-jre")
+    implementation("com.google.guava:guava:33.6.0-jre")
     implementation("org.kohsuke:github-api:1.330")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.84")
     implementation("com.github.ben-manes.caffeine:caffeine")
@@ -129,7 +129,7 @@ dependencies {
     implementation("com.google.apis:google-api-services-cloudidentity:v1-rev20241208-2.0.0")
 
     implementation("com.microsoft.graph:microsoft-graph:6.36.0")
-    implementation("com.azure.spring:spring-cloud-azure-starter:5.22.0")
+    implementation("com.azure.spring:spring-cloud-azure-starter:7.2.0")
 
     implementation("dev.langchain4j:langchain4j-vertex-ai-gemini:0.36.2")
     implementation("dev.langchain4j:langchain4j:0.36.2")
