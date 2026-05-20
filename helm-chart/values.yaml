@@ -350,14 +350,17 @@ dex:
   envVars: []
 
 # -------------------- Mode (b): Bundled static users --------------------
-# Set enabled: true to pre-seed four users so login → role works without an
-# external IdP. The chart fans each entry out into:
-#   - Dex config Secret                                   (enablePasswordDB: true + staticPasswords[])
-#   - configMap.config.team.support.static.members        → ROLE_SUPPORT_ENGINEER
-#   - configMap.config.team.leadership.static.members     → ROLE_LEADERSHIP
-#   - platform-integration.static-user.users.*            → ROLE_ESCALATION (escalation user) and
-#                                                           tenant team (tenant user, no role)
-#   - platform-integration.teams-scraping.static.teams    → bundled-escalation, bundled-tenant
+# Set enabled: true to pre-seed four users in Dex so they can log in without
+# an external IdP. The chart only writes these into Dex's `staticPasswords`
+# (enablePasswordDB: true) — it does NOT touch the API's team / role config.
+#
+# To get login → role end-to-end, configure the API side yourself in
+# configMap.config:
+#   - team.support.static.{enabled,members}        → ROLE_SUPPORT_ENGINEER
+#   - team.leadership.static.{enabled,members}     → ROLE_LEADERSHIP
+#   - platform-integration.static-user.users.*     → ROLE_ESCALATION + tenant team
+#   - platform-integration.teams-scraping.static   → enable + map team codes
+# See README.md "Local kind end-to-end walkthrough" for a full worked example.
 #
 # passwordHash MUST be set explicitly per role (no defaults) — bcrypt; generate with:
 #   htpasswd -bnBC 10 "" 'changeme' | tr -d ':\n' | sed 's/^\$2y/\$2a/'

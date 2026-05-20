@@ -170,7 +170,9 @@ The chart auto-derives Dex `redirectURIs` from `publicWebOrigin` (both `/login/o
 
 ### Mode (b) — bundled static users
 
-Pre-seed four users (one per role) without any external IdP. Useful for demos, local tests, ephemeral environments. Each user logs in at Dex's "Log in with Email" form; the chart fans the four emails out into both Dex (`staticPasswords`) and the API's role wiring (`team.support.static`, `team.leadership.static`, `platform-integration.static-user`, `enums.escalation-teams`) so login → role works end-to-end.
+Pre-seed four users (one per role) in Dex without any external IdP. Useful for demos, local tests, ephemeral environments. Each user logs in at Dex's "Log in with Email" form.
+
+`bundled.staticUsers` only writes into Dex's `staticPasswords` — it does **not** touch the API's team / role config. To get login → role end-to-end, wire `configMap.config.team.support.static` / `team.leadership.static` / `platform-integration.static-user` / `platform-integration.teams-scraping.static` yourself; see the [Local kind end-to-end walkthrough](#local-kind-end-to-end-walkthrough) for a complete worked overlay.
 
 ```yaml
 publicWebOrigin: http://localhost:3000
@@ -420,12 +422,49 @@ env:
   - name: SLACK_TICKET_CHANNEL_ID
     value: C0000000000
 
-# Disable Slack live wiring so the pod can start without a real workspace.
+# Disable Slack live wiring so the pod can start without a real workspace, and
+# wire the four bundled.staticUsers (below) into the API's team / role config.
+# bundled.staticUsers itself only pre-seeds Dex; the role mapping is your job.
 configMap:
   config:
     slack:
       mode: http
       enable-request-verification: false
+    team:
+      support:
+        name: Support
+        code: support-team
+        group-ref: "static:bundled-support"
+        static:
+          enabled: true
+          members:
+            - email: support@supportbot.local
+              slack-id: bundled-support
+      leadership:
+        name: Support Leadership
+        code: support-leads
+        group-ref: "static:bundled-leadership"
+        static:
+          enabled: true
+          members:
+            - email: leadership@supportbot.local
+              slack-id: bundled-leadership
+    platform-integration:
+      static-user:
+        enabled: true
+        users:
+          bundled-escalation:
+            - escalation@supportbot.local
+          bundled-tenant:
+            - tenant@supportbot.local
+      teams-scraping:
+        static:
+          enabled: true
+          teams:
+            - name: bundled-escalation
+              group-ref: bundled-escalation
+            - name: bundled-tenant
+              group-ref: bundled-tenant
 
 ui:
   enabled: true
@@ -549,7 +588,7 @@ kind delete cluster --name support-bot
 
 ### Notes
 
-- This recipe exercises **mode (b)** — bundled Dex with `staticUsers`. For **mode (a)** (external IdP via `dex.config.connectors`), drop the `bundled.staticUsers` block, set `dex.config.connectors` instead (Google / Microsoft / LDAP / generic OIDC), and team membership comes from `platform-integration.static-user` / Azure / GCP rather than the chart's fan-out. See [Bundled Dex](#bundled-dex) above.
+- This recipe exercises **mode (b)** — bundled Dex with `staticUsers`. For **mode (a)** (external IdP via `dex.config.connectors`), drop the `bundled.staticUsers` block, set `dex.config.connectors` instead (Google / Microsoft / LDAP / generic OIDC), and source team membership from `platform-integration.static-user` / Azure / GCP / Slack-resolved usergroups. See [Bundled Dex](#bundled-dex) above.
 - The Spring `dex` profile is not active; the chart's `configMap.config` overlay handles `slack.mode: http` and `enable-request-verification: false` directly so the API runs without any profile flag.
 - The four seeded users use the same password (`changeme` from step 4) — fine for local kind, do not reuse for anything you'd lose sleep over.
 - If something explodes outside the troubleshooting table, capture `kubectl logs deploy/support-bot --previous` and `kubectl logs deploy/support-bot-dex` — those two cover the vast majority of bring-up failures.

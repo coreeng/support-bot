@@ -1,5 +1,6 @@
 {{/*
-Helpers for the bundled Dex / static-users wiring.
+Helpers for the bundled Dex subchart and its companion validators (UI auth-secret,
+bundled.staticUsers passwordHash).
 See values.yaml `dex:` and `bundled:` blocks for the user-facing surface.
 */}}
 
@@ -101,34 +102,6 @@ don't inspect).
 {{- end -}}
 
 {{/*
-The four static users formatted for Dex `staticPasswords:` (YAML list).
-Returns empty string when bundled.staticUsers.enabled=false.
-*/}}
-{{- define "support-bot.bundled.staticPasswords" -}}
-{{- if .Values.bundled.staticUsers.enabled -}}
-{{- range $role := list "leadership" "support" "escalation" "tenant" }}
-{{- $u := index $.Values.bundled.staticUsers $role }}
-- email: {{ $u.email | quote }}
-  hash: {{ $u.passwordHash | quote }}
-  username: {{ $role | quote }}
-  userID: {{ $u.userID | quote }}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Default Dex redirectURIs derived from publicWebOrigin so the user doesn't repeat them.
-Used when dex.config.staticClients[0].redirectURIs is empty.
-*/}}
-{{- define "support-bot.dex.defaultRedirectURIs" -}}
-{{- $o := .Values.publicWebOrigin -}}
-{{- if $o }}
-- {{ printf "%s/login/oauth2/code/dex" $o | quote }}
-- {{ printf "%s/api/oauth/callback/dex" $o | quote }}
-{{- end -}}
-{{- end -}}
-
-{{/*
 In-cluster Dex base URL (svc FQDN). Used for DEX_INTERNAL_BASE_URL on the API so
 server-to-server /token /keys /userinfo calls stay inside the cluster.
 */}}
@@ -143,61 +116,3 @@ Name of the K8s Secret holding the Dex OAuth client secret consumed by the API.
 {{ include "support-bot.fullname" . }}-dex-client
 {{- end -}}
 
-{{/*
-Returns the user's configMap.config merged with bundled.staticUsers fan-out:
-  - team.support.static.members      ← support user
-  - team.leadership.static.members   ← leadership user
-  - platform-integration.static-user.users.bundled-{escalation,tenant}
-  - platform-integration.teams-scraping.static.teams (bundled-escalation, bundled-tenant)
-Returns user's configMap.config unchanged when bundled.staticUsers.enabled=false.
-Emit with toYaml.
-*/}}
-{{- define "support-bot.configmap.merged" -}}
-{{- $cfg := deepCopy (.Values.configMap.config | default dict) -}}
-{{- if .Values.bundled.staticUsers.enabled -}}
-{{- $b := .Values.bundled.staticUsers -}}
-
-{{- /* team block */ -}}
-{{- $team := index $cfg "team" | default dict -}}
-{{- $teamSupport := index $team "support" | default dict -}}
-{{- $supportStatic := index $teamSupport "static" | default dict -}}
-{{- $supportMembers := index $supportStatic "members" | default list -}}
-{{- $supportMembers = append $supportMembers (dict "email" $b.support.email "slack-id" "bundled-support") -}}
-{{- $_ := set $supportStatic "enabled" true -}}
-{{- $_ := set $supportStatic "members" $supportMembers -}}
-{{- $_ := set $teamSupport "static" $supportStatic -}}
-{{- $_ := set $team "support" $teamSupport -}}
-
-{{- $teamLeadership := index $team "leadership" | default dict -}}
-{{- $leadershipStatic := index $teamLeadership "static" | default dict -}}
-{{- $leadershipMembers := index $leadershipStatic "members" | default list -}}
-{{- $leadershipMembers = append $leadershipMembers (dict "email" $b.leadership.email "slack-id" "bundled-leadership") -}}
-{{- $_ := set $leadershipStatic "enabled" true -}}
-{{- $_ := set $leadershipStatic "members" $leadershipMembers -}}
-{{- $_ := set $teamLeadership "static" $leadershipStatic -}}
-{{- $_ := set $team "leadership" $teamLeadership -}}
-{{- $_ := set $cfg "team" $team -}}
-
-{{- /* platform-integration block */ -}}
-{{- $pi := index $cfg "platform-integration" | default dict -}}
-{{- $staticUser := index $pi "static-user" | default dict -}}
-{{- $users := index $staticUser "users" | default dict -}}
-{{- $_ := set $users "bundled-escalation" (list $b.escalation.email) -}}
-{{- $_ := set $users "bundled-tenant" (list $b.tenant.email) -}}
-{{- $_ := set $staticUser "enabled" true -}}
-{{- $_ := set $staticUser "users" $users -}}
-{{- $_ := set $pi "static-user" $staticUser -}}
-
-{{- $ts := index $pi "teams-scraping" | default dict -}}
-{{- $tsStatic := index $ts "static" | default dict -}}
-{{- $teams := index $tsStatic "teams" | default list -}}
-{{- $teams = append $teams (dict "name" "bundled-escalation" "group-ref" "bundled-escalation") -}}
-{{- $teams = append $teams (dict "name" "bundled-tenant"     "group-ref" "bundled-tenant") -}}
-{{- $_ := set $tsStatic "enabled" true -}}
-{{- $_ := set $tsStatic "teams" $teams -}}
-{{- $_ := set $ts "static" $tsStatic -}}
-{{- $_ := set $pi "teams-scraping" $ts -}}
-{{- $_ := set $cfg "platform-integration" $pi -}}
-{{- end -}}
-{{- toYaml $cfg -}}
-{{- end -}}
