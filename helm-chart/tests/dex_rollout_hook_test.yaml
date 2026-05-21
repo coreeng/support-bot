@@ -10,12 +10,11 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: does not render when dex.rolloutHook.enabled is false
+  - it: does not render by default when dex.enabled is true (opt-in)
     template: templates/dex-rollout-hook.yaml
     set:
       publicWebOrigin: https://support-bot.example
       dex.enabled: true
-      dex.rolloutHook.enabled: false
       dex.config.issuer: https://dex.example
       dex.config.staticClients:
         - id: support-bot
@@ -25,11 +24,12 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: renders 4 documents when enabled
+  - it: renders 4 documents when dex.rolloutHook.enabled is true
     template: templates/dex-rollout-hook.yaml
     set:
       publicWebOrigin: https://support-bot.example
       dex.enabled: true
+      dex.rolloutHook.enabled: true
       dex.config.issuer: https://dex.example
       dex.config.staticClients:
         - id: support-bot
@@ -44,6 +44,7 @@ tests:
     set:
       publicWebOrigin: https://support-bot.example
       dex.enabled: true
+      dex.rolloutHook.enabled: true
       dex.config.issuer: https://dex.example
       dex.config.staticClients:
         - id: support-bot
@@ -68,6 +69,7 @@ tests:
     set:
       publicWebOrigin: https://support-bot.example
       dex.enabled: true
+      dex.rolloutHook.enabled: true
       dex.config.issuer: https://dex.example
       dex.config.staticClients:
         - id: support-bot

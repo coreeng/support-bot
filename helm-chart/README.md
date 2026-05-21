@@ -227,10 +227,10 @@ The chart fails at `helm install` time — not at pod-runtime — if any of thes
 
 ### Pod rollout on config change
 
-`helm upgrade` will not roll the API or Dex pods on its own when only the rendered Dex config Secret or the mirrored Dex client Secret change — the Secret contents change but the pod-template stays byte-identical. The chart wires this up automatically:
+`helm upgrade` will not roll the API or Dex pods on its own when only the rendered Dex config Secret or the mirrored Dex client Secret change — the Secret contents change but the pod-template stays byte-identical.
 
-- **API pod**: rendered with `checksum/dex-config` and `checksum/dex-client` annotations on its pod template, so any change to either Secret rolls the API.
-- **Dex pod**: the dex/dex subchart owns that Deployment and Helm doesn't let a parent chart inject computed annotations into a subchart's pod template. Instead the chart adds a `post-install,post-upgrade` Job (RBAC-scoped to only patch the bundled Dex Deployment) that sets the same checksum annotations on the Dex pod template. The patch is idempotent: when the checksum is unchanged, the pod doesn't roll. Disable with `dex.rolloutHook.enabled: false` on clusters that can't pull a kubectl image — restart Dex manually instead.
+- **API pod**: handled automatically. Rendered with `checksum/dex-config` and `checksum/dex-client` annotations on its pod template, so any change to either Secret rolls the API.
+- **Dex pod**: the dex/dex subchart owns that Deployment and Helm doesn't let a parent chart inject computed annotations into a subchart's pod template. The chart ships an **opt-in** `post-install,post-upgrade` Job — set `dex.rolloutHook.enabled: true` — that patches the Dex pod template with the same checksum annotations (RBAC-scoped to only get/patch the bundled Dex Deployment). The patch is idempotent: when the checksum is unchanged, the pod doesn't roll. The hook is off by default because it needs a kubectl image at install time, which is unhelpful for air-gapped clusters; with it off, restart Dex by hand after any config change (`kubectl rollout restart deployment/support-bot-dex`).
 
 ### Externalising the Dex client secret
 
@@ -291,13 +291,9 @@ dex:
   image:
     repository: <private-registry>/dexidp/dex                 # Dex (subchart)
     tag: v2.44.0
-  rolloutHook:
-    image:
-      repository: <private-registry>/bitnami/kubectl          # post-upgrade rollout hook
-      tag: "1.30"
 ```
 
-If you can't mirror a kubectl image, set `dex.rolloutHook.enabled: false` and roll Dex by hand after a config change (`kubectl rollout restart deployment/support-bot-dex`).
+`dex.rolloutHook` (post-upgrade Dex restart, see [Pod rollout on config change](#pod-rollout-on-config-change)) is off by default — so no kubectl image to mirror unless you opt in. If you want it enabled in an air-gapped install, also override `dex.rolloutHook.image.repository` to your internal kubectl mirror.
 
 Image pull secrets are **per-chart** — the top-level `imagePullSecrets` only attaches to the API/UI pods; the Dex pod is owned by the subchart and reads its own `dex.imagePullSecrets` field. Set both if the same Secret covers all three:
 

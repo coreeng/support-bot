@@ -336,18 +336,21 @@ dex:
   # ----------------------------------------------------------------
   # Helm doesn't let a parent chart inject computed annotations into a
   # subchart's pod template, so on its own a `helm upgrade` that only changes
-  # the rendered Dex config Secret would not roll the Dex pod and Dex would
-  # keep serving the old config until someone restarted it manually.
+  # the rendered Dex config Secret will not roll the Dex pod and Dex will
+  # keep serving the old config until someone restarts it manually.
   #
-  # When enabled (default), the chart adds a post-install / post-upgrade Job
-  # that patches the Dex Deployment's pod-template with deterministic
-  # `checksum/dex-config` and `checksum/dex-client` annotations. The patch
-  # is idempotent: when the checksum is unchanged the pod doesn't roll.
+  # Opt-in (disabled by default) — the hook needs a kubectl image at install
+  # time, which is unhelpful for air-gapped clusters and for operators who'd
+  # rather restart Dex themselves. Set enabled: true and the chart adds a
+  # post-install / post-upgrade Job that patches the Dex Deployment's
+  # pod-template with deterministic `checksum/dex-config` and
+  # `checksum/dex-client` annotations; the patch is idempotent so the pod
+  # only rolls when the checksum actually changes.
   #
-  # Disable on air-gapped clusters that can't pull the kubectl image, and
-  # restart Dex by hand instead (`kubectl rollout restart deployment/<name>`).
+  # With the hook off, restart Dex manually after any Dex-config or static-
+  # user change (`kubectl rollout restart deployment/support-bot-dex`).
   rolloutHook:
-    enabled: true
+    enabled: false
     image:
       repository: bitnami/kubectl
       tag: "1.30"
