@@ -3,6 +3,11 @@
 #   helm upgrade --install ... -f values.yaml -f values-integrationtests.yaml -f values-integrationtests-oidc.yaml
 # Requires Dex values with issuer matching DEX_ISSUER_URI (http://dex.support-bot-integration.svc.cluster.local:5556).
 
+# Integration tests run Dex out-of-band (helm_dex.sh / dex-deploy-integration), so opt out of
+# the support-bot chart's bundled Dex to avoid two Dex installs in the namespace.
+dex:
+  enabled: false
+
 env:
   - name: SPRING_PROFILES_ACTIVE
     value: integrationtests,integrationtests-oidc

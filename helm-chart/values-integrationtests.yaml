@@ -1,3 +1,8 @@
+# Plain integration tests (no OIDC). Dex (when used) is deployed out-of-band by
+# dex-deploy-integration; opt out of the support-bot chart's bundled Dex.
+dex:
+  enabled: false
+
 env:
   - name: SPRING_PROFILES_ACTIVE
     value: integrationtests

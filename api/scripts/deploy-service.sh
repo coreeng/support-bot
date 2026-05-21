@@ -62,8 +62,29 @@ deploy_db() {
   reset_db_schema "$ns" "$release"
 }
 
+ensure_chart_deps() {
+  local chart_path="$1"
+  # Chart.yaml declares dex as a subchart dependency. Helm requires the dep to
+  # be present in charts/ before render, even when the active values disable
+  # it via `dex.enabled: false`. Skip the fetch if it's already vendored
+  # (e.g. baked into an image build, which is necessary for pods that run
+  # `helm install` without outbound access to charts.dexidp.io). Helm may
+  # leave the dep as a tarball (charts/dex-<ver>.tgz) or unpacked
+  # (charts/dex/Chart.yaml).
+  if compgen -G "${chart_path}/charts/dex-*.tgz" > /dev/null 2>&1 \
+     || [[ -f "${chart_path}/charts/dex/Chart.yaml" ]]; then
+    log "Chart dependencies already vendored at ${chart_path}/charts"
+    return 0
+  fi
+  log "Vendoring chart dependencies for ${chart_path}..."
+  helm repo add dex https://charts.dexidp.io >/dev/null
+  helm repo update dex >/dev/null
+  helm dependency build "$chart_path" >/dev/null
+}
+
 deploy_service() {
   local ns="$1" release="$2" chart_path="$3" image_repo="$4" image_tag="$5"
+  ensure_chart_deps "$chart_path"
   log "Installing service [${release}] in ${ns} from ${chart_path}..."
   local args=(upgrade --install "$release" "$chart_path" -n "$ns" \
     --set image.repository="$image_repo" \

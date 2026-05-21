@@ -12,7 +12,5 @@ metadata:
 data:
 #trivy:ignore:AVD-KSV-0109 ConfigMap contains placeholder refs; real secrets are provided via K8s Secrets
   application.yaml: |
-    {{- with .Values.configMap.config }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
+    {{- toYaml (.Values.configMap.config | default dict) | nindent 4 }}
 {{- end }}

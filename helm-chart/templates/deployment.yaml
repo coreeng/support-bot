@@ -11,10 +11,17 @@ spec:
       {{- include "support-bot.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
+        {{- /* Roll the API pod when Dex client secret or rendered Dex config change,
+               otherwise inline-secret rotation and issuer/redirectURI updates would
+               apply via Helm without the API picking them up. */}}
+        {{- if .Values.dex.enabled }}
+        checksum/dex-client: {{ include (print $.Template.BasePath "/dex-client-secret.yaml") . | sha256sum }}
+        checksum/dex-config: {{ include (print $.Template.BasePath "/dex-config-secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       labels:
         {{- include "support-bot.selectorLabels" . | nindent 8 }}
     spec:
@@ -44,6 +51,21 @@ spec:
             {{- $apiEnv := .Values.env | default list }}
             {{- if .Values.publicWebOrigin }}
             {{- $apiEnv = append $apiEnv (dict "name" "UI_ORIGIN" "value" .Values.publicWebOrigin) }}
+            {{- end }}
+            {{- if .Values.dex.enabled }}
+            {{- $apiEnv = append $apiEnv (dict "name" "DEX_CLIENT_ID" "valueFrom" (dict "secretKeyRef" (dict "name" (include "support-bot.dex.clientSecretName" .) "key" "client-id"))) }}
+            {{- if eq (include "support-bot.dex.clientSecretMode" .) "external" }}
+            {{- /* Reuse the operator-provided secretKeyRef (or value:) from dex.envVars verbatim. */ -}}
+            {{- range .Values.dex.envVars }}
+            {{- if eq (.name | default "") "DEX_CLIENT_SECRET" }}
+            {{- $apiEnv = append $apiEnv . }}
+            {{- end }}
+            {{- end }}
+            {{- else }}
+            {{- $apiEnv = append $apiEnv (dict "name" "DEX_CLIENT_SECRET" "valueFrom" (dict "secretKeyRef" (dict "name" (include "support-bot.dex.clientSecretName" .) "key" "client-secret"))) }}
+            {{- end }}
+            {{- $apiEnv = append $apiEnv (dict "name" "DEX_ISSUER_URI" "value" .Values.dex.config.issuer) }}
+            {{- $apiEnv = append $apiEnv (dict "name" "DEX_INTERNAL_BASE_URL" "value" (include "support-bot.dex.internalBaseURL" .)) }}
             {{- end }}
             {{- toYaml $apiEnv | nindent 12 }}
             {{- if .Values.analysisBundle.enabled }}
