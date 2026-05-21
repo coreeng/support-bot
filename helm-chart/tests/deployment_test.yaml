@@ -45,3 +45,10 @@ tests:
           content:
             name: config
             mountPath: /app/config
+
+  - it: omits dex checksum annotations when dex.enabled is false
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/dex-config"]
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/dex-client"]

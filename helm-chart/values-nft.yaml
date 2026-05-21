@@ -2,6 +2,18 @@ configMap:
   create: false
   enabled: false
 
+# NFT tests don't use Dex; opt out of the support-bot chart's bundled Dex.
+dex:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 0.5
+    memory: 512Mi
+  limits:
+    memory: 750Mi
+
+
 env:
   - name: JAVA_OPTS
     value: "-Xms512m -Xmx512m"

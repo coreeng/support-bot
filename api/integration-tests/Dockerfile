@@ -31,6 +31,13 @@ COPY api/integration-tests/src integration-tests/src
 
 RUN ./gradlew :integration-tests:jar --no-daemon
 
+# Pre-vendor the Dex subchart into helm-chart/charts/ on the builder (which
+# runs as root and has outbound network) so the integration-tests pod can
+# install the chart without reaching charts.dexidp.io at runtime.
+COPY helm-chart helm-chart
+RUN helm repo add dex https://charts.dexidp.io \
+    && helm dependency build helm-chart
+
 FROM registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24
 WORKDIR /app
 
@@ -39,7 +46,7 @@ COPY --from=builder /usr/local/bin/kubectl /usr/local/bin/kubectl
 
 COPY --from=builder /home/gradle/project/integration-tests/build/libs/integration-tests.jar .
 
-COPY helm-chart helm-chart
+COPY --from=builder /home/gradle/project/helm-chart helm-chart
 COPY api/scripts scripts
 
 ENV INTEGRATION_TEST_CONFIG=integration-test-docker.yaml
