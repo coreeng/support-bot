@@ -1,0 +1,119 @@
+{{- if and .Values.dex.enabled .Values.dex.rolloutHook.enabled }}
+{{- /*
+  Roll the bundled Dex pod on Helm upgrade when the rendered config Secret or
+  the mirrored client Secret changes.
+
+  Why a hook Job instead of a pod-template annotation: the Dex Deployment is
+  owned by the dex/dex subchart, and Helm doesn't let a parent chart inject
+  computed annotations into a subchart's pod template. So we patch the
+  Deployment in place via a post-install/post-upgrade Job, setting a
+  spec.template.metadata.annotations.checksum/dex-config field. The patch is
+  idempotent: when the checksum matches what's already on the Deployment the
+  patch is a no-op and Kubernetes does not roll the pod.
+
+  Disable with dex.rolloutHook.enabled: false (e.g. air-gapped clusters that
+  cannot pull the kubectl image — operators can `kubectl rollout restart` by
+  hand instead).
+*/}}
+{{- $hookName := printf "%s-dex-rollout" (include "support-bot.fullname" .) -}}
+{{- $dexDeployment := .Values.dex.fullnameOverride | default "support-bot-dex" -}}
+{{- $configHash := include (print $.Template.BasePath "/dex-config-secret.yaml") . | sha256sum -}}
+{{- $clientHash := include (print $.Template.BasePath "/dex-client-secret.yaml") . | sha256sum -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $hookName }}
+  labels:
+    {{- include "support-bot.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $hookName }}
+  labels:
+    {{- include "support-bot.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames:
+      - {{ $dexDeployment }}
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $hookName }}
+  labels:
+    {{- include "support-bot.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $hookName }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $hookName }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $hookName }}
+  labels:
+    {{- include "support-bot.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        {{- include "support-bot.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ $hookName }}
+      restartPolicy: Never
+      containers:
+        - name: kubectl-patch
+          image: "{{ .Values.dex.rolloutHook.image.repository }}:{{ .Values.dex.rolloutHook.image.tag }}"
+          imagePullPolicy: {{ .Values.dex.rolloutHook.image.pullPolicy }}
+          command:
+            - kubectl
+            - patch
+            - deployment
+            - {{ $dexDeployment }}
+            - --type=strategic
+            - --patch
+            - '{"spec":{"template":{"metadata":{"annotations":{"checksum/dex-config":"{{ $configHash }}","checksum/dex-client":"{{ $clientHash }}"}}}}}'
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1001
+            capabilities:
+              drop: ["ALL"]
+{{- end }}

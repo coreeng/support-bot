@@ -33,9 +33,14 @@ Reports how the Dex OAuth client secret is being supplied:
 {{- $client := index .Values.dex.config.staticClients 0 -}}
 {{- $hasInline := $client.secret -}}
 {{- $hasExternal := false -}}
+{{- /* Require a non-empty value or valueFrom on the matching entry — a name-only
+       envVar entry would pass the fail-fast but render an empty $DEX_CLIENT_SECRET
+       and fail at runtime. */ -}}
 {{- range (.Values.dex.envVars | default list) -}}
 {{- if eq (.name | default "") "DEX_CLIENT_SECRET" -}}
+{{- if or .value .valueFrom -}}
 {{- $hasExternal = true -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- if and $hasInline $hasExternal -}}both
@@ -58,6 +63,21 @@ passwordHash — explicit only, no defaults.
 {{- end -}}
 {{- if eq $mode "both" -}}
 {{- fail "ambiguous: both dex.config.staticClients[0].secret AND a DEX_CLIENT_SECRET entry in dex.envVars are set. Pick one." -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Validate dex.config.issuer is supplied explicitly. No default — the previous
+namespace-hardcoded default silently broke installs in any non-`default`
+namespace because DEX_ISSUER_URI on the API would not match Dex's actual
+service FQDN, and it was also not browser-reachable so the login flow would
+fail at runtime.
+*/}}
+{{- define "support-bot.dex.validateIssuer" -}}
+{{- if .Values.dex.enabled -}}
+{{- if not .Values.dex.config.issuer -}}
+{{- fail "dex.config.issuer is required when dex.enabled=true (the OIDC issuer URL Dex publishes — set to your browser-reachable Dex URL, e.g. https://dex.example.com, or for in-cluster-only installs: http://support-bot-dex.<release-namespace>.svc.cluster.local:5556)" -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
@@ -90,13 +110,17 @@ don't inspect).
 {{- define "support-bot.ui.validateAuthSecret" -}}
 {{- if and .Values.ui.enabled .Values.dex.enabled -}}
 {{- $found := false -}}
+{{- /* Require a non-empty value or valueFrom — name-only entries pass through
+       to the UI pod as an empty AUTH_SECRET and crash NextAuth at startup. */ -}}
 {{- range .Values.ui.env | default list -}}
 {{- if or (eq .name "AUTH_SECRET") (eq .name "NEXTAUTH_SECRET") -}}
+{{- if or .value .valueFrom -}}
 {{- $found = true -}}
 {{- end -}}
 {{- end -}}
+{{- end -}}
 {{- if not $found -}}
-{{- fail "ui.env must include AUTH_SECRET (or NEXTAUTH_SECRET) when ui.enabled=true and dex.enabled=true (generate with: openssl rand -base64 32)" -}}
+{{- fail "ui.env must include AUTH_SECRET (or NEXTAUTH_SECRET) with a value or valueFrom when ui.enabled=true and dex.enabled=true (generate with: openssl rand -base64 32)" -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

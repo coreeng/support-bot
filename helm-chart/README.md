@@ -220,9 +220,17 @@ The chart fails at `helm install` time — not at pod-runtime — if any of thes
 
 | Value | Required when | Error message |
 |---|---|---|
-| `dex.config.staticClients[0].secret` **or** `dex.envVars[DEX_CLIENT_SECRET]` | `dex.enabled=true` | `dex client secret is required when dex.enabled=true. Set EITHER dex.config.staticClients[0].secret (inline, generate with: openssl rand -hex 32) OR add an entry to dex.envVars named DEX_CLIENT_SECRET with valueFrom.secretKeyRef pointing to your externally-managed Secret.` |
+| `dex.config.issuer` | `dex.enabled=true` | `dex.config.issuer is required when dex.enabled=true …` (the previous default hardcoded the `default` namespace and silently broke installs elsewhere — no default now) |
+| `dex.config.staticClients[0].secret` **or** `dex.envVars[DEX_CLIENT_SECRET].value`/`valueFrom` | `dex.enabled=true` | `dex client secret is required when dex.enabled=true. Set EITHER dex.config.staticClients[0].secret (inline, generate with: openssl rand -hex 32) OR add an entry to dex.envVars named DEX_CLIENT_SECRET with valueFrom.secretKeyRef pointing to your externally-managed Secret.` (a name-only `dex.envVars` entry without `value`/`valueFrom` does **not** satisfy the check — it would render an empty secret and fail Dex at runtime) |
 | `bundled.staticUsers.<role>.passwordHash` (×4) | `bundled.staticUsers.enabled=true` | ``bundled.staticUsers.<role>.passwordHash is required when bundled.staticUsers.enabled=true (generate with: htpasswd -bnBC 10 "" PASSWORD \| tr -d ':\n' \| sed 's/^\$2y/\$2a/')`` |
-| `ui.env` includes `AUTH_SECRET` or `NEXTAUTH_SECRET` | `ui.enabled=true` | `ui.env must include AUTH_SECRET (or NEXTAUTH_SECRET) when ui.enabled=true (generate with: openssl rand -base64 32)` |
+| `ui.env` includes `AUTH_SECRET` or `NEXTAUTH_SECRET` with `value` or `valueFrom` | `ui.enabled=true` **and** `dex.enabled=true` | `ui.env must include AUTH_SECRET (or NEXTAUTH_SECRET) with a value or valueFrom when ui.enabled=true and dex.enabled=true (generate with: openssl rand -base64 32)` |
+
+### Pod rollout on config change
+
+`helm upgrade` will not roll the API or Dex pods on its own when only the rendered Dex config Secret or the mirrored Dex client Secret change — the Secret contents change but the pod-template stays byte-identical. The chart wires this up automatically:
+
+- **API pod**: rendered with `checksum/dex-config` and `checksum/dex-client` annotations on its pod template, so any change to either Secret rolls the API.
+- **Dex pod**: the dex/dex subchart owns that Deployment and Helm doesn't let a parent chart inject computed annotations into a subchart's pod template. Instead the chart adds a `post-install,post-upgrade` Job (RBAC-scoped to only patch the bundled Dex Deployment) that sets the same checksum annotations on the Dex pod template. The patch is idempotent: when the checksum is unchanged, the pod doesn't roll. Disable with `dex.rolloutHook.enabled: false` on clusters that can't pull a kubectl image — restart Dex manually instead.
 
 ### Externalising the Dex client secret
 
@@ -283,7 +291,13 @@ dex:
   image:
     repository: <private-registry>/dexidp/dex                 # Dex (subchart)
     tag: v2.44.0
+  rolloutHook:
+    image:
+      repository: <private-registry>/bitnami/kubectl          # post-upgrade rollout hook
+      tag: "1.30"
 ```
+
+If you can't mirror a kubectl image, set `dex.rolloutHook.enabled: false` and roll Dex by hand after a config change (`kubectl rollout restart deployment/support-bot-dex`).
 
 Image pull secrets are **per-chart** — the top-level `imagePullSecrets` only attaches to the API/UI pods; the Dex pod is owned by the subchart and reads its own `dex.imagePullSecrets` field. Set both if the same Secret covers all three:
 
@@ -573,7 +587,7 @@ To confirm the role end-to-end, copy the session cookie / JWT from the browser a
 | API pod CrashLoopBackOff with `Could not resolve placeholder 'SLACK_TICKET_CHANNEL_ID'` | Missing env var | Verify the full `env:` block in step 5 made it into the overlay |
 | API pod CrashLoopBackOff complaining about `UI_ORIGIN` or `redirect-uri` | `publicWebOrigin` mismatch with NEXTAUTH_URL origin | Both come from `publicWebOrigin` automatically — check `kubectl describe pod support-bot-xxxxx` env to confirm `UI_ORIGIN=http://localhost:3000` |
 | Dex login redirect fails with `redirect_uri did not match` | redirectURIs not derived correctly | Inspect Secret/support-bot-dex-config: `kubectl get secret support-bot-dex-config -o jsonpath='{.data.config\.yaml}' \| base64 -d` — should list `http://localhost:3000/login/oauth2/code/dex` and `http://localhost:3000/api/oauth/callback/dex` |
-| Browser redirected to `http://support-bot-dex.default.svc.cluster.local:5556/...` | Issuer wasn't overridden to `localhost:5556` | Confirm `dex.config.issuer: http://localhost:5556` in the overlay and reinstall |
+| `helm install` fails with `dex.config.issuer is required when dex.enabled=true` | The chart has no default issuer (the previous namespace-hardcoded default broke installs outside `default`). | Set `dex.config.issuer` in the overlay — `http://localhost:5556` for the kind walkthrough, or your browser-reachable Dex URL in production |
 | Pod `ImagePullBackOff` for `support-bot:dev` | Image wasn't loaded into kind | Re-run `kind load docker-image support-bot:dev --name support-bot` |
 | UI pod CrashLoopBackOff with `Missing required environment variables: AUTH_SECRET` | `ui.env` doesn't include `AUTH_SECRET` | Add it to the overlay (see step 5) and `helm upgrade` |
 | Pod logs end with `to create fsnotify watcher: too many open files` | Host inotify limit hit (common on Docker Desktop / Lima after many crash loops) | `docker exec -it <kind-node> sysctl fs.inotify.max_user_instances=512 fs.inotify.max_user_watches=524288` or restart Docker |

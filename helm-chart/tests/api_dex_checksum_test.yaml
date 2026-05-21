@@ -1,0 +1,27 @@
+suite: api dex checksum annotations
+templates:
+  - templates/deployment.yaml
+  - templates/dex-client-secret.yaml
+  - templates/dex-config-secret.yaml
+tests:
+  - it: adds dex checksum annotations on the API pod when dex.enabled is true
+    template: templates/deployment.yaml
+    set:
+      publicWebOrigin: https://support-bot.example
+      dex.enabled: true
+      dex.config.issuer: https://dex.example
+      dex.config.staticClients:
+        - id: support-bot
+          name: Support Bot
+          secret: inline-test-secret
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/dex-config"]
+      - exists:
+          path: spec.template.metadata.annotations["checksum/dex-client"]
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/dex-config"]
+          pattern: '^[0-9a-f]{64}$'
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/dex-client"]
+          pattern: '^[0-9a-f]{64}$'

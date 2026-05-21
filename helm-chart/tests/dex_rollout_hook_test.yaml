@@ -1,0 +1,88 @@
+suite: dex rollout hook
+templates:
+  - templates/dex-rollout-hook.yaml
+  - templates/dex-config-secret.yaml
+  - templates/dex-client-secret.yaml
+tests:
+  - it: does not render when dex.enabled is false
+    template: templates/dex-rollout-hook.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render when dex.rolloutHook.enabled is false
+    template: templates/dex-rollout-hook.yaml
+    set:
+      publicWebOrigin: https://support-bot.example
+      dex.enabled: true
+      dex.rolloutHook.enabled: false
+      dex.config.issuer: https://dex.example
+      dex.config.staticClients:
+        - id: support-bot
+          name: Support Bot
+          secret: inline-test-secret
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders 4 documents when enabled
+    template: templates/dex-rollout-hook.yaml
+    set:
+      publicWebOrigin: https://support-bot.example
+      dex.enabled: true
+      dex.config.issuer: https://dex.example
+      dex.config.staticClients:
+        - id: support-bot
+          name: Support Bot
+          secret: inline-test-secret
+    asserts:
+      - hasDocuments:
+          count: 4
+
+  - it: scopes the Role to the bundled Dex Deployment only
+    template: templates/dex-rollout-hook.yaml
+    set:
+      publicWebOrigin: https://support-bot.example
+      dex.enabled: true
+      dex.config.issuer: https://dex.example
+      dex.config.staticClients:
+        - id: support-bot
+          name: Support Bot
+          secret: inline-test-secret
+    documentSelector:
+      path: kind
+      value: Role
+    asserts:
+      - equal:
+          path: rules[0].resources
+          value: ["deployments"]
+      - equal:
+          path: rules[0].resourceNames
+          value: ["support-bot-dex"]
+      - equal:
+          path: rules[0].verbs
+          value: ["get", "patch"]
+
+  - it: Job carries the helm post-install/post-upgrade hook annotation
+    template: templates/dex-rollout-hook.yaml
+    set:
+      publicWebOrigin: https://support-bot.example
+      dex.enabled: true
+      dex.config.issuer: https://dex.example
+      dex.config.staticClients:
+        - id: support-bot
+          name: Support Bot
+          secret: inline-test-secret
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: "post-install,post-upgrade"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[6]
+          pattern: 'checksum/dex-config'
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[6]
+          pattern: 'checksum/dex-client'

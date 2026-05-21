@@ -279,10 +279,13 @@ dex:
     tls: []
   # Read by the support-bot chart's dex-config-secret.yaml renderer (not the dex subchart).
   config:
-    # Required when dex.enabled=true: the OIDC issuer URL the API and UI should trust.
-    # In-cluster default points at the bundled Dex Service. Set to a public URL when exposing
-    # Dex via Ingress, e.g. https://dex.example.com.
-    issuer: "http://support-bot-dex.default.svc.cluster.local:5556"
+    # Required when dex.enabled=true: the OIDC issuer URL Dex publishes. No default —
+    # the previous default hardcoded the `default` namespace, which silently broke installs
+    # in any other namespace. Set this to:
+    #   - your browser-reachable Dex URL when exposed via Ingress (e.g. https://dex.example.com), or
+    #   - http://<dex-service>.<release-namespace>.svc.cluster.local:5556 for in-cluster-only
+    #     installs (note: not browser-reachable, login flow will not work in real browsers).
+    issuer: ""
     storage:
       type: sqlite3
       config:
@@ -327,6 +330,28 @@ dex:
         secret: ""
         # Defaults to publicWebOrigin-derived URIs when empty (see _bundled.tpl).
         redirectURIs: []
+
+  # ----------------------------------------------------------------
+  # Rollout hook — keeps the bundled Dex pod in sync with config changes
+  # ----------------------------------------------------------------
+  # Helm doesn't let a parent chart inject computed annotations into a
+  # subchart's pod template, so on its own a `helm upgrade` that only changes
+  # the rendered Dex config Secret would not roll the Dex pod and Dex would
+  # keep serving the old config until someone restarted it manually.
+  #
+  # When enabled (default), the chart adds a post-install / post-upgrade Job
+  # that patches the Dex Deployment's pod-template with deterministic
+  # `checksum/dex-config` and `checksum/dex-client` annotations. The patch
+  # is idempotent: when the checksum is unchanged the pod doesn't roll.
+  #
+  # Disable on air-gapped clusters that can't pull the kubectl image, and
+  # restart Dex by hand instead (`kubectl rollout restart deployment/<name>`).
+  rolloutHook:
+    enabled: true
+    image:
+      repository: bitnami/kubectl
+      tag: "1.30"
+      pullPolicy: IfNotPresent
 
   # ----------------------------------------------------------------
   # Externalising the client secret (no plaintext in values.yaml)

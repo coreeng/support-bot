@@ -73,3 +73,39 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "ui.env must include AUTH_SECRET"
+
+  - it: fails when ui.env AUTH_SECRET entry is name-only (no value or valueFrom)
+    set:
+      ui.enabled: true
+      publicWebOrigin: https://support-bot.example
+      dex.enabled: true
+      dex.config.issuer: https://dex.example
+      dex.config.staticClients:
+        - id: support-bot
+          name: Support Bot
+          secret: inline-test-secret
+      ui.env:
+        - name: AUTH_SECRET
+    asserts:
+      - failedTemplate:
+          errorPattern: "ui.env must include AUTH_SECRET"
+
+  - it: AUTH_SECRET valueFrom satisfies the validator
+    set:
+      ui.enabled: true
+      publicWebOrigin: https://support-bot.example
+      dex.enabled: true
+      dex.config.issuer: https://dex.example
+      dex.config.staticClients:
+        - id: support-bot
+          name: Support Bot
+          secret: inline-test-secret
+      ui.env:
+        - name: AUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ui-creds
+              key: auth-secret
+    asserts:
+      - isKind:
+          of: Deployment

@@ -11,10 +11,17 @@ spec:
       {{- include "support-bot.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
+        {{- /* Roll the API pod when Dex client secret or rendered Dex config change,
+               otherwise inline-secret rotation and issuer/redirectURI updates would
+               apply via Helm without the API picking them up. */}}
+        {{- if .Values.dex.enabled }}
+        checksum/dex-client: {{ include (print $.Template.BasePath "/dex-client-secret.yaml") . | sha256sum }}
+        checksum/dex-config: {{ include (print $.Template.BasePath "/dex-config-secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       labels:
         {{- include "support-bot.selectorLabels" . | nindent 8 }}
     spec:
