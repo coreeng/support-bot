@@ -484,6 +484,10 @@
         }
       }
     },
+    "global": {
+      "type": "object",
+      "additionalProperties": true
+    },
     "dex": {
       "type": "object",
       "additionalProperties": true
