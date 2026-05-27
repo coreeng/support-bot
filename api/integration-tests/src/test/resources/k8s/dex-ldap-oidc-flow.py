@@ -113,7 +113,7 @@ def main() -> int:
 
         ex = requests.post(
             f"{API_BASE}/auth/oauth/exchange",
-            json={"code": code, "redirectUri": REDIRECT_URI},
+            json={"provider": "dex", "code": code, "redirectUri": REDIRECT_URI},
             timeout=120,
         )
         if ex.status_code != 200:

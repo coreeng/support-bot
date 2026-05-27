@@ -17,7 +17,7 @@ class RedirectUriValidatorTest {
         var props = new SecurityProperties(
                 new SecurityProperties.JwtProperties(
                         "secret-not-used-here-but-must-be-256-bits!!", Duration.ofHours(1)),
-                new SecurityProperties.OAuth2Properties(configuredRedirectUri),
+                SecurityProperties.OAuth2Properties.withRedirectOnly(configuredRedirectUri),
                 new SecurityProperties.CorsProperties(null),
                 new SecurityProperties.TestBypassProperties(false),
                 new SecurityProperties.AllowListProperties(List.of(), List.of()));
@@ -25,7 +25,12 @@ class RedirectUriValidatorTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"http://localhost:3000/api/oauth/callback/dex"})
+    @ValueSource(
+            strings = {
+                "http://localhost:3000/api/oauth/callback/google",
+                "http://localhost:3000/api/oauth/callback/azure",
+                "http://localhost:3000/api/oauth/callback/dex",
+            })
     void acceptsValidCallbackUris(String uri) {
         var v = validator("http://localhost:3000/login");
         ValidatedRedirectUri validated = assertDoesNotThrow(() -> v.validate(uri));
@@ -35,9 +40,9 @@ class RedirectUriValidatorTest {
     @Test
     void returnsValidatedRedirectUriWithCanonicalAsciiValue() {
         var v = validator("http://localhost:3000/login");
-        var validated = v.validate("http://localhost:3000/api/oauth/callback/dex");
+        var validated = v.validate("http://localhost:3000/api/oauth/callback/google");
         assertThat(validated).isInstanceOf(ValidatedRedirectUri.class);
-        assertThat(validated.value()).isEqualTo("http://localhost:3000/api/oauth/callback/dex");
+        assertThat(validated.value()).isEqualTo("http://localhost:3000/api/oauth/callback/google");
     }
 
     @Test
@@ -50,26 +55,28 @@ class RedirectUriValidatorTest {
     @Test
     void acceptsNonDefaultPort() {
         var v = validator("https://app.example.com:8443/login");
-        var validated = assertDoesNotThrow(() -> v.validate("https://app.example.com:8443/api/oauth/callback/dex"));
-        assertThat(validated.value()).isEqualTo("https://app.example.com:8443/api/oauth/callback/dex");
+        var validated = assertDoesNotThrow(() -> v.validate("https://app.example.com:8443/api/oauth/callback/google"));
+        assertThat(validated.value()).isEqualTo("https://app.example.com:8443/api/oauth/callback/google");
     }
 
     @Test
     void rejectsWrongHost() {
         var v = validator("http://localhost:3000/login");
-        assertThrows(IllegalArgumentException.class, () -> v.validate("http://evil.example/api/oauth/callback/dex"));
+        assertThrows(IllegalArgumentException.class, () -> v.validate("http://evil.example/api/oauth/callback/google"));
     }
 
     @Test
     void rejectsWrongPort() {
         var v = validator("http://localhost:3000/login");
-        assertThrows(IllegalArgumentException.class, () -> v.validate("http://localhost:9999/api/oauth/callback/dex"));
+        assertThrows(
+                IllegalArgumentException.class, () -> v.validate("http://localhost:9999/api/oauth/callback/google"));
     }
 
     @Test
     void rejectsWrongScheme() {
         var v = validator("https://app.example.com/login");
-        assertThrows(IllegalArgumentException.class, () -> v.validate("http://app.example.com/api/oauth/callback/dex"));
+        assertThrows(
+                IllegalArgumentException.class, () -> v.validate("http://app.example.com/api/oauth/callback/google"));
     }
 
     @Test
@@ -79,7 +86,7 @@ class RedirectUriValidatorTest {
     }
 
     @Test
-    void rejectsNonDexProviderPath() {
+    void rejectsUnknownProvider() {
         var v = validator("http://localhost:3000/login");
         assertThrows(IllegalArgumentException.class, () -> v.validate("http://localhost:3000/api/oauth/callback/evil"));
     }
@@ -109,7 +116,7 @@ class RedirectUriValidatorTest {
         var v = validator("http://localhost:3000/login");
         var ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> v.validate("http://attacker@localhost:3000/api/oauth/callback/dex"));
+                () -> v.validate("http://attacker@localhost:3000/api/oauth/callback/google"));
         assertThat(ex.getMessage()).containsIgnoringCase("userinfo");
     }
 
@@ -119,21 +126,22 @@ class RedirectUriValidatorTest {
         var v = validator("http://localhost:3000/login");
         assertThrows(
                 IllegalArgumentException.class,
-                () -> v.validate("http://localhost:3000@evil.example/api/oauth/callback/dex"));
+                () -> v.validate("http://localhost:3000@evil.example/api/oauth/callback/google"));
     }
 
     /** Unicode “dot” in host breaks hostname parsing — must not be accepted as localhost. */
     @Test
     void rejectsUnicodeHomographHost() {
         var v = validator("http://localhost:3000/login");
-        String malicious = "http://localhost\u3002example.com:3000/api/oauth/callback/dex";
+        String malicious = "http://localhost\u3002example.com:3000/api/oauth/callback/google";
         assertThrows(IllegalArgumentException.class, () -> v.validate(malicious));
     }
 
     @Test
     void rejectsTrailingSlashAfterProvider() {
         var v = validator("http://localhost:3000/login");
-        assertThrows(IllegalArgumentException.class, () -> v.validate("http://localhost:3000/api/oauth/callback/dex/"));
+        assertThrows(
+                IllegalArgumentException.class, () -> v.validate("http://localhost:3000/api/oauth/callback/google/"));
     }
 
     @Test
@@ -141,7 +149,7 @@ class RedirectUriValidatorTest {
         var v = validator("http://localhost:3000/login");
         var ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> v.validate("http://localhost:3000/api/oauth/callback/dex#@evil.com"));
+                () -> v.validate("http://localhost:3000/api/oauth/callback/google#@evil.com"));
         assertThat(ex.getMessage()).containsIgnoringCase("fragment");
     }
 }
