@@ -1,0 +1,48 @@
+name: support-bot Preview Publish
+
+# Mirrors the prod publish (skopeo copy GCP Artifact Registry -> ghcr.io/coreeng),
+# but sources the fast-feedback build so an unmerged branch can be shared via ghcr
+# without going through the main-gated promotion chain. Runs in gcp-dev.
+#
+# TEMPORARY: the `push` trigger lets this run on the feature branch without merging to
+# main (workflow_dispatch only becomes available once the file is on the default branch).
+# Before/at merge, drop the `push:` block and keep `workflow_dispatch`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Fast-feedback version to publish, e.g. 0.0.189-<full-git-sha>. Leave blank to use the current commit's version."
+        required: false
+        type: string
+  push:
+    branches:
+      - pt-439-gitlab-merge-request-tracking
+
+permissions:
+  packages: write
+  contents: read
+  id-token: write
+
+jobs:
+  # Compute the same version string fast-feedback used for this commit
+  # (<latest vX.Y.Z tag>-<full-sha>), so the image we copy actually exists.
+  version:
+    uses: coreeng/p2p/.github/workflows/p2p-version.yaml@v1
+    with:
+      version-prefix: v
+    secrets:
+      git-token: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-preview:
+    needs: [version]
+    uses: coreeng/p2p/.github/workflows/p2p-execute-command.yaml@v1
+    secrets:
+      env_vars: ${{ secrets.env_vars }}
+    with:
+      command: publish-preview
+      github_env: gcp-dev
+      app-name: support-bot
+      tenant-name: support-bot
+      version: ${{ inputs.version || needs.version.outputs.version }}
+      working-directory: ./

@@ -435,6 +435,37 @@ publish-dex-prod: login-ghcr ## Publish Dex container image
 .PHONY: publish-prod
 publish-prod: publish-api-prod publish-ui-prod publish-dex-prod ## Publish all container images
 
+# Preview publish: mirror publish-prod, but source the fast-feedback image (branch
+# builds never reach the prod registry) so an unmerged build can be shared via ghcr.
+# Source path uses $(P2P_REGISTRY_FAST_FEEDBACK) because publish-preview does not match
+# the %-prod pattern rule that would otherwise set $(p2p_registry).
+.PHONY: publish-api-preview
+publish-api-preview: login-ghcr ## Publish API container image (preview, from fast-feedback)
+	skopeo copy --all --preserve-digests "docker://$(P2P_REGISTRY_FAST_FEEDBACK)/$(p2p_app_name):$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name):$(p2p_version)"
+
+.PHONY: publish-ui-preview
+publish-ui-preview: login-ghcr ## Publish UI container image (preview, from fast-feedback)
+	skopeo copy --all --preserve-digests "docker://$(P2P_REGISTRY_FAST_FEEDBACK)/$(p2p_app_name)-ui:$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name)-ui:$(p2p_version)"
+
+.PHONY: publish-dex-preview
+publish-dex-preview: login-ghcr ## Publish Dex container image (preview, from fast-feedback)
+	skopeo copy --all --preserve-digests "docker://$(P2P_REGISTRY_FAST_FEEDBACK)/$(p2p_app_name)-dex:$(p2p_version)" "docker://ghcr.io/coreeng/$(p2p_app_name)-dex:$(p2p_version)"
+
+.PHONY: wait-preview-source
+wait-preview-source: ## Wait until the fast-feedback images for $(p2p_version) are pushed (handles the build race when triggered on push)
+	@for img in $(p2p_app_name) $(p2p_app_name)-ui $(p2p_app_name)-dex; do \
+	  ref="$(P2P_REGISTRY_FAST_FEEDBACK)/$$img:$(p2p_version)"; \
+	  printf 'Waiting for %s ...\n' "$$ref"; \
+	  n=0; until skopeo inspect --raw "docker://$$ref" >/dev/null 2>&1; do \
+	    n=$$((n+1)); if [ $$n -ge 40 ]; then echo "Timed out (20m) waiting for $$ref"; exit 1; fi; \
+	    sleep 30; \
+	  done; \
+	  printf 'Found %s\n' "$$ref"; \
+	done
+
+.PHONY: publish-preview
+publish-preview: wait-preview-source publish-api-preview publish-ui-preview publish-dex-preview ## Publish all container images to ghcr from the fast-feedback build
+
 .PHONY: publish-chart
 publish-chart: ## Package and publish Helm chart (version aligned to image)
 	@echo "Packaging Helm chart with version $(p2p_version)..."
