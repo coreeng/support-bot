@@ -27,7 +27,19 @@ class JwtGroupTeamMergerTest {
         var merger = new JwtGroupTeamMerger(props, teamService);
         var emailTeams = ImmutableList.of(tenant("wow"));
 
-        var out = merger.merge(Map.of("groups", List.of("developers")), emailTeams);
+        var out = merger.mergeForProvider("dex", Map.of("groups", List.of("developers")), emailTeams);
+
+        assertEquals(emailTeams, out);
+    }
+
+    @Test
+    void merge_nonDex_returnsEmailTeams() {
+        var props = new JwtGroupsProperties(
+                true, "groups", List.of(new JwtGroupsProperties.Mapping(new GroupRef.Jwt("g"), "wow")));
+        var merger = new JwtGroupTeamMerger(props, teamService);
+        var emailTeams = ImmutableList.<Team>of();
+
+        var out = merger.mergeForProvider("google", Map.of("groups", List.of("g")), emailTeams);
 
         assertEquals(emailTeams, out);
     }
@@ -39,7 +51,7 @@ class JwtGroupTeamMergerTest {
         var merger = new JwtGroupTeamMerger(props, teamService);
         when(teamService.findTeamByCode("wow")).thenReturn(tenant("wow"));
 
-        var out = merger.merge(Map.of("groups", List.of("Developers")), ImmutableList.<Team>of());
+        var out = merger.mergeForProvider("dex", Map.of("groups", List.of("Developers")), ImmutableList.<Team>of());
 
         assertEquals(1, out.size());
         assertEquals("wow", out.get(0).code());
@@ -53,7 +65,7 @@ class JwtGroupTeamMergerTest {
         var existing = ImmutableList.of(tenant("wow"));
         when(teamService.findTeamByCode("wow")).thenReturn(tenant("wow"));
 
-        var out = merger.merge(Map.of("groups", List.of("developers")), existing);
+        var out = merger.mergeForProvider("dex", Map.of("groups", List.of("developers")), existing);
 
         assertEquals(1, out.size());
     }
@@ -70,7 +82,7 @@ class JwtGroupTeamMergerTest {
         when(teamService.findTeamByCode("unknown-team")).thenReturn(null);
         when(teamService.findTeamByCode("core")).thenReturn(tenant("core"));
 
-        var out = merger.merge(Map.of("groups", List.of("developers")), ImmutableList.of());
+        var out = merger.mergeForProvider("dex", Map.of("groups", List.of("developers")), ImmutableList.of());
 
         assertEquals(1, out.size());
         assertEquals("core", out.get(0).code());

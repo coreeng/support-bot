@@ -32,8 +32,8 @@ Example keys you may mirror from a Secret into values (conceptually):
 
 For **Tier 2** integration tests, Kubernetes Secret `dex-secrets` is expected with **`client-id`** and **`client-secret`** (see [`api/integration-tests/README.md`](../../integration-tests/README.md)).
 - `ldap-bind-password` — same as LDAP connector `bindPW` when LDAP is enabled.
-- `google-client-id` / `google-client-secret` — when adding a Google connector to Dex (so Dex can act as the Google SSO gateway).
-- `microsoft-client-id` / `microsoft-client-secret` — when adding a Microsoft connector to Dex.
+- `google-client-id` / `google-client-secret` — when adding a Google connector.
+- `microsoft-client-id` / `microsoft-client-secret` — when adding a Microsoft connector.
 
 ## Install / upgrade
 
@@ -75,11 +75,7 @@ Ephemeral plaintext LDAP lives in [`values-integration-ldap-plaintext-ephemeral.
 
 Because `connectors` is a YAML list, merge carefully: the last values file that sets `config.connectors` **replaces** the whole list. Combine LDAP with Google/Microsoft in **one** overlay file, or merge connector lists in your pipeline.
 
-User-facing SSO against Dex is the **only** OAuth2 client the API registers
-(`DEX_CLIENT_ID`, `DEX_CLIENT_SECRET`, `DEX_ISSUER_URI`). Google, Azure AD, and LDAP
-are reachable as **Dex connectors**, configured here in your Dex deployment, not as
-separate front doors in the Support Bot app. See
-[configuration.md](../../service/docs/configuration.md).
+User-facing SSO against Dex uses the **Dex** OAuth2 registration on the API (`DEX_CLIENT_ID`, `DEX_CLIENT_SECRET`, `DEX_ISSUER_URI`). The API can also register **Google** and **Azure AD** directly; by default **all** fully configured IdPs are shown. To show **only Dex** on the login UI while `GOOGLE_*` / `AZURE_*` remain set (e.g. for Azure Cloud integration), set `security.oauth2.login-providers: [dex]` (see [configuration.md](../../service/docs/configuration.md)).
 
 ## Integration deploy order (with LDAP)
 

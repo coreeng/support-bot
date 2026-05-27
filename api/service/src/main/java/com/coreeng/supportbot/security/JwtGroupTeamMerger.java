@@ -13,19 +13,24 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Merges platform teams derived from JWT group claims (default claim: {@code groups}) into
- * email-based team resolution. Only active when {@code jwt-groups.enabled} is true and the
- * configured claim is present in the ID token.
+ * Merges platform teams derived from Dex {@code groups} (or configured claim) into email-based team
+ * resolution. LDAP-backed Dex logins expose groups; Google/Azure via Dex typically do not, so behavior
+ * stays email + direct IdP group fetch only.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtGroupTeamMerger {
+    private static final String DEX_REGISTRATION = "dex";
+
     private final JwtGroupsProperties properties;
     private final TeamService teamService;
 
-    public ImmutableList<Team> merge(java.util.Map<String, Object> claims, ImmutableList<Team> emailTeams) {
-        if (!properties.enabled()) {
+    public ImmutableList<Team> mergeForProvider(
+            String oauthRegistrationId, java.util.Map<String, Object> claims, ImmutableList<Team> emailTeams) {
+        if (!properties.enabled()
+                || oauthRegistrationId == null
+                || !DEX_REGISTRATION.equalsIgnoreCase(oauthRegistrationId)) {
             return emailTeams;
         }
         var rawGroups = extractGroupStrings(claims.get(properties.claimName()));

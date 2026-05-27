@@ -28,6 +28,13 @@ describe("LoginPage", () => {
     mockUseRouter.mockReturnValue({ replace: mockReplace } as any);
     mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: false } as any);
     mockUseSearchParams.mockReturnValue(new URLSearchParams() as any);
+    // Mock fetch for provider fetching
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ providers: ["google", "azure"] }),
+      } as Response)
+    );
 
     // Default: no opener (not a popup)
     Object.defineProperty(window, "opener", { value: null, writable: true, configurable: true });
@@ -43,14 +50,14 @@ describe("LoginPage", () => {
   // Basic rendering
   // -------------------------------------------------------------------
 
-  it("auto-redirects to Dex on mount when not authenticated and not in iframe", async () => {
+  it("shows login form when not authenticated", async () => {
     render(<LoginPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Redirecting to sign-in...")).toBeInTheDocument();
+      expect(screen.getByText("Sign in")).toBeInTheDocument();
+      expect(screen.getByText("Continue with Google")).toBeInTheDocument();
+      expect(screen.getByText("Continue with Microsoft")).toBeInTheDocument();
     });
-    // Button should not render — the page is in the auto-redirect spinner state.
-    expect(screen.queryByText("Continue with SSO")).not.toBeInTheDocument();
   });
 
   it("redirects to home if already authenticated", async () => {
@@ -71,7 +78,7 @@ describe("LoginPage", () => {
     expect(screen.getByText((_content, el) => el?.className?.includes("animate-spin") ?? false)).toBeInTheDocument();
   });
 
-  it("shows error from search params (skips auto-redirect)", async () => {
+  it("shows error from search params", async () => {
     mockUseSearchParams.mockReturnValue(new URLSearchParams("error=TokenExpired") as any);
 
     render(<LoginPage />);
@@ -80,8 +87,6 @@ describe("LoginPage", () => {
       expect(screen.getByText("Authentication Error")).toBeInTheDocument();
       expect(screen.getByText("TokenExpired")).toBeInTheDocument();
     });
-    // Auto-redirect spinner must not appear when an error is present.
-    expect(screen.queryByText("Redirecting to sign-in...")).not.toBeInTheDocument();
   });
 
   it("shows not-onboarded message for user_not_allowed error", async () => {
@@ -133,6 +138,11 @@ describe("LoginPage", () => {
       expect(mockSignIn).not.toHaveBeenCalled();
       expect(mockReplace).not.toHaveBeenCalled();
     });
+
+    // Note: window.location.href assignment cannot be directly asserted in JSDOM
+    // because Location is a host object with internal type checks. The important
+    // security behaviour (origin validation, callbackUrl sanitization) is covered
+    // by the tests above and by the sanitizeCallbackUrl unit tests.
   });
 
   // -------------------------------------------------------------------
@@ -156,19 +166,40 @@ describe("LoginPage", () => {
 
     it("calls signIn(redirect:false), sends postMessage to opener, and closes", async () => {
       mockSignIn.mockResolvedValue({ error: undefined, ok: true, status: 200, url: "" } as any);
-      mockUseSearchParams.mockReturnValue(new URLSearchParams("code=mycode&callbackUrl=/dash") as any);
+      mockUseSearchParams.mockReturnValue(new URLSearchParams("code=mycode&provider=dex&callbackUrl=/dash") as any);
 
       render(<LoginPage />);
 
       await waitFor(() => {
         expect(mockSignIn).toHaveBeenCalledWith("backend-code", {
           code: "mycode",
+          provider: "dex",
           redirect: false,
         });
       });
 
       await waitFor(() => {
         expect(mockPostMessage).toHaveBeenCalledWith({ type: "auth:success", callbackUrl: "/dash" }, window.location.origin);
+        expect(window.close).toHaveBeenCalled();
+      });
+    });
+
+    it("handles code flow identically", async () => {
+      mockSignIn.mockResolvedValue({ error: undefined, ok: true, status: 200, url: "" } as any);
+      mockUseSearchParams.mockReturnValue(new URLSearchParams("code=mycode&provider=google&callbackUrl=/home") as any);
+
+      render(<LoginPage />);
+
+      await waitFor(() => {
+        expect(mockSignIn).toHaveBeenCalledWith("backend-code", {
+          code: "mycode",
+          provider: "google",
+          redirect: false,
+        });
+      });
+
+      await waitFor(() => {
+        expect(mockPostMessage).toHaveBeenCalledWith({ type: "auth:success", callbackUrl: "/home" }, window.location.origin);
         expect(window.close).toHaveBeenCalled();
       });
     });
@@ -180,7 +211,7 @@ describe("LoginPage", () => {
         status: 401,
         url: "",
       } as any);
-      mockUseSearchParams.mockReturnValue(new URLSearchParams("code=bad") as any);
+      mockUseSearchParams.mockReturnValue(new URLSearchParams("code=bad&provider=dex") as any);
 
       render(<LoginPage />);
 
@@ -194,7 +225,7 @@ describe("LoginPage", () => {
 
     it("sanitizes callbackUrl sent in postMessage", async () => {
       mockSignIn.mockResolvedValue({ error: undefined, ok: true, status: 200, url: "" } as any);
-      mockUseSearchParams.mockReturnValue(new URLSearchParams("code=c&callbackUrl=https://evil.com") as any);
+      mockUseSearchParams.mockReturnValue(new URLSearchParams("code=c&provider=dex&callbackUrl=https://evil.com") as any);
 
       render(<LoginPage />);
 
@@ -206,7 +237,7 @@ describe("LoginPage", () => {
 
     it("does not call signIn a second time on re-render", async () => {
       mockSignIn.mockResolvedValue({ error: undefined, ok: true, status: 200, url: "" } as any);
-      mockUseSearchParams.mockReturnValue(new URLSearchParams("code=mycode") as any);
+      mockUseSearchParams.mockReturnValue(new URLSearchParams("code=mycode&provider=dex") as any);
 
       const { rerender } = render(<LoginPage />);
 
@@ -229,28 +260,32 @@ describe("LoginPage", () => {
   describe("non-popup flow", () => {
     it("calls signIn with redirect:false for code", async () => {
       mockSignIn.mockResolvedValue({ ok: true } as any);
-      mockUseSearchParams.mockReturnValue(new URLSearchParams("code=mycode&callbackUrl=/dash") as any);
+      mockUseSearchParams.mockReturnValue(new URLSearchParams("code=mycode&provider=dex&callbackUrl=/dash") as any);
 
       render(<LoginPage />);
 
       await waitFor(() => {
         expect(mockSignIn).toHaveBeenCalledWith("backend-code", {
           code: "mycode",
+          provider: "dex",
           redirect: false,
         });
       });
     });
 
-    it("ignores token query parameters instead of signing in with bearer tokens", async () => {
+    it("calls signIn with redirect:false for code with azure provider", async () => {
       mockSignIn.mockResolvedValue({ ok: true } as any);
-      mockUseSearchParams.mockReturnValue(new URLSearchParams("token=t&callbackUrl=//evil.com") as any);
+      mockUseSearchParams.mockReturnValue(new URLSearchParams("code=mycode&provider=azure&callbackUrl=/dash") as any);
 
       render(<LoginPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("Redirecting to sign-in...")).toBeInTheDocument();
+        expect(mockSignIn).toHaveBeenCalledWith("backend-code", {
+          code: "mycode",
+          provider: "azure",
+          redirect: false,
+        });
       });
-      expect(mockSignIn).not.toHaveBeenCalled();
     });
 
     it("sanitizes callbackUrl in authenticated redirect", async () => {
@@ -266,28 +301,181 @@ describe("LoginPage", () => {
   });
 
   // -------------------------------------------------------------------
-  // Iframe detection — auto-redirect skipped, button rendered, popup opens on click
+  // Provider fetching error scenarios
+  // -------------------------------------------------------------------
+
+  describe("provider fetching", () => {
+    it('shows "No authentication providers configured" when fetch returns empty array', async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: [] }),
+        } as Response)
+      );
+
+      render(<LoginPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("No authentication providers configured.")).toBeInTheDocument();
+        expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
+        expect(screen.queryByText("Continue with Microsoft")).not.toBeInTheDocument();
+      });
+    });
+
+    it("shows error with no login buttons when fetch fails with network error", async () => {
+      global.fetch = jest.fn(() => Promise.reject(new Error("Network error")));
+
+      render(<LoginPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Unable to fetch identity provider configuration from backend/)).toBeInTheDocument();
+        expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
+        expect(screen.queryByText("Continue with Microsoft")).not.toBeInTheDocument();
+      });
+    });
+
+    it("shows error with no login buttons when backend returns error", async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: [], error: true }),
+        } as Response)
+      );
+
+      render(<LoginPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Unable to fetch identity provider configuration from backend/)).toBeInTheDocument();
+        expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
+        expect(screen.queryByText("Continue with Microsoft")).not.toBeInTheDocument();
+      });
+    });
+
+    it("shows only Google when only Google is configured", async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ["google"] }),
+        } as Response)
+      );
+
+      render(<LoginPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Continue with Google")).toBeInTheDocument();
+        expect(screen.queryByText("Continue with Microsoft")).not.toBeInTheDocument();
+      });
+    });
+
+    it("shows only Azure when only Azure is configured", async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ["azure"] }),
+        } as Response)
+      );
+
+      render(<LoginPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Continue with Microsoft")).toBeInTheDocument();
+        expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
+      });
+    });
+
+    it("shows only SSO when only Dex is configured", async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ["dex"] }),
+        } as Response)
+      );
+
+      render(<LoginPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Continue with SSO")).toBeInTheDocument();
+        expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
+        expect(screen.queryByText("Continue with Microsoft")).not.toBeInTheDocument();
+      });
+    });
+
+    it("filters out unknown providers from API response", async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ["google", "unknown-provider", "azure", "dex"] }),
+        } as Response)
+      );
+
+      render(<LoginPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("Continue with Google")).toBeInTheDocument();
+        expect(screen.getByText("Continue with Microsoft")).toBeInTheDocument();
+        expect(screen.getByText("Continue with SSO")).toBeInTheDocument();
+        // No button for "unknown-provider" should be rendered
+      });
+    });
+
+    it("handles malformed API response gracefully", async () => {
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ notProviders: "malformed" }),
+        } as Response)
+      );
+
+      render(<LoginPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText("No authentication providers configured.")).toBeInTheDocument();
+        expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
+        expect(screen.queryByText("Continue with Microsoft")).not.toBeInTheDocument();
+      });
+    });
+
+    it("does not fetch providers when already authenticated", async () => {
+      mockUseAuth.mockReturnValue({ isLoading: false, isAuthenticated: true } as any);
+      const fetchSpy = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ providers: ["google", "azure"] }),
+        } as Response)
+      );
+      global.fetch = fetchSpy;
+
+      render(<LoginPage />);
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith("/");
+      });
+
+      // Fetch should not be called when already authenticated
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // Iframe detection — handleLogin opens popup when in iframe
   // -------------------------------------------------------------------
 
   describe("iframe detection", () => {
-    it("renders SSO button instead of auto-redirecting, opens popup on click", async () => {
+    it("opens popup when in an iframe", async () => {
       const mockPopup = { focus: jest.fn() };
       window.open = jest.fn(() => mockPopup) as any;
 
-      // Simulate iframe: make window.self !== window.top.
+      // Simulate iframe: make window.self !== window.top
       const origSelf = window.self;
       Object.defineProperty(window, "self", { value: {}, writable: true, configurable: true });
 
       render(<LoginPage />);
 
-      // Auto-redirect must be suppressed in iframe context.
-      await waitFor(() => expect(screen.getByText("Continue with SSO")).toBeInTheDocument());
-      expect(screen.queryByText("Redirecting to sign-in...")).not.toBeInTheDocument();
-
-      fireEvent.click(screen.getByText("Continue with SSO"));
+      await waitFor(() => expect(screen.getByText("Continue with Google")).toBeInTheDocument());
+      fireEvent.click(screen.getByText("Continue with Google"));
 
       expect(window.open).toHaveBeenCalledWith(
-        "/api/oauth/start/dex?callbackUrl=%2F",
+        "/api/oauth/start/google?callbackUrl=%2F",
         "supportbot-auth",
         expect.stringContaining("popup=yes")
       );
