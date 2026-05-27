@@ -54,9 +54,9 @@ describe("LoginPage", () => {
     render(<LoginPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Sign in")).toBeInTheDocument();
-      expect(screen.getByText("Continue with Google")).toBeInTheDocument();
-      expect(screen.getByText("Continue with Microsoft")).toBeInTheDocument();
+      expect(screen.getByText("Log in to Support Bot")).toBeInTheDocument();
+      expect(screen.getByText("Sign in with Google")).toBeInTheDocument();
+      expect(screen.getByText("Sign in with Microsoft")).toBeInTheDocument();
     });
   });
 
@@ -75,7 +75,7 @@ describe("LoginPage", () => {
 
     render(<LoginPage />);
 
-    expect(screen.getByText((_content, el) => el?.className?.includes("animate-spin") ?? false)).toBeInTheDocument();
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
 
   it("shows error from search params", async () => {
@@ -317,8 +317,8 @@ describe("LoginPage", () => {
 
       await waitFor(() => {
         expect(screen.getByText("No authentication providers configured.")).toBeInTheDocument();
-        expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
-        expect(screen.queryByText("Continue with Microsoft")).not.toBeInTheDocument();
+        expect(screen.queryByText("Sign in with Google")).not.toBeInTheDocument();
+        expect(screen.queryByText("Sign in with Microsoft")).not.toBeInTheDocument();
       });
     });
 
@@ -329,8 +329,8 @@ describe("LoginPage", () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Unable to fetch identity provider configuration from backend/)).toBeInTheDocument();
-        expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
-        expect(screen.queryByText("Continue with Microsoft")).not.toBeInTheDocument();
+        expect(screen.queryByText("Sign in with Google")).not.toBeInTheDocument();
+        expect(screen.queryByText("Sign in with Microsoft")).not.toBeInTheDocument();
       });
     });
 
@@ -346,8 +346,8 @@ describe("LoginPage", () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Unable to fetch identity provider configuration from backend/)).toBeInTheDocument();
-        expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
-        expect(screen.queryByText("Continue with Microsoft")).not.toBeInTheDocument();
+        expect(screen.queryByText("Sign in with Google")).not.toBeInTheDocument();
+        expect(screen.queryByText("Sign in with Microsoft")).not.toBeInTheDocument();
       });
     });
 
@@ -362,8 +362,8 @@ describe("LoginPage", () => {
       render(<LoginPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("Continue with Google")).toBeInTheDocument();
-        expect(screen.queryByText("Continue with Microsoft")).not.toBeInTheDocument();
+        expect(screen.getByText("Sign in with Google")).toBeInTheDocument();
+        expect(screen.queryByText("Sign in with Microsoft")).not.toBeInTheDocument();
       });
     });
 
@@ -378,8 +378,8 @@ describe("LoginPage", () => {
       render(<LoginPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("Continue with Microsoft")).toBeInTheDocument();
-        expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
+        expect(screen.getByText("Sign in with Microsoft")).toBeInTheDocument();
+        expect(screen.queryByText("Sign in with Google")).not.toBeInTheDocument();
       });
     });
 
@@ -394,9 +394,9 @@ describe("LoginPage", () => {
       render(<LoginPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("Continue with SSO")).toBeInTheDocument();
-        expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
-        expect(screen.queryByText("Continue with Microsoft")).not.toBeInTheDocument();
+        expect(screen.getByText("Sign in with SSO")).toBeInTheDocument();
+        expect(screen.queryByText("Sign in with Google")).not.toBeInTheDocument();
+        expect(screen.queryByText("Sign in with Microsoft")).not.toBeInTheDocument();
       });
     });
 
@@ -411,9 +411,9 @@ describe("LoginPage", () => {
       render(<LoginPage />);
 
       await waitFor(() => {
-        expect(screen.getByText("Continue with Google")).toBeInTheDocument();
-        expect(screen.getByText("Continue with Microsoft")).toBeInTheDocument();
-        expect(screen.getByText("Continue with SSO")).toBeInTheDocument();
+        expect(screen.getByText("Sign in with Google")).toBeInTheDocument();
+        expect(screen.getByText("Sign in with Microsoft")).toBeInTheDocument();
+        expect(screen.getByText("Sign in with SSO")).toBeInTheDocument();
         // No button for "unknown-provider" should be rendered
       });
     });
@@ -430,8 +430,8 @@ describe("LoginPage", () => {
 
       await waitFor(() => {
         expect(screen.getByText("No authentication providers configured.")).toBeInTheDocument();
-        expect(screen.queryByText("Continue with Google")).not.toBeInTheDocument();
-        expect(screen.queryByText("Continue with Microsoft")).not.toBeInTheDocument();
+        expect(screen.queryByText("Sign in with Google")).not.toBeInTheDocument();
+        expect(screen.queryByText("Sign in with Microsoft")).not.toBeInTheDocument();
       });
     });
 
@@ -471,8 +471,8 @@ describe("LoginPage", () => {
 
       render(<LoginPage />);
 
-      await waitFor(() => expect(screen.getByText("Continue with Google")).toBeInTheDocument());
-      fireEvent.click(screen.getByText("Continue with Google"));
+      await waitFor(() => expect(screen.getByText("Sign in with Google")).toBeInTheDocument());
+      fireEvent.click(screen.getByText("Sign in with Google"));
 
       expect(window.open).toHaveBeenCalledWith(
         "/api/oauth/start/google?callbackUrl=%2F",
