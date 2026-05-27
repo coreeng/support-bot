@@ -12,13 +12,12 @@ import org.springframework.stereotype.Component;
  *
  * <p>The allowed origin is derived from {@code security.oauth2.redirect-uri} (the fixed post-login
  * redirect target). Only the scheme + authority (host:port) are compared; the path must be exactly
- * {@code /api/oauth/callback/dex}. Userinfo, fragments, and ambiguous host forms are rejected.
+ * {@code /api/oauth/callback/}{@code <provider>} with a known provider id. Userinfo, fragments, and
+ * ambiguous host forms are rejected.
  */
 @Slf4j
 @Component
 public class RedirectUriValidator {
-    private static final String ALLOWED_PATH = "/api/oauth/callback/dex";
-
     private final String allowedOrigin;
 
     public RedirectUriValidator(SecurityProperties properties) {
@@ -55,8 +54,21 @@ public class RedirectUriValidator {
         }
 
         String path = uri.getPath();
-        if (!ALLOWED_PATH.equals(path)) {
-            throw new IllegalArgumentException("redirect_uri path must be " + ALLOWED_PATH);
+        if (path == null || !path.startsWith(OauthUiCallbackConstants.CALLBACK_PATH_PREFIX)) {
+            throw new IllegalArgumentException(
+                    "redirect_uri path must start with " + OauthUiCallbackConstants.CALLBACK_PATH_PREFIX);
+        }
+        if (path.contains("..")) {
+            throw new IllegalArgumentException("redirect_uri path must not contain '..' components");
+        }
+        String rest = path.substring(OauthUiCallbackConstants.CALLBACK_PATH_PREFIX.length());
+        if (rest.isEmpty() || rest.indexOf('/') >= 0) {
+            throw new IllegalArgumentException("redirect_uri path must be exactly "
+                    + OauthUiCallbackConstants.CALLBACK_PATH_PREFIX
+                    + "<provider> with no trailing slash or extra segments");
+        }
+        if (!OauthUiCallbackConstants.KNOWN_PROVIDERS.contains(rest)) {
+            throw new IllegalArgumentException("redirect_uri references unknown provider: " + rest);
         }
 
         return new ValidatedRedirectUri.Valid(canonicalRedirectUri(uri));

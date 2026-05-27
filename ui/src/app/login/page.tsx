@@ -1,17 +1,36 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
+import { isOauthUiKnownProvider, type OauthUiKnownProvider } from "@/lib/auth/oauth-ui-callback";
 import { sanitizeCallbackUrl } from "@/lib/utils/url";
+import { Loader2, ShieldCheck } from "lucide-react";
 import { signIn } from "next-auth/react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
-function isInIframe(): boolean {
-  try {
-    return window.self !== window.top;
-  } catch {
-    return true;
-  }
+type LoginProvider = OauthUiKnownProvider;
+
+function LoginShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="flex min-h-screen items-center justify-center bg-cover bg-fixed bg-center p-6"
+      style={{
+        backgroundImage: "linear-gradient(rgb(0 0 0 / 0.35), rgb(0 0 0 / 0.35)), url(/bg.png)",
+      }}
+    >
+      <Card className="w-full max-w-[28rem] gap-0 py-0">
+        <CardHeader className="justify-items-center pt-7 pb-0">
+          <Image src="/logo.png" alt="Support Bot" width={200} height={50} priority className="col-span-full dark:hidden" />
+          <Image src="/logo-dark.png" alt="Support Bot" width={200} height={50} priority className="col-span-full hidden dark:block" />
+        </CardHeader>
+        <CardContent className="px-7 pt-6 pb-7">{children}</CardContent>
+      </Card>
+    </div>
+  );
 }
 
 function LoginContent() {
@@ -19,22 +38,48 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading } = useAuth();
   const authAttemptedRef = useRef(false);
-  // Tracked as React state (not refs) so the bfcache-restore handler below can
-  // re-render the page out of the "Redirecting to sign-in..." spinner.
-  const [autoRedirectAttempted, setAutoRedirectAttempted] = useState(false);
-  const [autoRedirecting, setAutoRedirecting] = useState(false);
+  const [providers, setProviders] = useState<LoginProvider[]>(["google", "azure"]);
+  const [providersLoading, setProvidersLoading] = useState(true);
+  const [providersError, setProvidersError] = useState(false);
 
   const code = searchParams.get("code");
+  const provider = searchParams.get("provider");
+  const token = searchParams.get("token");
   const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const error = searchParams.get("error");
 
-  // Iframe: listen for auth completion from popup
+  useEffect(() => {
+    if (isAuthenticated) return;
+
+    fetch("/api/identity-providers", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) {
+          console.error("[Login] Failed to fetch providers from backend");
+          setProvidersError(true);
+          setProviders([]);
+        } else {
+          const availableProviders = (data.providers || []).filter((p: string): p is LoginProvider => isOauthUiKnownProvider(p));
+          setProviders(availableProviders);
+          setProvidersError(false);
+        }
+      })
+      .catch((error) => {
+        console.error("[Login] Exception fetching providers:", error);
+        setProvidersError(true);
+        setProviders([]);
+      })
+      .finally(() => {
+        setProvidersLoading(false);
+      });
+  }, [isAuthenticated]);
+
+  const showProvidersLoading = !isAuthenticated && providersLoading;
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type === "auth:success") {
-        // Popup completed signIn — session cookie is already set (shared origin).
-        // Sanitize the callbackUrl from the message to prevent open redirects.
         window.location.href = sanitizeCallbackUrl(event.data.callbackUrl);
       }
     };
@@ -42,29 +87,12 @@ function LoginContent() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  // bfcache: when the browser restores this page after the user pressed "back" from Dex,
-  // clear the spinner so the SSO button renders as a fallback. autoRedirectAttempted stays
-  // true so the auto-redirect effect doesn't re-fire and bounce the user straight back.
-  useEffect(() => {
-    const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) {
-        setAutoRedirecting(false);
-      }
-    };
-    window.addEventListener("pageshow", handlePageShow);
-    return () => window.removeEventListener("pageshow", handlePageShow);
-  }, []);
-
   useEffect(() => {
     if (isLoading) return;
-
-    // Don't retry if we already attempted authentication with this code
     if (authAttemptedRef.current) return;
 
-    // Detect if we're in a popup opened by the iframe
     const isPopup = !!window.opener && !window.opener.closed;
 
-    // Helper to perform sign-in with consistent error handling
     const performSignIn = (providerId: string, credentials: Record<string, string>) => {
       signIn(providerId, { ...credentials, redirect: false })
         .then((result) => {
@@ -72,7 +100,6 @@ function LoginContent() {
             router.replace(`/login?error=${encodeURIComponent(result.error)}`);
             return;
           }
-          // Success: different action for popup vs non-popup
           if (isPopup) {
             window.opener!.postMessage({ type: "auth:success", callbackUrl }, window.location.origin);
             window.close();
@@ -85,48 +112,39 @@ function LoginContent() {
         });
     };
 
-    if (code) {
+    if (token) {
       authAttemptedRef.current = true;
-      performSignIn("backend-code", { code });
+      performSignIn("backend-token", { token });
       return;
     }
 
-    // If already authenticated, redirect
+    if (code && provider) {
+      authAttemptedRef.current = true;
+      performSignIn("backend-code", { code, provider });
+      return;
+    }
+
     if (isAuthenticated) {
       router.replace(callbackUrl);
     }
-  }, [code, isAuthenticated, isLoading, callbackUrl, router]);
+  }, [code, provider, token, isAuthenticated, isLoading, callbackUrl, router]);
 
-  // Auto-redirect to Dex on mount. Skipped on iframes (popups need a user gesture),
-  // when an in-flight code is being completed, or when an error is being shown —
-  // those paths need the page to render so the user sees the message or completes the flow.
-  useEffect(() => {
-    if (autoRedirectAttempted) return;
-    if (isLoading) return;
-    if (isAuthenticated) return;
-    if (error || code) return;
-    if (isInIframe()) return;
+  const handleLogin = (loginProvider: LoginProvider) => {
+    const oauthUrl = `/api/oauth/start/${loginProvider}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
 
-    const redirectTimer = window.setTimeout(() => {
-      setAutoRedirectAttempted(true);
-      setAutoRedirecting(true);
-      window.location.href = `/api/oauth/start/dex?callbackUrl=${encodeURIComponent(callbackUrl)}`;
-    }, 0);
+    const isInIframe = (() => {
+      try {
+        return window.self !== window.top;
+      } catch {
+        return true;
+      }
+    })();
 
-    return () => window.clearTimeout(redirectTimer);
-  }, [autoRedirectAttempted, isLoading, isAuthenticated, error, code, callbackUrl]);
-
-  const handleLogin = () => {
-    // OAuth goes through API route - server handles redirect to backend
-    // Include callbackUrl so user returns to the right page after login
-    const oauthUrl = `/api/oauth/start/dex?callbackUrl=${encodeURIComponent(callbackUrl)}`;
-
-    if (!isInIframe()) {
+    if (!isInIframe) {
       window.location.href = oauthUrl;
       return;
     }
 
-    // Popup mode for iframes
     const width = 600;
     const height = 720;
     const left = window.screenX + (window.outerWidth - width) / 2;
@@ -140,99 +158,104 @@ function LoginContent() {
     }
   };
 
-  // Show loading state during auth checks, in-flight callbacks, or while the auto-redirect is firing.
-  // The pre-emptive `willAutoRedirectSoon` clause covers the gap between first render and
-  // the effect firing, so the SSO button doesn't flicker into view; once the effect has run,
-  // `autoRedirectAttempted` flips and only the `autoRedirecting` state controls the spinner —
-  // which the bfcache pageshow handler clears when the user pressed Back from Dex.
-  const willAutoRedirectSoon = !autoRedirectAttempted && !isLoading && !isAuthenticated && !error && !code && !isInIframe();
-  const showSpinner = isLoading || autoRedirecting || willAutoRedirectSoon || (code && !error);
-  if (showSpinner) {
-    const message = code
-      ? "Completing authentication..."
-      : autoRedirecting || willAutoRedirectSoon
-        ? "Redirecting to sign-in..."
-        : "Loading...";
+  if (isLoading || showProvidersLoading || ((code || token) && !error)) {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="border-foreground mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2"></div>
-          <p className="text-muted-foreground">{message}</p>
+      <LoginShell>
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+          <p className="text-muted-foreground text-sm">{code || token ? "Completing authentication..." : "Loading..."}</p>
         </div>
-      </div>
+      </LoginShell>
     );
   }
 
   if (error === "configuration") {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center">
-        <div className="w-full max-w-md space-y-8 p-8 text-center">
-          <h2 className="text-foreground text-2xl font-bold">Sign-in unavailable</h2>
-          <p className="text-muted-foreground">
-            This deployment is misconfigured: the public app URL (<code className="text-sm">NEXTAUTH_URL</code>) must be set and must match
-            the API&apos;s expected UI origin (<code className="text-sm">UI_ORIGIN</code>). Contact your administrator.
-          </p>
-          <button type="button" onClick={() => router.replace("/login")} className="text-primary hover:underline">
+      <LoginShell>
+        <h1 className="text-foreground text-xl font-bold tracking-tight">Sign-in unavailable</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          This deployment is misconfigured: <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">NEXTAUTH_URL</code> must be set
+          and must match <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">UI_ORIGIN</code>. Contact your administrator.
+        </p>
+        <div className="mt-4 text-center">
+          <Button variant="link" onClick={() => router.replace("/login")} className="text-muted-foreground text-xs">
             Back to login
-          </button>
+          </Button>
         </div>
-      </div>
+      </LoginShell>
     );
   }
 
-  // Show not-onboarded message for allow-list rejections
   if (error === "user_not_allowed") {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center">
-        <div className="w-full max-w-md space-y-8 p-8 text-center">
-          <h2 className="text-foreground text-2xl font-bold">Access Restricted</h2>
-          <p className="text-muted-foreground">
-            You have successfully authenticated but your user has not been onboarded to the Support UI.
-          </p>
-          <p className="text-muted-foreground text-sm">Please contact your administrator for access.</p>
-          <button onClick={() => router.replace("/login")} className="text-primary hover:underline">
+      <LoginShell>
+        <h1 className="text-foreground text-xl font-bold tracking-tight">Access Restricted</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          You have successfully authenticated but your user has not been onboarded to the Support UI.
+        </p>
+        <p className="text-muted-foreground mt-1 text-xs">Please contact your administrator for access.</p>
+        <div className="mt-4 text-center">
+          <Button variant="link" onClick={() => router.replace("/login")} className="text-muted-foreground text-xs">
             Back to login
-          </button>
+          </Button>
         </div>
-      </div>
+      </LoginShell>
     );
   }
 
-  // Show error if present
   if (error) {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center">
-        <div className="w-full max-w-md space-y-8 p-8 text-center">
-          <h2 className="text-destructive text-2xl font-bold">Authentication Error</h2>
-          <p className="text-muted-foreground">{error}</p>
-          <button onClick={() => router.replace("/login")} className="text-primary hover:underline">
+      <LoginShell>
+        <h1 className="text-foreground text-xl font-bold tracking-tight">Authentication Error</h1>
+        <div className="bg-destructive/10 text-destructive border-destructive/30 mt-3 rounded-md border px-3 py-2.5 text-sm">{error}</div>
+        <div className="mt-4 text-center">
+          <Button variant="link" onClick={() => router.replace("/login")} className="text-muted-foreground text-xs">
             Try again
-          </button>
+          </Button>
         </div>
-      </div>
+      </LoginShell>
     );
   }
 
-  // Iframe path (popups need a user gesture) and bfcache fallback (when the user pressed
-  // Back from Dex) both render the SSO button so the user can complete login manually.
   return (
-    <div className="bg-background flex min-h-screen items-center justify-center">
-      <div className="w-full max-w-md space-y-8 p-8">
-        <div className="text-center">
-          <h2 className="text-foreground text-3xl font-bold">Sign in</h2>
-          <p className="text-muted-foreground mt-2">Choose your authentication method</p>
-        </div>
-
-        <div className="space-y-4">
-          <button
-            onClick={handleLogin}
-            className="border-border bg-card hover:bg-accent text-foreground flex w-full items-center justify-center gap-3 rounded-lg border px-4 py-3 font-medium shadow-sm transition-colors"
-          >
-            Continue with SSO
-          </button>
-        </div>
+    <LoginShell>
+      <div className="mb-4">
+        <h1 className="text-foreground text-xl font-bold tracking-tight">Log in to Support Bot</h1>
+        <p className="text-muted-foreground mt-1 text-sm">Choose a sign-in method to continue.</p>
+        <Separator className="mt-3" />
       </div>
-    </div>
+
+      {providersError && (
+        <div className="bg-destructive/10 text-destructive border-destructive/30 mb-3 rounded-md border px-3 py-2.5 text-center text-sm">
+          Unable to fetch identity provider configuration from backend.
+        </div>
+      )}
+
+      {!providersError && providers.length === 0 && (
+        <p className="text-muted-foreground py-2 text-center text-sm">No authentication providers configured.</p>
+      )}
+
+      <div className="flex flex-col gap-2.5">
+        {providers.includes("google") && (
+          <Button variant="outline" size="lg" className="w-full gap-2.5" onClick={() => handleLogin("google")}>
+            <Image src="/google.svg" alt="" width={20} height={20} className="size-5" />
+            Sign in with Google
+          </Button>
+        )}
+        {providers.includes("azure") && (
+          <Button variant="outline" size="lg" className="w-full gap-2.5" onClick={() => handleLogin("azure")}>
+            <Image src="/microsoft.svg" alt="" width={20} height={20} className="size-5" />
+            Sign in with Microsoft
+          </Button>
+        )}
+        {providers.includes("dex") && (
+          <Button variant="outline" size="lg" className="w-full gap-2.5" onClick={() => handleLogin("dex")}>
+            <ShieldCheck className="size-5" />
+            Sign in with SSO
+          </Button>
+        )}
+      </div>
+    </LoginShell>
   );
 }
 
@@ -240,9 +263,11 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="bg-background flex min-h-screen items-center justify-center">
-          <div className="border-foreground h-8 w-8 animate-spin rounded-full border-b-2"></div>
-        </div>
+        <LoginShell>
+          <div className="flex justify-center">
+            <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+          </div>
+        </LoginShell>
       }
     >
       <LoginContent />

@@ -60,11 +60,7 @@ Then("I should be redirected to the login page", async function (this: CustomWor
   const currentUrl = this.page.url();
   const url = new URL(currentUrl);
 
-  // The login flow is a chain: proxy redirects unauthenticated users to /login,
-  // which immediately auto-redirects to /api/oauth/start/dex (the only configured
-  // OAuth provider). Either waypoint satisfies "user is being asked to log in" —
-  // both carry the original callbackUrl so the subsequent assertion still works.
-  expect(["/login", "/api/oauth/start/dex"]).toContain(url.pathname);
+  expect(url.pathname).toBe("/login");
 });
 
 Then("the callback URL should be {string}", async function (this: CustomWorld, expectedCallback: string) {
