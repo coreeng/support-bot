@@ -1,12 +1,41 @@
 ---
 name: doc-categorise
-description: Use when auditing a repository's markdown documentation to produce a strict Diátaxis-organised copy under docs/ (or docs.proposed/), rewriting or splitting pages that aren't a perfect match for a single Diátaxis type, without ever modifying or moving the originals, and emit an executive report of what changed.
+description: Use when auditing a repository's markdown documentation for Diátaxis classification, journey-coverage gaps, audience drift, duplication candidates, and quality issues. Produces a stakeholder report identifying coverage gaps and a prioritised list of next actions; optionally also produces a Diátaxis-organised copy tree under docs/ (or docs.proposed/) by rewriting or splitting drift pages. Originals are never modified.
 ---
 
 # doc-categorise
 
 ## When to use
-Use this when the user asks to "categorise", "categorize", "audit", "restructure", "rewrite", "Diátaxis-ify", or "reorganise into tutorials/how-to/reference/explanation" the markdown docs in a repository. Output is a brand-new tree alongside the originals; originals are never edited, moved, renamed, or deleted.
+Use this when the user asks to "categorise", "categorize", "audit", "restructure", "rewrite", "Diátaxis-ify", "reorganise into tutorials/how-to/reference/explanation", or "find documentation gaps" in a repository. Outputs are configurable via the execution mode: `full` produces both the rewritten tree and a report; `report-only` produces only the report. In either mode, originals are never edited, moved, renamed, or deleted.
+
+## Documentation model
+
+The skill operates on a small, explicit model of what good documentation is. Every rule in this skill maps to one of these principles or to a deliberately-scoped quality-of-life feature. The skill does NOT enforce anything outside this model.
+
+**Principles the skill enforces:**
+
+1. **User-focused** — every documentation page targets an intended User (a persona). The skill detects audience via content signals and journey-supplied user labels, and reports drift between authored intent and how the page actually reads. (Operationalised in `references/audience-tagging.md`.)
+
+2. **Two audience tiers**:
+   - **Product-level documentation** (reference, explanation, how-to) aimed at the product's builders/maintainers — anyone who extends, operates, or repairs the product.
+   - **Journey-level documentation** (end-to-end how-to) aimed at end-users — the people who consume the product through its supported journeys.
+
+3. **Journey-level coverage** — every supplied journey should have at least one matching how-to. Missing how-tos are the **only** "high"-severity actions the skill emits. (Operationalised in `references/gap-analysis.md` Part A.)
+
+4. **Single-type focus** — each piece of documentation should target exactly one of the four Diátaxis types (tutorial, how-to, reference, explanation). Pages that straddle types are classified as REWRITE (drift toward a dominant intent) or SPLIT (multiple distinct intents).
+
+**Things the skill explicitly does NOT assert:**
+
+- That every product must carry all of reference + explanation + how-to. Product-level coverage (Subsection B of Coverage analysis) is reported descriptively as counts; the reader judges per-product whether the spread is right.
+- That documentation must follow any particular style guide. Style consistency is gated on a style guide being explicitly defined; deferred.
+- Factual correctness. "Incorrect bits" require an oracle of correctness; out of scope.
+
+**Quality-of-life features** (reported alongside the principles above but not derived from them):
+
+- **Duplication candidates** — structural clustering by `(journey, type, variation)` tuple. See `references/duplication.md`.
+- **Quality flags** — deterministic `hollow` (stub) and `stale-marker` (explicit `deprecated`/`TODO`) checks. See `references/quality-flags.md`.
+
+These are general documentation-hygiene checks; the skill does not claim they are part of any principle.
 
 ## Reference materials
 
@@ -20,10 +49,10 @@ Load order:
 - `references/decision-rubric.md` — load **on demand**, when the compass is ambiguous, content is mixed, or no type fits. Fixed-procedure rubric covering SPLIT, OUTLIER, low-confidence, and user-escalation cases.
 - `references/journey-matching.md` — load **after classification completes, once per run, only if `journeys` is non-empty**. Specifies the two-pass hybrid procedure (deterministic + LLM) that tags each scanned page with journey relevance (name, variation, confidence).
 - `references/audience-tagging.md` — load **after journey matching completes, once per run, always**. Specifies how to assign an audience tier (builder/maintainer vs end-user) and detailed audience labels to each scanned page, plus the mismatch-detection procedure.
-- `references/gap-analysis.md` — load **after audience tagging completes, once per run, always**. Specifies per-journey coverage verdicts (covered/partial/missing) and product-level R/E/H presence checks. Produces the Coverage analysis section of REPORT.md.
+- `references/gap-analysis.md` — load **after audience tagging completes, once per run, always**. Specifies per-journey coverage verdicts (covered/partial/missing) and descriptive product-level page counts by Diátaxis type. Produces the Coverage analysis section of REPORT.md.
 - `references/duplication.md` — load **after gap analysis completes, once per run, always**. Specifies the intentionally minimal duplication-candidate rule: structural grouping by `(journey, Diátaxis type, variation)`, no LLM judgement. Read its "What this does NOT catch" section before interpreting the cluster output.
 - `references/quality-flags.md` — load **after duplication detection completes, once per run, always**. Specifies the two deterministic quality flags (`hollow` and `stale-marker`), with no LLM judgement. Read its "What this does NOT catch" section before interpreting the output.
-- `references/suggested-actions.md` — load **after quality flags complete, once per run, always**. Specifies the deterministic synthesis that turns prior-step outputs into a single prioritised list of recommended actions, using a fixed enum of ten action types and three severity tiers.
+- `references/suggested-actions.md` — load **after quality flags complete, once per run, always**. Specifies the deterministic synthesis that turns prior-step outputs into a single prioritised list of recommended actions, using a fixed enum of nine action types and three severity tiers.
 - `references/examples.md` — load **on demand**, when you need a worked exemplar to pattern-match against. Optional.
 
 Do not invent disambiguation logic. If you reach a case the rubric does not cover, escalate to the user using the scoring format the rubric specifies.
@@ -93,7 +122,7 @@ Field semantics:
 
 If journey matching produced at least one match for the source page (per `references/journey-matching.md`), an additional `journeys:` field is appended to the frontmatter — see that reference file for the schema. Omit the field entirely when the match list is empty; do not emit `journeys: []`.
 
-An `audience:` block is **always** appended to the frontmatter (per `references/audience-tagging.md`), regardless of journey-match status. It carries `tier` (the binary `builder/maintainer` vs `end-user` from the team's "good docs" definition), `labels` (free-form list), `confidence`, `source`, and an optional `mismatch` block when journey-supplied audience disagrees with content-inferred audience. See the reference file for the schema.
+An `audience:` block is **always** appended to the frontmatter (per `references/audience-tagging.md`), regardless of journey-match status. It carries `tier` (the binary `builder/maintainer` vs `end-user` used by this skill), `labels` (free-form list), `confidence`, `source`, and an optional `mismatch` block when journey-supplied audience disagrees with content-inferred audience. See the reference file for the schema.
 
 Feature data resolved from `product-definition/` is **not** injected into output frontmatter as a standalone field. Downstream consumers join back to the input journey list via the journey `name` to recover feature context.
 
@@ -125,7 +154,7 @@ The mode is per-run; it is not persisted.
 - Process steps "write generated files" and "copy assets" are skipped.
 - The report's structure is identical to a `full`-mode report. "Output path" columns in PERFECT/REWRITE/SPLIT tables describe the path the file *would have been at* in `full` mode (the placement map is computed but not materialised on disk).
 
-This mode is a deliberate temporary affordance for stakeholder demos where the rewritten tree adds noise. It may be removed once the team is comfortable with the tree-producing behaviour.
+This mode is a deliberate temporary affordance for stakeholder demos where the rewritten tree adds noise. It may be removed in a future version of the skill once the default tree-producing behaviour is the more common choice.
 
 ## Output root resolution
 
@@ -195,10 +224,10 @@ Collision resolution: if two outputs would share the same `<output_root>/<catego
 3. For each source file: extract frontmatter, headings, and a content sample; classify per the Classification section (applying `references/compass.md` and `references/types.md`, escalating to `references/decision-rubric.md` for ambiguous cases) as PERFECT-<type>, REWRITE-<type>, SPLIT-<types>, or OUTLIER.
 4. If `journeys` is non-empty, tag each source file with journey relevance per `references/journey-matching.md`. Skipped entirely when `journeys = []`.
 5. Tag each source file with audience per `references/audience-tagging.md`. Always runs. Uses journey-relevance results from step 4 when available; falls back to content inference when no journey match exists or the matched journey has no `users:` field.
-6. Compute coverage gaps per `references/gap-analysis.md`. Always runs. Produces a per-journey coverage verdict (covered/partial/missing) — Part A skipped when `journeys = []` — and product-level R/E/H presence counts (Part B always).
+6. Compute coverage gaps per `references/gap-analysis.md`. Always runs. Produces a per-journey coverage verdict (covered/partial/missing) — Part A skipped when `journeys = []` — and descriptive product-level page counts at the builder/maintainer audience tier (Part B always).
 7. Identify duplication candidates per `references/duplication.md`. Always runs (section appears in REPORT.md either way); pages without strong journey matches are not analysed.
 8. Apply quality flags per `references/quality-flags.md`. Always runs. Two deterministic checks: `hollow` (mostly empty page) and `stale-marker` (explicit deprecation/TODO keywords).
-9. Synthesise suggested actions per `references/suggested-actions.md`. Always runs. Walks the outputs of steps 3–8 and emits one action per matching signal from a fixed enum of ten action types and three severity tiers.
+9. Synthesise suggested actions per `references/suggested-actions.md`. Always runs. Walks the outputs of steps 3–8 and emits one action per matching signal from a fixed enum of nine action types and three severity tiers.
 10. Build the global placement map (paths + collision resolution). Always runs — the placement map is needed for the REPORT.md tables even in `report-only` mode.
 11. In `full` mode: write generated files, copy assets, rewrite links using the placement map. **Skipped in `report-only` mode.**
 12. Write the report. In `full` mode: `<output_root>/REPORT.md`. In `report-only` mode: `<repo_root>/doc-categorise-report.md`.
@@ -207,6 +236,19 @@ Collision resolution: if two outputs would share the same `<output_root>/<catego
 ## Executive report format (`REPORT.md`)
 
 REPORT.md is organised in two reader-priority blocks separated by a divider. The **exec block** carries actions, gaps, and signal summaries — what an executive reader needs. The **engineer block** carries per-page classification detail behind a `## Detail for reviewers` H2 divider that lets exec readers stop at a clear boundary.
+
+### Cross-section consistency invariants (read before generating any section)
+
+The per-page journey-relevance and audience tags emitted in REPORT.md's Sections 8 (Copied verbatim) and 9 (Rewritten) are the **ground truth** for every aggregated count elsewhere in the report. The following invariants MUST hold across the whole report. They are not aspirational — they are required, and the agent MUST self-check every aggregated count against the per-page tags before emitting the report.
+
+1. **Journey coverage table (Section 3 Subsection A)** — for every journey row, `strong_how_to_count` and `weak_how_to_count` MUST equal the count of pages in Sections 8/9 tagged with that journey at the corresponding confidence, restricted to `how-to` Diátaxis verdicts. See `references/gap-analysis.md` Step 4b for the explicit self-check.
+2. **Per-journey page count table (Section 4 Part A)** — for every journey row, the per-Diátaxis-type cell counts MUST equal the count of pages in Sections 8/9 tagged with that journey at any confidence, broken down by Diátaxis type. The parenthetical `(N weak)` annotation MUST equal the count restricted to weak matches.
+3. **Duplication clusters (Section 5)** — every cluster MUST consist of pages tagged with the cluster's journey at confidence `strong` in Sections 8/9, with matching Diátaxis type and variation.
+4. **Suggested actions (Section 2)** — every action MUST correspond 1:1 with a triggering signal as defined in `references/suggested-actions.md`. The "Top 3 risks" list MUST be the first three rows of the same action table.
+
+**No re-judgement.** The journey-matching, audience-tagging, and classification steps already decided which pages match which journeys, what audience they read for, and what Diátaxis type they are. Later aggregations count and cross-reference; they do NOT re-evaluate. If the agent is tempted to filter or downgrade a per-page tag while building an aggregated count, that's a violation of these invariants — re-run the relevant judgement step instead.
+
+If an invariant cannot be satisfied, the per-page tags are the source of truth — re-derive the aggregate, do not adjust the per-page tags.
 
 ### Header and conventions preamble
 
@@ -239,7 +281,7 @@ When `journeys = []`, omit both the conventions blockquote and the TL;DR — the
 
 - **Summary**: total source files scanned, counts per category, counts of PERFECT / REWRITTEN / SPLIT / OUTLIER, asset count, unresolved-link count, **audience tier counts** (`end-user X, builder/maintainer Y`), and **suggested actions count** (`Suggested actions: N (high X · medium Y · low Z)`). Render as a single concise table. Do **not** repeat the output root or the run mode here — both are already in the header metadata.
 - **Suggested actions** (always): deterministic synthesis of prior sections per `references/suggested-actions.md`. Sorted by severity (high → low). Columns: severity, action type, one-line description, source reference. Shows "No suggested actions" when nothing fires. Placed second so stakeholders see the action list immediately after the summary; forward references to later sections are intentional and fine.
-- **Coverage analysis** (always): two subsections per `references/gap-analysis.md`. Subsection A — per-journey coverage verdicts (covered/partial/missing) with reasons, how-to counts (strong/weak), other-type counts, and variation status; replaced with "No journeys were supplied for this run." when `journeys = []`. Subsection B — builder/maintainer audience page counts by Diátaxis type, with flags for any of R/E/H at zero.
+- **Coverage analysis** (always): two subsections per `references/gap-analysis.md`. Subsection A — per-journey coverage verdicts (covered/partial/missing) with reasons, how-to counts (strong/weak), other-type counts, and variation status; replaced with "No journeys were supplied for this run." when `journeys = []`. Subsection B — descriptive page counts by Diátaxis type at the builder/maintainer audience tier. No flags; no assertion that any tier must be present.
 - **Journey relevance summary** (only if `journeys` was non-empty for the run): per-journey page-count table by Diátaxis type, plus a "Pages with no journey match" table, plus an **"Audience mismatches"** subtable per `references/audience-tagging.md`. If no mismatches were detected, the subtable shows "No audience mismatches detected." See `references/journey-matching.md` and `references/audience-tagging.md` for the column specs.
 - **Duplication candidates** (always): clusters of pages sharing the same `(journey, Diátaxis type, variation)` tuple. Includes the explicit "what this does NOT catch" preamble per `references/duplication.md`. Shows "No duplicate candidates detected by the (journey, type, variation) rule." or "Duplication detection requires a journey list; none was supplied." when applicable.
 - **Quality flags** (always): pages flagged as `hollow` or carrying `stale-marker` keywords, per `references/quality-flags.md`. Includes the same "what this does NOT catch" preamble. Shows "No hollow pages or stale markers detected." when none found.

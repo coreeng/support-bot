@@ -15,7 +15,7 @@ There are two routes to resolve these values:
 1. A `product-definition/` folder at the root of the repository being scanned (preferred — durable, version-controlled, reusable).
 2. An interactive paste fallback at run time (used when the folder is missing or invalid).
 
-The skill ingests this data only. It does **not** yet use journeys, users, features, or variations for classification, journey-relevance tagging, audience inference, gap analysis, or per-row suggested actions. Those are downstream steps and will be specified separately. For now, this file defines what comes in and where it lives.
+This file defines the input data shape. Downstream steps consume the resolved values: journey matching uses `name`, `description`, and `variations`; audience tagging uses `users`; gap analysis uses `variations`; suggested-actions synthesis uses the journey list and verdicts. `feature` is currently informational (preserved in the input but not consumed by any downstream rule).
 
 ## Location
 

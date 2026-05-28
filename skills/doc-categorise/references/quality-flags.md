@@ -55,7 +55,7 @@ The following are documented here so stakeholders reading the report know the li
 - **Vague prose** — pages that are well-formed but say nothing useful. Detecting this requires LLM judgement and is deferred.
 - **Factual contradictions between pages.** "Incorrect" is hard to define without an oracle of correctness; deferred.
 - **Stale-by-context** — a page that doesn't mention "deprecated" but is implicitly outdated (refers to a removed component, uses an old API shape, mentions a version no longer in use). Requires LLM judgement and repo context; deferred.
-- **Style / tone inconsistency** — pages that don't match the org's documentation style. Gated on defining that style explicitly; deferred.
+- **Style / tone inconsistency** — pages that don't match a documented style guide. Gated on a style guide being explicitly defined; deferred.
 - **Low-confidence Diátaxis classification.** Already flagged in REPORT.md's "Risk and follow-ups" section; not duplicated here.
 - **Drift between Diátaxis types.** Already handled by REWRITE/SPLIT verdicts in classification.
 

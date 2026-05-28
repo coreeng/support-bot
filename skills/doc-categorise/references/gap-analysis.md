@@ -1,6 +1,6 @@
 ---
 name: Gap analysis
-description: How the skill computes coverage gaps — per-journey verdicts (covered/partial/missing) with reasons, plus product-level R/E/H presence checks. Load once per run, after audience tagging, before the placement map. Produces a coverage report for stakeholder discussion.
+description: How the skill computes coverage gaps — per-journey verdicts (covered/partial/missing) with reasons, plus descriptive product-level page counts by Diátaxis type. Load once per run, after audience tagging, before the placement map. Produces a coverage report for stakeholder discussion.
 ---
 
 # Gap analysis
@@ -17,7 +17,7 @@ The output is a coverage analysis written into REPORT.md. Gap analysis is per-jo
 
 **Per-run outputs:**
 - **Journey coverage** — one record per supplied journey with `verdict`, reasons, variation status, and counts.
-- **Product-level coverage** — counts of builder/maintainer-audience pages by Diátaxis type, plus flags for any of R/E/H at zero.
+- **Product-level coverage** — descriptive counts of builder/maintainer-audience pages by Diátaxis type. No flags; no assertion that any tier must be present.
 
 ## Procedure
 
@@ -55,9 +55,13 @@ The agent answers:
 - `end_to_end: yes` — the matched how-tos collectively walk the reader from start to finish of the journey, covering every essential step.
 - `end_to_end: no` — one or more essential steps are missing. Provide one short sentence naming the missing step(s).
 
-#### Step 4 — Determine verdict
+#### Step 4 — Determine verdict (counts-driven, no re-judgement)
 
-Apply the following rules in order:
+**The verdict is determined SOLELY by the counts collected in Step 1.** This step counts; it does NOT re-evaluate whether a tagged match "really counts" or is "too tangential". The journey-matching procedure in `references/journey-matching.md` is the only place where the line between strong, weak, and not-a-match is drawn; that decision is final.
+
+If you find yourself reasoning "these matches are tangential, so I'll exclude them" or "the weak matches don't really cover the journey" — **STOP**. The page is in `weak_how_to` because the journey-matching step decided it was a partial-coverage match; that is exactly what `weak` means. Re-judging here breaks consistency with the per-page tags emitted in REPORT.md Sections 8 and 9 (and would, for the same journey, produce a Section 3 row that contradicts the per-page tags shown elsewhere in the same report).
+
+Apply the following rules in order. The first rule that matches wins.
 
 1. `strong_how_to` empty AND `weak_how_to` empty AND `non_how_to` empty → **missing**. Reason: `no matching pages`.
 2. `strong_how_to` empty AND `weak_how_to` empty AND `non_how_to` non-empty → **partial**. Reason: `no how-to; only non-how-to types matched: [comma-separated type list]`.
@@ -67,6 +71,50 @@ Apply the following rules in order:
    - Read the end-to-end result from Step 3.
    - If variation gaps OR `end_to_end: no` → **partial**. Reasons: `missing variations: [list]` and/or `not end-to-end: [missing-step sentence]`.
    - Else → **covered**. No reasons.
+
+#### Step 4a — Enumerated reasons (the ONLY allowed values)
+
+The `reasons` field accepts ONLY the following strings (with bracketed placeholders filled in from the data). The skill MUST NOT emit any other reason text.
+
+| Reason string | When |
+| --- | --- |
+| `no matching pages` | verdict `missing` (rule 1) |
+| `no how-to; only non-how-to types matched: [type list]` | verdict `partial` (rule 2) |
+| `weak how-to matches only — investigate` | verdict `partial` (rule 3) |
+| `missing variations: [variation list]` | verdict `partial` (rule 4, variation gap) |
+| `not end-to-end: [missing-step sentence from Step 3]` | verdict `partial` (rule 4, end-to-end check returned `no`) |
+
+Editorial commentary in any other form is **prohibited**. Reasons like `"tangential matches"`, `"page only mentions the topic"`, `"doesn't cover this directly"`, `"only autoscaling docs touch it"` are all forbidden — those are judgements that belong in the journey-matching step, not here. If you cannot express the verdict's justification with one of the five strings above, the verdict logic produced an unexpected state — re-run the verdict procedure rather than inventing a new reason.
+
+#### Step 4b — Mandatory self-consistency check (run before emitting Section 3)
+
+For every journey row in Section 3 Subsection A, verify:
+
+`row.strong_how_to_count` MUST equal the count of pages in REPORT.md Sections 8 (Copied verbatim) and 9 (Rewritten) such that:
+- the page's Diátaxis type is `how-to`, AND
+- the page's `journeys` column lists this journey at confidence `strong`.
+
+`row.weak_how_to_count` MUST equal the same count restricted to confidence `weak`.
+
+If the counts disagree, the per-page tags in Sections 8/9 are the **ground truth** — re-derive Section 3's counts from them. Do **not** "fix" the disagreement by changing tags in Sections 8/9. The journey-matching step is the only place where journey-relevance tags are decided, and it has already run for the day.
+
+The check must pass for every row. If it cannot pass, the count was wrong, not the tags.
+
+#### Step 4c — Worked example of the bug this prevents
+
+Suppose journey "X" has two pages tagged `(X, weak)` in the journey-matching step, both with Diátaxis type `how-to`.
+
+**Correct verdict**: `partial`, reason `weak how-to matches only — investigate` (rule 3 above).
+
+**Incorrect verdict**: `missing`, with a freshly-invented reason like `"only tangential pages touch it"`.
+
+The incorrect verdict is wrong on three counts:
+
+1. The journey-matching step already labelled those pages as relevant — that's what `weak` means. The verdict step counts; it does not re-evaluate that label.
+2. The reason string isn't in the enumerated list in Step 4a — it's editorial, which is prohibited.
+3. The verdict contradicts the per-page tags REPORT.md Sections 8/9 will still emit, breaking cross-section consistency (Step 4b would fail).
+
+If the agent is tempted to add custom reasoning, that's a signal the journey-matching step may have been too generous and the matches should be re-evaluated **there** — not filtered here.
 
 #### Step 5 — Record
 
@@ -84,30 +132,24 @@ variations:                              # absent when journey has no variations
 end_to_end: yes | no | n/a               # "n/a" when the check was not run
 ```
 
-### Part B — Product-level coverage
+### Part B — Product-level coverage (descriptive)
 
-Always runs, regardless of whether `journeys` is empty. Per the team's "good docs" definition, product-level documentation comprises reference, explanation, and how-to types aimed at builders/maintainers.
+Always runs, regardless of whether `journeys` is empty. Reports the counts of pages at the builder/maintainer audience tier, grouped by Diátaxis type. This is **purely descriptive** — it surfaces how the product-level documentation is composed so stakeholders can see the spread.
+
+The skill does **NOT** assert that every product must have all of reference + explanation + how-to. Whether a missing tier is a problem depends on the product (a small CLI may legitimately have only how-tos; a complex platform usually needs all three). The skill reports what's there and lets the reader judge.
 
 #### Step 1 — Count
 
 Count every scanned page whose `audience.tier = builder/maintainer`, grouped by Diátaxis type:
+
 - `reference_count`
 - `explanation_count`
 - `how_to_count`
-- `tutorial_count` (informational only — tutorials are not part of the team's product-level expectation, but reported for completeness)
+- `tutorial_count`
 
 Outliers do not count (they are not audience-tagged).
 
-#### Step 2 — Flag
-
-For each of the three core types (R/E/H), emit a flag if the count is zero:
-- "No reference documentation for builders/maintainers detected."
-- "No explanation documentation for builders/maintainers detected."
-- "No how-to documentation for builders/maintainers detected."
-
-If all three are non-zero, the flag list is empty.
-
-#### Step 3 — Record
+#### Step 2 — Record
 
 ```yaml
 builder_maintainer:
@@ -115,8 +157,9 @@ builder_maintainer:
   explanation_count: N
   how_to_count: N
   tutorial_count: N
-  flags: ["<flag 1>", ...]
 ```
+
+No flags. No verdict. No automatic suggested action. The counts stand on their own.
 
 ## What `partial` means
 
@@ -145,7 +188,7 @@ Sort: `missing` first, then `partial`, then `covered`. Within each verdict, pres
 
 ### Subsection B — Product-level coverage
 
-A small block showing builder/maintainer audience page counts by Diátaxis type, followed by flags:
+A small block showing builder/maintainer audience page counts by Diátaxis type. This is **descriptive only** — the skill makes no assertion that any of these types must be present for a given product. The counts surface the composition so the reader can judge per product.
 
 ```
 Builder/maintainer audience pages:
@@ -153,12 +196,9 @@ Builder/maintainer audience pages:
 - Explanation: 5
 - How-to: 8
 - Tutorial: 2
-
-Flags:
-- (none)
 ```
 
-If any flag fires, list each flag on its own line. If no flags, show `(none)` so the absence is explicit.
+No flags. No verdicts. No automatic suggested actions derive from this subsection.
 
 ## What this step does not do
 
@@ -170,4 +210,4 @@ If any flag fires, list each flag on its own line. If no flags, show `(none)` so
 
 ## Sources
 
-The journey-coverage verdicts and variation-by-variation breakdown are original to this skill. The product-level R/E/H expectation is from the team's "good docs" definition.
+The journey-coverage verdicts and variation-by-variation breakdown are original to this skill. The product-level Part B is purely descriptive: it reports counts by Diátaxis type at the builder/maintainer audience tier so stakeholders can see the composition without the skill asserting any particular tier must be present.
