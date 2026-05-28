@@ -38,10 +38,10 @@ audience:
 
 ## Tier vocabulary
 
-A fixed binary: `builder/maintainer` or `end-user`. Exact strings (including the slash). Taken from the team's "good docs" definition:
+A fixed binary: `builder/maintainer` or `end-user`. Exact strings (including the slash). The vocabulary used by this skill:
 
-- **Product-level documentation** (reference, explanation, how-to aimed at product builders/maintainers) → `builder/maintainer`.
-- **Journey-level documentation** (end-to-end how-to aimed at end-users) → `end-user`.
+- **Product-level documentation** (reference, explanation, how-to aimed at product builders/maintainers — anyone who extends, operates, or repairs the product) → `builder/maintainer`.
+- **Journey-level documentation** (end-to-end how-to aimed at end-users — the people who consume the product through its supported journeys) → `end-user`.
 
 The tier is derived structurally from the journey-relevance list — see Step 1 below.
 
@@ -215,4 +215,4 @@ If no mismatches were detected, the subsection still appears with a single line:
 
 ## Sources
 
-The binary tier vocabulary (`builder/maintainer` vs `end-user`) is from the team's "good docs" definition. The free-form detailed label inference and the mismatch-detection procedure are original to this skill.
+The binary tier vocabulary (`builder/maintainer` vs `end-user`) is the convention used by this skill. The free-form detailed label inference and the mismatch-detection procedure are original to this skill.

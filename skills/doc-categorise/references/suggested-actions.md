@@ -11,12 +11,11 @@ The step runs after quality flags (`references/quality-flags.md`) and before the
 
 ## Action vocabulary
 
-Ten action types, fixed enum. The skill MUST NOT emit actions outside this list.
+Nine action types, fixed enum. The skill MUST NOT emit actions outside this list.
 
 | Action type | Severity | Triggered by |
 | --- | --- | --- |
 | `write-how-to` | high | A journey whose gap-analysis verdict is `missing` (reason `no matching pages`). |
-| `write-builder-doc` | high | Any zero count in product-level coverage (any of `reference_count`, `explanation_count`, `how_to_count` for builder/maintainer audience). |
 | `complete-how-to` | medium | A journey whose gap-analysis verdict is `partial` AND the reason list contains `missing variations` or `not end-to-end`. |
 | `strengthen-how-to` | medium | A journey whose gap-analysis verdict is `partial` AND the reason list contains `weak how-to matches only`. |
 | `realign-audience` | medium | Any row in section 3's "Audience mismatches" subtable. |
@@ -32,7 +31,7 @@ A page may produce multiple actions if it carries multiple signals: a `hollow` p
 
 Three tiers, fixed:
 
-- `high` — gaps that block journey-level or product-level expectations from the team's "good docs" definition.
+- `high` — gaps that block this skill's journey-level coverage expectation (every supplied journey should have at least one matching how-to).
 - `medium` — drift signals where docs exist but need work (incomplete coverage, audience mismatch, duplication).
 - `low` — review prompts and cleanup tasks.
 
@@ -46,13 +45,6 @@ For each journey in Part A of gap analysis with `verdict == missing`:
 
 - Description: `Write a how-to for journey '<journey name>' (currently missing: no matching pages).`
 - Source reference: the journey name.
-
-### `write-builder-doc`
-
-For each zero count in `builder_maintainer` (reference, explanation, how-to — NOT tutorial):
-
-- Description: `Write <reference|explanation|how-to> documentation for builders/maintainers (currently 0 pages at the builder/maintainer audience tier).`
-- Source reference: the Diátaxis type with the zero count.
 
 ### `complete-how-to`
 
@@ -178,10 +170,10 @@ Add one line to section 1 (Summary) of REPORT.md:
 
 - **Invent actions outside the enum.** If an unusual signal needs an unusual response, the stakeholder uses "Risk and follow-ups", not Suggested actions.
 - **LLM-judge** severity or wording. The mapping is fixed.
-- **Collapse multiple signals into one action.** Each signal on a page produces its own action.
+- **Combine signals from one page into a single action.** Each signal a page carries produces its own action — a page that's both `hollow` and has `stale-marker` content yields both an `expand-stub` AND a `clean-stale-markers` action. This is separate from the **row grouping** rule above (a table-display rule that collapses same-type **low-severity** actions across **different pages** into one row).
 - **Include outliers.** Section 10 already carries per-outlier handling.
 - **Modify per-page outputs** or any earlier output.
 
 ## Sources
 
-The synthesis pattern and action vocabulary are original to this skill. The severity calibration (gaps in journey-level how-to and product-level R/E/H = high) reflects the team's "good docs" definition.
+The synthesis pattern and action vocabulary are original to this skill. The severity calibration (gaps in journey-level how-to = high) reflects this skill's only hard coverage expectation: every supplied journey should have a matching how-to.

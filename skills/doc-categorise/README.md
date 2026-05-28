@@ -1,9 +1,15 @@
 # doc-categorise
 
-A standalone agentic skill that reads a repository's markdown documentation, classifies every page against the four [Diátaxis](https://diataxis.fr/) types, and produces:
+A standalone agentic skill that audits a repository's markdown documentation against the four [Diátaxis](https://diataxis.fr/) types and a small explicit documentation model. It produces a stakeholder-grade report and, optionally, a fresh Diátaxis-organised copy of the docs alongside the originals.
 
-1. A fresh, Diátaxis-organised copy of the docs alongside the originals.
-2. An executive report (`REPORT.md`) for stakeholder review.
+What the skill reports on:
+
+- **Diátaxis classification** of every page (tutorial / how-to / reference / explanation / mixture / outlier).
+- **Journey coverage** — given a list of user journeys, which have how-to documentation and which don't (with reasons for partial coverage and an end-to-end completeness check).
+- **Audience tagging** — every page is tagged with an audience tier (`builder/maintainer` vs `end-user`) and detailed labels; drift between authored intent and how the page reads is flagged.
+- **Duplication candidates** — structural clustering of pages sharing the same `(journey, type, variation)` tuple.
+- **Quality flags** — `hollow` (stubs) and `stale-marker` (explicit `deprecated`/`TODO`/`FIXME`) deterministic checks.
+- **Suggested next actions** — a prioritised list synthesised deterministically from the analysis, with a "Top 3 risks" callout.
 
 Originals are never modified, moved, renamed, or deleted.
 
@@ -15,7 +21,7 @@ This README documents how to run the skill and how to interpret its output. The 
 
 ## What the skill does, in one paragraph
 
-When pointed at a repo, the skill walks every markdown file it finds, applies a Diátaxis decision procedure to classify each page (tutorial / how-to / reference / explanation), and writes a new categorised tree under `docs/` (or `docs.proposed/` if `docs/` already exists). Pages that already match one type cleanly are copied verbatim. Pages that drift in tone or structure are rewritten into single-type files preserving every fact. Pages that blend multiple intents or contain multiple independent topics are split into multiple files. Pages that do not fit any Diátaxis type (changelogs, meeting minutes, etc.) are listed as outliers. The whole run is summarised in `REPORT.md`.
+When pointed at a repo, the skill walks every markdown file it finds, applies a Diátaxis decision procedure to classify each page (tutorial / how-to / reference / explanation), and tags each page with the journey(s) it covers and the audience it serves. It then computes coverage gaps per journey (covered / partial / missing, with reasons), flags audience mismatches, structural duplicate candidates, hollow stubs, and stale markers, and synthesises a prioritised list of next actions. In `full` mode it also writes a Diátaxis-organised tree under `docs/` (or `docs.proposed/`) where drift pages are rewritten or split into single-type files; in `report-only` mode only the analysis report is written. In both modes the entire run is summarised in a single stakeholder-grade report.
 
 ---
 
@@ -26,14 +32,16 @@ When pointed at a repo, the skill walks every markdown file it finds, applies a 
    ```
    Use doc-categorise on this repo.
    ```
-3. The skill will pause and ask:
-   > What product is this documentation for?
+3. The skill will ask, in order:
+   1. **The run mode** — `full` (writes the rewritten tree + a report) or `report-only` (writes only a report). Add `report only` or `full mode` to the invocation to skip this question.
+   2. **The product name** — skipped if a `product-definition/product.md` exists at the repo root.
+   3. **The journey list** — skipped if `product-definition/journeys/` exists. Paste one journey per line, or type `not applicable` if none.
+4. The skill confirms the resolved inputs (product, journeys, mode) and the file list before writing.
+5. When the run completes, open the report:
+   - `full` mode → `<repo>/docs/REPORT.md` (or `docs.proposed/REPORT.md`)
+   - `report-only` mode → `<repo>/doc-categorise-report.md`
 
-   Type the product name (e.g. `Acme Widget`). If the docs are not tied to a specific product, type `not applicable`.
-4. The skill confirms the file list before writing.
-5. When the run completes, open `<repo>/docs/REPORT.md` (or `docs.proposed/REPORT.md`) for the summary.
-
-That is the happy path. No flags, no config files.
+That is the happy path. Optional: pre-populate a `product-definition/` folder to skip the product and journey prompts on every run (see "Pre-supplying the product and journeys" below).
 
 ---
 
@@ -77,7 +85,7 @@ gh skill install coreeng/support-bot doc-categorise --agent claude-code
 gh skill install coreeng/support-bot doc-categorise --agent augment
 ```
 
-The entry file is `SKILL.md`. The eight files under `references/` are loaded on demand by the agent during a run.
+The entry file is `SKILL.md`. The eleven files under `references/` (compass, types, decision-rubric, examples, product-definition, journey-matching, audience-tagging, gap-analysis, duplication, quality-flags, suggested-actions) are loaded on demand by the agent during a run.
 
 ---
 
@@ -151,7 +159,7 @@ Examples:
 - `Use doc-categorise on this repo; report only.` → no prompt, goes straight to report-only.
 - `Use doc-categorise on this repo; full mode.` → no prompt, goes straight to full.
 
-Report-only is a deliberate temporary affordance for stakeholder demos where the rewritten tree adds noise. It may be removed once the team is comfortable with the full-mode behaviour.
+Report-only is a deliberate temporary affordance for stakeholder demos where the rewritten tree adds noise. It may be removed in a future version of the skill.
 
 ### Directory layout
 
@@ -189,7 +197,7 @@ source_path: "<path to original file>"
 ---
 ```
 
-When a `product-definition/` folder is in use and the source page matched at least one journey, the frontmatter also carries a `journeys:` field listing each match with its variation (if any) and confidence tier. Every output file also carries an `audience:` block giving the audience tier (`builder/maintainer` vs `end-user` per the team's "good docs" definition) and detailed labels:
+When a `product-definition/` folder is in use and the source page matched at least one journey, the frontmatter also carries a `journeys:` field listing each match with its variation (if any) and confidence tier. Every output file also carries an `audience:` block giving the audience tier (`builder/maintainer` vs `end-user`, the binary used by this skill) and detailed labels:
 
 ```yaml
 ---
@@ -254,16 +262,16 @@ Within the exec block, section 4 (Journey relevance summary) appears only when a
 
 ### 1. Summary
 
-Top-level counts: total source files scanned, output root used, counts per category, counts per verdict, asset count, unresolved-link count, audience tier counts (`end-user X, builder/maintainer Y`), and suggested-actions count (`Suggested actions: N (high X · medium Y · low Z)`). **Sanity-check first.** If the totals look obviously off (e.g. zero references in a CLI tool repo, zero end-user pages despite a non-empty journey list, or zero high-severity actions on a docs set you know has gaps), the source scope is probably wrong or the journey list is mis-supplied.
+Top-level counts: total source files scanned, counts per category, counts per verdict, asset count, unresolved-link count, audience tier counts (`end-user X, builder/maintainer Y`), and suggested-actions count (`Suggested actions: N (high X · medium Y · low Z)`). The output root and run mode are not repeated here — they're in the header metadata above the Summary. **Sanity-check first.** If the totals look obviously off (e.g. zero references in a CLI tool repo, zero end-user pages despite a non-empty journey list, or zero high-severity actions on a docs set you know has gaps), the source scope is probably wrong or the journey list is mis-supplied.
 
 ### 2. Suggested actions
 
-A single prioritised list of recommended next actions, synthesised deterministically from the analysis in sections 3–6 plus the REWRITE/SPLIT verdicts in the engineer block. Each action is one of ten fixed types (`write-how-to`, `write-builder-doc`, `complete-how-to`, `strengthen-how-to`, `realign-audience`, `consolidate-cluster`, `expand-stub`, `clean-stale-markers`, `review-rewrite`, `review-split`) with one of three severities (`high` / `medium` / `low`). Sorted high → low. Columns: severity, type, one-line description, source reference (the page, journey, or cluster the action derives from).
+A single prioritised list of recommended next actions, synthesised deterministically from the analysis in sections 3–6 plus the REWRITE/SPLIT verdicts in the engineer block. Each action is one of nine fixed types (`write-how-to`, `complete-how-to`, `strengthen-how-to`, `realign-audience`, `consolidate-cluster`, `expand-stub`, `clean-stale-markers`, `review-rewrite`, `review-split`) with one of three severities (`high` / `medium` / `low`). Sorted high → low. Columns: severity, type, one-line description, source reference (the page, journey, or cluster the action derives from).
 
 **The skill does NOT invent actions outside the enum.** If a signal needs an unusual response, it lives in section 14 (Risk and follow-ups), not here. The skill does NOT LLM-judge severity — the mapping from signal type to severity is fixed.
 
 **Severity calibration**:
-- `high` — gaps in journey-level how-to coverage (missing how-tos for supplied journeys) and product-level R/E/H presence (zero pages of R, E, or H for builders/maintainers). These block the team's "good docs" expectations.
+- `high` — gaps in journey-level how-to coverage: every supplied journey should have at least one matching how-to. Missing how-tos are the only "high" trigger.
 - `medium` — drift signals: incomplete coverage (missing variations or not end-to-end), audience mismatch, duplication clusters.
 - `low` — review prompts (REWRITE/SPLIT verdicts) and cleanup tasks (hollow pages, stale markers).
 
@@ -277,7 +285,7 @@ The headline gap section for stakeholder discussion. Two subsections.
 
 **Subsection A — Journey coverage** (empty when no journeys were supplied). A table with one row per journey, sorted `missing` first, then `partial`, then `covered`. Columns: journey name, verdict, how-to coverage (`X strong, Y weak`), other types matched, variation status (`linux ✓ · macos ✗ · windows ✓` if the journey has variations, otherwise `—`), and reasons (empty for `covered`; otherwise specific gaps like `missing variations: macos, windows` or `not end-to-end: rollback step is not documented`).
 
-**Subsection B — Product-level coverage** (always). Page counts by Diátaxis type for builder/maintainer audience pages (reference, explanation, how-to, tutorial). A flag fires when any of R/E/H is zero — the team's "good docs" definition expects all three for product-level documentation.
+**Subsection B — Product-level coverage** (always, descriptive). Page counts by Diátaxis type for builder/maintainer audience pages (reference, explanation, how-to, tutorial). This subsection is **purely descriptive** — it surfaces the composition of product-level documentation so you can judge whether the spread matches the product's needs. The skill does not assert that every product must have all of R/E/H — that's a judgement call per product.
 
 **Use Subsection A** to identify the journeys that need work and what specifically is missing. **Use Subsection B** to see whether the product itself has the R/E/H foundation aimed at builders/maintainers. Each row of Subsection A drives one or more entries in section 2 (Suggested actions).
 
@@ -391,16 +399,19 @@ If every file lands as OUTLIER or REWRITE, the source repo probably needs editor
 
 ---
 
-## What this skill does not do (yet)
+## What this skill explicitly does not do
 
-These are known gaps relative to the broader documentation strategy:
+The skill is deliberately scoped. These are NOT in scope today, and the spec says so explicitly:
 
-- **Journey context.** The skill captures product, but not user journey (onboarding, day-2 operations, migration, etc.). Journey-tagging is on the roadmap.
-- **Audience inference.** The Diátaxis type implies audience (tutorial → beginner, how-to → competent practitioner), but the report does not yet surface finer audience tells (e.g. "assumes Kubernetes experience"). Free-text audience extraction is planned.
-- **Content-similarity duplication detection.** The skill detects filename collisions, but not two pages that say roughly the same thing under different names.
-- **Per-page suggested actions.** The current report has high-level recommendations in section 9, not per-row action suggestions.
+- **Assert that every product must carry all of reference + explanation + how-to.** Product-level coverage is reported descriptively as counts; the reader judges per-product whether the spread is right.
+- **Enforce a documentation style guide.** Style consistency is gated on a style guide being explicitly defined; deferred.
+- **Detect factually incorrect content.** "Incorrect bits" require an oracle of correctness; out of scope.
+- **Detect semantic duplication.** Duplication detection is structural only (same `journey + type + variation` tuple). Two pages saying the same thing under different journey tags, or under no journey tag, will not cluster. See `references/duplication.md` for the full list of cases the rule deliberately misses.
+- **Detect vague or hollow-by-context content.** Quality flagging is deterministic (line count + keyword scan) only. Pages that are well-formed but say nothing useful are not flagged; pages that are implicitly outdated without saying `deprecated` are not flagged. See `references/quality-flags.md` for the full list.
+- **Re-judge per-page tags at aggregation time.** The journey-matching and audience-tagging steps are the only places where those judgements are made. Aggregations (coverage analysis, journey relevance summary, duplication, suggested actions) MUST count what was tagged; they MUST NOT filter or re-evaluate. See `SKILL.md` "Cross-section consistency invariants" for the explicit rules.
+- **Invent suggested actions outside the fixed enum.** The action vocabulary is nine fixed types; the synthesis is deterministic. Anything not in the enum belongs in "Risk and follow-ups" (the prose wrap-up), not in "Suggested actions".
 
-These will be added incrementally. The skill is useful today without them.
+Each of these limits is documented in the appropriate reference file under `references/`. The skill is honest about its boundaries so the report can be read without inferring rules that aren't there.
 
 ---
 
@@ -413,7 +424,7 @@ Either (a) the skill found a valid `product-definition/product.md` at the repo r
 The most common cause is missing required fields. `product-definition/product.md` needs a non-empty `name` and `owners`; each `journeys/*.md` needs a non-empty `name`. Files with missing required fields are skipped and listed in the run summary. Fix the offending frontmatter and re-run, or accept the skip and paste the missing journeys at the prompt.
 
 **The agent classifies too many pages as OUTLIER.**
-Either the source scope is wrong (it picked up non-docs like configuration files or notes), or the source repo really does have a lot of non-Diátaxis material. Check section 2 (Coverage) and section 6 (Outliers) of REPORT.md and narrow the include globs if needed.
+Either the source scope is wrong (it picked up non-docs like configuration files or notes), or the source repo really does have a lot of non-Diátaxis material. Check section 7 (Coverage by source folder) and section 11 (Outliers) of REPORT.md and narrow the include globs if needed.
 
 **The agent asks too many questions during the run.**
 The skill should only escalate in extreme cases (foundational page + close call + downstream impact). For a typical repo, escalations should fire 0–2 times. If you see many, something is mis-tuned — share the run log so the skill behaviour can be checked.

@@ -152,6 +152,8 @@ The section contains two parts:
 
 **Part A — Per-journey page count table.** One row per journey from the input list. Columns: journey name, tutorial count, how-to count, reference count, explanation count, total. The count includes both strong and weak matches; weak counts may optionally be shown in parentheses, e.g. `5 (2 weak)`.
 
+The counts in Part A MUST equal the count of pages in REPORT.md Sections 8 (Copied verbatim) and 9 (Rewritten) tagged with this journey, broken down by Diátaxis type. See the "Cross-section consistency invariants" section in `SKILL.md` — Part A is bound by invariant 2 there. Mechanical counting only; no re-judgement of whether a tagged match "really counts".
+
 **Part B — Pages with no journey match.** A table listing every scanned page that produced an empty journey-relevance list. Columns: source path, assigned Diátaxis type, a brief content hint (the first non-empty H1 or the first non-empty paragraph, truncated to **~50 characters** — long enough to identify the page, short enough not to dominate the table). Source paths in this table benefit from the report-wide prefix-stripping rule in `SKILL.md` when applicable.
 
 The journey relevance summary is independent of "Coverage by source folder" — the two tables answer different questions (one is by-folder source organisation, the other is by-journey coverage).
