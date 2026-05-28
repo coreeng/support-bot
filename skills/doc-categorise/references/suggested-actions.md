@@ -108,7 +108,7 @@ A new section "Suggested actions", placed near the top of REPORT.md immediately 
 
 The section header is followed by:
 
-1. A short orientation sentence: "Deterministic synthesis of the prior sections. No new analysis. Each action references the section it derives from."
+1. A short orientation sentence with exact wording: "Synthesised deterministically from the analysis sections that follow. No new analysis happens here — this section is placed near the top so stakeholders see the action list first; each action references its source section below." Do NOT write "prior sections" or anything that implies the sources have already been read; at section 2, the sources are still ahead.
 2. **A "Top 3 risks" list** — see "Top 3 risks list" below.
 3. The full action table. Columns:
    - **Severity** — `high` / `medium` / `low`.

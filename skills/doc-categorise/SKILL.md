@@ -279,7 +279,17 @@ When `journeys = []`, omit both the conventions blockquote and the TL;DR — the
 
 ### Exec block
 
-- **Summary**: total source files scanned, counts per category, counts of PERFECT / REWRITTEN / SPLIT / OUTLIER, asset count, unresolved-link count, **audience tier counts** (`end-user X, builder/maintainer Y`), and **suggested actions count** (`Suggested actions: N (high X · medium Y · low Z)`). Render as a single concise table. Do **not** repeat the output root or the run mode here — both are already in the header metadata.
+- **Summary**: a single concise metric table. The metrics it MUST contain — and the only metrics it may contain — are:
+  - Total source files scanned.
+  - Counts per Diátaxis category (tutorial / how-to / reference / explanation).
+  - Counts of PERFECT / REWRITTEN / SPLIT / OUTLIER.
+  - Asset count.
+  - Unresolved-link count.
+  - Audience tier counts, exact format: `end-user X, builder/maintainer Y`.
+  - Suggested actions count, exact format: `Suggested actions: N (high X · medium Y · low Z)`.
+  - **Only when `mode = report-only`**: a projected-output line with exact wording: `Output files that would be written in 'full' mode (excludes outliers): ~N. This run is 'report-only'; no files were actually written.` The wording is **mandatory** — do not abbreviate to "Output files in full mode" or similar, because that phrase is opaque to readers who haven't read the header metadata.
+
+  Do **not** repeat the output root or the run mode in the table — both are already in the header metadata above. The skill MUST NOT add metrics beyond those listed above. If a new metric becomes useful, it belongs in a new section, not appended to the Summary.
 - **Suggested actions** (always): deterministic synthesis of prior sections per `references/suggested-actions.md`. Sorted by severity (high → low). Columns: severity, action type, one-line description, source reference. Shows "No suggested actions" when nothing fires. Placed second so stakeholders see the action list immediately after the summary; forward references to later sections are intentional and fine.
 - **Coverage analysis** (always): two subsections per `references/gap-analysis.md`. Subsection A — per-journey coverage verdicts (covered/partial/missing) with reasons, how-to counts (strong/weak), other-type counts, and variation status; replaced with "No journeys were supplied for this run." when `journeys = []`. Subsection B — descriptive page counts by Diátaxis type at the builder/maintainer audience tier. No flags; no assertion that any tier must be present.
 - **Journey relevance summary** (only if `journeys` was non-empty for the run): per-journey page-count table by Diátaxis type, plus a "Pages with no journey match" table, plus an **"Audience mismatches"** subtable per `references/audience-tagging.md`. If no mismatches were detected, the subtable shows "No audience mismatches detected." See `references/journey-matching.md` and `references/audience-tagging.md` for the column specs.
