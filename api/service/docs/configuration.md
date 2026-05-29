@@ -705,3 +705,62 @@ Available CEL variables:
 | `provider`      | string | `github` or `gitlab`                                        |
 
 Setting an `escalated` message on a no-SLA repo is rejected at startup.
+
+## Roles
+
+Every authenticated user is assigned one or more roles that control what they can do in the UI.
+
+| Role | Who it's for | Capabilities |
+|---|---|---|
+| `ROLE_USER` | Everyone — assigned automatically on login | View tickets |
+| `ROLE_SUPPORT_ENGINEER` | Support team members | Manage tickets: update status, assign, tag, close |
+| `ROLE_LEADERSHIP` | Support leads | Everything in `ROLE_SUPPORT_ENGINEER` plus metrics dashboards and aggregate views |
+| `ROLE_ESCALATION` | Teams that *receive* escalations | Resolve escalations raised against their team |
+
+Roles are additive — a user can hold multiple roles simultaneously.
+
+### Assigning roles via Slack groups (recommended)
+
+The simplest way to manage roles is to point `team.support.group-ref` and `team.leadership.group-ref` at Slack user groups. At login time the API resolves group members from Slack and assigns the corresponding role — no redeployment needed when membership changes.
+
+```yaml
+team:
+  support:
+    name: Core Support
+    group-ref: slack:<SLACK_GROUP_ID>       # members get ROLE_SUPPORT_ENGINEER
+  leadership:
+    name: Support Leadership
+    group-ref: slack:<SLACK_GROUP_ID>       # members get ROLE_LEADERSHIP
+```
+
+Add or remove people from those Slack groups and their role takes effect at their next login.
+
+> **Prerequisite:** the Slack bot token must have the `usergroups:read` scope. If the scope is missing, group membership resolution fails silently and no support/leadership roles are assigned.
+
+### Assigning roles via LDAP groups (Dex)
+
+When authenticating through Dex with an LDAP backend, roles can alternatively be derived from LDAP group membership via the `platform-integration.jwt-groups` config. Dex populates a `groups` claim in the ID token with the user's LDAP groups; the API maps those to team codes which resolve to roles.
+
+```yaml
+platform-integration:
+  jwt-groups:
+    enabled: true
+    claim-name: groups          # LDAP groups claim emitted by Dex
+    mappings:
+      - claim-values: [support-admins]
+        team-code: support      # Must match team.support.code → ROLE_SUPPORT_ENGINEER
+      - claim-values: [support-leads]
+        team-code: support-leadership  # Must match team.leadership.code → ROLE_LEADERSHIP
+```
+
+This path requires `platform-integration.jwt-groups.enabled: true` and only applies to the `dex` OAuth provider — Google and Azure logins are not affected.
+
+### `ROLE_ESCALATION`
+
+`ROLE_ESCALATION` is for teams that *receive* escalations — typically product or platform teams outside the core support team. Escalation team members must be in the support channel to see and respond to escalations.
+
+When a support engineer escalates a ticket, the bot posts in the Slack thread and tags the team's Slack group (`enums.escalation-teams[].slack-group-id`). That tag is the primary notification mechanism — no UI login required.
+
+`ROLE_ESCALATION` in the UI is secondary: it allows escalation team members who do log in to see and resolve escalations assigned to their team.
+
+**How membership is resolved:** unlike `ROLE_SUPPORT_ENGINEER` and `ROLE_LEADERSHIP` which use a simple `group-ref: slack:<ID>`, `ROLE_ESCALATION` is resolved through `platform-integration` (Azure, GCP, Kubernetes). This made sense when escalation teams mirrored tenant teams already tracked in those identity sources. However, since the Slack group ID is already configured on each escalation team for tagging, using it for membership resolution too (the same way support/leadership work) would be simpler and sufficient for Slack-first deployments — this is a known limitation.
