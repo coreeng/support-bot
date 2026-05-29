@@ -759,8 +759,6 @@ This path requires `platform-integration.jwt-groups.enabled: true` and only appl
 
 `ROLE_ESCALATION` is for teams that *receive* escalations — typically product or platform teams outside the core support team. Escalation team members must be in the support channel to see and respond to escalations.
 
-When a support engineer escalates a ticket, the bot posts in the Slack thread and tags the team's Slack group (`enums.escalation-teams[].slack-group-id`). That tag is the primary notification mechanism — no UI login required.
-
-`ROLE_ESCALATION` in the UI is secondary: it allows escalation team members who do log in to see and resolve escalations assigned to their team.
+When a support engineer escalates a ticket, the bot posts in the Slack thread and tags the team's Slack group (`enums.escalation-teams[].slack-group-id`). Escalation team members need to be in the support channel to see and respond to the thread. Those who log into the UI get `ROLE_ESCALATION`, which allows them to view and resolve escalations assigned to their team.
 
 **How membership is resolved:** unlike `ROLE_SUPPORT_ENGINEER` and `ROLE_LEADERSHIP` which use a simple `group-ref: slack:<ID>`, `ROLE_ESCALATION` is resolved through `platform-integration` (Azure, GCP, Kubernetes). This made sense when escalation teams mirrored tenant teams already tracked in those identity sources. However, since the Slack group ID is already configured on each escalation team for tagging, using it for membership resolution too (the same way support/leadership work) would be simpler and sufficient for Slack-first deployments — this is a known limitation.
