@@ -27,6 +27,12 @@ You can:
 
 ___
 
+## Using the bot
+
+Already deployed? See the **[user guides](docs/user-guides/README.md)** for role-specific walkthroughs (support engineers, leadership, escalation teams).
+
+___
+
 ## 🤝 Contributing
 
 We welcome contributions! Please read the [CONTRIBUTING guide](CONTRIBUTING.md) before submitting issues or pull requests.
