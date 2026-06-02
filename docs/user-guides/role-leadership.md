@@ -32,7 +32,7 @@ Service health indicators.
 
 - **Edit tickets** — requires `ROLE_SUPPORT_ENGINEER`
 - **Run, export, or import analysis** — requires `ROLE_SUPPORT_ENGINEER`. The Knowledge Gaps page is read-only for leadership.
-- **Resolve escalations from your team** — requires `ROLE_ESCALATION` (separate role, not implied by leadership)
+- **Resolve escalations in the UI** — requires `ROLE_SUPPORT_ENGINEER`; closing a ticket closes its escalations. `ROLE_ESCALATION` only grants visibility into escalations assigned to your team, not the ability to resolve them.
 
 ## Common workflows
 
