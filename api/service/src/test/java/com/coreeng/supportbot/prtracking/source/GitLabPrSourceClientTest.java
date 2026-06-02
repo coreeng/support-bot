@@ -190,6 +190,25 @@ class GitLabPrSourceClientTest {
     }
 
     @Test
+    void fetchPullRequestTreatsLockedStateAsOpen() {
+        // "locked" is transient (GitLab sets it while a merge is processed), not terminal. It must
+        // map to OPEN so tracking continues and no premature "closed" notification is posted.
+        server.expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/13"))
+                .andRespond(withSuccess("""
+                        {
+                          "iid": 13, "state": "locked",
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "updated_at": "2026-01-01T00:00:00Z",
+                          "detailed_merge_status": "mergeable"
+                        }
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/13/approvals"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.fetchPullRequest(RepoCoord.gitlab(REPO), 13).state()).isEqualTo(PrMetadata.PrState.OPEN);
+    }
+
+    @Test
     void fetchPullRequestRejectsUnknownState() {
         server.expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/1"))
                 .andRespond(withSuccess("""
@@ -259,21 +278,23 @@ class GitLabPrSourceClientTest {
     }
 
     @Test
-    void listChangedFilesPrefersNewPathFallsBackToOldPath() {
-        // old_path is set + new_path null when a file is deleted by the MR; cover both shapes.
+    void listChangedFilesEmitsBothSidesOfRenamesAndDedupes() {
+        // Modified: new_path == old_path -> single entry. Deleted: new_path null -> old_path.
+        // Renamed: new_path != old_path -> both sides, so a path filter keyed on either matches.
         server.expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/12/changes"))
                 .andRespond(withSuccess("""
                         {
                           "changes": [
-                            {"new_path": "src/new.java", "old_path": "src/new.java"},
-                            {"new_path": null, "old_path": "deleted.txt"}
+                            {"new_path": "src/modified.java", "old_path": "src/modified.java"},
+                            {"new_path": null, "old_path": "deleted.txt"},
+                            {"new_path": "src/renamed.java", "old_path": "src/original.java"}
                           ]
                         }
                         """, MediaType.APPLICATION_JSON));
 
         List<String> files = client.listChangedFiles(RepoCoord.gitlab(REPO), 12);
 
-        assertThat(files).containsExactly("src/new.java", "deleted.txt");
+        assertThat(files).containsExactly("src/modified.java", "deleted.txt", "src/renamed.java", "src/original.java");
     }
 
     @Test

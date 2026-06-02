@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -155,9 +156,14 @@ public class GitLabPrSourceClient implements PrSourceClient {
         if (changes == null || changes.changes() == null) {
             return List.of();
         }
+        // Emit both sides of every change. For a rename new_path and old_path differ, and a path
+        // filter keyed on either the source or the destination must still match; deletions have a
+        // null new_path, additions a null old_path. distinct() collapses the common case where the
+        // two are equal (an in-place modification).
         return changes.changes().stream()
-                .map(c -> c.newPath() != null ? c.newPath() : c.oldPath())
+                .flatMap(c -> Stream.of(c.newPath(), c.oldPath()))
                 .filter(Objects::nonNull)
+                .distinct()
                 .toList();
     }
 
@@ -301,9 +307,12 @@ public class GitLabPrSourceClient implements PrSourceClient {
 
     private static PrMetadata.PrState mapState(String state) {
         return switch (state.toLowerCase(Locale.ROOT)) {
-            case "opened" -> PrMetadata.PrState.OPEN;
+            // "locked" is transient — GitLab sets it on an MR while a merge is being processed, not as
+            // a terminal state. Treat it as still-open so tracking continues and we don't post a
+            // premature "closed" notification; the next poll resolves it to merged/closed/opened.
+            case "opened", "locked" -> PrMetadata.PrState.OPEN;
             case "merged" -> PrMetadata.PrState.MERGED;
-            case "closed", "locked" -> PrMetadata.PrState.CLOSED;
+            case "closed" -> PrMetadata.PrState.CLOSED;
             default -> throw new GitLabApiException(0, "Unrecognised GitLab MR state: " + state);
         };
     }
@@ -330,6 +339,13 @@ public class GitLabPrSourceClient implements PrSourceClient {
         };
     }
 
+    /**
+     * Maps GitLab's {@code approved_by} list to provider-neutral {@link Review}s. GitLab is
+     * approvals-only by design: per the spec's locked decision (no {@code CHANGES_REQUESTED} for v1 —
+     * see {@code docs/pr-tracking-gitlab-spec.md}), every approver becomes an {@code APPROVED} review
+     * and this method never produces {@code CHANGES_REQUESTED}. GitLab approvals carry no per-approval
+     * timestamp, so the caller passes the MR's {@code updated_at} as a shared {@code submittedAtProxy}.
+     */
     private static List<Review> mapApprovals(@Nullable ApprovalsDto approvals, Instant submittedAtProxy) {
         if (approvals == null || approvals.approvedBy() == null) {
             return List.of();
