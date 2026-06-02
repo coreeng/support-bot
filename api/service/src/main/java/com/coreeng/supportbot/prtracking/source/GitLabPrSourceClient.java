@@ -371,8 +371,8 @@ public class GitLabPrSourceClient implements PrSourceClient {
 
     /**
      * Maps GitLab's {@code approved_by} list to provider-neutral {@link Review}s. GitLab is
-     * approvals-only by design: per the spec's locked decision (no {@code CHANGES_REQUESTED} for v1 —
-     * see {@code docs/pr-tracking-gitlab-spec.md}), every approver becomes an {@code APPROVED} review
+     * approvals-only by design: GitLab has no {@code CHANGES_REQUESTED} state in v1 (see
+     * {@code docs/user-guides/pr-tracking.md}), so every approver becomes an {@code APPROVED} review
      * and this method never produces {@code CHANGES_REQUESTED}. GitLab approvals carry no per-approval
      * timestamp, so the caller passes the MR's {@code updated_at} as a shared {@code submittedAtProxy}.
      */
