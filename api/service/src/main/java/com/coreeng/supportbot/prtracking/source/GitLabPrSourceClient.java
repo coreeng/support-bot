@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -148,23 +147,54 @@ public class GitLabPrSourceClient implements PrSourceClient {
         GitLabConnection conn = resolveConnection(coord.name());
         String projectSegment = UriUtils.encodePathSegment(coord.name(), StandardCharsets.UTF_8);
 
-        ChangesDto changes = get(
-                conn,
-                "/projects/" + projectSegment + "/merge_requests/" + prNumber + "/changes",
-                ChangesDto.class,
-                "changes %s!%d".formatted(coord.name(), prNumber));
-        if (changes == null || changes.changes() == null) {
-            return List.of();
+        // /diffs (GitLab 15.7+) is the paginated, supported replacement for the deprecated /changes
+        // endpoint, whose single-response body silently truncates large MRs (overflow=true). Paging
+        // at PAGE_SIZE keeps each response bounded and guarantees every changed file is seen.
+        List<String> paths = new ArrayList<>();
+        int page = 1;
+        while (true) {
+            String uri = "/projects/" + projectSegment + "/merge_requests/" + prNumber + "/diffs?per_page=" + PAGE_SIZE
+                    + "&page=" + page;
+            List<DiffEntryDto> batch;
+            try {
+                batch = restClient
+                        .get()
+                        .uri(URI.create(conn.apiBaseUrl() + uri))
+                        .header("PRIVATE-TOKEN", conn.token())
+                        .retrieve()
+                        .body(new ParameterizedTypeReference<List<DiffEntryDto>>() {});
+            } catch (RestClientResponseException e) {
+                throw new GitLabApiException(
+                        e.getStatusCode().value(),
+                        "GitLab API %d listing changed files for %s!%d"
+                                .formatted(e.getStatusCode().value(), coord.name(), prNumber),
+                        e);
+            } catch (RestClientException e) {
+                throw new GitLabApiException(
+                        0,
+                        "GitLab API call failed listing changed files for %s!%d".formatted(coord.name(), prNumber),
+                        e);
+            }
+            if (batch == null || batch.isEmpty()) {
+                break;
+            }
+            // Emit both sides of every change: a rename has differing new/old paths and a filter on
+            // either must match; deletions have a null new_path, additions a null old_path.
+            for (DiffEntryDto d : batch) {
+                if (d.newPath() != null) {
+                    paths.add(d.newPath());
+                }
+                if (d.oldPath() != null) {
+                    paths.add(d.oldPath());
+                }
+            }
+            if (batch.size() < PAGE_SIZE) {
+                break;
+            }
+            page++;
         }
-        // Emit both sides of every change. For a rename new_path and old_path differ, and a path
-        // filter keyed on either the source or the destination must still match; deletions have a
-        // null new_path, additions a null old_path. distinct() collapses the common case where the
-        // two are equal (an in-place modification).
-        return changes.changes().stream()
-                .flatMap(c -> Stream.of(c.newPath(), c.oldPath()))
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
+        // distinct() collapses the common case where new_path == old_path (in-place modification).
+        return paths.stream().distinct().toList();
     }
 
     @Override
@@ -381,10 +411,7 @@ public class GitLabPrSourceClient implements PrSourceClient {
     private record UserRefDto(@Nullable String username) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record ChangesDto(@Nullable List<ChangeEntryDto> changes) {}
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private record ChangeEntryDto(
+    private record DiffEntryDto(
             @JsonProperty("new_path") @Nullable String newPath,
             @JsonProperty("old_path") @Nullable String oldPath) {}
 

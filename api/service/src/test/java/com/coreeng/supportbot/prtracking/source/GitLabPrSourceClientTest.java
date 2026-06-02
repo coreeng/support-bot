@@ -281,20 +281,45 @@ class GitLabPrSourceClientTest {
     void listChangedFilesEmitsBothSidesOfRenamesAndDedupes() {
         // Modified: new_path == old_path -> single entry. Deleted: new_path null -> old_path.
         // Renamed: new_path != old_path -> both sides, so a path filter keyed on either matches.
-        server.expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/12/changes"))
+        server.expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/12/diffs?per_page=100&page=1"))
                 .andRespond(withSuccess("""
-                        {
-                          "changes": [
-                            {"new_path": "src/modified.java", "old_path": "src/modified.java"},
-                            {"new_path": null, "old_path": "deleted.txt"},
-                            {"new_path": "src/renamed.java", "old_path": "src/original.java"}
-                          ]
-                        }
+                        [
+                          {"new_path": "src/modified.java", "old_path": "src/modified.java"},
+                          {"new_path": null, "old_path": "deleted.txt"},
+                          {"new_path": "src/renamed.java", "old_path": "src/original.java"}
+                        ]
                         """, MediaType.APPLICATION_JSON));
 
         List<String> files = client.listChangedFiles(RepoCoord.gitlab(REPO), 12);
 
         assertThat(files).containsExactly("src/modified.java", "deleted.txt", "src/renamed.java", "src/original.java");
+        server.verify();
+    }
+
+    @Test
+    void listChangedFilesPaginatesThroughAllDiffPages() {
+        // A full first page (100 entries) forces a page-2 fetch; the short page 2 ends the loop.
+        // Guards against the deprecated /changes endpoint's silent overflow truncation on large MRs.
+        StringBuilder page1 = new StringBuilder("[");
+        for (int i = 0; i < 100; i++) {
+            if (i > 0) page1.append(",");
+            page1.append("{\"new_path\": \"f")
+                    .append(i)
+                    .append(".java\", \"old_path\": \"f")
+                    .append(i)
+                    .append(".java\"}");
+        }
+        page1.append("]");
+        server.expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/20/diffs?per_page=100&page=1"))
+                .andRespond(withSuccess(page1.toString(), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/20/diffs?per_page=100&page=2"))
+                .andRespond(withSuccess(
+                        "[{\"new_path\": \"last.java\", \"old_path\": \"last.java\"}]", MediaType.APPLICATION_JSON));
+
+        List<String> files = client.listChangedFiles(RepoCoord.gitlab(REPO), 20);
+
+        assertThat(files).hasSize(101).contains("f0.java", "f99.java", "last.java");
+        server.verify();
     }
 
     @Test
