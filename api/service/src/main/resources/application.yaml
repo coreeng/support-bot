@@ -134,7 +134,7 @@ pr-review-tracking:
   pr-emoji: pr                           # Slack emoji name added to the message when a PR is detected
   tags: PR                               # Required when enabled: tag codes from enums.tags, applied when the bot auto-closes a ticket
   impact: Information Request            # Required when enabled: impact code from enums.impacts, applied when the bot auto-closes a ticket
-  repositories: []
+  repositories: [ ]
   # Example repository entries:
   #   - name: my-org/my-repo
   #     owning-team: <team-code from enums.escalation-teams>
@@ -286,8 +286,6 @@ platform-integration:
           group-ref: infra-group
         - name: connected-app
           group-ref: connected-app-group
-        - name: support-team
-          group-ref: support-group
     core-platform:
       enabled: false
     k8s-generic:
