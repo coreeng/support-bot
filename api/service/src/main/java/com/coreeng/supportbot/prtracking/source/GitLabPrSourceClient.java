@@ -313,9 +313,11 @@ public class GitLabPrSourceClient implements PrSourceClient {
      * {@link PrMetadata#mergeable()}. Treats {@code mergeable} and {@code ci_still_running} as
      * mergeable — this matches the GitHub behaviour of ignoring required-check state.
      *
-     * <p>A null/missing value (older GitLab versions, or transient between status calculations)
-     * yields a {@code null} tri-state — same semantics as GitHub when mergeability hasn't been
-     * computed yet, so the lifecycle poller will retry.
+     * <p>A null/missing value (older GitLab versions), or one of GitLab's transient
+     * "still computing" statuses ({@code preparing}, {@code unchecked}, {@code checking},
+     * {@code cannot_be_merged_recheck}), yields a {@code null} tri-state — same semantics as GitHub
+     * when mergeability hasn't been computed yet, so the lifecycle poller retries next cycle rather
+     * than treating a not-yet-evaluated MR as a hard conflict.
      */
     private static @Nullable Boolean mapMergeable(@Nullable String detailedMergeStatus) {
         if (detailedMergeStatus == null) {
@@ -323,6 +325,7 @@ public class GitLabPrSourceClient implements PrSourceClient {
         }
         return switch (detailedMergeStatus.toLowerCase(Locale.ROOT)) {
             case "mergeable", "ci_still_running" -> Boolean.TRUE;
+            case "preparing", "unchecked", "checking", "cannot_be_merged_recheck" -> null;
             default -> Boolean.FALSE;
         };
     }

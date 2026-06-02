@@ -153,6 +153,26 @@ class GitLabPrSourceClientTest {
     }
 
     @Test
+    void fetchPullRequestLeavesMergeableNullWhileGitLabIsStillChecking() {
+        // detailed_merge_status is transient while GitLab recomputes mergeability. It must read as
+        // unknown (null) so the poller retries, not as a hard not-mergeable that parks the MR.
+        server.expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/11"))
+                .andRespond(withSuccess("""
+                        {
+                          "iid": 11, "state": "opened",
+                          "created_at": "2026-01-01T00:00:00Z",
+                          "updated_at": "2026-01-01T00:00:00Z",
+                          "detailed_merge_status": "checking"
+                        }
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/11/approvals"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.fetchPullRequest(RepoCoord.gitlab(REPO), 11).mergeable())
+                .isNull();
+    }
+
+    @Test
     void fetchPullRequestLeavesMergeableNullWhenStatusAbsent() {
         server.expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/9"))
                 .andRespond(withSuccess("""

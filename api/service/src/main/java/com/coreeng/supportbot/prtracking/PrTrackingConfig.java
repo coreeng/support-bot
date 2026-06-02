@@ -27,12 +27,8 @@ public class PrTrackingConfig {
     }
 
     @Bean
-    public GitLabMrUrlParser gitLabMrUrlParser(PrTrackingProps props, PrUrlResolver resolver) {
-        Set<String> repoNames = props.repositories().stream()
-                .filter(r -> r.provider() == Provider.GITLAB)
-                .map(PrTrackingProps.Repository::name)
-                .collect(Collectors.toUnmodifiableSet());
-        return new GitLabMrUrlParser(resolver.gitLabHosts(), repoNames);
+    public GitLabMrUrlParser gitLabMrUrlParser(PrUrlResolver resolver) {
+        return new GitLabMrUrlParser(resolver.gitLabRepoPrefixes());
     }
 
     @Bean

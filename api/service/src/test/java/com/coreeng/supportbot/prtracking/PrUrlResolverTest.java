@@ -33,7 +33,7 @@ class PrUrlResolverTest {
     }
 
     @Test
-    void gitLabHostsContainsConfiguredHostsOnly() {
+    void gitLabRepoPrefixesCoverGitLabReposOnly() {
         PrUrlResolver resolver = new PrUrlResolver(new PrTrackingProps(
                 true,
                 "0 * * * * *",
@@ -47,7 +47,19 @@ class PrUrlResolverTest {
                 new PrTrackingProps.Gitlab("https://gitlab.com/api/v4", "token"),
                 new PrTrackingProps.SlaDiscovery(Duration.ofHours(1))));
 
-        assertThat(resolver.gitLabHosts()).containsExactly("gitlab.com");
+        assertThat(resolver.gitLabRepoPrefixes())
+                .containsExactly(
+                        org.assertj.core.api.Assertions.entry("gitlab.com/my-group/project", "my-group/project"));
+    }
+
+    @Test
+    void gitLabRepoPrefixesIncludeBasePathForSelfHostedInstance() {
+        PrUrlResolver resolver =
+                new PrUrlResolver(propsWithGitLab("Base-Path/Service", "https://example.com/gitlab/api/v4"));
+        // Base path preserved, project path lowercased to the canonical name.
+        assertThat(resolver.gitLabRepoPrefixes())
+                .containsExactly(org.assertj.core.api.Assertions.entry(
+                        "example.com/gitlab/base-path/service", "base-path/service"));
     }
 
     @Test

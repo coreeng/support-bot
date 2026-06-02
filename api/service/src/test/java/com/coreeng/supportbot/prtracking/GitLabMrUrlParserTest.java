@@ -4,14 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.prtracking.source.Provider;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class GitLabMrUrlParserTest {
 
-    private final GitLabMrUrlParser parser = new GitLabMrUrlParser(
-            Set.of("gitlab.com", "gitlab.internal.example"),
-            Set.of("my-group/project", "my-group/sub-group/nested", "infra-team/platform"));
+    // Keyed on the normalized host[/base-path]/project prefix → canonical repo name, exactly as
+    // PrUrlResolver.gitLabRepoPrefixes() builds it.
+    private final GitLabMrUrlParser parser = new GitLabMrUrlParser(Map.of(
+            "gitlab.com/my-group/project", "my-group/project",
+            "gitlab.com/my-group/sub-group/nested", "my-group/sub-group/nested",
+            "gitlab.internal.example/infra-team/platform", "infra-team/platform",
+            "example.com/gitlab/base-path/service", "base-path/service"));
 
     @Test
     void detectsTopLevelGroupMr() {
@@ -38,6 +42,15 @@ class GitLabMrUrlParserTest {
         List<DetectedPr> result =
                 parser.parse("https://gitlab.internal.example/infra-team/platform/-/merge_requests/99");
         assertThat(result).containsExactly(new DetectedPr(Provider.GITLAB, "infra-team/platform", 99));
+    }
+
+    @Test
+    void detectsSelfHostedInstanceUnderBasePath() {
+        // Self-hosted GitLab served under a sub-path (apiBaseUrl https://example.com/gitlab/api/v4):
+        // the base path is part of the public MR link and must be matched, not treated as part of
+        // the project path.
+        List<DetectedPr> result = parser.parse("https://example.com/gitlab/base-path/service/-/merge_requests/12");
+        assertThat(result).containsExactly(new DetectedPr(Provider.GITLAB, "base-path/service", 12));
     }
 
     @Test
@@ -80,7 +93,9 @@ class GitLabMrUrlParserTest {
     }
 
     @Test
-    void normalizesMixedCasePath() {
+    void matchesMixedCasePathAgainstCanonicalRepo() {
+        // GitLab project paths are case-insensitive for matching; the canonical (lowercased) name is
+        // what gets tracked and later used to address the project via the API.
         List<DetectedPr> result = parser.parse("https://gitlab.com/My-Group/Project/-/merge_requests/8");
         assertThat(result).containsExactly(new DetectedPr(Provider.GITLAB, "my-group/project", 8));
     }
@@ -91,8 +106,8 @@ class GitLabMrUrlParserTest {
     }
 
     @Test
-    void returnsEmptyWhenNoAllowedHostsConfigured() {
-        GitLabMrUrlParser empty = new GitLabMrUrlParser(Set.of(), Set.of("my-group/project"));
+    void returnsEmptyWhenNoReposConfigured() {
+        GitLabMrUrlParser empty = new GitLabMrUrlParser(Map.of());
         assertThat(empty.parse("https://gitlab.com/my-group/project/-/merge_requests/1"))
                 .isEmpty();
     }

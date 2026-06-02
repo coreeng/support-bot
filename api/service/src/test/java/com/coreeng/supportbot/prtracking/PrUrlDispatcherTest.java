@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.prtracking.source.Provider;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -11,7 +12,7 @@ class PrUrlDispatcherTest {
 
     private final PrUrlDispatcher dispatcher = new PrUrlDispatcher(
             new GitHubPrUrlParser(Set.of("my-org/my-repo")),
-            new GitLabMrUrlParser(Set.of("gitlab.com"), Set.of("my-group/project")));
+            new GitLabMrUrlParser(Map.of("gitlab.com/my-group/project", "my-group/project")));
 
     @Test
     void fansOutToBothParsers() {

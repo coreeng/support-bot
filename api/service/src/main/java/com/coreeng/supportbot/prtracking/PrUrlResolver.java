@@ -3,36 +3,35 @@ package com.coreeng.supportbot.prtracking;
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.prtracking.source.Provider;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * Single source of truth for the public-facing URL of every tracked repo, plus the GitLab host
- * allow-list the URL parser uses.
+ * Single source of truth for the public-facing URL of every tracked repo, plus the GitLab MR-link
+ * prefixes the URL parser matches against.
  *
  * <p>Built once at startup from {@link PrTrackingProps}; lookups are O(1). Keeps the
- * apiBaseUrl→public-host derivation in one place so message rendering, in-flight URL building, and
+ * apiBaseUrl→public-URL derivation in one place so message rendering, in-flight URL building, and
  * URL parsing can't drift.
  */
 public class PrUrlResolver {
 
     private final Map<String, PublicCoordinates> coordsByRepoName;
-    private final Set<String> gitLabHosts;
+    private final Map<String, String> gitLabRepoByUrlPrefix;
 
     public PrUrlResolver(PrTrackingProps props) {
         Map<String, PublicCoordinates> coords = new HashMap<>();
-        Set<String> hosts = new HashSet<>();
+        Map<String, String> gitLabPrefixes = new HashMap<>();
         for (PrTrackingProps.Repository repo : props.repositories()) {
             PublicCoordinates resolved = resolveFor(repo, props.gitlab());
-            coords.put(repo.name().toLowerCase(Locale.ROOT), resolved);
+            String canonicalName = repo.name().toLowerCase(Locale.ROOT);
+            coords.put(canonicalName, resolved);
             if (repo.provider() == Provider.GITLAB) {
-                hosts.add(hostOf(resolved.baseUrl()));
+                gitLabPrefixes.put(urlPrefixOf(resolved.baseUrl(), repo.name()), canonicalName);
             }
         }
         this.coordsByRepoName = Map.copyOf(coords);
-        this.gitLabHosts = Set.copyOf(hosts);
+        this.gitLabRepoByUrlPrefix = Map.copyOf(gitLabPrefixes);
     }
 
     /**
@@ -51,9 +50,15 @@ public class PrUrlResolver {
         };
     }
 
-    /** Hosts (e.g. {@code gitlab.com}, {@code gitlab.internal.example}) of every configured GitLab repo. */
-    public Set<String> gitLabHosts() {
-        return gitLabHosts;
+    /**
+     * Maps each GitLab repo's normalized MR-link prefix — {@code host[/base-path]/project}, lowercased
+     * and scheme-stripped — to its canonical (lowercased) repo name. {@link GitLabMrUrlParser} matches
+     * the whole prefix rather than host and project path separately, which is what lets self-hosted
+     * instances served under a base path (e.g. {@code https://example.com/gitlab/group/project}) resolve
+     * and keeps matching case-insensitive on the project path.
+     */
+    public Map<String, String> gitLabRepoPrefixes() {
+        return gitLabRepoByUrlPrefix;
     }
 
     /** Public URL to the repo's landing page, used by message templates as {@code repo_url}. */
@@ -97,13 +102,19 @@ public class PrUrlResolver {
         return idx < 0 ? apiBaseUrl : apiBaseUrl.substring(0, idx);
     }
 
-    private static String hostOf(String baseUrl) {
-        // Cheap path-strip parser — base URLs are operator-authored and validated by PrTrackingProps,
-        // so URI.create() would be overkill and forces nullable handling for .getHost().
+    /**
+     * Normalized prefix a public MR link must start with to belong to {@code repoName}:
+     * the public base URL with its scheme stripped, joined to the project path, lowercased — e.g.
+     * {@code https://example.com/gitlab} + {@code group/project} → {@code example.com/gitlab/group/project}.
+     * Base URLs are operator-authored and validated by PrTrackingProps, so a cheap scheme-strip is enough.
+     */
+    private static String urlPrefixOf(String baseUrl, String repoName) {
         int schemeEnd = baseUrl.indexOf("://");
-        int hostStart = schemeEnd < 0 ? 0 : schemeEnd + 3;
-        int pathStart = baseUrl.indexOf('/', hostStart);
-        return pathStart < 0 ? baseUrl.substring(hostStart) : baseUrl.substring(hostStart, pathStart);
+        String hostAndPath = schemeEnd < 0 ? baseUrl : baseUrl.substring(schemeEnd + 3);
+        if (hostAndPath.endsWith("/")) {
+            hostAndPath = hostAndPath.substring(0, hostAndPath.length() - 1);
+        }
+        return (hostAndPath + "/" + repoName).toLowerCase(Locale.ROOT);
     }
 
     private record PublicCoordinates(Provider provider, String baseUrl) {}
