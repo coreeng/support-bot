@@ -1,6 +1,6 @@
 # Contributing to the support bot
 
-We welcome contributions of all forms — from bug reports and documentation improvements to new features.  
+We welcome contributions of all forms — from bug reports and documentation improvements to new features.
 This guide outlines the process and expectations for contributing to ensure consistency and maintainability.
 
 ## Requirements
@@ -16,7 +16,7 @@ To contribute to this project, you will need:
 - **Unit tests**: Every module and function must be covered with unit tests.
 - **Functional tests**: Required for all new features and bug fixes.
 - **Integration tests**: Add integration tests when introducing or modifying any third-party service or external dependency.
- 
+
 > We require all code changes to be accompanied by adequate test coverage
 
 ## Contributing
@@ -51,7 +51,7 @@ to review the PR within 3 working days.
 
 ## Coding standards/style
 
-* We use [PMD](https://pmd.github.io/) for linting 
+* We use [PMD](https://pmd.github.io/) for linting
 * Use meaningful variable and function names
 * Keep functions small and focused
 
@@ -81,7 +81,8 @@ We are committed to fostering a welcoming and harassment-free community for ever
 
 ## Enforcement
 
-Project maintainers are responsible for clarifying and enforcing this Code of Conduct. In cases of unacceptable behavior, maintainers may take appropriate action, including warnings, temporary bans, or permanent bans.
+Project maintainers are responsible for clarifying and enforcing this Code of Conduct.
+In cases of unacceptable behavior, maintainers may take appropriate action, including warnings, temporary bans, or permanent bans.
 
 ## Attribution
 
