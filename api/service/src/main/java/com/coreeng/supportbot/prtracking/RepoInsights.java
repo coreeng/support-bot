@@ -2,7 +2,11 @@ package com.coreeng.supportbot.prtracking;
 
 import static java.util.Objects.requireNonNull;
 
+import com.coreeng.supportbot.prtracking.source.Provider;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 public record RepoInsights(
+        @JsonIgnore Provider provider,
         String repo,
         String owningTeam,
         long prCount,
@@ -14,6 +18,7 @@ public record RepoInsights(
         double p99Seconds,
         boolean hasSla) {
     public RepoInsights {
+        requireNonNull(provider, "provider must not be null");
         requireNonNull(repo, "repo must not be null");
         requireNonNull(owningTeam, "owningTeam must not be null");
         if (prCount < 0 || openCount < 0 || escalatedCount < 0 || breachedCount < 0) {
@@ -37,6 +42,7 @@ public record RepoInsights(
             return this;
         }
         return new RepoInsights(
+                provider,
                 repo,
                 owningTeam,
                 prCount,

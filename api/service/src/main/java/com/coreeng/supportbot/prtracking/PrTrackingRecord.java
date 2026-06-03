@@ -3,6 +3,7 @@ package com.coreeng.supportbot.prtracking;
 import static java.util.Objects.requireNonNull;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Duration;
 import java.time.Instant;
 import org.jspecify.annotations.Nullable;
@@ -10,7 +11,8 @@ import org.jspecify.annotations.Nullable;
 public record PrTrackingRecord(
         long id,
         long ticketId,
-        String githubRepo,
+        Provider provider,
+        String repo,
         int prNumber,
         Instant prCreatedAt,
         @Nullable Instant slaDeadline,
@@ -23,7 +25,8 @@ public record PrTrackingRecord(
         @Nullable Instant lastReviewAt,
         @Nullable Instant lastAuthorActivityAt) {
     public PrTrackingRecord {
-        requireNonNull(githubRepo, "githubRepo must not be null");
+        requireNonNull(provider, "provider must not be null");
+        requireNonNull(repo, "repo must not be null");
         if (prNumber <= 0) {
             throw new IllegalArgumentException("prNumber must be positive, was " + prNumber);
         }

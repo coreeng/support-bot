@@ -185,18 +185,23 @@ metrics: # Prometheus metrics populated from database
   enabled: true # Set to false to disable
   refresh-interval: 60s # How often to refresh ticket metrics e.g. 60s
 
-pr-review-tracking: # Detects PR links in support threads and manages their lifecycle (SLA tracking, escalation, auto-close)
+# PR review tracking — detects PR/MR links in support threads and manages their lifecycle
+# (SLA tracking, escalation, auto-close). Full operator reference (token permissions, per-repo
+# settings, GitLab, message customisation) is in the "PR review tracking" section under Integrations below.
+pr-review-tracking:
   enabled: false # Feature flag — off by default
-  poll-cron: 0 0 9-18 * * 1-5 # Cron schedule for the lifecycle poller (default: business hours Mon–Fri)
-  pr-emoji: pr # Slack emoji added to the message when a PR is detected — must exist in your Slack workspace
-  tags: # Required when enabled: tag codes from enums.tags applied to the ticket when the bot auto closes it
+  poll-cron: 0 0 9-18 * * 1-5 # Cron for the lifecycle poller (default: business hours Mon–Fri UTC)
+  pr-emoji: pr # Slack reaction added when a PR/MR is detected — must already exist in your workspace
+  tags: # Required when enabled: tag code(s) from enums.tags applied when the bot auto-closes the ticket
     - <tag-code>
-  impact: <impact-code> # Required when enabled: impact code from enums.impacts applied when the bot auto-closes a ticket
+  impact: <impact-code> # Required when enabled: impact code from enums.impacts applied on auto-close
   repositories: # Repositories to watch. At least one entry is required when enabled.
-    - name: my-org/my-repo # Repository in org/repo format
-      owning-team: <team-code> # Team code from enums.escalation-teams — escalated when the SLA is breached
-      sla: PT48H # SLA duration for PRs in this repository (ISO 8601 duration, e.g. PT48H = 48 hours)
-  github:
+    - name: my-org/my-repo # org/repo (GitHub) or group/.../project (GitLab)
+      # provider: github # github (default) | gitlab
+      owning-team: <team-code> # Team code from enums.escalation-teams — chased when the SLA is breached
+      sla:
+        default: 48h # SLA duration (e.g. 48h, 7d). See the reference below for file-based and per-path SLAs.
+  github: # Required only if any repo uses provider: github
     api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
     auth-mode: ${GITHUB_AUTH_MODE:token} # token | app
     token: ${GITHUB_TOKEN:} # Personal Access Token — used only when auth-mode=token
@@ -204,6 +209,9 @@ pr-review-tracking: # Detects PR links in support threads and manages their life
     installation-id: ${GITHUB_APP_INSTALLATION_ID:} # GitHub App installation ID — used only when auth-mode=app
     private-key-pem: ${GITHUB_APP_PRIVATE_KEY_PEM:} # Private key input — used only when auth-mode=app
                                                      # Accepts raw PEM content or base64-encoded PEM
+  gitlab: # Required only if any repo uses provider: gitlab
+    api-base-url: ${GITLAB_API_BASE_URL:https://gitlab.com/api/v4} # must include /api/v4, no trailing slash
+    token: ${GITLAB_TOKEN:}
 ```
 
 For deployment versatility across different secret delivery mechanisms, you can base64-encode the PEM file into a single line before storing it:
@@ -425,3 +433,274 @@ For Kubernetes deployment values (platform chart), see [`api/k8s/dex/README.md`]
 | **Missing or wrong teams after LDAP login** | Dex must emit the configured claim (default `groups`). `jwt-groups.mappings[].claim-values` must match those strings (case-insensitive). `team-code` must match a platform team. Only the **`dex`** registration uses `jwt-groups`; Google/Azure direct clients use static-user / Azure / GCP only. |
 
 Full operational order and integration sequencing: [auth Dex/LDAP runbook](../../../../docs/runbooks/auth-dex-ldap.md).
+
+## PR review tracking
+
+`pr-review-tracking` detects PR/MR links posted in support threads and manages
+their lifecycle: SLA tracking, escalation to the owning team, and ticket
+auto-close. The **end-user** view of the feature — what it does and how it shows
+up in Slack and the dashboard — is documented in the
+[PR tracking user guide](../../../docs/user-guides/pr-tracking.md). This section
+is the **operator** reference: how to wire it up.
+
+All settings live under `pr-review-tracking` in `application.yaml`. Validation
+runs at startup and **fails fast** on a bad config — a misconfigured block stops
+the app from starting rather than failing silently at runtime.
+
+### Global settings
+
+```yaml
+pr-review-tracking:
+  enabled: true                            # master feature flag (default: false)
+  poll-cron: "0 0 9-18 * * 1-5"            # lifecycle poller schedule (default: business hours, Mon–Fri UTC)
+  pr-emoji: pr                             # Slack reaction added to the detected message (default: pr)
+  tags: [PR]                               # tag code(s) from enums.tags, applied when the bot auto-closes the ticket
+  impact: Information Request              # impact code from enums.impacts, applied on auto-close
+  duration-unit: days                      # optional; how bare SLA numbers are read: hours | days | weeks (default: days)
+  sla-discovery:
+    cache: PT24H                           # optional; TTL for in-repo SLA files and GitLab group/branch lookups (default: PT24H)
+
+  github:                                  # required only if any repo uses provider: github
+    api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
+    auth-mode:    ${GITHUB_AUTH_MODE:token}      # token | app (default: token)
+    token:        ${GITHUB_TOKEN:}               # PAT — required when auth-mode=token
+    app-id:           ${GITHUB_APP_ID:}          # GitHub App fields — required when auth-mode=app
+    installation-id:  ${GITHUB_APP_INSTALLATION_ID:}
+    private-key-pem:  ${GITHUB_APP_PRIVATE_KEY_PEM:}   # raw PEM or base64-encoded PEM
+
+  gitlab:                                  # required only if any repo uses provider: gitlab
+    api-base-url: ${GITLAB_API_BASE_URL:https://gitlab.com/api/v4}   # must include /api/v4, no trailing slash
+    token:        ${GITLAB_TOKEN:}
+
+  repositories:                            # at least one entry is required when enabled
+    - name: my-org/my-repo
+      owning-team: support-team
+      sla:
+        default: 48h
+```
+
+| Key | Required | Default | Description |
+|-----|----------|---------|-------------|
+| `enabled` | — | `false` | Master feature flag. When false, no PR-tracking beans, schedulers, or REST endpoints are created. |
+| `poll-cron` | when enabled | `0 0 9-18 * * 1-5` | Spring cron expression for the lifecycle poller. |
+| `pr-emoji` | — | `pr` | Slack reaction added to the detected message. Must already exist in the workspace. |
+| `tags` | when enabled | — | One or more codes from `enums.tags`, applied to the ticket on auto-close. |
+| `impact` | when enabled | — | A code from `enums.impacts`, applied to the ticket on auto-close. |
+| `duration-unit` | — | `days` | How a bare numeric SLA value is interpreted: `hours`, `days`, or `weeks`. |
+| `sla-discovery.cache` | — | `PT24H` | TTL (ISO-8601 duration) for cached in-repo SLA files and GitLab group-membership / default-branch lookups. |
+| `github` | when any GitHub repo | — | GitHub connection block (see [Token permissions](#token-permissions)). |
+| `gitlab` | when any GitLab repo | — | GitLab connection block (see [Token permissions](#token-permissions)). |
+| `repositories` | when enabled | — | Repositories to watch; at least one entry. See [Per-repository configuration](#per-repository-configuration). |
+
+### Token permissions
+
+The bot only ever **reads** from the provider — it never writes to PRs/MRs.
+Grant the minimum read scopes:
+
+**GitHub** (`github` block):
+
+- **`auth-mode: token`** (a Personal Access Token in `github.token`):
+  - Classic PAT: `repo` (read PRs, reviews, and file contents on **private**
+    repos — omit only if every tracked repo is public) and `read:org` (resolve
+    `github-team-slug` membership).
+  - Fine-grained PAT: repository permissions **Pull requests: Read**,
+    **Contents: Read**, **Metadata: Read**; organization permission
+    **Members: Read** (only if any repo uses `github-team-slug`).
+- **`auth-mode: app`** (a GitHub App via `app-id` / `installation-id` /
+  `private-key-pem`): the same permissions as the fine-grained PAT above —
+  **Pull requests: Read**, **Contents: Read**, **Metadata: Read**, and
+  **Members: Read** (org) when `github-team-slug` is used.
+
+**GitLab** (`gitlab` block — a Personal, Group, or Project access token, sent as
+the `PRIVATE-TOKEN` header). GitLab supports two permission models; use whichever
+your instance offers.
+
+*Classic token scopes* (available on all GitLab versions):
+
+- Scope **`read_api`**.
+- The token's identity needs at least the **Reporter** role on every tracked
+  project (to read merge requests, approvals, diffs, and repository files).
+- Only when a repo sets the optional `gitlab-group-path` does the token
+  additionally need at least the **Reporter** role on that reviewer group, so it
+  can list the group's members (including inherited members). Repos that omit
+  `gitlab-group-path` need no group-level access.
+
+*Fine-grained (granular) permissions* — GitLab's
+[fine-grained personal access tokens](https://docs.gitlab.com/auth/tokens/fine_grained_access_tokens/),
+introduced as a beta in **GitLab 18.10**. Instead of `read_api`, grant these
+read-only resource permissions (the exact set below is a verified working token):
+
+| Permission (resource: action)        | Required                          | Used for                                                                 |
+|--------------------------------------|-----------------------------------|--------------------------------------------------------------------------|
+| **Repository: Read**                 | yes                               | Read the in-repo SLA file and project metadata (default branch).         |
+| **Merge Request: Read**              | yes                               | Read MR details and the MR diff (changed-file matching for path filters). |
+| **Approval Setting: Read**           | yes                               | Read the MR's approval configuration.                                     |
+| **Merge Request Approval Rule: Read**| yes                               | Read the MR's approval state (who has approved).                          |
+| **Group: Read**                      | only if `gitlab-group-path` set   | Access the reviewer group.                                                |
+| **Member: Read**                     | only if `gitlab-group-path` set   | List the reviewer group's members (including inherited members).         |
+
+Note that fine-grained PATs are still rolling out (~75% REST API coverage at
+beta), so on older instances or for full coverage the classic `read_api` scope
+above is the safe choice.
+
+For self-hosted instances (either model), point `gitlab.api-base-url` (globally
+or per-repo) at that instance's `/api/v4` endpoint and issue the token there.
+
+### Per-repository configuration
+
+Each entry under `repositories` is either **SLA-tracked** (has an `sla` block)
+or **no-SLA** (has a `paths` list) — never both. No-SLA repos track only PRs/MRs
+touching the listed paths and never escalate.
+
+| Key | Required | Applies to | Description |
+|-----|----------|------------|-------------|
+| `name` | yes | both | `org/repo` (GitHub) or `group/project` / nested `group/subgroup/project` (GitLab). Unique, case-insensitive. |
+| `owning-team` | yes | both | Code from `enums.escalation-teams`; chased when the SLA is breached. |
+| `provider` | — | both | `github` (default) or `gitlab`. |
+| `github-team-slug` | — | GitHub only | Team whose members' reviews count as a qualifying review. Falls back to the PR's requested team reviewers when omitted. |
+| `gitlab-group-path` | — | GitLab only | Reviewer group whose members' approvals count (see [Approver validation and CODEOWNERS](#approver-validation-and-codeowners)). |
+| `sla` | one of `sla`/`paths` | both | SLA block — see below. |
+| `paths` | one of `sla`/`paths` | both | Glob list; a no-SLA repo tracks only PRs/MRs touching these paths. |
+| `gitlab` | — | GitLab only | Per-repo `api-base-url` / `token` override of the global `gitlab` block. |
+| `messages` | — | both | Per-event Slack copy overrides — see [Customising the Slack messages](#customising-the-slack-messages). |
+
+The `sla` block has:
+
+- `default` — a duration like `48h` or `7d`. Required unless `file` is set.
+- `file` — path to an in-repo SLA file; `default` is the fallback when the file
+  is missing or invalid.
+- `overrides` — optional list of `{ path, sla }` for path-specific SLAs.
+
+**GitHub, fixed SLA:**
+
+```yaml
+repositories:
+  - name: my-org/my-repo
+    # provider: github                    # implicit default
+    owning-team: support-team
+    github-team-slug: support-reviewers    # optional; falls back to the PR's requested teams
+    sla:
+      default: 48h
+      overrides:                           # optional, path-specific
+        - path: infra/**
+          sla: 7d
+```
+
+**GitHub, SLA discovered from a file in the repo:**
+
+```yaml
+  - name: my-org/my-repo
+    owning-team: support-team
+    sla:
+      file: .pr-sla.yaml
+      default: 48h                         # fallback when the file is missing or invalid
+```
+
+**GitLab on gitlab.com:**
+
+```yaml
+  - name: my-group/my-project
+    provider: gitlab
+    owning-team: support-team
+    gitlab-group-path: my-group/reviewers  # optional; approvals by this group's members count
+    sla:
+      default: 48h
+```
+
+**GitLab self-hosted, with a per-repo connection override:**
+
+```yaml
+  - name: platform/infra/cluster-config    # nested groups are supported
+    provider: gitlab
+    owning-team: support-team
+    gitlab-group-path: platform/reviewers
+    gitlab:
+      api-base-url: https://gitlab.internal.example.com/api/v4
+      token:        ${GITLAB_INTERNAL_TOKEN}
+    sla:
+      file: .pr-sla.yaml
+      default: 7d
+```
+
+**No-SLA, path-scoped (works for either provider):**
+
+```yaml
+  - name: my-org/no-sla-repo
+    owning-team: support-team
+    paths:
+      - infra/**
+      - rbac/**
+```
+
+#### Approver validation and CODEOWNERS
+
+This is how the bot decides whose review counts toward an approval:
+
+- **GitHub** — `github-team-slug` selects the team whose members' reviews count.
+  When omitted, the bot falls back to the PR's requested team reviewers; if none
+  were requested, any review counts.
+- **GitLab** — `gitlab-group-path` plays the same role: only approvals by
+  members of that group (including inherited members) count as a qualifying
+  review.
+
+`gitlab-group-path` is **optional**. When it is omitted, the bot accepts **any**
+approval GitLab records on the MR. Omit it when your organisation already
+controls who may approve through GitLab's own rules — e.g. **CODEOWNERS** or
+required-approval rules — so that GitLab stays the single source of truth for
+approval validity and the bot simply mirrors it. Set `gitlab-group-path` only
+when you additionally want the bot to restrict qualifying approvals to a
+specific reviewer group.
+
+### Validation rules
+
+Checked at startup; any failure aborts boot:
+
+- `provider` is `github` (default) or `gitlab`.
+- Repository `name`s are unique (case-insensitive). GitHub names are exactly
+  `org/repo`; GitLab names allow nested groups
+  (`group/subgroup/project`).
+- `github-team-slug` is only valid on GitHub repos; `gitlab-group-path` and a
+  per-repo `gitlab:` block are only valid on GitLab repos.
+- `owning-team` must exist in `enums.escalation-teams`; `tags` / `impact` must
+  reference `enums.tags` / `enums.impacts`.
+- Each repo has **either** an `sla` block **or** a non-empty `paths` list.
+- When any repo uses `provider: gitlab`, `gitlab.token` must resolve (globally
+  or per-repo) and `gitlab.api-base-url` must include the `/api/v4` segment with
+  no trailing slash.
+- When any repo uses `provider: github`, the `github` block must be configured
+  for the chosen `auth-mode` (token, or all three App fields).
+- A `messages.escalated` override is rejected on a no-SLA repo (it can never
+  fire).
+
+### Customising the Slack messages
+
+Each repo can override the default Slack copy for any event with a CEL
+expression. Templates compile at startup; a bad template logs a warning and
+falls back to the built-in default (the feature is fail-safe). The provider only
+selects the **default** wording (GitHub says "PR #N", GitLab says "MR !N") — a
+custom override always wins.
+
+```yaml
+    messages:
+      detected:           '"PR " + string(pr_number) + " detected. SLA: " + sla_duration + ", deadline: " + sla_deadline + "."'
+      escalated:          '"Contact #pr-reviews in Slack to chase this review."'
+      approved:           '"PR " + string(pr_number) + " approved — ready to merge!"'
+      changes-requested:  '"Changes requested on PR " + string(pr_number) + ". Please review the feedback."'
+      merged:             '"PR " + string(pr_number) + " merged. Thanks!"'
+      closed:             '"PR " + string(pr_number) + " closed."'
+```
+
+Available CEL variables:
+
+| Variable        | Type   | Notes                                                       |
+|-----------------|--------|-------------------------------------------------------------|
+| `pr_number`     | int    | Convert with `string(pr_number)` for concatenation          |
+| `pr_url`        | string | Full PR/MR URL                                             |
+| `repo_name`     | string | `org/repo` (GitHub) or `group/.../project` (GitLab)         |
+| `repo_url`      | string | Full repository URL                                        |
+| `owning_team`   | string | Team code from `enums.escalation-teams`                     |
+| `sla_duration`  | string | e.g. `2 days`; empty for no-SLA repos                       |
+| `sla_deadline`  | string | e.g. `Wed 08 May at 17:00 UTC`; empty for no-SLA repos      |
+| `provider`      | string | `github` or `gitlab`                                        |
+
+Setting an `escalated` message on a no-SLA repo is rejected at startup.

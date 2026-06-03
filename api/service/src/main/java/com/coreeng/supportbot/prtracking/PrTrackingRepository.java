@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.prtracking;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -36,7 +37,7 @@ public interface PrTrackingRepository {
     /** Updates activity timestamps on a tracking record. */
     void updateActivityTimestamps(long id, @Nullable Instant lastReviewAt, @Nullable Instant lastAuthorActivityAt);
 
-    boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, String githubRepo, int prNumber);
+    boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, Provider provider, String repo, int prNumber);
 
     /** Returns all active (OPEN, ESCALATED, CHANGES_REQUESTED, APPROVED) PR tracking records, optionally filtered by owning team. */
     List<InFlightPr> findAllInFlight(@Nullable String owningTeam);

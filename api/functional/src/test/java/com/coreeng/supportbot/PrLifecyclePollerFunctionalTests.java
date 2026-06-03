@@ -20,7 +20,9 @@ import com.coreeng.supportbot.testkit.TicketByIdQuery;
 import com.coreeng.supportbot.testkit.TicketMessage;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -1049,5 +1051,127 @@ public class PrLifecyclePollerFunctionalTests {
         var result = supportBotClient.test().getPrTrackingRecord(record.id());
         assertThat(result.status()).isEqualTo("CHANGES_REQUESTED");
         assertThat(result.escalationId()).isNotNull();
+    }
+
+    /**
+     * Lifecycle poller tests for GitLab MR records. Seed a record with
+     * {@code provider=gitlab} and then drive transitions via the GitLab v4 API stubs.
+     */
+    @Nested
+    public class GitLab {
+
+        private static final String MR_REPO = "gitlab-org/gitlab-pr-test-repo";
+
+        @Test
+        public void whenPollDetectsApprovalAndMergeable_closesGitLabRecord() {
+            String channelId = testKit.config().mocks().slack().supportChannelId();
+            MessageTs queryTs = MessageTs.now();
+            MessageTs ticketTs = MessageTs.now();
+
+            var ticket = supportBotClient
+                    .test()
+                    .createTicket(SupportBotClient.TicketToCreateRequest.builder()
+                            .channelId(channelId)
+                            .queryTs(queryTs)
+                            .createdMessageTs(ticketTs)
+                            .build());
+
+            var record = supportBotClient
+                    .test()
+                    .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                            .ticketId(ticket.id())
+                            .provider("gitlab")
+                            .githubRepo(MR_REPO)
+                            .prNumber(42)
+                            .prCreatedAt(Instant.now().minus(Duration.ofHours(1)))
+                            .slaDeadline(Instant.now().plus(Duration.ofHours(23)))
+                            .owningTeam("wow")
+                            .canAutoCloseTicket(false)
+                            .build());
+
+            String createdAt = Instant.now().minus(Duration.ofHours(1)).toString();
+            // Approved + mergeable on an open MR should drive the record straight to CLOSED.
+            var mrStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetMergeRequest(
+                            "MR !42 approved mergeable", MR_REPO, 42, "opened", "mergeable", createdAt, createdAt);
+            var approvalsStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetMergeRequestApprovals("MR !42 approvals", MR_REPO, 42, List.of("reviewer"));
+            // Group members served by the permanent catch-all stub (empty list) — TeamReviewFilter
+            // then falls back to "accept all reviews" so the reviewer approval still counts.
+            var closeMessageStub =
+                    testKit.slack().wiremock().stubChatPostMessage("approved + mergeable notification", channelId);
+
+            supportBotClient.test().triggerPrTrackingPoll();
+
+            await().atMost(Duration.ofSeconds(8)).untilAsserted(() -> {
+                mrStub.assertIsCalled();
+                approvalsStub.assertIsCalled();
+                closeMessageStub.assertIsCalled();
+            });
+            var result = supportBotClient.test().getPrTrackingRecord(record.id());
+            assertThat(result.status()).isEqualTo("CLOSED");
+            assertThat(result.closedAt()).isNotNull();
+        }
+
+        @Test
+        public void whenPollDetectsSlaBreachOnGitLabMr_escalatesAndPostsSlackMessage() {
+            String channelId = testKit.config().mocks().slack().supportChannelId();
+            MessageTs queryTs = MessageTs.now();
+            MessageTs ticketTs = MessageTs.now();
+
+            var ticket = supportBotClient
+                    .test()
+                    .createTicket(SupportBotClient.TicketToCreateRequest.builder()
+                            .channelId(channelId)
+                            .queryTs(queryTs)
+                            .createdMessageTs(ticketTs)
+                            .build());
+
+            var record = supportBotClient
+                    .test()
+                    .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                            .ticketId(ticket.id())
+                            .provider("gitlab")
+                            .githubRepo(MR_REPO)
+                            .prNumber(42)
+                            .prCreatedAt(Instant.now().minus(Duration.ofHours(25)))
+                            .slaDeadline(Instant.now().minus(Duration.ofHours(1)))
+                            .owningTeam("wow")
+                            .canAutoCloseTicket(false)
+                            .build());
+
+            String createdAt = Instant.now().minus(Duration.ofHours(25)).toString();
+            var mrStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetMergeRequest(
+                            "MR !42 open no approvals", MR_REPO, 42, "opened", "mergeable", createdAt, createdAt);
+            var approvalsStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetMergeRequestApprovals("MR !42 no approvals", MR_REPO, 42, List.of());
+            var escalationMessageStub =
+                    testKit.slack().wiremock().stubChatPostMessage("escalation notification", channelId);
+            var rocketReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("rocket reaction on ticket query")
+                            .reaction("rocket")
+                            .channelId(channelId)
+                            .ts(queryTs)
+                            .build());
+
+            supportBotClient.test().triggerPrTrackingPoll();
+
+            await().atMost(Duration.ofSeconds(8)).untilAsserted(() -> {
+                mrStub.assertIsCalled();
+                approvalsStub.assertIsCalled();
+                escalationMessageStub.assertIsCalled();
+                rocketReactionStub.assertIsCalled();
+            });
+            var updated = supportBotClient.test().getPrTrackingRecord(record.id());
+            assertThat(updated.status()).isEqualTo("ESCALATED");
+            assertThat(updated.escalationId()).isNotNull();
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.coreeng.supportbot.prtracking;
 
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -45,7 +46,7 @@ public class GitHubPrUrlParser {
                         .log("Skipping PR URL due to invalid PR number: url={}, pullNumber={}");
                 continue;
             }
-            DetectedPr candidate = new DetectedPr(repoName, pullNumber);
+            DetectedPr candidate = new DetectedPr(Provider.GITHUB, repoName, pullNumber);
             if (trackedRepositories.contains(repoName) && !results.contains(candidate)) {
                 results.add(candidate);
             }

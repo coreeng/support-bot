@@ -4,6 +4,7 @@ import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.prtracking.*;
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
@@ -60,16 +61,20 @@ public class TenantInsightsController {
      */
     private List<RepoInsights> replaceHasSlaWithCurrentConfig(List<RepoInsights> insights) {
         // Config-side names are normalised to lowercase by PrTrackingProps#normalizeRepositoryName,
-        // but DB github_repo values are whatever a historical caller inserted. Compare in lowercase
-        // on both sides so a mismatched-case legacy row doesn't silently evade the current-state rule.
-        Set<String> configuredSlaRepos = prTrackingProps.repositories().stream()
+        // but DB repo values are whatever a historical caller inserted. Compare in lowercase on
+        // both sides so a mismatched-case legacy row doesn't silently evade the current-state rule.
+        // Keyed by (provider, name) so the same repo string across providers stays distinct.
+        Set<ProviderRepoKey> configuredSlaRepos = prTrackingProps.repositories().stream()
                 .filter(r -> !r.hasNoSla())
-                .map(r -> r.name().toLowerCase(Locale.ROOT))
+                .map(r -> new ProviderRepoKey(r.provider(), r.name().toLowerCase(Locale.ROOT)))
                 .collect(Collectors.toUnmodifiableSet());
         return insights.stream()
-                .map(i -> i.withHasSla(configuredSlaRepos.contains(i.repo().toLowerCase(Locale.ROOT))))
+                .map(i -> i.withHasSla(configuredSlaRepos.contains(
+                        new ProviderRepoKey(i.provider(), i.repo().toLowerCase(Locale.ROOT)))))
                 .toList();
     }
+
+    private record ProviderRepoKey(Provider provider, String repo) {}
 
     @GetMapping("/escalation-breakdown")
     public EscalationBreakdown escalationBreakdown(

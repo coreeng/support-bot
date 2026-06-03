@@ -7,6 +7,7 @@ import com.coreeng.supportbot.prtracking.NewPrTracking;
 import com.coreeng.supportbot.prtracking.PrLifecyclePoller;
 import com.coreeng.supportbot.prtracking.PrTrackingRecord;
 import com.coreeng.supportbot.prtracking.PrTrackingRepository;
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
@@ -40,8 +41,12 @@ public class PrTrackingTestController {
     @PostMapping("/record")
     public PrTrackingRecord createRecord(@RequestBody PrTrackingToCreate request) {
         boolean canAutoClose = request.canAutoCloseTicket() == null || request.canAutoCloseTicket();
+        // Provider defaults to GitHub when omitted so existing functional-test fixtures (all
+        // GitHub) keep working without touching their JSON.
+        Provider provider = request.provider() == null ? Provider.GITHUB : Provider.fromStorage(request.provider());
         PrTrackingRecord created = prTrackingRepository.insertIfAbsent(new NewPrTracking(
                 request.ticketId(),
+                provider,
                 request.githubRepo(),
                 request.prNumber(),
                 request.prCreatedAt(),
@@ -81,6 +86,7 @@ public class PrTrackingTestController {
 
     public record PrTrackingToCreate(
             long ticketId,
+            @Nullable String provider,
             String githubRepo,
             int prNumber,
             Instant prCreatedAt,

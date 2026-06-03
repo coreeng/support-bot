@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.prtracking.*;
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -47,7 +48,7 @@ class TenantInsightsControllerTest {
     private static PrTrackingProps propsWithRepos(List<PrTrackingProps.Repository> repos) {
         // Non-enabled config: skips the strict validation but still exposes repositories() to the
         // controller's config-join logic.
-        return new PrTrackingProps(false, "0 * * * * *", null, null, null, null, repos, null, null);
+        return new PrTrackingProps(false, "0 * * * * *", null, null, null, null, repos, null, null, null);
     }
 
     private static PrTrackingProps.Repository slaRepo(String name) {
@@ -59,12 +60,25 @@ class TenantInsightsControllerTest {
         return new PrTrackingProps.Repository(name, "team-foo", null, List.of("src/"), null);
     }
 
+    private static PrTrackingProps.Repository slaGitlabRepo(String name) {
+        return new PrTrackingProps.Repository(
+                name,
+                "team-foo",
+                Provider.GITLAB,
+                null,
+                "group/reviewers",
+                List.of(),
+                new PrTrackingProps.Sla(null, Duration.ofHours(24), null),
+                null,
+                null);
+    }
+
     @Test
     void prStats_returnsInsightsForDateRange() {
         // given a repo with 10 PRs, 2 open, 1 escalated, 3 breached SLA
         LocalDate from = LocalDate.of(2026, 3, 1);
-        List<RepoInsights> insights =
-                List.of(new RepoInsights("org/repo-a", "team-foo", 10, 2, 1, 3, 3600.0, 7200.0, 86400.0, true));
+        List<RepoInsights> insights = List.of(new RepoInsights(
+                Provider.GITHUB, "org/repo-a", "team-foo", 10, 2, 1, 3, 3600.0, 7200.0, 86400.0, true));
         when(prTrackingRepository.getInsightsByRepo(from, TO)).thenReturn(insights);
 
         // when requesting with a date range
@@ -84,8 +98,8 @@ class TenantInsightsControllerTest {
                 prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/repo-a"))));
         LocalDate from = LocalDate.of(2026, 2, 1);
         List<RepoInsights> insights = List.of(
-                new RepoInsights("org/repo-a", "team-foo", 5, 1, 1, 2, 3600.0, 7200.0, 86400.0, false),
-                new RepoInsights("org/repo-b", "team-bar", 3, 0, 0, 0, 1800.0, 3600.0, 43200.0, true));
+                new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 5, 1, 1, 2, 3600.0, 7200.0, 86400.0, false),
+                new RepoInsights(Provider.GITHUB, "org/repo-b", "team-bar", 3, 0, 0, 0, 1800.0, 3600.0, 43200.0, true));
         when(prTrackingRepository.getInsightsByRepo(from, TO)).thenReturn(insights);
 
         // when requesting stats
@@ -174,7 +188,8 @@ class TenantInsightsControllerTest {
         controller = new TenantInsightsController(
                 prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/repo-a"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
-                .thenReturn(List.of(new RepoInsights("org/repo-a", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
+                .thenReturn(List.of(
+                        new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
 
         // when
         List<RepoInsights> response = controller.prStats(null, null);
@@ -189,7 +204,8 @@ class TenantInsightsControllerTest {
         // given — config-based hasSla must not touch counts, percentiles, owning team etc
         controller = new TenantInsightsController(
                 prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/repo-a"))));
-        RepoInsights stored = new RepoInsights("org/repo-a", "team-foo", 5, 1, 1, 2, 10.0, 20.0, 30.0, false);
+        RepoInsights stored =
+                new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 5, 1, 1, 2, 10.0, 20.0, 30.0, false);
         when(prTrackingRepository.getInsightsByRepo(null, null)).thenReturn(List.of(stored));
 
         // when
@@ -214,7 +230,8 @@ class TenantInsightsControllerTest {
         controller = new TenantInsightsController(
                 prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(noSlaRepo("org/repo-a"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
-                .thenReturn(List.of(new RepoInsights("org/repo-a", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
+                .thenReturn(List.of(
+                        new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
 
         // when
         List<RepoInsights> response = controller.prStats(null, null);
@@ -230,7 +247,8 @@ class TenantInsightsControllerTest {
         controller = new TenantInsightsController(
                 prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/other-repo"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
-                .thenReturn(List.of(new RepoInsights("org/repo-a", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
+                .thenReturn(List.of(
+                        new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
 
         // when
         List<RepoInsights> response = controller.prStats(null, null);
@@ -247,7 +265,8 @@ class TenantInsightsControllerTest {
         controller = new TenantInsightsController(
                 prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(noSlaRepo("org/repo-a"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
-                .thenReturn(List.of(new RepoInsights("org/repo-a", "team-foo", 2, 0, 0, 1, 1.0, 2.0, 3.0, true)));
+                .thenReturn(List.of(
+                        new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 2, 0, 0, 1, 1.0, 2.0, 3.0, true)));
 
         // when
         List<RepoInsights> response = controller.prStats(null, null);
@@ -263,7 +282,8 @@ class TenantInsightsControllerTest {
         controller = new TenantInsightsController(
                 prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/other-repo"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
-                .thenReturn(List.of(new RepoInsights("org/repo-a", "team-foo", 2, 0, 0, 1, 1.0, 2.0, 3.0, true)));
+                .thenReturn(List.of(
+                        new RepoInsights(Provider.GITHUB, "org/repo-a", "team-foo", 2, 0, 0, 1, 1.0, 2.0, 3.0, true)));
 
         // when
         List<RepoInsights> response = controller.prStats(null, null);
@@ -274,13 +294,33 @@ class TenantInsightsControllerTest {
     }
 
     @Test
+    void prStats_hasSlaIsTrueForGitlabRepoInSlaConfig() {
+        // given — a GitLab-backed repo currently in config with an SLA. The config-join must key
+        // on (provider, name) using each repo's actual provider, otherwise the GITLAB row's lookup
+        // key never matches a GITHUB-stamped config entry and hasSla is silently false.
+        controller = new TenantInsightsController(
+                prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaGitlabRepo("group/project"))));
+        when(prTrackingRepository.getInsightsByRepo(null, null))
+                .thenReturn(List.of(new RepoInsights(
+                        Provider.GITLAB, "group/project", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
+
+        // when
+        List<RepoInsights> response = controller.prStats(null, null);
+
+        // then — GitLab repo's hasSla is driven by its GitLab config entry
+        assertThat(response).singleElement().satisfies(r -> assertThat(r.hasSla())
+                .isTrue());
+    }
+
+    @Test
     void prStats_hasSlaMatchesAcrossCasingDifferences() {
         // given — config is lowercased by PrTrackingProps, but a legacy DB row may be mixed case.
         // The config match must still fire for that row.
         controller = new TenantInsightsController(
                 prTrackingRepository, escalationTeamsRegistry, propsWithRepos(List.of(slaRepo("org/repo-a"))));
         when(prTrackingRepository.getInsightsByRepo(null, null))
-                .thenReturn(List.of(new RepoInsights("Org/Repo-A", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
+                .thenReturn(List.of(
+                        new RepoInsights(Provider.GITHUB, "Org/Repo-A", "team-foo", 2, 0, 0, 0, 1.0, 2.0, 3.0, false)));
 
         // when
         List<RepoInsights> response = controller.prStats(null, null);
@@ -337,6 +377,7 @@ class TenantInsightsControllerTest {
         // given
         Instant now = Instant.parse("2026-03-25T12:00:00Z");
         InFlightPr pr = new InFlightPr(
+                Provider.GITHUB,
                 "org/repo-a",
                 101,
                 "https://github.com/org/repo-a/pull/101",
@@ -358,7 +399,7 @@ class TenantInsightsControllerTest {
 
         // then — sla-backed PR has hasSla=true
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).githubRepo()).isEqualTo("org/repo-a");
+        assertThat(result.get(0).repo()).isEqualTo("org/repo-a");
         assertThat(result.get(0).prNumber()).isEqualTo(101);
         assertThat(result.get(0).hasSla()).isTrue();
         verify(prTrackingRepository).findAllInFlight(null);
@@ -369,6 +410,7 @@ class TenantInsightsControllerTest {
         // given — a no-SLA PR: both slaDeadline and slaRemainingSeconds are null
         Instant now = Instant.parse("2026-03-25T12:00:00Z");
         InFlightPr noSlaPr = new InFlightPr(
+                Provider.GITHUB,
                 "org/no-sla-repo",
                 200,
                 "https://github.com/org/no-sla-repo/pull/200",
@@ -397,6 +439,7 @@ class TenantInsightsControllerTest {
         // given — a PR with a paused SLA: slaDeadline is null, slaRemainingSeconds is set
         Instant now = Instant.parse("2026-03-25T12:00:00Z");
         InFlightPr pausedPr = new InFlightPr(
+                Provider.GITHUB,
                 "org/repo-a",
                 201,
                 "https://github.com/org/repo-a/pull/201",
@@ -425,6 +468,7 @@ class TenantInsightsControllerTest {
         // given — registry knows about team-foo
         Instant now = Instant.parse("2026-03-25T12:00:00Z");
         InFlightPr pr = new InFlightPr(
+                Provider.GITHUB,
                 "org/repo-a",
                 102,
                 "https://github.com/org/repo-a/pull/102",
@@ -455,6 +499,7 @@ class TenantInsightsControllerTest {
         // given — registry does not know about unknown-team
         Instant now = Instant.parse("2026-03-25T12:00:00Z");
         InFlightPr pr = new InFlightPr(
+                Provider.GITHUB,
                 "org/repo-b",
                 103,
                 "https://github.com/org/repo-b/pull/103",
@@ -501,6 +546,7 @@ class TenantInsightsControllerTest {
         controller = new TenantInsightsController(prTrackingRepository, escalationTeamsRegistry, propsWithNoRepos());
         Instant now = Instant.parse("2026-03-25T12:00:00Z");
         InFlightPr pr = new InFlightPr(
+                Provider.GITHUB,
                 "org/removed-from-config",
                 500,
                 "https://github.com/org/removed-from-config/pull/500",

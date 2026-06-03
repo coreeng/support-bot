@@ -6,6 +6,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import com.coreeng.supportbot.escalation.EscalationSource;
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -18,30 +19,34 @@ import org.jooq.types.DayToSecond;
 import org.jooq.types.YearToMonth;
 import org.jooq.types.YearToSecond;
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
+@ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Transactional
 @Slf4j
 public class JdbcPrTrackingRepository implements PrTrackingRepository {
 
     private final DSLContext dsl;
+    private final PrUrlResolver urlResolver;
 
     @Override
     public @Nullable PrTrackingRecord insertIfAbsent(NewPrTracking newRecord) {
         com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.insertInto(PR_TRACKING)
                 .set(PR_TRACKING.TICKET_ID, newRecord.ticketId())
-                .set(PR_TRACKING.GITHUB_REPO, newRecord.githubRepo())
+                .set(PR_TRACKING.PROVIDER, newRecord.provider().storageValue())
+                .set(PR_TRACKING.REPO, newRecord.repo())
                 .set(PR_TRACKING.PR_NUMBER, newRecord.prNumber())
                 .set(PR_TRACKING.PR_CREATED_AT, newRecord.prCreatedAt())
                 .set(PR_TRACKING.SLA_DEADLINE, newRecord.slaDeadline())
                 .set(PR_TRACKING.HAS_SLA, newRecord.hasSla())
                 .set(PR_TRACKING.OWNING_TEAM, newRecord.owningTeam())
                 .set(PR_TRACKING.CAN_AUTO_CLOSE_TICKET, newRecord.canAutoCloseTicket())
-                .onConflict(PR_TRACKING.TICKET_ID, PR_TRACKING.GITHUB_REPO, PR_TRACKING.PR_NUMBER)
+                .onConflict(PR_TRACKING.TICKET_ID, PR_TRACKING.PROVIDER, PR_TRACKING.REPO, PR_TRACKING.PR_NUMBER)
                 .doNothing()
                 .returning()
                 .fetchOne();
@@ -156,13 +161,14 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
 
     @Transactional(readOnly = true)
     @Override
-    public boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, String githubRepo, int prNumber) {
+    public boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, Provider provider, String repo, int prNumber) {
         return dsl.fetchExists(
                 PR_TRACKING,
                 PR_TRACKING
                         .TICKET_ID
                         .eq(ticketId)
-                        .and(PR_TRACKING.GITHUB_REPO.eq(githubRepo))
+                        .and(PR_TRACKING.PROVIDER.eq(provider.storageValue()))
+                        .and(PR_TRACKING.REPO.eq(repo))
                         .and(PR_TRACKING.PR_NUMBER.eq(prNumber)));
     }
 
@@ -175,13 +181,15 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
             teamFilter = "AND pt.owning_team = ? ";
             binds.add(owningTeam);
         }
+        // Provider is selected so commit 5's provider-aware URL builder has the data it needs;
+        // in this commit every row is provider='github' and the URL builder stays GitHub-only.
         String sql = """
-                SELECT github_repo, pr_number, status, pr_created_at,
+                SELECT provider, repo, pr_number, status, pr_created_at,
                        sla_deadline, sla_remaining, last_review_at, owning_team,
                        ticket_channel_id, ticket_query_ts, escalated_at, has_sla
                 FROM (
-                    SELECT DISTINCT ON (pt.github_repo, pt.pr_number)
-                           pt.github_repo, pt.pr_number, pt.status, pt.pr_created_at,
+                    SELECT DISTINCT ON (pt.provider, pt.repo, pt.pr_number)
+                           pt.provider, pt.repo, pt.pr_number, pt.status, pt.pr_created_at,
                            pt.sla_deadline, pt.sla_remaining, pt.last_review_at, pt.owning_team,
                            pt.has_sla,
                            q.channel_id AS ticket_channel_id, q.ts AS ticket_query_ts,
@@ -194,7 +202,8 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                     WHERE pt.status IN ('OPEN', 'ESCALATED', 'CHANGES_REQUESTED', 'APPROVED')
                       %s
                     ORDER BY
-                        pt.github_repo,
+                        pt.provider,
+                        pt.repo,
                         pt.pr_number,
                         CASE pt.status
                             WHEN 'ESCALATED' THEN 1
@@ -215,7 +224,9 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                 """.formatted(teamFilter);
 
         return dsl.resultQuery(sql, binds.toArray()).fetch(r -> {
-            String repo = checkNotNull(r.get("github_repo", String.class), "github_repo was null");
+            String providerRaw = checkNotNull(r.get("provider", String.class), "provider was null");
+            Provider provider = Provider.fromStorage(providerRaw);
+            String repo = checkNotNull(r.get("repo", String.class), "repo was null");
             int prNumber = checkNotNull(r.get("pr_number", Integer.class), "pr_number was null for repo %s", repo);
             String status = checkNotNull(r.get("status", String.class), "status was null for %s#%s", repo, prNumber);
             String waitingOn =
@@ -235,9 +246,10 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
             boolean hasSla =
                     checkNotNull(r.get("has_sla", Boolean.class), "has_sla was null for %s#%s", repo, prNumber);
             return new InFlightPr(
+                    provider,
                     repo,
                     prNumber,
-                    "https://github.com/%s/pull/%d".formatted(repo, prNumber),
+                    urlResolver.publicUrlFor(repo, prNumber),
                     status,
                     waitingOn,
                     checkNotNull(
@@ -266,9 +278,12 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     public List<RepoInsights> getInsightsByRepo(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
         List<Object> binds = new ArrayList<>();
         String dateFilter = buildDateFilter(dateFrom, dateTo, binds);
+        // Group by (provider, repo) so the same repo name across providers stays distinct in the
+        // dashboard. Today every row is provider='github', so the groups collapse exactly as before.
         String sql = """
                 SELECT
-                    github_repo,
+                    provider,
+                    repo,
                     COALESCE(MIN(owning_team), 'unknown') AS owning_team,
                     COUNT(*) AS pr_count,
                     COUNT(*) FILTER (WHERE status IN ('OPEN', 'ESCALATED', 'CHANGES_REQUESTED', 'APPROVED')) AS open_count,
@@ -279,7 +294,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                     percentile_cont(0.99) WITHIN GROUP (ORDER BY lifetime) AS p99,
                     BOOL_OR(has_sla) AS has_sla
                 FROM (
-                    SELECT github_repo, owning_team, status, sla_deadline, closed_at, has_sla,
+                    SELECT provider, repo, owning_team, status, sla_deadline, closed_at, has_sla,
                         EXTRACT(EPOCH FROM
                             CASE WHEN closed_at IS NOT NULL THEN closed_at - pr_created_at
                                  ELSE now() - pr_created_at END
@@ -288,12 +303,14 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                     WHERE 1=1
                       %s
                 ) sub
-                GROUP BY github_repo
-                ORDER BY github_repo
+                GROUP BY provider, repo
+                ORDER BY provider, repo
                 """.formatted(dateFilter);
 
         return dsl.resultQuery(sql, binds.toArray()).fetch(r -> {
-            String repo = checkNotNull(r.get("github_repo", String.class), "github_repo was null in insights row");
+            String providerRaw = checkNotNull(r.get("provider", String.class), "provider was null in insights row");
+            Provider provider = Provider.fromStorage(providerRaw);
+            String repo = checkNotNull(r.get("repo", String.class), "repo was null in insights row");
             String owningTeam =
                     checkNotNull(r.get("owning_team", String.class), "owning_team was null for repo %s", repo);
             Boolean hasSlaRaw = requireNonNullAggregate(
@@ -311,6 +328,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
             Long breachedCount =
                     requireNonNullAggregate(r.get("breached_count", Long.class), "breached_count", repo, null);
             return new RepoInsights(
+                    provider,
                     repo,
                     owningTeam,
                     prCount,
@@ -400,7 +418,8 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
         return new PrTrackingRecord(
                 checkNotNull(row.getId()),
                 checkNotNull(row.getTicketId()),
-                checkNotNull(row.getGithubRepo()),
+                Provider.fromStorage(checkNotNull(row.getProvider())),
+                checkNotNull(row.getRepo()),
                 checkNotNull(row.getPrNumber()),
                 checkNotNull(row.getPrCreatedAt()),
                 row.getSlaDeadline(),

@@ -17,6 +17,7 @@ import com.coreeng.supportbot.testkit.TicketMessage;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -751,5 +752,360 @@ public class PrTrackingFunctionalTests {
         assertThat(ticketResponse.escalated()).isTrue();
 
         creationStubs.cleanUp();
+    }
+
+    /**
+     * GitLab MR detection mirrors the GitHub detection flow but routes via the GitLab adapter.
+     *
+     * <p>Wiremock serves both GitHub stubs (under {@code /repos/...}) and GitLab stubs (under
+     * {@code /api/v4/...}) on the same port. The bot's URL allow-list is derived from its
+     * configured {@code gitlab.api-base-url} (the wiremock service URL in K8s), so MR URLs the
+     * test posts must use that same host — not {@code gitlab.com} or {@code localhost}.
+     */
+    @Nested
+    public class GitLab {
+
+        private static final String GITLAB_HOST = "support-bot-functional-tests-wiremock:8000";
+        private static final String MR_REPO = "gitlab-org/gitlab-pr-test-repo";
+        private static final String MR_LINK_42 = "http://" + GITLAB_HOST + "/" + MR_REPO + "/-/merge_requests/42";
+        private static final String SLA_FILE_MR_REPO = "gitlab-org/gitlab-pr-sla-file-repo";
+        private static final String SLA_FILE_MR_LINK =
+                "http://" + GITLAB_HOST + "/" + SLA_FILE_MR_REPO + "/-/merge_requests/101";
+        private static final String ESCALATION_MR_REPO = "gitlab-org/gitlab-pr-escalation-message-repo";
+        private static final String ESCALATION_MR_LINK =
+                "http://" + GITLAB_HOST + "/" + ESCALATION_MR_REPO + "/-/merge_requests/301";
+
+        @Test
+        public void whenGitLabMrUrlIsPostedAsReply_itIsTrackedAndSlaReplyPosted() {
+            TestKit.RoledTestKit asTenant = testKit.as(tenant);
+            SlackTestKit asTenantSlack = asTenant.slack();
+            SlackTestKit asSupportSlack = testKit.as(support).slack();
+
+            MessageTs queryTs = MessageTs.now();
+            String queryText = "Please help with my issue";
+            SlackMessage tenantsQuery = asTenantSlack.postMessage(queryTs, queryText);
+
+            MessageTs ticketMessageTs = MessageTs.now();
+            var creationStubs = tenantsQuery.stubTicketCreationFlow("ticket created", ticketMessageTs);
+            asSupportSlack.addReactionTo(tenantsQuery, "eyes");
+            creationStubs.awaitAllCalled(Duration.ofSeconds(5));
+
+            String createdAt = Instant.now().minus(Duration.ofHours(1)).toString();
+            var mrStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetMergeRequest(
+                            "GitLab MR !42", MR_REPO, 42, "opened", "mergeable", createdAt, createdAt);
+            var approvalsStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetMergeRequestApprovals("GitLab MR !42 approvals", MR_REPO, 42, List.of());
+            var prReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("PR reaction on query")
+                            .reaction("pr")
+                            .channelId(tenantsQuery.channelId())
+                            .ts(queryTs)
+                            .build());
+            var eyesReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("Eyes reaction on query")
+                            .reaction("eyes")
+                            .channelId(tenantsQuery.channelId())
+                            .ts(queryTs)
+                            .build());
+            var ticketReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("Ticket reaction on query")
+                            .reaction("ticket")
+                            .channelId(tenantsQuery.channelId())
+                            .ts(queryTs)
+                            .build());
+            var slaReplyStub =
+                    testKit.slack().wiremock().stubChatPostMessage("MR SLA reply in thread", tenantsQuery.channelId());
+
+            asTenantSlack.postThreadReply(MessageTs.now(), queryTs, "Here is the fix: " + MR_LINK_42);
+
+            await().atMost(Duration.ofSeconds(8)).untilAsserted(() -> {
+                mrStub.assertIsCalled();
+                approvalsStub.assertIsCalled();
+                prReactionStub.assertIsCalled();
+                eyesReactionStub.assertIsCalled();
+                ticketReactionStub.assertIsCalled();
+                slaReplyStub.assertIsCalled();
+            });
+
+            var ticketResponse = supportBotClient.findTicketByQueryTs(tenantsQuery.channelId(), queryTs);
+            assertThat(ticketResponse).isNotNull();
+            assertThat(ticketResponse.status()).isEqualTo("opened");
+            assertThat(ticketResponse.escalated()).isFalse();
+        }
+
+        @Test
+        public void whenSlaFileExistsInGitLabRepo_fetchesViaRawAndUsesFileSla() {
+            TestKit.RoledTestKit asTenant = testKit.as(tenant);
+            SlackTestKit asTenantSlack = asTenant.slack();
+            String channelId = testKit.config().mocks().slack().supportChannelId();
+
+            MessageTs queryTs = MessageTs.now();
+            MessageTs ticketMessageTs = MessageTs.now();
+
+            // MR created 2 minutes ago — well inside any reasonable SLA in seconds.
+            String oldCreatedAt = Instant.now().minus(Duration.ofMinutes(2)).toString();
+            var mrStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetMergeRequest(
+                            "GitLab MR !101", SLA_FILE_MR_REPO, 101, "opened", "mergeable", oldCreatedAt, oldCreatedAt);
+            var approvalsStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetMergeRequestApprovals("GitLab MR !101 approvals", SLA_FILE_MR_REPO, 101, List.of());
+            // SLA discovery: project metadata (default_branch) then the raw file.
+            var projectStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetProject("project for sla file repo", SLA_FILE_MR_REPO, "main");
+            var fileStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetFileRaw(
+                            "SLA file for gitlab repo", SLA_FILE_MR_REPO, ".pr-sla.yaml", "main", "default: PT1M");
+
+            var prReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("PR reaction")
+                            .reaction("pr")
+                            .channelId(channelId)
+                            .ts(queryTs)
+                            .build());
+            var eyesReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("Eyes reaction")
+                            .reaction("eyes")
+                            .channelId(channelId)
+                            .ts(queryTs)
+                            .build());
+            var escalatedReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("Escalated reaction")
+                            .reaction("rocket")
+                            .channelId(channelId)
+                            .ts(queryTs)
+                            .build());
+
+            SlackMessage messageForStubs = SlackMessage.builder()
+                    .slackWiremock(testKit.slack().wiremock())
+                    .ts(queryTs)
+                    .channelId(channelId)
+                    .build();
+            var creationStubs = messageForStubs.stubTicketCreationFlow("ticket created", ticketMessageTs);
+
+            asTenantSlack.postMessage(queryTs, "Please review " + SLA_FILE_MR_LINK);
+
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+                mrStub.assertIsCalled();
+                approvalsStub.assertIsCalled();
+                projectStub.assertIsCalled();
+                fileStub.assertIsCalled();
+                prReactionStub.assertIsCalled();
+                eyesReactionStub.assertIsCalled();
+                escalatedReactionStub.assertIsCalled();
+            });
+
+            var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
+            assertThat(ticketResponse).isNotNull();
+            assertThat(ticketResponse.escalated()).isTrue();
+
+            creationStubs.cleanUp();
+        }
+
+        @Test
+        public void whenMrIsMergedInOriginalMessage_detectionSkipsTrackingAndDoesNotCreateTicket() {
+            TestKit.RoledTestKit asTenant = testKit.as(tenant);
+            SlackTestKit asTenantSlack = asTenant.slack();
+            String channelId = testKit.config().mocks().slack().supportChannelId();
+
+            MessageTs queryTs = MessageTs.now();
+            String messageWithMr = "Could you review " + MR_LINK_42 + "?";
+            String createdAt = Instant.now().minus(Duration.ofHours(1)).toString();
+
+            // Merged MR — the detector should skip tracking entirely and no ticket should be created.
+            var mrStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetMergeRequest(
+                            "GitLab MR !42 merged", MR_REPO, 42, "merged", "not_open", createdAt, createdAt);
+
+            var prReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("No PR reaction expected")
+                            .reaction("pr")
+                            .channelId(channelId)
+                            .ts(queryTs)
+                            .build());
+            var eyesReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("No eyes reaction expected")
+                            .reaction("eyes")
+                            .channelId(channelId)
+                            .ts(queryTs)
+                            .build());
+
+            asTenantSlack.postMessage(queryTs, messageWithMr);
+
+            await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+                mrStub.assertIsCalled();
+                prReactionStub.assertIsNotCalled();
+                eyesReactionStub.assertIsNotCalled();
+            });
+
+            var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
+            assertThat(ticketResponse).isNull();
+
+            mrStub.cleanUp();
+            prReactionStub.cleanUp();
+            eyesReactionStub.cleanUp();
+        }
+
+        @Test
+        public void whenNestedGroupMrUrlPosted_dispatcherRoutesViaGitLabAdapter() {
+            // gitlab-org/gitlab-pr-test-repo is a single-level path, but the lazy MR regex must
+            // still tolerate the /-/ separator and the dispatcher must route through Provider.GITLAB
+            // (not fall through to the GitHub parser). This test exercises the host+path filter
+            // both for the GitLab dispatcher (positive match) and confirms the GitLab adapter URL
+            // shape (slashes encoded to %2F).
+            TestKit.RoledTestKit asTenant = testKit.as(tenant);
+            SlackTestKit asTenantSlack = asTenant.slack();
+            String channelId = testKit.config().mocks().slack().supportChannelId();
+
+            MessageTs queryTs = MessageTs.now();
+            MessageTs ticketMessageTs = MessageTs.now();
+            String createdAt = Instant.now().minus(Duration.ofHours(1)).toString();
+
+            var mrStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetMergeRequest(
+                            "GitLab MR !42 nested route", MR_REPO, 42, "opened", "mergeable", createdAt, createdAt);
+            var approvalsStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetMergeRequestApprovals("GitLab MR !42 approvals", MR_REPO, 42, List.of());
+            var prReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("PR reaction")
+                            .reaction("pr")
+                            .channelId(channelId)
+                            .ts(queryTs)
+                            .build());
+            var eyesReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("Eyes reaction")
+                            .reaction("eyes")
+                            .channelId(channelId)
+                            .ts(queryTs)
+                            .build());
+
+            SlackMessage messageForStubs = SlackMessage.builder()
+                    .slackWiremock(testKit.slack().wiremock())
+                    .ts(queryTs)
+                    .channelId(channelId)
+                    .build();
+            var creationStubs = messageForStubs.stubTicketCreationFlow("ticket created", ticketMessageTs);
+
+            asTenantSlack.postMessage(queryTs, "Could you review " + MR_LINK_42 + "?");
+
+            await().atMost(Duration.ofSeconds(8)).untilAsserted(() -> {
+                mrStub.assertIsCalled();
+                approvalsStub.assertIsCalled();
+                prReactionStub.assertIsCalled();
+                eyesReactionStub.assertIsCalled();
+                creationStubs.reactionAdded().assertIsCalled();
+            });
+
+            var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
+            assertThat(ticketResponse).isNotNull();
+            assertThat(ticketResponse.status()).isEqualTo("opened");
+
+            creationStubs.cleanUp();
+        }
+
+        @Test
+        public void whenSlaAlreadyBreachedOnGitLabMr_escalatesWithCustomMessage() {
+            TestKit.RoledTestKit asTenant = testKit.as(tenant);
+            SlackTestKit asTenantSlack = asTenant.slack();
+            String channelId = testKit.config().mocks().slack().supportChannelId();
+
+            MessageTs queryTs = MessageTs.now();
+            String messageWithMr = "Could you review " + ESCALATION_MR_LINK + "?";
+            MessageTs ticketMessageTs = MessageTs.now();
+
+            // MR created 2 days ago, breaking the 24h SLA on the escalation-message repo.
+            String oldCreatedAt = Instant.now().minus(Duration.ofDays(2)).toString();
+            var mrStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetMergeRequest(
+                            "GitLab MR !301 stale",
+                            ESCALATION_MR_REPO,
+                            301,
+                            "opened",
+                            "mergeable",
+                            oldCreatedAt,
+                            oldCreatedAt);
+            var approvalsStub = testKit.slack()
+                    .wiremock()
+                    .stubGitLabGetMergeRequestApprovals("GitLab MR !301 approvals", ESCALATION_MR_REPO, 301, List.of());
+
+            var prReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("PR reaction")
+                            .reaction("pr")
+                            .channelId(channelId)
+                            .ts(queryTs)
+                            .build());
+            var eyesReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("Eyes reaction")
+                            .reaction("eyes")
+                            .channelId(channelId)
+                            .ts(queryTs)
+                            .build());
+            var escalatedReactionStub = testKit.slack()
+                    .wiremock()
+                    .stubReactionAdd(ReactionAddedExpectation.builder()
+                            .description("Escalated reaction")
+                            .reaction("rocket")
+                            .channelId(channelId)
+                            .ts(queryTs)
+                            .build());
+
+            SlackMessage messageForStubs = SlackMessage.builder()
+                    .slackWiremock(testKit.slack().wiremock())
+                    .ts(queryTs)
+                    .channelId(channelId)
+                    .build();
+            var creationStubs = messageForStubs.stubTicketCreationFlow("ticket created", ticketMessageTs);
+
+            asTenantSlack.postMessage(queryTs, messageWithMr);
+
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+                mrStub.assertIsCalled();
+                approvalsStub.assertIsCalled();
+                prReactionStub.assertIsCalled();
+                eyesReactionStub.assertIsCalled();
+                escalatedReactionStub.assertIsCalled();
+            });
+
+            var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
+            assertThat(ticketResponse).isNotNull();
+            assertThat(ticketResponse.status()).isEqualTo("opened");
+            assertThat(ticketResponse.escalated()).isTrue();
+
+            creationStubs.cleanUp();
+        }
     }
 }

@@ -80,6 +80,7 @@ class PrTrackingGitHubConfigTest {
                         List.of(),
                         new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
                 appGithub,
+                null,
                 DEFAULT_SLA_DISCOVERY);
 
         // when
@@ -112,6 +113,7 @@ class PrTrackingGitHubConfigTest {
                         List.of(),
                         new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
                 appGithub,
+                null,
                 DEFAULT_SLA_DISCOVERY);
 
         // when
@@ -147,6 +149,7 @@ class PrTrackingGitHubConfigTest {
                         List.of(),
                         new PrTrackingProps.Sla(null, Duration.ofDays(2), null))),
                 appGithub,
+                null,
                 DEFAULT_SLA_DISCOVERY);
 
         // when / then

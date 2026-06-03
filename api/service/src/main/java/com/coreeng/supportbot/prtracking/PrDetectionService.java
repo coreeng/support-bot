@@ -11,10 +11,12 @@ import com.coreeng.supportbot.escalation.CreateEscalationRequest;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
 import com.coreeng.supportbot.escalation.EscalationSource;
-import com.coreeng.supportbot.github.GitHubApiException;
-import com.coreeng.supportbot.github.GitHubClient;
-import com.coreeng.supportbot.github.GitHubPullRequest;
-import com.coreeng.supportbot.github.GitHubPullRequestReview;
+import com.coreeng.supportbot.prtracking.source.PrMetadata;
+import com.coreeng.supportbot.prtracking.source.PrSourceClients;
+import com.coreeng.supportbot.prtracking.source.PrSourceException;
+import com.coreeng.supportbot.prtracking.source.Provider;
+import com.coreeng.supportbot.prtracking.source.RepoCoord;
+import com.coreeng.supportbot.prtracking.source.Review;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.SlackId;
@@ -63,8 +65,8 @@ public class PrDetectionService {
 
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
-    private final GitHubPrUrlParser prUrlParser;
-    private final GitHubClient gitHubClient;
+    private final PrUrlDispatcher prUrlDispatcher;
+    private final PrSourceClients prSourceClients;
     private final TeamReviewFilter teamReviewFilter;
     private final PrTrackingRepository prTrackingRepository;
     private final PrTrackingProps prTrackingProps;
@@ -77,13 +79,14 @@ public class PrDetectionService {
     private final SlackTicketsProps slackTicketsProps;
     private final SlaLookup slaLookup;
     private final PrMessageRenderer messageRenderer;
+    private final PrUrlResolver prUrlResolver;
 
     public boolean containsPrLinks(String message) {
-        return !prUrlParser.parse(message).isEmpty();
+        return !prUrlDispatcher.parse(message).isEmpty();
     }
 
     public PrDetectionOutcome handleMessagePosted(MessagePosted event, Ticket ticket) {
-        List<DetectedPr> detectedPrs = prUrlParser.parse(event.message());
+        List<DetectedPr> detectedPrs = prUrlDispatcher.parse(event.message());
         if (detectedPrs.isEmpty()) {
             return PrDetectionOutcome.skipped();
         }
@@ -98,7 +101,7 @@ public class PrDetectionService {
 
         for (DetectedPr pr : detectedPrs) {
             if (prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(
-                    ticketId.id(), pr.repositoryName(), pr.pullNumber())) {
+                    ticketId.id(), pr.provider(), pr.repositoryName(), pr.pullNumber())) {
                 log.atInfo()
                         .addArgument(pr::repositoryName)
                         .addArgument(pr::pullNumber)
@@ -107,10 +110,12 @@ public class PrDetectionService {
                 continue;
             }
 
-            GitHubPullRequest prMetadata;
+            PrMetadata prMetadata;
             try {
-                prMetadata = gitHubClient.getPullRequest(pr.repositoryName(), pr.pullNumber());
-            } catch (GitHubApiException e) {
+                prMetadata = prSourceClients
+                        .forProvider(pr.provider())
+                        .fetchPullRequest(new RepoCoord(pr.provider(), pr.repositoryName()), pr.pullNumber());
+            } catch (PrSourceException e) {
                 log.atWarn()
                         .addArgument(pr::repositoryName)
                         .addArgument(pr::pullNumber)
@@ -173,7 +178,7 @@ public class PrDetectionService {
     }
 
     public PrDetectionOutcome handleQueryMessagePosted(MessagePosted event, Supplier<Ticket> ticketSupplier) {
-        List<DetectedPr> detectedPrs = prUrlParser.parse(event.message());
+        List<DetectedPr> detectedPrs = prUrlDispatcher.parse(event.message());
         if (detectedPrs.isEmpty()) {
             return PrDetectionOutcome.skipped();
         }
@@ -190,10 +195,12 @@ public class PrDetectionService {
         for (DetectedPr pr : detectedPrs) {
             try {
 
-                GitHubPullRequest prMetadata;
+                PrMetadata prMetadata;
                 try {
-                    prMetadata = gitHubClient.getPullRequest(pr.repositoryName(), pr.pullNumber());
-                } catch (GitHubApiException e) {
+                    prMetadata = prSourceClients
+                            .forProvider(pr.provider())
+                            .fetchPullRequest(new RepoCoord(pr.provider(), pr.repositoryName()), pr.pullNumber());
+                } catch (PrSourceException e) {
                     log.atWarn()
                             .addArgument(pr::repositoryName)
                             .addArgument(pr::pullNumber)
@@ -217,7 +224,7 @@ public class PrDetectionService {
                 }
 
                 if (prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(
-                        checkNotNull(ticketId).id(), pr.repositoryName(), pr.pullNumber())) {
+                        checkNotNull(ticketId).id(), pr.provider(), pr.repositoryName(), pr.pullNumber())) {
                     log.atInfo()
                             .addArgument(pr::repositoryName)
                             .addArgument(pr::pullNumber)
@@ -284,6 +291,7 @@ public class PrDetectionService {
     }
 
     private record PendingNotification(
+            Provider provider,
             String repo,
             int prNumber,
             NotificationType type,
@@ -291,6 +299,7 @@ public class PrDetectionService {
             @Nullable Instant slaDeadline,
             @Nullable String teamLabel) {
         PendingNotification {
+            checkNotNull(provider);
             checkNotNull(repo);
             checkNotNull(type);
             if (type.requiresSla()) {
@@ -312,7 +321,7 @@ public class PrDetectionService {
             DetectedPr detectedPr,
             Ticket ticket,
             boolean canAutoCloseTicket,
-            GitHubPullRequest prMetadata,
+            PrMetadata prMetadata,
             Map<String, Optional<Set<String>>> teamReviewerCache,
             List<PendingNotification> notifications,
             List<PendingEscalation> pendingEscalations) {
@@ -357,15 +366,18 @@ public class PrDetectionService {
             Ticket ticket,
             boolean canAutoCloseTicket,
             PrTrackingProps.Repository repoConfig,
-            GitHubPullRequest prMetadata,
+            PrMetadata prMetadata,
             Map<String, Optional<Set<String>>> teamReviewerCache,
             List<PendingNotification> notifications,
             List<PendingEscalation> pendingEscalations) {
 
         Duration sla;
         try {
-            sla = slaLookup.getSla(repoConfig, detectedPr.repositoryName(), detectedPr.pullNumber());
-        } catch (GitHubApiException e) {
+            sla = slaLookup.getSla(
+                    repoConfig,
+                    new RepoCoord(detectedPr.provider(), detectedPr.repositoryName()),
+                    detectedPr.pullNumber());
+        } catch (PrSourceException e) {
             log.atWarn()
                     .addArgument(detectedPr::repositoryName)
                     .addArgument(detectedPr::pullNumber)
@@ -386,6 +398,7 @@ public class PrDetectionService {
 
         PrTrackingRecord tracking = prTrackingRepository.insertIfAbsent(new NewPrTracking(
                 ticketId.id(),
+                detectedPr.provider(),
                 detectedPr.repositoryName(),
                 detectedPr.pullNumber(),
                 prMetadata.createdAt(),
@@ -415,14 +428,15 @@ public class PrDetectionService {
         // Note: wall-clock time progresses between the review evaluation and the SLA deadline check
         // below. For deadlines very close to now, remaining duration may go slightly negative;
         // clamping to Duration.ZERO handles this.
-        List<GitHubPullRequestReview> teamReviews =
+        List<Review> teamReviews =
                 teamReviewFilter.filterToOwningTeam(prMetadata.reviews(), prMetadata, repoConfig, teamReviewerCache);
-        GitHubPullRequestReview latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
+        Review latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
 
         if (Instant.now().isAfter(slaDeadline)) {
             if (latestVerdict != null && latestVerdict.requestsChanges()) {
                 prTrackingRepository.pauseSla(tracking.id(), PrTrackingStatus.CHANGES_REQUESTED, Duration.ZERO);
                 notifications.add(new PendingNotification(
+                        detectedPr.provider(),
                         detectedPr.repositoryName(),
                         detectedPr.pullNumber(),
                         NotificationType.CHANGES_REQUESTED,
@@ -432,6 +446,7 @@ public class PrDetectionService {
             } else if (latestVerdict != null && latestVerdict.isApproved()) {
                 prTrackingRepository.pauseSla(tracking.id(), PrTrackingStatus.APPROVED, Duration.ZERO);
                 notifications.add(new PendingNotification(
+                        detectedPr.provider(),
                         detectedPr.repositoryName(),
                         detectedPr.pullNumber(),
                         NotificationType.APPROVED,
@@ -444,6 +459,7 @@ public class PrDetectionService {
                 // both steps the poller could fire between the insert and postNotificationsAndEscalations,
                 // posting the escalation card before our notification arrives in the thread.
                 PrMessageContext breachCtx = new PrMessageContext(
+                        detectedPr.provider(),
                         detectedPr.repositoryName(),
                         detectedPr.pullNumber(),
                         repoConfig.owningTeam(),
@@ -453,7 +469,8 @@ public class PrDetectionService {
                         messageRenderer.render(detectedPr.repositoryName(), MessageEvent.ESCALATED, breachCtx);
                 String breachText = override != null
                         ? override
-                        : formatEscalatedText(detectedPr.repositoryName(), detectedPr.pullNumber(), sla);
+                        : formatEscalatedText(
+                                detectedPr.provider(), detectedPr.repositoryName(), detectedPr.pullNumber(), sla);
                 postText(
                         breachText,
                         detectedPr.repositoryName(),
@@ -467,6 +484,7 @@ public class PrDetectionService {
             Duration remaining = clampNonNegative(Duration.between(Instant.now(), slaDeadline));
             prTrackingRepository.pauseSla(tracking.id(), PrTrackingStatus.CHANGES_REQUESTED, remaining);
             notifications.add(new PendingNotification(
+                    detectedPr.provider(),
                     detectedPr.repositoryName(),
                     detectedPr.pullNumber(),
                     NotificationType.CHANGES_REQUESTED,
@@ -477,6 +495,7 @@ public class PrDetectionService {
             Duration remaining = clampNonNegative(Duration.between(Instant.now(), slaDeadline));
             prTrackingRepository.pauseSla(tracking.id(), PrTrackingStatus.APPROVED, remaining);
             notifications.add(new PendingNotification(
+                    detectedPr.provider(),
                     detectedPr.repositoryName(),
                     detectedPr.pullNumber(),
                     NotificationType.APPROVED,
@@ -485,6 +504,7 @@ public class PrDetectionService {
                     teamLabel));
         } else {
             notifications.add(new PendingNotification(
+                    detectedPr.provider(),
                     detectedPr.repositoryName(),
                     detectedPr.pullNumber(),
                     NotificationType.TRACKED,
@@ -500,11 +520,12 @@ public class PrDetectionService {
             Ticket ticket,
             boolean canAutoCloseTicket,
             PrTrackingProps.Repository repoConfig,
-            GitHubPullRequest prMetadata,
+            PrMetadata prMetadata,
             Map<String, Optional<Set<String>>> teamReviewerCache,
             List<PendingNotification> notifications) {
 
-        if (!matchesPathFilter(repoConfig.paths(), detectedPr.repositoryName(), detectedPr.pullNumber())) {
+        if (!matchesPathFilter(
+                repoConfig.paths(), detectedPr.provider(), detectedPr.repositoryName(), detectedPr.pullNumber())) {
             log.atDebug()
                     .addArgument(detectedPr::repositoryName)
                     .addArgument(detectedPr::pullNumber)
@@ -515,6 +536,7 @@ public class PrDetectionService {
         TicketId ticketId = checkNotNull(ticket.id());
         PrTrackingRecord tracking = prTrackingRepository.insertIfAbsent(new NewPrTracking(
                 ticketId.id(),
+                detectedPr.provider(),
                 detectedPr.repositoryName(),
                 detectedPr.pullNumber(),
                 prMetadata.createdAt(),
@@ -542,13 +564,14 @@ public class PrDetectionService {
         // Mirror the SLA branch: inspect reviews already fetched with the PR so that a no-SLA PR
         // detected while already in CHANGES_REQUESTED or APPROVED state transitions correctly on
         // first sight, instead of sitting in OPEN until the poller notices and posts a duplicate.
-        List<GitHubPullRequestReview> teamReviews =
+        List<Review> teamReviews =
                 teamReviewFilter.filterToOwningTeam(prMetadata.reviews(), prMetadata, repoConfig, teamReviewerCache);
-        GitHubPullRequestReview latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
+        Review latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
 
         if (latestVerdict != null && latestVerdict.requestsChanges()) {
             prTrackingRepository.updateStatus(tracking.id(), PrTrackingStatus.CHANGES_REQUESTED, null, null);
             notifications.add(new PendingNotification(
+                    detectedPr.provider(),
                     detectedPr.repositoryName(),
                     detectedPr.pullNumber(),
                     NotificationType.CHANGES_REQUESTED,
@@ -558,6 +581,7 @@ public class PrDetectionService {
         } else if (latestVerdict != null && latestVerdict.isApproved()) {
             prTrackingRepository.updateStatus(tracking.id(), PrTrackingStatus.APPROVED, null, null);
             notifications.add(new PendingNotification(
+                    detectedPr.provider(),
                     detectedPr.repositoryName(),
                     detectedPr.pullNumber(),
                     NotificationType.APPROVED,
@@ -566,6 +590,7 @@ public class PrDetectionService {
                     teamLabel));
         } else {
             notifications.add(new PendingNotification(
+                    detectedPr.provider(),
                     detectedPr.repositoryName(),
                     detectedPr.pullNumber(),
                     NotificationType.NO_SLA_TRACKED,
@@ -577,14 +602,16 @@ public class PrDetectionService {
         return PerPrResult.TRACKED;
     }
 
-    private boolean matchesPathFilter(List<String> paths, String repositoryName, int pullNumber) {
+    private boolean matchesPathFilter(List<String> paths, Provider provider, String repositoryName, int pullNumber) {
 
         if (paths.isEmpty()) {
             return true;
         }
 
         try {
-            List<String> prFiles = gitHubClient.listPullRequestFiles(repositoryName, pullNumber);
+            List<String> prFiles = prSourceClients
+                    .forProvider(provider)
+                    .listChangedFiles(new RepoCoord(provider, repositoryName), pullNumber);
 
             for (String pattern : paths) {
                 for (String prFile : prFiles) {
@@ -593,7 +620,7 @@ public class PrDetectionService {
                     }
                 }
             }
-        } catch (GitHubApiException e) {
+        } catch (PrSourceException e) {
             log.atError()
                     .addArgument(repositoryName)
                     .addArgument(pullNumber)
@@ -658,7 +685,7 @@ public class PrDetectionService {
         Map<String, List<PendingEscalation>> escalationsByRepo = new LinkedHashMap<>();
         for (PendingEscalation e : pendingEscalations) {
             escalationsByRepo
-                    .computeIfAbsent(e.tracking().githubRepo(), k -> new ArrayList<>())
+                    .computeIfAbsent(e.tracking().repo(), k -> new ArrayList<>())
                     .add(e);
         }
 
@@ -689,7 +716,7 @@ public class PrDetectionService {
                 } catch (Exception e) {
                     log.atError()
                             .setCause(e)
-                            .addArgument(esc.tracking()::githubRepo)
+                            .addArgument(esc.tracking()::repo)
                             .addArgument(esc.tracking()::prNumber)
                             .log("Failed to escalate PR {}#{}, continuing");
                 }
@@ -706,41 +733,58 @@ public class PrDetectionService {
                     case CHANGES_REQUESTED -> MessageEvent.CHANGES_REQUESTED;
                 };
         PrMessageContext ctx = new PrMessageContext(
+                pendingNotification.provider(),
                 pendingNotification.repo(),
                 pendingNotification.prNumber(),
                 checkNotNull(pendingNotification.teamLabel()),
                 pendingNotification.sla(),
                 pendingNotification.slaDeadline());
         String override = messageRenderer.render(pendingNotification.repo(), event, ctx);
+        Provider p = pendingNotification.provider();
+        String noun = PrTerminology.noun(p);
+        String sep = PrTerminology.separator(p);
+        String longForm = PrTerminology.longForm(p);
+        String plural = PrTerminology.plural(p);
         String text = override != null
                 ? override
                 : switch (pendingNotification.type()) {
                     case TRACKED ->
-                        "Pull requests submitted to `%s` are expected to be reviewed within %s. You don't have to ping us for reviews, but I'll keep an eye on this one. If <%s|PR #%d> hasn't been reviewed by %s, I'll automatically escalate it to the owning team (%s)."
+                        "%s submitted to `%s` are expected to be reviewed within %s. You don't have to ping us for reviews, but I'll keep an eye on this one. If <%s|%s %s%d> hasn't been reviewed by %s, I'll automatically escalate it to the owning team (%s)."
                                 .formatted(
+                                        longForm,
                                         pendingNotification.repo(),
                                         formatDuration(checkNotNull(pendingNotification.sla())),
                                         prUrl(pendingNotification.repo(), pendingNotification.prNumber()),
+                                        noun,
+                                        sep,
                                         pendingNotification.prNumber(),
                                         DEADLINE_FMT.format(checkNotNull(pendingNotification.slaDeadline())),
                                         checkNotNull(pendingNotification.teamLabel()));
                     case NO_SLA_TRACKED ->
-                        "PRs to %s have no automated SLAs, they are monitored by %s team. I'll still keep an eye on this one and let you know when it moves."
-                                .formatted(pendingNotification.repo(), checkNotNull(pendingNotification.teamLabel()));
+                        "%s to %s have no automated SLAs, they are monitored by %s team. I'll still keep an eye on this one and let you know when it moves."
+                                .formatted(
+                                        plural,
+                                        pendingNotification.repo(),
+                                        checkNotNull(pendingNotification.teamLabel()));
                     case CHANGES_REQUESTED ->
-                        "<%s|PR #%d> for `%s` has been reviewed and changes have been requested. :eyes:"
+                        "<%s|%s %s%d> for `%s` has been reviewed and changes have been requested. :eyes:"
                                 .formatted(
                                         prUrl(pendingNotification.repo(), pendingNotification.prNumber()),
+                                        noun,
+                                        sep,
                                         pendingNotification.prNumber(),
                                         pendingNotification.repo());
                     case APPROVED ->
-                        "<%s|PR #%d> for `%s` has been approved and is ready to merge. :white_check_mark:"
+                        "<%s|%s %s%d> for `%s` has been approved and is ready to merge. :white_check_mark:"
                                 .formatted(
                                         prUrl(pendingNotification.repo(), pendingNotification.prNumber()),
+                                        noun,
+                                        sep,
                                         pendingNotification.prNumber(),
                                         pendingNotification.repo());
                     case ESCALATED ->
                         formatEscalatedText(
+                                p,
                                 pendingNotification.repo(),
                                 pendingNotification.prNumber(),
                                 checkNotNull(pendingNotification.sla()));
@@ -784,25 +828,31 @@ public class PrDetectionService {
                 continue;
             }
 
+            // Provider is consistent within a (repo, type) group: PrTrackingProps disallows the same
+            // repo name across providers and group entries share repo. Take it from the first.
+            Provider groupProvider = group.getFirst().provider();
+            String groupPlural = PrTerminology.plural(groupProvider);
+            String groupSep = PrTerminology.separator(groupProvider);
             String prList = group.stream()
-                    .map(n -> "<%s|#%d>".formatted(prUrl(n.repo(), n.prNumber()), n.prNumber()))
+                    .map(n -> "<%s|%s%d>".formatted(prUrl(n.repo(), n.prNumber()), groupSep, n.prNumber()))
                     .collect(Collectors.joining(", "));
 
             String text =
                     switch (type) {
-                        case TRACKED -> formatTrackedGroup(repo, group, prList);
+                        case TRACKED -> formatTrackedGroup(repo, group, prList, groupProvider);
                         case NO_SLA_TRACKED ->
-                            "PRs %s have no automated SLAs, they are monitored by %s team(s). I'll still keep an eye on them and let you know when they move."
-                                    .formatted(prList, teams(group));
+                            "%s %s have no automated SLAs, they are monitored by %s team(s). I'll still keep an eye on them and let you know when they move."
+                                    .formatted(groupPlural, prList, teams(group));
                         case CHANGES_REQUESTED ->
-                            "PRs %s for `%s` have been reviewed and changes have been requested. :eyes:"
-                                    .formatted(prList, repo);
+                            "%s %s for `%s` have been reviewed and changes have been requested. :eyes:"
+                                    .formatted(groupPlural, prList, repo);
                         case APPROVED ->
-                            "PRs %s for `%s` have been approved and are ready to merge. :white_check_mark:"
-                                    .formatted(prList, repo);
+                            "%s %s for `%s` have been approved and are ready to merge. :white_check_mark:"
+                                    .formatted(groupPlural, prList, repo);
                         case ESCALATED ->
-                            "PRs %s for `%s` are expected to be reviewed within %s. They have exceeded that timeframe — escalating. :rocket:"
+                            "%s %s for `%s` are expected to be reviewed within %s. They have exceeded that timeframe — escalating. :rocket:"
                                     .formatted(
+                                            groupPlural,
                                             prList,
                                             repo,
                                             formatDuration(checkNotNull(
@@ -825,26 +875,37 @@ public class PrDetectionService {
         return String.join(", ", labels);
     }
 
-    private String formatTrackedGroup(String repo, List<PendingNotification> group, String prList) {
+    private String formatTrackedGroup(String repo, List<PendingNotification> group, String prList, Provider provider) {
         String teamLabel = group.getFirst().teamLabel();
         boolean sameSla =
                 group.stream().map(PendingNotification::slaDeadline).distinct().count() == 1;
+        String plural = PrTerminology.plural(provider);
+        String longForm = PrTerminology.longForm(provider);
+        String separator = PrTerminology.separator(provider);
 
         if (sameSla) {
             Instant deadline = checkNotNull(group.getFirst().slaDeadline());
             Duration sla = checkNotNull(group.getFirst().sla());
-            return ("I'm tracking PRs %s for `%s`. Pull requests are expected to be reviewed within %s. "
+            return ("I'm tracking %s %s for `%s`. %s are expected to be reviewed within %s. "
                             + "You don't have to ping for reviews — I'll keep an eye on these. "
                             + "If not reviewed by %s, I'll automatically escalate to the owning team (%s).")
-                    .formatted(prList, repo, formatDuration(sla), DEADLINE_FMT.format(deadline), teamLabel);
+                    .formatted(
+                            plural,
+                            prList,
+                            repo,
+                            longForm,
+                            formatDuration(sla),
+                            DEADLINE_FMT.format(deadline),
+                            teamLabel);
         } else {
             StringBuilder sb = new StringBuilder();
-            sb.append("I'm tracking PRs for `%s`. You don't have to ping for reviews — I'll keep an eye on these:\n"
-                    .formatted(repo));
+            sb.append("I'm tracking %s for `%s`. You don't have to ping for reviews — I'll keep an eye on these:\n"
+                    .formatted(plural, repo));
             for (PendingNotification n : group) {
-                sb.append("- <%s|#%d> — review by %s\n"
+                sb.append("- <%s|%s%d> — review by %s\n"
                         .formatted(
                                 prUrl(n.repo(), n.prNumber()),
+                                separator,
                                 n.prNumber(),
                                 DEADLINE_FMT.format(checkNotNull(n.slaDeadline()))));
             }
@@ -853,13 +914,20 @@ public class PrDetectionService {
         }
     }
 
-    private static String prUrl(String repo, int prNumber) {
-        return "https://github.com/%s/pull/%d".formatted(repo, prNumber);
+    private String prUrl(String repo, int prNumber) {
+        return prUrlResolver.publicUrlFor(repo, prNumber);
     }
 
-    private static String formatEscalatedText(String repo, int prNumber, Duration sla) {
-        return "Pull requests submitted to `%s` are expected to be reviewed within %s. It looks like <%s|PR #%d> has exceeded that timeframe."
-                .formatted(repo, formatDuration(sla), prUrl(repo, prNumber), prNumber);
+    private String formatEscalatedText(Provider provider, String repo, int prNumber, Duration sla) {
+        return "%s submitted to `%s` are expected to be reviewed within %s. It looks like <%s|%s %s%d> has exceeded that timeframe."
+                .formatted(
+                        PrTerminology.longForm(provider),
+                        repo,
+                        formatDuration(sla),
+                        prUrl(repo, prNumber),
+                        PrTerminology.noun(provider),
+                        PrTerminology.separator(provider),
+                        prNumber);
     }
 
     private void postText(
@@ -880,7 +948,7 @@ public class PrDetectionService {
 
     private void escalateImmediately(PrTrackingRecord tracking, Ticket ticket, String owningTeam) {
         log.atInfo()
-                .addArgument(tracking::githubRepo)
+                .addArgument(tracking::repo)
                 .addArgument(tracking::prNumber)
                 .log("PR {}#{} SLA already breached at detection time — escalating immediately");
 
@@ -893,7 +961,7 @@ public class PrDetectionService {
 
         if (escalation == null || escalation.id() == null) {
             log.atWarn()
-                    .addArgument(tracking::githubRepo)
+                    .addArgument(tracking::repo)
                     .addArgument(tracking::prNumber)
                     .addArgument(() -> checkNotNull(ticket.id()).id())
                     .log(

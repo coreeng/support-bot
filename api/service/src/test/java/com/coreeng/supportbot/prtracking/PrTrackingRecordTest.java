@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
@@ -19,10 +20,34 @@ class PrTrackingRecordTest {
 
     @SuppressWarnings("NullAway")
     @Test
-    void rejectsNullGithubRepo() {
+    void rejectsNullProvider() {
         assertThatThrownBy(() -> new PrTrackingRecord(
                         1L,
                         1L,
+                        null,
+                        "org/repo",
+                        42,
+                        NOW,
+                        DEADLINE,
+                        "team",
+                        true,
+                        PrTrackingStatus.OPEN,
+                        null,
+                        null,
+                        SLA_REMAINING,
+                        LAST_REVIEW,
+                        LAST_AUTHOR_ACTIVITY))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("provider");
+    }
+
+    @SuppressWarnings("NullAway")
+    @Test
+    void rejectsNullRepo() {
+        assertThatThrownBy(() -> new PrTrackingRecord(
+                        1L,
+                        1L,
+                        Provider.GITHUB,
                         null,
                         42,
                         NOW,
@@ -36,7 +61,7 @@ class PrTrackingRecordTest {
                         LAST_REVIEW,
                         LAST_AUTHOR_ACTIVITY))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("githubRepo");
+                .hasMessageContaining("repo");
     }
 
     @SuppressWarnings("NullAway")
@@ -45,6 +70,7 @@ class PrTrackingRecordTest {
         assertThatThrownBy(() -> new PrTrackingRecord(
                         1L,
                         1L,
+                        Provider.GITHUB,
                         "org/repo",
                         42,
                         null,
@@ -67,6 +93,7 @@ class PrTrackingRecordTest {
         assertThatThrownBy(() -> new PrTrackingRecord(
                         1L,
                         1L,
+                        Provider.GITHUB,
                         "org/repo",
                         42,
                         NOW,
@@ -88,6 +115,7 @@ class PrTrackingRecordTest {
         assertThatThrownBy(() -> new PrTrackingRecord(
                         1L,
                         1L,
+                        Provider.GITHUB,
                         "org/repo",
                         42,
                         NOW,
@@ -110,6 +138,7 @@ class PrTrackingRecordTest {
         assertThatThrownBy(() -> new PrTrackingRecord(
                         1L,
                         1L,
+                        Provider.GITHUB,
                         "org/repo",
                         42,
                         NOW,
@@ -131,6 +160,7 @@ class PrTrackingRecordTest {
         assertThatThrownBy(() -> new PrTrackingRecord(
                         1L,
                         1L,
+                        Provider.GITHUB,
                         "org/repo",
                         42,
                         NOW,
@@ -152,6 +182,7 @@ class PrTrackingRecordTest {
         var record = new PrTrackingRecord(
                 1L,
                 1L,
+                Provider.GITHUB,
                 "org/repo",
                 42,
                 NOW,
@@ -173,6 +204,7 @@ class PrTrackingRecordTest {
         assertThatThrownBy(() -> new PrTrackingRecord(
                         1L,
                         1L,
+                        Provider.GITHUB,
                         "org/repo",
                         42,
                         NOW,
@@ -194,6 +226,7 @@ class PrTrackingRecordTest {
         assertThatThrownBy(() -> new PrTrackingRecord(
                         1L,
                         1L,
+                        Provider.GITHUB,
                         "org/repo",
                         42,
                         NOW,
@@ -215,6 +248,7 @@ class PrTrackingRecordTest {
         var record = new PrTrackingRecord(
                 1L,
                 1L,
+                Provider.GITHUB,
                 "org/repo",
                 42,
                 NOW,
