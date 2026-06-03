@@ -6,6 +6,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Caches the result of {@code GET /groups/:id/members/all} per (apiBaseUrl, groupPath).
@@ -18,6 +20,8 @@ import java.util.function.Supplier;
  * dependency confined here and lets the source client own all URL/auth concerns.
  */
 public class GitLabGroupMemberCache {
+
+    private static final Logger LOG = LoggerFactory.getLogger(GitLabGroupMemberCache.class);
 
     private final Cache<Key, List<String>> cache;
 
@@ -35,7 +39,21 @@ public class GitLabGroupMemberCache {
      */
     public List<String> getMembers(String apiBaseUrl, String groupPath, Supplier<List<String>> loader) {
         Key key = new Key(apiBaseUrl, groupPath);
-        return Objects.requireNonNull(cache.get(key, k -> loader.get()), "loader returned null member list");
+        boolean[] loaded = {false};
+        List<String> members = Objects.requireNonNull(
+                cache.get(key, k -> {
+                    loaded[0] = true;
+                    LOG.debug(
+                            "GitLab group members cache miss for group '{}' at {} — fetching from API",
+                            groupPath,
+                            apiBaseUrl);
+                    return loader.get();
+                }),
+                "loader returned null member list");
+        if (!loaded[0]) {
+            LOG.debug("GitLab group members cache hit for group '{}' at {}", groupPath, apiBaseUrl);
+        }
+        return members;
     }
 
     private record Key(String apiBaseUrl, String groupPath) {}
