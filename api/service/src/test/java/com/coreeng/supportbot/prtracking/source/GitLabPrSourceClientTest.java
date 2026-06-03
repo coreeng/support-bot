@@ -52,7 +52,7 @@ class GitLabPrSourceClientTest {
 
     @Test
     void reportsProviderAsGitlab() {
-        assertThat(client.provider()).isEqualTo(Provider.GITLAB);
+        assertThat(client.getProvider()).isEqualTo(Provider.GITLAB);
     }
 
     @Test

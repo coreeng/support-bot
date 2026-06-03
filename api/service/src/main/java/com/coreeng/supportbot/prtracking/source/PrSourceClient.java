@@ -17,7 +17,7 @@ public interface PrSourceClient {
      * auto-register adapters by their provider — adapters that fail to register here will not
      * be reachable through {@code forProvider}.
      */
-    Provider provider();
+    Provider getProvider();
 
     /**
      * Fetches PR metadata including reviews and requested team reviewers. Adapters

@@ -57,7 +57,7 @@ public class GitLabPrSourceClient implements PrSourceClient {
     }
 
     @Override
-    public Provider provider() {
+    public Provider getProvider() {
         return Provider.GITLAB;
     }
 

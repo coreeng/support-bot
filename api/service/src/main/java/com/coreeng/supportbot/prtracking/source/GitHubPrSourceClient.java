@@ -16,7 +16,7 @@ public class GitHubPrSourceClient implements PrSourceClient {
     }
 
     @Override
-    public Provider provider() {
+    public Provider getProvider() {
         return Provider.GITHUB;
     }
 

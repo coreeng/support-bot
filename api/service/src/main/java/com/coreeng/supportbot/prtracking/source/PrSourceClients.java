@@ -21,10 +21,10 @@ public class PrSourceClients {
     public PrSourceClients(List<PrSourceClient> clients) {
         Map<Provider, PrSourceClient> byProvider = new HashMap<>();
         for (PrSourceClient client : clients) {
-            PrSourceClient existing = byProvider.put(client.provider(), client);
+            PrSourceClient existing = byProvider.put(client.getProvider(), client);
             if (existing != null) {
                 throw new IllegalStateException("Multiple PrSourceClient beans registered for provider "
-                        + client.provider() + ": " + existing.getClass().getName() + " and "
+                        + client.getProvider() + ": " + existing.getClass().getName() + " and "
                         + client.getClass().getName());
             }
         }
