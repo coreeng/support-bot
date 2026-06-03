@@ -17,9 +17,11 @@ import java.util.Locale;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
 @Slf4j
 public class PrMessageRenderer {
 
@@ -32,7 +34,10 @@ public class PrMessageRenderer {
     private final Map<String, Map<MessageEvent, CompiledProgram>> programs;
     private final CelRuntime runtime;
 
-    public PrMessageRenderer(PrTrackingProps props) {
+    private final PrUrlResolver urlResolver;
+
+    public PrMessageRenderer(PrTrackingProps props, PrUrlResolver urlResolver) {
+        this.urlResolver = urlResolver;
         CelCompiler compiler = CelCompilerFactory.standardCelCompilerBuilder()
                 .addVar("pr_number", SimpleType.INT)
                 .addVar("pr_url", SimpleType.STRING)
@@ -41,6 +46,7 @@ public class PrMessageRenderer {
                 .addVar("sla_duration", SimpleType.STRING)
                 .addVar("sla_deadline", SimpleType.STRING)
                 .addVar("owning_team", SimpleType.STRING)
+                .addVar("provider", SimpleType.STRING)
                 .build();
         this.runtime = CelRuntimeFactory.standardCelRuntimeBuilder().build();
 
@@ -132,20 +138,18 @@ public class PrMessageRenderer {
                 "pr_number",
                 (long) ctx.prNumber(),
                 "pr_url",
-                ctx.prNumber() > 0 ? prUrl(ctx.repoName(), ctx.prNumber()) : "",
+                ctx.prNumber() > 0 ? urlResolver.publicUrlFor(ctx.repoName(), ctx.prNumber()) : "",
                 "repo_name",
                 ctx.repoName(),
                 "repo_url",
-                "https://github.com/" + ctx.repoName(),
+                urlResolver.repoUrl(ctx.repoName()),
                 "sla_duration",
                 ctx.sla() != null ? PrDetectionService.formatDuration(ctx.sla()) : "",
                 "sla_deadline",
                 ctx.slaDeadline() != null ? DEADLINE_FMT.format(ctx.slaDeadline()) : "",
                 "owning_team",
-                ctx.owningTeam());
-    }
-
-    private static String prUrl(String repo, int prNumber) {
-        return "https://github.com/%s/pull/%d".formatted(repo, prNumber);
+                ctx.owningTeam(),
+                "provider",
+                ctx.provider().storageValue());
     }
 }

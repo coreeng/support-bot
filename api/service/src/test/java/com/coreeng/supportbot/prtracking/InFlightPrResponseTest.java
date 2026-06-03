@@ -2,6 +2,9 @@ package com.coreeng.supportbot.prtracking;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.coreeng.supportbot.prtracking.source.Provider;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +20,7 @@ class InFlightPrResponseTest {
     @Test
     void acceptsHasSlaFalseWithNonNullSlaDeadline() {
         var response = new InFlightPrResponse(
+                Provider.GITHUB,
                 "org/repo",
                 1,
                 "url",
@@ -39,6 +43,7 @@ class InFlightPrResponseTest {
     @Test
     void acceptsHasSlaTrueWithBothSlaFieldsNull() {
         var response = new InFlightPrResponse(
+                Provider.GITHUB,
                 "org/repo",
                 1,
                 "url",
@@ -62,6 +67,7 @@ class InFlightPrResponseTest {
     @Test
     void acceptsHasSlaTrueWithBothSlaFieldsNonNull() {
         var response = new InFlightPrResponse(
+                Provider.GITHUB,
                 "org/repo",
                 1,
                 "url",
@@ -85,6 +91,7 @@ class InFlightPrResponseTest {
     @Test
     void acceptsActiveSla() {
         var response = new InFlightPrResponse(
+                Provider.GITHUB,
                 "org/repo",
                 1,
                 "url",
@@ -108,6 +115,7 @@ class InFlightPrResponseTest {
     @Test
     void acceptsPausedSla() {
         var response = new InFlightPrResponse(
+                Provider.GITHUB,
                 "org/repo",
                 1,
                 "url",
@@ -131,6 +139,7 @@ class InFlightPrResponseTest {
     @Test
     void acceptsNoSlaPr() {
         var response = new InFlightPrResponse(
+                Provider.GITHUB,
                 "org/repo",
                 1,
                 "url",
@@ -154,6 +163,7 @@ class InFlightPrResponseTest {
     @Test
     void convenienceConstructorCopiesHasSlaTrueForActiveSla() {
         var pr = new InFlightPr(
+                Provider.GITHUB,
                 "org/repo",
                 1,
                 "url",
@@ -175,6 +185,7 @@ class InFlightPrResponseTest {
     @Test
     void convenienceConstructorCopiesHasSlaTrueForPausedSla() {
         var pr = new InFlightPr(
+                Provider.GITHUB,
                 "org/repo",
                 1,
                 "url",
@@ -196,8 +207,51 @@ class InFlightPrResponseTest {
     @Test
     void convenienceConstructorCopiesHasSlaFalseForNoSlaPr() {
         var pr = new InFlightPr(
-                "org/repo", 1, "url", "OPEN", "TEAM", NOW, null, null, null, "team", "C1", "ts1", null, false);
+                Provider.GITHUB,
+                "org/repo",
+                1,
+                "url",
+                "OPEN",
+                "TEAM",
+                NOW,
+                null,
+                null,
+                null,
+                "team",
+                "C1",
+                "ts1",
+                null,
+                false);
         var response = new InFlightPrResponse(pr, "Team Label");
         assertThat(response.hasSla()).isFalse();
+    }
+
+    @Test
+    void serializesRepoAsGithubRepoForWireCompat() throws Exception {
+        // Load-bearing for the v1 UI which reads pr.githubRepo. If this assertion fails,
+        // the in-flight tab will silently blank the repo column. See @JsonProperty in
+        // InFlightPrResponse.
+        var pr = new InFlightPr(
+                Provider.GITHUB,
+                "org/repo",
+                1,
+                "url",
+                "OPEN",
+                "TEAM",
+                NOW,
+                null,
+                null,
+                null,
+                "team",
+                "C1",
+                "ts1",
+                null,
+                false);
+        var response = new InFlightPrResponse(pr, "Team Label");
+        ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        String json = mapper.writeValueAsString(response);
+        assertThat(json).contains("\"githubRepo\":\"org/repo\"");
+        assertThat(json).doesNotContain("\"repo\":");
+        assertThat(json).doesNotContain("\"provider\":");
     }
 }

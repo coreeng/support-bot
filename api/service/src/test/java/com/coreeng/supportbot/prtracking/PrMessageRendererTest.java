@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -29,17 +30,18 @@ class PrMessageRendererTest {
                         List.of(),
                         new PrTrackingProps.Sla(null, Duration.ofDays(1), null),
                         messages)));
-        return new PrMessageRenderer(prTrackingProps);
+        return new PrMessageRenderer(prTrackingProps, new PrUrlResolver(prTrackingProps));
     }
 
     private PrMessageContext ctx() {
-        return new PrMessageContext(REPO, 42, "wow", Duration.ofHours(24), Instant.parse("2024-06-01T14:00:00Z"));
+        return new PrMessageContext(
+                Provider.GITHUB, REPO, 42, "wow", Duration.ofHours(24), Instant.parse("2024-06-01T14:00:00Z"));
     }
 
     @Test
     void returnsNullWhenNoOverrideConfiguredForRepo() {
         when(prTrackingProps.repositories()).thenReturn(List.of());
-        PrMessageRenderer renderer = new PrMessageRenderer(prTrackingProps);
+        PrMessageRenderer renderer = new PrMessageRenderer(prTrackingProps, new PrUrlResolver(prTrackingProps));
 
         assertThat(renderer.render(REPO, MessageEvent.DETECTED, ctx())).isNull();
         assertThat(renderer.hasOverride(REPO, MessageEvent.DETECTED)).isFalse();
@@ -105,7 +107,7 @@ class PrMessageRendererTest {
 
     @Test
     void rendersEmptySlaDurationWhenNoSla() {
-        PrMessageContext noSlaCtx = new PrMessageContext(REPO, 42, "wow", null, null);
+        PrMessageContext noSlaCtx = new PrMessageContext(Provider.GITHUB, REPO, 42, "wow", null, null);
         PrMessageRenderer renderer = rendererWith(
                 new PrTrackingProps.Messages("\"duration:\" + sla_duration", null, null, null, null, null));
 

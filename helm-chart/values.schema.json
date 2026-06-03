@@ -107,6 +107,17 @@
       "properties": {
         "name": { "type": "string" },
         "owning-team": { "type": "string" },
+        "provider": { "type": "string", "enum": ["github", "gitlab"] },
+        "github-team-slug": { "type": "string" },
+        "gitlab-group-path": { "type": "string" },
+        "gitlab": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "api-base-url": { "type": "string" },
+            "token": { "type": "string" }
+          }
+        },
         "paths": {
           "type": "array",
           "items": { "type": "string" }
@@ -353,9 +364,12 @@
                 "enabled": { "type": "boolean" },
                 "poll-cron": { "type": "string" },
                 "pr-emoji": { "type": "string" },
+                "duration-unit": { "type": "string" },
                 "tags": {
-                  "type": "array",
-                  "items": { "type": "string" }
+                  "oneOf": [
+                    { "type": "string" },
+                    { "type": "array", "items": { "type": "string" } }
+                  ]
                 },
                 "impact": { "type": "string" },
                 "repositories": {
@@ -379,6 +393,14 @@
                     "app-id": { "type": "string" },
                     "installation-id": { "type": "string" },
                     "private-key-pem": { "type": "string" }
+                  }
+                },
+                "gitlab": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "api-base-url": { "type": "string" },
+                    "token": { "type": "string" }
                   }
                 }
               }

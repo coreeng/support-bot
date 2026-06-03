@@ -10,6 +10,12 @@ spring:
       credential:
         client-id: ${AZURE_CLIENT_ID}
         client-secret: ${AZURE_CLIENT_SECRET}
+# Integration tests do not exercise PR tracking; opt out so the base config's
+# enabled=true (kept on for sandbox dogfood) doesn't drag this profile into
+# requiring a GitHub token that isn't provisioned in the integration namespace.
+pr-review-tracking:
+  enabled: false
+
 enums:
   escalation-teams:
     - label: core

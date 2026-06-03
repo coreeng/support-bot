@@ -13,8 +13,10 @@ env:
     value: "http://support-bot-functional-tests-wiremock:8000/api/"
   - name: GITHUB_API_BASE_URL
     value: "http://support-bot-functional-tests-wiremock:8000"
+  - name: GITLAB_API_BASE_URL
+    value: "http://support-bot-functional-tests-wiremock:8000/api/v4"
   - name: DB_URL
-    value: "jdbc:postgresql://support-bot-db-postgresql-hl.support-bot-functional.svc.cluster.local:5432/supportbot"
+    value: "jdbc:postgresql://support-bot-db-postgresql-hl.support-bot-functional.svc.cluster.local:5432/supportbot?currentSchema=public"
   - name: DB_USERNAME
     value: "supportbot"
   - name: DB_PASSWORD

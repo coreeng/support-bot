@@ -2,6 +2,7 @@ package com.coreeng.supportbot.prtracking;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,7 @@ class GitHubPrUrlParserTest {
         List<DetectedPr> result = parser.parse("Please review https://github.com/my-org/onboarding-repo/pull/42");
 
         // then
-        assertThat(result).containsExactly(new DetectedPr("my-org/onboarding-repo", 42));
+        assertThat(result).containsExactly(new DetectedPr(Provider.GITHUB, "my-org/onboarding-repo", 42));
     }
 
     @Test
@@ -26,7 +27,7 @@ class GitHubPrUrlParserTest {
         List<DetectedPr> result = parser.parse("Please review <https://github.com/my-org/onboarding-repo/pull/42>");
 
         // then
-        assertThat(result).containsExactly(new DetectedPr("my-org/onboarding-repo", 42));
+        assertThat(result).containsExactly(new DetectedPr(Provider.GITHUB, "my-org/onboarding-repo", 42));
     }
 
     @Test
@@ -36,7 +37,7 @@ class GitHubPrUrlParserTest {
                 parser.parse("Please review <https://github.com/my-org/onboarding-repo/pull/42|my PR title>");
 
         // then
-        assertThat(result).containsExactly(new DetectedPr("my-org/onboarding-repo", 42));
+        assertThat(result).containsExactly(new DetectedPr(Provider.GITHUB, "my-org/onboarding-repo", 42));
     }
 
     @Test
@@ -48,7 +49,8 @@ class GitHubPrUrlParserTest {
         // then
         assertThat(result)
                 .containsExactlyInAnyOrder(
-                        new DetectedPr("my-org/onboarding-repo", 1), new DetectedPr("my-org/another-repo", 99));
+                        new DetectedPr(Provider.GITHUB, "my-org/onboarding-repo", 1),
+                        new DetectedPr(Provider.GITHUB, "my-org/another-repo", 99));
     }
 
     @Test
@@ -58,7 +60,7 @@ class GitHubPrUrlParserTest {
                 + "https://github.com/my-org/onboarding-repo/pull/7");
 
         // then
-        assertThat(result).containsExactly(new DetectedPr("my-org/onboarding-repo", 7));
+        assertThat(result).containsExactly(new DetectedPr(Provider.GITHUB, "my-org/onboarding-repo", 7));
     }
 
     @Test
@@ -82,7 +84,7 @@ class GitHubPrUrlParserTest {
         List<DetectedPr> result = parser.parse("http://github.com/my-org/onboarding-repo/pull/10");
 
         // then
-        assertThat(result).containsExactly(new DetectedPr("my-org/onboarding-repo", 10));
+        assertThat(result).containsExactly(new DetectedPr(Provider.GITHUB, "my-org/onboarding-repo", 10));
     }
 
     @Test
@@ -99,7 +101,7 @@ class GitHubPrUrlParserTest {
         List<DetectedPr> result = parser.parse("https://github.com/My-Org/Onboarding-Repo/pull/42");
 
         // then
-        assertThat(result).containsExactly(new DetectedPr("my-org/onboarding-repo", 42));
+        assertThat(result).containsExactly(new DetectedPr(Provider.GITHUB, "my-org/onboarding-repo", 42));
     }
 
     @Test
@@ -109,6 +111,6 @@ class GitHubPrUrlParserTest {
                 + "https://github.com/my-org/another-repo/pull/9");
 
         // then
-        assertThat(result).containsExactly(new DetectedPr("my-org/another-repo", 9));
+        assertThat(result).containsExactly(new DetectedPr(Provider.GITHUB, "my-org/another-repo", 9));
     }
 }

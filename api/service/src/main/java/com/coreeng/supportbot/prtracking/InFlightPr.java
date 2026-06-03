@@ -2,6 +2,7 @@ package com.coreeng.supportbot.prtracking;
 
 import static java.util.Objects.requireNonNull;
 
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
@@ -27,7 +28,8 @@ import org.jspecify.annotations.Nullable;
  * {@code JdbcPrTrackingRepositoryInvariantTest}, not by this read constructor.
  */
 public record InFlightPr(
-        String githubRepo,
+        Provider provider,
+        String repo,
         int prNumber,
         String prUrl,
         String status,
@@ -42,7 +44,8 @@ public record InFlightPr(
         @Nullable Instant escalatedAt,
         boolean hasSla) {
     public InFlightPr {
-        requireNonNull(githubRepo, "githubRepo must not be null");
+        requireNonNull(provider, "provider must not be null");
+        requireNonNull(repo, "repo must not be null");
         if (prNumber <= 0) {
             throw new IllegalArgumentException("prNumber must be positive, was " + prNumber);
         }

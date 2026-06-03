@@ -3,6 +3,8 @@ package com.coreeng.supportbot.prtracking;
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.github.Hub4jGitHubClient;
+import com.coreeng.supportbot.prtracking.source.GitHubPrSourceClient;
+import com.coreeng.supportbot.prtracking.source.PrSourceClient;
 import io.jsonwebtoken.Jwts;
 import java.io.IOException;
 import java.io.StringReader;
@@ -21,10 +23,18 @@ import org.kohsuke.github.authorization.AppInstallationAuthorizationProvider;
 import org.kohsuke.github.authorization.AuthorizationProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Wires the GitHub adapter for PR tracking. Only activates when at least one repository uses
+ * {@code provider: github} (default), so a pure-GitLab deployment can start without a GitHub
+ * token. Provider-neutral wiring (the {@link com.coreeng.supportbot.prtracking.source.PrSourceClients}
+ * registry itself) lives in {@link PrTrackingSourceClientsConfig}.
+ */
 @Configuration
 @ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
+@Conditional(AnyGithubRepoCondition.class)
 public class PrTrackingGitHubConfig {
 
     @Bean
@@ -46,6 +56,11 @@ public class PrTrackingGitHubConfig {
     @Bean
     public GitHubClient gitHubClient(GitHub gitHub) {
         return new Hub4jGitHubClient(gitHub);
+    }
+
+    @Bean
+    public PrSourceClient gitHubPrSourceClient(GitHubClient gitHubClient) {
+        return new GitHubPrSourceClient(gitHubClient);
     }
 
     private static GitHub buildAppModeClient(PrTrackingProps.GitHub config) throws IOException {

@@ -2,6 +2,7 @@ package com.coreeng.supportbot.prtracking;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +19,7 @@ class InFlightPrTest {
         // Write-path mutual exclusion is enforced by atomic single-statement UPDATEs and by
         // JdbcPrTrackingRepositoryInvariantTest, not here.
         InFlightPr pr = new InFlightPr(
+                Provider.GITHUB,
                 "org/repo",
                 1,
                 "https://github.com/org/repo/pull/1",
@@ -40,6 +42,7 @@ class InFlightPrTest {
     @Test
     void acceptsSlaDeadlineOnlyWithNullSlaRemainingSeconds() {
         InFlightPr pr = new InFlightPr(
+                Provider.GITHUB,
                 "org/repo",
                 1,
                 "https://github.com/org/repo/pull/1",
@@ -62,6 +65,7 @@ class InFlightPrTest {
     @Test
     void acceptsBothNullSlaFieldsForNoSlaPr() {
         InFlightPr pr = new InFlightPr(
+                Provider.GITHUB,
                 "org/repo",
                 1,
                 "https://github.com/org/repo/pull/1",
@@ -88,6 +92,7 @@ class InFlightPrTest {
         // must round-trip without throwing — the record just carries both values through and
         // lets the frontend decide how to render.
         InFlightPr pr = new InFlightPr(
+                Provider.GITHUB,
                 "org/repo",
                 1,
                 "https://github.com/org/repo/pull/1",

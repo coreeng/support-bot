@@ -1,7 +1,9 @@
 package com.coreeng.supportbot.prtracking;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
-import com.coreeng.supportbot.github.GitHubClient;
+import com.coreeng.supportbot.prtracking.source.PrSourceClient;
+import com.coreeng.supportbot.prtracking.source.PrSourceClients;
+import com.coreeng.supportbot.prtracking.source.RepoCoord;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,14 +27,14 @@ import org.springframework.util.AntPathMatcher;
 @Slf4j
 public class SlaLookup {
 
-    private final GitHubClient gitHubClient;
+    private final PrSourceClients prSourceClients;
     private final String durationUnit;
     private final ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory());
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
     private final Cache<String, Optional<ParsedSlaFile>> fileCache;
 
-    public SlaLookup(GitHubClient gitHubClient, PrTrackingProps prTrackingProps) {
-        this.gitHubClient = gitHubClient;
+    public SlaLookup(PrSourceClients prSourceClients, PrTrackingProps prTrackingProps) {
+        this.prSourceClients = prSourceClients;
         this.durationUnit = prTrackingProps.durationUnit();
         Duration cacheTtl =
                 Objects.requireNonNull(prTrackingProps.slaDiscovery().cache(), "slaDiscovery.cache must not be null");
@@ -70,7 +72,7 @@ public class SlaLookup {
      *
      * @return the SLA, or null if none could be determined
      */
-    @Nullable public Duration getSla(PrTrackingProps.Repository repoConfig, String repositoryName, int pullNumber) {
+    @Nullable public Duration getSla(PrTrackingProps.Repository repoConfig, RepoCoord coord, int pullNumber) {
         if (repoConfig.sla() == null) {
             return null;
         }
@@ -81,14 +83,14 @@ public class SlaLookup {
         // If a file path is configured, fetch it (cached) and let it override config values
         String file = configSla.file();
         if (file != null && !file.isBlank()) {
-            String cacheKey = repositoryName + ":" + file;
+            String cacheKey = coord.provider() + ":" + coord.name() + ":" + file;
             Optional<ParsedSlaFile> cached;
             try {
-                cached = fileCache.get(cacheKey, k -> fetchAndParse(repositoryName, file));
+                cached = fileCache.get(cacheKey, k -> fetchAndParse(coord, file));
             } catch (InvalidSlaFileException e) {
                 log.atWarn()
                         .addArgument(file)
-                        .addArgument(repositoryName)
+                        .addArgument(coord::name)
                         .addArgument(e::getMessage)
                         .log("Invalid SLA file {} in {}: {}. Using config instead.");
                 cached = Optional.empty();
@@ -104,22 +106,23 @@ public class SlaLookup {
             }
         }
 
-        Duration matched = matchOverride(overrides, repositoryName, pullNumber);
+        Duration matched = matchOverride(overrides, coord, pullNumber);
         return matched != null ? matched : defaultSla;
     }
 
-    @Nullable private Duration matchOverride(List<PrTrackingProps.SlaOverride> overrides, String repositoryName, int pullNumber) {
+    @Nullable private Duration matchOverride(List<PrTrackingProps.SlaOverride> overrides, RepoCoord coord, int pullNumber) {
         if (overrides.isEmpty()) {
             return null;
         }
 
-        List<String> prFiles = gitHubClient.listPullRequestFiles(repositoryName, pullNumber);
+        PrSourceClient client = prSourceClients.forProvider(coord.provider());
+        List<String> prFiles = client.listChangedFiles(coord, pullNumber);
         for (PrTrackingProps.SlaOverride override : overrides) {
             String pattern = override.path().endsWith("/") ? override.path() + "**" : override.path();
             for (String prFile : prFiles) {
                 if (pathMatcher.match(pattern, prFile)) {
                     log.atDebug()
-                            .addArgument(repositoryName)
+                            .addArgument(coord::name)
                             .addArgument(pullNumber)
                             .addArgument(override::path)
                             .addArgument(override::sla)
@@ -136,12 +139,12 @@ public class SlaLookup {
      * into Duration objects. Returns Optional.empty() if the file is not found (cached — safe sentinel).
      * Throws on parse/validation errors so Caffeine does not cache the failure.
      */
-    private Optional<ParsedSlaFile> fetchAndParse(String repositoryName, String filePath) {
-        String content = gitHubClient.getFileContent(repositoryName, filePath);
+    private Optional<ParsedSlaFile> fetchAndParse(RepoCoord coord, String filePath) {
+        String content = prSourceClients.forProvider(coord.provider()).fetchFileContents(coord, filePath);
         if (content == null) {
             log.atInfo()
                     .addArgument(filePath)
-                    .addArgument(repositoryName)
+                    .addArgument(coord::name)
                     .log("SLA file {} not found in {}, using config");
             return Optional.empty();
         }
@@ -151,14 +154,14 @@ public class SlaLookup {
             raw = yamlMapper.readValue(content, RawSlaFile.class);
         } catch (JsonProcessingException e) {
             throw new InvalidSlaFileException(
-                    "Failed to parse SLA file %s from %s".formatted(filePath, repositoryName), e);
+                    "Failed to parse SLA file %s from %s".formatted(filePath, coord.name()), e);
         }
 
         if (raw.overrides() != null) {
             for (RawSlaOverrideEntry entry : raw.overrides()) {
                 if (entry.path() == null || entry.sla() == null) {
                     throw new InvalidSlaFileException("SLA file %s from %s has override entry missing path or sla field"
-                            .formatted(filePath, repositoryName));
+                            .formatted(filePath, coord.name()));
                 }
             }
         }
@@ -177,7 +180,7 @@ public class SlaLookup {
             return Optional.of(new ParsedSlaFile(parsedDefault, parsedOverrides));
         } catch (IllegalArgumentException | DateTimeException | ArithmeticException e) {
             throw new InvalidSlaFileException(
-                    "Invalid values in SLA file %s from %s: %s".formatted(filePath, repositoryName, e.getMessage()), e);
+                    "Invalid values in SLA file %s from %s: %s".formatted(filePath, coord.name(), e.getMessage()), e);
         }
     }
 

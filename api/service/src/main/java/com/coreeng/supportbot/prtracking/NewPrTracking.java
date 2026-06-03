@@ -2,31 +2,35 @@ package com.coreeng.supportbot.prtracking;
 
 import static java.util.Objects.requireNonNull;
 
+import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
 public record NewPrTracking(
         long ticketId,
-        String githubRepo,
+        Provider provider,
+        String repo,
         int prNumber,
         Instant prCreatedAt,
         @Nullable Instant slaDeadline,
         String owningTeam,
         boolean canAutoCloseTicket) {
     public NewPrTracking {
-        requireNonNull(githubRepo, "githubRepo must not be null");
+        requireNonNull(provider, "provider must not be null");
+        requireNonNull(repo, "repo must not be null");
         requireNonNull(prCreatedAt, "prCreatedAt must not be null");
         requireNonNull(owningTeam, "owningTeam must not be null");
     }
 
     public NewPrTracking(
             long ticketId,
-            String githubRepo,
+            Provider provider,
+            String repo,
             int prNumber,
             Instant prCreatedAt,
             @Nullable Instant slaDeadline,
             String owningTeam) {
-        this(ticketId, githubRepo, prNumber, prCreatedAt, slaDeadline, owningTeam, true);
+        this(ticketId, provider, repo, prNumber, prCreatedAt, slaDeadline, owningTeam, true);
     }
 
     /**
