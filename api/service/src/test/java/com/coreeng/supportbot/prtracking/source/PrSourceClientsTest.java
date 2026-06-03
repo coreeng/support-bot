@@ -41,6 +41,11 @@ class PrSourceClientsTest {
 
     private record StubClient(Provider provider) implements PrSourceClient {
         @Override
+        public Provider getProvider() {
+            return provider;
+        }
+
+        @Override
         public PrMetadata fetchPullRequest(RepoCoord coord, int prNumber) {
             throw new UnsupportedOperationException();
         }
