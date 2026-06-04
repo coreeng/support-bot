@@ -259,6 +259,7 @@ settings:
       - message.channels
       - message.groups
       - reaction_added
+      - subteam_members_changed
   interactivity:
     is_enabled: true
   org_deploy_enabled: false
