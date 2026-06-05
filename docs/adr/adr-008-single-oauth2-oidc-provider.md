@@ -71,9 +71,10 @@ Dex is configured with one or more upstream connectors (Azure, Google, …)
 
 ### Dex issuer URL options
 
-These options change how Dex is exposed to the browser and Support Agent API.
+These options are meant to explore and simplify Dex deployment at companies that have strict egress policies by eliminating exposing Dex to the Internet
 
-It is desirable to simplify Dex deployment at companies that have strict egress policies by eliminating exposing Dex to the Internet
+They change how Dex is exposed to Support Agent API.
+These options do not change how Dex authorization_endpoint and callback_endpoint are exposed to the browser.
 
 ### Option 1 - Autodiscovery via external ingress
 
@@ -91,6 +92,7 @@ JWKS, Token and userinfo also go over the Internet
 #### Cons
 
 - External connectivity needs approval from security teams at every client that enforces egress controls
+- Deploying Support Bot to another cluster requires Dex issuer URL change
 
 ### Option 2 - Autodiscovery via internal ingress
 
@@ -105,7 +107,7 @@ JWKS, Token and userinfo also go over private corporate network
 
 #### Cons
 
-- None
+- Deploying Support Bot to another cluster requires Dex issuer URL change
 
 ### Option 3 - Autodiscovery via namespace local service or pod
 
@@ -121,9 +123,7 @@ JWKS, Token and userinfo also go over cluster network
 
 #### Cons
 
-- we must override authorization_endpoint to use ingress URL
-- we must override Dex callback URL to use ingress URL
-
+- we must override Dex authorization_endpoint and callback_endpoint to use ingress URLs
 
 
 ### Dex callback URL options
