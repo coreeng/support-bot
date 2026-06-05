@@ -255,7 +255,7 @@ Support Agent's behaviour:
 - Adding a new IdP becomes a configuration change, not a code change.
 - The backend no longer carries provider-specific branches; `OAuth2ClientConfig.java` is deleted.
 - Dex is treated as deployment infrastructure, decoupling its lifecycle from the application.
-- The UI login surface is consistent across deployments; per-deployment branding is presentational only.
+- The UI login is consistent across deployments; per-deployment branding is presentational only.
 - Group/team claim mapping works uniformly across providers.
 
 ### Negative / Trade-offs
