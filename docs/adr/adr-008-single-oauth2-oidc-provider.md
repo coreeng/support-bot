@@ -167,7 +167,7 @@ It is desirable to simplify migration to Dex from a single IdP by eliminating an
 
 ### 1. Single Active Provider
 
-Support Agent supports exactly one active OAuth2/OIDC login provider at any time.
+Support Agent configures exactly one active OAuth2/OIDC login provider at any time.
 The active provider is configured through standard Spring properties under a fixed registration ID (proposed: `sso`).
 The same configuration shape works for Dex, Azure, Google, and any other OAuth2/OIDC-compliant IdP.
 
@@ -260,11 +260,8 @@ Support Agent's behaviour:
 
 ### Negative / Trade-offs
 
-- Operators currently relying on the legacy `GOOGLE_*` / `AZURE_*` env vars must migrate within one release. A translation shim and clear deprecation warnings mitigate this.
-- Only one active login provider is supported. Deployments that today configure both Google and Azure simultaneously must front them with Dex (or another federating IdP) configured with both as connectors.
-- Bundled Dex adds an extra in-cluster component to operate (a stateful service with its own signing keys, storage, and upstream credentials). The chart provides sensible defaults but operators must understand that Dex is the trust anchor for Support Agent in this mode.
-- Per-upstream claim quirks (GitHub email visibility, Azure groups format, Google Workspace groups availability) move from Java code into operator-owned Dex configuration. This is correct architecturally but shifts cognitive load to whoever runs the cluster.
-- Providers without OIDC discovery require operators to specify endpoints explicitly. This is unavoidable for non-OIDC OAuth2 providers.
+- This is a breaking change. Deployments that today configure both Google and Azure simultaneously must front them with Dex (or another federating IdP) configured with both as connectors.
+- Bundled Dex adds an extra in-cluster component to operate (a stateful service with its own signing keys, storage, and upstream credentials).
 
 ### Neutral
 
