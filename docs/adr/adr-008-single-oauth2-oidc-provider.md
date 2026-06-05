@@ -1,6 +1,6 @@
 # ADR: Single OAuth2/OIDC Provider for Authentication
 
-**Date:** 2026-06-03
+**Date:** 2026-06-05
 **Status:** Proposed
 
 ---
