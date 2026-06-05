@@ -139,11 +139,12 @@ It is desirable to simplify migration to Dex from a single IdP by eliminating an
 #### Prod
 
 - Simple to understand and implement
-- Consistent with existing IdPs
+- Consistent with the spec
+- this is an expected behaviour
 
 #### Cons
 
-- When migrating from a single IdP to Dex, new callback URL must be whitelisted at the IdP
+- When migrating from a single IdP to Dex, Dex callback URL must be whitelisted at the IdP
 
 ### Option 2 - IdP re-uses Support agent UI callback to proxy callback to Dex
 
@@ -154,6 +155,7 @@ It is desirable to simplify migration to Dex from a single IdP by eliminating an
 #### Cons
 
 - More complex to implement
+- this is un-expected
 - Only makes sense when migrating from a single IdP to Dex
 
 
