@@ -63,34 +63,92 @@ Dex is configured with one or more upstream connectors (Azure, Google, GitHub, �
 
 10. Next.js stores API JWT in session
 
-## Dex Flow Options
-
-These options change how Dex is exposed to the browser and Support Agent API.
-
-It is desirable to
-- simplify Dex deployment at companies that that strict egress policies by eliminating exposing dedx to the Internet
-- eliminate additional callbacks that need to be registered at IdP providers such as Azure
 
 ### Dex issuer URL options
 
-### Option 1 - external Dex issuer Url with discovery
+These options change how Dex is exposed to the browser and Support Agent API.
 
-### Option 2 - external Dex issuer Url overwritten cluster internal discovery, JWKS, token and userinfo endpoints
+It is desirable to simplify Dex deployment at companies that have strict egress policies by eliminating exposing Dex to the Internet
+
+### Option 1 - Autodiscovery via external ingress
+
+Issuer URL: https://support-bot-dex.tools.pit.prod.gspcloud.com/dex
+Discovery goes over the Internet
+JWKS, Token and userinfo also go over the Internet
+
+#### Pros
+
+- Consistent with commercial IdPs like Azure and Google
+- Very simple configuration - everything is auto-discovered
+- Issuer is accessible via browser for debugging by a developer or client
+- Browser authorization_endpoint and callback_endpoint are the same as issuer URL
+
+#### Cons
+
+- External connectivity needs approval from security teams at every client that enforces egress controls
+
+### Option 2 - Autodiscovery via internal ingress
+
+Issuer URL: https://support-bot-dex-internal.tools.pit.prod.gspcloud.com/dex
+Discovery goes over private corporate network
+JWKS, Token and userinfo also go over private corporate network
+
+#### Pros
+
+- Same as in Option 1
+- no egress approval required
+
+#### Cons
+
+- None
+
+### Option 3 - Autodiscovery via namespace local service or pod
+
+Issuer URL: http://dex:5556/dex
+Discovery goes over cluster network
+JWKS, Token and userinfo also go over cluster network
+
+#### Pros
+
+- Same as in Option 1
+- no egress approval required
+- Support Bot can be deployed to any cluster without Dex issuer URL change
+
+#### Cons
+
+- we must override authorization_endpoint to use ingress URL
+- we must override Dex callback URL to use ingress URL
+
+
 
 ### Dex callback URL options
 
-### Option 1 - connector IdP uses Dex callback directly
+These options change what callback URL IdPs use to send auth code to Dex. Callback URL must be registered at the IdP.
 
-### Option 2 - connector IdP uses Dex Support agent UI callback
+It is desirable to simplify migration to Dex from a single IdP by eliminating an additional callback that needs to be registered at the IdP providers.
 
-## Affected Personas
+### Option 1 - IdP uses Dex callback directly
 
-- **Operators deploying Support Agent**: configure a single IdP through standard Spring properties; choose between bundling Dex (as a Helm subchart) or pointing at an external provider.
-- **Users running Support Agent in their own environment**: can integrate with their existing corporate IdP without forking the codebase.
-- **Support Agent developers**: lose two provider-specific code paths; gain a single, standards-based auth surface that is easier to test and reason about.
-- **End users**: see one consistent SSO action on the login screen instead of a per-provider button.
+#### Prod
 
----
+- Simple to understand and implement
+- Consistent with existing IdPs
+
+#### Cons
+
+- When migrating from a single IdP to Dex, new callback URL must be whitelisted at the IdP
+
+### Option 2 - IdP re-uses Support agent UI callback to proxy callback to Dex
+
+#### Prod
+
+- No additional callback URL needs to be registered at the IdP when migrating from a single IdP to Dex
+
+#### Cons
+
+- More complex to implement
+- Only makes sense when migrating from a single IdP to Dex
+
 
 ## Decision Drivers
 
@@ -100,31 +158,19 @@ It is desirable to
 - Backward-compatible migration: existing `GOOGLE_*` / `AZURE_*` deployments must keep working through a defined transition period.
 - Simpler UI: one SSO button, optionally rebranded per deployment, instead of an enumerated list.
 
----
-
-## Options Considered
-
-### Keep the registry, add a third entry for Dex
-
-Add `if (isNotBlank(dexClientId) …) providers.add("dex")` to `OAuth2AvailabilityChecker` and a `dexClientRegistration(...)` method to `OAuth2ClientConfig`. Rejected: it perpetuates the closed enumeration, requires a Java change for every new IdP, and bakes the false premise that "Dex" is meaningfully different from any other OIDC provider.
-
-### N configurable providers, dynamic list at runtime
-
-Allow the operator to register an arbitrary number of providers under `spring.security.oauth2.client.registration.*` and expose all of them via `GET /auth/providers`. Rejected for this iteration: no current use case requires more than one active login provider, and exposing multiple buttons re-introduces the UI complexity we are trying to remove. The single-provider model is a strict subset of the multi-provider model and can be relaxed later if needed.
-
-### One configurable provider, driven by OIDC discovery
-
-Operators configure a single OAuth2/OIDC provider. Where the provider supports OIDC discovery (Dex, Azure, Google, Okta, Keycloak, …) only the `issuer-uri`, `client-id`, `client-secret`, and `scope` are required; Spring Security resolves the rest from `<issuer>/.well-known/openid-configuration`. Endpoints may also be specified explicitly for non-discoverable providers. **Selected.**
-
----
-
 ## Decision
 
 ### 1. Single Active Provider
 
-Support Agent supports exactly one active OAuth2/OIDC login provider at any time. The active provider is configured through standard Spring properties under a fixed registration ID (proposed: `sso`). The same configuration shape works for Dex, Azure, Google, and any other OAuth2/OIDC-compliant IdP.
+Support Agent supports exactly one active OAuth2/OIDC login provider at any time.
+The active provider is configured through standard Spring properties under a fixed registration ID (proposed: `sso`).
+The same configuration shape works for Dex, Azure, Google, and any other OAuth2/OIDC-compliant IdP.
 
-### 2. Configuration Shape
+### 2. Use internal ingress-based issuer URL for Dex
+
+### 3. Use Dex callback directly
+
+### 4. Configuration Shape
 
 Provider configuration uses the standard Spring Security OAuth2 client properties, with no Support Agent-specific keys:
 
@@ -151,7 +197,8 @@ spring:
             user-name-attribute: email             # configurable username claim
 ```
 
-When `issuer-uri` is set and the provider exposes a valid discovery document, Spring Security populates `authorization-uri`, `token-uri`, `jwk-set-uri`, and `user-info-uri` automatically. All endpoints remain individually overridable for providers that do not support discovery.
+When `issuer-uri` is set and the provider exposes a valid discovery document, Spring Security populates `authorization-uri`, `token-uri`, `jwk-set-uri`, and `user-info-uri` automatically.
+All endpoints remain individually overridable for providers that do not support discovery.
 
 ### 3. Backend Changes
 
@@ -163,20 +210,19 @@ When `issuer-uri` is set and the provider exposes a valid discovery document, Sp
 
 ### 4. Claim Model and Group / Team Mapping
 
-Support Agent reads claims from a single source — the ID token (and, where present, the `/userinfo` response) issued by the configured OIDC provider. In the bundled-Dex mode this is always Dex; the upstream Azure / Google / GitHub claims are not consumed by Support Agent directly.
+Support Agent reads claims from a single source — the ID token (and, where present, the `/userinfo` response) issued by the configured OIDC provider.
+In the bundled-Dex mode this is always Dex; the upstream Azure / Google / GitHub claims are not consumed by Support Agent directly.
 
 **Claim normalisation happens in Dex, not in Support Agent.** Every Dex connector is responsible for mapping its upstream user representation into Dex's standard OIDC claim set:
 
-| Claim                | Source per upstream (via Dex connector)                                                                                          |
-|----------------------|----------------------------------------------------------------------------------------------------------------------------------|
-| `sub`                | Dex-generated, stable per `(connector_id, upstream user id)`. Opaque to Support Agent.                                           |
-| `iss`                | Dex's issuer URI. Identical regardless of upstream.                                                                              |
-| `email`              | Azure: `mail` / `userPrincipalName`. Google: primary account email. GitHub: primary verified email (requires `user:email` scope).|
-| `email_verified`     | Set by Dex per connector. GitHub: only true when the upstream email is marked verified.                                          |
-| `name`               | Azure: `displayName`. Google: `name`. GitHub: `name` (falls back to `login` when unset).                                         |
-| `preferred_username` | Azure: `userPrincipalName`. Google: email local-part. GitHub: `login`.                                                           |
+| Claim                | Source per upstream (via Dex connector)                                                                                                                                     |
+|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `sub`                | Dex-generated, stable per `(connector_id, upstream user id)`. Opaque to Support Agent.                                                                                      |
+| `iss`                | Dex's issuer URI. Identical regardless of upstream.                                                                                                                         |
+| `email`              | Azure: `mail` / `userPrincipalName`. Google: primary account email. GitHub: primary verified email (requires `user:email` scope).                                           |
+| `name`               | Azure: `displayName`. Google: `name`. GitHub: `name` (falls back to `login` when unset).                                                                                    |
+| `preferred_username` | Azure: `userPrincipalName`. Google: email local-part. GitHub: `login`.                                                                                                      |
 | `groups`             | Azure: AAD group object IDs or display names (per connector config). Google: G-Suite groups (when enabled). GitHub: `org:team` strings for the user's org/team memberships. |
-| `federated_claims`   | Dex adds `{connector_id, user_id}` so downstream systems *can* tell which upstream signed the user in, if they need to.          |
 
 Support Agent's behaviour:
 
@@ -189,9 +235,6 @@ Support Agent's behaviour:
 
 - **Azure connector**: configure `groups: true` and choose between group object IDs and display names; document the implication for the operator's group-to-team mapping. The `email` claim requires the `User.Read` scope and an Azure app registration that emits `email`.
 - **Google connector**: configure `hostedDomains` for Workspace tenancy; request the `groups` scope only if the connector is configured to fetch Workspace groups (otherwise `groups` will be absent and team mapping falls back to allow-list / `TeamService`).
-- **GitHub connector**: configure `orgs` to scope group membership to specific organisations; `groups` claim values are `org:team` strings. Operators map these to `TeamType` via the configurable mapping above.
-
-This keeps the application layer ignorant of upstream identity providers. Adding a new upstream (e.g. GitLab, Bitbucket, LDAP) is a Dex configuration change with zero Support Agent code change.
 
 ### 5. UI Changes
 
@@ -199,37 +242,6 @@ This keeps the application layer ignorant of upstream identity providers. Adding
 - The login page renders a single SSO action. The default copy is `Login via SSO` with a generic shield/lock icon. When `GET /auth/providers` returns a known provider hint (e.g. `google`, `azure`, `dex`), the UI may substitute branded copy and icon; the allow-list of known hints lives in the UI and is purely cosmetic — authentication does not depend on it.
 - In the bundled-Dex mode the SSO button still leads to the same single OIDC endpoint. Dex itself presents the upstream connector chooser (Azure / Google / GitHub) — or, when Dex is configured with a single connector, skips straight through to it. Support Agent's UI does not enumerate upstream IdPs and does not need to be redeployed when a connector is added or removed in Dex.
 - The redirect-flow callback path (`/api/oauth/callback/<provider>`) is collapsed to a single route or generalised to accept the configured registration ID.
-
-### 6. Helm and Bundled Dex
-
-Dex remains an **optional** Helm subchart, not a runtime dependency of Support Agent. Two deployment modes are supported through the same single-provider configuration path:
-
-- **Bundled Dex (`dex.enabled: true`)**: the chart deploys Dex, generates a static OIDC client for Support Agent, and renders the Spring OAuth2 properties to point at the in-cluster Dex issuer (`https://<dex-host>/dex`). Dex is configured with one or more upstream connectors (Azure, Google, GitHub, …) supplied by the operator in `dex.connectors`. Support Agent sees Dex as a single external OIDC provider; it has no awareness that Dex is bundled or which connectors are wired behind it.
-- **External provider (`dex.enabled: false`, default)**: operators supply `OAUTH2_ISSUER_URI`, `OAUTH2_CLIENT_ID`, and `OAUTH2_CLIENT_SECRET` (and optionally `OAUTH2_USERNAME_CLAIM`, scope overrides, explicit endpoints). The chart renders these into the same properties. The external provider may itself be a Dex instance run by the operator, a corporate IdP, or Azure/Google directly.
-
-The chart's `values.yaml` exposes:
-
-- a single `auth.oauth2` block with the keys listed in section 2 (used in both modes);
-- a `dex` block (bundled mode only) carrying `dex.connectors[]` — a pass-through of the upstream OIDC/OAuth credentials Dex needs (Azure tenant + client, Google client, GitHub OAuth app + orgs, …) and `dex.groupsClaim` controls. The chart never injects these values into Support Agent's environment; they flow only into Dex's `config.yaml`.
-
-Legacy `GOOGLE_*` / `AZURE_*` values, if still set on the Support Agent Deployment, are translated by the chart into the new single-provider block during a deprecation window and produce a warning; they do **not** create multiple simultaneous registrations. Operators migrating from direct Azure/Google integration to bundled Dex move the same upstream credentials from Support Agent's env vars into `dex.connectors`.
-
-### 7. Migration
-
-- The ADR is accepted before code work begins.
-- The new `sso` registration is introduced alongside the existing `google` / `azure` registrations behind a feature flag; both paths coexist for one release.
-- The Helm chart gains the new `auth.oauth2` block and a translation shim for the legacy env vars.
-- The UI is updated to render a single SSO action and stops branching on provider string.
-- The legacy `google` / `azure` registrations, hard-coded UI checks, and provider-specific env vars are removed in the following release. The legacy `OAuth2ClientConfig.java`, the provider list in `OAuth2AvailabilityChecker`, and the `provider === "google" || provider === "azure"` check in `auth.config.ts` are all deleted.
-
-## Open Questions
-
-- **Registration ID**: proposed `sso`. An alternative is to let the operator pick the ID (e.g. `dex`, `corp`) so the discovery URL `/oauth2/authorization/<id>` reads naturally. Either way, the backend must not treat the ID as semantically meaningful.
-- **Username claim default**: `email` matches today's behaviour but is not always present (e.g. the GitHub Dex connector may omit `email` when the user has no verified public email). The existing `extractEmail` fallback chain in `OAuthExchangeService` should be retained and made claim-name-driven, with a documented fallback order (`email` → `preferred_username` → `federated_claims.user_id` as last resort).
-- **Group claim shape**: `groups` is the de facto standard (Dex, Keycloak, Okta) but its values vary by upstream — Azure may emit GUIDs or display names, GitHub emits `org:team`, Google emits group email addresses. The team-mapping configuration must accept arbitrary string values, not assume a particular format.
-- **`federated_claims` exposure**: whether to surface `federated_claims.connector_id` on `UserPrincipal` for auditing / debugging. Default: no — exposing it tempts code paths to branch on upstream identity, which this ADR explicitly disallows.
-
----
 
 ## Consequences
 
