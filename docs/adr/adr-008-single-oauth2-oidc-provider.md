@@ -14,35 +14,40 @@ This model makes it difficult to deploy Support Agent without code change.
 Users may want to configure their own corporate IdP — Okta, Keycloak, Ping, an internal OIDC gateway.
 Every new provider currently requires a Java change, a YAML change, a UI change, and a Helm change.
 There is no value in the backend knowing *which* IdP is in use: every supported provider speaks the same standard (OAuth2 authorization code + OIDC discovery),
-and the post-login flow (mint internal JWT, look up teams, derive roles) is identical regardless of issuer.
+and the post-login flow (issue internal JWT, look up teams, derive roles) is identical regardless of issuer.
 
 ## Dex as a federating proxy
 
 A single generic OAuth2 configuration is a first step to solve this issue.
-Using Dex as this single provider has the added benefit of allowing us to support multiple upstream providers.
+Using an OIDC Proxy like Dex as this single provider is the second step that allows us to support multiple upstream providers.
 
 In the bundled-Dex deployment mode, **Dex does not authenticate users itself**.
-It acts as an OIDC proxy in front of one or more upstream identity providers — typically Azure AD, Google, and GitHub — configured as Dex *connectors*.
+It acts as an OIDC proxy in front of one or more upstream identity providers — typically Azure AD or Google or any other OIDC provider  — configured as Dex *connectors*.
 Users continue to sign in to their actual corporate IdP;
 Dex orchestrates the upstream OAuth2/OIDC exchange and re-issues a single normalised OIDC ID token to Support Agent.
 
 From Support Agent's perspective Dex is indistinguishable from any other OIDC provider: same `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `userinfo_endpoint`, same `openid email profile [groups]` scopes, same signed JWT ID token.
 The `iss` claim is always Dex's issuer URI; the JWT is validated against Dex's JWKS, not the upstream IdP's.
-Treating Dex as "just another OIDC provider" eliminates the need for any Dex-specific — or Azure-, Google-, GitHub-specific — code path in the application.
+Treating Dex as "just another OIDC provider" eliminates the need for any Dex-specific — or Azure-, Google-specific — code path in the application.
 All per-upstream variation lives in Dex's connector configuration.
 
+## Single OIDC Provider Flow
+
+Support Agent Api is configured with a single OAuth2 provider `sso` pointing at Azure, Google or any other OIDC Provider.
+This flow is unchanged from today's flow, except that we have a single generic provider `sso` instead of `google` and `azure`.
 
 ## Dex Flow
 
-Support Agent Api is configured with a single oauth2 provider `sso` pointing at Dex issuer or any other OIDC provider (such as Azure or Google).
-Dex is configured with one or more upstream connectors (Azure, Google, GitHub, …)
+Support Agent Api is configured with a single OAuth2 provider `sso` pointing at Dex issuer.
+Dex is configured with one or more upstream connectors (Azure, Google, …)
 
-1. Browser -> Dex /auth
+1. Support Agent UI in a Browser -> Dex /auth
    https://support-bot-dex.gcp-prod-internal.cecg.platform.cecg.io/dex/auth?...client_id=support-agent...
 
 2. Dex shows connector choice
-   Azure AD
-   Google
+   - Azure AD
+   - Google
+   - ...
 
 3. User chooses Azure and Dex redirects browser -> Azure authorization endpoint
    https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize?...
@@ -52,16 +57,16 @@ Dex is configured with one or more upstream connectors (Azure, Google, GitHub, �
 5. Azure redirects browser -> Dex callback
    https://support-bot-dex.gcp-prod-internal.cecg.platform.cecg.io/dex/callback?code=...&state=...
 
-6. Dex exchanges Azure code server-side and stores Azure tokens, it generates its own code (or reuses Azure code) to return to Support Agent UI
+6. Dex exchanges Azure code server-side and stores Azure tokens, it generates its own code to return to Support Agent UI callback
 
-7. Dex redirects browser -> Support Agent callback with its code
+7. Dex redirects browser -> Support Agent UI callback with its code
    https://support-bot-app-cecg-ui.gcp-prod-internal.cecg.platform.cecg.io/api/oauth/callback/sso?code=...&state=...
 
-8. Support Agent UI exchanges Dex code for Dex tokens
+8. Support Agent UI delegates to Next.js Auth to make an API call to Support agent API to exchange Dex code for Dex tokens
 
-9. Support Agent API exchanges Dex token for Dex user info and mint Support Agent JWT
+9. Support Agent API exchanges Dex code for Dex OIDC token, calls DFex user info endpoint and issues Support Agent JWT and returns it to Next.js
 
-10. Next.js stores API JWT in session
+10. Next.js encrypts and stores API JWT in session cookie
 
 
 ### Dex issuer URL options
