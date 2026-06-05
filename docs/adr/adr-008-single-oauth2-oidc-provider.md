@@ -57,16 +57,18 @@ Dex is configured with one or more upstream connectors (Azure, Google, …)
 5. Azure redirects browser -> Dex callback
    https://support-bot-dex.gcp-prod-internal.cecg.platform.cecg.io/dex/callback?code=...&state=...
 
-6. Dex exchanges Azure code server-side and stores Azure tokens, it generates its own code to return to Support Agent UI callback
+6. Dex exchanges Azure code server-side and stores Azure tokens internally
 
-7. Dex redirects browser -> Support Agent UI callback with its code
+7. Dex generates its own auth code and redirects browser -> Support Agent UI callback with its code
    https://support-bot-app-cecg-ui.gcp-prod-internal.cecg.platform.cecg.io/api/oauth/callback/sso?code=...&state=...
 
-8. Support Agent UI delegates to Next.js Auth to make an API call to Support agent API to exchange Dex code for Dex tokens
+8. Support Agent UI delegates to Next.js Auth component to handle authentication
 
-9. Support Agent API exchanges Dex code for Dex OIDC token, calls DFex user info endpoint and issues Support Agent JWT and returns it to Next.js
+9. Next.js invokes a plugin function provided by us to make an API call to Support Agent API
 
-10. Next.js encrypts and stores API JWT in session cookie
+10. Support Agent API exchanges Dex code for Dex OIDC token, calls Dex user info endpoint, issues Support Agent JWT with user teams and roles and returns it to Next.js
+
+11. Next.js encrypts and stores API JWT in session cookie
 
 
 ### Dex issuer URL options
