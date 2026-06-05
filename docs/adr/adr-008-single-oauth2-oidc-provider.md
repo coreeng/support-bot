@@ -80,9 +80,9 @@ These options do not change how Dex authorization_endpoint and callback_endpoint
 
 ### Option 1 - Autodiscovery via external ingress
 
-Issuer URL: https://support-bot-dex.tools.pit.prod.gspcloud.com/dex
-Discovery goes over the Internet
-JWKS, Token and userinfo also go over the Internet
+- Issuer URL: https://support-bot-dex.tools.pit.prod.gspcloud.com/dex
+- Discovery goes over the Internet
+- JWKS, Token and userinfo also go over the Internet
 
 #### Pros
 
@@ -94,13 +94,13 @@ JWKS, Token and userinfo also go over the Internet
 #### Cons
 
 - External connectivity needs approval from security teams at every client that enforces egress controls
-- Deploying Support Bot to another cluster requires Dex issuer URL change
+- Deploying Support Bot to another cluster requires Dex issuer URL change (unless a stable identity domain name is configured - this is typically outside of ingress controller capabilities)
 
 ### Option 2 - Autodiscovery via internal ingress
 
-Issuer URL: https://support-bot-dex-internal.tools.pit.prod.gspcloud.com/dex
-Discovery goes over private corporate network
-JWKS, Token and userinfo also go over private corporate network
+- Issuer URL: https://support-bot-dex-internal.tools.pit.prod.gspcloud.com/dex
+- Discovery goes over private corporate network
+- JWKS, Token and userinfo also go over private corporate network
 
 #### Pros
 
@@ -109,13 +109,13 @@ JWKS, Token and userinfo also go over private corporate network
 
 #### Cons
 
-- Deploying Support Bot to another cluster requires Dex issuer URL change
+- Deploying Support Bot to another cluster requires Dex issuer URL change (with the same caveat about a stable identity domain)
 
 ### Option 3 - Autodiscovery via namespace local service or pod
 
-Issuer URL: http://dex:5556/dex
-Discovery goes over cluster network
-JWKS, Token and userinfo also go over cluster network
+- Issuer URL: http://dex:5556/dex
+- Discovery goes over cluster local network
+- JWKS, Token and userinfo also go over cluster local network
 
 #### Pros
 
