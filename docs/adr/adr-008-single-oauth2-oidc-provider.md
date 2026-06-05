@@ -175,7 +175,7 @@ Support Agent configures exactly one active OAuth2/OIDC login provider at any ti
 The active provider is configured through standard Spring properties under a fixed registration ID (proposed: `sso`).
 The same configuration shape works for Dex, Azure, Google, and any other OAuth2/OIDC-compliant IdP.
 
-### 2. Use internal ingress-based issuer URL for Dex
+### 2. Use service-based issuer URL for Dex
 
 ### 3. Use Dex callback directly
 
