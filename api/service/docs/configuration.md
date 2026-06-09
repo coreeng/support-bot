@@ -765,8 +765,23 @@ This path requires `platform-integration.jwt-groups.enabled: true` and only appl
 
 ### `ROLE_ESCALATION`
 
-`ROLE_ESCALATION` is for teams that *receive* escalations — typically product or platform teams outside the core support team. Escalation team members must be in the support channel to see and respond to escalations.
+`ROLE_ESCALATION` is for teams that *receive* escalations — typically product or platform teams outside the core support team.
 
-When a support engineer escalates a ticket, the bot posts in the Slack thread and tags the team's Slack group (`enums.escalation-teams[].slack-group-id`). Escalation team members need to be in the support channel to see and respond to the thread. Those who log into the UI get `ROLE_ESCALATION`, which allows them to view and resolve escalations assigned to their team.
+When a support engineer escalates a ticket, the bot tags the team's Slack group in the thread — no UI login required. Those who do log into the UI get `ROLE_ESCALATION`, which gives them a dedicated view of escalations assigned to their team.
 
-**How membership is resolved:** unlike `ROLE_SUPPORT_ENGINEER` and `ROLE_LEADERSHIP` which use a simple `group-ref: slack:<ID>`, `ROLE_ESCALATION` is resolved through `platform-integration` (Azure, GCP, Kubernetes). This made sense when escalation teams mirrored tenant teams already tracked in those identity sources. However, since the Slack group ID is already configured on each escalation team for tagging, using it for membership resolution too (the same way support/leadership work) would be simpler and sufficient for Slack-first deployments — this is a known limitation.
+Unlike `ROLE_SUPPORT_ENGINEER` and `ROLE_LEADERSHIP`, membership is not resolved via a direct Slack group lookup. It comes from `platform-integration` (Azure, GCP, or Kubernetes), which scrapes team membership from your cloud identity source:
+
+```yaml
+enums:
+  escalation-teams:
+    - label: Platform Team
+      code: platform-team
+      group-ref: <CLOUD_GROUP_ID>           # Azure group ID, GCP group email, etc.
+
+platform-integration:
+  enabled: true
+  gcp:
+    enabled: true                           # or azure / teams-scraping depending on your setup
+```
+
+> **Known limitation:** since the Slack group ID is already configured on each escalation team for tagging, using it for membership resolution too (as support/leadership do) would be simpler for Slack-first deployments — but this is not currently supported.
