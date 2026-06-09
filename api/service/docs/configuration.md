@@ -731,11 +731,19 @@ team:
   leadership:
     name: Support Leadership
     group-ref: slack:<SLACK_GROUP_ID>       # members get ROLE_LEADERSHIP
+
+platform-integration:
+  enabled: true                             # must be true or the app fails to start
+  teams-scraping:
+    static:
+      enabled: true                         # no teams needed — acts as a no-op placeholder
 ```
 
 Add or remove people from those Slack groups and their role takes effect at their next login.
 
 > **Prerequisite:** the Slack bot token must have the `usergroups:read` scope. If the scope is missing, group membership resolution fails silently and no support/leadership roles are assigned.
+
+> **Note:** Slack group membership is resolved directly via the Slack API and does not depend on `platform-integration`. However, `platform-integration.enabled: true` is required or the app will fail to start. If you are not using any cloud identity source, the `teams-scraping.static` block with no teams listed is sufficient.
 
 ### Assigning roles via LDAP groups (Dex)
 
