@@ -775,13 +775,17 @@ Unlike `ROLE_SUPPORT_ENGINEER` and `ROLE_LEADERSHIP`, membership is not resolved
 enums:
   escalation-teams:
     - label: Platform Team
-      code: platform-team
-      group-ref: <CLOUD_GROUP_ID>           # Azure group ID, GCP group email, etc.
+      code: platform-team                   # must match platform-integration.teams-scraping name below
+      group-ref: <CLOUD_GROUP_ID>           # Slack group ID tagged on escalation
 
 platform-integration:
   enabled: true
-  gcp:
-    enabled: true                           # or azure / teams-scraping depending on your setup
+  teams-scraping:
+    static:                                 # or core-platform / k8s-generic / gcp / azure
+      enabled: true
+      teams:
+        - name: platform-team              # must match enums.escalation-teams[].code above
+          group-ref: <CLOUD_GROUP_ID>      # cloud group whose members get ROLE_ESCALATION
 ```
 
 > **Known limitation:** since the Slack group ID is already configured on each escalation team for tagging, using it for membership resolution too (as support/leadership do) would be simpler for Slack-first deployments — but this is not currently supported.
