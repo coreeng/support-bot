@@ -713,8 +713,8 @@ Every authenticated user is assigned one or more roles that control what they ca
 | Role | Who it's for | Capabilities |
 |---|---|---|
 | `ROLE_USER` | Everyone — assigned automatically on login | View tickets |
-| `ROLE_SUPPORT_ENGINEER` | Support team members | Manage tickets: update status, assign, tag, close |
-| `ROLE_LEADERSHIP` | Support leads | Everything in `ROLE_SUPPORT_ENGINEER` plus metrics dashboards and aggregate views |
+| `ROLE_LEADERSHIP` | Support leads | View tickets, metrics dashboards, and aggregate views |
+| `ROLE_SUPPORT_ENGINEER` | Support team members | Everything in `ROLE_LEADERSHIP` plus manage tickets: update status, assign, tag, close |
 | `ROLE_ESCALATION` | Teams that *receive* escalations | Resolve escalations raised against their team |
 
 Roles are additive — a user can hold multiple roles simultaneously.
