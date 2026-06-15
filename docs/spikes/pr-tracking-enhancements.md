@@ -176,11 +176,11 @@ Verdicts from official-doc research (GitHub `docs.github.com`, GitLab `docs.gitl
 ## 7. Open questions
 
 1. **Close-on-merge for all repos?** Should *every* repo switch from "close on mergeable" to "close on actual `MERGED`", or only `requires-codeowners` repos (to avoid changing existing behaviour)? Current default closes on mergeable.
-2. **Codeowner SLA semantics (PT-445).** The escalation clock "starts only after a codeowner approval" — confirm what it then measures (time for the maintaining team to merge after codeowner approval) and whether there's *also* a separate pre-approval timer/nudge to chase the codeowner. This reconciles the earlier "SLA paused after approval" framing: for codeowner repos the post-approval phase actively chases the maintaining team rather than pausing silently.
-3. **Re-escalation cadence** while in `AWAITING_MERGE` — one nudge, or recurring until merged?
-4. **A — multiple teams & nested membership:** confirm whitelist semantics (any-of) and that GitLab inherited/invited-group membership counts.
+2. **Re-escalation cadence** while in `AWAITING_MERGE` — one nudge, or recurring until merged?
+3. **A — multiple teams & nested membership:** confirm whitelist semantics (any-of) and that GitLab inherited/invited-group membership counts.
 
 > Resolved during this spike:
+> - **C — escalation timer starts only after a codeowner approval (PT-445).** On `requires-codeowners` repos the escalation clock does **not** run at detection; it starts once a codeowner has approved (and then measures the maintaining team's time to merge). There is no silent "SLA paused" phase for these repos — the post-approval phase actively chases the maintaining team.
 > - **C closes on merge, no merger check** — once the provider reports `MERGED`, that is sufficient to close. We do **not** verify that `merged_by`/`merge_user` belongs to the maintaining/codeowner team. (Consequence: merger identity capture is no longer required for C — see §4.)
 > - **B has no GitHub parity** (see §6.1) — GitHub can't express conditional reviewers natively; making the bot the gate inverts its read-only design.
 > - **B is GitLab Ultimate Tier Subscription only** (see §6.1) — offered only where MR Approval Policies exist, with no CE/Premium degradation path.
