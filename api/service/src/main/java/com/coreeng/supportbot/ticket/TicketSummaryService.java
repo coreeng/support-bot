@@ -7,6 +7,7 @@ import static com.slack.api.model.block.composition.BlockCompositions.markdownTe
 import static java.util.Comparator.comparing;
 
 import com.coreeng.supportbot.config.TicketAssignmentProps;
+import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
 import com.coreeng.supportbot.enums.Tag;
@@ -98,10 +99,18 @@ public class TicketSummaryService {
         TicketId ticketId = checkNotNull(ticket.id());
         return escalationQueryService.listByTicketId(ticketId).stream()
                 .sorted(comparing(Escalation::openedAt))
-                .map(e -> TicketSummaryView.EscalationView.of(
-                        e,
-                        checkNotNull(escalationTeamsRegistry.findEscalationTeamByCode(checkNotNull(e.team())))
-                                .slackMentionId()))
+                .map(e -> {
+                    EscalationTeam team =
+                            e.team() != null ? escalationTeamsRegistry.findEscalationTeamByCode(e.team()) : null;
+                    if (team == null) {
+                        log.atWarn()
+                                .addKeyValue("ticketId", ticketId)
+                                .addKeyValue("escalationId", e.id())
+                                .addKeyValue("teamCode", e.team())
+                                .log("Escalation references an unresolved team; rendering summary without a mention");
+                    }
+                    return TicketSummaryView.EscalationView.of(e, team != null ? team.slackMentionId() : null);
+                })
                 .collect(toImmutableList());
     }
 

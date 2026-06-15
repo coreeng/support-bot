@@ -20,6 +20,7 @@ import com.coreeng.supportbot.enums.TicketImpact;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationQueryService;
+import com.coreeng.supportbot.escalation.EscalationStatus;
 import com.coreeng.supportbot.slack.MessageTs;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.SlackId;
@@ -251,6 +252,63 @@ class TicketSummaryServiceTest {
         // Should be sorted by openedAt
         assertThat(result.escalations().get(0).teamSlackGroupId()).isEqualTo("platform-support");
         assertThat(result.escalations().get(1).teamSlackGroupId()).isEqualTo("security-group");
+    }
+
+    @Test
+    void escalationWithUnresolvableTeam_doesNotCrashSummary() {
+        // Regression: an escalation whose team code no longer resolves in the registry must not
+        // blow up the whole Full Summary view (the "View Summary" spinner in Slack).
+        TicketAssignmentProps assignmentProps =
+                new TicketAssignmentProps(false, new TicketAssignmentProps.Encryption(false, null));
+        service = new TicketSummaryService(
+                repository,
+                slackClient,
+                escalationQueryService,
+                tagsRegistry,
+                impactsRegistry,
+                escalationTeamsRegistry,
+                supportTeamService,
+                assignmentProps);
+
+        Escalation resolvable = Escalation.builder()
+                .id(new EscalationId(1L))
+                .ticketId(ticketId)
+                .channelId(channelId)
+                .threadTs(MessageTs.of("1111111111.111111"))
+                .team("platform-team")
+                .status(EscalationStatus.opened)
+                .openedAt(Instant.parse("2024-01-01T10:00:00Z"))
+                .build();
+        Escalation orphaned = Escalation.builder()
+                .id(new EscalationId(2L))
+                .ticketId(ticketId)
+                .channelId(channelId)
+                .threadTs(MessageTs.of("2222222222.222222"))
+                .team("removed-team")
+                .status(EscalationStatus.opened)
+                .openedAt(Instant.parse("2024-01-01T11:00:00Z"))
+                .build();
+
+        when(repository.findTicketById(ticketId)).thenReturn(ticket);
+        when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
+        when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
+        when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of(resolvable, orphaned));
+        when(impactsRegistry.listAllImpacts()).thenReturn(ImmutableList.of());
+        when(escalationTeamsRegistry.findEscalationTeamByCode("platform-team"))
+                .thenReturn(
+                        new EscalationTeam("Platform Team", "platform-team", new GroupRef.Slack("platform-support")));
+        when(escalationTeamsRegistry.findEscalationTeamByCode("removed-team")).thenReturn(null);
+
+        TicketSummaryView result = service.summaryView(ticketId);
+
+        assertThat(result.escalations()).hasSize(2);
+        assertThat(result.escalations().get(0).teamSlackGroupId()).isEqualTo("platform-support");
+        assertThat(result.escalations().get(1).teamSlackGroupId()).isNull();
+        assertThat(result.escalations().get(1).teamCode()).isEqualTo("removed-team");
+
+        // The mapper must render a fallback for the unresolved team instead of throwing.
+        View view = view(v -> summaryViewMapper.render(result, v).type("modal"));
+        assertThat(view).isNotNull();
     }
 
     @Test
