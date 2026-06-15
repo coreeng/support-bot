@@ -171,6 +171,18 @@ Verdicts from official-doc research (GitHub `docs.github.com`, GitLab `docs.gitl
 - **No GitHub parity.** GitHub has **no native** check-result-conditional reviewer rule (rulesets support only *path-based* required teams). The only way to implement "if a scan fails, require the security team" on GitHub is for support-bot to *become the enforcement gate* — owning the policy logic and writing a required commit status. That inverts the bot's design: it **reads and reflects** provider state rather than enforcing merge policy, and there would be no provider-side source of truth to read the *required* approvals from. The complexity, fragility, and ownership shift aren't justified — so dynamic approvals are **GitLab-only**.
 - **GitLab Ultimate Tier Subscription only, no degradation.** The feature is enabled **only** for repos that actually use **MR Approval Policies** (GitLab Ultimate Tier Subscription), where `approval_state` natively reports the policy-escalated `report_approver` rules. Rather than degrade gracefully on CE/Premium, the feature is simply **not offered** for those repos (config validation rejects / no-ops `dynamic-approvals` where policies aren't available). This keeps support entirely native — we read what GitLab computes, we never reimplement it.
 
+### 6.2 Delivery strategy (branching)
+
+**Do not** develop A, B and C on separate long-lived branches and merge them at the end. A is cleanly separable (it lives upstream in `PrDetectionService`), but **B and C both rewrite the same seam** — `PrLifecyclePoller`'s state machine and the `pr_tracking_status` enum migration — so parallel branches would collide in the same methods and in the migration. Instead:
+
+1. **Foundation PR (to `main`).** Author on `PrMetadata` + both source clients, config plumbing, and any FSM/enum scaffolding shared by the features. Self-contained, low-risk, unblocks A and C.
+2. **Stacked feature PRs, in order A → C → B.** Each is its own small PR rebased on the previous one — no long-lived parallel branches, no big-bang merge.
+   - **A (PT-521)** — author admission gate. Independent, ships first.
+   - **C (PT-445)** — codeowners + close-on-merge. Builds on the foundation; owns the FSM changes (`AWAITING_MERGE`, codeowner-gated SLA start, detected-message override).
+   - **B (PT-522)** — dynamic approvals. **In scope but last** — the heaviest and most provider-divergent (GitLab Ultimate Tier Subscription only), and it should not gate A or C. Its FSM changes (`AWAITING_APPROVALS`) land *after* C's, avoiding the collision. A natural point to split into its own spike if scope grows.
+
+This keeps the "one coherent effort on a shared foundation" benefit while leaving each piece independently reviewable and shippable.
+
 ---
 
 ## 7. Open questions
