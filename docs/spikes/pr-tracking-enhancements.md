@@ -183,6 +183,45 @@ Verdicts from official-doc research (GitHub `docs.github.com`, GitLab `docs.gitl
 
 This keeps the "one coherent effort on a shared foundation" benefit while leaving each piece independently reviewable and shippable.
 
+### 6.3 Implementation pattern (state machine)
+
+The Foundation PR should also restructure *how* the lifecycle is expressed, because both B and C add states to the same machine. Today the FSM is **implicit**: a `switch (record.status())` in `PrLifecyclePoller` fans into `processOpen/ChangesRequested/Approved/Escalated` methods, each an inline `if/else` chain that braids three concerns together — deriving "what happened" from `PrMetadata`, deciding the next state, and running side effects (Slack, escalation, `pauseSla`). Consequences that bite the upcoming work:
+
+- The rule `approved + mergeable ⇒ CLOSED` is restated in **four** places (`handleApproval`, `processApprovedRecord`, `processEscalatedRecord`, and via `handleApproval` from `CHANGES_REQUESTED`). Adding C's `AWAITING_MERGE` means editing all of them.
+- There is **no single source of truth** for legal transitions, so the diagrams in §2/§3 are hand-maintained and can drift from the code.
+- The decision logic **can't be unit-tested** without mocking the repository, Slack client and escalation service.
+
+**Recommendation: a declarative transition table + functional core / imperative shell.** Model the machine as data plus a pure `decide` function; run effects in a thin shell. This *embraces* the polling model — the poller is a reconciler, not an event stream, so `observe()` is the event-derivation step.
+
+```java
+// Pure inputs (already-resolved values — no clients):
+record Observation(PrTrackingStatus current, @Nullable Verdict latestVerdict,
+        boolean mergeable, boolean merged, boolean closed,
+        boolean slaBreached, boolean codeownerApproved /* C */, boolean requiredApprovalsSatisfied /* B */) {}
+
+// Pure output: next state + ordered effects, nothing executed:
+record Decision(PrTrackingStatus next, SlaOp slaOp, List<Effect> effects) {}
+sealed interface Effect permits NotifyChangesRequested, NotifyApproved, NotifyClosed, Escalate, NotifyAwaitingMerge {}
+
+Decision decide(Observation o) { ... }   // pure, table-driven, trivially unit-testable
+```
+
+The shell stays boring: `observe(record, pr, teamReviews)` → `decide(obs)` → `apply(record, decision)`. `apply` is the **only** place that touches the repository / Slack / escalation, and it runs `decision.effects()` in list order — which turns the current "post the custom message *before* the escalation card" ordering (today a call-order convention guarded by a comment) into an explicit data fact.
+
+Adding a state becomes a localised change: C adds the `AWAITING_MERGE` rows/guards, B adds `AWAITING_APPROVALS` rows/guards — neither rewrites the other's `if`-chains, which is exactly the collision §6.2 warns about.
+
+**Mermaid-from-code.** Because transitions are data, a tiny test renders the table to a `stateDiagram-v2` and the build fails if the committed diagram is stale:
+
+```java
+@Test void lifecycleDiagramIsUpToDate() {
+    String generated = MermaidRenderer.render(PrLifecycle.TRANSITIONS); // from,to,label per row
+    assertThat(readFencedDiagram("docs/spikes/pr-tracking-enhancements.md", "lifecycle"))
+            .isEqualTo(generated);   // diagram drift = red build
+}
+```
+
+The §2/§3 diagrams in *this* doc then stop being hand-maintained — they become generated artefacts checked into the doc, guaranteed to match the FSM the code actually runs.
+
 ---
 
 ## 7. Open questions
