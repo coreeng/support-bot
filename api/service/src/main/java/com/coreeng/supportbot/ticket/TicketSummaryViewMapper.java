@@ -174,10 +174,13 @@ public class TicketSummaryViewMapper {
     }
 
     private ImmutableList<LayoutBlock> renderEscalation(TicketSummaryView.EscalationView escalation) {
+        String teamText = escalation.teamSlackGroupId() != null
+                ? "Team: <!subteam^" + escalation.teamSlackGroupId() + ">"
+                : "Team: " + (escalation.teamCode() != null ? escalation.teamCode() : "unknown") + " (not configured)";
         return ImmutableList.of(
                 section(s -> s.fields(ImmutableList.of(
                         plainText(t -> t.text("Status: " + escalation.status().label())),
-                        markdownText(t -> t.text("Team: <!subteam^" + escalation.teamSlackGroupId() + ">"))))),
+                        markdownText(t -> t.text(teamText))))),
                 divider());
     }
 

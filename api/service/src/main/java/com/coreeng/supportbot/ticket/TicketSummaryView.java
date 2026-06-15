@@ -58,9 +58,14 @@ public record TicketSummaryView(
             @Nullable SlackId senderId,
             @Nullable String permalink) {}
 
-    public record EscalationView(EscalationId id, String teamSlackGroupId, EscalationStatus status) {
-        public static EscalationView of(Escalation escalation, String teamSlackGroupId) {
-            return new EscalationView(checkNotNull(escalation.id()), teamSlackGroupId, escalation.status());
+    public record EscalationView(
+            EscalationId id,
+            @Nullable String teamSlackGroupId,
+            @Nullable String teamCode,
+            EscalationStatus status) {
+        public static EscalationView of(Escalation escalation, @Nullable String teamSlackGroupId) {
+            return new EscalationView(
+                    checkNotNull(escalation.id()), teamSlackGroupId, escalation.team(), escalation.status());
         }
     }
 
