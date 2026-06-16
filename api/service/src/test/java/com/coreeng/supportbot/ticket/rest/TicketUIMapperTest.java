@@ -19,6 +19,7 @@ import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.Team;
+import com.coreeng.supportbot.teams.TeamDisplay;
 import com.coreeng.supportbot.teams.TeamMemberFetcher;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
@@ -130,8 +131,8 @@ public class TicketUIMapperTest {
     }
 
     @Test
-    void mapToUIReturnsNullWhenKnownTeamNotFound() {
-        // given
+    void mapToUIRendersRetiredTeamLabelWhenNotInConfig() {
+        // given: PT-518 — a team code that is no longer in config should still render its label
         Ticket ticket = Ticket.builder()
                 .id(new TicketId(1))
                 .channelId("C123")
@@ -147,12 +148,17 @@ public class TicketUIMapperTest {
 
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
 
-        // when
-        when(teamService.findTeamByCode("deleted-team")).thenReturn(null);
+        Team retired = new Team("Deleted Team", "deleted-team", ImmutableList.of());
+        TeamUI retiredUI = new TeamUI("Deleted Team", "deleted-team", ImmutableList.of());
+        when(teamService.resolveForDisplay("deleted-team"))
+                .thenReturn(new TeamDisplay("deleted-team", "Deleted Team", ImmutableList.of(), false));
+        when(teamUIMapper.mapToUI(retired)).thenReturn(retiredUI);
 
-        // then
+        // then: renders the retired label instead of disappearing
         TicketUI result = assertDoesNotThrow(() -> ticketUIMapper.mapToUI(detailedTicket));
-        assertNull(result.team());
+        TeamUI team = requireNonNull(result.team());
+        assertEquals("Deleted Team", team.label());
+        assertEquals("deleted-team", team.code());
     }
 
     @Test
@@ -176,7 +182,8 @@ public class TicketUIMapperTest {
         Team team = new Team("wow", "wow", ImmutableList.of(TeamType.TENANT));
         TeamUI teamUI = new TeamUI("wow", "wow", ImmutableList.of(TeamType.TENANT));
 
-        when(teamService.findTeamByCode("wow")).thenReturn(team);
+        when(teamService.resolveForDisplay("wow"))
+                .thenReturn(new TeamDisplay("wow", "wow", ImmutableList.of(TeamType.TENANT), true));
         when(teamUIMapper.mapToUI(team)).thenReturn(teamUI);
 
         // when

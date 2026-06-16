@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.coreeng.supportbot.enums.EscalationTeam;
+import com.coreeng.supportbot.enums.EscalationTeamHistoryRepository;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.teams.fakes.FakeEscalationTeamsRegistry;
 import com.google.common.collect.ImmutableList;
@@ -26,7 +27,8 @@ class TeamServiceTest {
         PlatformTeam platformTeam2 = new PlatformTeam("team2", Set.of(), Set.of());
         when(platformTeamsService.listTeams()).thenReturn(ImmutableList.of(platformTeam1, platformTeam2));
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         ImmutableList<Team> result = teamService.listTeamsByType(TeamType.TENANT);
@@ -54,7 +56,8 @@ class TeamServiceTest {
                 new EscalationTeam("Escalation Team 2", "esc2", "slack:SLACK2")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         ImmutableList<Team> result = teamService.listTeamsByType(TeamType.ESCALATION);
@@ -87,7 +90,8 @@ class TeamServiceTest {
                 new EscalationTeam("Escalation Team 2", "esc2", "slack:SLACK2")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         ImmutableList<Team> result = teamService.listTeamsByType(TeamType.ESCALATION);
@@ -115,7 +119,8 @@ class TeamServiceTest {
         EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of());
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         ImmutableList<Team> result = teamService.listTeamsByType(TeamType.SUPPORT);
@@ -134,7 +139,8 @@ class TeamServiceTest {
         EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of());
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         ImmutableList<Team> result = teamService.listTeamsByType(TeamType.LEADERSHIP);
@@ -153,7 +159,8 @@ class TeamServiceTest {
         EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of());
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         Team result = teamService.findTeamByCode("support");
@@ -171,7 +178,8 @@ class TeamServiceTest {
         EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of());
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         Team result = teamService.findTeamByCode("leadership");
 
@@ -196,7 +204,8 @@ class TeamServiceTest {
                 new EscalationTeam("Escalation Noise 2", "escalation-noise-2", "slack:SLACK2")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         Team result = teamService.findTeamByCode("platform1");
@@ -221,7 +230,8 @@ class TeamServiceTest {
                 new EscalationTeam("Other Team", "other-team", "slack:SLACK2")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         Team result = teamService.findTeamByCode("team1");
@@ -248,7 +258,8 @@ class TeamServiceTest {
                 new EscalationTeam("Escalation Team 2", "esc2", "slack:SLACK2")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         Team result = teamService.findTeamByCode("esc1");
@@ -269,7 +280,8 @@ class TeamServiceTest {
         EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of());
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         Team result = teamService.findTeamByCode("unknown");
@@ -290,7 +302,8 @@ class TeamServiceTest {
                 new FakeEscalationTeamsRegistry(List.of(new EscalationTeam("Both Team", "both1", "slack:SLACK1")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         ImmutableList<Team> result = teamService.listTeams();
@@ -357,7 +370,8 @@ class TeamServiceTest {
         EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of());
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         ImmutableList<Team> result = teamService.listTeamsByUserEmail("user@test.com");
@@ -379,7 +393,8 @@ class TeamServiceTest {
         SupportTeamService supportTeamService = mockSupportTeamService();
         when(supportTeamService.isMemberByUserEmail("support@test.com")).thenReturn(true);
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         ImmutableList<Team> result = teamService.listTeamsByUserEmail("support@test.com");
@@ -402,7 +417,8 @@ class TeamServiceTest {
         when(supportTeamService.isLeadershipMemberByUserEmail("leader@test.com"))
                 .thenReturn(true);
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         ImmutableList<Team> result = teamService.listTeamsByUserEmail("leader@test.com");
@@ -425,7 +441,8 @@ class TeamServiceTest {
         when(supportTeamService.isMemberByUserEmail("both@test.com")).thenReturn(true);
         when(supportTeamService.isLeadershipMemberByUserEmail("both@test.com")).thenReturn(true);
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when
         ImmutableList<Team> result = teamService.listTeamsByUserEmail("both@test.com");
@@ -449,7 +466,8 @@ class TeamServiceTest {
                 new FakeEscalationTeamsRegistry(List.of(new EscalationTeam("Team 1", "team1", "slack:SLACK1")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when - query the same team in different ways
         Team fromFindByCode = teamService.findTeamByCode("team1");
@@ -493,7 +511,8 @@ class TeamServiceTest {
                 new FakeEscalationTeamsRegistry(List.of(new EscalationTeam("Escalation Only", "esc1", "slack:SLACK1")));
         SupportTeamService supportTeamService = mockSupportTeamService();
 
-        TeamService teamService = new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService);
+        TeamService teamService = new TeamService(
+                platformTeamsService, escalationTeamsRegistry, supportTeamService, mock(EscalationTeamHistoryRepository.class));
 
         // when - query the same team in different ways
         Team fromFindByCode = teamService.findTeamByCode("esc1");
@@ -514,6 +533,63 @@ class TeamServiceTest {
         // Should NOT appear in tenant list
         ImmutableList<Team> tenantTeams = teamService.listTeamsByType(TeamType.TENANT);
         assertTrue(tenantTeams.stream().noneMatch(t -> "esc1".equals(t.code())));
+    }
+
+    @Test
+    void resolveForDisplay_activeTeam_returnsActiveWithTypes() {
+        PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
+        when(platformTeamsService.findTeamByName("esc1")).thenReturn(null);
+        EscalationTeamsRegistry escalationTeamsRegistry =
+                new FakeEscalationTeamsRegistry(List.of(new EscalationTeam("Escalation One", "esc1", "slack:SLACK1")));
+        SupportTeamService supportTeamService = mockSupportTeamService();
+        EscalationTeamHistoryRepository history = mock(EscalationTeamHistoryRepository.class);
+        TeamService teamService =
+                new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService, history);
+
+        TeamDisplay result = teamService.resolveForDisplay("esc1");
+
+        assertEquals("esc1", result.code());
+        assertEquals("Escalation One", result.label());
+        assertEquals(ImmutableList.of(TeamType.ESCALATION), result.types());
+        assertTrue(result.active());
+        verifyNoInteractions(history);
+    }
+
+    @Test
+    void resolveForDisplay_retiredTeam_returnsHistoryLabelInactive() {
+        PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
+        when(platformTeamsService.findTeamByName("old")).thenReturn(null);
+        EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of());
+        SupportTeamService supportTeamService = mockSupportTeamService();
+        EscalationTeamHistoryRepository history = mock(EscalationTeamHistoryRepository.class);
+        when(history.findLabelByCode("old")).thenReturn("Old Team");
+        TeamService teamService =
+                new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService, history);
+
+        TeamDisplay result = teamService.resolveForDisplay("old");
+
+        assertEquals("Old Team", result.label());
+        assertEquals("old", result.code());
+        assertFalse(result.active());
+        assertTrue(result.types().isEmpty());
+    }
+
+    @Test
+    void resolveForDisplay_unknownTeam_fallsBackToRawCodeInactive() {
+        PlatformTeamsService platformTeamsService = mock(PlatformTeamsService.class);
+        when(platformTeamsService.findTeamByName("ghost")).thenReturn(null);
+        EscalationTeamsRegistry escalationTeamsRegistry = new FakeEscalationTeamsRegistry(List.of());
+        SupportTeamService supportTeamService = mockSupportTeamService();
+        EscalationTeamHistoryRepository history = mock(EscalationTeamHistoryRepository.class);
+        when(history.findLabelByCode("ghost")).thenReturn(null);
+        TeamService teamService =
+                new TeamService(platformTeamsService, escalationTeamsRegistry, supportTeamService, history);
+
+        TeamDisplay result = teamService.resolveForDisplay("ghost");
+
+        assertEquals("ghost", result.code());
+        assertEquals("ghost", result.label());
+        assertFalse(result.active());
     }
 
     private SupportTeamService mockSupportTeamService() {

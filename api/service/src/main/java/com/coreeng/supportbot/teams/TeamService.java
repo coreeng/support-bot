@@ -3,6 +3,7 @@ package com.coreeng.supportbot.teams;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.coreeng.supportbot.enums.EscalationTeam;
+import com.coreeng.supportbot.enums.EscalationTeamHistoryRepository;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.google.common.collect.ImmutableList;
 import java.util.stream.Stream;
@@ -17,6 +18,7 @@ public class TeamService {
     private final PlatformTeamsService platformTeamsService;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
     private final SupportTeamService supportTeamService;
+    private final EscalationTeamHistoryRepository escalationTeamHistoryRepository;
 
     public ImmutableList<Team> listTeamsByUserEmail(String email) {
         ImmutableList<PlatformTeam> platformTeams = platformTeamsService.listTeamsByUserEmail(email);
@@ -82,6 +84,22 @@ public class TeamService {
         }
 
         return null;
+    }
+
+    /**
+     * Resolves a stored team code to a display-safe value that is never null (PT-518).
+     * Active config team -> active; else retired label from history -> inactive; else raw code -> inactive.
+     */
+    public TeamDisplay resolveForDisplay(String code) {
+        Team team = findTeamByCode(code);
+        if (team != null) {
+            return new TeamDisplay(team.code(), team.label(), team.types(), true);
+        }
+        String retiredLabel = escalationTeamHistoryRepository.findLabelByCode(code);
+        if (retiredLabel != null) {
+            return new TeamDisplay(code, retiredLabel, ImmutableList.of(), false);
+        }
+        return new TeamDisplay(code, code, ImmutableList.of(), false);
     }
 
     private ImmutableList<Team> mapPlatformTeams(ImmutableList<PlatformTeam> platformTeams) {

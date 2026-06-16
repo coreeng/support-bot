@@ -116,4 +116,33 @@ class EscalationProcessingServiceTest {
         assertThat(escalation.team()).isEqualTo(expectedEscalation.team());
         assertThat(escalation.tags()).isEqualTo(expectedEscalation.tags());
     }
+
+    @Test
+    public void shouldNotPostMessageWhenEscalationTeamUnresolved() {
+        // given: PT-518 — the escalation references a team code that no longer resolves in config
+        CreateEscalationRequest escalationRequest = CreateEscalationRequest.builder()
+                .ticket(Ticket.builder()
+                        .id(new TicketId(1))
+                        .queryTs(MessageTs.of("1234567890.123456"))
+                        .channelId("test-channel")
+                        .build())
+                .team("removed-team")
+                .tags(ImmutableList.of())
+                .build();
+        Escalation created = Escalation.builder()
+                .id(new EscalationId(1))
+                .ticketId(new TicketId(1))
+                .status(EscalationStatus.opened)
+                .team("removed-team")
+                .build();
+        when(escalationRepository.createIfNotExists(any(Escalation.class))).thenReturn(created);
+        when(escalationTeamsRegistry.findEscalationTeamByCode("removed-team")).thenReturn(null);
+
+        // when
+        Escalation escalation = requireNonNull(processingService.createEscalation(escalationRequest));
+
+        // then: no NPE, escalation still returned, and no Slack post for the unresolved team
+        assertThat(escalation.id()).isEqualTo(new EscalationId(1));
+        verifyNoInteractions(slackClient);
+    }
 }

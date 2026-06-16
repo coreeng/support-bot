@@ -11,6 +11,7 @@ import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.teams.SupportTeamService;
 import com.coreeng.supportbot.teams.Team;
+import com.coreeng.supportbot.teams.TeamDisplay;
 import com.coreeng.supportbot.teams.TeamMemberFetcher;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.rest.TeamUI;
@@ -103,11 +104,10 @@ public class TicketUIMapper {
                 .build();
     }
 
-    // TODO: If team is deleted after ticket has been saved to to db, this returns null. We should potentially look at
-    // saving team info to database so deleted teams can still be displayed instead of returning null
     @Nullable private TeamUI mapKnownTeamToUI(String code) {
-        Team team = teamService.findTeamByCode(code);
-        return team != null ? teamUIMapper.mapToUI(team) : null;
+        TeamDisplay team = teamService.resolveForDisplay(code);
+        // Retired/unknown teams still render their label instead of disappearing (PT-518).
+        return teamUIMapper.mapToUI(new Team(team.label(), team.code(), team.types()));
     }
 
     @Nullable private String resolveQueryPermalink(DetailedTicket ticket) {
