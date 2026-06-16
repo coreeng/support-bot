@@ -46,9 +46,7 @@ dependencies {
     api("org.assertj:assertj-core:3.27.7")
 
     // WireMock
-    api("org.wiremock:wiremock:3.13.+")
-    // Override Jetty to address security findings reported for wiremock's transitive dependency
-    implementation("org.eclipse.jetty:jetty-server:11.0.+")
+    api("org.wiremock:wiremock-jetty12:3.13.+")
 
     // Jackson
     api("com.fasterxml.jackson.core:jackson-databind:2.18.6")

@@ -9,7 +9,6 @@ val safeDependencyVersions =
         "com.microsoft.kiota:microsoft-kiota-abstractions" to "1.9.1",
         "com.squareup.okhttp3:okhttp" to "4.12.0",
         "com.squareup.okio:okio" to "3.16.4",
-        "io.grpc:grpc-netty-shaded" to "1.75.0",
         "io.netty:netty-codec" to "4.1.133.Final",
         "io.netty:netty-codec-dns" to "4.1.133.Final",
         "io.netty:netty-codec-http" to "4.1.133.Final",

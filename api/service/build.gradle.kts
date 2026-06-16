@@ -127,6 +127,7 @@ dependencies {
 
     implementation("com.google.cloud:spring-cloud-gcp-starter:5.10.0")
     implementation("com.google.apis:google-api-services-cloudidentity:v1-rev20241208-2.0.0")
+    implementation("com.google.cloud:google-cloud-vertexai:1.52.0")
 
     implementation("com.microsoft.graph:microsoft-graph:6.36.0")
     implementation("com.azure.spring:spring-cloud-azure-starter:5.22.0")
