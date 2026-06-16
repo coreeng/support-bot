@@ -385,19 +385,23 @@ export default function TicketsPage() {
           title="Impact"
           value={impactFilter || undefined}
           onChange={(v) => setParams({ impact: v ?? "" })}
-          options={(registryData?.impacts ?? []).map((impact: TicketImpact) => ({
-            label: impact.label,
-            value: impact.code,
-          }))}
+          options={(registryData?.impacts ?? [])
+            .filter((impact: TicketImpact) => impact.active !== false)
+            .map((impact: TicketImpact) => ({
+              label: impact.label,
+              value: impact.code,
+            }))}
         />
         <SingleSelectFilter
           title="Tag"
           value={tagFilter || undefined}
           onChange={(v) => setParams({ tag: v ?? "" })}
-          options={(registryData?.tags ?? []).map((tag: TicketTag) => ({
-            label: tag.label,
-            value: tag.code,
-          }))}
+          options={(registryData?.tags ?? [])
+            .filter((tag: TicketTag) => tag.active !== false)
+            .map((tag: TicketTag) => ({
+              label: tag.label,
+              value: tag.code,
+            }))}
         />
         <SingleSelectFilter
           title="Escalated"
@@ -530,20 +534,51 @@ export default function TicketsPage() {
                           {t.summary?.trim() ? t.summary : "—"}
                         </div>
                       </TableCell>
-                      <TableCell>{t.team?.name || "-"}</TableCell>
                       <TableCell>
-                        {registryData?.impacts.find((i: TicketImpact) => i.code === t.impact)?.label || t.impact || "-"}
+                        {t.team ? (
+                          <span className="inline-flex items-center gap-1">
+                            {t.team.name || "-"}
+                            {t.team.active === false && (
+                              <Badge variant="secondary" className="text-[10px]">
+                                Retired
+                              </Badge>
+                            )}
+                          </span>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          if (!t.impact) return "-";
+                          const impact = registryData?.impacts.find((i: TicketImpact) => i.code === t.impact);
+                          return (
+                            <span className="inline-flex items-center gap-1">
+                              {impact?.label || t.impact}
+                              {impact?.active === false && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  Retired
+                                </Badge>
+                              )}
+                            </span>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         {(t.tags?.length ?? 0) > 0
-                          ? t.tags
-                              ?.map(getTagLabel)
-                              .filter(Boolean)
-                              .map((tag, idx) => (
-                                <Badge key={`${t.id}-tag-${idx}`} variant="outline" className="mb-1 block w-fit last:mb-0">
-                                  {tag}
+                          ? t.tags?.map((code, idx) => {
+                              const retired = registryData?.tags.find((x: TicketTag) => x.code === code)?.active === false;
+                              return (
+                                <Badge
+                                  key={`${t.id}-tag-${idx}`}
+                                  variant="outline"
+                                  className="mb-1 flex w-fit items-center gap-1 last:mb-0"
+                                >
+                                  {getTagLabel(code)}
+                                  {retired && <span className="text-muted-foreground text-[10px]">(retired)</span>}
                                 </Badge>
-                              ))
+                              );
+                            })
                           : "-"}
                       </TableCell>
                       {isAssignmentEnabled && <TableCell>{t.assignedTo || "-"}</TableCell>}

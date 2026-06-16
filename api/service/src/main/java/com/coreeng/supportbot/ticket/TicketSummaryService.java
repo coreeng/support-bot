@@ -85,12 +85,7 @@ public class TicketSummaryService {
                 escalations,
                 currentTags,
                 allImpacts,
-                ticket.impact() != null
-                        ? allImpacts.stream()
-                                .filter(i -> ticket.impact().contains(i.code()))
-                                .findAny()
-                                .orElse(null)
-                        : null,
+                ticket.impact() != null ? impactsRegistry.findImpactByCode(ticket.impact()) : null,
                 currentAssignee,
                 availableAssignees);
     }

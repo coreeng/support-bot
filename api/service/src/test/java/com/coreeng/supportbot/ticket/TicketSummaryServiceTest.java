@@ -480,6 +480,8 @@ class TicketSummaryServiceTest {
                 .thenReturn(ImmutableList.of(
                         new TicketImpact("Production Blocking", "production-blocking"),
                         new TicketImpact("Minor Issue", "minor-issue")));
+        when(impactsRegistry.findImpactByCode("production-blocking"))
+                .thenReturn(new TicketImpact("Production Blocking", "production-blocking"));
 
         // when
         TicketSummaryView result = service.summaryView(ticketId);
