@@ -435,10 +435,12 @@ export default function EditTicketModal({ ticketId, open, onOpenChange, onSucces
                     placeholder="Select tags..."
                     searchPlaceholder="Search tags..."
                     error={!!validationErrors.tags}
-                    options={(registryData?.tags ?? []).map((t: TicketTag) => ({
-                      label: t.label,
-                      value: t.code,
-                    }))}
+                    options={(registryData?.tags ?? [])
+                      .filter((t: TicketTag) => t.active !== false)
+                      .map((t: TicketTag) => ({
+                        label: t.label,
+                        value: t.code,
+                      }))}
                     selected={selectedTags}
                     onChange={(next) => {
                       setSelectedTags(next);
@@ -488,11 +490,13 @@ export default function EditTicketModal({ ticketId, open, onOpenChange, onSucces
                       <SelectValue placeholder="Select impact..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {registryData?.impacts.map((imp: TicketImpact) => (
-                        <SelectItem key={imp.code} value={imp.code}>
-                          {imp.label}
-                        </SelectItem>
-                      ))}
+                      {registryData?.impacts
+                        .filter((imp: TicketImpact) => imp.active !== false)
+                        .map((imp: TicketImpact) => (
+                          <SelectItem key={imp.code} value={imp.code}>
+                            {imp.label}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   {validationErrors.impact && <p className="text-destructive text-sm">{validationErrors.impact}</p>}

@@ -82,11 +82,13 @@ export interface EscalationTeam extends TicketTeam {
 export type TicketImpact = {
   code: string;
   label: string;
+  active?: boolean;
 };
 
 export type TicketTag = {
   code: string;
   label: string;
+  active?: boolean;
 };
 
 export interface PaginatedTickets {

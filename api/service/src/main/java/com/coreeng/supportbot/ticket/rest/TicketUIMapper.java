@@ -106,8 +106,11 @@ public class TicketUIMapper {
 
     @Nullable private TeamUI mapKnownTeamToUI(String code) {
         TeamDisplay team = teamService.resolveForDisplay(code);
-        // Retired/unknown teams still render their label instead of disappearing (PT-518).
-        return teamUIMapper.mapToUI(new Team(team.label(), team.code(), team.types()));
+        // Retired/unknown teams still render their label, flagged active=false so the UI can badge them (PT-518).
+        if (team.active()) {
+            return teamUIMapper.mapToUI(new Team(team.label(), team.code(), team.types()));
+        }
+        return new TeamUI(team.label(), team.code(), team.types(), false);
     }
 
     @Nullable private String resolveQueryPermalink(DetailedTicket ticket) {

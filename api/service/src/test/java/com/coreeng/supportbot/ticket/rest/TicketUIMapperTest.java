@@ -3,6 +3,7 @@ package com.coreeng.supportbot.ticket.rest;
 import static java.util.Objects.requireNonNull;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -148,17 +149,15 @@ public class TicketUIMapperTest {
 
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
 
-        Team retired = new Team("Deleted Team", "deleted-team", ImmutableList.of());
-        TeamUI retiredUI = new TeamUI("Deleted Team", "deleted-team", ImmutableList.of());
         when(teamService.resolveForDisplay("deleted-team"))
                 .thenReturn(new TeamDisplay("deleted-team", "Deleted Team", ImmutableList.of(), false));
-        when(teamUIMapper.mapToUI(retired)).thenReturn(retiredUI);
 
-        // then: renders the retired label instead of disappearing
+        // then: renders the retired label (active=false so the UI can badge it) instead of disappearing
         TicketUI result = assertDoesNotThrow(() -> ticketUIMapper.mapToUI(detailedTicket));
         TeamUI team = requireNonNull(result.team());
         assertEquals("Deleted Team", team.label());
         assertEquals("deleted-team", team.code());
+        assertFalse(team.active());
     }
 
     @Test

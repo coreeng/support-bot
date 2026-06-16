@@ -77,6 +77,25 @@ class EnumsServiceTest {
     }
 
     @Test
+    void listAllImpactsIncludingRetired_delegatesToListAll() {
+        ImmutableList<TicketImpact> all =
+                ImmutableList.of(new TicketImpact("Active", "active"), new TicketImpact("Retired", "retired"));
+        when(impactsRepository.listAll()).thenReturn(all);
+
+        assertThat(service.listAllImpactsIncludingRetired()).isEqualTo(all);
+        verify(impactsRepository).listAll();
+    }
+
+    @Test
+    void listAllTagsIncludingRetired_delegatesToListAll() {
+        ImmutableList<Tag> all = ImmutableList.of(new Tag("Active", "active"), new Tag("Retired", "retired"));
+        when(tagsRepository.listAll()).thenReturn(all);
+
+        assertThat(service.listAllTagsIncludingRetired()).isEqualTo(all);
+        verify(tagsRepository).listAll();
+    }
+
+    @Test
     void listTagsByCodes_delegatesToListByCodes() {
         ImmutableList<String> codes = ImmutableList.of("networking", "deleted-tag");
         ImmutableList<Tag> tags =
