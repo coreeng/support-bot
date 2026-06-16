@@ -85,12 +85,9 @@ public class TicketSummaryService {
                 escalations,
                 currentTags,
                 allImpacts,
-                ticket.impact() != null
-                        ? allImpacts.stream()
-                                .filter(i -> ticket.impact().contains(i.code()))
-                                .findAny()
-                                .orElse(null)
-                        : null,
+                // Resolve the ticket's current impact directly (incl. soft-deleted) so a retired
+                // impact still renders on existing tickets even though the picker is active-only (PT-518).
+                ticket.impact() != null ? impactsRegistry.findImpactByCode(ticket.impact()) : null,
                 currentAssignee,
                 availableAssignees);
     }

@@ -35,7 +35,8 @@ public class EnumsService implements EscalationTeamsRegistry, TagsRegistry, Impa
 
     @Override
     public ImmutableList<TicketImpact> listAllImpacts() {
-        return impactsRepository.listAll();
+        // Active only — mirrors listAllTags(); retired impacts stay resolvable via findImpactByCode (PT-518).
+        return impactsRepository.listAllActive();
     }
 
     @Nullable @Override

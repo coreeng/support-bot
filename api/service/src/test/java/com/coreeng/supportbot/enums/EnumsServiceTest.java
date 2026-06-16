@@ -65,6 +65,18 @@ class EnumsServiceTest {
     }
 
     @Test
+    void listAllImpacts_delegatesToListAllActive_excludingSoftDeleted() {
+        ImmutableList<TicketImpact> activeImpacts =
+                ImmutableList.of(new TicketImpact("Production Blocking", "production-blocking"));
+        when(impactsRepository.listAllActive()).thenReturn(activeImpacts);
+
+        ImmutableList<TicketImpact> result = service.listAllImpacts();
+
+        assertThat(result).isEqualTo(activeImpacts);
+        verify(impactsRepository).listAllActive();
+    }
+
+    @Test
     void listTagsByCodes_delegatesToListByCodes() {
         ImmutableList<String> codes = ImmutableList.of("networking", "deleted-tag");
         ImmutableList<Tag> tags =
