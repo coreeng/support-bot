@@ -705,3 +705,87 @@ Available CEL variables:
 | `provider`      | string | `github` or `gitlab`                                        |
 
 Setting an `escalated` message on a no-SLA repo is rejected at startup.
+
+## Roles
+
+Every authenticated user is assigned one or more roles that control what they can do in the UI.
+
+| Role | Who it's for | Capabilities |
+|---|---|---|
+| `ROLE_USER` | Everyone — assigned automatically on login | View tickets |
+| `ROLE_LEADERSHIP` | Support leads | View tickets, metrics dashboards, and aggregate views |
+| `ROLE_SUPPORT_ENGINEER` | Support team members | Everything in `ROLE_LEADERSHIP` plus manage tickets: update status, assign, tag, close |
+| `ROLE_ESCALATION` | Teams that *receive* escalations | Resolve escalations raised against their team |
+
+Roles are additive — a user can hold multiple roles simultaneously.
+
+### Assigning roles via Slack groups (recommended)
+
+The simplest way to manage roles is to point `team.support.group-ref` and `team.leadership.group-ref` at Slack user groups. At login time the API resolves group members from Slack and assigns the corresponding role — no redeployment needed when membership changes.
+
+```yaml
+team:
+  support:
+    name: Core Support
+    group-ref: slack:<SLACK_GROUP_ID>       # members get ROLE_SUPPORT_ENGINEER
+  leadership:
+    name: Support Leadership
+    group-ref: slack:<SLACK_GROUP_ID>       # members get ROLE_LEADERSHIP
+
+platform-integration:
+  enabled: true                             # must be true or the app fails to start
+  teams-scraping:
+    static:
+      enabled: true                         # no teams needed — acts as a no-op placeholder
+```
+
+Add or remove people from those Slack groups and their role takes effect at their next login.
+
+> **Prerequisite:** the Slack bot token must have the `usergroups:read` scope. If the scope is missing, group membership resolution fails silently and no support/leadership roles are assigned.
+
+> **Note:** Slack group membership is resolved directly via the Slack API and does not depend on `platform-integration`. However, `platform-integration.enabled: true` is required or the app will fail to start. If you are not using any cloud identity source, the `teams-scraping.static` block with no teams listed is sufficient.
+
+### Assigning roles via LDAP groups (Dex)
+
+When authenticating through Dex with an LDAP backend, roles can alternatively be derived from LDAP group membership via the `platform-integration.jwt-groups` config. Dex populates a `groups` claim in the ID token with the user's LDAP groups; the API maps those to team codes which resolve to roles.
+
+```yaml
+platform-integration:
+  jwt-groups:
+    enabled: true
+    claim-name: groups          # LDAP groups claim emitted by Dex
+    mappings:
+      - claim-values: [support-admins]
+        team-code: support      # Must match team.support.code → ROLE_SUPPORT_ENGINEER
+      - claim-values: [support-leads]
+        team-code: support-leadership  # Must match team.leadership.code → ROLE_LEADERSHIP
+```
+
+This path requires `platform-integration.jwt-groups.enabled: true` and only applies to the `dex` OAuth provider — Google and Azure logins are not affected.
+
+### `ROLE_ESCALATION`
+
+`ROLE_ESCALATION` is for teams that *receive* escalations — typically product or platform teams outside the core support team.
+
+When a support engineer escalates a ticket, the bot tags the team's Slack group in the thread — no UI login required. Those who do log into the UI get `ROLE_ESCALATION`, which gives them a dedicated view of escalations assigned to their team.
+
+Unlike `ROLE_SUPPORT_ENGINEER` and `ROLE_LEADERSHIP`, membership is not resolved via a direct Slack group lookup. It comes from `platform-integration` (Azure, GCP, or Kubernetes), which scrapes team membership from your cloud identity source:
+
+```yaml
+enums:
+  escalation-teams:
+    - label: Platform Team
+      code: platform-team                   # must match platform-integration.teams-scraping name below
+      group-ref: <CLOUD_GROUP_ID>           # Slack group ID tagged on escalation
+
+platform-integration:
+  enabled: true
+  teams-scraping:
+    static:                                 # or core-platform / k8s-generic / gcp / azure
+      enabled: true
+      teams:
+        - name: platform-team              # must match enums.escalation-teams[].code above
+          group-ref: <CLOUD_GROUP_ID>      # cloud group whose members get ROLE_ESCALATION
+```
+
+> **Known limitation:** since the Slack group ID is already configured on each escalation team for tagging, using it for membership resolution too (as support/leadership do) would be simpler for Slack-first deployments — but this is not currently supported.
