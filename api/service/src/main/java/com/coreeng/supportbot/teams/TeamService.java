@@ -49,7 +49,7 @@ public class TeamService {
             case ESCALATION ->
                 escalationTeamsRegistry.listAllEscalationTeams().stream()
                         .map(t -> {
-                            PlatformTeam platformTeam = platformTeamsService.findTeamByName(t.code());
+                            PlatformTeam platformTeam = platformTeamsService.findTeamByCode(t.code());
                             if (platformTeam != null) {
                                 return new Team(
                                         t.label(), t.code(), ImmutableList.of(TeamType.TENANT, TeamType.ESCALATION));
@@ -73,7 +73,7 @@ public class TeamService {
             return leadershipTeam;
         }
 
-        PlatformTeam platformTeam = platformTeamsService.findTeamByName(code);
+        PlatformTeam platformTeam = platformTeamsService.findTeamByCode(code);
         if (platformTeam != null) {
             return mapPlatformTeam(platformTeam);
         }
@@ -107,13 +107,14 @@ public class TeamService {
     }
 
     @NonNull private Team mapPlatformTeam(PlatformTeam t) {
-        EscalationTeam escalationTeam = escalationTeamsRegistry.findEscalationTeamByCode(t.name());
+        EscalationTeam escalationTeam = escalationTeamsRegistry.findEscalationTeamByCode(t.code());
         if (escalationTeam != null) {
             return new Team(
                     escalationTeam.label(),
                     escalationTeam.code(),
                     ImmutableList.of(TeamType.TENANT, TeamType.ESCALATION));
         }
-        return new Team(t.name(), t.name(), ImmutableList.of(TeamType.TENANT));
+        // Display uses name; identity uses code (defaults to name for scraped teams) — PT-518.
+        return new Team(t.name(), t.code(), ImmutableList.of(TeamType.TENANT));
     }
 }

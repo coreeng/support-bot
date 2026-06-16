@@ -62,7 +62,7 @@ public class TicketUpdateService {
             return ValidationResult.invalid("authorsTeam is required");
         }
         boolean isNotATenant = TicketTeam.NOT_A_TENANT_CODE.equals(request.authorsTeam());
-        PlatformTeam team = platformTeamsService.findTeamByName(request.authorsTeam());
+        PlatformTeam team = platformTeamsService.findTeamByCode(request.authorsTeam());
         if (!isNotATenant && team == null) {
             return ValidationResult.invalid("authorsTeam must be a valid team code");
         }

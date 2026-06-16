@@ -46,7 +46,7 @@ class PlatformTeamsServiceTest {
         service.init();
 
         assertEquals(1, service.listTeams().size());
-        var team = service.findTeamByName("wow");
+        var team = service.findTeamByCode("wow");
         assertNotNull(team);
         assertTrue(team.groupRefs().contains(ref("wow-group")));
         assertEquals(1, team.users().size());
@@ -82,8 +82,8 @@ class PlatformTeamsServiceTest {
 
         assertEquals(1, usersFetcher.getCallCount("shared"));
 
-        var teamA = service.findTeamByName("A");
-        var teamB = service.findTeamByName("B");
+        var teamA = service.findTeamByCode("A");
+        var teamB = service.findTeamByCode("B");
         assertNotNull(teamA);
         assertNotNull(teamB);
         assertEquals(2, teamA.users().size());
@@ -111,7 +111,7 @@ class PlatformTeamsServiceTest {
 
         service.init();
 
-        var t1 = service.findTeamByName("T1");
+        var t1 = service.findTeamByCode("T1");
         assertNotNull(t1);
         assertEquals(2, t1.users().size());
         assertEquals(1, service.listTeamsByUserEmail("a@test.com").size());
@@ -155,7 +155,7 @@ class PlatformTeamsServiceTest {
 
         // Verify that the service initialized correctly with the known team
         assertEquals(1, service.listTeams().size());
-        var team = service.findTeamByName("wow");
+        var team = service.findTeamByCode("wow");
         assertNotNull(team);
         assertEquals("wow", team.name());
         assertEquals(1, team.users().size());
@@ -210,7 +210,7 @@ class PlatformTeamsServiceTest {
         service.init();
 
         assertEquals(1, usersFetcher.getCallCount("G"));
-        var t = service.findTeamByName("T");
+        var t = service.findTeamByCode("T");
         assertNotNull(t);
         assertEquals(1, t.groupRefs().size());
         assertTrue(t.groupRefs().contains(ref("G")));
@@ -246,12 +246,12 @@ class PlatformTeamsServiceTest {
         assertEquals(2, service.listTeams().size());
 
         // TeamA with working group should have its users
-        var teamA = service.findTeamByName("TeamA");
+        var teamA = service.findTeamByCode("TeamA");
         assertNotNull(teamA);
         assertEquals(2, teamA.users().size());
 
         // TeamB with failing group should have zero users
-        var teamB = service.findTeamByName("TeamB");
+        var teamB = service.findTeamByCode("TeamB");
         assertNotNull(teamB);
         assertEquals(0, teamB.users().size());
 
@@ -284,11 +284,11 @@ class PlatformTeamsServiceTest {
         // Teams should exist but with no users
         assertEquals(2, service.listTeams().size());
 
-        var teamA = service.findTeamByName("TeamA");
+        var teamA = service.findTeamByCode("TeamA");
         assertNotNull(teamA);
         assertEquals(0, teamA.users().size());
 
-        var teamB = service.findTeamByName("TeamB");
+        var teamB = service.findTeamByCode("TeamB");
         assertNotNull(teamB);
         assertEquals(0, teamB.users().size());
 
