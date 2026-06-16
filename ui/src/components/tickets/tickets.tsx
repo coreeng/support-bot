@@ -534,7 +534,20 @@ export default function TicketsPage() {
                           {t.summary?.trim() ? t.summary : "—"}
                         </div>
                       </TableCell>
-                      <TableCell>{t.team?.name || "-"}</TableCell>
+                      <TableCell>
+                        {t.team ? (
+                          <span className="inline-flex items-center gap-1">
+                            {t.team.name || "-"}
+                            {t.team.active === false && (
+                              <Badge variant="secondary" className="text-[10px]">
+                                Retired
+                              </Badge>
+                            )}
+                          </span>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
                       <TableCell>
                         {(() => {
                           if (!t.impact) return "-";
