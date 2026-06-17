@@ -229,7 +229,10 @@ export default function KnowledgeGapsPage() {
     }
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (!settingsContainerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Element;
+      const insidePanel = settingsContainerRef.current?.contains(target);
+      const insidePortal = !!target.closest?.('[data-radix-popper-content-wrapper]');
+      if (!insidePanel && !insidePortal) {
         restoreFocusOnCloseRef.current = true;
         setIsSettingsOpen(false);
       }
