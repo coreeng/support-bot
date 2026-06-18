@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       openedAt: e.openedAt,
       resolvedAt: e.resolvedAt,
       escalatingTeam: e.escalatingTeam,
-      team: team ? { name: team.code || team.label || "" } : null,
+      team: team ? { name: team.code || team.label || "", label: team.label || team.code || "" } : null,
       tags: e.tags ?? [],
       impact: e.impact ?? null,
     };

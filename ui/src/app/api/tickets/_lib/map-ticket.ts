@@ -13,12 +13,14 @@ export function mapTicket(ticket: Record<string, unknown>) {
     ...ticket,
     summary: (ticket.summary as string) ?? null,
     id: String(ticket.id),
-    team: team ? { name: team.code || team.label || "", active: team.active } : null,
+    team: team ? { name: team.code || team.label || "", label: team.label || team.code || "", active: team.active } : null,
     escalations:
       escalations?.map((esc) => ({
         ...esc,
         id: String(esc.id),
-        team: esc.team ? { name: esc.team.code || esc.team.label || "", active: esc.team.active } : null,
+        team: esc.team
+          ? { name: esc.team.code || esc.team.label || "", label: esc.team.label || esc.team.code || "", active: esc.team.active }
+          : null,
       })) ?? [],
   };
 }

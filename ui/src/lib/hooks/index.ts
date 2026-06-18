@@ -204,6 +204,7 @@ export function useEscalationTeams(enabled: boolean = true) {
 
 export interface Team {
   name: string;
+  label?: string;
 }
 
 export function useTenantTeams() {

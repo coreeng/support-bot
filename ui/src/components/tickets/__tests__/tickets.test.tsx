@@ -577,6 +577,21 @@ describe("Tickets Component", () => {
 
       expect(screen.getByRole("table")).toBeInTheDocument();
     });
+
+    it("displays the team's display name (label) rather than its code", () => {
+      const ticket = { ...createMockTicket("1", "opened", "pe", "high"), team: { name: "pe", label: "PE Core" } };
+
+      mockUseTickets.mockReturnValue({
+        data: getMockPaginatedTickets([ticket]),
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useTickets>);
+
+      render(<Tickets />, { wrapper: Wrapper });
+
+      // The friendly display name is shown; the immutable code is kept only for filtering/identity.
+      expect(screen.getAllByText("PE Core").length).toBeGreaterThan(0);
+    });
   });
 
   describe("Impact Display", () => {

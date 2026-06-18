@@ -167,16 +167,24 @@ export default function TicketsPage() {
   const ticketsContent = useMemo(() => (ticketsDataTyped?.content as TicketWithLogs[] | undefined) ?? [], [ticketsDataTyped]);
 
   const teamOptions = useMemo(() => {
-    const fromData = ticketsContent.map((t: TicketWithLogs) => t.team?.name).filter((name): name is string => !!name);
-    const fromRegistry = teamsData?.map((t: { name: string }) => t.name).filter(Boolean) ?? [];
-    return Array.from(new Set([...fromData, ...fromRegistry])).sort();
+    const byCode = new Map<string, string>();
+    ticketsContent.forEach((t: TicketWithLogs) => {
+      if (t.team?.name) byCode.set(t.team.name, t.team.label || t.team.name);
+    });
+    (teamsData ?? []).forEach((t: { name: string; label?: string }) => {
+      if (t.name) byCode.set(t.name, t.label || t.name);
+    });
+    return Array.from(byCode, ([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
   }, [ticketsContent, teamsData]);
 
   const escalatedToOptions = useMemo(() => {
-    const escalationTeams = ticketsContent.flatMap((t: TicketWithLogs) =>
-      (t.escalations ?? []).map((e) => e.team?.name).filter((name): name is string => !!name)
+    const byCode = new Map<string, string>();
+    ticketsContent.forEach((t: TicketWithLogs) =>
+      (t.escalations ?? []).forEach((e) => {
+        if (e.team?.name) byCode.set(e.team.name, e.team.label || e.team.name);
+      })
     );
-    return Array.from(new Set(escalationTeams)).sort();
+    return Array.from(byCode, ([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
   }, [ticketsContent]);
 
   // --- Filter tickets based on superuser/team + UI filters ---
@@ -375,10 +383,7 @@ export default function TicketsPage() {
             title="Team"
             value={teamFilter || undefined}
             onChange={(v) => setParams({ teamFilter: v ?? "" })}
-            options={[
-              ...(!isViewingAllTeams ? [{ label: "All Teams", value: ALL_TEAMS_FILTER }] : []),
-              ...teamOptions.map((name: string) => ({ label: name, value: name })),
-            ]}
+            options={[...(!isViewingAllTeams ? [{ label: "All Teams", value: ALL_TEAMS_FILTER }] : []), ...teamOptions]}
           />
         )}
         <SingleSelectFilter
@@ -417,7 +422,7 @@ export default function TicketsPage() {
           title="Escalated To"
           value={escalatedToFilter || undefined}
           onChange={(v) => setParams({ escalatedTo: v ?? "" })}
-          options={escalatedToOptions.map((name: string) => ({ label: name, value: name }))}
+          options={escalatedToOptions}
         />
       </div>
 
@@ -501,7 +506,7 @@ export default function TicketsPage() {
                 paginatedTickets.map((t: TicketWithLogs) => {
                   const { opened, closed } = getOpenedClosed(t);
                   const escalatedTo = Array.from(
-                    new Set((t.escalations ?? []).map((e) => e.team?.name).filter((name): name is string => !!name))
+                    new Set((t.escalations ?? []).map((e) => e.team?.label || e.team?.name).filter((name): name is string => !!name))
                   );
                   return (
                     <TableRow
@@ -537,7 +542,7 @@ export default function TicketsPage() {
                       <TableCell>
                         {t.team ? (
                           <span className="inline-flex items-center gap-1">
-                            {t.team.name || "-"}
+                            {t.team.label || t.team.name || "-"}
                             {t.team.active === false && (
                               <Badge variant="secondary" className="text-[10px]">
                                 Retired
