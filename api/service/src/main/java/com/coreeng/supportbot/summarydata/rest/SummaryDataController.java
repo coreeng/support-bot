@@ -81,14 +81,16 @@ public class SummaryDataController {
         try (var byteArrayOutputStream = new java.io.ByteArrayOutputStream();
                 var zip = new java.util.zip.ZipOutputStream(byteArrayOutputStream)) {
 
-            // Add each thread as a separate file in the zip. Guard against duplicate entry names so a
-            // single collision can never abort the whole export with a ZipException.
-            Set<String> seenFileNames = new HashSet<>();
+            // Add each thread as a separate file in the zip. Genuine duplicates within a single
+            // channel (a thread_ts repeated by a reply_broadcast or a page boundary) are already
+            // deduped at the source in ThreadService. The remaining collisions are cross-channel:
+            // two genuinely different threads in different channels can share a thread_ts, so
+            // disambiguate the name instead of dropping one and silently losing data.
+            Set<String> usedNames = new HashSet<>();
             for (ThreadService.ThreadData thread : threads) {
                 String fileName = thread.threadTs() + ".txt";
-                if (!seenFileNames.add(fileName)) {
-                    log.warn("Skipping duplicate thread entry in export: {}", fileName);
-                    continue;
+                for (int dup = 2; !usedNames.add(fileName); dup++) {
+                    fileName = thread.threadTs() + "-" + dup + ".txt";
                 }
                 log.debug("Adding thread to zip: {}", fileName);
 

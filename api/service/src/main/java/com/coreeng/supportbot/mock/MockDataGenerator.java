@@ -138,21 +138,22 @@ public class MockDataGenerator implements ApplicationRunner {
         return Math.clamp(round(random.nextGaussian(AVG_TICKETS_PER_DAY, STD_TICKETS_PER_DAY)), 0, MAX_TICKETS_PER_DAY);
     }
 
-    /** Mock data is seeded into the first monitored channel. */
-    private String mockChannelId() {
-        return channelRegistry.monitoredChannelIds().getFirst();
+    /** Picks a monitored channel at random so mock data is spread across every configured channel. */
+    private String mockChannelId(Random random) {
+        ImmutableList<String> channelIds = channelRegistry.monitoredChannelIds();
+        return channelIds.get(random.nextInt(channelIds.size()));
     }
 
     private void generateQuery(Random random, LocalDate date) {
         MessageTs queryTs = generateMessageTsAt(random, date);
-        ticketRepository.createQueryIfNotExists(new MessageRef(queryTs, mockChannelId()));
+        ticketRepository.createQueryIfNotExists(new MessageRef(queryTs, mockChannelId(random)));
     }
 
     private Ticket generateCreatedTicket(Random random, LocalDate date) {
         MessageTs queryTs = generateMessageTsAt(random, date);
         MessageTs createdMessageTs = generateMessageTsAfter(
                 random, queryTs.getDate(), AVG_QUERY_RESPONSE_TIME_SECS, STD_QUERY_RESPONSE_TIME_SECS);
-        return ticketRepository.createTicketIfNotExists(Ticket.createNew(queryTs, mockChannelId()).toBuilder()
+        return ticketRepository.createTicketIfNotExists(Ticket.createNew(queryTs, mockChannelId(random)).toBuilder()
                 .createdMessageTs(createdMessageTs)
                 .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, createdMessageTs.getDate())))
                 .build());

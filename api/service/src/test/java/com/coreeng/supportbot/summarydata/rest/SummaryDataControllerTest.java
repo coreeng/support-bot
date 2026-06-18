@@ -137,6 +137,46 @@ class SummaryDataControllerTest {
     }
 
     @Test
+    void export_shouldKeepBothThreadsWhenTimestampsCollideAcrossChannels() throws IOException {
+        // given two channels that each surface a thread with the SAME threadTs (ts is unique only
+        // within a channel, so a cross-channel collision is possible)
+        SlackChannelRegistry multiChannel = new SlackChannelRegistry(new SlackTicketsProps(
+                null,
+                List.of(
+                        new SlackChannelProps("a", "C-a", SlackChannelProps.TrackMode.BOTH),
+                        new SlackChannelProps("b", "C-b", SlackChannelProps.TrackMode.BOTH)),
+                "eyes",
+                "eyes",
+                "white_check_mark",
+                "sos"));
+        SummaryDataController multiController = new SummaryDataController(
+                threadService, multiChannel, analysisProps, analysisResultsService, objectMapper);
+
+        when(threadService.getThreadsWithCheckMarkAsText("C-a", 31))
+                .thenReturn(ImmutableList.of(new ThreadService.ThreadData("1700000000.000001", "from A")));
+        when(threadService.getThreadsWithCheckMarkAsText("C-b", 31))
+                .thenReturn(ImmutableList.of(new ThreadService.ThreadData("1700000000.000001", "from B")));
+
+        // when
+        ResponseEntity<byte[]> response = multiController.exportSummaryData(31);
+
+        // then — both threads are exported under disambiguated names; neither is dropped
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<String> fileNames = new ArrayList<>();
+        List<String> fileContents = new ArrayList<>();
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(response.getBody()))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                fileNames.add(entry.getName());
+                fileContents.add(new String(zis.readAllBytes(), StandardCharsets.UTF_8));
+                zis.closeEntry();
+            }
+        }
+        assertThat(fileNames).containsExactlyInAnyOrder("1700000000.000001.txt", "1700000000.000001-2.txt");
+        assertThat(fileContents).containsExactlyInAnyOrder("from A", "from B");
+    }
+
+    @Test
     void export_shouldReturnBadRequest_whenDaysExceedsMax() {
         // when
         ResponseEntity<byte[]> response = controller.exportSummaryData(366);
@@ -184,9 +224,12 @@ class SummaryDataControllerTest {
     }
 
     @Test
-    void export_shouldSkipDuplicateEntries_withoutFailing() throws IOException {
-        // given - two threads resolve to the same file name (e.g. a reply_broadcast sharing the parent thread_ts).
-        // A single duplicate previously aborted the whole export with a ZipException.
+    void export_shouldDisambiguateDuplicateFileNames_withoutFailing() throws IOException {
+        // given - two threads resolve to the same file name. A single duplicate previously aborted
+        // the whole export with a ZipException. Genuine within-channel duplicates (a reply_broadcast
+        // sharing the parent thread_ts) are now deduped at the source in ThreadService, so a name
+        // collision reaching the controller is a cross-channel one; disambiguate it rather than drop
+        // a thread, while still never aborting the export.
         var threads = ImmutableList.of(
                 new ThreadService.ThreadData("1700000000.000001", "First content"),
                 new ThreadService.ThreadData("1700000000.000001", "Duplicate content"),
@@ -196,7 +239,7 @@ class SummaryDataControllerTest {
         // when
         ResponseEntity<byte[]> response = controller.exportSummaryData(31);
 
-        // then - export succeeds and the duplicate name is written exactly once
+        // then - export succeeds and the colliding name is disambiguated so no thread is dropped
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         List<String> fileNames = new ArrayList<>();
@@ -210,8 +253,9 @@ class SummaryDataControllerTest {
             }
         }
 
-        assertThat(fileNames).containsExactly("1700000000.000001.txt", "1700000000.000002.txt");
-        assertThat(fileContents).containsExactly("First content", "Second content");
+        assertThat(fileNames)
+                .containsExactly("1700000000.000001.txt", "1700000000.000001-2.txt", "1700000000.000002.txt");
+        assertThat(fileContents).containsExactly("First content", "Duplicate content", "Second content");
     }
 
     // --- Import tests ---

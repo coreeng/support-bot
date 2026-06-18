@@ -20,6 +20,11 @@ import org.springframework.stereotype.Component;
  *   <li>Otherwise, for backward compatibility, the legacy single {@code slack.ticket.channel-id} is
  *       synthesized into one channel tracking {@link TrackMode#BOTH}.
  * </ul>
+ *
+ * <p>Slack event handlers must gate on this registry so each channel's {@link TrackMode} is honoured:
+ * call {@link #isMonitored} to decide whether to handle an event at all, and {@link
+ * #shouldTrackQueries}/{@link #shouldTrackPrs} for the normal-query vs PR-link behaviour in the
+ * event's channel. A handler that skips these checks will silently ignore per-channel track modes.
  */
 @Component
 @Slf4j
