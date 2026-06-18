@@ -3,6 +3,7 @@
 import EditTicketModal from "@/components/tickets/EditTicketModal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { apiFetch, useAnalysis } from "@/lib/hooks";
@@ -45,13 +46,8 @@ export default function KnowledgeGapsPage() {
   const isCompletedRef = useRef(false);
   const [isAnalysisEnabled, setIsAnalysisEnabled] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const settingsContainerRef = useRef<HTMLDivElement>(null);
-  const settingsTriggerRef = useRef<HTMLButtonElement>(null);
-  const restoreFocusOnCloseRef = useRef(false);
-  const wasSettingsOpenRef = useRef(false);
   const settingsTitleId = useId();
   const settingsDescriptionId = useId();
-  const settingsPanelId = "analysis-settings-popover";
 
   const formatQueryTimestamp = (timestamp: string): string => {
     const parsed = new Date(timestamp);
@@ -77,7 +73,6 @@ export default function KnowledgeGapsPage() {
   };
 
   const closeSettingsAndRun = (action: () => void) => {
-    restoreFocusOnCloseRef.current = false;
     setIsSettingsOpen(false);
     action();
   };
@@ -213,43 +208,6 @@ export default function KnowledgeGapsPage() {
     // startPolling and stopPolling are stable functions that don't need to be in deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analysisStatus?.running]);
-
-  useEffect(() => {
-    if (!isSettingsOpen && wasSettingsOpenRef.current && restoreFocusOnCloseRef.current) {
-      settingsTriggerRef.current?.focus();
-      restoreFocusOnCloseRef.current = false;
-    }
-
-    wasSettingsOpenRef.current = isSettingsOpen;
-  }, [isSettingsOpen]);
-
-  useEffect(() => {
-    if (!isSettingsOpen) {
-      return;
-    }
-
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!settingsContainerRef.current?.contains(event.target as Node)) {
-        restoreFocusOnCloseRef.current = true;
-        setIsSettingsOpen(false);
-      }
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        restoreFocusOnCloseRef.current = true;
-        setIsSettingsOpen(false);
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isSettingsOpen]);
 
   const handleStartAnalysis = async () => {
     closeSettingsAndRun(() => setIsStartingAnalysis(true));
@@ -560,104 +518,95 @@ export default function KnowledgeGapsPage() {
           <p className="text-muted-foreground text-sm">Overview of support areas and knowledge gaps requiring attention</p>
         </div>
         {isSupportEngineer && (
-          <div ref={settingsContainerRef} className="relative">
+          <Popover open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
             {!isAnalysisEnabled && <input ref={fileInputRef} type="file" accept=".jsonl" onChange={handleFileChange} className="hidden" />}
-            <button
-              ref={settingsTriggerRef}
-              type="button"
-              onClick={() => {
-                restoreFocusOnCloseRef.current = false;
-                setIsSettingsOpen((current) => !current);
-              }}
-              disabled={isAnalysisEnabled && (analysisStatus?.running || isStartingAnalysis || showCompletedStatus)}
-              aria-haspopup="dialog"
-              aria-expanded={isSettingsOpen}
-              aria-controls={settingsPanelId}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-4 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Play className="h-4 w-4" />
-              {isAnalysisEnabled && isStartingAnalysis ? "Checking..." : "Run Analysis"}
-            </button>
-            {isSettingsOpen && (
-              <div
-                id={settingsPanelId}
-                role="dialog"
-                aria-modal="false"
-                aria-labelledby={settingsTitleId}
-                aria-describedby={settingsDescriptionId}
-                className="bg-popover text-popover-foreground animate-in fade-in slide-in-from-top-1 absolute right-0 z-10 mt-2 w-72 rounded-md border p-4 shadow-md duration-[200ms]"
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                disabled={isAnalysisEnabled && (analysisStatus?.running || isStartingAnalysis || showCompletedStatus)}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-4 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <div className="space-y-4">
-                  <div>
-                    <h2 id={settingsTitleId} className="text-foreground text-sm font-semibold">
-                      Analysis settings
-                    </h2>
-                    <p id={settingsDescriptionId} className="text-muted-foreground mt-1 text-xs">
-                      Choose how far back to pull queries for this run.
-                    </p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="query-window" className="text-foreground text-sm font-medium">
-                      Query window
-                    </Label>
-                    <Select value={String(selectedDays)} onValueChange={(v) => setSelectedDays(Number(v))}>
-                      <SelectTrigger id="query-window" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="7">Week</SelectItem>
-                        <SelectItem value="31">Month</SelectItem>
-                        <SelectItem value="92">Quarter</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {isAnalysisEnabled ? (
-                    <Button
-                      type="button"
-                      onClick={handleStartAnalysis}
-                      disabled={analysisStatus?.running || isStartingAnalysis || showCompletedStatus}
-                      className="w-full"
-                    >
-                      <Play className="h-4 w-4" />
-                      {isStartingAnalysis ? "Checking..." : "Run Analysis"}
-                    </Button>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        variant="outline"
-                        type="button"
-                        onClick={() => closeSettingsAndRun(handleExportDownload)}
-                        disabled={isDownloading}
-                        className="w-full justify-start"
-                      >
-                        <Download className="h-4 w-4" />
-                        {isDownloading ? "Downloading..." : "Export"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        type="button"
-                        onClick={() => closeSettingsAndRun(handleAnalysisBundleDownload)}
-                        className="w-full justify-start"
-                      >
-                        <FileText className="h-4 w-4" />
-                        Analysis Bundle
-                      </Button>
-                      <Button
-                        variant="outline"
-                        type="button"
-                        onClick={() => closeSettingsAndRun(handleImportClick)}
-                        disabled={isUploading}
-                        className="w-full justify-start"
-                      >
-                        <Upload className="h-4 w-4" />
-                        {isUploading ? "Uploading..." : "Import"}
-                      </Button>
-                    </div>
-                  )}
+                <Play className="h-4 w-4" />
+                {isAnalysisEnabled && isStartingAnalysis ? "Checking..." : "Run Analysis"}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              role="dialog"
+              aria-labelledby={settingsTitleId}
+              aria-describedby={settingsDescriptionId}
+              className="w-72"
+            >
+              <div className="space-y-4">
+                <div>
+                  <h2 id={settingsTitleId} className="text-foreground text-sm font-semibold">
+                    Analysis settings
+                  </h2>
+                  <p id={settingsDescriptionId} className="text-muted-foreground mt-1 text-xs">
+                    Choose how far back to pull queries for this run.
+                  </p>
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="query-window" className="text-foreground text-sm font-medium">
+                    Query window
+                  </Label>
+                  <Select value={String(selectedDays)} onValueChange={(v) => setSelectedDays(Number(v))}>
+                    <SelectTrigger id="query-window" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7">Week</SelectItem>
+                      <SelectItem value="31">Month</SelectItem>
+                      <SelectItem value="92">Quarter</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {isAnalysisEnabled ? (
+                  <Button
+                    type="button"
+                    onClick={handleStartAnalysis}
+                    disabled={analysisStatus?.running || isStartingAnalysis || showCompletedStatus}
+                    className="w-full"
+                  >
+                    <Play className="h-4 w-4" />
+                    {isStartingAnalysis ? "Checking..." : "Run Analysis"}
+                  </Button>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() => closeSettingsAndRun(handleExportDownload)}
+                      disabled={isDownloading}
+                      className="w-full justify-start"
+                    >
+                      <Download className="h-4 w-4" />
+                      {isDownloading ? "Downloading..." : "Export"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() => closeSettingsAndRun(handleAnalysisBundleDownload)}
+                      className="w-full justify-start"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Analysis Bundle
+                    </Button>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() => closeSettingsAndRun(handleImportClick)}
+                      disabled={isUploading}
+                      className="w-full justify-start"
+                    >
+                      <Upload className="h-4 w-4" />
+                      {isUploading ? "Uploading..." : "Import"}
+                    </Button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </PopoverContent>
+          </Popover>
         )}
       </div>
 
