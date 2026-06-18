@@ -160,7 +160,7 @@ public class HomepageViewMapper {
     private String viewDescriptionMessage(HomepageView homepage) {
         ImmutableList<String> channelIds = homepage.channelIds();
         String mentions =
-                channelIds.stream().map(id -> "<#" + id + ">").collect(java.util.stream.Collectors.joining(", "));
+                join(", ", channelIds.stream().map(id -> "<#" + id + ">").toList());
         String channelWord = channelIds.size() == 1 ? "channel" : "channels";
         return "Handle all queries, including their escalations. "
                 + "The bot is designed to assist support engineers in managing and escalating support queries within the "

@@ -75,10 +75,11 @@ public class TicketProcessingService {
                     && prDetectionService.isPresent()
                     && prDetectionService.get().containsPrLinks(e.message());
 
-            // In a PRS-only channel the normal query flow is suppressed: a message only becomes a
-            // query/ticket when it actually carries a PR link. Channels that track queries (QUERIES
-            // or BOTH) always create the query.
-            if (!channelRegistry.shouldTrackQueries(channelId) && !hasPrLink) {
+            // A message becomes a query/ticket when the channel tracks normal queries (QUERIES or
+            // BOTH), or when it carries a PR link. In a PRS-only channel the normal query flow is
+            // suppressed, so a plain message with no PR link is ignored.
+            boolean shouldCreateQuery = channelRegistry.shouldTrackQueries(channelId) || hasPrLink;
+            if (!shouldCreateQuery) {
                 return;
             }
 

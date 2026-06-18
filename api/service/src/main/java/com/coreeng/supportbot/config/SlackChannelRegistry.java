@@ -5,8 +5,6 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import com.coreeng.supportbot.config.SlackChannelProps.TrackMode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -48,15 +46,13 @@ public class SlackChannelRegistry {
             channels = ImmutableList.of();
         }
 
-        // Keep insertion order (LinkedHashMap) so monitoredChannelIds() and logs are deterministic.
-        Map<String, SlackChannelProps> map = new LinkedHashMap<>();
+        // buildOrThrow() preserves insertion order and rejects duplicate channel ids (naming the
+        // offending id), so monitoredChannelIds() and logs stay deterministic.
+        ImmutableMap.Builder<String, SlackChannelProps> byId = ImmutableMap.builder();
         for (SlackChannelProps channel : channels) {
-            if (map.putIfAbsent(channel.id(), channel) != null) {
-                throw new IllegalArgumentException(
-                        "slack.ticket.channels contains a duplicate channel id: " + channel.id());
-            }
+            byId.put(channel.id(), channel);
         }
-        return ImmutableMap.copyOf(map);
+        return byId.buildOrThrow();
     }
 
     /** Channel IDs of every monitored channel, in configuration order. */
