@@ -521,14 +521,10 @@ export default function KnowledgeGapsPage() {
           <Popover open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
             {!isAnalysisEnabled && <input ref={fileInputRef} type="file" accept=".jsonl" onChange={handleFileChange} className="hidden" />}
             <PopoverTrigger asChild>
-              <button
-                type="button"
-                disabled={isAnalysisEnabled && (analysisStatus?.running || isStartingAnalysis || showCompletedStatus)}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-4 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-              >
+              <Button type="button" disabled={isAnalysisEnabled && (analysisStatus?.running || isStartingAnalysis || showCompletedStatus)}>
                 <Play className="h-4 w-4" />
                 {isAnalysisEnabled && isStartingAnalysis ? "Checking..." : "Run Analysis"}
-              </button>
+              </Button>
             </PopoverTrigger>
             <PopoverContent
               align="end"
