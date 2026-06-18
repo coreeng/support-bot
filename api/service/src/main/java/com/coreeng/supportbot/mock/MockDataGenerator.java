@@ -5,7 +5,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.lang.Math.max;
 import static java.lang.Math.round;
 
-import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
@@ -74,7 +74,7 @@ public class MockDataGenerator implements ApplicationRunner {
     private static final double STD_ESCALATION_RESOLUTION_TIME = 2 * 60;
     private static final double CLOSED_TICKET_IS_ESCALATED_CHANCE = 33.0;
 
-    private final SlackTicketsProps ticketsProps;
+    private final SlackChannelRegistry channelRegistry;
     private final TicketRepository ticketRepository;
     private final EscalationRepository escalationRepository;
 
@@ -133,16 +133,21 @@ public class MockDataGenerator implements ApplicationRunner {
         return Math.clamp(round(random.nextGaussian(AVG_TICKETS_PER_DAY, STD_TICKETS_PER_DAY)), 0, MAX_TICKETS_PER_DAY);
     }
 
+    /** Mock data is seeded into the first monitored channel. */
+    private String mockChannelId() {
+        return channelRegistry.monitoredChannelIds().getFirst();
+    }
+
     private void generateQuery(Random random, LocalDate date) {
         MessageTs queryTs = generateMessageTsAt(random, date);
-        ticketRepository.createQueryIfNotExists(new MessageRef(queryTs, ticketsProps.channelId()));
+        ticketRepository.createQueryIfNotExists(new MessageRef(queryTs, mockChannelId()));
     }
 
     private Ticket generateCreatedTicket(Random random, LocalDate date) {
         MessageTs queryTs = generateMessageTsAt(random, date);
         MessageTs createdMessageTs = generateMessageTsAfter(
                 random, queryTs.getDate(), AVG_QUERY_RESPONSE_TIME_SECS, STD_QUERY_RESPONSE_TIME_SECS);
-        return ticketRepository.createTicketIfNotExists(Ticket.createNew(queryTs, ticketsProps.channelId()).toBuilder()
+        return ticketRepository.createTicketIfNotExists(Ticket.createNew(queryTs, mockChannelId()).toBuilder()
                 .createdMessageTs(createdMessageTs)
                 .statusLog(ImmutableList.of(new Ticket.StatusLog(TicketStatus.opened, createdMessageTs.getDate())))
                 .build());

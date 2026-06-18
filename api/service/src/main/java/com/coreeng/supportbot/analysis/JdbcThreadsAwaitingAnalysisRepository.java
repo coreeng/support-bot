@@ -1,6 +1,10 @@
 package com.coreeng.supportbot.analysis;
 
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.DSLContext;
@@ -32,24 +36,38 @@ public class JdbcThreadsAwaitingAnalysisRepository implements ThreadsAwaitingAna
      */
     @Override
     @Transactional(readOnly = true)
-    public ImmutableList<ThreadToAnalyze> findThreadsAwaitingAnalysis(int days, String promptId, String channelId) {
-        log.info("Finding threads awaiting analysis: channelId={}, days={}, promptId={}", channelId, days, promptId);
+    public ImmutableList<ThreadToAnalyze> findThreadsAwaitingAnalysis(
+            int days, String promptId, Collection<String> channelIds) {
+        log.info("Finding threads awaiting analysis: channelIds={}, days={}, promptId={}", channelIds, days, promptId);
 
+        if (channelIds.isEmpty()) {
+            return ImmutableList.of();
+        }
+
+        String channelPlaceholders = channelIds.stream().map(c -> "?").collect(Collectors.joining(", "));
         String sql = """
             SELECT DISTINCT
                 t.id as ticket_id,
-                q.ts as thread_ts
+                q.ts as thread_ts,
+                q.channel_id as channel_id
             FROM query q
                 JOIN ticket t ON t.query_id = q.id
             WHERE t.status = 'closed'
-              AND q.channel_id = ?
+              AND q.channel_id IN (%s)
               AND t.last_interacted_at > NOW()::date - (? * INTERVAL '1 days')
               AND NOT EXISTS (SELECT 1 FROM analysis WHERE ticket_id = t.id AND prompt_id = ?)
-            """;
+            """.formatted(channelPlaceholders);
+
+        List<Object> binds = new ArrayList<>(channelIds);
+        binds.add(days);
+        binds.add(promptId);
 
         ImmutableList<ThreadToAnalyze> threads = dsl
-                .resultQuery(sql, channelId, days, promptId)
-                .fetch(r -> new ThreadToAnalyze(r.get("ticket_id", Long.class), r.get("thread_ts", String.class)))
+                .resultQuery(sql, binds.toArray())
+                .fetch(r -> new ThreadToAnalyze(
+                        r.get("ticket_id", Long.class),
+                        r.get("thread_ts", String.class),
+                        r.get("channel_id", String.class)))
                 .stream()
                 .collect(ImmutableList.toImmutableList());
 

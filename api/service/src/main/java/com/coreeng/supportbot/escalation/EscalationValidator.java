@@ -1,10 +1,9 @@
 package com.coreeng.supportbot.escalation;
 
-import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.slack.MessageRef;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -14,7 +13,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 public class EscalationValidator {
-    private final SlackTicketsProps slackTicketsProps;
+    private final SlackChannelRegistry channelRegistry;
     private final SlackClient slackClient;
     private final EscalationQueryService queryService;
 
@@ -24,7 +23,7 @@ public class EscalationValidator {
         }
 
         MessageRef threadRef = MessageRef.fromPermalink(threadPermalink);
-        if (!Objects.equals(slackTicketsProps.channelId(), threadRef.channelId())) {
+        if (!channelRegistry.isMonitored(threadRef.channelId())) {
             return "Link leads to the wrong channel. Channel for escalations is expected.";
         }
         if (threadRef.isReply()) {

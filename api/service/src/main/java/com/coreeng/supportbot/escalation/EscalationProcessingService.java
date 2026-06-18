@@ -2,7 +2,6 @@ package com.coreeng.supportbot.escalation;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.slack.MessageTs;
@@ -25,7 +24,6 @@ public class EscalationProcessingService {
     private final EscalationCreatedMessageMapper createdMessageMapper;
     private final SlackClient slackClient;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
-    private final SlackTicketsProps slackTicketsProps;
 
     @Nullable public Escalation createEscalation(CreateEscalationRequest request) {
         TicketId ticketId = checkNotNull(request.ticket().id());
@@ -51,9 +49,12 @@ public class EscalationProcessingService {
                     .log("Escalation references an unresolved team; created without posting a team mention");
             return escalation;
         }
+        // Post the escalation notice back to the ticket's own channel — with multiple monitored
+        // channels the ticket may not live in the legacy primary channel, and the queryTs only
+        // resolves within its source channel.
         ChatPostMessageResponse messagePostResponse = slackClient.postMessage(new SlackPostMessageRequest(
                 createdMessageMapper.renderMessage(new EscalationCreatedMessage(escalation.id(), team)),
-                slackTicketsProps.channelId(),
+                request.ticket().channelId(),
                 request.ticket().queryTs()));
 
         escalation = escalation.toBuilder()

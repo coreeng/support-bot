@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,14 +43,15 @@ class SummaryDataControllerTest {
     @Mock
     private AnalysisResultsService analysisResultsService;
 
-    private SlackTicketsProps slackTicketsProps;
+    private SlackChannelRegistry channelRegistry;
     private AnalysisProps analysisProps;
     private ObjectMapper objectMapper;
     private SummaryDataController controller;
 
     @BeforeEach
     void setUp() {
-        slackTicketsProps = new SlackTicketsProps("C123", "eyes", "eyes", "white_check_mark", "sos");
+        channelRegistry = new SlackChannelRegistry(
+                new SlackTicketsProps("C123", List.of(), "eyes", "eyes", "white_check_mark", "sos"));
         AnalysisProps.Vertex vertex =
                 new AnalysisProps.Vertex("test-project", "europe-west2", "gemini-2.5-flash", Duration.ofMillis(100));
         AnalysisProps.Bundle bundle = new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip");
@@ -57,7 +59,7 @@ class SummaryDataControllerTest {
         analysisProps = new AnalysisProps(vertex, bundle, prompt);
         objectMapper = new ObjectMapper();
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+                threadService, channelRegistry, analysisProps, analysisResultsService, objectMapper);
     }
 
     // --- Export tests ---
@@ -294,7 +296,7 @@ class SummaryDataControllerTest {
                 new AnalysisProps.Bundle("classpath:nonexistent.zip"),
                 new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+                threadService, channelRegistry, analysisProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
@@ -315,7 +317,7 @@ class SummaryDataControllerTest {
                 new AnalysisProps.Bundle(tempDir.toString()),
                 new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+                threadService, channelRegistry, analysisProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
@@ -352,7 +354,7 @@ class SummaryDataControllerTest {
                 new AnalysisProps.Bundle(tempDir.toString()),
                 new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+                threadService, channelRegistry, analysisProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
@@ -381,7 +383,7 @@ class SummaryDataControllerTest {
                 new AnalysisProps.Bundle(tempDir.toString()),
                 new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+                threadService, channelRegistry, analysisProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
@@ -411,7 +413,7 @@ class SummaryDataControllerTest {
                 new AnalysisProps.Bundle("/nonexistent/directory"),
                 new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+                threadService, channelRegistry, analysisProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();

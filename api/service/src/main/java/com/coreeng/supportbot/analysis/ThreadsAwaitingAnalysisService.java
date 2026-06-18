@@ -1,7 +1,7 @@
 package com.coreeng.supportbot.analysis;
 
 import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadToAnalyze;
-import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,14 +18,14 @@ import org.springframework.stereotype.Service;
  * </ul>
  *
  * <p>The service delegates to {@link ThreadsAwaitingAnalysisRepository} for data access
- * and automatically injects the configured Slack channel ID from {@link SlackTicketsProps}.
+ * and spans every monitored Slack channel from {@link SlackChannelRegistry}.
  */
 @Service
 @RequiredArgsConstructor
 public class ThreadsAwaitingAnalysisService {
 
     private final ThreadsAwaitingAnalysisRepository repository;
-    private final SlackTicketsProps slackTicketsProps;
+    private final SlackChannelRegistry channelRegistry;
 
     /**
      * Finds threads from closed tickets in the last N days that don't have an analysis record
@@ -36,6 +36,6 @@ public class ThreadsAwaitingAnalysisService {
      * @return Immutable list of threads that need analysis
      */
     public ImmutableList<ThreadToAnalyze> find(int days, String promptId) {
-        return repository.findThreadsAwaitingAnalysis(days, promptId, slackTicketsProps.channelId());
+        return repository.findThreadsAwaitingAnalysis(days, promptId, channelRegistry.monitoredChannelIds());
     }
 }

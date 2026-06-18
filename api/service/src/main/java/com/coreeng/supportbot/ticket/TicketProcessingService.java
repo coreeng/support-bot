@@ -2,6 +2,7 @@ package com.coreeng.supportbot.ticket;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.SupportTeamProps;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
@@ -36,6 +37,7 @@ public class TicketProcessingService {
     private final TicketSlackService slackService;
     private final EscalationQueryService escalationQueryService;
     private final SlackTicketsProps slackTicketsProps;
+    private final SlackChannelRegistry channelRegistry;
     private final TicketAssignmentProps assignmentProps;
     private final ApplicationEventPublisher publisher;
     private final Optional<PrDetectionService> prDetectionService;
@@ -48,6 +50,7 @@ public class TicketProcessingService {
             TicketSlackService slackService,
             EscalationQueryService escalationQueryService,
             SlackTicketsProps slackTicketsProps,
+            SlackChannelRegistry channelRegistry,
             TicketAssignmentProps assignmentProps,
             ApplicationEventPublisher publisher,
             Optional<PrDetectionService> prDetectionService,
@@ -57,6 +60,7 @@ public class TicketProcessingService {
         this.slackService = slackService;
         this.escalationQueryService = escalationQueryService;
         this.slackTicketsProps = slackTicketsProps;
+        this.channelRegistry = channelRegistry;
         this.assignmentProps = assignmentProps;
         this.publisher = publisher;
         this.prDetectionService = prDetectionService;
@@ -66,10 +70,22 @@ public class TicketProcessingService {
 
     public void handleMessagePosted(MessagePosted e) {
         if (isQueryEvent(e)) {
+            String channelId = e.messageRef().channelId();
+            boolean hasPrLink = channelRegistry.shouldTrackPrs(channelId)
+                    && prDetectionService.isPresent()
+                    && prDetectionService.get().containsPrLinks(e.message());
+
+            // In a PRS-only channel the normal query flow is suppressed: a message only becomes a
+            // query/ticket when it actually carries a PR link. Channels that track queries (QUERIES
+            // or BOTH) always create the query.
+            if (!channelRegistry.shouldTrackQueries(channelId) && !hasPrLink) {
+                return;
+            }
+
             repository.createQueryIfNotExists(e.messageRef());
             log.atInfo().addArgument(e::messageRef).log("Query is created on message({})");
 
-            if (prDetectionService.isPresent() && prDetectionService.get().containsPrLinks(e.message())) {
+            if (hasPrLink) {
                 PrDetectionOutcome outcome = handlePrDetectionForQueryEvent(prDetectionService.get(), e);
                 if (outcome.shouldCloseTicket()) {
                     Ticket ticket = repository.findTicketByQuery(e.messageRef());
@@ -103,12 +119,14 @@ public class TicketProcessingService {
             repository.touchTicketById(ticketId, Instant.now());
         }
 
-        prDetectionService.ifPresent(svc -> {
-            PrDetectionOutcome outcome = handlePrDetectionSafely(svc, e, ticket);
-            if (outcome.shouldCloseTicket()) {
-                closeForPrResolution(checkNotNull(ticket.id()), outcome.closingTags(), outcome.closingImpact());
-            }
-        });
+        if (channelRegistry.shouldTrackPrs(ticket.channelId())) {
+            prDetectionService.ifPresent(svc -> {
+                PrDetectionOutcome outcome = handlePrDetectionSafely(svc, e, ticket);
+                if (outcome.shouldCloseTicket()) {
+                    closeForPrResolution(checkNotNull(ticket.id()), outcome.closingTags(), outcome.closingImpact());
+                }
+            });
+        }
     }
 
     private PrDetectionOutcome handlePrDetectionSafely(PrDetectionService svc, MessagePosted event, Ticket ticket) {
@@ -193,6 +211,12 @@ public class TicketProcessingService {
      */
     public void handleReactionAdded(ReactionAdded e) {
         if (!isQueryEvent(e)) {
+            return;
+        }
+
+        // Reaction-driven ticket creation is part of the normal query flow, so it is suppressed in
+        // PRS-only channels (where tickets are created solely from PR links).
+        if (!channelRegistry.shouldTrackQueries(e.messageRef().channelId())) {
             return;
         }
 
@@ -417,6 +441,6 @@ public class TicketProcessingService {
     }
 
     private boolean isQueryMessageRef(MessageRef messageRef) {
-        return Objects.equals(slackTicketsProps.channelId(), messageRef.channelId()) && !messageRef.isReply();
+        return channelRegistry.isMonitored(messageRef.channelId()) && !messageRef.isReply();
     }
 }

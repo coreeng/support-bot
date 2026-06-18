@@ -4,7 +4,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Comparator.comparing;
 
-import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
 import com.coreeng.supportbot.slack.SlackId;
@@ -33,7 +33,7 @@ public class HomepageService {
     private final TicketQueryService ticketQueryService;
     private final ExecutorService executor;
     private final SlackClient slackClient;
-    private final SlackTicketsProps slackTicketsProps;
+    private final SlackChannelRegistry channelRegistry;
     private final ImpactsRegistry impactsRegistry;
     private final SupportTeamService supportTeamService;
     private final TicketAssignmentProps assignmentProps;
@@ -52,7 +52,7 @@ public class HomepageService {
                 .totalTickets(page.totalElements())
                 .totalPages(page.totalPages())
                 .page(page.page())
-                .channelId(slackTicketsProps.channelId())
+                .channelIds(channelRegistry.monitoredChannelIds())
                 .state(state)
                 .build();
     }

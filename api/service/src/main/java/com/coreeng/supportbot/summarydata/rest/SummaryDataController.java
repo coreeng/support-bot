@@ -3,11 +3,10 @@ package com.coreeng.supportbot.summarydata.rest;
 import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.AnalysisProps;
-import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -43,7 +42,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class SummaryDataController {
 
     private final ThreadService threadService;
-    private final SlackTicketsProps slackTicketsProps;
+    private final SlackChannelRegistry channelRegistry;
     private final AnalysisProps analysisProps;
     private final AnalysisResultsService analysisResultsService;
     private final ObjectMapper objectMapper;
@@ -61,11 +60,14 @@ public class SummaryDataController {
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Exporting summary data for last {} days from channel {}", days, slackTicketsProps.channelId());
+        List<String> channelIds = channelRegistry.monitoredChannelIds();
+        log.info("Exporting summary data for last {} days from channels {}", days, channelIds);
 
-        // Fetch all threads with white_check_mark from the configured channel
-        ImmutableList<ThreadService.ThreadData> threads =
-                threadService.getThreadsWithCheckMarkAsText(slackTicketsProps.channelId(), days);
+        // Fetch all threads with white_check_mark, aggregated across every monitored channel.
+        List<ThreadService.ThreadData> threads = new ArrayList<>();
+        for (String channelId : channelIds) {
+            threads.addAll(threadService.getThreadsWithCheckMarkAsText(channelId, days));
+        }
 
         log.info("Found {} threads to export", threads.size());
 
