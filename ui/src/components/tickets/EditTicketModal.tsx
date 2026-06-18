@@ -492,10 +492,11 @@ export default function EditTicketModal({ ticketId, open, onOpenChange, onSucces
                     </SelectTrigger>
                     <SelectContent>
                       {registryData?.impacts
-                        .filter((imp: TicketImpact) => imp.active !== false)
+                        .filter((imp: TicketImpact) => imp.active !== false || imp.code === impact)
                         .map((imp: TicketImpact) => (
                           <SelectItem key={imp.code} value={imp.code}>
                             {imp.label}
+                            {imp.active === false && " (retired)"}
                           </SelectItem>
                         ))}
                     </SelectContent>

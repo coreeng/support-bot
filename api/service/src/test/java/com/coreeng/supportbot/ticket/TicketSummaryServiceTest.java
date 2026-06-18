@@ -523,6 +523,26 @@ class TicketSummaryServiceTest {
         assertThat(result.currentImpact()).isNull();
     }
 
+    @Test
+    void retiredCurrentImpact_isIncludedInImpactOptions() {
+        // Regression (#1): the impact picker is a required static select whose initialOption is the
+        // ticket's current impact. A retired impact must still appear among the options, otherwise
+        // Slack rejects the view and the modal won't open.
+        when(repository.findTicketById(ticketId)).thenReturn(ticket);
+        when(slackClient.getMessageByTs(any(SlackGetMessageByTsRequest.class))).thenReturn(slackMessage);
+        when(slackClient.getPermalink(any(SlackGetMessageByTsRequest.class))).thenReturn("https://slack.com/permalink");
+        when(escalationQueryService.listByTicketId(ticketId)).thenReturn(ImmutableList.of());
+        when(impactsRegistry.listAllImpacts())
+                .thenReturn(ImmutableList.of(new TicketImpact("Minor Issue", "minor-issue")));
+        when(impactsRegistry.findImpactByCode("production-blocking"))
+                .thenReturn(new TicketImpact("Production Blocking", "production-blocking"));
+
+        TicketSummaryView result = service.summaryView(ticketId);
+
+        assertThat(result.currentImpact()).isNotNull();
+        assertThat(result.impacts().stream().map(TicketImpact::code)).contains("production-blocking");
+    }
+
     private Ticket sampleTicket() {
         return Ticket.builder()
                 .id(new TicketId(1))

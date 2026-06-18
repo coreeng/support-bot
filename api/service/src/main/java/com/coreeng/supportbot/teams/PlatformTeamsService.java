@@ -181,7 +181,9 @@ public class PlatformTeamsService {
                     Ensure that it's expected that these teams are not found among platform teams.""", setsDiff);
             } else {
                 throw new IllegalStateException("Unknown escalation teams specified: "
-                        + setsDiff.stream().collect(joining(", ", "[", "]")));
+                        + setsDiff.stream().collect(joining(", ", "[", "]"))
+                        + ". An escalation team's code must match a platform team's code; if a platform team uses an "
+                        + "explicit code, set the same code on its escalation-teams entry.");
             }
         }
     }

@@ -626,6 +626,26 @@ describe("Tickets Component", () => {
     });
   });
 
+  describe("Tag Display", () => {
+    it("renders tag labels from the registry, not the raw codes", () => {
+      const ticket = { ...createMockTicket("1", "opened", "Team A", "high"), tags: ["networking"] };
+      mockUseRegistry.mockReturnValue({
+        data: { impacts: mockRegistry.impacts, tags: [{ code: "networking", label: "Networking", active: true }] },
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useRegistry>);
+      mockUseTickets.mockReturnValue({
+        data: getMockPaginatedTickets([ticket]),
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useTickets>);
+
+      render(<Tickets />, { wrapper: Wrapper });
+
+      expect(screen.getAllByText("Networking").length).toBeGreaterThan(0);
+    });
+  });
+
   describe("Ticket Modal Interaction", () => {
     it("opens modal when ticket row is clicked", () => {
       const mockTickets = getMockPaginatedTickets([createMockTicket("1", "opened", "Team A", "high")]);

@@ -2,6 +2,7 @@ package com.coreeng.supportbot.enums;
 
 import com.coreeng.supportbot.config.EnumProps;
 import com.coreeng.supportbot.config.EnumerationValue;
+import com.coreeng.supportbot.teams.StaticPlatformTeamsProps;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -15,12 +16,13 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Component
-@Order(101)
+@Order(99)
 @RequiredArgsConstructor
 @Slf4j
 public class EnumConfigValidator implements ApplicationRunner {
 
     private final EnumProps enumProps;
+    private final StaticPlatformTeamsProps staticTeamsProps;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -28,6 +30,9 @@ public class EnumConfigValidator implements ApplicationRunner {
         problems.addAll(findProblems("enums.escalation-teams", enumProps.escalationTeams()));
         problems.addAll(findProblems("enums.tags", enumProps.tags()));
         problems.addAll(findProblems("enums.impacts", enumProps.impacts()));
+        if (staticTeamsProps.enabled()) {
+            problems.addAll(findStaticTeamProblems(staticTeamsProps.teams()));
+        }
 
         if (!problems.isEmpty()) {
             throw new IllegalStateException("Invalid enum configuration: " + String.join("; ", problems)
@@ -45,6 +50,21 @@ public class EnumConfigValidator implements ApplicationRunner {
                 problems.add(path + " has an entry with a blank code");
             } else if (!seen.add(code)) {
                 problems.add(path + " has duplicate code '" + code + "'");
+            }
+        }
+        return problems;
+    }
+
+    private static List<String> findStaticTeamProblems(List<StaticPlatformTeamsProps.TeamConfig> teams) {
+        List<String> problems = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (StaticPlatformTeamsProps.TeamConfig team : teams) {
+            String explicit = team.code();
+            String code = explicit != null && !explicit.isBlank() ? explicit : team.name();
+            if (code.isBlank()) {
+                problems.add("platform-integration.teams-scraping.static.teams has an entry with a blank code/name");
+            } else if (!seen.add(code)) {
+                problems.add("platform-integration.teams-scraping.static.teams has duplicate code '" + code + "'");
             }
         }
         return problems;

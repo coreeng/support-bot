@@ -132,7 +132,11 @@ class PlatformTeamsServiceTest {
                 new PlatformTeamsService(teamsFetcher, resolverOf(usersFetcher), registry, props);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, service::init);
-        assertEquals("Unknown escalation teams specified: [unknown]", ex.getMessage());
+        assertEquals(
+                "Unknown escalation teams specified: [unknown]. An escalation team's code must match a "
+                        + "platform team's code; if a platform team uses an explicit code, set the same code "
+                        + "on its escalation-teams entry.",
+                ex.getMessage());
     }
 
     @Test

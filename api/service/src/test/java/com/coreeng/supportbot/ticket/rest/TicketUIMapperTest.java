@@ -19,7 +19,6 @@ import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.teams.SupportTeamService;
-import com.coreeng.supportbot.teams.Team;
 import com.coreeng.supportbot.teams.TeamDisplay;
 import com.coreeng.supportbot.teams.TeamMemberFetcher;
 import com.coreeng.supportbot.teams.TeamService;
@@ -148,8 +147,10 @@ public class TicketUIMapperTest {
 
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
 
-        when(teamService.resolveForDisplay("deleted-team"))
-                .thenReturn(new TeamDisplay("deleted-team", "Deleted Team", ImmutableList.of(), false));
+        TeamDisplay retired = new TeamDisplay("deleted-team", "Deleted Team", ImmutableList.of(), false);
+        TeamUI retiredUI = new TeamUI("Deleted Team", "deleted-team", ImmutableList.of(), false);
+        when(teamService.resolveForDisplay("deleted-team")).thenReturn(retired);
+        when(teamUIMapper.mapToUI(retired)).thenReturn(retiredUI);
 
         TicketUI result = assertDoesNotThrow(() -> ticketUIMapper.mapToUI(detailedTicket));
         TeamUI team = requireNonNull(result.team());
@@ -176,12 +177,11 @@ public class TicketUIMapperTest {
 
         DetailedTicket detailedTicket = new DetailedTicket(ticket, ImmutableList.of());
 
-        Team team = new Team("wow", "wow", ImmutableList.of(TeamType.TENANT));
+        TeamDisplay teamDisplay = new TeamDisplay("wow", "wow", ImmutableList.of(TeamType.TENANT), true);
         TeamUI teamUI = new TeamUI("wow", "wow", ImmutableList.of(TeamType.TENANT));
 
-        when(teamService.resolveForDisplay("wow"))
-                .thenReturn(new TeamDisplay("wow", "wow", ImmutableList.of(TeamType.TENANT), true));
-        when(teamUIMapper.mapToUI(team)).thenReturn(teamUI);
+        when(teamService.resolveForDisplay("wow")).thenReturn(teamDisplay);
+        when(teamUIMapper.mapToUI(teamDisplay)).thenReturn(teamUI);
 
         // when
         TicketUI result = ticketUIMapper.mapToUI(detailedTicket);

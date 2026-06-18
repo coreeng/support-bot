@@ -572,14 +572,15 @@ export default function TicketsPage() {
                       <TableCell>
                         {(t.tags?.length ?? 0) > 0
                           ? t.tags?.map((code, idx) => {
-                              const retired = registryData?.tags.find((x: TicketTag) => x.code === code)?.active === false;
+                              const tagMeta = registryData?.tags.find((x: TicketTag) => x.code === code);
+                              const retired = tagMeta?.active === false;
                               return (
                                 <Badge
                                   key={`${t.id}-tag-${idx}`}
                                   variant="outline"
                                   className="mb-1 flex w-fit items-center gap-1 last:mb-0"
                                 >
-                                  {getTagLabel(code)}
+                                  {tagMeta?.label || getTagLabel(code)}
                                   {retired && <span className="text-muted-foreground text-[10px]">(retired)</span>}
                                 </Badge>
                               );

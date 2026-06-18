@@ -12,6 +12,9 @@ import com.coreeng.supportbot.config.EnumProps;
 import com.google.common.collect.ImmutableList;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.Condition;
@@ -30,6 +33,7 @@ public class OrphanReferenceScanner implements ApplicationRunner {
     private final DSLContext dsl;
     private final EnumProps enumProps;
     private final MeterRegistry meterRegistry;
+    private final Map<String, AtomicLong> orphanGauges = new ConcurrentHashMap<>();
 
     @Override
     public void run(ApplicationArguments args) {
@@ -78,10 +82,16 @@ public class OrphanReferenceScanner implements ApplicationRunner {
     }
 
     private void register(String type, long count) {
-        Gauge.builder("support_bot.orphaned_references", () -> count)
-                .description("Stored references to retired/removed enum codes")
-                .tag("type", type)
-                .strongReference(true)
-                .register(meterRegistry);
+        orphanGauges
+                .computeIfAbsent(type, key -> {
+                    AtomicLong holder = new AtomicLong();
+                    Gauge.builder("support_bot.orphaned_references", holder, AtomicLong::get)
+                            .description("Stored references to retired/removed enum codes")
+                            .tag("type", key)
+                            .strongReference(true)
+                            .register(meterRegistry);
+                    return holder;
+                })
+                .set(count);
     }
 }

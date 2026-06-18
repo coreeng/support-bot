@@ -411,10 +411,12 @@ export default function EscalationsPage() {
             title="Impact"
             value={impactFilter !== "all" ? impactFilter : undefined}
             onChange={(v) => setParams({ impact: v ?? "all", page: "0" })}
-            options={(registryData?.impacts ?? []).map((impact: { code: string; label: string }) => ({
-              label: impact.label,
-              value: impact.code,
-            }))}
+            options={(registryData?.impacts ?? [])
+              .filter((impact: { code: string; label: string; active?: boolean }) => impact.active !== false)
+              .map((impact) => ({
+                label: impact.label,
+                value: impact.code,
+              }))}
           />
           {!hasNoTeamScope && (
             <SingleSelectFilter
@@ -431,10 +433,12 @@ export default function EscalationsPage() {
             title="Tag"
             value={tagFilter || undefined}
             onChange={(v) => setParams({ tag: v ?? "", page: "0" })}
-            options={(registryData?.tags ?? []).map((tag: { code: string; label: string }) => ({
-              label: tag.label,
-              value: tag.code,
-            }))}
+            options={(registryData?.tags ?? [])
+              .filter((tag: { code: string; label: string; active?: boolean }) => tag.active !== false)
+              .map((tag) => ({
+                label: tag.label,
+                value: tag.code,
+              }))}
           />
         </div>
 
@@ -524,7 +528,7 @@ export default function EscalationsPage() {
                 return (
                   <tr key={esc.id} className="hover:bg-accent transition-colors">
                     <td className="px-4 py-2 text-sm">{esc.ticketId}</td>
-                    {showEscalatedForColumn && <td className="px-4 py-2 text-sm">{esc.escalatingTeam || "-"}</td>}
+                    {showEscalatedForColumn && <td className="px-4 py-2 text-sm">{teamLabel(esc.escalatingTeam) || "-"}</td>}
                     <td className="px-4 py-2 text-sm">{esc.team?.label || esc.team?.name || "-"}</td>
                     <td className="px-4 py-2">
                       <span

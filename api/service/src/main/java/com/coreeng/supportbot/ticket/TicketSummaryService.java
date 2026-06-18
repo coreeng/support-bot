@@ -66,7 +66,9 @@ public class TicketSummaryService {
         // Resolve labels for tags on this ticket, including any soft-deleted from the database,
         // so historical tag data remains visible in the summary view.
         ImmutableList<Tag> currentTags = tagsRegistry.listTagsByCodes(ticket.tags());
-        ImmutableList<TicketImpact> allImpacts = impactsRegistry.listAllImpacts();
+        ImmutableList<TicketImpact> activeImpacts = impactsRegistry.listAllImpacts();
+        TicketImpact currentImpact = ticket.impact() != null ? impactsRegistry.findImpactByCode(ticket.impact()) : null;
+        ImmutableList<TicketImpact> impactOptions = impactOptionsWithCurrent(activeImpacts, currentImpact);
 
         // Assignee fields (only if assignment is enabled)
         String currentAssignee = assignmentProps.enabled() && ticket.assignedTo() != null
@@ -84,10 +86,22 @@ public class TicketSummaryService {
                 querySummary,
                 escalations,
                 currentTags,
-                allImpacts,
-                ticket.impact() != null ? impactsRegistry.findImpactByCode(ticket.impact()) : null,
+                impactOptions,
+                currentImpact,
                 currentAssignee,
                 availableAssignees);
+    }
+
+    private static ImmutableList<TicketImpact> impactOptionsWithCurrent(
+            ImmutableList<TicketImpact> active, @Nullable TicketImpact current) {
+        if (current == null) {
+            return active;
+        }
+        String currentCode = current.code();
+        if (active.stream().anyMatch(i -> currentCode.equals(i.code()))) {
+            return active;
+        }
+        return ImmutableList.<TicketImpact>builder().addAll(active).add(current).build();
     }
 
     private ImmutableList<TicketSummaryView.EscalationView> getEscalationViews(Ticket ticket) {

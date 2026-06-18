@@ -4,6 +4,7 @@ import { backendFetch, errorResponse, unauthorizedResponse } from "../_lib/backe
 interface BackendTeam {
   label?: string;
   code?: string;
+  active?: boolean;
 }
 
 export async function GET(request: NextRequest) {
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
       openedAt: e.openedAt,
       resolvedAt: e.resolvedAt,
       escalatingTeam: e.escalatingTeam,
-      team: team ? { name: team.code || team.label || "", label: team.label || team.code || "" } : null,
+      team: team ? { name: team.code || team.label || "", label: team.label || team.code || "", active: team.active } : null,
       tags: e.tags ?? [],
       impact: e.impact ?? null,
     };

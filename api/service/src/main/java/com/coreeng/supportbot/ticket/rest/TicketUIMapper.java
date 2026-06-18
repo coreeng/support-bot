@@ -10,8 +10,6 @@ import com.coreeng.supportbot.slack.SlackId;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackGetMessageByTsRequest;
 import com.coreeng.supportbot.teams.SupportTeamService;
-import com.coreeng.supportbot.teams.Team;
-import com.coreeng.supportbot.teams.TeamDisplay;
 import com.coreeng.supportbot.teams.TeamMemberFetcher;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.rest.TeamUI;
@@ -104,12 +102,8 @@ public class TicketUIMapper {
                 .build();
     }
 
-    @Nullable private TeamUI mapKnownTeamToUI(String code) {
-        TeamDisplay team = teamService.resolveForDisplay(code);
-        if (team.active()) {
-            return teamUIMapper.mapToUI(new Team(team.label(), team.code(), team.types()));
-        }
-        return new TeamUI(team.label(), team.code(), team.types(), false);
+    private TeamUI mapKnownTeamToUI(String code) {
+        return teamUIMapper.mapToUI(teamService.resolveForDisplay(code));
     }
 
     @Nullable private String resolveQueryPermalink(DetailedTicket ticket) {

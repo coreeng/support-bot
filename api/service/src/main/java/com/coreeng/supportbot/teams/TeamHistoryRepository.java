@@ -35,7 +35,7 @@ public class TeamHistoryRepository {
 
     public int deleteAllExcept(ImmutableList<String> codes) {
         if (codes.isEmpty()) {
-            return dsl.update(TEAM).set(TEAM.DELETED_AT, Instant.now()).execute();
+            return 0;
         }
         return dsl.update(TEAM)
                 .set(TEAM.DELETED_AT, Instant.now())
