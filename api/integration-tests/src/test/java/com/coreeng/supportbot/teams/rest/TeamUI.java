@@ -6,4 +6,5 @@ import java.util.List;
 public record TeamUI(
         @JsonProperty("label") String label,
         @JsonProperty("code") String code,
-        @JsonProperty("types") List<String> types) {}
+        @JsonProperty("types") List<String> types,
+        @JsonProperty("active") boolean active) {}
