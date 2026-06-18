@@ -1,11 +1,5 @@
 package com.coreeng.supportbot.enums;
 
-import static com.coreeng.supportbot.dbschema.Tables.ESCALATION;
-import static com.coreeng.supportbot.dbschema.Tables.ESCALATION_TO_TAG;
-import static com.coreeng.supportbot.dbschema.Tables.IMPACT;
-import static com.coreeng.supportbot.dbschema.Tables.TAG;
-import static com.coreeng.supportbot.dbschema.Tables.TICKET;
-import static com.coreeng.supportbot.dbschema.Tables.TICKET_TO_TAG;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 import com.coreeng.supportbot.config.EnumProps;
@@ -17,8 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jooq.Condition;
-import org.jooq.DSLContext;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -30,7 +22,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class OrphanReferenceScanner implements ApplicationRunner {
 
-    private final DSLContext dsl;
+    private final OrphanReferenceRepository repository;
     private final EnumProps enumProps;
     private final MeterRegistry meterRegistry;
     private final Map<String, AtomicLong> orphanGauges = new ConcurrentHashMap<>();
@@ -38,18 +30,13 @@ public class OrphanReferenceScanner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         try {
-            long retiredImpactRefs = dsl.fetchCount(
-                    TICKET,
-                    TICKET.IMPACT_CODE.in(dsl.select(IMPACT.CODE).from(IMPACT).where(IMPACT.DELETED_AT.isNotNull())));
-            long retiredTagRefs = (long) dsl.fetchCount(
-                            TICKET_TO_TAG,
-                            TICKET_TO_TAG.TAG_CODE.in(
-                                    dsl.select(TAG.CODE).from(TAG).where(TAG.DELETED_AT.isNotNull())))
-                    + dsl.fetchCount(
-                            ESCALATION_TO_TAG,
-                            ESCALATION_TO_TAG.TAG_CODE.in(
-                                    dsl.select(TAG.CODE).from(TAG).where(TAG.DELETED_AT.isNotNull())));
-            long orphanedEscalationTeamRefs = dsl.fetchCount(ESCALATION, orphanedEscalationTeamCondition());
+            ImmutableList<String> activeEscalationCodes = enumProps.escalationTeams().stream()
+                    .map(EscalationTeam::code)
+                    .collect(toImmutableList());
+
+            long retiredImpactRefs = repository.countRetiredImpactReferences();
+            long retiredTagRefs = repository.countRetiredTagReferences();
+            long orphanedEscalationTeamRefs = repository.countOrphanedEscalationTeamReferences(activeEscalationCodes);
 
             register("impact", retiredImpactRefs);
             register("tag", retiredTagRefs);
@@ -70,15 +57,6 @@ public class OrphanReferenceScanner implements ApplicationRunner {
         } catch (RuntimeException e) {
             log.atWarn().setCause(e).log("Orphaned-reference scan failed; skipping (non-fatal)");
         }
-    }
-
-    private Condition orphanedEscalationTeamCondition() {
-        ImmutableList<String> activeCodes =
-                enumProps.escalationTeams().stream().map(EscalationTeam::code).collect(toImmutableList());
-        if (activeCodes.isEmpty()) {
-            return ESCALATION.TEAM.isNotNull();
-        }
-        return ESCALATION.TEAM.isNotNull().and(ESCALATION.TEAM.notIn(activeCodes));
     }
 
     private void register(String type, long count) {
