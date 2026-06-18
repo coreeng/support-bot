@@ -12,6 +12,7 @@ import com.slack.api.model.Message;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -189,8 +190,7 @@ public class ThreadService {
         String oldestTimestamp = String.valueOf(cutoffTime.getEpochSecond());
 
         log.debug("Searching for messages since timestamp: {} ({})", oldestTimestamp, cutoffTime);
-
-        List<String> threadTimestamps = new ArrayList<>();
+        Set<String> threadTimestamps = new LinkedHashSet<>();
         String cursor = null;
         boolean hasMore = true;
         int pageCount = 0;
