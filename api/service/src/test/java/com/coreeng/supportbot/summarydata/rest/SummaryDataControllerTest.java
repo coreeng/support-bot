@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.SlackChannelProps;
 import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.summarydata.ThreadService;
@@ -95,6 +96,44 @@ class SummaryDataControllerTest {
         assertThat(fileNames).containsExactly("1700000000.000001.txt", "1700000000.000002.txt");
         assertThat(fileContents).containsExactly("Thread one content", "Thread two content");
         verify(threadService).getThreadsWithCheckMarkAsText("C123", 31);
+    }
+
+    @Test
+    void export_shouldSkipChannelThatFailsAndStillExportOtherChannels() throws IOException {
+        // given two monitored channels where the first fails to fetch (e.g. the bot is not a member)
+        SlackChannelRegistry multiChannel = new SlackChannelRegistry(new SlackTicketsProps(
+                null,
+                List.of(
+                        new SlackChannelProps("a", "C-a", SlackChannelProps.TrackMode.BOTH),
+                        new SlackChannelProps("b", "C-b", SlackChannelProps.TrackMode.BOTH)),
+                "eyes",
+                "eyes",
+                "white_check_mark",
+                "sos"));
+        SummaryDataController multiController = new SummaryDataController(
+                threadService, multiChannel, analysisProps, analysisResultsService, objectMapper);
+
+        when(threadService.getThreadsWithCheckMarkAsText("C-a", 31)).thenThrow(new RuntimeException("not_in_channel"));
+        when(threadService.getThreadsWithCheckMarkAsText("C-b", 31))
+                .thenReturn(ImmutableList.of(new ThreadService.ThreadData("1700000000.000009", "Channel B content")));
+
+        // when
+        ResponseEntity<byte[]> response = multiController.exportSummaryData(31);
+
+        // then — the export still succeeds with the readable channel's data
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<String> fileNames = new ArrayList<>();
+        List<String> fileContents = new ArrayList<>();
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(response.getBody()))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                fileNames.add(entry.getName());
+                fileContents.add(new String(zis.readAllBytes(), StandardCharsets.UTF_8));
+                zis.closeEntry();
+            }
+        }
+        assertThat(fileNames).containsExactly("1700000000.000009.txt");
+        assertThat(fileContents).containsExactly("Channel B content");
     }
 
     @Test

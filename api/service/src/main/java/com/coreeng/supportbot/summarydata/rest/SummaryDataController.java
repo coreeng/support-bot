@@ -63,10 +63,16 @@ public class SummaryDataController {
         List<String> channelIds = channelRegistry.monitoredChannelIds();
         log.info("Exporting summary data for last {} days from channels {}", days, channelIds);
 
-        // Fetch all threads with white_check_mark, aggregated across every monitored channel.
+        // Fetch all threads with white_check_mark, aggregated across every monitored channel. A
+        // failure for one channel (e.g. the bot is not a member, or a Slack API error) must not fail
+        // the whole export, so each channel is fetched independently and a failing one is skipped.
         List<ThreadService.ThreadData> threads = new ArrayList<>();
         for (String channelId : channelIds) {
-            threads.addAll(threadService.getThreadsWithCheckMarkAsText(channelId, days));
+            try {
+                threads.addAll(threadService.getThreadsWithCheckMarkAsText(channelId, days));
+            } catch (Exception e) {
+                log.warn("Failed to fetch threads for channel {}; skipping it in the export", channelId, e);
+            }
         }
 
         log.info("Found {} threads to export", threads.size());

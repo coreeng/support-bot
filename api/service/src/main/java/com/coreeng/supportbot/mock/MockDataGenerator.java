@@ -88,6 +88,11 @@ public class MockDataGenerator implements ApplicationRunner {
     @Transactional
     @Override
     public void run(ApplicationArguments args) {
+        if (channelRegistry.monitoredChannelIds().isEmpty()) {
+            log.atWarn().log("Skipping mock data generation because no Slack channels are configured");
+            return;
+        }
+
         Page<Ticket> existingTickets =
                 ticketRepository.listTickets(TicketsQuery.builder().build());
         if (existingTickets.totalElements() > 0) {
