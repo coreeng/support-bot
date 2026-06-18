@@ -84,9 +84,11 @@ ticket:
       key: ${TICKET_ASSIGNMENT_ENCRYPTION_KEY:} # Encryption key (AES-256-GCM). Required when encryption.enabled=true; assignment skipped if missing.
 
 enums:
+  # Codes are immutable primary keys: unique and non-blank within each list (and across the static
+  # platform teams). The app validates this at startup and fails fast on a duplicate/blank code.
   escalation-teams: # Teams available for query escalation
     - label: wow # Label showed on the UI
-      code: wow # Team ID. Must be unique. Have to match platform team name unless platform-integration.fetch.ignore-unknown-teams is set to true
+      code: wow # Team ID. Must be unique. Have to match a platform team code unless platform-integration.fetch.ignore-unknown-teams is set to true
       slack-group-id: S08948NBMED # Slack group ID that will be tagged on escalations
   tags: # Ticket tags
     - label: Ingresses # Label showed on the UI
