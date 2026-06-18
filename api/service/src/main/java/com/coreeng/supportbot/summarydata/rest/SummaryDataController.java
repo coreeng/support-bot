@@ -17,7 +17,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -71,9 +73,15 @@ public class SummaryDataController {
         try (var byteArrayOutputStream = new java.io.ByteArrayOutputStream();
                 var zip = new java.util.zip.ZipOutputStream(byteArrayOutputStream)) {
 
-            // Add each thread as a separate file in the zip
+            // Add each thread as a separate file in the zip. Guard against duplicate entry names so a
+            // single collision can never abort the whole export with a ZipException.
+            Set<String> seenFileNames = new HashSet<>();
             for (ThreadService.ThreadData thread : threads) {
                 String fileName = thread.threadTs() + ".txt";
+                if (!seenFileNames.add(fileName)) {
+                    log.warn("Skipping duplicate thread entry in export: {}", fileName);
+                    continue;
+                }
                 log.debug("Adding thread to zip: {}", fileName);
 
                 zip.putNextEntry(new java.util.zip.ZipEntry(fileName));

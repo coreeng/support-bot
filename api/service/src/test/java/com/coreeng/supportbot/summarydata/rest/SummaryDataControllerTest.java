@@ -142,6 +142,37 @@ class SummaryDataControllerTest {
         }
     }
 
+    @Test
+    void export_shouldSkipDuplicateEntries_withoutFailing() throws IOException {
+        // given - two threads resolve to the same file name (e.g. a reply_broadcast sharing the parent thread_ts).
+        // A single duplicate previously aborted the whole export with a ZipException.
+        var threads = ImmutableList.of(
+                new ThreadService.ThreadData("1700000000.000001", "First content"),
+                new ThreadService.ThreadData("1700000000.000001", "Duplicate content"),
+                new ThreadService.ThreadData("1700000000.000002", "Second content"));
+        when(threadService.getThreadsWithCheckMarkAsText("C123", 31)).thenReturn(threads);
+
+        // when
+        ResponseEntity<byte[]> response = controller.exportSummaryData(31);
+
+        // then - export succeeds and the duplicate name is written exactly once
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        List<String> fileNames = new ArrayList<>();
+        List<String> fileContents = new ArrayList<>();
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(response.getBody()))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                fileNames.add(entry.getName());
+                fileContents.add(new String(zis.readAllBytes(), StandardCharsets.UTF_8));
+                zis.closeEntry();
+            }
+        }
+
+        assertThat(fileNames).containsExactly("1700000000.000001.txt", "1700000000.000002.txt");
+        assertThat(fileContents).containsExactly("First content", "Second content");
+    }
+
     // --- Import tests ---
 
     @Test

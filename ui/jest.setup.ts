@@ -108,4 +108,12 @@ if (typeof window !== "undefined") {
   if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = () => {};
   }
+  // Radix popper (Popover/Select content) positions via floating-ui, which needs ResizeObserver.
+  if (!window.ResizeObserver) {
+    window.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+  }
 }
