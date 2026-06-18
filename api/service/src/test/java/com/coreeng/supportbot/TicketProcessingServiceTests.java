@@ -97,7 +97,7 @@ public class TicketProcessingServiceTests {
     private SlackChannelRegistry registryFor(String channelId, TrackMode mode) {
         return new SlackChannelRegistry(new SlackTicketsProps(
                 null,
-                List.of(new SlackChannelProps(mode.name().toLowerCase(), channelId, mode)),
+                List.of(new SlackChannelProps(mode.name(), channelId, mode)),
                 "eyes",
                 "ticket",
                 "white_check_mark",
@@ -216,7 +216,8 @@ public class TicketProcessingServiceTests {
         when(prDetectionService.containsPrLinks(any())).thenReturn(true);
         when(prDetectionService.handleQueryMessagePosted(any(), any())).thenAnswer(invocation -> {
             Supplier<Ticket> ticketCreator = invocation.getArgument(1);
-            ticketCreator.get();
+            Ticket created = ticketCreator.get();
+            assertNotNull(created);
             return PrDetectionOutcome.tracked();
         });
         when(slackService.postTicketForm(eq(new MessageRef(MESSAGE_TS, "P123")), any()))
@@ -238,8 +239,7 @@ public class TicketProcessingServiceTests {
         MessageRef threadRef = new MessageRef(MESSAGE_TS, null, "P123");
 
         // when the initial reaction is added
-        service.handleReactionAdded(
-                new ReactionAdded(slackTicketsProps.expectedInitialReaction(), USER_ID, threadRef));
+        service.handleReactionAdded(new ReactionAdded(slackTicketsProps.expectedInitialReaction(), USER_ID, threadRef));
 
         // then nothing is created and no ticket form is posted
         assertFalse(
