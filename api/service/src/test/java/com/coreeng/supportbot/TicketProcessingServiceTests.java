@@ -93,6 +93,17 @@ public class TicketProcessingServiceTests {
         ticketProcessingService = buildService(channelRegistry, Optional.empty());
     }
 
+    /** Builds a registry with a single channel in the given track mode. */
+    private SlackChannelRegistry registryFor(String channelId, TrackMode mode) {
+        return new SlackChannelRegistry(new SlackTicketsProps(
+                null,
+                List.of(new SlackChannelProps(mode.name().toLowerCase(), channelId, mode)),
+                "eyes",
+                "ticket",
+                "white_check_mark",
+                "rocket"));
+    }
+
     /** Builds a processing service against a specific channel registry / PR-detection setup. */
     private TicketProcessingService buildService(
             SlackChannelRegistry channelRegistry, Optional<PrDetectionService> prDetection) {
@@ -192,6 +203,68 @@ public class TicketProcessingServiceTests {
         // then both produce queries, aggregated into the same store
         assertTrue(ticketRepository.queryExists(refOne), "Query created in first channel");
         assertTrue(ticketRepository.queryExists(refTwo), "Query created in second channel");
+    }
+
+    @Test
+    public void shouldCreateTicketAndRunPrDetectionForPrLinkInPrsOnlyChannel() {
+        // given a PRS-only channel with PR detection wired
+        TicketProcessingService service =
+                buildService(registryFor("P123", TrackMode.PRS), Optional.of(prDetectionService));
+        MessageRef queryRef = new MessageRef(MESSAGE_TS, null, "P123");
+        MessageRef formRef = new MessageRef(MessageTs.of("form-ts"), MESSAGE_TS, "P123");
+
+        when(prDetectionService.containsPrLinks(any())).thenReturn(true);
+        when(prDetectionService.handleQueryMessagePosted(any(), any())).thenAnswer(invocation -> {
+            Supplier<Ticket> ticketCreator = invocation.getArgument(1);
+            ticketCreator.get();
+            return PrDetectionOutcome.tracked();
+        });
+        when(slackService.postTicketForm(eq(new MessageRef(MESSAGE_TS, "P123")), any()))
+                .thenReturn(formRef);
+
+        // when a message carrying a PR link is posted
+        service.handleMessagePosted(new MessagePosted("https://github.com/org/repo/pull/1", USER_ID, queryRef));
+
+        // then the query + ticket are created even though this channel suppresses plain queries
+        assertTrue(ticketRepository.queryExists(queryRef), "query is created for a PR link in a PRS-only channel");
+        assertNotNull(ticketRepository.findTicketByQuery(queryRef), "ticket is auto-created for the PR link");
+        verify(prDetectionService).handleQueryMessagePosted(any(MessagePosted.class), any());
+    }
+
+    @Test
+    public void shouldSuppressReactionDrivenTicketInPrsOnlyChannel() {
+        // given a PRS-only channel: reaction-driven creation is part of the normal query flow
+        TicketProcessingService service = buildService(registryFor("P123", TrackMode.PRS), Optional.empty());
+        MessageRef threadRef = new MessageRef(MESSAGE_TS, null, "P123");
+
+        // when the initial reaction is added
+        service.handleReactionAdded(
+                new ReactionAdded(slackTicketsProps.expectedInitialReaction(), USER_ID, threadRef));
+
+        // then nothing is created and no ticket form is posted
+        assertFalse(
+                ticketRepository.queryExists(threadRef), "reaction-driven query is suppressed in a PRS-only channel");
+        verify(slackService, never()).postTicketForm(any(), any());
+    }
+
+    @Test
+    public void shouldNotRunPrDetectionOnThreadReplyInQueriesOnlyChannel() {
+        // given a QUERIES-only channel with a ticket already created via the normal reaction flow
+        TicketProcessingService service =
+                buildService(registryFor("Q123", TrackMode.QUERIES), Optional.of(prDetectionService));
+        MessageRef queryRef = new MessageRef(MESSAGE_TS, null, "Q123");
+        MessageRef formRef = new MessageRef(MessageTs.of("form-ts"), MESSAGE_TS, "Q123");
+        when(slackService.postTicketForm(any(), any())).thenReturn(formRef);
+        service.handleReactionAdded(new ReactionAdded(slackTicketsProps.expectedInitialReaction(), USER_ID, queryRef));
+        assertNotNull(ticketRepository.findTicketByQuery(queryRef), "precondition: ticket exists");
+
+        // when a thread reply carrying a PR link arrives
+        MessageRef replyRef = new MessageRef(MessageTs.of("reply-ts"), MESSAGE_TS, "Q123");
+        service.handleMessagePosted(
+                new MessagePosted("follow-up https://github.com/org/repo/pull/1", USER_ID, replyRef));
+
+        // then PR detection is never consulted in a QUERIES-only channel
+        verify(prDetectionService, never()).handleMessagePosted(any(), any());
     }
 
     @Test
