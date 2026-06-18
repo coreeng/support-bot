@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import React from "react";
 import { Toaster } from "sonner";
 import * as useAuthHook from "../../../hooks/useAuth";
@@ -513,6 +514,51 @@ describe("KnowledgeGapsPage", () => {
     expect(mockClick).toHaveBeenCalled();
     expect(mockCreateObjectURL).toHaveBeenCalled();
     expect(mockRevokeObjectURL).toHaveBeenCalled();
+  });
+
+  it("keeps the settings panel open when picking a query window and applies it to the export", async () => {
+    const user = userEvent.setup();
+
+    mockUseAnalysis.mockReturnValue({
+      data: mockAnalysisData,
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockApiFetch.mockImplementation((url) => {
+      if (url === "/api/summary-data/export?days=31") {
+        return Promise.resolve({
+          ok: true,
+          blob: () => Promise.resolve(new Blob(["test"], { type: "application/zip" })),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ enabled: false }),
+      } as Response);
+    });
+
+    global.URL.createObjectURL = jest.fn(() => "blob:test-url");
+    global.URL.revokeObjectURL = jest.fn();
+    HTMLAnchorElement.prototype.click = jest.fn();
+
+    renderWithToast(<KnowledgeGapsPage />);
+
+    // Open the settings popover
+    await user.click(screen.getByRole("button", { name: "Run Analysis" }));
+
+    // The Query window options render in a portal outside the panel. Selecting one must NOT
+    // dismiss the panel (the bug this guards against), and must update the selected window.
+    await user.click(screen.getByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name: "Month" }));
+
+    expect(screen.getByText("Analysis settings")).toBeInTheDocument();
+
+    await user.click(screen.getByText("Export"));
+
+    await waitFor(() => {
+      expect(mockApiFetch).toHaveBeenCalledWith("/api/summary-data/export?days=31");
+    });
   });
 
   it("handles import button click and file upload", async () => {
