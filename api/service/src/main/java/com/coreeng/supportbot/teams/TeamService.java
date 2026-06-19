@@ -17,6 +17,7 @@ public class TeamService {
     private final PlatformTeamsService platformTeamsService;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
     private final SupportTeamService supportTeamService;
+    private final TeamHistoryRepository teamHistoryRepository;
 
     public ImmutableList<Team> listTeamsByUserEmail(String email) {
         ImmutableList<PlatformTeam> platformTeams = platformTeamsService.listTeamsByUserEmail(email);
@@ -47,7 +48,7 @@ public class TeamService {
             case ESCALATION ->
                 escalationTeamsRegistry.listAllEscalationTeams().stream()
                         .map(t -> {
-                            PlatformTeam platformTeam = platformTeamsService.findTeamByName(t.code());
+                            PlatformTeam platformTeam = platformTeamsService.findTeamByCode(t.code());
                             if (platformTeam != null) {
                                 return new Team(
                                         t.label(), t.code(), ImmutableList.of(TeamType.TENANT, TeamType.ESCALATION));
@@ -71,7 +72,7 @@ public class TeamService {
             return leadershipTeam;
         }
 
-        PlatformTeam platformTeam = platformTeamsService.findTeamByName(code);
+        PlatformTeam platformTeam = platformTeamsService.findTeamByCode(code);
         if (platformTeam != null) {
             return mapPlatformTeam(platformTeam);
         }
@@ -84,18 +85,30 @@ public class TeamService {
         return null;
     }
 
+    public TeamDisplay resolveForDisplay(String code) {
+        Team team = findTeamByCode(code);
+        if (team != null) {
+            return new TeamDisplay(team.code(), team.label(), team.types(), true);
+        }
+        String retiredLabel = teamHistoryRepository.findLabelByCode(code);
+        if (retiredLabel != null) {
+            return new TeamDisplay(code, retiredLabel, ImmutableList.of(), false);
+        }
+        return new TeamDisplay(code, code, ImmutableList.of(), false);
+    }
+
     private ImmutableList<Team> mapPlatformTeams(ImmutableList<PlatformTeam> platformTeams) {
         return platformTeams.stream().map(this::mapPlatformTeam).collect(toImmutableList());
     }
 
     @NonNull private Team mapPlatformTeam(PlatformTeam t) {
-        EscalationTeam escalationTeam = escalationTeamsRegistry.findEscalationTeamByCode(t.name());
+        EscalationTeam escalationTeam = escalationTeamsRegistry.findEscalationTeamByCode(t.code());
         if (escalationTeam != null) {
             return new Team(
                     escalationTeam.label(),
                     escalationTeam.code(),
                     ImmutableList.of(TeamType.TENANT, TeamType.ESCALATION));
         }
-        return new Team(t.name(), t.name(), ImmutableList.of(TeamType.TENANT));
+        return new Team(t.name(), t.code(), ImmutableList.of(TeamType.TENANT));
     }
 }

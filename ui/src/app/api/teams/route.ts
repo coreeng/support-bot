@@ -10,6 +10,7 @@ interface BackendTeam {
 function mapTeam(team: BackendTeam) {
   return {
     name: team.code || team.label || "",
+    label: team.label || team.code || "",
     types: team.types,
   };
 }

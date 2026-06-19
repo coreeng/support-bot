@@ -7,9 +7,13 @@ import java.util.List;
 public interface PlatformTeamsFetcher {
     List<TeamAndGroupTuple> fetchTeams();
 
-    record TeamAndGroupTuple(String name, GroupRef groupRef) {
+    record TeamAndGroupTuple(String name, String code, GroupRef groupRef) {
+        public TeamAndGroupTuple(String name, GroupRef groupRef) {
+            this(name, name, groupRef);
+        }
+
         public TeamAndGroupTuple(String name, String groupRef) {
-            this(name, GroupRef.parse(groupRef));
+            this(name, name, GroupRef.parse(groupRef));
         }
     }
 }

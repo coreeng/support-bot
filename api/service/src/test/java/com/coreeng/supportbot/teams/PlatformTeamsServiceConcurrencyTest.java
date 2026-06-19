@@ -76,7 +76,7 @@ class PlatformTeamsServiceConcurrencyTest {
         for (int i = 1; i <= groups; i++) {
             String teamName = "team-" + i;
             String groupKey = "G" + i;
-            var team = service.findTeamByName(teamName);
+            var team = service.findTeamByCode(teamName);
             assertNotNull(team);
             assertTrue(team.groupRefs().contains(GroupRef.parse(groupKey)));
             assertEquals(1, team.users().size());

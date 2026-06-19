@@ -84,9 +84,11 @@ ticket:
       key: ${TICKET_ASSIGNMENT_ENCRYPTION_KEY:} # Encryption key (AES-256-GCM). Required when encryption.enabled=true; assignment skipped if missing.
 
 enums:
+  # Codes are immutable primary keys: unique and non-blank within each list (and across the static
+  # platform teams). The app validates this at startup and fails fast on a duplicate/blank code.
   escalation-teams: # Teams available for query escalation
     - label: wow # Label showed on the UI
-      code: wow # Team ID. Must be unique. Have to match platform team name unless platform-integration.fetch.ignore-unknown-teams is set to true
+      code: wow # Team ID. Must be unique. Have to match a platform team code unless platform-integration.fetch.ignore-unknown-teams is set to true
       slack-group-id: S08948NBMED # Slack group ID that will be tagged on escalations
   tags: # Ticket tags
     - label: Ingresses # Label showed on the UI
@@ -131,6 +133,12 @@ platform-integration: # Whether to enable platform integration to automatically 
   azure:
     enabled: false
   teams-scraping: # team-name <-> cloud group id scrapper configuration
+    static: # Explicitly-listed teams (no cloud scraping); each team's members come from its group-ref
+      enabled: true
+      teams:
+        - name: My Team # display value shown in the UI
+          code: my-team # optional immutable identity used for mapping (ticket/escalation refs + escalation<->platform join); defaults to name
+          group-ref: my-group # group whose members belong to the team
     core-platform: # Scraper specific to CECG's Core Platform
       enabled: true
     k8s-generic: # A generic scraper that might be used in any K8S environment

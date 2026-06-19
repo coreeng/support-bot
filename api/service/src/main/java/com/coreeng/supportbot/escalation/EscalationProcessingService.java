@@ -43,7 +43,14 @@ public class EscalationProcessingService {
         log.atInfo().addArgument(escalation::id).log("Escalation created: {}");
 
         String teamCode = checkNotNull(escalation.team());
-        EscalationTeam team = checkNotNull(escalationTeamsRegistry.findEscalationTeamByCode(teamCode));
+        EscalationTeam team = escalationTeamsRegistry.findEscalationTeamByCode(teamCode);
+        if (team == null) {
+            log.atWarn()
+                    .addKeyValue("escalationId", escalation.id())
+                    .addKeyValue("teamCode", teamCode)
+                    .log("Escalation references an unresolved team; created without posting a team mention");
+            return escalation;
+        }
         ChatPostMessageResponse messagePostResponse = slackClient.postMessage(new SlackPostMessageRequest(
                 createdMessageMapper.renderMessage(new EscalationCreatedMessage(escalation.id(), team)),
                 slackTicketsProps.channelId(),

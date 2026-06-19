@@ -167,16 +167,24 @@ export default function TicketsPage() {
   const ticketsContent = useMemo(() => (ticketsDataTyped?.content as TicketWithLogs[] | undefined) ?? [], [ticketsDataTyped]);
 
   const teamOptions = useMemo(() => {
-    const fromData = ticketsContent.map((t: TicketWithLogs) => t.team?.name).filter((name): name is string => !!name);
-    const fromRegistry = teamsData?.map((t: { name: string }) => t.name).filter(Boolean) ?? [];
-    return Array.from(new Set([...fromData, ...fromRegistry])).sort();
+    const byCode = new Map<string, string>();
+    ticketsContent.forEach((t: TicketWithLogs) => {
+      if (t.team?.name) byCode.set(t.team.name, t.team.label || t.team.name);
+    });
+    (teamsData ?? []).forEach((t: { name: string; label?: string }) => {
+      if (t.name) byCode.set(t.name, t.label || t.name);
+    });
+    return Array.from(byCode, ([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
   }, [ticketsContent, teamsData]);
 
   const escalatedToOptions = useMemo(() => {
-    const escalationTeams = ticketsContent.flatMap((t: TicketWithLogs) =>
-      (t.escalations ?? []).map((e) => e.team?.name).filter((name): name is string => !!name)
+    const byCode = new Map<string, string>();
+    ticketsContent.forEach((t: TicketWithLogs) =>
+      (t.escalations ?? []).forEach((e) => {
+        if (e.team?.name) byCode.set(e.team.name, e.team.label || e.team.name);
+      })
     );
-    return Array.from(new Set(escalationTeams)).sort();
+    return Array.from(byCode, ([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
   }, [ticketsContent]);
 
   // --- Filter tickets based on superuser/team + UI filters ---
@@ -375,29 +383,30 @@ export default function TicketsPage() {
             title="Team"
             value={teamFilter || undefined}
             onChange={(v) => setParams({ teamFilter: v ?? "" })}
-            options={[
-              ...(!isViewingAllTeams ? [{ label: "All Teams", value: ALL_TEAMS_FILTER }] : []),
-              ...teamOptions.map((name: string) => ({ label: name, value: name })),
-            ]}
+            options={[...(!isViewingAllTeams ? [{ label: "All Teams", value: ALL_TEAMS_FILTER }] : []), ...teamOptions]}
           />
         )}
         <SingleSelectFilter
           title="Impact"
           value={impactFilter || undefined}
           onChange={(v) => setParams({ impact: v ?? "" })}
-          options={(registryData?.impacts ?? []).map((impact: TicketImpact) => ({
-            label: impact.label,
-            value: impact.code,
-          }))}
+          options={(registryData?.impacts ?? [])
+            .filter((impact: TicketImpact) => impact.active !== false)
+            .map((impact: TicketImpact) => ({
+              label: impact.label,
+              value: impact.code,
+            }))}
         />
         <SingleSelectFilter
           title="Tag"
           value={tagFilter || undefined}
           onChange={(v) => setParams({ tag: v ?? "" })}
-          options={(registryData?.tags ?? []).map((tag: TicketTag) => ({
-            label: tag.label,
-            value: tag.code,
-          }))}
+          options={(registryData?.tags ?? [])
+            .filter((tag: TicketTag) => tag.active !== false)
+            .map((tag: TicketTag) => ({
+              label: tag.label,
+              value: tag.code,
+            }))}
         />
         <SingleSelectFilter
           title="Escalated"
@@ -413,7 +422,7 @@ export default function TicketsPage() {
           title="Escalated To"
           value={escalatedToFilter || undefined}
           onChange={(v) => setParams({ escalatedTo: v ?? "" })}
-          options={escalatedToOptions.map((name: string) => ({ label: name, value: name }))}
+          options={escalatedToOptions}
         />
       </div>
 
@@ -497,7 +506,7 @@ export default function TicketsPage() {
                 paginatedTickets.map((t: TicketWithLogs) => {
                   const { opened, closed } = getOpenedClosed(t);
                   const escalatedTo = Array.from(
-                    new Set((t.escalations ?? []).map((e) => e.team?.name).filter((name): name is string => !!name))
+                    new Set((t.escalations ?? []).map((e) => e.team?.label || e.team?.name).filter((name): name is string => !!name))
                   );
                   return (
                     <TableRow
@@ -530,20 +539,52 @@ export default function TicketsPage() {
                           {t.summary?.trim() ? t.summary : "—"}
                         </div>
                       </TableCell>
-                      <TableCell>{t.team?.name || "-"}</TableCell>
                       <TableCell>
-                        {registryData?.impacts.find((i: TicketImpact) => i.code === t.impact)?.label || t.impact || "-"}
+                        {t.team ? (
+                          <span className="inline-flex items-center gap-1">
+                            {t.team.label || t.team.name || "-"}
+                            {t.team.active === false && (
+                              <Badge variant="secondary" className="text-[10px]">
+                                Retired
+                              </Badge>
+                            )}
+                          </span>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          if (!t.impact) return "-";
+                          const impact = registryData?.impacts.find((i: TicketImpact) => i.code === t.impact);
+                          return (
+                            <span className="inline-flex items-center gap-1">
+                              {impact?.label || t.impact}
+                              {impact?.active === false && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  Retired
+                                </Badge>
+                              )}
+                            </span>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         {(t.tags?.length ?? 0) > 0
-                          ? t.tags
-                              ?.map(getTagLabel)
-                              .filter(Boolean)
-                              .map((tag, idx) => (
-                                <Badge key={`${t.id}-tag-${idx}`} variant="outline" className="mb-1 block w-fit last:mb-0">
-                                  {tag}
+                          ? t.tags?.map((code, idx) => {
+                              const tagMeta = registryData?.tags.find((x: TicketTag) => x.code === code);
+                              const retired = tagMeta?.active === false;
+                              return (
+                                <Badge
+                                  key={`${t.id}-tag-${idx}`}
+                                  variant="outline"
+                                  className="mb-1 flex w-fit items-center gap-1 last:mb-0"
+                                >
+                                  {tagMeta?.label || getTagLabel(code)}
+                                  {retired && <span className="text-muted-foreground text-[10px]">(retired)</span>}
                                 </Badge>
-                              ))
+                              );
+                            })
                           : "-"}
                       </TableCell>
                       {isAssignmentEnabled && <TableCell>{t.assignedTo || "-"}</TableCell>}

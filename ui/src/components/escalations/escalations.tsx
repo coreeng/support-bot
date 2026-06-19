@@ -267,7 +267,7 @@ export default function EscalationsPage() {
       } else if (sortColumn === "escalatingTeam") {
         cmp = (a.escalatingTeam || "").localeCompare(b.escalatingTeam || "");
       } else if (sortColumn === "escalatedTo") {
-        cmp = (a.team?.name || "").localeCompare(b.team?.name || "");
+        cmp = (a.team?.label || a.team?.name || "").localeCompare(b.team?.label || b.team?.name || "");
       } else if (sortColumn === "openedAt") {
         cmp = (a.openedAt || "").localeCompare(b.openedAt || "");
       } else if (sortColumn === "resolvedAt") {
@@ -303,17 +303,18 @@ export default function EscalationsPage() {
       .map(([tag, count]) => ({ tag, count }));
   }, [filteredEscalations]);
 
+  const teamLabel = (code?: string | null): string => (tenantTeamsData ?? []).find((t) => t.name === code)?.label || code || "";
   const secondTableTitle =
     selectedTeam === ALL_TEAMS_FILTER
       ? "All Escalations"
       : selectedTeam
-        ? `Escalated for ${selectedTeam}`
+        ? `Escalated for ${teamLabel(selectedTeam)}`
         : isViewingAsEscalationTeam && teamFilterSelectedTeam
-          ? `Escalated for ${teamFilterSelectedTeam}`
+          ? `Escalated for ${teamLabel(teamFilterSelectedTeam)}`
           : "All Escalations";
-  const scopeLabel = effectiveTeams.length === 0 ? "All Teams" : effectiveTeams.join(", ");
-  const teamFilterLabel = selectedTeam === ALL_TEAMS_FILTER ? "All Teams" : selectedTeam || "Current Team Scope";
-  const topTagsTitleSuffix = selectedTeam ? (selectedTeam === ALL_TEAMS_FILTER ? "for All Teams" : `for ${selectedTeam}`) : "";
+  const scopeLabel = effectiveTeams.length === 0 ? "All Teams" : effectiveTeams.map(teamLabel).join(", ");
+  const teamFilterLabel = selectedTeam === ALL_TEAMS_FILTER ? "All Teams" : teamLabel(selectedTeam) || "Current Team Scope";
+  const topTagsTitleSuffix = selectedTeam ? (selectedTeam === ALL_TEAMS_FILTER ? "for All Teams" : `for ${teamLabel(selectedTeam)}`) : "";
   const showEscalatedForColumn = hasFullAccess || selectedTeam === ALL_TEAMS_FILTER;
 
   const ANY_DATE = "__any";
@@ -410,10 +411,12 @@ export default function EscalationsPage() {
             title="Impact"
             value={impactFilter !== "all" ? impactFilter : undefined}
             onChange={(v) => setParams({ impact: v ?? "all", page: "0" })}
-            options={(registryData?.impacts ?? []).map((impact: { code: string; label: string }) => ({
-              label: impact.label,
-              value: impact.code,
-            }))}
+            options={(registryData?.impacts ?? [])
+              .filter((impact: { code: string; label: string; active?: boolean }) => impact.active !== false)
+              .map((impact) => ({
+                label: impact.label,
+                value: impact.code,
+              }))}
           />
           {!hasNoTeamScope && (
             <SingleSelectFilter
@@ -422,7 +425,7 @@ export default function EscalationsPage() {
               onChange={(v) => setParams({ selectedTeam: v ?? "", page: "0" })}
               options={[
                 ...(effectiveTeams.length > 0 ? [{ label: "All Teams", value: ALL_TEAMS_FILTER }] : []),
-                ...(tenantTeamsData ?? []).map((team) => ({ label: team.name, value: team.name })),
+                ...(tenantTeamsData ?? []).map((team) => ({ label: team.label || team.name, value: team.name })),
               ]}
             />
           )}
@@ -430,10 +433,12 @@ export default function EscalationsPage() {
             title="Tag"
             value={tagFilter || undefined}
             onChange={(v) => setParams({ tag: v ?? "", page: "0" })}
-            options={(registryData?.tags ?? []).map((tag: { code: string; label: string }) => ({
-              label: tag.label,
-              value: tag.code,
-            }))}
+            options={(registryData?.tags ?? [])
+              .filter((tag: { code: string; label: string; active?: boolean }) => tag.active !== false)
+              .map((tag) => ({
+                label: tag.label,
+                value: tag.code,
+              }))}
           />
         </div>
 
@@ -523,8 +528,8 @@ export default function EscalationsPage() {
                 return (
                   <tr key={esc.id} className="hover:bg-accent transition-colors">
                     <td className="px-4 py-2 text-sm">{esc.ticketId}</td>
-                    {showEscalatedForColumn && <td className="px-4 py-2 text-sm">{esc.escalatingTeam || "-"}</td>}
-                    <td className="px-4 py-2 text-sm">{esc.team?.name || "-"}</td>
+                    {showEscalatedForColumn && <td className="px-4 py-2 text-sm">{teamLabel(esc.escalatingTeam) || "-"}</td>}
+                    <td className="px-4 py-2 text-sm">{esc.team?.label || esc.team?.name || "-"}</td>
                     <td className="px-4 py-2">
                       <span
                         className={`rounded-full px-2 py-1 text-xs font-semibold ${esc.resolvedAt ? "bg-success/20 text-success" : "bg-warning/20 text-warning"}`}

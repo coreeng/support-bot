@@ -331,7 +331,7 @@ export default function HealthPage() {
   const ticketsByTeam = useMemo(() => {
     const counts: Record<string, number> = {};
     filteredTickets.forEach((t) => {
-      const teamName = t.team?.name || "Unassigned Team";
+      const teamName = t.team?.label || t.team?.name || "Unassigned Team";
       counts[teamName] = (counts[teamName] || 0) + 1;
     });
     return Object.entries(counts)
@@ -553,21 +553,21 @@ export default function HealthPage() {
 
   // --- Teams lists for filters (safe) ---
   const inquiringTeamsWithTickets = useMemo(() => {
-    const set = new Set<string>();
+    const byCode = new Map<string, string>();
     tickets?.content?.forEach((t) => {
-      if (t.team?.name) set.add(t.team.name);
+      if (t.team?.name) byCode.set(t.team.name, t.team.label || t.team.name);
     });
-    return Array.from(set);
+    return Array.from(byCode, ([value, label]) => ({ value, label }));
   }, [tickets]);
 
   const escalatedTeamsWithTickets = useMemo(() => {
-    const set = new Set<string>();
+    const byCode = new Map<string, string>();
     tickets?.content?.forEach((t) =>
       (t.escalations || []).forEach((e: Escalation) => {
-        if (e.team?.name) set.add(e.team.name);
+        if (e.team?.name) byCode.set(e.team.name, e.team.label || e.team.name);
       })
     );
-    return Array.from(set);
+    return Array.from(byCode, ([value, label]) => ({ value, label }));
   }, [tickets]);
 
   if (ticketsLoading || ratingsLoading) return <LoadingSkeleton />;
@@ -1478,7 +1478,7 @@ export default function HealthPage() {
                     setInquiringTeamFilter(v ?? "");
                     setCurrentPage(1);
                   }}
-                  options={inquiringTeamsWithTickets.map((team) => ({ label: team, value: team }))}
+                  options={inquiringTeamsWithTickets}
                 />
                 <SingleSelectFilter
                   title="Escalated To"
@@ -1487,7 +1487,7 @@ export default function HealthPage() {
                     setEscalatedTeamFilter(v ?? "");
                     setCurrentPage(1);
                   }}
-                  options={escalatedTeamsWithTickets.map((team) => ({ label: team, value: team }))}
+                  options={escalatedTeamsWithTickets}
                 />
                 <SingleSelectFilter
                   title="Status"
@@ -1565,7 +1565,7 @@ export default function HealthPage() {
                         const { opened } = getOpenedClosed(t);
                         return (
                           <TableRow key={t.id}>
-                            <TableCell>{t.team?.name || "-"}</TableCell>
+                            <TableCell>{t.team?.label || t.team?.name || "-"}</TableCell>
                             <TableCell>
                               {registryData?.impacts.find((i: TicketImpact) => i.code === t.impact)?.label || t.impact || "-"}
                             </TableCell>
@@ -1581,7 +1581,7 @@ export default function HealthPage() {
                             <TableCell>
                               {(t.escalations || []).length ? (
                                 (t.escalations || [])
-                                  .map((e: Escalation) => e.team?.name)
+                                  .map((e: Escalation) => e.team?.label || e.team?.name)
                                   .filter(Boolean)
                                   .join(", ")
                               ) : (

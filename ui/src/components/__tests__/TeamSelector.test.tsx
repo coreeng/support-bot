@@ -289,4 +289,28 @@ describe("TeamSelector", () => {
     expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining("team=Tenant+A"));
     expect(mockReplace).not.toHaveBeenCalledWith(expect.stringContaining("OldTeam"));
   });
+
+  it("shows the team display label while selecting by its code", async () => {
+    const setSelectedTeam = jest.fn();
+    mockUseTeamFilter.mockReturnValue({ selectedTeam: "pe", setSelectedTeam });
+    mockUseAuth.mockReturnValue({
+      user: {
+        teams: [{ name: "pe", label: "PE Core", types: ["tenant"], groupRefs: [] }],
+      },
+      isLeadership: false,
+      isSupportEngineer: false,
+    });
+
+    renderSelector();
+
+    // Trigger shows the friendly label, not the code.
+    expect(screen.getByTestId("team-selector-trigger")).toHaveTextContent("PE Core");
+
+    const user = await openMenu();
+    expect(screen.getByRole("menuitem", { name: /PE Core/ })).toBeInTheDocument();
+
+    // Selecting it writes the immutable code into the URL.
+    await user.click(screen.getByRole("menuitem", { name: /PE Core/ }));
+    expect(mockReplace).toHaveBeenCalledWith(expect.stringContaining("team=pe"));
+  });
 });

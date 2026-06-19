@@ -31,7 +31,7 @@ export interface Escalation {
   hasThread: boolean;
   openedAt: string;
   resolvedAt: string | null;
-  team: { name: string } | null;
+  team: { name: string; label?: string; active?: boolean } | null;
   escalatingTeam: string;
   tags: string[];
   impact: string | null;
@@ -56,7 +56,7 @@ export interface ParsedTicketLog extends TicketLog {
 export type TicketWithLogs = {
   id: string;
   status: string;
-  team?: { name: string } | null;
+  team?: { name: string; label?: string; active?: boolean } | null;
   query?: {
     link?: string;
     text?: string;
@@ -73,6 +73,8 @@ export type TicketWithLogs = {
 
 export type TicketTeam = {
   name: string;
+  label?: string;
+  active?: boolean;
 };
 
 export interface EscalationTeam extends TicketTeam {
@@ -82,11 +84,13 @@ export interface EscalationTeam extends TicketTeam {
 export type TicketImpact = {
   code: string;
   label: string;
+  active?: boolean;
 };
 
 export type TicketTag = {
   code: string;
   label: string;
+  active?: boolean;
 };
 
 export interface PaginatedTickets {
