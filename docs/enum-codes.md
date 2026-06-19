@@ -12,10 +12,12 @@ primary key. `label` is the display value and may be changed freely.
 
 ## Static teams
 
-`platform-integration.teams-scraping.static.teams[]` accept an optional `code` (and `label`).
-When omitted, `code` defaults to `name`, so the `name` doubles as the identity — renaming it
-orphans references. Set an explicit `code` to keep identity stable while changing the display
-`name`/`label`. The bot logs a startup warning for static teams without an explicit `code`.
+`platform-integration.teams-scraping.static.teams[]` take a `name` and an optional `code`. The
+`code` is the **identity** used for mapping (ticket/escalation references and the escalation↔platform
+join); the `name` is the **display** value. When `code` is omitted it defaults to `name`, so the
+`name` then doubles as the identity and renaming it orphans references. Set an explicit `code` to
+keep the identity stable while changing the displayed `name`. The bot logs a startup warning for
+static teams that have no explicit `code`.
 
 ## Startup validation
 
