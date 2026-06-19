@@ -264,7 +264,7 @@ export default function EditTicketModal({ ticketId, open, onOpenChange, onSucces
                   <ul className="divide-y">
                     {displayTicket.escalations.map((esc, idx) => (
                       <li key={idx} className="text-foreground flex h-9 items-center px-3">
-                        Escalated to <span className="ml-1 font-medium">{esc.team?.name || "Unknown team"}</span>
+                        Escalated to <span className="ml-1 font-medium">{esc.team?.label || esc.team?.name || "Unknown team"}</span>
                       </li>
                     ))}
                   </ul>
@@ -367,6 +367,7 @@ export default function EditTicketModal({ ticketId, open, onOpenChange, onSucces
                   const CLEAR_SENTINEL = "__clear__";
                   const suggested = isTeamSuggestionsError ? [] : (teamSuggestionsData?.suggestedTeams ?? []);
                   const others = isTeamSuggestionsError ? (teamsData?.map((t) => t.name) ?? []) : (teamSuggestionsData?.otherTeams ?? []);
+                  const teamLabel = (code: string) => teamsData?.find((t) => t.name === code)?.label || code;
                   return (
                     <div className="space-y-1">
                       <Select
@@ -388,7 +389,7 @@ export default function EditTicketModal({ ticketId, open, onOpenChange, onSucces
                               <SelectLabel>Suggested teams</SelectLabel>
                               {suggested.map((name) => (
                                 <SelectItem key={`s-${name}`} value={name}>
-                                  {name}
+                                  {teamLabel(name)}
                                 </SelectItem>
                               ))}
                             </SelectGroup>
@@ -399,7 +400,7 @@ export default function EditTicketModal({ ticketId, open, onOpenChange, onSucces
                               <SelectLabel>Others</SelectLabel>
                               {others.map((name) => (
                                 <SelectItem key={`o-${name}`} value={name}>
-                                  {name}
+                                  {teamLabel(name)}
                                 </SelectItem>
                               ))}
                             </SelectGroup>
@@ -419,7 +420,7 @@ export default function EditTicketModal({ ticketId, open, onOpenChange, onSucces
                   );
                 })()
               ) : (
-                <p className="text-foreground text-sm">{displayTicket.team?.name || "-"}</p>
+                <p className="text-foreground text-sm">{displayTicket.team?.label || displayTicket.team?.name || "-"}</p>
               )}
             </div>
 
@@ -435,10 +436,12 @@ export default function EditTicketModal({ ticketId, open, onOpenChange, onSucces
                     placeholder="Select tags..."
                     searchPlaceholder="Search tags..."
                     error={!!validationErrors.tags}
-                    options={(registryData?.tags ?? []).map((t: TicketTag) => ({
-                      label: t.label,
-                      value: t.code,
-                    }))}
+                    options={(registryData?.tags ?? [])
+                      .filter((t: TicketTag) => t.active !== false)
+                      .map((t: TicketTag) => ({
+                        label: t.label,
+                        value: t.code,
+                      }))}
                     selected={selectedTags}
                     onChange={(next) => {
                       setSelectedTags(next);
@@ -488,11 +491,14 @@ export default function EditTicketModal({ ticketId, open, onOpenChange, onSucces
                       <SelectValue placeholder="Select impact..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {registryData?.impacts.map((imp: TicketImpact) => (
-                        <SelectItem key={imp.code} value={imp.code}>
-                          {imp.label}
-                        </SelectItem>
-                      ))}
+                      {registryData?.impacts
+                        .filter((imp: TicketImpact) => imp.active !== false || imp.code === impact)
+                        .map((imp: TicketImpact) => (
+                          <SelectItem key={imp.code} value={imp.code}>
+                            {imp.label}
+                            {imp.active === false && " (retired)"}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   {validationErrors.impact && <p className="text-destructive text-sm">{validationErrors.impact}</p>}

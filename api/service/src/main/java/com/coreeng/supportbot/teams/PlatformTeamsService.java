@@ -41,7 +41,7 @@ public class PlatformTeamsService {
     private final PlatformTeamsFetchProps fetchProps;
 
     private final Map<String, PlatformUser> usersByEmail = new HashMap<>();
-    private final Map<String, PlatformTeam> teamByName = new HashMap<>();
+    private final Map<String, PlatformTeam> teamByCode = new HashMap<>();
     private final Map<GroupRef, List<PlatformUser>> groupRefToUsers = new HashMap<>();
 
     @PostConstruct
@@ -52,8 +52,8 @@ public class PlatformTeamsService {
 
         // Build team objects and collect unique group refs
         for (var t : teams) {
-            PlatformTeam team = teamByName.computeIfAbsent(
-                    t.name(), k -> new PlatformTeam(t.name(), new HashSet<>(), new HashSet<>()));
+            PlatformTeam team = teamByCode.computeIfAbsent(
+                    t.code(), k -> new PlatformTeam(t.name(), t.code(), new HashSet<>(), new HashSet<>()));
             team.groupRefs().add(t.groupRef());
         }
 
@@ -83,7 +83,7 @@ public class PlatformTeamsService {
         }
 
         groupRefToUsers.putAll(fetchedGroupUsers);
-        for (PlatformTeam team : teamByName.values()) {
+        for (PlatformTeam team : teamByCode.values()) {
             for (GroupRef groupRef : team.groupRefs()) {
                 List<PlatformUser> users = groupRefToUsers.getOrDefault(groupRef, List.of());
                 team.users().addAll(users);
@@ -94,7 +94,7 @@ public class PlatformTeamsService {
         }
 
         log.atInfo()
-                .addArgument(teamByName::size)
+                .addArgument(teamByCode::size)
                 .addArgument(groupRefToUsers::size)
                 .addArgument(usersByEmail::size)
                 .addArgument(() -> Duration.between(start, Instant.now()))
@@ -168,12 +168,12 @@ public class PlatformTeamsService {
     }
 
     private void validateEscalationTeamsMapping(List<PlatformTeamsFetcher.TeamAndGroupTuple> teams) {
-        ImmutableSet<String> teamNames =
-                teams.stream().map(PlatformTeamsFetcher.TeamAndGroupTuple::name).collect(toImmutableSet());
-        ImmutableSet<String> escalationTeamNames = escalationTeamsRegistry.listAllEscalationTeams().stream()
+        ImmutableSet<String> teamCodes =
+                teams.stream().map(PlatformTeamsFetcher.TeamAndGroupTuple::code).collect(toImmutableSet());
+        ImmutableSet<String> escalationTeamCodes = escalationTeamsRegistry.listAllEscalationTeams().stream()
                 .map(EscalationTeam::code)
                 .collect(toImmutableSet());
-        var setsDiff = Sets.difference(escalationTeamNames, teamNames);
+        var setsDiff = Sets.difference(escalationTeamCodes, teamCodes);
         if (!setsDiff.isEmpty()) {
             if (fetchProps.ignoreUnknownTeams()) {
                 log.info("""
@@ -181,13 +181,15 @@ public class PlatformTeamsService {
                     Ensure that it's expected that these teams are not found among platform teams.""", setsDiff);
             } else {
                 throw new IllegalStateException("Unknown escalation teams specified: "
-                        + setsDiff.stream().collect(joining(", ", "[", "]")));
+                        + setsDiff.stream().collect(joining(", ", "[", "]"))
+                        + ". An escalation team's code must match a platform team's code; if a platform team uses an "
+                        + "explicit code, set the same code on its escalation-teams entry.");
             }
         }
     }
 
     public ImmutableList<PlatformTeam> listTeams() {
-        return ImmutableList.copyOf(teamByName.values());
+        return ImmutableList.copyOf(teamByCode.values());
     }
 
     public ImmutableList<PlatformTeam> listTeamsByUserEmail(String email) {
@@ -198,8 +200,8 @@ public class PlatformTeamsService {
         return ImmutableList.copyOf(user.teams());
     }
 
-    @Nullable public PlatformTeam findTeamByName(String name) {
-        return teamByName.get(name);
+    @Nullable public PlatformTeam findTeamByCode(String code) {
+        return teamByCode.get(code);
     }
 
     @Nullable public PlatformUser findUserByEmail(String email) {

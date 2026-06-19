@@ -256,10 +256,12 @@ export default function EscalatedToMyTeamTable() {
             setImpactFilter(v ?? "all");
             setPageIndex(0);
           }}
-          options={(registryData?.impacts ?? []).map((impact: { code: string; label: string }) => ({
-            label: impact.label,
-            value: impact.code,
-          }))}
+          options={(registryData?.impacts ?? [])
+            .filter((impact) => impact.active !== false)
+            .map((impact: { code: string; label: string }) => ({
+              label: impact.label,
+              value: impact.code,
+            }))}
         />
         <SingleSelectFilter
           title="Tag"
@@ -268,10 +270,12 @@ export default function EscalatedToMyTeamTable() {
             setTagFilter(v ?? "");
             setPageIndex(0);
           }}
-          options={(registryData?.tags ?? []).map((tag: { code: string; label: string }) => ({
-            label: tag.label,
-            value: tag.code,
-          }))}
+          options={(registryData?.tags ?? [])
+            .filter((tag) => tag.active !== false)
+            .map((tag: { code: string; label: string }) => ({
+              label: tag.label,
+              value: tag.code,
+            }))}
         />
       </div>
 

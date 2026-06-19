@@ -35,6 +35,11 @@ public class EnumsService implements EscalationTeamsRegistry, TagsRegistry, Impa
 
     @Override
     public ImmutableList<TicketImpact> listAllImpacts() {
+        return impactsRepository.listAllActive();
+    }
+
+    @Override
+    public ImmutableList<TicketImpact> listAllImpactsIncludingRetired() {
         return impactsRepository.listAll();
     }
 
@@ -62,6 +67,11 @@ public class EnumsService implements EscalationTeamsRegistry, TagsRegistry, Impa
             }
             throw new RuntimeException("Cache retrieval failed for key: " + TAGS_CACHE_KEY, e);
         }
+    }
+
+    @Override
+    public ImmutableList<Tag> listAllTagsIncludingRetired() {
+        return tagsRepository.listAll();
     }
 
     @Override
