@@ -107,7 +107,9 @@ public class GitLabPrSourceClient implements PrSourceClient {
             reviews = List.of();
         }
 
-        return new PrMetadata(coord, prNumber, createdAt, state, mergeable, List.of(), reviews);
+        UserRefDto authorRef = mr.author();
+        String authorLogin = authorRef != null ? authorRef.username() : null;
+        return new PrMetadata(coord, prNumber, createdAt, state, mergeable, List.of(), reviews, authorLogin);
     }
 
     @Override
@@ -398,6 +400,7 @@ public class GitLabPrSourceClient implements PrSourceClient {
             @JsonProperty("created_at") @Nullable Instant createdAt,
             @JsonProperty("updated_at") @Nullable Instant updatedAt,
             @Nullable String state,
+            @JsonProperty("author") @Nullable UserRefDto author,
             @JsonProperty("detailed_merge_status") @Nullable String detailedMergeStatus) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)

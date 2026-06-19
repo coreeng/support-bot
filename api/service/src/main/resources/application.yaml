@@ -139,6 +139,10 @@ pr-review-tracking:
   #   - name: my-org/my-repo
   #     owning-team: <team-code from enums.escalation-teams>
   #     github-team-slug: <slug>  # optional: GitHub team slug for review validation; when absent, falls back to PR requested teams
+  #     allowed-author-teams:     # optional (PT-521): only track PRs whose author is in one of these GitHub teams
+  #       - <slug>
+  #     requires-codeowners: false  # optional (PT-445): repo needs a codeowner approval before the owning team merges
+  #     codeowner-team: <slug>      # optional (PT-445): team whose approval counts as the codeowner gate
   #     sla:
   #       file: ".pr-sla.yaml"  # optional: read SLA from this file in the repo
   #       default: 48h          # default SLA duration (required when file is not configured)
@@ -189,6 +193,9 @@ pr-review-tracking:
   #     provider: gitlab
   #     owning-team: <team-code from enums.escalation-teams>
   #     gitlab-group-path: my-group/reviewers   # group whose members count as owning-team reviewers
+  #     allowed-author-teams:                   # optional (PT-521): GitLab group paths whose members may have MRs tracked
+  #       - my-group/engineers
+  #     dynamic-approvals: false                # optional (PT-522): GitLab-only — wait for CI + MR Approval Policies to decide required approvals
   #     sla:
   #       default: 48h
   #   - name: platform/infra/cluster-config
