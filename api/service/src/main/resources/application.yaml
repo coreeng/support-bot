@@ -109,12 +109,11 @@ slack:
     socket-token: ${SLACK_SOCKET_TOKEN} # Token like: xapp-1-abc-def-ghi
     signing-secret: ${SLACK_SIGNING_SECRET} # Token like: 1234567890abcdef
   ticket:
-    channel-id: ${SLACK_TICKET_CHANNEL_ID:} # Channel ID like: C1234567890 (optional when slack.ticket.channels is configured)
-    # Multi-channel config. One bot can monitor several channels, each with its own `track` mode:
+    # Recommended: monitor one or more channels via `channels`, each with its own `track` mode:
     #   QUERIES - only normal support queries (PR detection disabled)
     #   PRS     - only PR-link tickets (the normal query/reaction flow is suppressed)
     #   BOTH    - both (default when `track` is omitted)
-    # When `channels` is non-empty it takes precedence over `channel-id`.
+    # When `channels` is non-empty it takes precedence over the deprecated `channel-id` below.
     # channels:
     #   - name: cecg-product-support-local
     #     id: C0ADA3KLH9P
@@ -125,6 +124,9 @@ slack:
     #   - name: cecg-product-support-local-queries
     #     id: C0BBD436YKF
     #     track: QUERIES
+    # Deprecated: legacy single-channel config, kept for backward compatibility. Equivalent to one
+    # `channels` entry tracking BOTH; prefer `channels` above for new deployments.
+    channel-id: ${SLACK_TICKET_CHANNEL_ID:} # Channel ID like: C1234567890 (optional when slack.ticket.channels is set)
     expected-initial-reaction: eyes
     response-initial-reaction: ticket
     resolved-reaction: white_check_mark
