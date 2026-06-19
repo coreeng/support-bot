@@ -27,11 +27,11 @@ public class EnumConfigValidator implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         List<String> problems = new ArrayList<>();
-        problems.addAll(findProblems("enums.escalation-teams", enumProps.escalationTeams()));
-        problems.addAll(findProblems("enums.tags", enumProps.tags()));
-        problems.addAll(findProblems("enums.impacts", enumProps.impacts()));
+        problems.addAll(validateCodes("enums.escalation-teams", enumProps.escalationTeams()));
+        problems.addAll(validateCodes("enums.tags", enumProps.tags()));
+        problems.addAll(validateCodes("enums.impacts", enumProps.impacts()));
         if (staticTeamsProps.enabled()) {
-            problems.addAll(findStaticTeamProblems(staticTeamsProps.teams()));
+            problems.addAll(validateStaticTeamCodes(staticTeamsProps.teams()));
         }
 
         if (!problems.isEmpty()) {
@@ -41,7 +41,7 @@ public class EnumConfigValidator implements ApplicationRunner {
         log.atInfo().log("Enum config validation passed");
     }
 
-    private static List<String> findProblems(String path, ImmutableList<? extends EnumerationValue> values) {
+    private static List<String> validateCodes(String path, ImmutableList<? extends EnumerationValue> values) {
         List<String> problems = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (EnumerationValue value : values) {
@@ -55,7 +55,7 @@ public class EnumConfigValidator implements ApplicationRunner {
         return problems;
     }
 
-    private static List<String> findStaticTeamProblems(List<StaticPlatformTeamsProps.TeamConfig> teams) {
+    private static List<String> validateStaticTeamCodes(List<StaticPlatformTeamsProps.TeamConfig> teams) {
         List<String> problems = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (StaticPlatformTeamsProps.TeamConfig team : teams) {
