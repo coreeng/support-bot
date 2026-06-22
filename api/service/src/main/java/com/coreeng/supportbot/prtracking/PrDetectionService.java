@@ -331,6 +331,10 @@ public class PrDetectionService {
                 .findFirst();
 
         if (repoConfig.isPresent()) {
+            // Author admission gate (PT-521): runs before any tracking record or Slack side effect.
+            if (!authorAllowed(detectedPr, repoConfig.get(), prMetadata, teamReviewerCache)) {
+                return PerPrResult.SKIPPED;
+            }
             // Repo is configured for PR tracking with or without SLA
             if (repoConfig.get().hasNoSla()) {
                 // No-SLA tracking: track by path filter without a deadline or escalation.
@@ -359,6 +363,62 @@ public class PrDetectionService {
                     .log("Repo {} is not configured for PR tracking, skipping");
             return PerPrResult.SKIPPED;
         }
+    }
+
+    /**
+     * Author admission gate (PT-521). When a repo configures {@code allowed-author-teams}, only
+     * PRs/MRs whose author belongs to at least one of those teams are tracked; everyone else is
+     * skipped before a tracking record (or any Slack side effect) is created.
+     *
+     * <p>Fails open — we never silently drop a PR because of a transient lookup problem. Tracking
+     * proceeds when no allow-list is configured, when the provider returned no author, or when team
+     * membership could not be fully resolved; we skip only when every configured team resolved and
+     * the author was in none of them. Membership is any-of, and GitLab inherited/invited-group
+     * members count (resolution uses {@code /members/all}). Mirrors {@link TeamReviewFilter}'s
+     * graceful-degradation stance.
+     */
+    private boolean authorAllowed(
+            DetectedPr detectedPr,
+            PrTrackingProps.Repository repoConfig,
+            PrMetadata prMetadata,
+            Map<String, Optional<Set<String>>> teamReviewerCache) {
+        List<String> allowedTeams = repoConfig.allowedAuthorTeams();
+        if (allowedTeams.isEmpty()) {
+            return true;
+        }
+        String author = prMetadata.authorLogin();
+        if (author == null) {
+            log.atWarn()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .log("PR {}#{} has no resolved author but allowed-author-teams is configured — tracking anyway");
+            return true;
+        }
+        RepoCoord coord = new RepoCoord(detectedPr.provider(), detectedPr.repositoryName());
+        boolean allResolved = true;
+        for (String team : allowedTeams) {
+            Set<String> members = teamReviewFilter.resolveTeamMembers(coord, team, teamReviewerCache);
+            if (members == null) {
+                allResolved = false;
+                continue;
+            }
+            if (members.contains(author)) {
+                return true;
+            }
+        }
+        if (!allResolved) {
+            log.atWarn()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .log("PR {}#{} allowed-author-teams membership could not be fully resolved — tracking anyway");
+            return true;
+        }
+        log.atInfo()
+                .addArgument(detectedPr::repositoryName)
+                .addArgument(detectedPr::pullNumber)
+                .addArgument(() -> author)
+                .log("PR {}#{} author {} is not in any allowed-author-team — skipping tracking");
+        return false;
     }
 
     private PerPrResult processOpenPr(

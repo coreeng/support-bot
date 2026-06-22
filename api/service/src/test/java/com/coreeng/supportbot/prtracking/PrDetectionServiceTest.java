@@ -2174,6 +2174,152 @@ class PrDetectionServiceTest {
     // Helpers
     // -------------------------------------------------------------------------
 
+    // -------------------------------------------------------------------------
+    // Author admission gate (PT-521)
+    // -------------------------------------------------------------------------
+
+    @Nested
+    class AuthorAdmissionGate {
+
+        private static final String ALLOWED_TEAM = "platform-team";
+
+        private PrTrackingProps.Repository repoWithAllowedAuthorTeams(String... teams) {
+            return new PrTrackingProps.Repository(
+                    REPO,
+                    TEAM_CODE,
+                    Provider.GITHUB,
+                    null,
+                    null,
+                    List.of(),
+                    sla(SLA_24H),
+                    null,
+                    null,
+                    List.of(teams),
+                    false,
+                    null,
+                    false);
+        }
+
+        private void stubDetectedOpenPr(@Nullable String authorLogin) {
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            Instant.now().minus(Duration.ofHours(1)),
+                            PrMetadata.PrState.OPEN,
+                            null,
+                            List.of(),
+                            List.of(),
+                            authorLogin));
+        }
+
+        @Test
+        void skipsTrackingWhenAuthorNotInAnyAllowedTeam() {
+            // given — author "outsider" is not a member of the configured allowed team
+            stubDetectedOpenPr("outsider");
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoWithAllowedAuthorTeams(ALLOWED_TEAM)));
+            when(prSourceClient.resolveTeamMembers(COORD, ALLOWED_TEAM)).thenReturn(List.of("insider"));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — no record, no Slack side effects
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).postMessage(any());
+        }
+
+        @Test
+        void tracksWhenAuthorInAllowedTeam() {
+            // given
+            stubDetectedOpenPr("insider");
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoWithAllowedAuthorTeams(ALLOWED_TEAM)));
+            when(prSourceClient.resolveTeamMembers(COORD, ALLOWED_TEAM)).thenReturn(List.of("insider"));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(Instant.now(), Instant.now().plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then
+            verify(prTrackingRepository).insertIfAbsent(any());
+        }
+
+        @Test
+        void tracksWhenAuthorIsInAnyOfMultipleAllowedTeams() {
+            // given — author is in the second configured team (any-of semantics)
+            stubDetectedOpenPr("insider");
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoWithAllowedAuthorTeams("team-a", "team-b")));
+            when(prSourceClient.resolveTeamMembers(COORD, "team-a")).thenReturn(List.of("someone-else"));
+            when(prSourceClient.resolveTeamMembers(COORD, "team-b")).thenReturn(List.of("insider"));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(Instant.now(), Instant.now().plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then
+            verify(prTrackingRepository).insertIfAbsent(any());
+        }
+
+        @Test
+        void tracksWhenNoAllowListConfigured() {
+            // given — no allowed-author-teams: every author is tracked, gate never resolves teams
+            stubDetectedOpenPr("anyone");
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(
+                            List.of(new PrTrackingProps.Repository(REPO, TEAM_CODE, null, List.of(), sla(SLA_24H))));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(Instant.now(), Instant.now().plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then
+            verify(prTrackingRepository).insertIfAbsent(any());
+            verify(prSourceClient, never()).resolveTeamMembers(any(), any());
+        }
+
+        @Test
+        void tracksWhenAuthorUnknownFailsOpen() {
+            // given — provider returned no author; allow-list configured but we can't verify
+            stubDetectedOpenPr(null);
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoWithAllowedAuthorTeams(ALLOWED_TEAM)));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(Instant.now(), Instant.now().plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — tracked, and we never even attempted resolution
+            verify(prTrackingRepository).insertIfAbsent(any());
+            verify(prSourceClient, never()).resolveTeamMembers(any(), any());
+        }
+
+        @Test
+        void tracksWhenTeamMembershipUnresolvableFailsOpen() {
+            // given — the team lookup fails (e.g. forbidden); must not drop the PR
+            stubDetectedOpenPr("outsider");
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoWithAllowedAuthorTeams(ALLOWED_TEAM)));
+            when(prSourceClient.resolveTeamMembers(COORD, ALLOWED_TEAM)).thenThrow(new PrSourceException("forbidden"));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(Instant.now(), Instant.now().plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then
+            verify(prTrackingRepository).insertIfAbsent(any());
+        }
+    }
+
     private static MessagePosted messagePostedWith(String text) {
         MessageRef ref = new MessageRef(QUERY_TS, null, CHANNEL_ID);
         return new MessagePosted(text, "U_USER", ref);
