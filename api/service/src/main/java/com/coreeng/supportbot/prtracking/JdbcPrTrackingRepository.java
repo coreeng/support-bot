@@ -380,7 +380,8 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     @Override
     public RequestBreakdown getRequestBreakdown(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
         // Compares PR tickets against ALL support tickets that came in during the window, so every count
-        // is bucketed by when the support request arrived — making the PR and intervention counts true subsets of the total.
+        // is bucketed by when the support request arrived — making the PR and intervention counts true subsets of the
+        // total.
         // Bind order matches the textual '?' order: the manual-source filter (SELECT list) first,
         // then the query.date range in the WHERE clause.
         List<Object> binds = new ArrayList<>();
