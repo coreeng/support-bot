@@ -41,6 +41,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/**
+ * Polls tracked PRs and advances their lifecycle. The FSM is expressed declaratively in {@link
+ * PrLifecycle}: this class is the imperative shell — {@code observe()} snapshots the world, {@link
+ * PrLifecycle#decide} picks the next state + ordered effects (pure), and {@code apply()} runs them.
+ */
 @Component
 @ConditionalOnProperty(name = "pr-review-tracking.enabled", havingValue = "true")
 @RequiredArgsConstructor
@@ -95,7 +100,10 @@ public class PrLifecyclePoller {
         }
 
         if (pr.isClosed()) {
-            handlePrClosed(record, pr);
+            // Closed/merged PRs skip team-filtering and activity-timestamp updates: the verdict is
+            // irrelevant (the closed rows of the table fire regardless of it), so there's no reason to
+            // pay the team-membership lookups for a record we're about to terminate.
+            apply(record, PrLifecycle.decide(observe(record, pr, null)));
             return;
         }
 
@@ -103,13 +111,7 @@ public class PrLifecyclePoller {
                 pr.reviews(), pr, findRepoConfig(record.provider(), record.repo()), teamMemberCache);
         Review latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
 
-        switch (record.status()) {
-            case OPEN -> processOpenRecord(record, pr, latestVerdict);
-            case CHANGES_REQUESTED -> processChangesRequestedRecord(record, pr, latestVerdict);
-            case APPROVED -> processApprovedRecord(record, pr, latestVerdict);
-            case ESCALATED -> processEscalatedRecord(record, pr, latestVerdict);
-            default -> log.atWarn().addArgument(record::status).log("Unexpected active record status: {}");
-        }
+        apply(record, PrLifecycle.decide(observe(record, pr, latestVerdict)));
 
         updateActivityTimestamps(record, teamReviews);
     }
@@ -124,108 +126,79 @@ public class PrLifecyclePoller {
                 .orElse(null);
     }
 
-    // OPEN → CHANGES_REQUESTED | APPROVED | CLOSED (via approved+mergeable) | ESCALATED (SLA breach) | no-op
-    private void processOpenRecord(PrTrackingRecord record, PrMetadata pr, @Nullable Review latestVerdict) {
-        if (latestVerdict != null && latestVerdict.requestsChanges()) {
-            Duration remaining = computeRemainingDuration(record);
+    // ── Functional core wiring ──
 
-            if (remaining != null) {
-                prTrackingRepository.pauseSla(record.id(), PrTrackingStatus.CHANGES_REQUESTED, remaining);
-            } else if (record.slaRemaining() == null) {
-                // No-SLA PR tracking record (slaDeadline and slaRemaining are not set)
+    /**
+     * The only impure step: snapshots {@code now()} and derives the SLA-clock fields. {@code
+     * remainingForPause} is non-null exactly when there is a live deadline, and {@code slaBreached}
+     * can only be true with one — so a no-SLA record never escalates.
+     */
+    private PrLifecycle.Observation observe(PrTrackingRecord record, PrMetadata pr, @Nullable Review latestVerdict) {
+        Instant now = Instant.now();
+        PrLifecycle.Verdict verdict = latestVerdict == null
+                ? null
+                : latestVerdict.isApproved() ? PrLifecycle.Verdict.APPROVED : PrLifecycle.Verdict.CHANGES_REQUESTED;
+        Instant deadline = record.slaDeadline();
+        Duration remainingForPause = deadline == null ? null : clampNonNegative(Duration.between(now, deadline));
+        boolean slaBreached = deadline != null && now.isAfter(deadline);
+        return new PrLifecycle.Observation(
+                record.status(),
+                verdict,
+                pr.isMergeable(),
+                pr.state() == PrMetadata.PrState.MERGED,
+                pr.isClosed(),
+                slaBreached,
+                deadline != null,
+                remainingForPause,
+                record.slaRemaining());
+    }
+
+    /**
+     * The only place that touches the repository / Slack / escalation. Writes the status row implied by
+     * {@code (next, slaOp)}, then runs effects in list order. The one exception: {@link
+     * PrLifecycle.Effect.Escalate} owns its own status write — it is gated on ticket existence and the
+     * escalation result — so the generic write is skipped when one is present.
+     */
+    private void apply(PrTrackingRecord record, PrLifecycle.Decision decision) {
+        boolean escalateOwnsWrite = decision.effects().stream().anyMatch(e -> e instanceof PrLifecycle.Effect.Escalate);
+        switch (decision.slaOp()) {
+            case PrLifecycle.SlaOp.Pause pause ->
+                prTrackingRepository.pauseSla(record.id(), decision.next(), pause.remaining());
+            case PrLifecycle.SlaOp.Resume ignored ->
+                prTrackingRepository.resumeSla(record.id(), Instant.now().plus(checkNotNull(record.slaRemaining())));
+            case PrLifecycle.SlaOp.SetClosedAt ignored -> {
                 prTrackingRepository.updateStatus(
-                        record.id(), PrTrackingStatus.CHANGES_REQUESTED, null, record.escalationId());
-            }
-            notifyChangesRequested(record);
-
-        } else if (latestVerdict != null && latestVerdict.isApproved()) {
-            handleApproval(record, pr);
-        } else if (record.slaDeadline() != null && Instant.now().isAfter(record.slaDeadline())) {
-            handleSlaBreached(record);
-        }
-    }
-
-    // CHANGES_REQUESTED → APPROVED | CLOSED (approved+mergeable) | OPEN (no actionable reviews remain)
-    private void processChangesRequestedRecord(PrTrackingRecord record, PrMetadata pr, @Nullable Review latestVerdict) {
-        if (latestVerdict != null && latestVerdict.isApproved()) {
-            handleApproval(record, pr);
-        } else if (latestVerdict == null) {
-            // No actionable reviews remain (all dismissed or retracted) — resume SLA
-            resumeSlaToOpen(record);
-        }
-    }
-
-    // APPROVED → CLOSED (mergeable, checked first) | CHANGES_REQUESTED (re-review, only if not mergeable) | no-op
-    private void processApprovedRecord(PrTrackingRecord record, PrMetadata pr, @Nullable Review latestVerdict) {
-        if (pr.isMergeable()) {
-            handleApprovalClosure(record);
-        } else if (latestVerdict != null && latestVerdict.requestsChanges()) {
-            // SLA remains paused: updateStatus does not touch sla_remaining/sla_deadline for non-CLOSED
-            // transitions. The existing sla_remaining from APPROVED carries over to CHANGES_REQUESTED.
-            prTrackingRepository.updateStatus(
-                    record.id(), PrTrackingStatus.CHANGES_REQUESTED, null, record.escalationId());
-            notifyChangesRequested(record);
-        }
-    }
-
-    // ESCALATED → APPROVED | CLOSED (approved+mergeable) | CHANGES_REQUESTED
-    private void processEscalatedRecord(PrTrackingRecord record, PrMetadata pr, @Nullable Review latestVerdict) {
-        if (latestVerdict != null && latestVerdict.isApproved()) {
-            if (pr.isMergeable()) {
-                handleApprovalClosure(record);
-            } else {
-                prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.APPROVED, null, record.escalationId());
+                        record.id(), PrTrackingStatus.CLOSED, Instant.now(), record.escalationId());
                 log.atInfo()
                         .addArgument(record::repo)
                         .addArgument(record::prNumber)
-                        .log("PR {}#{} approved after escalation — awaiting merge");
+                        .log("PR {}#{} marked as CLOSED");
             }
-        } else if (latestVerdict != null && latestVerdict.requestsChanges()) {
-            prTrackingRepository.updateStatus(
-                    record.id(), PrTrackingStatus.CHANGES_REQUESTED, null, record.escalationId());
-            notifyChangesRequested(record);
+            case PrLifecycle.SlaOp.None ignored -> {
+                if (decision.next() != record.status() && !escalateOwnsWrite) {
+                    prTrackingRepository.updateStatus(record.id(), decision.next(), null, record.escalationId());
+                }
+            }
+        }
+        for (PrLifecycle.Effect effect : decision.effects()) {
+            runEffect(record, effect);
         }
     }
 
-    // Called from OPEN and CHANGES_REQUESTED. Closes if mergeable; pauses SLA (APPROVED) when OPEN; transitions to
-    // APPROVED otherwise.
-    private void handleApproval(PrTrackingRecord record, PrMetadata pr) {
-        if (pr.isMergeable()) {
-            handleApprovalClosure(record);
-        } else {
-            Duration remaining = computeRemainingDuration(record);
-            if (record.status() == PrTrackingStatus.OPEN && remaining != null) {
-                prTrackingRepository.pauseSla(record.id(), PrTrackingStatus.APPROVED, remaining);
-                log.atInfo()
-                        .addArgument(record::repo)
-                        .addArgument(record::prNumber)
-                        .log("PR {}#{} approved — SLA paused, awaiting merge");
-            } else {
-                prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.APPROVED, null, record.escalationId());
-                log.atInfo()
-                        .addArgument(record::repo)
-                        .addArgument(record::prNumber)
-                        .log("PR {}#{} approved — awaiting merge");
-            }
+    private void runEffect(PrTrackingRecord record, PrLifecycle.Effect effect) {
+        switch (effect) {
+            case PrLifecycle.Effect.NotifyChangesRequested ignored -> notifyChangesRequested(record);
+            case PrLifecycle.Effect.NotifyApproved ignored -> notifyClosure(record, MessageEvent.APPROVED);
+            case PrLifecycle.Effect.NotifyClosed notify -> notifyClosure(record, notify.event());
+            case PrLifecycle.Effect.Escalate ignored -> escalate(record);
         }
     }
 
-    private void handlePrClosed(PrTrackingRecord record, PrMetadata pr) {
-        boolean isMerged = pr.state() == PrMetadata.PrState.MERGED;
-        MessageEvent event = isMerged ? MessageEvent.MERGED : MessageEvent.CLOSED;
-        PrMessageContext ctx = recordContext(record);
-        String override = messageRenderer.render(record.repo(), event, ctx);
-        String message = override != null
-                ? override
-                : "%s `%s%s%d` has been %s. :white_check_mark:"
-                        .formatted(
-                                PrTerminology.noun(record.provider()),
-                                record.repo(),
-                                PrTerminology.separator(record.provider()),
-                                record.prNumber(),
-                                isMerged ? "merged" : "closed");
-        closeRecordAndNotify(record, message);
+    private static Duration clampNonNegative(Duration d) {
+        return d.isNegative() ? Duration.ZERO : d;
     }
+
+    // ── Effects (imperative shell) ──
 
     private void notifyChangesRequested(PrTrackingRecord record) {
         log.atInfo().addArgument(record::repo).addArgument(record::prNumber).log("PR {}#{} changes requested");
@@ -251,24 +224,13 @@ public class PrLifecyclePoller {
         postMessage(message, ticket.channelId(), ticket.queryTs(), record);
     }
 
-    private void handleApprovalClosure(PrTrackingRecord record) {
-        PrMessageContext ctx = recordContext(record);
-        String override = messageRenderer.render(record.repo(), MessageEvent.APPROVED, ctx);
-        String message = override != null
-                ? override
-                : "%s `%s%s%d` has been approved and is ready to merge. :white_check_mark:"
-                        .formatted(
-                                PrTerminology.noun(record.provider()),
-                                record.repo(),
-                                PrTerminology.separator(record.provider()),
-                                record.prNumber());
-        closeRecordAndNotify(record, message);
-    }
-
-    private void closeRecordAndNotify(PrTrackingRecord record, String message) {
-        prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.CLOSED, Instant.now(), record.escalationId());
-        log.atInfo().addArgument(record::repo).addArgument(record::prNumber).log("PR {}#{} marked as CLOSED");
-
+    /**
+     * Posts the closure message (approved / merged / closed) and auto-closes the ticket when this was
+     * the last closable PR for it. The status write to {@code CLOSED} has already happened in {@link
+     * #apply} via {@link PrLifecycle.SlaOp.SetClosedAt}, so this runs after it — preserving the old
+     * "close, post, then auto-close" order.
+     */
+    private void notifyClosure(PrTrackingRecord record, MessageEvent event) {
         Ticket ticket = ticketRepository.findTicketById(new TicketId(record.ticketId()));
         if (ticket == null) {
             log.atWarn()
@@ -277,7 +239,7 @@ public class PrLifecyclePoller {
             return;
         }
 
-        postMessage(message, ticket.channelId(), ticket.queryTs(), record);
+        postMessage(closureMessage(record, event), ticket.channelId(), ticket.queryTs(), record);
 
         if (!record.canAutoCloseTicket()) {
             log.atInfo()
@@ -293,7 +255,34 @@ public class PrLifecyclePoller {
         }
     }
 
-    private void handleSlaBreached(PrTrackingRecord record) {
+    private String closureMessage(PrTrackingRecord record, MessageEvent event) {
+        String override = messageRenderer.render(record.repo(), event, recordContext(record));
+        if (override != null) {
+            return override;
+        }
+        String verbPhrase =
+                switch (event) {
+                    case APPROVED -> "approved and is ready to merge";
+                    case MERGED -> "merged";
+                    case CLOSED -> "closed";
+                    default -> throw new IllegalArgumentException("Not a closure event: " + event);
+                };
+        return "%s `%s%s%d` has been %s. :white_check_mark:"
+                .formatted(
+                        PrTerminology.noun(record.provider()),
+                        record.repo(),
+                        PrTerminology.separator(record.provider()),
+                        record.prNumber(),
+                        verbPhrase);
+    }
+
+    /**
+     * Compound effect (preserved from the old {@code handleSlaBreached}). Owns its own status write:
+     * the custom escalation message is posted <em>before</em> the escalation card; the {@code ESCALATED}
+     * write uses the new escalation id, or null when creation failed (to avoid reprocessing); and if the
+     * ticket is missing nothing is written at all, so the record retries on the next poll.
+     */
+    private void escalate(PrTrackingRecord record) {
         Ticket ticket = ticketRepository.findTicketById(new TicketId(record.ticketId()));
         if (ticket == null) {
             log.atWarn().addArgument(record::ticketId).log("Ticket {} not found for SLA breach, skipping");
@@ -349,24 +338,6 @@ public class PrLifecyclePoller {
                 && (record.lastReviewAt() == null || latestReviewAt.isAfter(record.lastReviewAt()))) {
             prTrackingRepository.updateActivityTimestamps(record.id(), latestReviewAt, record.lastAuthorActivityAt());
         }
-    }
-
-    private void resumeSlaToOpen(PrTrackingRecord record) {
-        if (record.slaRemaining() == null) {
-            log.atWarn().addArgument(record::id).log("Cannot resume SLA for record {} — no remaining duration stored");
-            return;
-        }
-        Instant newDeadline = Instant.now().plus(record.slaRemaining());
-        prTrackingRepository.resumeSla(record.id(), newDeadline);
-        log.atInfo().addArgument(record::repo).addArgument(record::prNumber).log("PR {}#{} — SLA resumed");
-    }
-
-    private @Nullable Duration computeRemainingDuration(PrTrackingRecord record) {
-        if (record.slaDeadline() == null) {
-            return null;
-        }
-        Duration remaining = Duration.between(Instant.now(), record.slaDeadline());
-        return remaining.isNegative() ? Duration.ZERO : remaining;
     }
 
     private PrMessageContext recordContext(PrTrackingRecord record) {

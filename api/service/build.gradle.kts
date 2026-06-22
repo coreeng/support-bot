@@ -161,6 +161,8 @@ tasks.withType<Test> {
         "-javaagent:${mockitoAgent.asPath}",
         "-XX:+EnableDynamicAgentLoading", "-Xshare:off"
     )
+    // Lets `-DupdateGolden=true` reach golden-file tests (e.g. MermaidRendererTest) to regenerate artefacts.
+    System.getProperty("updateGolden")?.let { systemProperty("updateGolden", it) }
 }
 
 tasks.withType<JavaCompile>().configureEach {
