@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.slack.MessageTs;
@@ -37,13 +36,10 @@ class EscalationProcessingServiceTest {
     @Mock
     private EscalationTeamsRegistry escalationTeamsRegistry;
 
-    @Mock
-    private SlackTicketsProps slackTicketsProps;
-
     @BeforeEach
     public void setup() {
         processingService = new EscalationProcessingService(
-                escalationRepository, escalationMapper, slackClient, escalationTeamsRegistry, slackTicketsProps);
+                escalationRepository, escalationMapper, slackClient, escalationTeamsRegistry);
     }
 
     @Test

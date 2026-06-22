@@ -5,7 +5,6 @@ import com.coreeng.supportbot.analysis.ThreadsAwaitingAnalysisRepository.ThreadT
 import com.coreeng.supportbot.analysis.llm.LlmAnalysisService;
 import com.coreeng.supportbot.asyncjob.AsyncJobRepository;
 import com.coreeng.supportbot.config.AnalysisProps;
-import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.google.common.collect.ImmutableList;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -65,7 +64,6 @@ public class AnalysisService {
     private final LlmAnalysisService llmAnalysisService;
     private final AnalysisRepository analysisRepository;
     private final AnalysisProps analysisProps;
-    private final SlackTicketsProps slackTicketsProps;
     private final ApplicationContext applicationContext;
 
     private static final AnalysisStatus IDLE_STATUS = new AnalysisStatus(null, null, null, false, null);
@@ -178,7 +176,7 @@ public class AnalysisService {
             for (ThreadToAnalyze thread : threads) {
                 try {
                     AnalysisRecord record = llmAnalysisService.analyzeThread(
-                            slackTicketsProps.channelId(), thread.threadTs(), thread.ticketId(), prompt);
+                            thread.channelId(), thread.threadTs(), thread.ticketId(), prompt);
 
                     if (record == null || !record.isValid()) {
                         log.warn("Skipping invalid analysis result for ticket {}", thread.ticketId());

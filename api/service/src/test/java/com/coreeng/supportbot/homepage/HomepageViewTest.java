@@ -64,7 +64,7 @@ class HomepageViewTest {
                 .page(0)
                 .totalPages(1)
                 .totalTickets(20)
-                .channelId("C123")
+                .channelIds(ImmutableList.of("C123"))
                 .timestamp(Instant.now())
                 .state(HomepageView.State.getDefault())
                 .build();
@@ -94,7 +94,7 @@ class HomepageViewTest {
                 .page(0)
                 .totalPages(1)
                 .totalTickets(20)
-                .channelId("C123")
+                .channelIds(ImmutableList.of("C123"))
                 .timestamp(Instant.now())
                 .state(HomepageView.State.getDefault())
                 .build();

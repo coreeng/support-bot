@@ -6,6 +6,8 @@ import static org.mockito.Mockito.*;
 import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.AnalysisProps;
+import com.coreeng.supportbot.config.SlackChannelProps;
+import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,14 +44,15 @@ class SummaryDataControllerTest {
     @Mock
     private AnalysisResultsService analysisResultsService;
 
-    private SlackTicketsProps slackTicketsProps;
+    private SlackChannelRegistry channelRegistry;
     private AnalysisProps analysisProps;
     private ObjectMapper objectMapper;
     private SummaryDataController controller;
 
     @BeforeEach
     void setUp() {
-        slackTicketsProps = new SlackTicketsProps("C123", "eyes", "eyes", "white_check_mark", "sos");
+        channelRegistry = new SlackChannelRegistry(
+                new SlackTicketsProps("C123", List.of(), "eyes", "eyes", "white_check_mark", "sos"));
         AnalysisProps.Vertex vertex =
                 new AnalysisProps.Vertex("test-project", "europe-west2", "gemini-2.5-flash", Duration.ofMillis(100));
         AnalysisProps.Bundle bundle = new AnalysisProps.Bundle("classpath:placeholder-analysis-bundle.zip");
@@ -57,7 +60,7 @@ class SummaryDataControllerTest {
         analysisProps = new AnalysisProps(vertex, bundle, prompt);
         objectMapper = new ObjectMapper();
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+                threadService, channelRegistry, analysisProps, analysisResultsService, objectMapper);
     }
 
     // --- Export tests ---
@@ -93,6 +96,84 @@ class SummaryDataControllerTest {
         assertThat(fileNames).containsExactly("1700000000.000001.txt", "1700000000.000002.txt");
         assertThat(fileContents).containsExactly("Thread one content", "Thread two content");
         verify(threadService).getThreadsWithCheckMarkAsText("C123", 31);
+    }
+
+    @Test
+    void export_shouldSkipChannelThatFailsAndStillExportOtherChannels() throws IOException {
+        // given two monitored channels where the first fails to fetch (e.g. the bot is not a member)
+        SlackChannelRegistry multiChannel = new SlackChannelRegistry(new SlackTicketsProps(
+                null,
+                List.of(
+                        new SlackChannelProps("a", "C-a", SlackChannelProps.TrackMode.BOTH),
+                        new SlackChannelProps("b", "C-b", SlackChannelProps.TrackMode.BOTH)),
+                "eyes",
+                "eyes",
+                "white_check_mark",
+                "sos"));
+        SummaryDataController multiController = new SummaryDataController(
+                threadService, multiChannel, analysisProps, analysisResultsService, objectMapper);
+
+        when(threadService.getThreadsWithCheckMarkAsText("C-a", 31)).thenThrow(new RuntimeException("not_in_channel"));
+        when(threadService.getThreadsWithCheckMarkAsText("C-b", 31))
+                .thenReturn(ImmutableList.of(new ThreadService.ThreadData("1700000000.000009", "Channel B content")));
+
+        // when
+        ResponseEntity<byte[]> response = multiController.exportSummaryData(31);
+
+        // then — the export still succeeds with the readable channel's data
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<String> fileNames = new ArrayList<>();
+        List<String> fileContents = new ArrayList<>();
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(response.getBody()))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                fileNames.add(entry.getName());
+                fileContents.add(new String(zis.readAllBytes(), StandardCharsets.UTF_8));
+                zis.closeEntry();
+            }
+        }
+        assertThat(fileNames).containsExactly("1700000000.000009.txt");
+        assertThat(fileContents).containsExactly("Channel B content");
+    }
+
+    @Test
+    void export_shouldKeepBothThreadsWhenTimestampsCollideAcrossChannels() throws IOException {
+        // given two channels that each surface a thread with the SAME threadTs (ts is unique only
+        // within a channel, so a cross-channel collision is possible)
+        SlackChannelRegistry multiChannel = new SlackChannelRegistry(new SlackTicketsProps(
+                null,
+                List.of(
+                        new SlackChannelProps("a", "C-a", SlackChannelProps.TrackMode.BOTH),
+                        new SlackChannelProps("b", "C-b", SlackChannelProps.TrackMode.BOTH)),
+                "eyes",
+                "eyes",
+                "white_check_mark",
+                "sos"));
+        SummaryDataController multiController = new SummaryDataController(
+                threadService, multiChannel, analysisProps, analysisResultsService, objectMapper);
+
+        when(threadService.getThreadsWithCheckMarkAsText("C-a", 31))
+                .thenReturn(ImmutableList.of(new ThreadService.ThreadData("1700000000.000001", "from A")));
+        when(threadService.getThreadsWithCheckMarkAsText("C-b", 31))
+                .thenReturn(ImmutableList.of(new ThreadService.ThreadData("1700000000.000001", "from B")));
+
+        // when
+        ResponseEntity<byte[]> response = multiController.exportSummaryData(31);
+
+        // then — both threads are exported under disambiguated names; neither is dropped
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<String> fileNames = new ArrayList<>();
+        List<String> fileContents = new ArrayList<>();
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(response.getBody()))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                fileNames.add(entry.getName());
+                fileContents.add(new String(zis.readAllBytes(), StandardCharsets.UTF_8));
+                zis.closeEntry();
+            }
+        }
+        assertThat(fileNames).containsExactlyInAnyOrder("1700000000.000001.txt", "1700000000.000001-2.txt");
+        assertThat(fileContents).containsExactlyInAnyOrder("from A", "from B");
     }
 
     @Test
@@ -143,9 +224,12 @@ class SummaryDataControllerTest {
     }
 
     @Test
-    void export_shouldSkipDuplicateEntries_withoutFailing() throws IOException {
-        // given - two threads resolve to the same file name (e.g. a reply_broadcast sharing the parent thread_ts).
-        // A single duplicate previously aborted the whole export with a ZipException.
+    void export_shouldDisambiguateDuplicateFileNames_withoutFailing() throws IOException {
+        // given - two threads resolve to the same file name. A single duplicate previously aborted
+        // the whole export with a ZipException. Genuine within-channel duplicates (a reply_broadcast
+        // sharing the parent thread_ts) are now deduped at the source in ThreadService, so a name
+        // collision reaching the controller is a cross-channel one; disambiguate it rather than drop
+        // a thread, while still never aborting the export.
         var threads = ImmutableList.of(
                 new ThreadService.ThreadData("1700000000.000001", "First content"),
                 new ThreadService.ThreadData("1700000000.000001", "Duplicate content"),
@@ -155,7 +239,7 @@ class SummaryDataControllerTest {
         // when
         ResponseEntity<byte[]> response = controller.exportSummaryData(31);
 
-        // then - export succeeds and the duplicate name is written exactly once
+        // then - export succeeds and the colliding name is disambiguated so no thread is dropped
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         List<String> fileNames = new ArrayList<>();
@@ -169,8 +253,9 @@ class SummaryDataControllerTest {
             }
         }
 
-        assertThat(fileNames).containsExactly("1700000000.000001.txt", "1700000000.000002.txt");
-        assertThat(fileContents).containsExactly("First content", "Second content");
+        assertThat(fileNames)
+                .containsExactly("1700000000.000001.txt", "1700000000.000001-2.txt", "1700000000.000002.txt");
+        assertThat(fileContents).containsExactly("First content", "Duplicate content", "Second content");
     }
 
     // --- Import tests ---
@@ -294,7 +379,7 @@ class SummaryDataControllerTest {
                 new AnalysisProps.Bundle("classpath:nonexistent.zip"),
                 new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+                threadService, channelRegistry, analysisProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
@@ -315,7 +400,7 @@ class SummaryDataControllerTest {
                 new AnalysisProps.Bundle(tempDir.toString()),
                 new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+                threadService, channelRegistry, analysisProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
@@ -352,7 +437,7 @@ class SummaryDataControllerTest {
                 new AnalysisProps.Bundle(tempDir.toString()),
                 new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+                threadService, channelRegistry, analysisProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
@@ -381,7 +466,7 @@ class SummaryDataControllerTest {
                 new AnalysisProps.Bundle(tempDir.toString()),
                 new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+                threadService, channelRegistry, analysisProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
@@ -411,7 +496,7 @@ class SummaryDataControllerTest {
                 new AnalysisProps.Bundle("/nonexistent/directory"),
                 new AnalysisProps.Prompt(true, ""));
         controller = new SummaryDataController(
-                threadService, slackTicketsProps, analysisProps, analysisResultsService, objectMapper);
+                threadService, channelRegistry, analysisProps, analysisResultsService, objectMapper);
 
         // when
         ResponseEntity<?> response = controller.download();
