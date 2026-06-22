@@ -2048,6 +2048,100 @@ class PrDetectionServiceTest {
 
         @Test
         @SuppressWarnings("unchecked")
+        void skipsTicketCreationWhenAuthorNotInAnyAllowedTeam() {
+            // given — the query's only PR is authored outside allowed-author-teams. The admission
+            // gate now runs before the lazy ticket creation, so no ticket (and no in-thread ticket
+            // form) is ever created for a PR that will not be tracked.
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            Instant.now().minus(Duration.ofHours(1)),
+                            PrMetadata.PrState.OPEN,
+                            null,
+                            List.of(),
+                            List.of(),
+                            "outsider"));
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            null,
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of("platform-team"),
+                            false,
+                            null,
+                            false)));
+            when(prSourceClient.resolveTeamMembers(COORD, "platform-team")).thenReturn(List.of("insider"));
+
+            Supplier<Ticket> supplier = mock(Supplier.class);
+
+            // when
+            service.handleQueryMessagePosted(messagePostedWith("msg"), supplier);
+
+            // then — admission precedes ticket creation: nothing created, posted, or tracked
+            verify(supplier, never()).get();
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).postMessage(any());
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void createsTicketAndTracksWhenAuthorInAllowedTeam() {
+            // given — admitted author: the query path behaves exactly as before the gate, creating
+            // the ticket via the supplier and tracking the PR.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            null,
+                            List.of(),
+                            List.of(),
+                            "insider"));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            null,
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of("platform-team"),
+                            false,
+                            null,
+                            false)));
+            when(prSourceClient.resolveTeamMembers(COORD, "platform-team")).thenReturn(List.of("insider"));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
+
+            Supplier<Ticket> supplier = mock(Supplier.class);
+            when(supplier.get()).thenReturn(ticketWithId(100L));
+
+            // when
+            service.handleQueryMessagePosted(messagePostedWith("msg"), supplier);
+
+            // then — ticket created once, PR tracked
+            verify(supplier).get();
+            verify(prTrackingRepository).insertIfAbsent(any());
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
         void doesNotCreateTicketWhenAllPrsClosed() {
             // given
             Instant prCreatedAt = Instant.now().minus(Duration.ofDays(5));

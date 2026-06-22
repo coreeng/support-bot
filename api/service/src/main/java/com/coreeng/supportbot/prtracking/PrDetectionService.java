@@ -218,6 +218,17 @@ public class PrDetectionService {
                     continue;
                 }
 
+                // Author admission must precede the lazy ticket creation below: in the query path a
+                // PR-link message auto-creates a ticket (and posts its in-thread form) the moment the
+                // first open PR is seen, so a PR authored outside allowed-author-teams has to be
+                // skipped here — before the supplier runs — not only inside processPr. processPr
+                // re-checks as the authoritative seam (membership is cached, so the second check is
+                // free); that is the path handleMessagePosted relies on.
+                Optional<PrTrackingProps.Repository> repoConfig = repoConfigFor(pr);
+                if (repoConfig.isPresent() && !authorAllowed(pr, repoConfig.get(), prMetadata, teamReviewerCache)) {
+                    continue;
+                }
+
                 if (ticket == null) {
                     ticket = ticketSupplier.get();
                     ticketId = checkNotNull(ticket.id());
@@ -317,6 +328,13 @@ public class PrDetectionService {
         }
     }
 
+    /** Finds the PR-tracking config for a detected PR's repository, if one is configured. */
+    private Optional<PrTrackingProps.Repository> repoConfigFor(DetectedPr detectedPr) {
+        return prTrackingProps.repositories().stream()
+                .filter(r -> r.name().equals(detectedPr.repositoryName()))
+                .findFirst();
+    }
+
     private PerPrResult processPr(
             DetectedPr detectedPr,
             Ticket ticket,
@@ -326,9 +344,7 @@ public class PrDetectionService {
             List<PendingNotification> notifications,
             List<PendingEscalation> pendingEscalations) {
 
-        Optional<PrTrackingProps.Repository> repoConfig = prTrackingProps.repositories().stream()
-                .filter(r -> r.name().equals(detectedPr.repositoryName()))
-                .findFirst();
+        Optional<PrTrackingProps.Repository> repoConfig = repoConfigFor(detectedPr);
 
         if (repoConfig.isPresent()) {
             // Author admission gate (PT-521): runs before any tracking record or Slack side effect.
