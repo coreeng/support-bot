@@ -1,0 +1,23 @@
+# Dependencies and build outputs
+node_modules
+.next
+build
+dist
+coverage
+
+# Local and generated test artifacts
+test-results
+playwright-report
+blob-report
+**/playwright/.cache
+**/cucumber-report.html
+**/cucumber-report.json
+
+# Local environment and editor files
+.env
+.env.*
+.DS_Store
+.idea
+.vscode
+*.log
+*.tmp

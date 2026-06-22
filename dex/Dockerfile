@@ -2,8 +2,11 @@
 # Published as support-bot-dex:<version> alongside support-bot and support-bot-ui from the main
 # support-bot-fast-feedback / support-bot-prod workflows (build context is the dex/ directory).
 # Bump DEX_BASE_TAG together with values-dexidp.yaml when upgrading Dex.
-ARG DEX_BASE_TAG=v2.44.0
+ARG DEX_BASE_TAG=v2.45.1
 FROM ghcr.io/dexidp/dex:${DEX_BASE_TAG}
+
+USER root
+RUN apk upgrade --no-cache
 
 # Theme assets (whole directory) — referenced by frontend.theme=supportbot in the Dex config.
 COPY --chown=1001:1001 web/themes/supportbot/ /srv/dex/web/themes/supportbot/
