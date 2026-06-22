@@ -204,6 +204,8 @@ public final class Hub4jGitHubClient implements GitHubClient {
             }
             Boolean mergeable = pr.getMergeable();
             String mergeableState = pr.getMergeableState();
+            GHUser author = pr.getUser();
+            String authorLogin = author != null ? author.getLogin() : null;
             List<String> requestedTeamReviewerLogins;
             List<GitHubPullRequestReview> reviews;
             if (prState == GitHubPullRequest.PrState.OPEN) {
@@ -224,7 +226,8 @@ public final class Hub4jGitHubClient implements GitHubClient {
                     mergeable,
                     mergeableState,
                     requestedTeamReviewerLogins,
-                    reviews);
+                    reviews,
+                    authorLogin);
         } catch (IllegalArgumentException e) {
             throw new GitHubApiException(
                     0, "Invalid repository name '%s': %s".formatted(repositoryName, e.getMessage()), e);

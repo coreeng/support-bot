@@ -32,7 +32,8 @@ public class GitHubPrSourceClient implements PrSourceClient {
                     mapState(pr.state()),
                     pr.mergeable(),
                     pr.requestedTeamReviewerLogins(),
-                    pr.reviews().stream().map(GitHubPrSourceClient::mapReview).toList());
+                    pr.reviews().stream().map(GitHubPrSourceClient::mapReview).toList(),
+                    pr.authorLogin());
         } catch (GitHubApiException e) {
             throw new PrSourceException(e.getMessage(), e);
         }

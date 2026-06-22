@@ -66,6 +66,7 @@ class GitLabPrSourceClientTest {
                           "state": "opened",
                           "created_at": "2026-01-01T10:00:00Z",
                           "updated_at": "2026-01-02T11:00:00Z",
+                          "author": {"username": "carol"},
                           "detailed_merge_status": "mergeable"
                         }
                         """, MediaType.APPLICATION_JSON));
@@ -86,6 +87,7 @@ class GitLabPrSourceClientTest {
         assertThat(metadata.state()).isEqualTo(PrMetadata.PrState.OPEN);
         assertThat(metadata.createdAt()).isEqualTo(Instant.parse("2026-01-01T10:00:00Z"));
         assertThat(metadata.mergeable()).isTrue();
+        assertThat(metadata.authorLogin()).isEqualTo("carol");
         assertThat(metadata.requestedTeamReviewerLogins()).isEmpty();
         assertThat(metadata.reviews())
                 .extracting(Review::userLogin, Review::state)
