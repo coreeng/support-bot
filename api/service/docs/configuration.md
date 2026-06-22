@@ -750,9 +750,10 @@ Group `A`, subgroups `A/B ▸ A/B/C`, separate group `D`, and group `E` invited 
 In short: on **GitHub** name the team at the *top* of the hierarchy to cover
 everything beneath it; on **GitLab** name the *exact subgroup* you mean (it also
 covers ancestor and invited-group members). A GitLab *parent-group* path will
-**not** match authors who live only in its subgroups — and because the author
-gate fails open, those PRs are then tracked anyway, silently defeating the
-intended scoping.
+**not** match authors who live only in its subgroups — the group resolves
+successfully but without them, so the gate finds the author in no configured
+team and **skips** those MRs, silently dropping authors you meant to admit. Name
+the *exact subgroup* instead.
 
 When membership cannot be resolved at all (missing read scope, or the API call
 fails) the bot degrades gracefully rather than failing hard: reviewer filtering
