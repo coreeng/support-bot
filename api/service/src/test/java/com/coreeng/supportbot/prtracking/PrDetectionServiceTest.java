@@ -2182,6 +2182,11 @@ class PrDetectionServiceTest {
     class AuthorAdmissionGate {
 
         private static final String ALLOWED_TEAM = "platform-team";
+        private static final String ALLOWED_GROUP = "my-group/reviewers";
+        private static final String GITLAB_REPO = "my-group/my-project";
+        private static final RepoCoord GITLAB_COORD = RepoCoord.gitlab(GITLAB_REPO);
+        private static final String NO_SLA_REPO = "my-org/no-sla-repo";
+        private static final RepoCoord NO_SLA_COORD = RepoCoord.github(NO_SLA_REPO);
 
         private PrTrackingProps.Repository repoWithAllowedAuthorTeams(String... teams) {
             return new PrTrackingProps.Repository(
@@ -2214,6 +2219,56 @@ class PrDetectionServiceTest {
                             List.of(),
                             List.of(),
                             authorLogin));
+        }
+
+        private void stubDetectedOpenPr(Provider provider, String repo, RepoCoord coord, @Nullable String authorLogin) {
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(provider, repo, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(coord, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            coord,
+                            PR_NUMBER,
+                            Instant.now().minus(Duration.ofHours(1)),
+                            PrMetadata.PrState.OPEN,
+                            null,
+                            List.of(),
+                            List.of(),
+                            authorLogin));
+        }
+
+        private PrTrackingProps.Repository gitlabRepoWithAllowedAuthorTeams(String... teams) {
+            return new PrTrackingProps.Repository(
+                    GITLAB_REPO,
+                    TEAM_CODE,
+                    Provider.GITLAB,
+                    null,
+                    null,
+                    List.of(),
+                    sla(SLA_24H),
+                    null,
+                    null,
+                    List.of(teams),
+                    false,
+                    null,
+                    false);
+        }
+
+        private PrTrackingProps.Repository noSlaRepoWithAllowedAuthorTeams(String... teams) {
+            return new PrTrackingProps.Repository(
+                    NO_SLA_REPO,
+                    TEAM_CODE,
+                    Provider.GITHUB,
+                    null,
+                    null,
+                    List.of("infra/**"),
+                    null,
+                    null,
+                    null,
+                    List.of(teams),
+                    false,
+                    null,
+                    false);
         }
 
         @Test
@@ -2309,6 +2364,74 @@ class PrDetectionServiceTest {
             when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
             when(prTrackingProps.repositories()).thenReturn(List.of(repoWithAllowedAuthorTeams(ALLOWED_TEAM)));
             when(prSourceClient.resolveTeamMembers(COORD, ALLOWED_TEAM)).thenThrow(new PrSourceException("forbidden"));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(Instant.now(), Instant.now().plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then
+            verify(prTrackingRepository).insertIfAbsent(any());
+        }
+
+        @Test
+        void tracksGitlabRepoWhenAuthorInAllowedGroup() {
+            // given — gate is provider-agnostic; exercise the GitLab path
+            when(prSourceClients.forProvider(Provider.GITLAB)).thenReturn(prSourceClient);
+            stubDetectedOpenPr(Provider.GITLAB, GITLAB_REPO, GITLAB_COORD, "insider");
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories()).thenReturn(List.of(gitlabRepoWithAllowedAuthorTeams(ALLOWED_GROUP)));
+            when(prSourceClient.resolveTeamMembers(GITLAB_COORD, ALLOWED_GROUP)).thenReturn(List.of("insider"));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(Instant.now(), Instant.now().plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then
+            verify(prTrackingRepository).insertIfAbsent(any());
+        }
+
+        @Test
+        void skipsTrackingForGitlabRepoWhenAuthorNotInAllowedGroup() {
+            // given — GitLab MR author is not a member of the configured allowed group
+            when(prSourceClients.forProvider(Provider.GITLAB)).thenReturn(prSourceClient);
+            stubDetectedOpenPr(Provider.GITLAB, GITLAB_REPO, GITLAB_COORD, "outsider");
+            when(prTrackingProps.repositories()).thenReturn(List.of(gitlabRepoWithAllowedAuthorTeams(ALLOWED_GROUP)));
+            when(prSourceClient.resolveTeamMembers(GITLAB_COORD, ALLOWED_GROUP)).thenReturn(List.of("insider"));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).postMessage(any());
+        }
+
+        @Test
+        void skipsTrackingForNoSlaRepoWhenAuthorNotInAnyAllowedTeam() {
+            // given — gate runs before the no-SLA path filter, so it must short-circuit there too
+            stubDetectedOpenPr(Provider.GITHUB, NO_SLA_REPO, NO_SLA_COORD, "outsider");
+            when(prTrackingProps.repositories()).thenReturn(List.of(noSlaRepoWithAllowedAuthorTeams(ALLOWED_TEAM)));
+            when(prSourceClient.resolveTeamMembers(NO_SLA_COORD, ALLOWED_TEAM)).thenReturn(List.of("insider"));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — skipped before any record, Slack side effect, or path lookup
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).postMessage(any());
+            verify(prSourceClient, never()).listChangedFiles(any(), anyInt());
+        }
+
+        @Test
+        void tracksWhenSomeTeamsResolveWithoutAuthorAndAnotherUnresolvableFailsOpen() {
+            // given — team-a resolves without the author, team-b can't be resolved: fail open
+            stubDetectedOpenPr("outsider");
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoWithAllowedAuthorTeams("team-a", "team-b")));
+            when(prSourceClient.resolveTeamMembers(COORD, "team-a")).thenReturn(List.of("someone-else"));
+            when(prSourceClient.resolveTeamMembers(COORD, "team-b")).thenThrow(new PrSourceException("forbidden"));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(Instant.now(), Instant.now().plus(SLA_24H)));
 
