@@ -58,7 +58,11 @@ public record PrTrackingProps(
                                 repository.paths(),
                                 repository.sla(),
                                 repository.gitlab(),
-                                repository.messages()))
+                                repository.messages(),
+                                repository.allowedAuthorTeams(),
+                                repository.requiresCodeowners(),
+                                repository.codeownerTeam(),
+                                repository.dynamicApprovals()))
                         .toList();
         this.slaDiscovery = slaDiscovery == null ? new SlaDiscovery(null) : slaDiscovery;
         this.github = github == null ? GitHub.defaultTokenModeConfig() : github;
@@ -245,7 +249,11 @@ public record PrTrackingProps(
             List<String> paths,
             @Nullable Sla sla,
             @Nullable Gitlab gitlab,
-            @Nullable Messages messages) {
+            @Nullable Messages messages,
+            List<String> allowedAuthorTeams,
+            boolean requiresCodeowners,
+            @Nullable String codeownerTeam,
+            boolean dynamicApprovals) {
         @ConstructorBinding
         public Repository(
                 String name,
@@ -256,7 +264,11 @@ public record PrTrackingProps(
                 @Nullable List<String> paths,
                 @Nullable Sla sla,
                 @Nullable Gitlab gitlab,
-                @Nullable Messages messages) {
+                @Nullable Messages messages,
+                @Nullable List<String> allowedAuthorTeams,
+                boolean requiresCodeowners,
+                @Nullable String codeownerTeam,
+                boolean dynamicApprovals) {
             requireNonNull(name, "name must not be null");
             requireNonNull(owningTeam, "owningTeam must not be null");
             Provider resolvedProvider = provider == null ? Provider.GITHUB : provider;
@@ -265,6 +277,16 @@ public record PrTrackingProps(
             }
             if (gitlabGroupPath != null && gitlabGroupPath.isBlank()) {
                 throw new IllegalArgumentException("gitlabGroupPath must not be blank when provided");
+            }
+            if (codeownerTeam != null && codeownerTeam.isBlank()) {
+                throw new IllegalArgumentException("codeownerTeam must not be blank when provided");
+            }
+            List<String> normalisedAllowedAuthorTeams =
+                    allowedAuthorTeams == null ? List.of() : List.copyOf(allowedAuthorTeams);
+            for (String team : normalisedAllowedAuthorTeams) {
+                if (team.isBlank()) {
+                    throw new IllegalArgumentException("allowed-author-teams[] must not be blank (repo: " + name + ")");
+                }
             }
             // Provider-scoped fields fail fast at config-bind time so a misconfigured repo never
             // makes it through to the adapter, where the mismatch would manifest as a confusing
@@ -277,6 +299,10 @@ public record PrTrackingProps(
                 if (gitlab != null) {
                     throw new IllegalArgumentException(
                             "per-repo gitlab override block is only valid when provider=gitlab (repo: " + name + ")");
+                }
+                if (dynamicApprovals) {
+                    throw new IllegalArgumentException(
+                            "dynamic-approvals is only valid when provider=gitlab (repo: " + name + ")");
                 }
             } else if (resolvedProvider == Provider.GITLAB) {
                 if (githubTeamSlug != null) {
@@ -293,6 +319,40 @@ public record PrTrackingProps(
             this.sla = sla;
             this.gitlab = gitlab;
             this.messages = messages;
+            this.allowedAuthorTeams = normalisedAllowedAuthorTeams;
+            this.requiresCodeowners = requiresCodeowners;
+            this.codeownerTeam = codeownerTeam;
+            this.dynamicApprovals = dynamicApprovals;
+        }
+
+        /**
+         * Convenience for callers predating the admission/codeowner/dynamic-approval fields: defaults
+         * allowed-author-teams to empty and the codeowner/dynamic-approval flags off.
+         */
+        public Repository(
+                String name,
+                String owningTeam,
+                @Nullable Provider provider,
+                @Nullable String githubTeamSlug,
+                @Nullable String gitlabGroupPath,
+                @Nullable List<String> paths,
+                @Nullable Sla sla,
+                @Nullable Gitlab gitlab,
+                @Nullable Messages messages) {
+            this(
+                    name,
+                    owningTeam,
+                    provider,
+                    githubTeamSlug,
+                    gitlabGroupPath,
+                    paths,
+                    sla,
+                    gitlab,
+                    messages,
+                    List.of(),
+                    false,
+                    null,
+                    false);
         }
 
         /** Test/legacy convenience: GitHub repo without GitLab fields. */
@@ -303,7 +363,20 @@ public record PrTrackingProps(
                 List<String> paths,
                 @Nullable Sla sla,
                 @Nullable Messages messages) {
-            this(name, owningTeam, Provider.GITHUB, githubTeamSlug, null, paths, sla, null, messages);
+            this(
+                    name,
+                    owningTeam,
+                    Provider.GITHUB,
+                    githubTeamSlug,
+                    null,
+                    paths,
+                    sla,
+                    null,
+                    messages,
+                    List.of(),
+                    false,
+                    null,
+                    false);
         }
 
         /** Test/legacy convenience: GitHub repo without messages or GitLab fields. */
@@ -313,7 +386,20 @@ public record PrTrackingProps(
                 @Nullable String githubTeamSlug,
                 List<String> paths,
                 @Nullable Sla sla) {
-            this(name, owningTeam, Provider.GITHUB, githubTeamSlug, null, paths, sla, null, null);
+            this(
+                    name,
+                    owningTeam,
+                    Provider.GITHUB,
+                    githubTeamSlug,
+                    null,
+                    paths,
+                    sla,
+                    null,
+                    null,
+                    List.of(),
+                    false,
+                    null,
+                    false);
         }
 
         /** Returns true when this repository has no SLA configured (no-SLA tracking mode). */
