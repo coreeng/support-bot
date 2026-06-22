@@ -102,6 +102,12 @@ command surface.
 - **Auto-close**: once every tracked PR on the thread reaches `CLOSED`, the
   bot closes the support ticket.
 
+You can dedicate a channel to PR tracking by configuring it with `track: PRS`
+under `slack.ticket.channels` (a `PRS` channel suppresses the normal
+query/reaction flow and only creates tickets from PR links). See
+[configuration.md](../../api/service/docs/configuration.md) for the full
+multi-channel config.
+
 ### Customising the messages
 
 The Slack copy for each lifecycle event can be tailored per repository by an

@@ -17,7 +17,7 @@ public class HomepageView {
     private long page;
     private long totalPages;
     private long totalTickets;
-    private String channelId;
+    private ImmutableList<String> channelIds;
 
     private Instant timestamp;
 

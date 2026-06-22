@@ -14,7 +14,6 @@ import com.coreeng.supportbot.config.AnalysisProps;
 import com.coreeng.supportbot.config.AnalysisProps.Bundle;
 import com.coreeng.supportbot.config.AnalysisProps.Prompt;
 import com.coreeng.supportbot.config.AnalysisProps.Vertex;
-import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -50,7 +49,6 @@ class AnalysisServiceTest {
     private ApplicationContext applicationContext;
 
     private AnalysisProps analysisProps;
-    private SlackTicketsProps slackTicketsProps;
     private AnalysisService service;
     private Path tempPromptFile;
 
@@ -64,7 +62,6 @@ class AnalysisServiceTest {
         Bundle bundle = new Bundle("classpath:placeholder-analysis-bundle.zip");
         Prompt prompt = new Prompt(true, tempPromptFile.toString());
         analysisProps = new AnalysisProps(vertex, bundle, prompt);
-        slackTicketsProps = new SlackTicketsProps("C123456", "eyes", "ticket", "white_check_mark", "rocket");
 
         service = new AnalysisService(
                 asyncJobRepository,
@@ -72,7 +69,6 @@ class AnalysisServiceTest {
                 llmAnalysisService,
                 analysisRepository,
                 analysisProps,
-                slackTicketsProps,
                 applicationContext);
     }
 
@@ -275,7 +271,8 @@ class AnalysisServiceTest {
     void runAsyncAnalysis_analyzesThreadsAndPersists() {
         // given
         when(threadsAwaitingAnalysisService.find(eq(7), anyString()))
-                .thenReturn(ImmutableList.of(new ThreadToAnalyze(1L, "ts1"), new ThreadToAnalyze(2L, "ts2")));
+                .thenReturn(ImmutableList.of(
+                        new ThreadToAnalyze(1L, "ts1", "C123456"), new ThreadToAnalyze(2L, "ts2", "C123456")));
         when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts1"), eq(1L), anyString()))
                 .thenReturn(new AnalysisRecord(1, "Bug", "Config", "networking", "Issue 1", null));
         when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts2"), eq(2L), anyString()))
@@ -307,7 +304,8 @@ class AnalysisServiceTest {
     void runAsyncAnalysis_skipsInvalidRecords() {
         // given — first thread returns null (LLM failure), second returns valid record
         when(threadsAwaitingAnalysisService.find(eq(7), anyString()))
-                .thenReturn(ImmutableList.of(new ThreadToAnalyze(1L, "ts1"), new ThreadToAnalyze(2L, "ts2")));
+                .thenReturn(ImmutableList.of(
+                        new ThreadToAnalyze(1L, "ts1", "C123456"), new ThreadToAnalyze(2L, "ts2", "C123456")));
         when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts1"), eq(1L), anyString()))
                 .thenReturn(null);
         when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts2"), eq(2L), anyString()))
@@ -374,9 +372,9 @@ class AnalysisServiceTest {
         // given — first thread throws, second and third return valid records
         when(threadsAwaitingAnalysisService.find(eq(7), anyString()))
                 .thenReturn(ImmutableList.of(
-                        new ThreadToAnalyze(1L, "ts1"),
-                        new ThreadToAnalyze(2L, "ts2"),
-                        new ThreadToAnalyze(3L, "ts3")));
+                        new ThreadToAnalyze(1L, "ts1", "C123456"),
+                        new ThreadToAnalyze(2L, "ts2", "C123456"),
+                        new ThreadToAnalyze(3L, "ts3", "C123456")));
         when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts1"), eq(1L), anyString()))
                 .thenThrow(new RuntimeException("Slack timeout for thread ts1"));
         when(llmAnalysisService.analyzeThread(eq("C123456"), eq("ts2"), eq(2L), anyString()))
@@ -408,7 +406,6 @@ class AnalysisServiceTest {
                 llmAnalysisService,
                 analysisRepository,
                 badProps,
-                slackTicketsProps,
                 applicationContext);
 
         // when

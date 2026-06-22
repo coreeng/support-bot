@@ -5,6 +5,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
 
+import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.config.TicketAssignmentProps;
 import com.coreeng.supportbot.enums.ImpactsRegistry;
@@ -69,7 +70,8 @@ class HomepageServiceTest {
                 ticketQueryService,
                 executorService,
                 slackClient,
-                new SlackTicketsProps(channelId, "eyes", "ticket", "tick", "rocket"),
+                new SlackChannelRegistry(
+                        new SlackTicketsProps(channelId, List.of(), "eyes", "ticket", "tick", "rocket")),
                 impactsRegistry,
                 supportTeamService,
                 assignmentProps);

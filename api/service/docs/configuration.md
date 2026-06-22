@@ -64,7 +64,24 @@ slack:
     socket-token: ${SLACK_SOCKET_TOKEN} # Token like: xapp-1-abc-def-ghi
     signing-secret: ${SLACK_SIGNING_SECRET} # Token like: 1234567890abcdef
   ticket:
-    channel-id: ${SLACK_TICKET_CHANNEL_ID} # Channel ID (C1234567890) where tenants post queries
+    # Recommended: monitor one or more channels via `channels`, each with its own `track` mode:
+    #   QUERIES - only normal support queries (PR detection disabled)
+    #   PRS     - only PR-link tickets (the normal query/reaction flow is suppressed)
+    #   BOTH    - both (default when `track` is omitted)
+    # When `channels` is non-empty it takes precedence over the deprecated `channel-id` below.
+    # channels:
+    #   - name: product-support
+    #     id: C1234567890
+    #     track: BOTH
+    #   - name: product-support-pr
+    #     id: C2345678901
+    #     track: PRS
+    #   - name: product-support-queries
+    #     id: C3456789012
+    #     track: QUERIES
+    # Deprecated: legacy single-channel config, kept for backward compatibility. Equivalent to one
+    # `channels` entry tracking BOTH; prefer `channels` above for new deployments.
+    channel-id: ${SLACK_TICKET_CHANNEL_ID:} # Channel ID (C1234567890) where tenants post queries
     expected-initial-reaction: eyes # Reaction to trigger ticket creation -- emoji name needs to already exist in slack
     response-initial-reaction: ticket # Reaction posted when ticket is created -- emoji name needs to already exist in slack
     resolved-reaction: white_check_mark # Reaction posted when ticket is resolved -- emoji name needs to already exist in slack

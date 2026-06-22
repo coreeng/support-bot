@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.analysis;
 
 import com.google.common.collect.ImmutableList;
+import java.util.Collection;
 
 /**
  * Repository for finding Slack threads that need LLM analysis.
@@ -19,16 +20,18 @@ public interface ThreadsAwaitingAnalysisRepository {
      *
      * @param days Number of days to look back from today
      * @param promptId The current prompt ID to check against existing analysis records
-     * @param channelId Slack channel ID to filter tickets by
+     * @param channelIds Slack channel IDs to include; tickets from any of these channels are returned
      * @return Immutable list of threads that need analysis
      */
-    ImmutableList<ThreadToAnalyze> findThreadsAwaitingAnalysis(int days, String promptId, String channelId);
+    ImmutableList<ThreadToAnalyze> findThreadsAwaitingAnalysis(
+            int days, String promptId, Collection<String> channelIds);
 
     /**
      * DTO representing a thread that needs analysis.
      *
      * @param ticketId The ticket ID
      * @param threadTs The Slack thread timestamp
+     * @param channelId The Slack channel the thread lives in
      */
-    record ThreadToAnalyze(Long ticketId, String threadTs) {}
+    record ThreadToAnalyze(Long ticketId, String threadTs, String channelId) {}
 }
