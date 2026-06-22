@@ -815,7 +815,10 @@ public class PrDetectionService {
                 continue;
             }
 
-            // When a custom message is configured, post one message per PR so each has its own context.
+            // When a custom message is configured, post it once for the whole repo group rather
+            // than once per PR. The override text is repo/event-level (not PR-specific), so N PRs
+            // in the same repo should yield a single message — mirroring the single grouped message
+            // the default path produces below. Rendered with the first PR's context.
             MessageEvent event =
                     switch (type) {
                         case TRACKED, NO_SLA_TRACKED -> MessageEvent.DETECTED;
@@ -824,7 +827,17 @@ public class PrDetectionService {
                         case CHANGES_REQUESTED -> MessageEvent.CHANGES_REQUESTED;
                     };
             if (messageRenderer.hasOverride(repo, event)) {
-                group.forEach(n -> postSingleNotification(n, queryTs, channelId));
+                // We reach here only when the group has >1 PR. A custom override is free-form text
+                // rendered with a single PR's context, so the other PRs can't be named in it — log
+                // them so the collapse is observable (e.g. if a repo uses a PR-specific override).
+                log.atDebug()
+                        .addArgument(repo)
+                        .addArgument(() -> group.stream()
+                                .map(n -> String.valueOf(n.prNumber()))
+                                .collect(Collectors.joining(", ")))
+                        .log(
+                                "Custom override for repo {} posted once for PRs {} (rendered with the first PR's context)");
+                postSingleNotification(group.getFirst(), queryTs, channelId);
                 continue;
             }
 

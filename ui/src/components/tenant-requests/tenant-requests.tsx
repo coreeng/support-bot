@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getDateRangeFromFilter, PRESET_DAYS } from "@/lib/dateRange";
-import { useEscalationBreakdown, useTenantInsightsStats } from "@/lib/hooks";
+import { useRequestBreakdown, useTenantInsightsStats } from "@/lib/hooks";
 import { enumValidator, isoDateValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
 import type { RepoInsights } from "@/lib/types/dashboard";
 import { formatDuration } from "@/lib/utils/format";
@@ -129,10 +129,10 @@ export default function TenantRequestsPage() {
   );
 
   const {
-    data: breakdown,
+    data: requestBreakdown,
     isLoading: breakdownLoading,
     error: breakdownError,
-  } = useEscalationBreakdown(
+  } = useRequestBreakdown(
     isDateRangeValid ? dateRange.from : undefined,
     isDateRangeValid ? dateRange.to : undefined,
     isDateRangeValid && activeTab === "stats"
@@ -143,8 +143,17 @@ export default function TenantRequestsPage() {
 
   const repos = realRepos ?? [];
 
+  // Request funnel: total support requests → % that are PRs → % of those PRs needing intervention.
+  // All three counts share the ticket-creation date anchor, so they are nested subsets and the
+  // percentages are coherent (PR share never exceeds 100%).
+  const prPercentage =
+    requestBreakdown && requestBreakdown.totalSupportTickets > 0
+      ? Math.round((requestBreakdown.totalPrTickets / requestBreakdown.totalSupportTickets) * 100)
+      : null;
   const interventionRate =
-    breakdown && breakdown.totalPrTickets > 0 ? Math.round((breakdown.manuallyEscalatedTickets / breakdown.totalPrTickets) * 100) : null;
+    requestBreakdown && requestBreakdown.totalPrTickets > 0
+      ? Math.round((requestBreakdown.interventionPrTickets / requestBreakdown.totalPrTickets) * 100)
+      : null;
 
   const totals = useMemo(() => {
     if (repos.length === 0) {
@@ -272,11 +281,53 @@ export default function TenantRequestsPage() {
 
           <TabsContent value="stats" className="space-y-6">
             <div>
+              <h2 className="text-foreground text-base font-semibold">Bot Impact</h2>
+              <p className="text-muted-foreground text-sm">
+                Share of incoming requests the bot handled automatically, and how often those still needed a human
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <StatCard
+                label="Total Requests"
+                value={requestBreakdown?.totalSupportTickets ?? null}
+                isLoading={isLoading}
+                accent="primary"
+                tooltip="Total support requests created in the selected period"
+              />
+              <StatCard
+                label="Handled by Bot"
+                value={prPercentage}
+                suffix="%"
+                isLoading={isLoading}
+                accent="info"
+                tooltip={
+                  requestBreakdown
+                    ? `${requestBreakdown.totalPrTickets} of ${requestBreakdown.totalSupportTickets} requests were PR reviews tracked automatically by the bot`
+                    : "Share of incoming requests the bot handled automatically (PR reviews)"
+                }
+              />
+              <StatCard
+                label="Needed Manual Escalation"
+                value={interventionRate}
+                suffix="%"
+                isLoading={isLoading}
+                valueClass={interventionRate !== null && interventionRate > 0 ? "text-warning" : undefined}
+                accent="indigo"
+                tooltip={
+                  requestBreakdown
+                    ? `${requestBreakdown.interventionPrTickets} of ${requestBreakdown.totalPrTickets} bot-handled requests required a manual escalation`
+                    : "Share of bot-handled requests that required a manual escalation"
+                }
+              />
+            </div>
+
+            <div>
               <h2 className="text-foreground text-base font-semibold">PR Activity & SLA Health</h2>
               <p className="text-muted-foreground text-sm">Pull request tracking across repositories</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-7">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
               <StatCard label="Repositories" value={repoCount} isLoading={isLoading} accent="primary" />
               <StatCard
                 label="No SLA Repos"
@@ -300,15 +351,6 @@ export default function TenantRequestsPage() {
                 isLoading={isLoading}
                 valueClass={totals.breachedCount > 0 ? "text-destructive" : undefined}
                 accent="destructive"
-              />
-              <StatCard
-                label="Intervention Rate"
-                value={interventionRate}
-                suffix="%"
-                isLoading={isLoading}
-                valueClass={interventionRate !== null && interventionRate > 0 ? "text-warning" : undefined}
-                accent="indigo"
-                tooltip="% of PR tickets requiring manual engineer escalation"
               />
             </div>
 

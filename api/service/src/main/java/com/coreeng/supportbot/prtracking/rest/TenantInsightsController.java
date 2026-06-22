@@ -86,6 +86,16 @@ public class TenantInsightsController {
         return prTrackingRepository.getEscalationBreakdown(dateFrom, dateTo);
     }
 
+    @GetMapping("/request-breakdown")
+    public RequestBreakdown requestBreakdown(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate dateTo) {
+        if (dateFrom != null && dateTo != null && dateFrom.isAfter(dateTo)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateFrom must not be after dateTo");
+        }
+        return prTrackingRepository.getRequestBreakdown(dateFrom, dateTo);
+    }
+
     @GetMapping("/in-flight-prs")
     public List<InFlightPrResponse> inFlightPrs(@RequestParam(required = false) @Nullable String team) {
         return prTrackingRepository.findAllInFlight(team).stream()

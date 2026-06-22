@@ -339,6 +339,198 @@ public class TenantInsightsFunctionalTests {
         return supportBotClient.tenantInsights().escalationBreakdown(dateFrom, dateTo);
     }
 
+    // The funnel asserts use a baseline-delta approach: pr_tracking is wiped between tests (so PR
+    // and intervention counts are already isolated to each test), but tickets and escalations
+    // accumulate across the shared DB, so totalSupportTickets is asserted as a delta from a
+    // baseline snapshot taken before seeding. This keeps every assertion exact and predictable.
+
+    @Test
+    public void requestBreakdown_nonPrTicketCountsInTotalButNotAsPr() {
+        var before = getRequestBreakdown(null, null);
+
+        createTicket(); // plain support ticket, no PR
+
+        var after = getRequestBreakdown(null, null);
+        assertThat(after.totalSupportTickets()).isEqualTo(before.totalSupportTickets() + 1);
+        assertThat(after.totalPrTickets()).isEqualTo(before.totalPrTickets());
+        assertThat(after.interventionPrTickets()).isEqualTo(before.interventionPrTickets());
+    }
+
+    @Test
+    public void requestBreakdown_prTicketCountsInTotalAndAsPr() {
+        var before = getRequestBreakdown(null, null);
+
+        long ticket = createTicket();
+        createPr(ticket, "test-org/pr-insights-req", 920, Instant.now().minus(Duration.ofHours(1)), "wow");
+
+        var after = getRequestBreakdown(null, null);
+        assertThat(after.totalSupportTickets()).isEqualTo(before.totalSupportTickets() + 1);
+        assertThat(after.totalPrTickets()).isEqualTo(before.totalPrTickets() + 1);
+        assertThat(after.interventionPrTickets()).isEqualTo(before.interventionPrTickets());
+    }
+
+    @Test
+    public void requestBreakdown_ticketWithMultiplePrsCountedOnce() {
+        var before = getRequestBreakdown(null, null);
+
+        long ticket = createTicket();
+        Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+        createPr(ticket, "test-org/pr-insights-req", 921, prCreatedAt, "wow");
+        createPr(ticket, "test-org/pr-insights-req", 922, prCreatedAt, "wow");
+
+        // one ticket referencing two PRs is a single PR ticket (and a single support ticket)
+        var after = getRequestBreakdown(null, null);
+        assertThat(after.totalSupportTickets()).isEqualTo(before.totalSupportTickets() + 1);
+        assertThat(after.totalPrTickets()).isEqualTo(before.totalPrTickets() + 1);
+    }
+
+    @Test
+    public void requestBreakdown_manualEscalationOnPrTicketCountsAsIntervention() {
+        var before = getRequestBreakdown(null, null);
+
+        long ticket = createTicket();
+        createPr(ticket, "test-org/pr-insights-req", 930, Instant.now().minus(Duration.ofHours(1)), "wow");
+        escalateTicket(ticket, "wow", "manual");
+
+        var after = getRequestBreakdown(null, null);
+        assertThat(after.totalPrTickets()).isEqualTo(before.totalPrTickets() + 1);
+        assertThat(after.interventionPrTickets()).isEqualTo(before.interventionPrTickets() + 1);
+    }
+
+    @Test
+    public void requestBreakdown_botEscalationOnPrTicketDoesNotCountAsIntervention() {
+        var before = getRequestBreakdown(null, null);
+
+        long ticket = createTicket();
+        createPr(ticket, "test-org/pr-insights-req", 931, Instant.now().minus(Duration.ofHours(1)), "wow");
+        escalateTicket(ticket, "wow", "bot");
+
+        // a bot SLA-breach escalation is automated, not a human intervention
+        var after = getRequestBreakdown(null, null);
+        assertThat(after.totalPrTickets()).isEqualTo(before.totalPrTickets() + 1);
+        assertThat(after.interventionPrTickets()).isEqualTo(before.interventionPrTickets());
+    }
+
+    @Test
+    public void requestBreakdown_prTicketWithBotAndManualEscalationsCountsOnceAsIntervention() {
+        var before = getRequestBreakdown(null, null);
+
+        // The escalation_open_unique index allows only one open escalation per (ticket, team), so
+        // to give one PR ticket BOTH a bot and a manual escalation they must go to different teams
+        // (bot auto-escalated to one team, a human manually escalated to another). The presence of
+        // the manual row qualifies it as intervention, and COUNT(DISTINCT) counts the ticket once.
+        long ticket = createTicket();
+        createPr(ticket, "test-org/pr-insights-req", 932, Instant.now().minus(Duration.ofHours(1)), "wow");
+        escalateTicket(ticket, "wow", "bot");
+        escalateTicket(ticket, "platform", "manual");
+
+        var after = getRequestBreakdown(null, null);
+        assertThat(after.totalPrTickets()).isEqualTo(before.totalPrTickets() + 1);
+        assertThat(after.interventionPrTickets()).isEqualTo(before.interventionPrTickets() + 1);
+    }
+
+    @Test
+    public void requestBreakdown_manualEscalationOnNonPrTicketDoesNotCountAsIntervention() {
+        var before = getRequestBreakdown(null, null);
+
+        long ticket = createTicket(); // no PR
+        escalateTicket(ticket, "wow", "manual");
+
+        // intervention requires a PR ticket; a manual escalation on a plain support ticket is
+        // outside the bot-handled funnel entirely
+        var after = getRequestBreakdown(null, null);
+        assertThat(after.totalSupportTickets()).isEqualTo(before.totalSupportTickets() + 1);
+        assertThat(after.totalPrTickets()).isEqualTo(before.totalPrTickets());
+        assertThat(after.interventionPrTickets()).isEqualTo(before.interventionPrTickets());
+    }
+
+    @Test
+    public void requestBreakdown_realisticMixIsCountedCoherently() {
+        var before = getRequestBreakdown(null, null);
+        Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+
+        long prManual = createTicket();
+        long prBotOnly = createTicket();
+        long prClean = createTicket();
+        createTicket(); // plain, no PR
+
+        createPr(prManual, "test-org/pr-insights-req", 950, prCreatedAt, "wow");
+        createPr(prBotOnly, "test-org/pr-insights-req", 951, prCreatedAt, "wow");
+        createPr(prClean, "test-org/pr-insights-req", 952, prCreatedAt, "wow");
+        escalateTicket(prManual, "wow", "manual");
+        escalateTicket(prBotOnly, "wow", "bot");
+
+        // 4 tickets in, 3 are PR tickets, 1 of those needed a manual escalation
+        var after = getRequestBreakdown(null, null);
+        assertThat(after.totalSupportTickets()).isEqualTo(before.totalSupportTickets() + 4);
+        assertThat(after.totalPrTickets()).isEqualTo(before.totalPrTickets() + 3);
+        assertThat(after.interventionPrTickets()).isEqualTo(before.interventionPrTickets() + 1);
+    }
+
+    @Test
+    public void requestBreakdown_anchorsOnTicketCreationDateNotPrCreatedAt() {
+        // a ticket created now whose PR was opened 200 days ago
+        long ticket = createTicket();
+        createPr(ticket, "test-org/pr-insights-req", 940, Instant.now().minus(Duration.ofDays(200)), "wow");
+
+        // recent window: the ticket (created now) is in range, so it counts as a PR ticket even
+        // though the PR is 200 days old — proving the anchor is query.date, not pr_created_at
+        var recent = getRequestBreakdown(
+                LocalDate.now().minusDays(7), LocalDate.now().plusDays(1));
+        assertThat(recent.totalPrTickets()).isEqualTo(1);
+        assertThat(recent.totalSupportTickets()).isGreaterThanOrEqualTo(1);
+
+        // window around the PR's creation date but before the ticket existed: nothing matches,
+        // because the ticket was not created then. A pr_created_at anchor would wrongly count it.
+        var aroundPrDate = getRequestBreakdown(
+                LocalDate.now().minusDays(250), LocalDate.now().minusDays(150));
+        assertThat(aroundPrDate.totalPrTickets()).isEqualTo(0);
+        assertThat(aroundPrDate.interventionPrTickets()).isEqualTo(0);
+    }
+
+    @Test
+    public void requestBreakdown_filtersByOpenEndedDateRanges() {
+        // a ticket + PR created now; exercises the single-bound SQL branches (dateFrom-only and
+        // dateTo-only), which build the WHERE clause and bind list independently of the two-bound
+        // case — a misaligned bind would only surface here. totalPrTickets is isolated per test
+        // (pr_tracking is wiped in @BeforeEach), so exact 1/0 assertions are safe.
+        long ticket = createTicket();
+        createPr(ticket, "test-org/pr-insights-req", 955, Instant.now().minus(Duration.ofHours(1)), "wow");
+        LocalDate today = LocalDate.now();
+
+        // dateFrom-only: from yesterday includes today's ticket; from tomorrow excludes it
+        assertThat(getRequestBreakdown(today.minusDays(1), null).totalPrTickets())
+                .isEqualTo(1);
+        assertThat(getRequestBreakdown(today.plusDays(1), null).totalPrTickets())
+                .isEqualTo(0);
+
+        // dateTo-only: up to tomorrow includes today's ticket; up to yesterday excludes it
+        assertThat(getRequestBreakdown(null, today.plusDays(1)).totalPrTickets())
+                .isEqualTo(1);
+        assertThat(getRequestBreakdown(null, today.minusDays(1)).totalPrTickets())
+                .isEqualTo(0);
+    }
+
+    @Test
+    public void requestBreakdown_returnsZerosWhenNoDataInRange() {
+        // given — a ticket with a PR created now
+        long ticketId = createTicket();
+        createPr(ticketId, "test-org/pr-insights-req", 910, Instant.now().minus(Duration.ofHours(1)), "wow");
+
+        // when — querying a past date range that predates any ticket
+        var response = getRequestBreakdown(LocalDate.of(2000, 1, 1), LocalDate.of(2000, 12, 31));
+
+        // then — nothing matches
+        assertThat(response.totalSupportTickets()).isEqualTo(0);
+        assertThat(response.totalPrTickets()).isEqualTo(0);
+        assertThat(response.interventionPrTickets()).isEqualTo(0);
+    }
+
+    private SupportBotClient.RequestBreakdownResponse getRequestBreakdown(
+            @Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
+        return supportBotClient.tenantInsights().requestBreakdown(dateFrom, dateTo);
+    }
+
     private void escalateTicket(long ticketId, String team, String source) {
         supportBotClient
                 .test()

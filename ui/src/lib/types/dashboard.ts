@@ -133,6 +133,16 @@ export interface EscalationBreakdown {
 }
 
 /**
+ * Support-request funnel from /tenant-insights/request-breakdown: total support requests, how many
+ * had a PR, and how many of those PR tickets needed a manual engineer escalation.
+ */
+export interface RequestBreakdown {
+  totalSupportTickets: number;
+  totalPrTickets: number;
+  interventionPrTickets: number;
+}
+
+/**
  * A single in-flight (currently open) pull request returned by
  * /tenant-insights/in-flight-prs
  */

@@ -376,6 +376,50 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                         r.get("manually_escalated_tickets", Long.class))));
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public RequestBreakdown getRequestBreakdown(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
+        // Compares PR tickets against ALL support tickets that came in during the window, so every count
+        // is bucketed by when the support request arrived — making the PR and intervention counts true subsets of the total.
+        // Bind order matches the textual '?' order: the manual-source filter (SELECT list) first,
+        // then the query.date range in the WHERE clause.
+        List<Object> binds = new ArrayList<>();
+        binds.add(EscalationSource.manual.name());
+        StringBuilder dateFilter = new StringBuilder();
+        if (dateFrom != null) {
+            dateFilter.append("AND q.date::date >= ?::date ");
+            binds.add(dateFrom);
+        }
+        if (dateTo != null) {
+            dateFilter.append("AND q.date::date <= ?::date ");
+            binds.add(dateTo);
+        }
+        String sql = """
+                SELECT
+                    COUNT(DISTINCT t.id) AS total_support_tickets,
+                    COUNT(DISTINCT t.id) FILTER (
+                        WHERE EXISTS (SELECT 1 FROM pr_tracking pt WHERE pt.ticket_id = t.id)
+                    ) AS total_pr_tickets,
+                    COUNT(DISTINCT t.id) FILTER (
+                        WHERE EXISTS (SELECT 1 FROM pr_tracking pt WHERE pt.ticket_id = t.id)
+                          AND EXISTS (
+                              SELECT 1 FROM escalation e
+                              WHERE e.ticket_id = t.id AND e.source = ?
+                          )
+                    ) AS intervention_pr_tickets
+                FROM ticket t
+                JOIN query q ON q.id = t.query_id
+                WHERE 1=1
+                  %s
+                """.formatted(dateFilter);
+
+        return checkNotNull(dsl.resultQuery(sql, binds.toArray())
+                .fetchOne(r -> new RequestBreakdown(
+                        r.get("total_support_tickets", Long.class),
+                        r.get("total_pr_tickets", Long.class),
+                        r.get("intervention_pr_tickets", Long.class))));
+    }
+
     private static <T> T requireNonNullAggregate(
             @Nullable T value, String column, String repo, @Nullable String extra) {
         if (value != null) {
