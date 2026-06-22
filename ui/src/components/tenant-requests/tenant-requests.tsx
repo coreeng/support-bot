@@ -281,9 +281,9 @@ export default function TenantRequestsPage() {
 
           <TabsContent value="stats" className="space-y-6">
             <div>
-              <h2 className="text-foreground text-base font-semibold">Bot Impact</h2>
+              <h2 className="text-foreground text-base font-semibold">PR Review Support Automation</h2>
               <p className="text-muted-foreground text-sm">
-                Share of incoming requests the bot handled automatically, and how often those still needed a human
+                Share of incoming requests handled automatically as PR reviews, and how often those still needed a human
               </p>
             </div>
 
