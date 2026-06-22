@@ -993,6 +993,119 @@ class PrTrackingConfigValidationTest {
                 .hasMessageContaining("contains duplicates");
     }
 
+    // ---- Admission / codeowner / dynamic-approval fields (foundation for PT-521/445/522) ---------
+
+    @Test
+    void defaultsAdmissionFieldsWhenNotConfigured() {
+        // given — a repo built via the legacy convenience constructor (no new fields supplied)
+        PrTrackingProps.Repository repo = validRepo();
+
+        // then — the new fields default to "off"
+        assertThat(repo.allowedAuthorTeams()).isEmpty();
+        assertThat(repo.requiresCodeowners()).isFalse();
+        assertThat(repo.dynamicApprovals()).isFalse();
+        assertThat(repo.codeownerTeam()).isNull();
+    }
+
+    @Test
+    void acceptsAllowedAuthorTeamsAndCodeownerTeam() {
+        assertThatCode(() -> new PrTrackingProps.Repository(
+                        "my-org/repo",
+                        "wow",
+                        Provider.GITHUB,
+                        null,
+                        null,
+                        List.of(),
+                        sla(Duration.ofDays(2)),
+                        null,
+                        null,
+                        List.of("platform-team"),
+                        true,
+                        "codeowners-team",
+                        false))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsBlankAllowedAuthorTeam() {
+        assertThatThrownBy(() -> new PrTrackingProps.Repository(
+                        "my-org/repo",
+                        "wow",
+                        Provider.GITHUB,
+                        null,
+                        null,
+                        List.of(),
+                        sla(Duration.ofDays(2)),
+                        null,
+                        null,
+                        List.of("platform-team", "  "),
+                        false,
+                        null,
+                        false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("allowed-author-teams[] must not be blank");
+    }
+
+    @Test
+    void rejectsBlankCodeownerTeam() {
+        assertThatThrownBy(() -> new PrTrackingProps.Repository(
+                        "my-org/repo",
+                        "wow",
+                        Provider.GITHUB,
+                        null,
+                        null,
+                        List.of(),
+                        sla(Duration.ofDays(2)),
+                        null,
+                        null,
+                        List.of(),
+                        false,
+                        "  ",
+                        false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("codeownerTeam must not be blank");
+    }
+
+    @Test
+    void rejectsDynamicApprovalsOnGithubRepo() {
+        // dynamic-approvals is GitLab-only (MR Approval Policies); reject it at config-bind time on GitHub.
+        assertThatThrownBy(() -> new PrTrackingProps.Repository(
+                        "my-org/repo",
+                        "wow",
+                        Provider.GITHUB,
+                        null,
+                        null,
+                        List.of(),
+                        sla(Duration.ofDays(2)),
+                        null,
+                        null,
+                        List.of(),
+                        false,
+                        null,
+                        true))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dynamic-approvals is only valid when provider=gitlab");
+    }
+
+    @Test
+    void acceptsDynamicApprovalsOnGitlabRepo() {
+        assertThatCode(() -> new PrTrackingProps.Repository(
+                        "my-group/project",
+                        "wow",
+                        Provider.GITLAB,
+                        null,
+                        "my-group/reviewers",
+                        List.of(),
+                        sla(Duration.ofDays(2)),
+                        null,
+                        null,
+                        List.of(),
+                        false,
+                        null,
+                        true))
+                .doesNotThrowAnyException();
+    }
+
     private static PrTrackingProps.Repository gitlabRepo(String name) {
         return new PrTrackingProps.Repository(
                 name,

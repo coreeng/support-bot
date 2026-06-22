@@ -13,7 +13,8 @@ public record PrMetadata(
         PrState state,
         @Nullable Boolean mergeable,
         List<String> requestedTeamReviewerLogins,
-        List<Review> reviews) {
+        List<Review> reviews,
+        @Nullable String authorLogin) {
     public PrMetadata {
         requireNonNull(coord, "coord must not be null");
         requireNonNull(createdAt, "createdAt must not be null");
@@ -23,6 +24,21 @@ public record PrMetadata(
         if (number <= 0) {
             throw new IllegalArgumentException("number must be positive, was " + number);
         }
+    }
+
+    /**
+     * Convenience constructor for callers (and tests) that don't supply an author. The author is
+     * captured natively by the source clients; an unknown author is represented as {@code null}.
+     */
+    public PrMetadata(
+            RepoCoord coord,
+            int number,
+            Instant createdAt,
+            PrState state,
+            @Nullable Boolean mergeable,
+            List<String> requestedTeamReviewerLogins,
+            List<Review> reviews) {
+        this(coord, number, createdAt, state, mergeable, requestedTeamReviewerLogins, reviews, null);
     }
 
     public boolean isOpen() {

@@ -77,6 +77,23 @@ class Hub4jGitHubClientTest {
     }
 
     @Test
+    void capturesAuthorLoginFromPullRequest() throws IOException {
+        // given
+        TestPullRequest pr = stubPullRequest("my-org/my-repo", 42, instant("2026-01-01T00:00:00Z"), GHIssueState.OPEN);
+        pr.testMergeable = true;
+        pr.testMergeableState = "clean";
+        pr.testRequestedTeams = List.of();
+        pr.testAuthorLogin = "octocat";
+        stubReviews(pr, List.of());
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.authorLogin()).isEqualTo("octocat");
+    }
+
+    @Test
     void returnsMergedStateWhenMergedAtIsNonNull() throws IOException {
         // given
         TestPullRequest pr =
@@ -552,6 +569,8 @@ class Hub4jGitHubClientTest {
 
         @Nullable String testMergeableState;
 
+        @Nullable String testAuthorLogin;
+
         List<GHTeam> testRequestedTeams = List.of();
 
         @Nullable IOException testRequestedTeamsException;
@@ -586,6 +605,16 @@ class Hub4jGitHubClientTest {
         @Override
         public String getMergeableState() throws IOException {
             return testMergeableState;
+        }
+
+        @Override
+        public GHUser getUser() throws IOException {
+            if (testAuthorLogin == null) {
+                return null;
+            }
+            GHUser user = mock(GHUser.class);
+            when(user.getLogin()).thenReturn(testAuthorLogin);
+            return user;
         }
 
         @Override

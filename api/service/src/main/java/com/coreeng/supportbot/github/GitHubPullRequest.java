@@ -14,7 +14,8 @@ public record GitHubPullRequest(
         @Nullable Boolean mergeable,
         @Nullable String mergeableState,
         List<String> requestedTeamReviewerLogins,
-        List<GitHubPullRequestReview> reviews) {
+        List<GitHubPullRequestReview> reviews,
+        @Nullable String authorLogin) {
     public GitHubPullRequest {
         requireNonNull(repositoryName, "repositoryName must not be null");
         requireNonNull(createdAt, "createdAt must not be null");
@@ -24,6 +25,28 @@ public record GitHubPullRequest(
         if (pullRequestNumber <= 0) {
             throw new IllegalArgumentException("pullRequestNumber must be positive, was " + pullRequestNumber);
         }
+    }
+
+    /** Convenience constructor for callers (and tests) that don't supply an author. */
+    public GitHubPullRequest(
+            String repositoryName,
+            int pullRequestNumber,
+            Instant createdAt,
+            PrState state,
+            @Nullable Boolean mergeable,
+            @Nullable String mergeableState,
+            List<String> requestedTeamReviewerLogins,
+            List<GitHubPullRequestReview> reviews) {
+        this(
+                repositoryName,
+                pullRequestNumber,
+                createdAt,
+                state,
+                mergeable,
+                mergeableState,
+                requestedTeamReviewerLogins,
+                reviews,
+                null);
     }
 
     public boolean isOpen() {
