@@ -3,7 +3,7 @@ P2P_TENANT_NAME ?= support-bot
 P2P_APP_NAME ?= support-bot
 HELM_CHART_PATH ?= helm-chart
 
-P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui $(P2P_APP_NAME)-ui-functional $(P2P_APP_NAME)-ui-nft $(P2P_APP_NAME)-dex
+P2P_IMAGE_NAMES := $(P2P_APP_NAME) $(P2P_APP_NAME)-ui $(P2P_APP_NAME)-dex
 
 # Download and include p2p makefile
 $(shell curl -fsSL "https://raw.githubusercontent.com/coreeng/p2p/v1/p2p.mk" -o ".p2p.mk")
