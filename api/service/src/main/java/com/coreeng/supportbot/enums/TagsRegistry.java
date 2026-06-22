@@ -6,5 +6,7 @@ import com.google.common.collect.ImmutableList;
 public interface TagsRegistry {
     ImmutableList<Tag> listAllTags();
 
+    ImmutableList<Tag> listAllTagsIncludingRetired();
+
     ImmutableList<Tag> listTagsByCodes(ImmutableCollection<String> codes);
 }

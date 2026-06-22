@@ -3,11 +3,10 @@ package com.coreeng.supportbot.summarydata.rest;
 import com.coreeng.supportbot.analysis.AnalysisRepository;
 import com.coreeng.supportbot.analysis.AnalysisResultsService;
 import com.coreeng.supportbot.config.AnalysisProps;
-import com.coreeng.supportbot.config.SlackTicketsProps;
+import com.coreeng.supportbot.config.SlackChannelRegistry;
 import com.coreeng.supportbot.summarydata.ThreadService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableList;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -17,7 +16,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -41,7 +42,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class SummaryDataController {
 
     private final ThreadService threadService;
-    private final SlackTicketsProps slackTicketsProps;
+    private final SlackChannelRegistry channelRegistry;
     private final AnalysisProps analysisProps;
     private final AnalysisResultsService analysisResultsService;
     private final ObjectMapper objectMapper;
@@ -59,11 +60,20 @@ public class SummaryDataController {
             return ResponseEntity.badRequest().build();
         }
 
-        log.info("Exporting summary data for last {} days from channel {}", days, slackTicketsProps.channelId());
+        List<String> channelIds = channelRegistry.monitoredChannelIds();
+        log.info("Exporting summary data for last {} days from channels {}", days, channelIds);
 
-        // Fetch all threads with white_check_mark from the configured channel
-        ImmutableList<ThreadService.ThreadData> threads =
-                threadService.getThreadsWithCheckMarkAsText(slackTicketsProps.channelId(), days);
+        // Fetch all threads with white_check_mark, aggregated across every monitored channel. A
+        // failure for one channel (e.g. the bot is not a member, or a Slack API error) must not fail
+        // the whole export, so each channel is fetched independently and a failing one is skipped.
+        List<ThreadService.ThreadData> threads = new ArrayList<>();
+        for (String channelId : channelIds) {
+            try {
+                threads.addAll(threadService.getThreadsWithCheckMarkAsText(channelId, days));
+            } catch (Exception e) {
+                log.warn("Failed to fetch threads for channel {}; skipping it in the export", channelId, e);
+            }
+        }
 
         log.info("Found {} threads to export", threads.size());
 
@@ -71,9 +81,17 @@ public class SummaryDataController {
         try (var byteArrayOutputStream = new java.io.ByteArrayOutputStream();
                 var zip = new java.util.zip.ZipOutputStream(byteArrayOutputStream)) {
 
-            // Add each thread as a separate file in the zip
+            // Add each thread as a separate file in the zip. Genuine duplicates within a single
+            // channel (a thread_ts repeated by a reply_broadcast or a page boundary) are already
+            // deduped at the source in ThreadService. The remaining collisions are cross-channel:
+            // two genuinely different threads in different channels can share a thread_ts, so
+            // disambiguate the name instead of dropping one and silently losing data.
+            Set<String> usedNames = new HashSet<>();
             for (ThreadService.ThreadData thread : threads) {
                 String fileName = thread.threadTs() + ".txt";
+                for (int dup = 2; !usedNames.add(fileName); dup++) {
+                    fileName = thread.threadTs() + "-" + dup + ".txt";
+                }
                 log.debug("Adding thread to zip: {}", fileName);
 
                 zip.putNextEntry(new java.util.zip.ZipEntry(fileName));

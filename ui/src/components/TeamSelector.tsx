@@ -35,31 +35,28 @@ export default function TeamSelector() {
     return null;
   };
 
-  const tenantTeamNames = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          teams
-            .filter((t) => !isRoleTeam(t) && !isEscalationTeam(t))
-            .map((t) => t.name)
-            .filter(Boolean)
-        )
-      ).sort(),
-    [teams]
-  );
+  const tenantTeams = useMemo(() => {
+    const byCode = new Map<string, string>();
+    teams
+      .filter((t) => !isRoleTeam(t) && !isEscalationTeam(t))
+      .forEach((t) => {
+        if (t.name) byCode.set(t.name, t.label || t.name);
+      });
+    return Array.from(byCode, ([name, label]) => ({ name, label })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [teams]);
 
   const userEscalationTeams = useMemo(() => teams.filter((t) => isEscalationTeam(t) && !isRoleTeam(t)), [teams]);
 
   const userRoleTeams = useMemo(() => teams.filter((t) => isRoleTeam(t)), [teams]);
 
-  const firstAvailableSelection = tenantTeamNames[0] || userEscalationTeams[0]?.name || userRoleTeams[0]?.name || null;
+  const firstAvailableSelection = tenantTeams[0]?.name || userEscalationTeams[0]?.name || userRoleTeams[0]?.name || null;
 
   const validSelections = useMemo(() => {
-    const set = new Set(tenantTeamNames);
+    const set = new Set(tenantTeams.map((t) => t.name));
     userEscalationTeams.forEach((t) => set.add(t.name));
     userRoleTeams.forEach((t) => set.add(t.name));
     return set;
-  }, [tenantTeamNames, userEscalationTeams, userRoleTeams]);
+  }, [tenantTeams, userEscalationTeams, userRoleTeams]);
 
   useEffect(() => {
     const urlTeam = teamParams.team;
@@ -121,6 +118,7 @@ export default function TeamSelector() {
   }
 
   const displayValue = selectedTeam && validSelections.has(selectedTeam) ? selectedTeam : firstAvailableSelection || "";
+  const displayLabel = teams.find((t) => t.name === displayValue)?.label || displayValue;
 
   const fallbackTeam = selectedTeam && validSelections.has(selectedTeam) ? selectedTeam : firstAvailableSelection;
 
@@ -128,11 +126,11 @@ export default function TeamSelector() {
     setTeamParam({ team: name });
   };
 
-  const renderItem = (name: string, suffix?: string | null) => (
+  const renderItem = (name: string, label: string, suffix?: string | null) => (
     <DropdownMenuItem key={name} onSelect={() => handleSelect(name)} className="cursor-pointer">
       <Users className="mr-2 h-4 w-4" />
       <span className="flex-1 break-words">
-        {name}
+        {label}
         {suffix && <span className="text-muted-foreground ml-1">· {suffix}</span>}
       </span>
       {displayValue === name && <Check className="text-primary ml-2 h-4 w-4" />}
@@ -170,34 +168,36 @@ export default function TeamSelector() {
         <DropdownMenuTrigger asChild>
           <Button variant="outline" data-testid="team-selector-trigger" className="cursor-pointer">
             <Users className="h-4 w-4" />
-            <span className="text-sm">{displayValue || "Select team"}</span>
+            <span className="text-sm">{displayLabel || "Select team"}</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-max max-w-[min(32rem,calc(100vw-2rem))] min-w-[14rem]">
-          {tenantTeamNames.length > 0 && (
+          {tenantTeams.length > 0 && (
             <>
               <DropdownMenuLabel className="text-muted-foreground text-xs">Teams</DropdownMenuLabel>
-              {tenantTeamNames.map((name) => renderItem(name))}
+              {tenantTeams.map((t) => renderItem(t.name, t.label))}
             </>
           )}
           {userEscalationTeams.length > 0 && (
             <>
-              {tenantTeamNames.length > 0 && <DropdownMenuSeparator />}
+              {tenantTeams.length > 0 && <DropdownMenuSeparator />}
               <DropdownMenuLabel className="text-muted-foreground text-xs">Escalation Teams</DropdownMenuLabel>
-              {userEscalationTeams.map((t) => renderItem(t.name, "Escalation"))}
+              {userEscalationTeams.map((t) => renderItem(t.name, t.label || t.name, "Escalation"))}
             </>
           )}
           {userRoleTeams.length > 0 && (
             <>
-              {(tenantTeamNames.length > 0 || userEscalationTeams.length > 0) && <DropdownMenuSeparator />}
+              {(tenantTeams.length > 0 || userEscalationTeams.length > 0) && <DropdownMenuSeparator />}
               <DropdownMenuLabel className="text-muted-foreground text-xs">Access Roles</DropdownMenuLabel>
-              {userRoleTeams.map((t) => renderItem(t.name, tagForTypes(t.types)))}
+              {userRoleTeams.map((t) => renderItem(t.name, t.label || t.name, tagForTypes(t.types)))}
             </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
       {selectedTeam && !(isLeadership || isSupportEngineer) && (
-        <span className="text-warning ml-2 text-xs italic">Viewing: {selectedTeam}</span>
+        <span className="text-warning ml-2 text-xs italic">
+          Viewing: {teams.find((t) => t.name === selectedTeam)?.label || selectedTeam}
+        </span>
       )}
     </>
   );

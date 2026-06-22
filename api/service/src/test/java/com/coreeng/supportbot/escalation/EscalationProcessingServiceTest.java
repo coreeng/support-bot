@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.coreeng.supportbot.config.SlackTicketsProps;
 import com.coreeng.supportbot.enums.EscalationTeam;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.slack.MessageTs;
@@ -37,13 +36,10 @@ class EscalationProcessingServiceTest {
     @Mock
     private EscalationTeamsRegistry escalationTeamsRegistry;
 
-    @Mock
-    private SlackTicketsProps slackTicketsProps;
-
     @BeforeEach
     public void setup() {
         processingService = new EscalationProcessingService(
-                escalationRepository, escalationMapper, slackClient, escalationTeamsRegistry, slackTicketsProps);
+                escalationRepository, escalationMapper, slackClient, escalationTeamsRegistry);
     }
 
     @Test
@@ -115,5 +111,31 @@ class EscalationProcessingServiceTest {
         assertThat(escalation.status()).isEqualTo(expectedEscalation.status());
         assertThat(escalation.team()).isEqualTo(expectedEscalation.team());
         assertThat(escalation.tags()).isEqualTo(expectedEscalation.tags());
+    }
+
+    @Test
+    public void shouldNotPostMessageWhenEscalationTeamUnresolved() {
+        CreateEscalationRequest escalationRequest = CreateEscalationRequest.builder()
+                .ticket(Ticket.builder()
+                        .id(new TicketId(1))
+                        .queryTs(MessageTs.of("1234567890.123456"))
+                        .channelId("test-channel")
+                        .build())
+                .team("removed-team")
+                .tags(ImmutableList.of())
+                .build();
+        Escalation created = Escalation.builder()
+                .id(new EscalationId(1))
+                .ticketId(new TicketId(1))
+                .status(EscalationStatus.opened)
+                .team("removed-team")
+                .build();
+        when(escalationRepository.createIfNotExists(any(Escalation.class))).thenReturn(created);
+        when(escalationTeamsRegistry.findEscalationTeamByCode("removed-team")).thenReturn(null);
+
+        Escalation escalation = requireNonNull(processingService.createEscalation(escalationRequest));
+
+        assertThat(escalation.id()).isEqualTo(new EscalationId(1));
+        verifyNoInteractions(slackClient);
     }
 }

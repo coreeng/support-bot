@@ -158,10 +158,14 @@ public class HomepageViewMapper {
     }
 
     private String viewDescriptionMessage(HomepageView homepage) {
+        ImmutableList<String> channelIds = homepage.channelIds();
+        String mentions =
+                join(", ", channelIds.stream().map(id -> "<#" + id + ">").toList());
+        String channelWord = channelIds.size() == 1 ? "channel" : "channels";
         return "Handle all queries, including their escalations. "
-                + "The bot is designed to assist support engineers in managing and escalating support queries within the <#"
-                + homepage.channelId()
-                + "> channel.";
+                + "The bot is designed to assist support engineers in managing and escalating support queries within the "
+                + mentions
+                + " " + channelWord + ".";
     }
 
     private List<LayoutBlock> renderBottomBlock(HomepageView homepage) {

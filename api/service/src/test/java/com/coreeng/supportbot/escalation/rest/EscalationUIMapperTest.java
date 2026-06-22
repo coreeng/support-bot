@@ -10,7 +10,7 @@ import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationStatus;
 import com.coreeng.supportbot.slack.MessageTs;
-import com.coreeng.supportbot.teams.Team;
+import com.coreeng.supportbot.teams.TeamDisplay;
 import com.coreeng.supportbot.teams.TeamService;
 import com.coreeng.supportbot.teams.TeamType;
 import com.coreeng.supportbot.teams.rest.TeamUI;
@@ -69,9 +69,9 @@ class EscalationUIMapperTest {
     void mapToUIReturnsTeam() {
         // given
         Escalation escalation = escalation().team("platform").build();
-        Team team = new Team("platform", "Platform", ImmutableList.of(TeamType.TENANT));
-        TeamUI teamUI = new TeamUI("platform", "Platform", ImmutableList.of(TeamType.TENANT));
-        when(teamService.findTeamByCode("platform")).thenReturn(team);
+        TeamDisplay team = new TeamDisplay("platform", "Platform", ImmutableList.of(TeamType.TENANT), true);
+        TeamUI teamUI = new TeamUI("Platform", "platform", ImmutableList.of(TeamType.TENANT));
+        when(teamService.resolveForDisplay("platform")).thenReturn(team);
         when(teamUIMapper.mapToUI(team)).thenReturn(teamUI);
 
         // when
@@ -94,16 +94,19 @@ class EscalationUIMapperTest {
     }
 
     @Test
-    void mapToUIReturnsNullTeamWhenTeamNotFound() {
-        // given
+    void mapToUIReturnsRetiredTeamWithLastKnownLabel() {
+        // given: a team removed from config still resolves to its last-known label, flagged retired
         Escalation escalation = escalation().team("deleted-team").build();
-        when(teamService.findTeamByCode("deleted-team")).thenReturn(null);
+        TeamDisplay retired = new TeamDisplay("deleted-team", "Deleted Team", ImmutableList.of(), false);
+        TeamUI retiredUI = new TeamUI("Deleted Team", "deleted-team", ImmutableList.of(), false);
+        when(teamService.resolveForDisplay("deleted-team")).thenReturn(retired);
+        when(teamUIMapper.mapToUI(retired)).thenReturn(retiredUI);
 
         // when
         EscalationUI result = escalationUIMapper.mapToUI(escalation);
 
-        // then
-        assertNull(result.team());
+        // then: equals covers active=false; the team is rendered rather than dropped
+        assertEquals(retiredUI, result.team());
     }
 
     private Escalation.EscalationBuilder escalation() {

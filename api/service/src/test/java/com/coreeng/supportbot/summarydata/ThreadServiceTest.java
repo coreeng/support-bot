@@ -12,8 +12,10 @@ import com.coreeng.supportbot.config.SummaryDataProps.SanitisationProperties;
 import com.coreeng.supportbot.slack.SlackException;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.slack.api.methods.SlackApiException;
+import com.slack.api.methods.response.conversations.ConversationsHistoryResponse;
 import com.slack.api.methods.response.conversations.ConversationsRepliesResponse;
 import com.slack.api.model.Message;
+import com.slack.api.model.Reaction;
 import com.slack.api.model.ResponseMetadata;
 import java.util.List;
 import okhttp3.Protocol;
@@ -291,6 +293,35 @@ class ThreadServiceTest {
         verify(slackClient, times(2)).getThreadPage(any());
     }
 
+    @Test
+    void getThreadsWithCheckMark_shouldDedupeThreadsSharingThreadTs() {
+        // Given — a thread parent and a reply_broadcast that share the same thread_ts, both check-marked.
+        // Such a thread surfaces more than once in conversations.history and used to produce a duplicate export entry.
+        var service = serviceWithSanitisation(List.of(), List.of());
+
+        var parent = messageWithText("parent");
+        parent.setTs("1700000000.000001");
+        parent.setThreadTs("1700000000.000001");
+        parent.setReactions(List.of(reaction("white_check_mark")));
+
+        var broadcast = messageWithText("broadcast reply");
+        broadcast.setTs("1700000000.000099");
+        broadcast.setThreadTs("1700000000.000001");
+        broadcast.setReactions(List.of(reaction("white_check_mark")));
+
+        var other = messageWithText("another thread");
+        other.setTs("1700000000.000002");
+        other.setReactions(List.of(reaction("white_check_mark")));
+
+        when(slackClient.getHistoryPage(any())).thenReturn(historyResponse(List.of(parent, broadcast, other)));
+
+        // When
+        var result = service.getThreadsWithCheckMark(CHANNEL_ID, 31);
+
+        // Then — the shared thread_ts appears once, first-seen order preserved
+        assertThat(result).containsExactly("1700000000.000001", "1700000000.000002");
+    }
+
     private ThreadService serviceWithSanitisation(List<String> patterns, List<String> exceptions) {
         var sanitisation = new SanitisationProperties(patterns, exceptions);
         var props = new SummaryDataProps(sanitisation);
@@ -309,6 +340,20 @@ class ThreadServiceTest {
         var msg = new Message();
         msg.setText(text);
         return msg;
+    }
+
+    private ConversationsHistoryResponse historyResponse(List<Message> messages) {
+        var response = new ConversationsHistoryResponse();
+        response.setOk(true);
+        response.setMessages(messages);
+        response.setHasMore(false);
+        return response;
+    }
+
+    private Reaction reaction(String name) {
+        var reaction = new Reaction();
+        reaction.setName(name);
+        return reaction;
     }
 
     private static SlackException rateLimitedSlackException(String retryAfterSeconds) {

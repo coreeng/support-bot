@@ -205,6 +205,7 @@ export function useEscalationTeams(enabled: boolean = true) {
 
 export interface Team {
   name: string;
+  label?: string;
 }
 
 export function useTenantTeams() {
@@ -305,8 +306,8 @@ export const useRatings = (from?: string, to?: string) => {
 };
 
 export interface Registry {
-  impacts: { label: string; code: string }[];
-  tags: { label: string; code: string }[];
+  impacts: { label: string; code: string; active?: boolean }[];
+  tags: { label: string; code: string; active?: boolean }[];
 }
 
 export function useRegistry() {
