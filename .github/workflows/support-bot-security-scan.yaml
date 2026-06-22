@@ -1,0 +1,20 @@
+name: support-bot Security Scan
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * *"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  scheduled-security-scan:
+    uses: coreeng/p2p/.github/workflows/p2p-workflow-security-scan.yaml@v1
+    secrets:
+      env_vars: ${{ secrets.env_vars }}
+    with:
+      tenant-name: support-bot
+      working-directory: ./
+      security-scan-blocking-severity: "off"
