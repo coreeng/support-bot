@@ -1,0 +1,29 @@
+# P2P-owned security ignore file, read from the repository root by the coreeng/p2p
+# image- and source-scan workflows. v1 schema — a malformed file FAILS the scan/report job.
+# See coreeng/p2p docs/how-to/ignore-security-findings.md.
+#
+# Only confirmed false positives / accepted risk belong here. Each entry is matched by the
+# standard P2P image name plus the finding `id` exactly as it appears in the scan report.
+version: 1
+
+images:
+  # api image — UBI9 runtime base (registry.access.redhat.com/ubi9/openjdk-25-runtime,
+  # final stage of api/Dockerfile).
+  - name: support-bot
+    secrets:
+      - id: p2psec_9756474ad1dca77c
+        reason: >-
+          False positive: TruffleHog "Box" detector matched a high-entropy byte sequence in
+          /usr/lib64/libgnutls.so.30.40.4 — the GnuTLS shared library shipped by the UBI9 base
+          image. It is a compiled ELF binary, not a Box credential, and the finding status was
+          "unverified" (live verification did not confirm an active credential).
+
+  # ui image — node:24.10.0-alpine3.22 base (ui/Dockerfile).
+  - name: support-bot-ui
+    secrets:
+      - id: p2psec_fa1393fff9412357
+        reason: >-
+          False positive: TruffleHog "Circle" detector matched the CircleCI status-badge token in
+          /opt/yarn-v1.22.22/README.md — yarn's own README bundled in the node base image
+          (line: circleci.com/gh/yarnpkg/yarn.svg?style=shield&circle-token=...). It is a public
+          build-status badge token, not an API credential, and the finding status was "unverified".
