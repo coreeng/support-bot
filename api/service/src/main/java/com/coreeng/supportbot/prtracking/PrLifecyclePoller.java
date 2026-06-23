@@ -180,9 +180,32 @@ public class PrLifecyclePoller {
                 }
             }
         }
+        logApprovedAwaitingMerge(record, decision);
         for (PrLifecycle.Effect effect : decision.effects()) {
             runEffect(record, effect);
         }
+    }
+
+    /**
+     * Restores the per-transition INFO line the old imperative code logged on every transition into
+     * {@code APPROVED} (awaiting merge). The {@code APPROVED} rows carry no {@link PrLifecycle.Effect},
+     * so unlike the other states their transition would otherwise be silent; the three wordings
+     * (SLA-paused / plain / post-escalation) mirror the old {@code handleApproval} and
+     * {@code processEscalatedRecord} logs.
+     */
+    private void logApprovedAwaitingMerge(PrTrackingRecord record, PrLifecycle.Decision decision) {
+        if (decision.next() != PrTrackingStatus.APPROVED) {
+            return;
+        }
+        String template;
+        if (decision.slaOp() instanceof PrLifecycle.SlaOp.Pause) {
+            template = "PR {}#{} approved — SLA paused, awaiting merge";
+        } else if (record.status() == PrTrackingStatus.ESCALATED) {
+            template = "PR {}#{} approved after escalation — awaiting merge";
+        } else {
+            template = "PR {}#{} approved — awaiting merge";
+        }
+        log.atInfo().addArgument(record::repo).addArgument(record::prNumber).log(template);
     }
 
     private void runEffect(PrTrackingRecord record, PrLifecycle.Effect effect) {
