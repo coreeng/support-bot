@@ -218,12 +218,8 @@ public class PrDetectionService {
                     continue;
                 }
 
-                // Author admission must precede the lazy ticket creation below: in the query path a
-                // PR-link message auto-creates a ticket (and posts its in-thread form) the moment the
-                // first open PR is seen, so a PR authored outside allowed-author-teams has to be
-                // skipped here — before the supplier runs — not only inside processPr. processPr
-                // re-checks as the authoritative seam (membership is cached, so the second check is
-                // free); that is the path handleMessagePosted relies on.
+                // Must run before the ticketSupplier below, or a PR authored outside
+                // allowed-author-teams would still auto-create a ticket. processPr re-checks (cached).
                 Optional<PrTrackingProps.Repository> repoConfig = repoConfigFor(pr);
                 if (repoConfig.isPresent() && !authorAllowed(pr, repoConfig.get(), prMetadata, teamReviewerCache)) {
                     continue;
@@ -328,7 +324,6 @@ public class PrDetectionService {
         }
     }
 
-    /** Finds the PR-tracking config for a detected PR's repository, if one is configured. */
     private Optional<PrTrackingProps.Repository> repoConfigFor(DetectedPr detectedPr) {
         return prTrackingProps.repositories().stream()
                 .filter(r -> r.name().equals(detectedPr.repositoryName()))
@@ -347,7 +342,6 @@ public class PrDetectionService {
         Optional<PrTrackingProps.Repository> repoConfig = repoConfigFor(detectedPr);
 
         if (repoConfig.isPresent()) {
-            // Author admission gate (PT-521): runs before any tracking record or Slack side effect.
             if (!authorAllowed(detectedPr, repoConfig.get(), prMetadata, teamReviewerCache)) {
                 return PerPrResult.SKIPPED;
             }
@@ -382,16 +376,8 @@ public class PrDetectionService {
     }
 
     /**
-     * Author admission gate (PT-521). When a repo configures {@code allowed-author-teams}, only
-     * PRs/MRs whose author belongs to at least one of those teams are tracked; everyone else is
-     * skipped before a tracking record (or any Slack side effect) is created.
-     *
-     * <p>Fails open — we never silently drop a PR because of a transient lookup problem. Tracking
-     * proceeds when no allow-list is configured, when the provider returned no author, or when team
-     * membership could not be fully resolved; we skip only when every configured team resolved and
-     * the author was in none of them. Membership is any-of, and GitLab inherited/invited-group
-     * members count (resolution uses {@code /members/all}). Mirrors {@link TeamReviewFilter}'s
-     * graceful-degradation stance.
+     * Author admission gate (PT-521): tracks unless every allowed-author-team resolved and the author
+     * is in none (any-of). Fails open on no allow-list, unknown author, or unresolved membership.
      */
     private boolean authorAllowed(
             DetectedPr detectedPr,
