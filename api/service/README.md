@@ -53,6 +53,24 @@ make lint
 
 Ruleset can be found [here](pmd-ruleset.xml)
 
+# PR lifecycle FSM
+
+The PR-tracking state machine is defined declaratively in
+[`PrLifecycle.TRANSITIONS`](src/main/java/com/coreeng/supportbot/prtracking/PrLifecycle.java)
+— one ordered table that is the single source of truth for the runtime (`PrLifecycle.decide`). It can
+also be rendered to a lifecycle diagram
+([`docs/diagrams/pr-lifecycle.generated.md`](docs/diagrams/pr-lifecycle.generated.md)).
+
+The diagram is an **optional, nice-to-have artefact**: it is generated (never hand-edited), but
+**nothing enforces that it stays in sync** with the table. If you change the FSM and want the diagram
+to match, regenerate it and commit the result:
+
+```bash
+make regen-fsm-diagram      # from api/, optional
+```
+
+If you skip it the diagram just goes stale — the build is unaffected.
+
 # Support Bot API
 
 ## Support Analysis API

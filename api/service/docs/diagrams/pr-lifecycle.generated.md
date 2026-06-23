@@ -1,7 +1,7 @@
 # PR lifecycle FSM (generated)
 
 <!-- Generated from PrLifecycle.TRANSITIONS by MermaidRenderer — do not edit by hand. -->
-<!-- Regenerate: ./gradlew :service:test --tests '*MermaidRendererTest*' -Ddocker=true -DupdateGolden=true -->
+<!-- Regenerate: make regen-fsm-diagram (from api/) -->
 
 ```mermaid
 stateDiagram-v2

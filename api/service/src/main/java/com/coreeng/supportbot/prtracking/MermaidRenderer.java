@@ -9,8 +9,9 @@ import java.util.List;
  * Renders the declarative {@link PrLifecycle#TRANSITIONS} table to a Mermaid {@code stateDiagram-v2}
  * — one edge ({@code from --> to : label}) per row. {@code from == null} ("any active state") rows
  * are expanded to one edge from each active state, in the order those states first appear in the
- * table. The output is golden-tested (see {@code MermaidRendererTest}), so the committed diagram can
- * never silently drift from the FSM the code actually runs.
+ * table. The committed diagram ({@code docs/diagrams/pr-lifecycle.generated.md}) is an optional,
+ * best-effort artefact regenerated manually via {@code make regen-fsm-diagram} — nothing enforces it,
+ * so refresh it after changing {@link PrLifecycle#TRANSITIONS}.
  */
 public final class MermaidRenderer {
 
