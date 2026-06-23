@@ -528,14 +528,16 @@ Grant the minimum read scopes:
 - **`auth-mode: token`** (a Personal Access Token in `github.token`):
   - Classic PAT: `repo` (read PRs, reviews, and file contents on **private**
     repos — omit only if every tracked repo is public) and `read:org` (resolve
-    `github-team-slug` membership).
+    `github-team-slug` / `allowed-author-teams` membership).
   - Fine-grained PAT: repository permissions **Pull requests: Read**,
     **Contents: Read**, **Metadata: Read**; organization permission
-    **Members: Read** (only if any repo uses `github-team-slug`).
+    **Members: Read** (only if any repo uses `github-team-slug` or
+    `allowed-author-teams`).
 - **`auth-mode: app`** (a GitHub App via `app-id` / `installation-id` /
   `private-key-pem`): the same permissions as the fine-grained PAT above —
   **Pull requests: Read**, **Contents: Read**, **Metadata: Read**, and
-  **Members: Read** (org) when `github-team-slug` is used.
+  **Members: Read** (org) when `github-team-slug` or `allowed-author-teams` is
+  used.
 
 **GitLab** (`gitlab` block — a Personal, Group, or Project access token, sent as
 the `PRIVATE-TOKEN` header). GitLab supports two permission models; use whichever
@@ -546,10 +548,12 @@ your instance offers.
 - Scope **`read_api`**.
 - The token's identity needs at least the **Reporter** role on every tracked
   project (to read merge requests, approvals, diffs, and repository files).
-- Only when a repo sets the optional `gitlab-group-path` does the token
-  additionally need at least the **Reporter** role on that reviewer group, so it
-  can list the group's members (including inherited members). Repos that omit
-  `gitlab-group-path` need no group-level access.
+- Only when a repo sets `gitlab-group-path` or `allowed-author-teams` does the
+  token additionally need at least the **Reporter** role on the referenced
+  group(s), so it can list their members (including inherited and invited-group
+  members — see
+  [Team and group membership resolution](#team-and-group-membership-resolution)).
+  Repos that set neither need no group-level access.
 
 *Fine-grained (granular) permissions* — GitLab's
 [fine-grained personal access tokens](https://docs.gitlab.com/auth/tokens/fine_grained_access_tokens/),
@@ -562,8 +566,8 @@ read-only resource permissions (the exact set below is a verified working token)
 | **Merge Request: Read**              | yes                               | Read MR details and the MR diff (changed-file matching for path filters). |
 | **Approval Setting: Read**           | yes                               | Read the MR's approval configuration.                                     |
 | **Merge Request Approval Rule: Read**| yes                               | Read the MR's approval state (who has approved).                          |
-| **Group: Read**                      | only if `gitlab-group-path` set   | Access the reviewer group.                                                |
-| **Member: Read**                     | only if `gitlab-group-path` set   | List the reviewer group's members (including inherited members).         |
+| **Group: Read**                      | if `gitlab-group-path` / `allowed-author-teams` set | Access the reviewer / author-admission group.           |
+| **Member: Read**                     | if `gitlab-group-path` / `allowed-author-teams` set | List the group's members (incl. inherited / invited — see [resolution](#team-and-group-membership-resolution)). |
 
 Note that fine-grained PATs are still rolling out (~75% REST API coverage at
 beta), so on older instances or for full coverage the classic `read_api` scope
@@ -585,6 +589,7 @@ touching the listed paths and never escalate.
 | `provider` | — | both | `github` (default) or `gitlab`. |
 | `github-team-slug` | — | GitHub only | Team whose members' reviews count as a qualifying review. Falls back to the PR's requested team reviewers when omitted. |
 | `gitlab-group-path` | — | GitLab only | Reviewer group whose members' approvals count (see [Approver validation and CODEOWNERS](#approver-validation-and-codeowners)). |
+| `allowed-author-teams` | — | both | Author admission allow-list: when non-empty, only PRs/MRs whose author belongs to one of these teams are tracked. GitHub team slugs / GitLab group paths. See [Author admission](#author-admission). |
 | `sla` | one of `sla`/`paths` | both | SLA block — see below. |
 | `paths` | one of `sla`/`paths` | both | Glob list; a no-SLA repo tracks only PRs/MRs touching these paths. |
 | `gitlab` | — | GitLab only | Per-repo `api-base-url` / `token` override of the global `gitlab` block. |
@@ -605,6 +610,7 @@ repositories:
     # provider: github                    # implicit default
     owning-team: support-team
     github-team-slug: support-reviewers    # optional; falls back to the PR's requested teams
+    allowed-author-teams: [contributors]   # optional; track only PRs whose author is in one of these teams
     sla:
       default: 48h
       overrides:                           # optional, path-specific
@@ -629,6 +635,7 @@ repositories:
     provider: gitlab
     owning-team: support-team
     gitlab-group-path: my-group/reviewers  # optional; approvals by this group's members count
+    allowed-author-teams: [my-group/engineers]  # optional; track only MRs whose author is in one of these groups
     sla:
       default: 48h
 ```
@@ -666,8 +673,9 @@ This is how the bot decides whose review counts toward an approval:
   When omitted, the bot falls back to the PR's requested team reviewers; if none
   were requested, any review counts.
 - **GitLab** — `gitlab-group-path` plays the same role: only approvals by
-  members of that group (including inherited members) count as a qualifying
-  review.
+  members of that group (including inherited and invited-group members — see
+  [Team and group membership resolution](#team-and-group-membership-resolution))
+  count as a qualifying review.
 
 `gitlab-group-path` is **optional**. When it is omitted, the bot accepts **any**
 approval GitLab records on the MR. Omit it when your organisation already
@@ -676,6 +684,80 @@ required-approval rules — so that GitLab stays the single source of truth for
 approval validity and the bot simply mirrors it. Set `gitlab-group-path` only
 when you additionally want the bot to restrict qualifying approvals to a
 specific reviewer group.
+
+#### Author admission
+
+`allowed-author-teams` gates **whether a PR/MR is tracked at all**, based on its
+author — distinct from approver validation above, which decides whose *review*
+counts. When the list is non-empty the bot tracks a PR only if its author belongs
+to at least one of the listed teams (**any-of**); otherwise the PR is skipped
+*before* any tracking record, Slack reaction, in-thread notification, or
+escalation is created. This applies to SLA and no-SLA repos alike. When the list
+is empty (the default) every PR is tracked, exactly as without the setting.
+
+Entries are **GitHub team slugs** on GitHub repos and **GitLab group paths** on
+GitLab repos, resolved with the same membership rules as the reviewer team (see
+[Team and group membership resolution](#team-and-group-membership-resolution)) —
+so the nested-team behaviour below applies when choosing which team/group to
+list.
+
+The gate **fails open**: it skips a PR only when *every* configured team resolved
+and the author is in none of them. If the provider returned no author, or any
+configured team's membership could not be fetched (e.g. the token lacks the
+membership read scope above), the PR is tracked anyway and a warning is logged —
+a transient lookup failure never silently drops a legitimate PR. When first
+rolling this out, confirm via the logs that the gate is admitting/skipping as you
+expect.
+
+#### Team and group membership resolution
+
+Both the reviewer team (`github-team-slug` / `gitlab-group-path`) and the author
+allow-list (`allowed-author-teams`) resolve a team/group reference to a set of
+member logins the same way — and the two providers expand **nested** teams in
+**opposite directions**. This decides which team/group you should name.
+
+**GitHub** — members come from the team slug via the org Teams API, which
+**includes the members of child (nested) teams**. Naming a *parent* team captures
+everyone in the teams beneath it; naming a child team does **not** pull in the
+parent's members.
+
+Org `acme`, nested teams `A ▸ B ▸ C` and standalone `D`; direct members
+`alice→A`, `bob→B`, `carol→C`, `dave→D`:
+
+| Team named | Resolves to       |
+|------------|-------------------|
+| `A`        | alice, bob, carol |
+| `B`        | bob, carol        |
+| `C`        | carol             |
+| `D`        | dave              |
+
+**GitLab** — members come from `GET /groups/:path/members/all`, which includes
+the group's direct members, members **inherited from ancestor (parent) groups**,
+and members of **invited (shared) groups** — but **not** members who sit only in a
+*descendant subgroup*. Naming a *subgroup* captures it plus everything above it;
+naming a parent group does **not** reach down into its subgroups.
+
+Group `A`, subgroups `A/B ▸ A/B/C`, separate group `D`, and group `E` invited into
+`A/B`; direct members `alice→A`, `bob→A/B`, `carol→A/B/C`, `dave→D`, `erin→E`:
+
+| Group path named | Resolves to             |
+|------------------|-------------------------|
+| `A`              | alice                   |
+| `A/B`            | alice, bob, erin        |
+| `A/B/C`          | alice, bob, carol, erin |
+| `D`              | dave                    |
+
+In short: on **GitHub** name the team at the *top* of the hierarchy to cover
+everything beneath it; on **GitLab** name the *exact subgroup* you mean (it also
+covers ancestor and invited-group members). A GitLab *parent-group* path will
+**not** match authors who live only in its subgroups — the group resolves
+successfully but without them, so the gate finds the author in no configured
+team and **skips** those MRs, silently dropping authors you meant to admit. Name
+the *exact subgroup* instead.
+
+When membership cannot be resolved at all (missing read scope, or the API call
+fails) the bot degrades gracefully rather than failing hard: reviewer filtering
+accepts all reviews, and the author gate tracks the PR.
 
 ### Validation rules
 
@@ -687,6 +769,9 @@ Checked at startup; any failure aborts boot:
   (`group/subgroup/project`).
 - `github-team-slug` is only valid on GitHub repos; `gitlab-group-path` and a
   per-repo `gitlab:` block are only valid on GitLab repos.
+- `allowed-author-teams` is valid on both providers; the list is optional, but
+  any entry present must be non-blank. The author-admission gate is active only
+  while the list is non-empty.
 - `owning-team` must exist in `enums.escalation-teams`; `tags` / `impact` must
   reference `enums.tags` / `enums.impacts`.
 - Each repo has **either** an `sla` block **or** a non-empty `paths` list.

@@ -74,14 +74,10 @@ public class TeamReviewFilter {
     }
 
     /**
-     * Resolves the members of a team/group reference via
-     * {@link com.coreeng.supportbot.prtracking.source.PrSourceClient#resolveTeamMembers}, memoising the
-     * outcome (success or failure) in the supplied per-poll cache. Returns {@code null} when membership
-     * could not be resolved (API failure); callers treat that as "cannot verify — don't filter".
-     *
-     * <p>Exposed for reuse by admission-time checks (author allow-listing, codeowner resolution) that
-     * build on the same cached lookup. The cache key folds in the provider so a GitHub team slug and a
-     * GitLab group path that happen to share a name in the same org/group can't collide.
+     * Resolves a team/group reference to its member logins, memoising success or failure in the
+     * supplied per-poll cache. Returns {@code null} when membership couldn't be resolved (API failure) —
+     * callers treat that as "cannot verify". The cache key folds in the provider so a GitHub team slug
+     * and a GitLab group path sharing a name can't collide.
      */
     public @Nullable Set<String> resolveTeamMembers(
             RepoCoord coord, String teamRef, Map<String, Optional<Set<String>>> cache) {

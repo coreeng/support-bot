@@ -325,10 +325,7 @@ public record PrTrackingProps(
             this.dynamicApprovals = dynamicApprovals;
         }
 
-        /**
-         * Convenience for callers predating the admission/codeowner/dynamic-approval fields: defaults
-         * allowed-author-teams to empty and the codeowner/dynamic-approval flags off.
-         */
+        /** Convenience for callers predating the admission/codeowner/dynamic-approval fields. */
         public Repository(
                 String name,
                 String owningTeam,

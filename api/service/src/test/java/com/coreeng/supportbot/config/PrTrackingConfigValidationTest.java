@@ -993,7 +993,7 @@ class PrTrackingConfigValidationTest {
                 .hasMessageContaining("contains duplicates");
     }
 
-    // ---- Admission / codeowner / dynamic-approval fields (foundation for PT-521/445/522) ---------
+    // ---- Admission / codeowner / dynamic-approval fields ---------
 
     @Test
     void defaultsAdmissionFieldsWhenNotConfigured() {

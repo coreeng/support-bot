@@ -2,6 +2,7 @@
 
 **Date:** 2026-02-25
 **Status:** Accepted
+**Amended:** 2026-06-23 — author-admission gate ([#285](https://github.com/coreeng/support-bot/pull/285)) added ahead of the §5 side effects.
 
 ---
 
@@ -106,12 +107,14 @@ Startup validation enforces required fields per mode (`token` requires `token`; 
 ### 4. PR Link Detection
 
 The existing Slack event listener is extended to match GitHub PR URLs (`github.com/<org>/<repo>/pull/<number>`) via compiled regex.
-If `<org>/<repo>` matches a configured repository, the PR is in-scope. Multiple links per message are each tracked independently.
+If `<org>/<repo>` matches a configured repository, the PR is a tracking *candidate* — still subject to the author-admission gate (§5) before any side effect. Multiple links per message are each tracked independently.
 Unrecognised repos are silently ignored.
 
 ### 5. On PR Detection
 
-When an in-scope PR link is found:
+**Author admission gate (added by [#285](https://github.com/coreeng/support-bot/pull/285)).** Before any of the steps below, if the repository configures `allowed-author-teams`, the PR is tracked only when its author belongs to at least one of those teams (**any-of**); otherwise it is skipped entirely — no metadata initialisation, thread reply, emoji reaction, `pr_tracking` record, or escalation. Membership is resolved against the VCS provider (GitHub Teams API / GitLab group members, including nested and inherited). The gate **fails open**: a candidate is skipped only when *every* configured team resolved and the author was in none; a missing author, an unresolved team (provider API failure), or no `allowed-author-teams` configured all track anyway. Applies to SLA and no-SLA repos, and to both the top-level query path and thread replies. See [configuration.md](../../api/service/docs/configuration.md) for the operator-facing detail and the nested/inherited membership rules per provider.
+
+When an admitted PR link is found:
 
 1. Fetch PR metadata via GitHub API (`created_at`, current state).
 2. For PR links detected on the top-level query message (not thread replies), if the ticket is missing metadata, initialise it with configured defaults (`tags`, `impact`) and suggested author team when available. Existing team/tags/impact are preserved.
