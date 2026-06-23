@@ -376,7 +376,7 @@ public class PrDetectionService {
     }
 
     /**
-     * Author admission gate (PT-521): tracks unless every allowed-author-team resolved and the author
+     * Author admission gate (#285): tracks unless every allowed-author-team resolved and the author
      * is in none (any-of). Fails open on no allow-list, unknown author, or unresolved membership.
      */
     private boolean authorAllowed(
