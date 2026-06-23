@@ -115,6 +115,22 @@ class PrLifecycleTest {
             // (no deadline, no stored remaining) with no verdict is always a no-op — never ESCALATED.
             assertDecision(decide(obs(OPEN)), OPEN, NONE);
         }
+
+        @Test
+        void mergeableWithNoVerdictIsNoOp() {
+            // The most common live state: a mergeable PR no team member has reviewed yet. Isolates the
+            // approved() conjunct of the "approved + mergeable" row — without it, every unreviewed
+            // mergeable PR would be wrongly CLOSED + NOTIFY_APPROVED.
+            assertDecision(decide(obs(OPEN).mergeable()), OPEN, NONE);
+        }
+
+        @Test
+        void pausedRecordWithNoVerdictIsNoOp() {
+            // A paused OPEN record (stored remaining, no live deadline) whose review was dismissed.
+            // Isolates the changesRequested() conjunct of the "SLA paused (notify only)" row — without
+            // it, a verdict-less paused record would emit a spurious NOTIFY_CHANGES_REQUESTED.
+            assertDecision(decide(obs(OPEN).storedRemaining(STORED)), OPEN, NONE);
+        }
     }
 
     @Nested
@@ -147,6 +163,13 @@ class PrLifecycleTest {
         void stillRequestingChangesIsNoOp() {
             assertDecision(
                     decide(obs(CHANGES_REQUESTED).changesRequested().storedRemaining(STORED)), CHANGES_REQUESTED, NONE);
+        }
+
+        @Test
+        void mergeableWithNoVerdictIsNoOp() {
+            // Isolates the approved() conjunct of the "approved + mergeable" row — a mergeable PR whose
+            // team verdict has been dismissed must stay put, not be CLOSED + NOTIFY_APPROVED.
+            assertDecision(decide(obs(CHANGES_REQUESTED).mergeable()), CHANGES_REQUESTED, NONE);
         }
     }
 
