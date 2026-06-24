@@ -2,15 +2,11 @@ plugins {
     id("com.diffplug.spotless") version "8.0.0" apply false
 }
 
+val jacksonVersion = "2.22.0"
+val jacksonBom = "com.fasterxml.jackson:jackson-bom:$jacksonVersion"
 val safeDependencyVersions =
     mapOf(
         "ch.qos.logback:logback-core" to "1.5.25",
-        "com.fasterxml.jackson:jackson-bom" to "2.22.0",
-        "com.fasterxml.jackson.core:jackson-core" to "2.22.0",
-        "com.fasterxml.jackson.core:jackson-databind" to "2.22.0",
-        "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml" to "2.22.0",
-        "com.fasterxml.jackson.datatype:jackson-datatype-guava" to "2.22.0",
-        "com.fasterxml.jackson.datatype:jackson-datatype-jsr310" to "2.22.0",
         "com.github.jknack:handlebars" to "4.5.2",
         "com.microsoft.kiota:microsoft-kiota-abstractions" to "1.9.1",
         "com.nimbusds:nimbus-jose-jwt" to "10.0.2",
@@ -52,6 +48,18 @@ val safeDependencyCoordinates = safeDependencyVersions.map { (dependency, versio
 
 subprojects {
     apply(plugin = "com.diffplug.spotless")
+
+    extra["jackson-bom.version"] = jacksonVersion
+
+    plugins.withType<JavaPlugin> {
+        dependencies {
+            add("implementation", enforcedPlatform(jacksonBom))
+            add("testImplementation", enforcedPlatform(jacksonBom))
+            configurations.findByName("api")?.let {
+                add("api", enforcedPlatform(jacksonBom))
+            }
+        }
+    }
 
     configurations.configureEach {
         resolutionStrategy {
