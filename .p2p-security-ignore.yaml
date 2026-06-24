@@ -27,3 +27,28 @@ images:
           /opt/yarn-v1.22.22/README.md — yarn's own README bundled in the node base image
           (line: circleci.com/gh/yarnpkg/yarn.svg?style=shield&circle-token=...). It is a public
           build-status badge token, not an API credential, and the finding status was "unverified".
+
+source:
+  secrets:
+    - id: 6926d3ba9e59e8bfa458b82d3109c3ac1da0723b32eee6a4f391794f58ac5d3d
+      reason: "False positive: historical FlatIO detector match in removed support-bot-ui/yarn.lock dependency metadata."
+    - id: 1b8e8972627e7ef0db02f63678f41989887dec6064d7cb0e1a4d505207f619c4
+      reason: "False positive: historical FlatIO detector match in removed support-bot-ui/yarn.lock dependency metadata."
+    - id: 0ff6ef3e6c7a117c37be4205d3d7853b1db00aa8c0e0cd15b11aba3664ddd81f
+      reason: "False positive: historical FlatIO detector match in removed support-bot-ui/yarn.lock dependency metadata."
+    - id: 6adaca22c342c7904b05a965f88004bd05cd4cb75773d0d12cf8ab4c41ddab15
+      reason: "False positive: historical FlatIO detector match in removed support-bot-ui/yarn.lock dependency metadata."
+    - id: 05e0b8ea0c8e68a2e1a2adce200a38a143afdb7acaca276feca8db7d12fafe47
+      reason: "False positive: historical FlatIO detector match in removed support-bot-ui/yarn.lock dependency metadata."
+    - id: ab5648c06aa45182307c5f7f905f663b45a204f9ee5ef2461ad1b1acb176d4f9
+      reason: "False positive: historical FlatIO detector match in removed support-bot-ui/yarn.lock dependency metadata."
+    - id: e7ef40f92785a5b37e9fbbb85938f8cb4d42326e517132f8934ddc260f77d546
+      reason: "False positive: historical FlatIO detector match in removed support-bot-ui/yarn.lock dependency metadata."
+    - id: 35f2241ec0a66747d29bdae91a74cf1ea8fea005047066a1dcca9a14a9d72b7e
+      reason: "False positive: historical GitHub detector match in removed support-bot-ui/kubernetes/backstage-secrets.yaml placeholder content."
+    - id: f705d66ed635f44562c5cb66d68159e7651cc0ac40d347dbec976859cefc238c
+      reason: "False positive: historical GitLab detector match in functional-test fixture data, not a credential."
+    - id: a88a907afd5e181b062b3bff9bfe4710e2394c7835987c50d3c02044541727fa
+      reason: "False positive: GitLab detector matched functional-test repository fixture names, not a credential."
+    - id: 47cc33af5d9b098bb6d6f2effbf1b51150b5e11eec627d9fd41a8ad8ce4a343f
+      reason: "False positive: URI detector matched a redirect URI validation test case for userinfo injection, not a secret."

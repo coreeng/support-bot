@@ -22,16 +22,18 @@ COPY src ./src
 # Build and test the app
 RUN yarn run test && yarn run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
+# Production image, copy only the runtime files and run next
+FROM docker.io/alpine:3.23.5 AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs \
+RUN apk add --no-cache libstdc++=15.2.0-r2 \
+ && addgroup --system --gid 1001 nodejs \
  && adduser --system --uid 1001 nextjs
 
+COPY --from=base /usr/local/bin/node /usr/local/bin/node
 COPY --from=build /app/public ./public
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
