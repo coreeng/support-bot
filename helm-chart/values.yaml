@@ -254,7 +254,7 @@ dex:
   image:
     repository: ghcr.io/dexidp/dex
     pullPolicy: IfNotPresent
-    tag: v2.44.0
+    tag: v2.45.1
   configSecret:
     create: false
     name: "support-bot-dex-config"
