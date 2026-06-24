@@ -1,3 +1,4 @@
+---
 name: support-bot Security Scan
 
 on:
@@ -15,6 +16,7 @@ jobs:
     secrets:
       env_vars: ${{ secrets.env_vars }}
     with:
+      app-name: support-bot
       tenant-name: support-bot
-      working-directory: ./
       security-scan-blocking-severity: "off"
+      working-directory: ./

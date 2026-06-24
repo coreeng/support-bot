@@ -1,3 +1,4 @@
+---
 name: support-bot Fast Feedback
 
 on:
@@ -28,11 +29,13 @@ jobs:
       version-prefix: v
     secrets:
       git-token: ${{ secrets.GITHUB_TOKEN }}
+      slack_webhook_url: ${{ secrets.P2P_SLACK_WEBHOOK_URL }}
 
   fastfeedback:
     needs: [version]
     uses: coreeng/p2p/.github/workflows/p2p-workflow-fastfeedback.yaml@v1
     secrets:
+      slack_webhook_url: ${{ secrets.P2P_SLACK_WEBHOOK_URL }}
       env_vars: |
         SLACK_TOKEN=${{ secrets.SLACK_TOKEN_INTEGRATION }}
         SLACK_SOCKET_TOKEN=${{ secrets.SLACK_SOCKET_TOKEN_INTEGRATION }}
