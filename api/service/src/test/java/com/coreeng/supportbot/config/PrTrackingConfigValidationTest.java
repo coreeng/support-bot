@@ -1001,14 +1001,14 @@ class PrTrackingConfigValidationTest {
         PrTrackingProps.Repository repo = validRepo();
 
         // then — the new fields default to "off"
-        assertThat(repo.allowedAuthorTeams()).isEmpty();
+        assertThat(repo.excludeAuthorTeams()).isEmpty();
         assertThat(repo.requiresCodeowners()).isFalse();
         assertThat(repo.dynamicApprovals()).isFalse();
         assertThat(repo.codeownerTeam()).isNull();
     }
 
     @Test
-    void acceptsAllowedAuthorTeamsAndCodeownerTeam() {
+    void acceptsExcludeAuthorTeamsAndCodeownerTeam() {
         assertThatCode(() -> new PrTrackingProps.Repository(
                         "my-org/repo",
                         "wow",
@@ -1027,7 +1027,7 @@ class PrTrackingConfigValidationTest {
     }
 
     @Test
-    void rejectsBlankAllowedAuthorTeam() {
+    void rejectsBlankExcludeAuthorTeam() {
         assertThatThrownBy(() -> new PrTrackingProps.Repository(
                         "my-org/repo",
                         "wow",
@@ -1043,7 +1043,7 @@ class PrTrackingConfigValidationTest {
                         null,
                         false))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("allowed-author-teams[] must not be blank");
+                .hasMessageContaining("exclude-author-teams[] must not be blank");
     }
 
     @Test

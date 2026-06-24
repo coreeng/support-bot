@@ -24,6 +24,8 @@ import com.coreeng.supportbot.slack.client.SimpleSlackMessage;
 import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.slack.client.SlackPostMessageRequest;
 import com.coreeng.supportbot.slack.events.MessagePosted;
+import com.coreeng.supportbot.teams.PlatformTeam;
+import com.coreeng.supportbot.teams.PlatformTeamsService;
 import com.coreeng.supportbot.ticket.Ticket;
 import com.coreeng.supportbot.ticket.TicketId;
 import com.coreeng.supportbot.ticket.TicketRepository;
@@ -33,6 +35,7 @@ import com.coreeng.supportbot.ticket.TicketTeamsSuggestion;
 import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.methods.request.reactions.ReactionsAddRequest;
+import com.slack.api.model.User;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -75,6 +78,7 @@ public class PrDetectionService {
     private final TicketSlackService ticketSlackService;
     private final TicketRepository ticketRepository;
     private final TicketTeamSuggestionsService ticketTeamSuggestionsService;
+    private final PlatformTeamsService platformTeamsService;
     private final SlackClient slackClient;
     private final SlackTicketsProps slackTicketsProps;
     private final SlaLookup slaLookup;
@@ -96,6 +100,8 @@ public class PrDetectionService {
         boolean metadataInitialized = false;
         boolean baseReactionsAdded = false;
         Map<String, Optional<Set<String>>> teamReviewerCache = new HashMap<>();
+        Optional<Set<String>> posterTeamCodes =
+                anyRepoExcludesAuthors() ? resolvePosterTeamCodes(event.userId()) : Optional.of(Set.of());
         List<PendingNotification> notifications = new ArrayList<>();
         List<PendingEscalation> pendingEscalations = new ArrayList<>();
 
@@ -141,6 +147,7 @@ public class PrDetectionService {
                         ticket,
                         canAutoCloseTicket,
                         prMetadata,
+                        posterTeamCodes,
                         teamReviewerCache,
                         notifications,
                         pendingEscalations);
@@ -189,6 +196,8 @@ public class PrDetectionService {
         boolean metadataInitialized = false;
         boolean baseReactionsAdded = false;
         Map<String, Optional<Set<String>>> teamReviewerCache = new HashMap<>();
+        Optional<Set<String>> posterTeamCodes =
+                anyRepoExcludesAuthors() ? resolvePosterTeamCodes(event.userId()) : Optional.of(Set.of());
         List<PendingNotification> notifications = new ArrayList<>();
         List<PendingEscalation> pendingEscalations = new ArrayList<>();
 
@@ -218,10 +227,10 @@ public class PrDetectionService {
                     continue;
                 }
 
-                // Must run before the ticketSupplier below, or a PR authored outside
-                // allowed-author-teams would still auto-create a ticket. processPr re-checks (cached).
+                // Must run before the ticketSupplier below, or a PR posted by an excluded author would
+                // still auto-create a ticket. processPr re-checks against the same resolved poster teams.
                 Optional<PrTrackingProps.Repository> repoConfig = repoConfigFor(pr);
-                if (repoConfig.isPresent() && !authorAllowed(pr, repoConfig.get(), prMetadata, teamReviewerCache)) {
+                if (repoConfig.isPresent() && authorExcluded(pr, repoConfig.get(), posterTeamCodes)) {
                     continue;
                 }
 
@@ -240,8 +249,15 @@ public class PrDetectionService {
                     continue;
                 }
 
-                PerPrResult result =
-                        processPr(pr, ticket, true, prMetadata, teamReviewerCache, notifications, pendingEscalations);
+                PerPrResult result = processPr(
+                        pr,
+                        ticket,
+                        true,
+                        prMetadata,
+                        posterTeamCodes,
+                        teamReviewerCache,
+                        notifications,
+                        pendingEscalations);
 
                 if (result == PerPrResult.TRACKED) {
                     if (!baseReactionsAdded) {
@@ -335,6 +351,7 @@ public class PrDetectionService {
             Ticket ticket,
             boolean canAutoCloseTicket,
             PrMetadata prMetadata,
+            Optional<Set<String>> posterTeamCodes,
             Map<String, Optional<Set<String>>> teamReviewerCache,
             List<PendingNotification> notifications,
             List<PendingEscalation> pendingEscalations) {
@@ -342,7 +359,7 @@ public class PrDetectionService {
         Optional<PrTrackingProps.Repository> repoConfig = repoConfigFor(detectedPr);
 
         if (repoConfig.isPresent()) {
-            if (!authorAllowed(detectedPr, repoConfig.get(), prMetadata, teamReviewerCache)) {
+            if (authorExcluded(detectedPr, repoConfig.get(), posterTeamCodes)) {
                 return PerPrResult.SKIPPED;
             }
             // Repo is configured for PR tracking with or without SLA
@@ -376,51 +393,66 @@ public class PrDetectionService {
     }
 
     /**
-     * Author admission gate (#285): tracks unless every allowed-author-team resolved and the author
-     * is in none (any-of). Fails open on no allow-list, unknown author, or unresolved membership.
+     * Author admission gate (#285): skips a PR/MR when the Slack user who posted it belongs to one of
+     * the repo's {@code exclude-author-teams} (any-of). Membership is resolved through the bot's
+     * platform teams (Slack/IdP-backed, keyed by email) — not the VCS provider. Fails open (tracks
+     * anyway) when no deny-list is configured or the poster's team membership cannot be determined.
      */
-    private boolean authorAllowed(
-            DetectedPr detectedPr,
-            PrTrackingProps.Repository repoConfig,
-            PrMetadata prMetadata,
-            Map<String, Optional<Set<String>>> teamReviewerCache) {
-        List<String> allowedTeams = repoConfig.allowedAuthorTeams();
-        if (allowedTeams.isEmpty()) {
-            return true;
+    private boolean authorExcluded(
+            DetectedPr detectedPr, PrTrackingProps.Repository repoConfig, Optional<Set<String>> posterTeamCodes) {
+        List<String> excludedTeams = repoConfig.excludeAuthorTeams();
+        if (excludedTeams.isEmpty()) {
+            return false;
         }
-        String author = prMetadata.authorLogin();
-        if (author == null) {
+        if (posterTeamCodes.isEmpty()) {
             log.atWarn()
                     .addArgument(detectedPr::repositoryName)
                     .addArgument(detectedPr::pullNumber)
-                    .log("PR {}#{} has no resolved author but allowed-author-teams is configured — tracking anyway");
-            return true;
+                    .log(
+                            "PR {}#{} poster team membership could not be resolved but exclude-author-teams is configured — tracking anyway");
+            return false;
         }
-        RepoCoord coord = new RepoCoord(detectedPr.provider(), detectedPr.repositoryName());
-        boolean allResolved = true;
-        for (String team : allowedTeams) {
-            Set<String> members = teamReviewFilter.resolveTeamMembers(coord, team, teamReviewerCache);
-            if (members == null) {
-                allResolved = false;
-                continue;
-            }
-            if (members.contains(author)) {
+        Set<String> posterCodes = posterTeamCodes.get();
+        for (String team : excludedTeams) {
+            if (posterCodes.contains(team)) {
+                log.atInfo()
+                        .addArgument(detectedPr::repositoryName)
+                        .addArgument(detectedPr::pullNumber)
+                        .addArgument(() -> team)
+                        .log("PR {}#{} poster is in excluded-author-team {} — skipping tracking");
                 return true;
             }
         }
-        if (!allResolved) {
-            log.atWarn()
-                    .addArgument(detectedPr::repositoryName)
-                    .addArgument(detectedPr::pullNumber)
-                    .log("PR {}#{} allowed-author-teams membership could not be fully resolved — tracking anyway");
-            return true;
-        }
-        log.atInfo()
-                .addArgument(detectedPr::repositoryName)
-                .addArgument(detectedPr::pullNumber)
-                .addArgument(() -> author)
-                .log("PR {}#{} author {} is not in any allowed-author-team — skipping tracking");
         return false;
+    }
+
+    /**
+     * Resolves the Slack poster's platform-team codes for the admission gate. Returns an empty
+     * {@link Optional} (fail open) when the poster has no resolvable Slack email or the lookup throws —
+     * distinct from {@code Optional.of(emptySet())}, which means "resolved, but a member of no team".
+     */
+    private Optional<Set<String>> resolvePosterTeamCodes(String slackUserId) {
+        try {
+            User user = slackClient.getUserById(SlackId.user(slackUserId));
+            String email = user.getProfile().getEmail();
+            if (email == null || email.isBlank()) {
+                return Optional.empty();
+            }
+            return Optional.of(platformTeamsService.listTeamsByUserEmail(email).stream()
+                    .map(PlatformTeam::code)
+                    .collect(Collectors.toSet()));
+        } catch (RuntimeException e) {
+            log.atWarn()
+                    .setCause(e)
+                    .addArgument(() -> slackUserId)
+                    .log("Failed to resolve Slack poster {} team membership for author admission — tracking anyway");
+            return Optional.empty();
+        }
+    }
+
+    private boolean anyRepoExcludesAuthors() {
+        return prTrackingProps.repositories().stream()
+                .anyMatch(r -> !r.excludeAuthorTeams().isEmpty());
     }
 
     private PerPrResult processOpenPr(

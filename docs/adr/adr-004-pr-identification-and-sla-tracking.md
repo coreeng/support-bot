@@ -3,6 +3,7 @@
 **Date:** 2026-02-25
 **Status:** Accepted
 **Amended:** 2026-06-23 — author-admission gate ([#285](https://github.com/coreeng/support-bot/pull/285)) added ahead of the §5 side effects.
+**Amended:** 2026-06-24 — author admission reworked to a Slack-poster deny-list (`exclude-author-teams`), resolved via the bot's platform teams instead of the VCS provider.
 
 ---
 
@@ -112,7 +113,7 @@ Unrecognised repos are silently ignored.
 
 ### 5. On PR Detection
 
-**Author admission gate (added by [#285](https://github.com/coreeng/support-bot/pull/285)).** Before any of the steps below, if the repository configures `allowed-author-teams`, the PR is tracked only when its author belongs to at least one of those teams (**any-of**); otherwise it is skipped entirely — no metadata initialisation, thread reply, emoji reaction, `pr_tracking` record, or escalation. Membership is resolved against the VCS provider (GitHub Teams API / GitLab group members, including nested and inherited). The gate **fails open**: a candidate is skipped only when *every* configured team resolved and the author was in none; a missing author, an unresolved team (provider API failure), or no `allowed-author-teams` configured all track anyway. Applies to SLA and no-SLA repos, and to both the top-level query path and thread replies. See [configuration.md](../../api/service/docs/configuration.md) for the operator-facing detail and the nested/inherited membership rules per provider.
+**Author admission gate (added by [#285](https://github.com/coreeng/support-bot/pull/285); reworked 2026-06-24).** Before any of the steps below, if the repository configures `exclude-author-teams`, the PR is skipped when the **Slack user who posted the link** belongs to at least one of those teams (**any-of**) — no metadata initialisation, thread reply, emoji reaction, `pr_tracking` record, or escalation. Team membership is resolved through the bot's **platform teams** (Slack/IdP-backed, keyed by the poster's Slack-profile email), *not* the VCS provider — so the gate needs no GitHub/GitLab org-membership token scopes. The gate **fails open**: a candidate is skipped only when the poster's teams resolved and one of them is excluded; an unresolvable poster (no Slack email, lookup failure) or no `exclude-author-teams` configured both track anyway. Applies to SLA and no-SLA repos, and to both the top-level query path and thread replies. See [configuration.md](../../api/service/docs/configuration.md) for the operator-facing detail.
 
 When an admitted PR link is found:
 
