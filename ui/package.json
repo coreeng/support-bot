@@ -73,6 +73,8 @@
     "glob/minimatch/brace-expansion": "1.1.13",
     "test-exclude/minimatch/brace-expansion": "1.1.13",
     "test-exclude/glob/minimatch/brace-expansion": "1.1.13",
+    "@babel/core": "7.29.6",
+    "js-yaml": "4.2.0",
     "postcss": "8.5.10"
   }
 }

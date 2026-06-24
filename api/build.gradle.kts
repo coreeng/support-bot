@@ -5,8 +5,15 @@ plugins {
 val safeDependencyVersions =
     mapOf(
         "ch.qos.logback:logback-core" to "1.5.25",
-        "com.fasterxml.jackson.core:jackson-core" to "2.21.2",
+        "com.fasterxml.jackson:jackson-bom" to "2.22.0",
+        "com.fasterxml.jackson.core:jackson-core" to "2.22.0",
+        "com.fasterxml.jackson.core:jackson-databind" to "2.22.0",
+        "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml" to "2.22.0",
+        "com.fasterxml.jackson.datatype:jackson-datatype-guava" to "2.22.0",
+        "com.fasterxml.jackson.datatype:jackson-datatype-jsr310" to "2.22.0",
+        "com.github.jknack:handlebars" to "4.5.2",
         "com.microsoft.kiota:microsoft-kiota-abstractions" to "1.9.1",
+        "com.nimbusds:nimbus-jose-jwt" to "10.0.2",
         "com.squareup.okhttp3:okhttp" to "4.12.0",
         "com.squareup.okio:okio" to "3.16.4",
         "io.netty:netty-codec" to "4.1.135.Final",

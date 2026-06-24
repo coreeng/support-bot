@@ -25,8 +25,8 @@ dependencies {
     testImplementation("org.apache.commons:commons-lang3:3.18.+")
     testImplementation("commons-codec:commons-codec:1.18.+")
 
-    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.18.6")
-    testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.6")
+    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.22.0")
+    testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.0")
     testImplementation("org.slf4j:slf4j-api:2.0.16")
     testRuntimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:2.25.0")
     testRuntimeOnly("org.apache.logging.log4j:log4j-core:2.25.4")
