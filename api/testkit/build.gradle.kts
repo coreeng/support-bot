@@ -49,9 +49,9 @@ dependencies {
     api("org.wiremock:wiremock-jetty12:3.13.+")
 
     // Jackson
-    api("com.fasterxml.jackson.core:jackson-databind:2.22.0")
-    api("com.fasterxml.jackson.datatype:jackson-datatype-guava:2.22.0")
-    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.0")
+    api("com.fasterxml.jackson.core:jackson-databind")
+    api("com.fasterxml.jackson.datatype:jackson-datatype-guava")
+    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
 
     // RestAssured
     api("io.rest-assured:rest-assured:5.5.+") {

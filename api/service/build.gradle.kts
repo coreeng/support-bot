@@ -121,8 +121,8 @@ dependencies {
     implementation("org.bouncycastle:bcpkix-jdk18on:1.84")
     implementation("com.github.ben-manes.caffeine:caffeine")
 
-    implementation("io.fabric8:kubernetes-client:7.1.0")
-    testImplementation("io.fabric8:kubernetes-server-mock:7.1.0")
+    implementation("io.fabric8:kubernetes-client:7.7.0")
+    testImplementation("io.fabric8:kubernetes-server-mock:7.7.0")
 
     implementation("dev.cel:cel:0.11.1")
 
