@@ -841,8 +841,9 @@ public class PrTrackingFunctionalTests {
                         .channelId(channelId)
                         .ts(queryTs)
                         .build());
-        var slaReplyStub = testKit.slack().wiremock().stubChatPostMessage("PR SLA reply in thread", channelId);
 
+        // The SLA-reply chat.postMessage is served by the generic stub registered in
+        // stubTicketCreationFlow below (Wiremock LIFO matching), so it is not stubbed separately here.
         SlackMessage messageForStubs = SlackMessage.builder()
                 .slackWiremock(testKit.slack().wiremock())
                 .ts(queryTs)
@@ -856,7 +857,7 @@ public class PrTrackingFunctionalTests {
             githubStub.assertIsCalled();
             prReactionStub.assertIsCalled();
             eyesReactionStub.assertIsCalled();
-            slaReplyStub.assertIsCalled();
+            creationStubs.reactionAdded().assertIsCalled();
         });
 
         var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
