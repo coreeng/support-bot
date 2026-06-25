@@ -8,8 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
-import com.coreeng.supportbot.prtracking.EscalationBreakdown;
 import com.coreeng.supportbot.prtracking.PrTrackingRepository;
+import com.coreeng.supportbot.prtracking.RequestBreakdown;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -47,7 +47,7 @@ class TenantInsightsRouteRegistrationTest {
                     .andExpect(content().json("{\"enabled\":false}"));
 
             mockMvc.perform(get("/tenant-insights/pr-stats")).andExpect(status().isNotFound());
-            mockMvc.perform(get("/tenant-insights/escalation-breakdown")).andExpect(status().isNotFound());
+            mockMvc.perform(get("/tenant-insights/request-breakdown")).andExpect(status().isNotFound());
         });
     }
 
@@ -70,7 +70,7 @@ class TenantInsightsRouteRegistrationTest {
                 .run(context -> {
                     PrTrackingRepository repository = context.getBean(PrTrackingRepository.class);
                     when(repository.getInsightsByRepo(null, null)).thenReturn(List.of());
-                    when(repository.getEscalationBreakdown(null, null)).thenReturn(new EscalationBreakdown(0, 0, 0));
+                    when(repository.getRequestBreakdown(null, null)).thenReturn(new RequestBreakdown(0, 0, 0));
                     when(repository.findAllInFlight(null)).thenReturn(List.of());
 
                     MockMvc mockMvc =
@@ -82,8 +82,7 @@ class TenantInsightsRouteRegistrationTest {
                     mockMvc.perform(get("/tenant-insights/pr-stats"))
                             .andExpect(status().isOk())
                             .andExpect(content().json("[]"));
-                    mockMvc.perform(get("/tenant-insights/escalation-breakdown"))
-                            .andExpect(status().isOk());
+                    mockMvc.perform(get("/tenant-insights/request-breakdown")).andExpect(status().isOk());
                     mockMvc.perform(get("/tenant-insights/in-flight-prs"))
                             .andExpect(status().isOk())
                             .andExpect(content().json("[]"));

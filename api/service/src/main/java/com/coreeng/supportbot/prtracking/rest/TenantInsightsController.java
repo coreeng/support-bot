@@ -35,10 +35,14 @@ public class TenantInsightsController {
     public List<RepoInsights> prStats(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate dateTo) {
+        validateDateRange(dateFrom, dateTo);
+        return replaceHasSlaWithCurrentConfig(prTrackingRepository.getInsightsByRepo(dateFrom, dateTo));
+    }
+
+    private static void validateDateRange(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
         if (dateFrom != null && dateTo != null && dateFrom.isAfter(dateTo)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateFrom must not be after dateTo");
         }
-        return replaceHasSlaWithCurrentConfig(prTrackingRepository.getInsightsByRepo(dateFrom, dateTo));
     }
 
     /**
@@ -76,14 +80,12 @@ public class TenantInsightsController {
 
     private record ProviderRepoKey(Provider provider, String repo) {}
 
-    @GetMapping("/escalation-breakdown")
-    public EscalationBreakdown escalationBreakdown(
+    @GetMapping("/request-breakdown")
+    public RequestBreakdown requestBreakdown(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @Nullable LocalDate dateTo) {
-        if (dateFrom != null && dateTo != null && dateFrom.isAfter(dateTo)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateFrom must not be after dateTo");
-        }
-        return prTrackingRepository.getEscalationBreakdown(dateFrom, dateTo);
+        validateDateRange(dateFrom, dateTo);
+        return prTrackingRepository.getRequestBreakdown(dateFrom, dateTo);
     }
 
     @GetMapping("/in-flight-prs")

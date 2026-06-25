@@ -4,11 +4,11 @@ import type { RepoInsights } from "../../../lib/types/dashboard";
 import TenantRequestsPage from "../tenant-requests";
 
 const mockUseTenantInsightsStats = jest.fn();
-const mockUseEscalationBreakdown = jest.fn();
+const mockUseRequestBreakdown = jest.fn();
 
 jest.mock("../../../lib/hooks", () => ({
   useTenantInsightsStats: (...args: unknown[]) => mockUseTenantInsightsStats(...args),
-  useEscalationBreakdown: (...args: unknown[]) => mockUseEscalationBreakdown(...args),
+  useRequestBreakdown: (...args: unknown[]) => mockUseRequestBreakdown(...args),
   useInFlightPrs: () => ({ data: [], isLoading: false, error: null }),
 }));
 
@@ -63,7 +63,7 @@ describe("TenantRequestsPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseTenantInsightsStats.mockReturnValue({ data: [], isLoading: false, error: null });
-    mockUseEscalationBreakdown.mockReturnValue({ data: undefined });
+    mockUseRequestBreakdown.mockReturnValue({ data: undefined });
     mockUseRouter.mockReturnValue({ replace: mockReplace, push: jest.fn() });
     mockUseSearchParams.mockReturnValue(new URLSearchParams());
     mockUsePathname.mockReturnValue("/");
@@ -201,7 +201,7 @@ describe("TenantRequestsPage", () => {
       render(<TenantRequestsPage />);
 
       const statsCall = mockUseTenantInsightsStats.mock.calls.at(-1);
-      const breakdownCall = mockUseEscalationBreakdown.mock.calls.at(-1);
+      const breakdownCall = mockUseRequestBreakdown.mock.calls.at(-1);
       expect(statsCall[0]).toBeDefined(); // dateFrom
       expect(statsCall[1]).toBeDefined(); // dateTo
       expect(breakdownCall[0]).toBe(statsCall[0]); // same dateFrom
@@ -451,52 +451,100 @@ describe("TenantRequestsPage", () => {
 
   describe("Stat Card Colour Logic", () => {});
 
-  describe("Intervention Rate", () => {
-    it("should show intervention rate percentage when breakdown data available", () => {
+  describe("Bot Impact funnel", () => {
+    it("should show PR-handled and intervention percentages when breakdown data available", () => {
       mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false });
-      mockUseEscalationBreakdown.mockReturnValue({
-        data: { totalPrTickets: 50, botEscalatedTickets: 10, manuallyEscalatedTickets: 5 },
+      // 50 of 100 requests handled by bot (50%); 5 of those 50 needed manual escalation (10%)
+      mockUseRequestBreakdown.mockReturnValue({
+        data: { totalSupportTickets: 100, totalPrTickets: 50, interventionPrTickets: 5 },
       });
 
       render(<TenantRequestsPage />);
 
-      const statValues = screen.getAllByText(/^\d+%$/).filter((el) => el.className.includes("text-3xl"));
-      expect(statValues).toHaveLength(1);
-      expect(statValues[0].textContent).toBe("10%");
+      const pctValues = screen
+        .getAllByText(/^\d+%$/)
+        .filter((el) => el.className.includes("text-3xl"))
+        .map((el) => el.textContent);
+      expect(pctValues).toEqual(expect.arrayContaining(["50%", "10%"]));
+      expect(pctValues).toHaveLength(2);
     });
 
-    it("should show dash when totalPrTickets is 0", () => {
+    it("should show the total requests count", () => {
       mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false });
-      mockUseEscalationBreakdown.mockReturnValue({
-        data: { totalPrTickets: 0, botEscalatedTickets: 0, manuallyEscalatedTickets: 0 },
+      mockUseRequestBreakdown.mockReturnValue({
+        data: { totalSupportTickets: 333, totalPrTickets: 46, interventionPrTickets: 8 },
       });
 
       render(<TenantRequestsPage />);
 
-      const statValues = screen.getAllByText("—").filter((el) => el.className.includes("text-3xl"));
-      expect(statValues).toHaveLength(1);
+      expect(screen.getByText("333")).toBeInTheDocument();
     });
 
-    it("should show dash when no breakdown data", () => {
+    it("should dash the percentages but show 0 total when counts are all zero", () => {
       mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false });
-      mockUseEscalationBreakdown.mockReturnValue({ data: undefined });
-
-      render(<TenantRequestsPage />);
-
-      const statValues = screen.getAllByText("—").filter((el) => el.className.includes("text-3xl"));
-      expect(statValues).toHaveLength(1);
-    });
-
-    it("should show 0% with green gradient when no manual escalations", () => {
-      mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false });
-      mockUseEscalationBreakdown.mockReturnValue({
-        data: { totalPrTickets: 20, botEscalatedTickets: 5, manuallyEscalatedTickets: 0 },
+      mockUseRequestBreakdown.mockReturnValue({
+        data: { totalSupportTickets: 0, totalPrTickets: 0, interventionPrTickets: 0 },
       });
 
       render(<TenantRequestsPage />);
 
-      const statValues = screen.getAllByText("0%").filter((el) => el.className.includes("text-3xl"));
-      expect(statValues).toHaveLength(1);
+      // both percentage cards dash (no denominator); total requests shows 0
+      const dashes = screen.getAllByText("—").filter((el) => el.className.includes("text-3xl"));
+      expect(dashes).toHaveLength(2);
+    });
+
+    it("should dash all three funnel cards when no breakdown data", () => {
+      mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false });
+      mockUseRequestBreakdown.mockReturnValue({ data: undefined });
+
+      render(<TenantRequestsPage />);
+
+      const dashes = screen.getAllByText("—").filter((el) => el.className.includes("text-3xl"));
+      expect(dashes).toHaveLength(3);
+    });
+
+    it("should show 0% intervention when no manual escalations", () => {
+      mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false });
+      // 20 of 40 handled by bot (50%); none needed manual escalation (0%)
+      mockUseRequestBreakdown.mockReturnValue({
+        data: { totalSupportTickets: 40, totalPrTickets: 20, interventionPrTickets: 0 },
+      });
+
+      render(<TenantRequestsPage />);
+
+      const zero = screen.getAllByText("0%").filter((el) => el.className.includes("text-3xl"));
+      expect(zero).toHaveLength(1);
+    });
+
+    it("should not round a near-complete ratio up to a misleading 100%", () => {
+      mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false });
+      // 199 of 200 PRs escalated → 99.5% rounds to 100% with Math.round; clamp to 99% since 1 PR did not.
+      // Bot share is 200/400 = 50% so a legitimate 100% never appears, isolating the clamp under test.
+      mockUseRequestBreakdown.mockReturnValue({
+        data: { totalSupportTickets: 400, totalPrTickets: 200, interventionPrTickets: 199 },
+      });
+
+      render(<TenantRequestsPage />);
+
+      const pctValues = screen
+        .getAllByText(/^\d+%$/)
+        .filter((el) => el.className.includes("text-3xl"))
+        .map((el) => el.textContent);
+      expect(pctValues).toEqual(expect.arrayContaining(["50%", "99%"]));
+      expect(pctValues).not.toContain("100%");
+    });
+
+    it("should not round a tiny non-zero ratio down to a misleading 0%", () => {
+      mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false });
+      // 1 of 1000 → 0.1% rounds to 0% with Math.round; clamp to 1% since a PR did need escalation.
+      mockUseRequestBreakdown.mockReturnValue({
+        data: { totalSupportTickets: 1000, totalPrTickets: 1000, interventionPrTickets: 1 },
+      });
+
+      render(<TenantRequestsPage />);
+
+      const onePct = screen.getAllByText("1%").filter((el) => el.className.includes("text-3xl"));
+      expect(onePct).toHaveLength(1);
     });
   });
 

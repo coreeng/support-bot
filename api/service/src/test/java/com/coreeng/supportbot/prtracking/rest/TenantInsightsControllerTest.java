@@ -344,29 +344,82 @@ class TenantInsightsControllerTest {
     }
 
     @Test
-    void escalationBreakdown_returnsBreakdownForDateRange() {
-        // given 10 PR tickets: 5 bot-escalated, 2 manually escalated
+    void requestBreakdown_returnsBreakdownForDateRange() {
+        // given 100 support tickets, 20 of which are PR tickets, 4 of those manually escalated
         LocalDate from = LocalDate.of(2026, 3, 1);
-        when(prTrackingRepository.getEscalationBreakdown(from, TO)).thenReturn(new EscalationBreakdown(10, 5, 2));
+        when(prTrackingRepository.getRequestBreakdown(from, TO)).thenReturn(new RequestBreakdown(100, 20, 4));
 
-        // when requesting breakdown
-        EscalationBreakdown response = controller.escalationBreakdown(from, TO);
+        // when requesting the breakdown
+        RequestBreakdown response = controller.requestBreakdown(from, TO);
 
-        // then returns the counts
-        assertThat(response.totalPrTickets()).isEqualTo(10);
-        assertThat(response.botEscalatedTickets()).isEqualTo(5);
-        assertThat(response.manuallyEscalatedTickets()).isEqualTo(2);
-        verify(prTrackingRepository).getEscalationBreakdown(from, TO);
+        // then returns the counts and delegates with the same range
+        assertThat(response.totalSupportTickets()).isEqualTo(100);
+        assertThat(response.totalPrTickets()).isEqualTo(20);
+        assertThat(response.interventionPrTickets()).isEqualTo(4);
+        verify(prTrackingRepository).getRequestBreakdown(from, TO);
     }
 
     @Test
-    void escalationBreakdown_throwsForInvertedDateRange() {
+    void requestBreakdown_returnsAllTimeWhenNoDatesProvided() {
+        // given no date range (null params = all-time query)
+        when(prTrackingRepository.getRequestBreakdown(null, null)).thenReturn(new RequestBreakdown(0, 0, 0));
+
+        // when requesting without dates
+        RequestBreakdown response = controller.requestBreakdown(null, null);
+
+        // then queries with null dates (all time)
+        assertThat(response.totalSupportTickets()).isZero();
+        verify(prTrackingRepository).getRequestBreakdown(null, null);
+    }
+
+    @Test
+    void requestBreakdown_acceptsDateFromOnly() {
+        // given only dateFrom (open-ended: from date to now) — exercises the single-bind SQL branch
+        LocalDate from = LocalDate.of(2026, 3, 1);
+        when(prTrackingRepository.getRequestBreakdown(from, null)).thenReturn(new RequestBreakdown(7, 2, 1));
+
+        // when requesting with dateFrom only
+        RequestBreakdown response = controller.requestBreakdown(from, null);
+
+        // then queries with dateFrom and null dateTo
+        assertThat(response.totalSupportTickets()).isEqualTo(7);
+        verify(prTrackingRepository).getRequestBreakdown(from, null);
+    }
+
+    @Test
+    void requestBreakdown_acceptsDateToOnly() {
+        // given only dateTo (open-ended: beginning of time to date) — exercises the single-bind branch
+        when(prTrackingRepository.getRequestBreakdown(null, TO)).thenReturn(new RequestBreakdown(9, 3, 0));
+
+        // when requesting with dateTo only
+        RequestBreakdown response = controller.requestBreakdown(null, TO);
+
+        // then queries with null dateFrom and dateTo
+        assertThat(response.totalSupportTickets()).isEqualTo(9);
+        verify(prTrackingRepository).getRequestBreakdown(null, TO);
+    }
+
+    @Test
+    void requestBreakdown_acceptsSameDayRange() {
+        // given dateFrom equals dateTo (single-day query)
+        when(prTrackingRepository.getRequestBreakdown(TO, TO)).thenReturn(new RequestBreakdown(5, 1, 0));
+
+        // when requesting a single day
+        RequestBreakdown response = controller.requestBreakdown(TO, TO);
+
+        // then accepts the request and delegates
+        assertThat(response.totalSupportTickets()).isEqualTo(5);
+        verify(prTrackingRepository).getRequestBreakdown(TO, TO);
+    }
+
+    @Test
+    void requestBreakdown_throwsForInvertedDateRange() {
         // when dateFrom is after dateTo
         LocalDate from = LocalDate.of(2026, 4, 1);
         LocalDate to = LocalDate.of(2026, 3, 1);
 
-        // then rejects with 400, never hits the database
-        assertThatThrownBy(() -> controller.escalationBreakdown(from, to))
+        // then rejects with 400 and descriptive message, never hits the database
+        assertThatThrownBy(() -> controller.requestBreakdown(from, to))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("dateFrom must not be after dateTo");
         verifyNoInteractions(prTrackingRepository);
