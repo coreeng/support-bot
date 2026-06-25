@@ -2098,7 +2098,9 @@ class PrDetectionServiceTest {
             // then — admission precedes ticket creation: nothing created, posted, or tracked
             verify(supplier, never()).get();
             verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).addReaction(any());
             verify(slackClient, never()).postMessage(any());
+            verify(ticketSlackService, never()).markPostTracked(any());
         }
 
         @Test
@@ -2386,7 +2388,9 @@ class PrDetectionServiceTest {
 
             // then — no record, no Slack side effects
             verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).addReaction(any());
             verify(slackClient, never()).postMessage(any());
+            verify(ticketSlackService, never()).markPostTracked(any());
         }
 
         @Test
@@ -2402,8 +2406,10 @@ class PrDetectionServiceTest {
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
-            // then
+            // then — tracked, and the poster's membership was genuinely resolved (disjoint teams)
             verify(prTrackingRepository).insertIfAbsent(any());
+            verify(slackClient).getUserById(SlackId.user(POSTER_USER_ID));
+            verify(platformTeamsService).listTeamsByUserEmail(POSTER_EMAIL);
         }
 
         @Test
@@ -2418,7 +2424,9 @@ class PrDetectionServiceTest {
 
             // then
             verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).addReaction(any());
             verify(slackClient, never()).postMessage(any());
+            verify(ticketSlackService, never()).markPostTracked(any());
         }
 
         @Test
@@ -2491,7 +2499,9 @@ class PrDetectionServiceTest {
 
             // then
             verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).addReaction(any());
             verify(slackClient, never()).postMessage(any());
+            verify(ticketSlackService, never()).markPostTracked(any());
         }
 
         @Test
@@ -2506,8 +2516,122 @@ class PrDetectionServiceTest {
 
             // then — skipped before any record, Slack side effect, or path lookup
             verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).addReaction(any());
             verify(slackClient, never()).postMessage(any());
+            verify(ticketSlackService, never()).markPostTracked(any());
             verify(prSourceClient, never()).listChangedFiles(any(), anyInt());
+        }
+
+        @Test
+        void tracksWhenPosterResolvesToNoTeams() {
+            // given — the poster resolves successfully but belongs to no platform team. This is the
+            // Optional.of(emptySet()) branch — distinct from an unresolvable poster (Optional.empty()):
+            // a resolved member of no team is in no excluded team, so the PR is tracked.
+            stubDetectedOpenPr("anyone");
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoWithExcludeAuthorTeams(EXCLUDED_TEAM)));
+            stubSlackPosterInTeams(); // resolves with an email, but zero teams
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(Instant.now(), Instant.now().plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — tracked, and membership was genuinely resolved (not the fail-open path)
+            verify(prTrackingRepository).insertIfAbsent(any());
+            verify(platformTeamsService).listTeamsByUserEmail(POSTER_EMAIL);
+        }
+
+        @Test
+        void resolvesPosterOncePerMessageWithMultiplePrLinks() {
+            // given — two PR links from the same poster in one message. resolvePosterTeamCodes is
+            // hoisted out of the per-PR loop, so the poster is resolved once regardless of link count.
+            int secondPr = PR_NUMBER + 1;
+            when(prUrlParser.parse(any()))
+                    .thenReturn(List.of(
+                            new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER),
+                            new DetectedPr(Provider.GITHUB, REPO, secondPr)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER)).thenReturn(openGithubPr(REPO, PR_NUMBER));
+            when(prSourceClient.fetchPullRequest(COORD, secondPr)).thenReturn(openGithubPr(REPO, secondPr));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoWithExcludeAuthorTeams(EXCLUDED_TEAM)));
+            stubSlackPosterInTeams(EXCLUDED_TEAM);
+
+            // when
+            service.handleMessagePosted(messagePostedWith("two prs"), ticketWithId(1L));
+
+            // then — both links dropped on the same resolved membership; resolved exactly once
+            verify(slackClient, times(1)).getUserById(any());
+            verify(platformTeamsService, times(1)).listTeamsByUserEmail(any());
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+        }
+
+        @Test
+        void skipsExcludedRepoButTracksRepoWithoutExcludeListInSameMessage() {
+            // given — one message links a PR in a repo WITH exclude-author-teams and a PR in a repo
+            // WITHOUT one. The poster is excluded, but authorExcluded short-circuits per-repo on an
+            // empty deny-list, so only the deny-listed repo's PR is dropped; the other is tracked.
+            String openRepo = "my-org/open-repo";
+            RepoCoord openCoord = RepoCoord.github(openRepo);
+            when(prUrlParser.parse(any()))
+                    .thenReturn(List.of(
+                            new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER),
+                            new DetectedPr(Provider.GITHUB, openRepo, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER)).thenReturn(openGithubPr(REPO, PR_NUMBER));
+            when(prSourceClient.fetchPullRequest(openCoord, PR_NUMBER)).thenReturn(openGithubPr(openRepo, PR_NUMBER));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(
+                            repoWithExcludeAuthorTeams(EXCLUDED_TEAM),
+                            new PrTrackingProps.Repository(openRepo, TEAM_CODE, null, List.of(), sla(SLA_24H))));
+            stubSlackPosterInTeams(EXCLUDED_TEAM);
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(Instant.now(), Instant.now().plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("two prs"), ticketWithId(1L));
+
+            // then — exactly the non-excluded repo's PR is tracked; the poster is resolved once
+            verify(prTrackingRepository, times(1)).insertIfAbsent(any());
+            verify(slackClient, times(1)).getUserById(any());
+        }
+
+        @Test
+        void tracksWhenPosterEmailBlankFailsOpen() {
+            // given — the poster's Slack email is blank (whitespace); treated like no email (fail open),
+            // and we never attempt a team lookup for a blank email.
+            stubDetectedOpenPr("anyone");
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoWithExcludeAuthorTeams(EXCLUDED_TEAM)));
+            User blankEmailUser = new User();
+            User.Profile blankProfile = new User.Profile();
+            blankProfile.setEmail("   ");
+            blankEmailUser.setProfile(blankProfile);
+            when(slackClient.getUserById(SlackId.user(POSTER_USER_ID))).thenReturn(blankEmailUser);
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(stubTrackingRecord(Instant.now(), Instant.now().plus(SLA_24H)));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — fail open, and we never looked up teams for a blank email
+            verify(prTrackingRepository).insertIfAbsent(any());
+            verify(platformTeamsService, never()).listTeamsByUserEmail(any());
+        }
+
+        private PrMetadata openGithubPr(String repo, int number) {
+            return new PrMetadata(
+                    RepoCoord.github(repo),
+                    number,
+                    Instant.now().minus(Duration.ofHours(1)),
+                    PrMetadata.PrState.OPEN,
+                    null,
+                    List.of(),
+                    List.of(),
+                    "anyone");
         }
     }
 
@@ -2532,7 +2656,7 @@ class PrDetectionServiceTest {
 
     private static MessagePosted messagePostedReplyWith(String text) {
         MessageRef ref = new MessageRef(MessageTs.of("1700000001.000001"), QUERY_TS, CHANNEL_ID);
-        return new MessagePosted(text, "U_USER", ref);
+        return new MessagePosted(text, POSTER_USER_ID, ref);
     }
 
     private static Ticket ticketWithId(long id) {
