@@ -290,7 +290,7 @@ ui:
 dex:
   image:
     repository: <private-registry>/dexidp/dex                 # Dex (subchart)
-    tag: v2.44.0
+    tag: v2.45.1
 ```
 
 `dex.rolloutHook` (post-upgrade Dex restart, see [Pod rollout on config change](#pod-rollout-on-config-change)) is off by default — so no kubectl image to mirror unless you opt in. If you want it enabled in an air-gapped install, also override `dex.rolloutHook.image.repository` to your internal kubectl mirror.

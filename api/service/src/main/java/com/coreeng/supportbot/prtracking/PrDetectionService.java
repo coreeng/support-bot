@@ -218,6 +218,13 @@ public class PrDetectionService {
                     continue;
                 }
 
+                // Must run before the ticketSupplier below, or a PR authored outside
+                // allowed-author-teams would still auto-create a ticket. processPr re-checks (cached).
+                Optional<PrTrackingProps.Repository> repoConfig = repoConfigFor(pr);
+                if (repoConfig.isPresent() && !authorAllowed(pr, repoConfig.get(), prMetadata, teamReviewerCache)) {
+                    continue;
+                }
+
                 if (ticket == null) {
                     ticket = ticketSupplier.get();
                     ticketId = checkNotNull(ticket.id());
@@ -317,6 +324,12 @@ public class PrDetectionService {
         }
     }
 
+    private Optional<PrTrackingProps.Repository> repoConfigFor(DetectedPr detectedPr) {
+        return prTrackingProps.repositories().stream()
+                .filter(r -> r.name().equals(detectedPr.repositoryName()))
+                .findFirst();
+    }
+
     private PerPrResult processPr(
             DetectedPr detectedPr,
             Ticket ticket,
@@ -326,11 +339,12 @@ public class PrDetectionService {
             List<PendingNotification> notifications,
             List<PendingEscalation> pendingEscalations) {
 
-        Optional<PrTrackingProps.Repository> repoConfig = prTrackingProps.repositories().stream()
-                .filter(r -> r.name().equals(detectedPr.repositoryName()))
-                .findFirst();
+        Optional<PrTrackingProps.Repository> repoConfig = repoConfigFor(detectedPr);
 
         if (repoConfig.isPresent()) {
+            if (!authorAllowed(detectedPr, repoConfig.get(), prMetadata, teamReviewerCache)) {
+                return PerPrResult.SKIPPED;
+            }
             // Repo is configured for PR tracking with or without SLA
             if (repoConfig.get().hasNoSla()) {
                 // No-SLA tracking: track by path filter without a deadline or escalation.
@@ -359,6 +373,54 @@ public class PrDetectionService {
                     .log("Repo {} is not configured for PR tracking, skipping");
             return PerPrResult.SKIPPED;
         }
+    }
+
+    /**
+     * Author admission gate (#285): tracks unless every allowed-author-team resolved and the author
+     * is in none (any-of). Fails open on no allow-list, unknown author, or unresolved membership.
+     */
+    private boolean authorAllowed(
+            DetectedPr detectedPr,
+            PrTrackingProps.Repository repoConfig,
+            PrMetadata prMetadata,
+            Map<String, Optional<Set<String>>> teamReviewerCache) {
+        List<String> allowedTeams = repoConfig.allowedAuthorTeams();
+        if (allowedTeams.isEmpty()) {
+            return true;
+        }
+        String author = prMetadata.authorLogin();
+        if (author == null) {
+            log.atWarn()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .log("PR {}#{} has no resolved author but allowed-author-teams is configured — tracking anyway");
+            return true;
+        }
+        RepoCoord coord = new RepoCoord(detectedPr.provider(), detectedPr.repositoryName());
+        boolean allResolved = true;
+        for (String team : allowedTeams) {
+            Set<String> members = teamReviewFilter.resolveTeamMembers(coord, team, teamReviewerCache);
+            if (members == null) {
+                allResolved = false;
+                continue;
+            }
+            if (members.contains(author)) {
+                return true;
+            }
+        }
+        if (!allResolved) {
+            log.atWarn()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .log("PR {}#{} allowed-author-teams membership could not be fully resolved — tracking anyway");
+            return true;
+        }
+        log.atInfo()
+                .addArgument(detectedPr::repositoryName)
+                .addArgument(detectedPr::pullNumber)
+                .addArgument(() -> author)
+                .log("PR {}#{} author {} is not in any allowed-author-team — skipping tracking");
+        return false;
     }
 
     private PerPrResult processOpenPr(

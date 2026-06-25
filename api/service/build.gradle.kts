@@ -63,7 +63,8 @@ extra["byte-buddy.version"] = "1.18.4"
 extra["mockito.version"] = "5.21.0"
 extra["asm.version"] = "9.9.1"
 extra["commons-lang3.version"] = "3.18.0"
-extra["netty.version"] = "4.1.133.Final"
+extra["netty.version"] = "4.1.135.Final"
+extra["opentelemetry.version"] = "1.62.0"
 extra["postgresql.version"] = "42.7.11"
 extra["spring-framework.version"] = "6.2.18"
 
@@ -86,7 +87,7 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
-    implementation("com.nimbusds:nimbus-jose-jwt:9.37.4")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.0.2")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("org.springframework.boot:spring-boot-starter-cache")
 
@@ -120,8 +121,8 @@ dependencies {
     implementation("org.bouncycastle:bcpkix-jdk18on:1.84")
     implementation("com.github.ben-manes.caffeine:caffeine")
 
-    implementation("io.fabric8:kubernetes-client:7.1.0")
-    testImplementation("io.fabric8:kubernetes-server-mock:7.1.0")
+    implementation("io.fabric8:kubernetes-client:7.7.0")
+    testImplementation("io.fabric8:kubernetes-server-mock:7.7.0")
 
     implementation("dev.cel:cel:0.11.1")
 

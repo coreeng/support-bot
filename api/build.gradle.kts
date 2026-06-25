@@ -2,22 +2,28 @@ plugins {
     id("com.diffplug.spotless") version "8.0.0" apply false
 }
 
+val jacksonVersion = "2.22.0"
+val jacksonBom = "com.fasterxml.jackson:jackson-bom:$jacksonVersion"
 val safeDependencyVersions =
     mapOf(
         "ch.qos.logback:logback-core" to "1.5.25",
-        "com.fasterxml.jackson.core:jackson-core" to "2.21.2",
+        "com.github.jknack:handlebars" to "4.5.2",
         "com.microsoft.kiota:microsoft-kiota-abstractions" to "1.9.1",
+        "com.nimbusds:nimbus-jose-jwt" to "10.0.2",
         "com.squareup.okhttp3:okhttp" to "4.12.0",
         "com.squareup.okio:okio" to "3.16.4",
-        "io.netty:netty-codec" to "4.1.133.Final",
-        "io.netty:netty-codec-dns" to "4.1.133.Final",
-        "io.netty:netty-codec-http" to "4.1.133.Final",
-        "io.netty:netty-codec-http2" to "4.1.133.Final",
-        "io.netty:netty-common" to "4.1.133.Final",
-        "io.netty:netty-handler" to "4.1.133.Final",
-        "io.netty:netty-handler-proxy" to "4.1.133.Final",
-        "io.netty:netty-transport-native-epoll" to "4.2.13.Final",
-        "io.vertx:vertx-core" to "4.5.24",
+        "io.netty:netty-codec" to "4.1.135.Final",
+        "io.netty:netty-codec-dns" to "4.1.135.Final",
+        "io.netty:netty-codec-http" to "4.1.135.Final",
+        "io.netty:netty-codec-http2" to "4.1.135.Final",
+        "io.netty:netty-common" to "4.1.135.Final",
+        "io.netty:netty-handler" to "4.1.135.Final",
+        "io.netty:netty-handler-proxy" to "4.1.135.Final",
+        "io.netty:netty-resolver-dns" to "4.1.135.Final",
+        "io.netty:netty-transport-native-epoll" to "4.1.135.Final",
+        "io.netty:netty-transport-native-kqueue" to "4.1.135.Final",
+        "io.opentelemetry:opentelemetry-api" to "1.62.0",
+        "io.vertx:vertx-core" to "4.5.27",
         "io.vertx:vertx-web" to "4.5.22",
         "net.minidev:json-smart" to "2.5.2",
         "net.sourceforge.pmd:pmd-core" to "7.22.0",
@@ -42,6 +48,18 @@ val safeDependencyCoordinates = safeDependencyVersions.map { (dependency, versio
 
 subprojects {
     apply(plugin = "com.diffplug.spotless")
+
+    extra["jackson-bom.version"] = jacksonVersion
+
+    plugins.withType<JavaPlugin> {
+        dependencies {
+            add("implementation", enforcedPlatform(jacksonBom))
+            add("testImplementation", enforcedPlatform(jacksonBom))
+            configurations.findByName("api")?.let {
+                add("api", enforcedPlatform(jacksonBom))
+            }
+        }
+    }
 
     configurations.configureEach {
         resolutionStrategy {
