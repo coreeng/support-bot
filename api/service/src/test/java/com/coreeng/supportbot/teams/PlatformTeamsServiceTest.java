@@ -22,7 +22,7 @@ class PlatformTeamsServiceTest {
     }
 
     private static GroupResolver resolverOf(PlatformUsersFetcher<GroupRef.Static> fetcher) {
-        return new GroupResolver(null, null, fetcher);
+        return new GroupResolver(null, null, fetcher, null);
     }
 
     private static EscalationTeam escalation(String name) {

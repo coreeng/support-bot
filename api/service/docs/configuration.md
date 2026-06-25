@@ -575,8 +575,8 @@ For self-hosted instances (either model), point `gitlab.api-base-url` (globally
 or per-repo) at that instance's `/api/v4` endpoint and issue the token there.
 
 Author admission (`exclude-author-teams`) needs **no** provider scopes on either
-side: it resolves team membership through the bot's platform teams (IdP-backed,
-keyed by email), not the VCS provider — see [Author admission](#author-admission).
+side: it resolves team membership through the bot's platform teams (your Slack/IdP
+groups, keyed by email), not the VCS provider — see [Author admission](#author-admission).
 
 ### Per-repository configuration
 
@@ -705,21 +705,27 @@ same mechanism that powers ticket team suggestions. Because membership is resolv
 through the platform teams (not the VCS provider), the gate is fully
 provider-agnostic and needs **no** GitHub/GitLab org-membership token scopes.
 
-**Where membership comes from.** Platform-team rosters are resolved from your
-configured identity sources under `platform-integration` — **Google Cloud
-Identity**, **Azure AD**, **Dex/LDAP JWT group claims**, or the **static** member
-map — all keyed by email. They are **not** read from Slack user groups: only the
-poster's *email* is taken from Slack; the rosters themselves come from the IdP.
+**Where membership comes from.** Each platform team (configured under
+`platform-integration.teams-scraping`) names a `group-ref`, and its roster is
+resolved from the matching identity source — a **Slack usergroup** (`slack:`),
+**Google Cloud Identity** (`google:`), **Azure AD** (`azure:`), or the **static**
+member map — then reduced to a set of emails. (For a `slack:` group-ref the bot
+enumerates the usergroup and looks up each member's Slack-profile email.) At match
+time the poster's own Slack-profile email is checked against that set.
 
-> **A team's `slack:` mention group is not its membership source.** An
-> `enums.escalation-teams` entry's `group-ref: "slack:…"` is only the Slack
-> usergroup the bot *@-mentions* on escalation — it is **never** enumerated for
-> membership (a `slack:` ref resolves to an empty roster). For `exclude-author-teams`
-> to match anyone, the platform team of that code must be backed by a
-> membership-resolvable source (Google / Azure / JWT / static) that contains the
-> poster's email. A team whose roster is defined *only* by a Slack usergroup matches
-> no one, so the gate never excludes — it just tracks. (In local dev this roster is
-> the `platform-integration` static member map.)
+> **Membership comes from the *platform team's* `group-ref`, not the escalation
+> team's mention group.** A team code appears in two places: under
+> `enums.escalation-teams` (where `group-ref: "slack:…"` is the usergroup the bot
+> *@-mentions*) and under `platform-integration.teams-scraping` (where the team's
+> `group-ref` defines its **roster**). The gate uses the roster. So for
+> `exclude-author-teams: [wow]` to match, the *platform* team `wow` must have a
+> roster `group-ref` that resolves to the poster — point it at a Slack usergroup
+> (`group-ref: "slack:S08948NBMED"`), a Google/Azure group, or the static map.
+>
+> **`jwt:` groups are the exception:** their membership is known only per
+> authenticated request (via the user's token), so they can't be enumerated at
+> PR-detection time — a `jwt:`-backed team resolves to empty and the gate falls open
+> (tracks).
 
 > The identity checked is the Slack user who *posted* the PR link in the support
 > channel — not the VCS author of the PR. In the support flow these are usually the
@@ -902,7 +908,7 @@ This path requires `platform-integration.jwt-groups.enabled: true` and only appl
 
 When a support engineer escalates a ticket, the bot tags the team's Slack group in the thread — no UI login required. Those who do log into the UI get `ROLE_ESCALATION`, which gives them a dedicated view of escalations assigned to their team.
 
-Unlike `ROLE_SUPPORT_ENGINEER` and `ROLE_LEADERSHIP`, membership is not resolved via a direct Slack group lookup. It comes from `platform-integration` (Azure, GCP, or Kubernetes), which scrapes team membership from your cloud identity source:
+Unlike `ROLE_SUPPORT_ENGINEER` and `ROLE_LEADERSHIP` (resolved from the `team.support` / `team.leadership` Slack groups), `ROLE_ESCALATION` membership comes from `platform-integration.teams-scraping`. That roster can be sourced from a Slack usergroup (`slack:`), Azure, GCP, Kubernetes, or a static map:
 
 ```yaml
 enums:

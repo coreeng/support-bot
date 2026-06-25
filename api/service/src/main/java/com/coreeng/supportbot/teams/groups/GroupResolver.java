@@ -16,19 +16,22 @@ public class GroupResolver {
     private final @Nullable PlatformUsersFetcher<GroupRef.Google> googleFetcher;
     private final @Nullable PlatformUsersFetcher<GroupRef.Azure> azureFetcher;
     private final @Nullable PlatformUsersFetcher<GroupRef.Static> staticFetcher;
+    private final @Nullable PlatformUsersFetcher<GroupRef.Slack> slackFetcher;
 
     public GroupResolver(
             @Autowired(required = false) @Nullable PlatformUsersFetcher<GroupRef.Google> googleFetcher,
             @Autowired(required = false) @Nullable PlatformUsersFetcher<GroupRef.Azure> azureFetcher,
-            @Autowired(required = false) @Nullable PlatformUsersFetcher<GroupRef.Static> staticFetcher) {
+            @Autowired(required = false) @Nullable PlatformUsersFetcher<GroupRef.Static> staticFetcher,
+            @Autowired(required = false) @Nullable PlatformUsersFetcher<GroupRef.Slack> slackFetcher) {
         this.googleFetcher = googleFetcher;
         this.azureFetcher = azureFetcher;
         this.staticFetcher = staticFetcher;
+        this.slackFetcher = slackFetcher;
     }
 
     public List<Membership> resolveMembers(GroupRef ref) {
         return switch (ref) {
-            case GroupRef.Slack s -> emptyAndWarn(s, "no Slack pull-side fetcher in PlatformTeams path");
+            case GroupRef.Slack s -> tryFetch(slackFetcher, s);
             case GroupRef.Google g -> tryFetch(googleFetcher, g);
             case GroupRef.Azure a -> tryFetch(azureFetcher, a);
             case GroupRef.Static st -> tryFetch(staticFetcher, st);
@@ -42,11 +45,6 @@ public class GroupResolver {
             return ImmutableList.of();
         }
         return fetcher.fetchMembershipsByGroupRef(ref);
-    }
-
-    private static List<Membership> emptyAndWarn(GroupRef ref, String reason) {
-        log.warn("Cannot resolve members for {}: {}", ref.canonical(), reason);
-        return ImmutableList.of();
     }
 
     private static List<Membership> emptyForJwt(GroupRef.Jwt ref) {
