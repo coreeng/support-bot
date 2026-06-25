@@ -85,6 +85,10 @@ public class PrDetectionService {
     private final PrMessageRenderer messageRenderer;
     private final PrUrlResolver prUrlResolver;
 
+    // Whether any configured repo has a non-empty exclude-author-teams list. Fixed at config-bind
+    // time, so it is computed once (lazily) rather than re-streamed on every message.
+    private volatile @Nullable Boolean anyRepoExcludesAuthorsCache;
+
     public boolean containsPrLinks(String message) {
         return !prUrlDispatcher.parse(message).isEmpty();
     }
@@ -140,6 +144,7 @@ public class PrDetectionService {
             }
 
             boolean canAutoCloseTicket = !event.messageRef().isReply();
+            Optional<PrTrackingProps.Repository> repoConfig = repoConfigFor(pr);
             PerPrResult result;
             try {
                 result = processPr(
@@ -147,6 +152,7 @@ public class PrDetectionService {
                         ticket,
                         canAutoCloseTicket,
                         prMetadata,
+                        repoConfig,
                         posterTeamCodes,
                         teamReviewerCache,
                         notifications,
@@ -254,6 +260,7 @@ public class PrDetectionService {
                         ticket,
                         true,
                         prMetadata,
+                        repoConfig,
                         posterTeamCodes,
                         teamReviewerCache,
                         notifications,
@@ -351,12 +358,11 @@ public class PrDetectionService {
             Ticket ticket,
             boolean canAutoCloseTicket,
             PrMetadata prMetadata,
+            Optional<PrTrackingProps.Repository> repoConfig,
             Optional<Set<String>> posterTeamCodes,
             Map<String, Optional<Set<String>>> teamReviewerCache,
             List<PendingNotification> notifications,
             List<PendingEscalation> pendingEscalations) {
-
-        Optional<PrTrackingProps.Repository> repoConfig = repoConfigFor(detectedPr);
 
         if (repoConfig.isPresent()) {
             if (authorExcluded(detectedPr, repoConfig.get(), posterTeamCodes)) {
@@ -451,8 +457,13 @@ public class PrDetectionService {
     }
 
     private boolean anyRepoExcludesAuthors() {
-        return prTrackingProps.repositories().stream()
-                .anyMatch(r -> !r.excludeAuthorTeams().isEmpty());
+        Boolean cached = anyRepoExcludesAuthorsCache;
+        if (cached == null) {
+            cached = prTrackingProps.repositories().stream()
+                    .anyMatch(r -> !r.excludeAuthorTeams().isEmpty());
+            anyRepoExcludesAuthorsCache = cached;
+        }
+        return cached;
     }
 
     private PerPrResult processOpenPr(

@@ -10,19 +10,29 @@ import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.google.common.collect.ImmutableList;
 import com.slack.api.model.User;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class SlackUsersFetcherTest {
 
     private SlackClient slackClient;
+    private ExecutorService executor;
     private SlackUsersFetcher fetcher;
 
     @BeforeEach
     void setUp() {
         slackClient = mock(SlackClient.class);
-        fetcher = new SlackUsersFetcher(slackClient);
+        executor = Executors.newVirtualThreadPerTaskExecutor();
+        fetcher = new SlackUsersFetcher(slackClient, executor);
+    }
+
+    @AfterEach
+    void tearDown() {
+        executor.shutdownNow();
     }
 
     private User userWithEmail(@Nullable String email) {
