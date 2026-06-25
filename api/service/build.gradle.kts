@@ -58,16 +58,6 @@ repositories {
     mavenCentral()
 }
 
-// Java 25 compatibility: override transitive dependency versions
-extra["byte-buddy.version"] = "1.18.4"
-extra["mockito.version"] = "5.21.0"
-extra["asm.version"] = "9.9.1"
-extra["commons-lang3.version"] = "3.18.0"
-extra["netty.version"] = "4.1.135.Final"
-extra["opentelemetry.version"] = "1.62.0"
-extra["postgresql.version"] = "42.7.11"
-extra["spring-framework.version"] = "6.2.18"
-
 val lombokVersion = "1.18.42"
 val errorProneVersion = "2.47.0"
 val nullAwayVersion = "0.13.1"
