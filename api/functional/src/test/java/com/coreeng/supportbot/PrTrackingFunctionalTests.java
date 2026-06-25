@@ -42,6 +42,13 @@ public class PrTrackingFunctionalTests {
     private static final String ESCALATION_MESSAGE_REPO = "test-org/pr-escalation-message-repo";
     private static final String ESCALATION_MESSAGE_PR = "https://github.com/" + ESCALATION_MESSAGE_REPO + "/pull/301";
 
+    // Author-admission gate repos (see application-functionaltests.yaml). The default users.info stub
+    // resolves the tenant poster to functional-user@example.com, which is in the pr-author-excluded team.
+    private static final String EXCLUDED_AUTHOR_REPO = "test-org/pr-author-excluded-repo";
+    private static final String EXCLUDED_AUTHOR_PR = "https://github.com/" + EXCLUDED_AUTHOR_REPO + "/pull/401";
+    private static final String ADMITTED_AUTHOR_REPO = "test-org/pr-author-admitted-repo";
+    private static final String ADMITTED_AUTHOR_PR = "https://github.com/" + ADMITTED_AUTHOR_REPO + "/pull/501";
+
     /** Returns a PR created-at timestamp 1 hour ago — safely within the 24h SLA window. */
     private static String recentCreatedAt() {
         return java.time.Instant.now().minus(Duration.ofHours(1)).toString();
@@ -752,6 +759,113 @@ public class PrTrackingFunctionalTests {
         assertThat(ticketResponse.escalated()).isTrue();
 
         creationStubs.cleanUp();
+    }
+
+    @Test
+    public void whenPosterIsInExcludedAuthorTeam_prNotTrackedAndNoTicketCreated() {
+        TestKit.RoledTestKit asTenant = testKit.as(tenant);
+        SlackTestKit asTenantSlack = asTenant.slack();
+        String channelId = testKit.config().mocks().slack().supportChannelId();
+
+        MessageTs queryTs = MessageTs.now();
+        String messageWithPr = "Could you review " + EXCLUDED_AUTHOR_PR + "?";
+
+        // PR is open, but the Slack poster's resolved platform team (functional-user@example.com ->
+        // pr-author-excluded) is in exclude-author-teams, so detection skips before any tracking,
+        // reaction, or ticket side effect. GitHub is still queried before the admission decision.
+        var githubStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest(
+                        "GitHub PR open (excluded author)", EXCLUDED_AUTHOR_REPO, 401, "open", recentCreatedAt());
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("No PR reaction expected (author excluded)")
+                        .reaction("pr")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("No eyes reaction expected (author excluded)")
+                        .reaction("eyes")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+
+        asTenantSlack.postMessage(queryTs, messageWithPr);
+
+        await().during(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            githubStub.assertIsCalled();
+            prReactionStub.assertIsNotCalled();
+            eyesReactionStub.assertIsNotCalled();
+        });
+
+        assertThat(supportBotClient.findTicketByQueryTs(channelId, queryTs)).isNull();
+
+        githubStub.cleanUp();
+        prReactionStub.cleanUp();
+        eyesReactionStub.cleanUp();
+    }
+
+    @Test
+    public void whenPosterNotInExcludedAuthorTeam_prTrackedNormally() {
+        TestKit.RoledTestKit asTenant = testKit.as(tenant);
+        SlackTestKit asTenantSlack = asTenant.slack();
+        String channelId = testKit.config().mocks().slack().supportChannelId();
+
+        MessageTs queryTs = MessageTs.now();
+        String messageWithPr = "Could you review " + ADMITTED_AUTHOR_PR + "?";
+        MessageTs ticketMessageTs = MessageTs.now();
+
+        // The repo configures exclude-author-teams: [wow], but the poster (functional-user@example.com)
+        // is not in 'wow', so the gate admits the PR and it tracks normally (within SLA, not escalated).
+        var githubStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest(
+                        "GitHub PR open (admitted author)", ADMITTED_AUTHOR_REPO, 501, "open", recentCreatedAt());
+        var prReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("PR reaction (author admitted)")
+                        .reaction("pr")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+        var eyesReactionStub = testKit.slack()
+                .wiremock()
+                .stubReactionAdd(ReactionAddedExpectation.builder()
+                        .description("Eyes reaction (author admitted)")
+                        .reaction("eyes")
+                        .channelId(channelId)
+                        .ts(queryTs)
+                        .build());
+        var slaReplyStub = testKit.slack().wiremock().stubChatPostMessage("PR SLA reply in thread", channelId);
+
+        SlackMessage messageForStubs = SlackMessage.builder()
+                .slackWiremock(testKit.slack().wiremock())
+                .ts(queryTs)
+                .channelId(channelId)
+                .build();
+        var creationStubs = messageForStubs.stubTicketCreationFlow("ticket created", ticketMessageTs);
+
+        asTenantSlack.postMessage(queryTs, messageWithPr);
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            githubStub.assertIsCalled();
+            prReactionStub.assertIsCalled();
+            eyesReactionStub.assertIsCalled();
+            slaReplyStub.assertIsCalled();
+        });
+
+        var ticketResponse = supportBotClient.findTicketByQueryTs(channelId, queryTs);
+        assertThat(ticketResponse).isNotNull();
+        assertThat(ticketResponse.status()).isEqualTo("opened");
+        assertThat(ticketResponse.escalated()).isFalse();
+
+        creationStubs.cleanUp();
+        githubStub.cleanUp();
     }
 
     /**
