@@ -740,9 +740,9 @@ class PrDetectionServiceTest {
         }
 
         @Test
-        void postsCustomDetectedMessageIndividuallyForGroupedPrs() {
+        void postsCustomDetectedMessageOnceForGroupedPrs() {
             // given — two no-SLA PRs to the same repo with a custom detected message configured;
-            // the renderer override causes grouped PRs to be posted individually.
+            // the repo-level override must produce a single message, not one per PR.
             String customMessage = "Docs PRs have no automated SLA. Tag #docs-team if urgent.";
             int prNumber2 = PR_NUMBER + 1;
             Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
@@ -817,11 +817,88 @@ class PrDetectionServiceTest {
             // when
             service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
 
-            // then — each PR gets its own custom message post (2 posts, not 1 grouped)
+            // then — a single custom message is posted for the repo group (not one per PR)
+            verify(slackClient, times(1)).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText()).isEqualTo(customMessage);
+        }
+
+        @Test
+        void postsCustomMessageOncePerNotificationTypeForGroupedPrs() {
+            // given — one repo with FOUR PRs in two states: two with changes requested, two
+            // approved, with custom overrides on BOTH events. The override-collapse runs inside the
+            // per-(repo,type) loop, so we expect exactly TWO posts — one per type, each collapsing
+            // its two PRs — not one (collapsed across types) and not four (one per PR).
+            String changesMsg = "Changes requested — see the PR.";
+            String approvedMsg = "Approved — ready to merge.";
+            int cr1 = PR_NUMBER;
+            int cr2 = PR_NUMBER + 1;
+            int ap1 = PR_NUMBER + 2;
+            int ap2 = PR_NUMBER + 3;
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(2));
+
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(NO_SLA_REPO, TEAM_CODE, null, PATHS, null)));
+            when(messageRenderer.hasOverride(NO_SLA_REPO, MessageEvent.CHANGES_REQUESTED))
+                    .thenReturn(true);
+            when(messageRenderer.hasOverride(NO_SLA_REPO, MessageEvent.APPROVED))
+                    .thenReturn(true);
+            when(messageRenderer.render(eq(NO_SLA_REPO), eq(MessageEvent.CHANGES_REQUESTED), any()))
+                    .thenReturn(changesMsg);
+            when(messageRenderer.render(eq(NO_SLA_REPO), eq(MessageEvent.APPROVED), any()))
+                    .thenReturn(approvedMsg);
+            when(prUrlParser.parse(any()))
+                    .thenReturn(List.of(
+                            new DetectedPr(Provider.GITHUB, NO_SLA_REPO, cr1),
+                            new DetectedPr(Provider.GITHUB, NO_SLA_REPO, cr2),
+                            new DetectedPr(Provider.GITHUB, NO_SLA_REPO, ap1),
+                            new DetectedPr(Provider.GITHUB, NO_SLA_REPO, ap2)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            for (int pr : new int[] {cr1, cr2}) {
+                when(prSourceClient.fetchPullRequest(NO_SLA_COORD, pr))
+                        .thenReturn(new PrMetadata(
+                                NO_SLA_COORD,
+                                pr,
+                                prCreatedAt,
+                                PrMetadata.PrState.OPEN,
+                                null,
+                                List.of(),
+                                List.of(new Review(
+                                        "reviewer",
+                                        Review.ReviewState.CHANGES_REQUESTED,
+                                        Instant.now().minusSeconds(600)))));
+            }
+            for (int pr : new int[] {ap1, ap2}) {
+                when(prSourceClient.fetchPullRequest(NO_SLA_COORD, pr))
+                        .thenReturn(new PrMetadata(
+                                NO_SLA_COORD,
+                                pr,
+                                prCreatedAt,
+                                PrMetadata.PrState.OPEN,
+                                null,
+                                List.of(),
+                                List.of(new Review(
+                                        "reviewer",
+                                        Review.ReviewState.APPROVED,
+                                        Instant.now().minusSeconds(600)))));
+            }
+            when(prSourceClient.listChangedFiles(eq(NO_SLA_COORD), anyInt())).thenReturn(List.of("infra/main.tf"));
+            when(prTrackingRepository.insertIfAbsent(any()))
+                    .thenReturn(
+                            stubTrackingRecord(1L, prCreatedAt, null),
+                            stubTrackingRecord(2L, prCreatedAt, null),
+                            stubTrackingRecord(3L, prCreatedAt, null),
+                            stubTrackingRecord(4L, prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("four PRs"), ticketWithId(1L));
+
+            // then — exactly two posts, one custom message per notification type
             verify(slackClient, times(2)).postMessage(postMessageCaptor.capture());
-            postMessageCaptor
-                    .getAllValues()
-                    .forEach(req -> assertThat(req.message().getText()).isEqualTo(customMessage));
+            assertThat(postMessageCaptor.getAllValues())
+                    .extracting(req -> req.message().getText())
+                    .containsExactlyInAnyOrder(changesMsg, approvedMsg);
         }
 
         @Test
@@ -1559,9 +1636,9 @@ class PrDetectionServiceTest {
     class HandleMessagePostedGrouping {
 
         @Test
-        void postsCustomDetectedMessageIndividuallyForGroupedSlaBackedPrs() {
+        void postsCustomDetectedMessageOnceForGroupedSlaBackedPrs() {
             // given — two SLA-backed PRs to the same repo with a custom detected message; the
-            // hasOverride check causes them to be posted individually rather than grouped.
+            // repo-level override must produce a single message, not one per PR.
             String customMessage = "I'm tracking this PR — SLA applies.";
             int prB = 99;
             Instant createdAt = Instant.now().minus(Duration.ofHours(1));
@@ -1600,11 +1677,9 @@ class PrDetectionServiceTest {
             // when
             service.handleMessagePosted(messagePostedWith("two PRs"), ticketWithId(10L));
 
-            // then — each PR gets its own custom message post (2 posts, not 1 grouped)
-            verify(slackClient, times(2)).postMessage(postMessageCaptor.capture());
-            postMessageCaptor
-                    .getAllValues()
-                    .forEach(req -> assertThat(req.message().getText()).isEqualTo(customMessage));
+            // then — a single custom message is posted for the repo group (not one per PR)
+            verify(slackClient, times(1)).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText()).isEqualTo(customMessage);
         }
 
         @Test

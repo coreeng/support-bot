@@ -250,8 +250,7 @@ public class SupportBotClient {
                     .getList(".", InFlightPrResponse.class));
         }
 
-        public EscalationBreakdownResponse escalationBreakdown(
-                @Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
+        public RequestBreakdownResponse requestBreakdown(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
             RequestSpecification requestSpecification = request();
             if (dateFrom != null) {
                 requestSpecification = requestSpecification.queryParam("dateFrom", dateFrom.toString());
@@ -261,13 +260,13 @@ public class SupportBotClient {
             }
             return requestSpecification
                     .when()
-                    .get(baseUrl + "/tenant-insights/escalation-breakdown")
+                    .get(baseUrl + "/tenant-insights/request-breakdown")
                     .then()
                     .log()
                     .ifValidationFails(LogDetail.ALL, true)
                     .statusCode(200)
                     .extract()
-                    .as(EscalationBreakdownResponse.class);
+                    .as(RequestBreakdownResponse.class);
         }
     }
 
@@ -567,8 +566,7 @@ public class SupportBotClient {
             double p99Seconds,
             boolean hasSla) {}
 
-    public record EscalationBreakdownResponse(
-            long totalPrTickets, long botEscalatedTickets, long manuallyEscalatedTickets) {}
+    public record RequestBreakdownResponse(long totalSupportTickets, long totalPrTickets, long interventionPrTickets) {}
 
     public record InFlightPrResponse(
             String githubRepo,
