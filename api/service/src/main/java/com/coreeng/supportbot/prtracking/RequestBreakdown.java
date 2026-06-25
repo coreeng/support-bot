@@ -6,20 +6,20 @@ package com.coreeng.supportbot.prtracking;
  *
  * <p>All three counts share one date anchor — ticket creation (the {@code query} table's
  * {@code date} column) — so they are nested subsets: {@code interventionPrTickets <=
- * totalPrTickets <= totalSupportTickets}. The
- * invariant is enforced here so a query regression surfaces loudly rather than rendering a
- * nonsensical >100% rate in the UI.
+ * totalPrTickets <= totalSupportTickets}. Each invariant is enforced here and throws a dedicated
+ * {@link RequestBreakdownInvariantException} so a query regression surfaces loudly (mapped to a
+ * server error by the controller advice) rather than rendering a nonsensical &gt;100% rate in the UI.
  */
 public record RequestBreakdown(long totalSupportTickets, long totalPrTickets, long interventionPrTickets) {
     public RequestBreakdown {
         if (totalSupportTickets < 0 || totalPrTickets < 0 || interventionPrTickets < 0) {
-            throw new IllegalArgumentException("counts must not be negative");
+            throw new NegativeCountException(totalSupportTickets, totalPrTickets, interventionPrTickets);
         }
         if (totalPrTickets > totalSupportTickets) {
-            throw new IllegalArgumentException("totalPrTickets must not exceed totalSupportTickets");
+            throw new PrTicketsExceedSupportTicketsException(totalPrTickets, totalSupportTickets);
         }
         if (interventionPrTickets > totalPrTickets) {
-            throw new IllegalArgumentException("interventionPrTickets must not exceed totalPrTickets");
+            throw new InterventionExceedsPrTicketsException(interventionPrTickets, totalPrTickets);
         }
     }
 }

@@ -124,15 +124,6 @@ export interface RepoInsights {
 }
 
 /**
- * Escalation breakdown from /tenant-insights/escalation-breakdown
- */
-export interface EscalationBreakdown {
-  totalPrTickets: number;
-  botEscalatedTickets: number;
-  manuallyEscalatedTickets: number;
-}
-
-/**
  * Support-request funnel from /tenant-insights/request-breakdown: total support requests, how many
  * had a PR, and how many of those PR tickets needed a manual engineer escalation.
  */

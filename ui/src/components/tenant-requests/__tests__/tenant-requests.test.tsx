@@ -515,6 +515,37 @@ describe("TenantRequestsPage", () => {
       const zero = screen.getAllByText("0%").filter((el) => el.className.includes("text-3xl"));
       expect(zero).toHaveLength(1);
     });
+
+    it("should not round a near-complete ratio up to a misleading 100%", () => {
+      mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false });
+      // 199 of 200 PRs escalated → 99.5% rounds to 100% with Math.round; clamp to 99% since 1 PR did not.
+      // Bot share is 200/400 = 50% so a legitimate 100% never appears, isolating the clamp under test.
+      mockUseRequestBreakdown.mockReturnValue({
+        data: { totalSupportTickets: 400, totalPrTickets: 200, interventionPrTickets: 199 },
+      });
+
+      render(<TenantRequestsPage />);
+
+      const pctValues = screen
+        .getAllByText(/^\d+%$/)
+        .filter((el) => el.className.includes("text-3xl"))
+        .map((el) => el.textContent);
+      expect(pctValues).toEqual(expect.arrayContaining(["50%", "99%"]));
+      expect(pctValues).not.toContain("100%");
+    });
+
+    it("should not round a tiny non-zero ratio down to a misleading 0%", () => {
+      mockUseTenantInsightsStats.mockReturnValue({ data: [makeRepo()], isLoading: false });
+      // 1 of 1000 → 0.1% rounds to 0% with Math.round; clamp to 1% since a PR did need escalation.
+      mockUseRequestBreakdown.mockReturnValue({
+        data: { totalSupportTickets: 1000, totalPrTickets: 1000, interventionPrTickets: 1 },
+      });
+
+      render(<TenantRequestsPage />);
+
+      const onePct = screen.getAllByText("1%").filter((el) => el.className.includes("text-3xl"));
+      expect(onePct).toHaveLength(1);
+    });
   });
 
   describe("Tab Navigation", () => {

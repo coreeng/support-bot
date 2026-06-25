@@ -18,6 +18,17 @@ import InFlightPrsTab from "./in-flight-prs";
 type StatsSortKey = "severity" | "repo" | "team" | "prCount" | "openCount" | "escalatedCount" | "breachedCount" | "p50" | "p90" | "p99";
 type SortDir = "asc" | "desc";
 
+// Rounds a funnel ratio to a whole percent, but never reports a misleading 0% or 100%: any
+// non-zero numerator shows at least 1%, and anything short of the full denominator shows at most
+// 99% — so e.g. 199 of 200 reads as 99%, not a rounded-up 100%. Returns null for an empty group.
+function funnelPercent(numerator: number, denominator: number): number | null {
+  if (denominator <= 0) return null;
+  const rounded = Math.round((numerator / denominator) * 100);
+  if (rounded >= 100 && numerator < denominator) return 99;
+  if (rounded <= 0 && numerator > 0) return 1;
+  return rounded;
+}
+
 function durationStyle(seconds: number): string {
   if (seconds < 14400) return "text-success bg-success/10";
   if (seconds < 86400) return "text-warning bg-warning/10";
@@ -131,29 +142,26 @@ export default function TenantRequestsPage() {
   const {
     data: requestBreakdown,
     isLoading: breakdownLoading,
-    error: breakdownError,
   } = useRequestBreakdown(
     isDateRangeValid ? dateRange.from : undefined,
     isDateRangeValid ? dateRange.to : undefined,
     isDateRangeValid && activeTab === "stats"
   );
 
-  const isLoading = statsLoading || breakdownLoading;
-  const error = statsError || breakdownError;
-
+  // The funnel and the repo table load independently, so keep their loading/error state separate:
+  // if the breakdown endpoint fails, the funnel cards degrade to a dash while the table still
+  // renders (and vice-versa), rather than one failure blanking the whole tab.
   const repos = realRepos ?? [];
 
   // Request funnel: total support requests → % that are PRs → % of those PRs needing intervention.
   // All three counts share the ticket-creation date anchor, so they are nested subsets and the
   // percentages are coherent (PR share never exceeds 100%).
-  const prPercentage =
-    requestBreakdown && requestBreakdown.totalSupportTickets > 0
-      ? Math.round((requestBreakdown.totalPrTickets / requestBreakdown.totalSupportTickets) * 100)
-      : null;
-  const interventionRate =
-    requestBreakdown && requestBreakdown.totalPrTickets > 0
-      ? Math.round((requestBreakdown.interventionPrTickets / requestBreakdown.totalPrTickets) * 100)
-      : null;
+  const prPercentage = requestBreakdown
+    ? funnelPercent(requestBreakdown.totalPrTickets, requestBreakdown.totalSupportTickets)
+    : null;
+  const interventionRate = requestBreakdown
+    ? funnelPercent(requestBreakdown.interventionPrTickets, requestBreakdown.totalPrTickets)
+    : null;
 
   const totals = useMemo(() => {
     if (repos.length === 0) {
@@ -291,7 +299,7 @@ export default function TenantRequestsPage() {
               <StatCard
                 label="Total Requests"
                 value={requestBreakdown?.totalSupportTickets ?? null}
-                isLoading={isLoading}
+                isLoading={breakdownLoading}
                 accent="primary"
                 tooltip="Total support requests created in the selected period"
               />
@@ -299,7 +307,7 @@ export default function TenantRequestsPage() {
                 label="Handled by Bot"
                 value={prPercentage}
                 suffix="%"
-                isLoading={isLoading}
+                isLoading={breakdownLoading}
                 accent="info"
                 tooltip={
                   requestBreakdown
@@ -311,7 +319,7 @@ export default function TenantRequestsPage() {
                 label="Needed Manual Escalation"
                 value={interventionRate}
                 suffix="%"
-                isLoading={isLoading}
+                isLoading={breakdownLoading}
                 valueClass={interventionRate !== null && interventionRate > 0 ? "text-warning" : undefined}
                 accent="indigo"
                 tooltip={
@@ -328,27 +336,27 @@ export default function TenantRequestsPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
-              <StatCard label="Repositories" value={repoCount} isLoading={isLoading} accent="primary" />
+              <StatCard label="Repositories" value={repoCount} isLoading={statsLoading} accent="primary" />
               <StatCard
                 label="No SLA Repos"
                 value={noSlaRepoCount}
-                isLoading={isLoading}
+                isLoading={statsLoading}
                 valueClass={noSlaRepoCount > 0 ? "text-warning" : undefined}
                 accent="warning"
               />
-              <StatCard label="Total PRs" value={totals.prCount} isLoading={isLoading} accent="info" />
-              <StatCard label="Open" value={totals.openCount} isLoading={isLoading} accent="success" />
+              <StatCard label="Total PRs" value={totals.prCount} isLoading={statsLoading} accent="info" />
+              <StatCard label="Open" value={totals.openCount} isLoading={statsLoading} accent="success" />
               <StatCard
                 label="Escalated"
                 value={totals.escalatedCount}
-                isLoading={isLoading}
+                isLoading={statsLoading}
                 valueClass={totals.escalatedCount > 0 ? "text-warning" : undefined}
                 accent="purple"
               />
               <StatCard
                 label="SLA Breached"
                 value={totals.breachedCount}
-                isLoading={isLoading}
+                isLoading={statsLoading}
                 valueClass={totals.breachedCount > 0 ? "text-destructive" : undefined}
                 accent="destructive"
               />
@@ -376,9 +384,9 @@ export default function TenantRequestsPage() {
                 </div>
               </div>
 
-              {error ? (
+              {statsError ? (
                 <div className="text-destructive p-16 text-center text-sm">Failed to load data — please try again</div>
-              ) : isLoading ? (
+              ) : statsLoading ? (
                 <div className="text-muted-foreground p-16 text-center text-sm">Loading...</div>
               ) : filteredAndSorted.length === 0 ? (
                 <div className="text-muted-foreground p-16 text-center text-sm">

@@ -250,26 +250,6 @@ public class SupportBotClient {
                     .getList(".", InFlightPrResponse.class));
         }
 
-        public EscalationBreakdownResponse escalationBreakdown(
-                @Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
-            RequestSpecification requestSpecification = request();
-            if (dateFrom != null) {
-                requestSpecification = requestSpecification.queryParam("dateFrom", dateFrom.toString());
-            }
-            if (dateTo != null) {
-                requestSpecification = requestSpecification.queryParam("dateTo", dateTo.toString());
-            }
-            return requestSpecification
-                    .when()
-                    .get(baseUrl + "/tenant-insights/escalation-breakdown")
-                    .then()
-                    .log()
-                    .ifValidationFails(LogDetail.ALL, true)
-                    .statusCode(200)
-                    .extract()
-                    .as(EscalationBreakdownResponse.class);
-        }
-
         public RequestBreakdownResponse requestBreakdown(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
             RequestSpecification requestSpecification = request();
             if (dateFrom != null) {
@@ -585,9 +565,6 @@ public class SupportBotClient {
             double p90Seconds,
             double p99Seconds,
             boolean hasSla) {}
-
-    public record EscalationBreakdownResponse(
-            long totalPrTickets, long botEscalatedTickets, long manuallyEscalatedTickets) {}
 
     public record RequestBreakdownResponse(long totalSupportTickets, long totalPrTickets, long interventionPrTickets) {}
 

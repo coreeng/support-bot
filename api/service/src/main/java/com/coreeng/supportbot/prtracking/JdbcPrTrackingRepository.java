@@ -1,8 +1,17 @@
 package com.coreeng.supportbot.prtracking;
 
+import static com.coreeng.supportbot.dbschema.Tables.ESCALATION;
 import static com.coreeng.supportbot.dbschema.Tables.PR_TRACKING;
+import static com.coreeng.supportbot.dbschema.Tables.QUERY;
+import static com.coreeng.supportbot.dbschema.Tables.TICKET;
 import static com.coreeng.supportbot.util.JooqUtils.nullToZero;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.jooq.impl.DSL.cast;
+import static org.jooq.impl.DSL.countDistinct;
+import static org.jooq.impl.DSL.exists;
+import static org.jooq.impl.DSL.noCondition;
+import static org.jooq.impl.DSL.selectOne;
+import static org.jooq.impl.DSL.val;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
 import com.coreeng.supportbot.escalation.EscalationSource;
@@ -14,7 +23,9 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.jooq.types.DayToSecond;
 import org.jooq.types.YearToMonth;
 import org.jooq.types.YearToSecond;
@@ -277,7 +288,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
     @Override
     public List<RepoInsights> getInsightsByRepo(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
         List<Object> binds = new ArrayList<>();
-        String dateFilter = buildDateFilter(dateFrom, dateTo, binds);
+        String dateFilter = buildDateFilter("pr_created_at", dateFrom, dateTo, binds);
         // Group by (provider, repo) so the same repo name across providers stays distinct in the
         // dashboard. Today every row is provider='github', so the groups collapse exactly as before.
         String sql = """
@@ -344,81 +355,47 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
 
     @Transactional(readOnly = true)
     @Override
-    public EscalationBreakdown getEscalationBreakdown(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
-        List<Object> binds = new ArrayList<>();
-        binds.add(EscalationSource.bot.name());
-        binds.add(EscalationSource.manual.name());
-        String dateFilter = buildDateFilter(dateFrom, dateTo, binds);
-        String sql = """
-                SELECT
-                    COUNT(DISTINCT ticket_id) AS total_pr_tickets,
-                    COUNT(DISTINCT ticket_id) FILTER (
-                        WHERE EXISTS (
-                            SELECT 1 FROM escalation e
-                            WHERE e.ticket_id = pt.ticket_id AND e.source = ?
-                        )
-                    ) AS bot_escalated_tickets,
-                    COUNT(DISTINCT ticket_id) FILTER (
-                        WHERE EXISTS (
-                            SELECT 1 FROM escalation e
-                            WHERE e.ticket_id = pt.ticket_id AND e.source = ?
-                        )
-                    ) AS manually_escalated_tickets
-                FROM pr_tracking pt
-                WHERE 1=1
-                  %s
-                """.formatted(dateFilter);
+    public RequestBreakdown getRequestBreakdown(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
+        // Compares PR tickets against ALL support tickets that came in during the window, so every
+        // count is bucketed by when the support request arrived (the ticket's query.date) — making
+        // the PR and intervention counts true subsets of the total. PR and intervention membership
+        // are EXISTS sub-selects inside COUNT(DISTINCT ...) FILTER (WHERE ...).
+        Condition hasPr = exists(selectOne().from(PR_TRACKING).where(PR_TRACKING.TICKET_ID.eq(TICKET.ID)));
+        Condition manuallyEscalated = exists(selectOne()
+                .from(ESCALATION)
+                .where(ESCALATION.TICKET_ID.eq(TICKET.ID).and(ESCALATION.SOURCE.eq(EscalationSource.manual.name()))));
 
-        return checkNotNull(dsl.resultQuery(sql, binds.toArray())
-                .fetchOne(r -> new EscalationBreakdown(
-                        r.get("total_pr_tickets", Long.class),
-                        r.get("bot_escalated_tickets", Long.class),
-                        r.get("manually_escalated_tickets", Long.class))));
+        Field<Integer> totalSupport = countDistinct(TICKET.ID);
+        Field<Integer> totalPr = countDistinct(TICKET.ID).filterWhere(hasPr);
+        Field<Integer> interventionPr = countDistinct(TICKET.ID).filterWhere(hasPr.and(manuallyEscalated));
+
+        return checkNotNull(dsl.select(totalSupport, totalPr, interventionPr)
+                .from(TICKET)
+                .join(QUERY)
+                .on(QUERY.ID.eq(TICKET.QUERY_ID))
+                .where(ticketCreatedBetween(dateFrom, dateTo))
+                .fetchOne(r -> new RequestBreakdown(
+                        r.get(totalSupport, Long.class),
+                        r.get(totalPr, Long.class),
+                        r.get(interventionPr, Long.class))));
     }
 
-    @Transactional(readOnly = true)
-    @Override
-    public RequestBreakdown getRequestBreakdown(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
-        // Compares PR tickets against ALL support tickets that came in during the window, so every count
-        // is bucketed by when the support request arrived — making the PR and intervention counts true subsets of the
-        // total.
-        // Bind order matches the textual '?' order: the manual-source filter (SELECT list) first,
-        // then the query.date range in the WHERE clause.
-        List<Object> binds = new ArrayList<>();
-        binds.add(EscalationSource.manual.name());
-        StringBuilder dateFilter = new StringBuilder();
+    /**
+     * Builds an inclusive day-range predicate on the ticket-creation timestamp ({@code query.date},
+     * a {@code timestamptz}) as a half-open interval ({@code date >= from AND date < to + 1 day}).
+     * The bound — not the column — is cast, so the predicate stays sargable (an index on
+     * {@code query.date} can be used), and the {@code + 1 day} is computed on the {@link LocalDate}
+     * rather than as SQL interval arithmetic.
+     */
+    private static Condition ticketCreatedBetween(@Nullable LocalDate dateFrom, @Nullable LocalDate dateTo) {
+        Condition condition = noCondition();
         if (dateFrom != null) {
-            dateFilter.append("AND q.date::date >= ?::date ");
-            binds.add(dateFrom);
+            condition = condition.and(QUERY.DATE.ge(cast(val(dateFrom), QUERY.DATE.getDataType())));
         }
         if (dateTo != null) {
-            dateFilter.append("AND q.date::date <= ?::date ");
-            binds.add(dateTo);
+            condition = condition.and(QUERY.DATE.lt(cast(val(dateTo.plusDays(1)), QUERY.DATE.getDataType())));
         }
-        String sql = """
-                SELECT
-                    COUNT(DISTINCT t.id) AS total_support_tickets,
-                    COUNT(DISTINCT t.id) FILTER (
-                        WHERE EXISTS (SELECT 1 FROM pr_tracking pt WHERE pt.ticket_id = t.id)
-                    ) AS total_pr_tickets,
-                    COUNT(DISTINCT t.id) FILTER (
-                        WHERE EXISTS (SELECT 1 FROM pr_tracking pt WHERE pt.ticket_id = t.id)
-                          AND EXISTS (
-                              SELECT 1 FROM escalation e
-                              WHERE e.ticket_id = t.id AND e.source = ?
-                          )
-                    ) AS intervention_pr_tickets
-                FROM ticket t
-                JOIN query q ON q.id = t.query_id
-                WHERE 1=1
-                  %s
-                """.formatted(dateFilter);
-
-        return checkNotNull(dsl.resultQuery(sql, binds.toArray())
-                .fetchOne(r -> new RequestBreakdown(
-                        r.get("total_support_tickets", Long.class),
-                        r.get("total_pr_tickets", Long.class),
-                        r.get("intervention_pr_tickets", Long.class))));
+        return condition;
     }
 
     private static <T> T requireNonNullAggregate(
@@ -434,15 +411,24 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
         throw new DataIntegrityViolationException(msg);
     }
 
+    /**
+     * Builds an inclusive day-range predicate on a {@code timestamptz} column as a half-open
+     * interval ({@code col >= from AND col < to + 1 day}). This keeps the predicate sargable so an
+     * index on {@code column} can be used (a {@code col::date} cast cannot), and compares the raw
+     * timestamp instead of truncating it in the DB session timezone, so rows near a day boundary
+     * land in the expected day regardless of server timezone.
+     *
+     * <p>{@code column} is a trusted compile-time constant supplied by the caller, never user input.
+     */
     private static String buildDateFilter(
-            @Nullable LocalDate dateFrom, @Nullable LocalDate dateTo, List<Object> binds) {
+            String column, @Nullable LocalDate dateFrom, @Nullable LocalDate dateTo, List<Object> binds) {
         StringBuilder sb = new StringBuilder();
         if (dateFrom != null) {
-            sb.append("AND pr_created_at::date >= ?::date ");
+            sb.append("AND ").append(column).append(" >= ?::date ");
             binds.add(dateFrom);
         }
         if (dateTo != null) {
-            sb.append("AND pr_created_at::date <= ?::date ");
+            sb.append("AND ").append(column).append(" < ?::date + interval '1 day' ");
             binds.add(dateTo);
         }
         return sb.toString();

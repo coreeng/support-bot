@@ -344,35 +344,6 @@ class TenantInsightsControllerTest {
     }
 
     @Test
-    void escalationBreakdown_returnsBreakdownForDateRange() {
-        // given 10 PR tickets: 5 bot-escalated, 2 manually escalated
-        LocalDate from = LocalDate.of(2026, 3, 1);
-        when(prTrackingRepository.getEscalationBreakdown(from, TO)).thenReturn(new EscalationBreakdown(10, 5, 2));
-
-        // when requesting breakdown
-        EscalationBreakdown response = controller.escalationBreakdown(from, TO);
-
-        // then returns the counts
-        assertThat(response.totalPrTickets()).isEqualTo(10);
-        assertThat(response.botEscalatedTickets()).isEqualTo(5);
-        assertThat(response.manuallyEscalatedTickets()).isEqualTo(2);
-        verify(prTrackingRepository).getEscalationBreakdown(from, TO);
-    }
-
-    @Test
-    void escalationBreakdown_throwsForInvertedDateRange() {
-        // when dateFrom is after dateTo
-        LocalDate from = LocalDate.of(2026, 4, 1);
-        LocalDate to = LocalDate.of(2026, 3, 1);
-
-        // then rejects with 400, never hits the database
-        assertThatThrownBy(() -> controller.escalationBreakdown(from, to))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("dateFrom must not be after dateTo");
-        verifyNoInteractions(prTrackingRepository);
-    }
-
-    @Test
     void requestBreakdown_returnsBreakdownForDateRange() {
         // given 100 support tickets, 20 of which are PR tickets, 4 of those manually escalated
         LocalDate from = LocalDate.of(2026, 3, 1);

@@ -295,50 +295,6 @@ public class TenantInsightsFunctionalTests {
         return supportBotClient.tenantInsights().inFlightPrs().items();
     }
 
-    @Test
-    public void escalationBreakdown_countsBotAndManualSources() {
-        // given — three PR tickets: one with bot escalation, one with manual, one with none
-        long botTicket = createTicket();
-        long manualTicket = createTicket();
-        long noEscTicket = createTicket();
-
-        Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
-        createPr(botTicket, "test-org/pr-insights-esc", 801, prCreatedAt, "wow");
-        createPr(manualTicket, "test-org/pr-insights-esc", 802, prCreatedAt, "wow");
-        createPr(noEscTicket, "test-org/pr-insights-esc", 803, prCreatedAt, "wow");
-
-        escalateTicket(botTicket, "wow", "bot");
-        escalateTicket(manualTicket, "wow", "manual");
-
-        // when
-        var response = getEscalationBreakdown(null, null);
-
-        // then — at least our seeded data is counted correctly
-        assertThat(response.totalPrTickets()).isGreaterThanOrEqualTo(3);
-        assertThat(response.botEscalatedTickets()).isGreaterThanOrEqualTo(1);
-        assertThat(response.manuallyEscalatedTickets()).isGreaterThanOrEqualTo(1);
-    }
-
-    @Test
-    public void escalationBreakdown_returnsZerosWhenNoDataInRange() {
-        // given — a PR ticket with bot escalation created now
-        long ticketId = createTicket();
-        createPr(ticketId, "test-org/pr-insights-esc", 810, Instant.now().minus(Duration.ofHours(1)), "wow");
-        escalateTicket(ticketId, "wow", "bot");
-
-        // when — querying a future date range
-        var response = getEscalationBreakdown(LocalDate.of(2099, 1, 1), LocalDate.of(2099, 12, 31));
-
-        // then — nothing matches
-        assertThat(response.totalPrTickets()).isEqualTo(0);
-        assertThat(response.botEscalatedTickets()).isEqualTo(0);
-        assertThat(response.manuallyEscalatedTickets()).isEqualTo(0);
-    }
-
-    private SupportBotClient.EscalationBreakdownResponse getEscalationBreakdown(LocalDate dateFrom, LocalDate dateTo) {
-        return supportBotClient.tenantInsights().escalationBreakdown(dateFrom, dateTo);
-    }
-
     // The funnel asserts use a baseline-delta approach: pr_tracking is wiped between tests (so PR
     // and intervention counts are already isolated to each test), but tickets and escalations
     // accumulate across the shared DB, so totalSupportTickets is asserted as a delta from a

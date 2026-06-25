@@ -38,35 +38,43 @@ class RequestBreakdownTest {
     @Test
     void rejectsNegativeTotalSupportTickets() {
         assertThatThrownBy(() -> new RequestBreakdown(-1, 0, 0))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(NegativeCountException.class)
                 .hasMessageContaining("must not be negative");
     }
 
     @Test
     void rejectsNegativeTotalPrTickets() {
         assertThatThrownBy(() -> new RequestBreakdown(0, -1, 0))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(NegativeCountException.class)
                 .hasMessageContaining("must not be negative");
     }
 
     @Test
     void rejectsNegativeInterventionPrTickets() {
         assertThatThrownBy(() -> new RequestBreakdown(0, 0, -1))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(NegativeCountException.class)
                 .hasMessageContaining("must not be negative");
     }
 
     @Test
     void rejectsMorePrTicketsThanTotalSupportTickets() {
         assertThatThrownBy(() -> new RequestBreakdown(5, 6, 0))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(PrTicketsExceedSupportTicketsException.class)
                 .hasMessageContaining("totalPrTickets must not exceed totalSupportTickets");
     }
 
     @Test
     void rejectsMoreInterventionsThanPrTickets() {
         assertThatThrownBy(() -> new RequestBreakdown(10, 3, 4))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(InterventionExceedsPrTicketsException.class)
                 .hasMessageContaining("interventionPrTickets must not exceed totalPrTickets");
+    }
+
+    @Test
+    void allInvariantViolationsShareTheSealedBaseType() {
+        // The controller advice catches the base type, so every concrete violation must extend it.
+        assertThatThrownBy(() -> new RequestBreakdown(-1, 0, 0)).isInstanceOf(RequestBreakdownInvariantException.class);
+        assertThatThrownBy(() -> new RequestBreakdown(5, 6, 0)).isInstanceOf(RequestBreakdownInvariantException.class);
+        assertThatThrownBy(() -> new RequestBreakdown(10, 3, 4)).isInstanceOf(RequestBreakdownInvariantException.class);
     }
 }
