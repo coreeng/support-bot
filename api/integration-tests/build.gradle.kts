@@ -18,15 +18,15 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter-api")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
-    testImplementation("io.fabric8:kubernetes-client:6.10.0")
+    testImplementation("io.fabric8:kubernetes-client:7.7.0")
     testImplementation("io.rest-assured:rest-assured:5.5.+")
 
     // Avoiding vulnerability reports from rest-assured
     testImplementation("org.apache.commons:commons-lang3:3.18.+")
     testImplementation("commons-codec:commons-codec:1.18.+")
 
-    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.18.6")
-    testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.6")
+    testImplementation("com.fasterxml.jackson.core:jackson-databind")
+    testImplementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
     testImplementation("org.slf4j:slf4j-api:2.0.16")
     testRuntimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:2.25.0")
     testRuntimeOnly("org.apache.logging.log4j:log4j-core:2.25.4")
