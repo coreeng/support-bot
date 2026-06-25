@@ -139,10 +139,7 @@ export default function TenantRequestsPage() {
     isDateRangeValid && activeTab === "stats"
   );
 
-  const {
-    data: requestBreakdown,
-    isLoading: breakdownLoading,
-  } = useRequestBreakdown(
+  const { data: requestBreakdown, isLoading: breakdownLoading } = useRequestBreakdown(
     isDateRangeValid ? dateRange.from : undefined,
     isDateRangeValid ? dateRange.to : undefined,
     isDateRangeValid && activeTab === "stats"
@@ -156,12 +153,8 @@ export default function TenantRequestsPage() {
   // Request funnel: total support requests → % that are PRs → % of those PRs needing intervention.
   // All three counts share the ticket-creation date anchor, so they are nested subsets and the
   // percentages are coherent (PR share never exceeds 100%).
-  const prPercentage = requestBreakdown
-    ? funnelPercent(requestBreakdown.totalPrTickets, requestBreakdown.totalSupportTickets)
-    : null;
-  const interventionRate = requestBreakdown
-    ? funnelPercent(requestBreakdown.interventionPrTickets, requestBreakdown.totalPrTickets)
-    : null;
+  const prPercentage = requestBreakdown ? funnelPercent(requestBreakdown.totalPrTickets, requestBreakdown.totalSupportTickets) : null;
+  const interventionRate = requestBreakdown ? funnelPercent(requestBreakdown.interventionPrTickets, requestBreakdown.totalPrTickets) : null;
 
   const totals = useMemo(() => {
     if (repos.length === 0) {
