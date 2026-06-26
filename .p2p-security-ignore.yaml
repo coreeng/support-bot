@@ -17,6 +17,18 @@ images:
           /usr/lib64/libgnutls.so.30.40.4 — the GnuTLS shared library shipped by the UBI9 base
           image. It is a compiled ELF binary, not a Box credential, and the finding status was
           "unverified" (live verification did not confirm an active credential).
+      - id: p2psec_146d28c666737e01
+        reason: >-
+          False positive: TruffleHog "Box" detector matched a high-entropy byte sequence in
+          /usr/lib/jvm/java-25-openjdk/lib/server/libjvm.so — the JVM shared library shipped in
+          the runtime image. It is a compiled ELF binary, not a Box credential, and the finding
+          status was "unverified" (live verification did not confirm an active credential).
+      - id: p2psec_8e1e664bef38e6e5
+        reason: >-
+          False positive: TruffleHog "Gitlab" detector matched byte sequences in
+          /var/lib/rpm/rpmdb.sqlite — the RPM package database from the runtime image. It is
+          package-manager metadata, not a GitLab credential, and the finding status was
+          "unverified" (live verification did not confirm an active credential).
 
   # ui image — node:24.10.0-alpine3.22 base (ui/Dockerfile).
   - name: support-bot-ui
