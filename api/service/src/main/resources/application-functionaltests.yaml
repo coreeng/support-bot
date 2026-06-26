@@ -117,6 +117,18 @@ pr-review-tracking:
         default: PT24H
       messages:
         escalated: '"Contact #pr-reviews in Slack to chase this review."'
+    # Author-admission gate: poster (functional-user@example.com) is in the pr-author-excluded team -> skipped.
+    - name: test-org/pr-author-excluded-repo
+      owning-team: wow
+      exclude-author-teams: [pr-author-excluded]
+      sla:
+        default: PT24H
+    # Author-admission gate: deny-list configured but poster is NOT in the 'wow' team -> tracked.
+    - name: test-org/pr-author-admitted-repo
+      owning-team: wow
+      exclude-author-teams: [wow]
+      sla:
+        default: PT24H
     - name: gitlab-org/gitlab-pr-test-repo
       owning-team: wow
       provider: gitlab
@@ -166,6 +178,10 @@ platform-integration:
       group-ref-connected-app:
         - chandra.giustino@company.com
         - nazira.armel@company.com
+      # The default users.info stub resolves every Slack poster to this email; placing it in a
+      # dedicated team lets the author-admission functional tests exercise the exclude path.
+      group-ref-pr-author-excluded:
+        - functional-user@example.com
   teams-scraping:
     core-platform:
       enabled: false
@@ -178,6 +194,8 @@ platform-integration:
           groupRef: group-ref-infra-integration
         - name: connected-app
           groupRef: group-ref-connected-app
+        - name: pr-author-excluded
+          groupRef: group-ref-pr-author-excluded
 
 analysis:
   vertex:
