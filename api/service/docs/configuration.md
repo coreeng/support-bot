@@ -528,16 +528,14 @@ Grant the minimum read scopes:
 - **`auth-mode: token`** (a Personal Access Token in `github.token`):
   - Classic PAT: `repo` (read PRs, reviews, and file contents on **private**
     repos — omit only if every tracked repo is public) and `read:org` (resolve
-    `github-team-slug` / `allowed-author-teams` membership).
+    `github-team-slug` membership).
   - Fine-grained PAT: repository permissions **Pull requests: Read**,
     **Contents: Read**, **Metadata: Read**; organization permission
-    **Members: Read** (only if any repo uses `github-team-slug` or
-    `allowed-author-teams`).
+    **Members: Read** (only if any repo uses `github-team-slug`).
 - **`auth-mode: app`** (a GitHub App via `app-id` / `installation-id` /
   `private-key-pem`): the same permissions as the fine-grained PAT above —
   **Pull requests: Read**, **Contents: Read**, **Metadata: Read**, and
-  **Members: Read** (org) when `github-team-slug` or `allowed-author-teams` is
-  used.
+  **Members: Read** (org) when `github-team-slug` is used.
 
 **GitLab** (`gitlab` block — a Personal, Group, or Project access token, sent as
 the `PRIVATE-TOKEN` header). GitLab supports two permission models; use whichever
@@ -548,12 +546,12 @@ your instance offers.
 - Scope **`read_api`**.
 - The token's identity needs at least the **Reporter** role on every tracked
   project (to read merge requests, approvals, diffs, and repository files).
-- Only when a repo sets `gitlab-group-path` or `allowed-author-teams` does the
+- Only when a repo sets `gitlab-group-path` does the
   token additionally need at least the **Reporter** role on the referenced
   group(s), so it can list their members (including inherited and invited-group
   members — see
   [Team and group membership resolution](#team-and-group-membership-resolution)).
-  Repos that set neither need no group-level access.
+  Repos that don't set it need no group-level access.
 
 *Fine-grained (granular) permissions* — GitLab's
 [fine-grained personal access tokens](https://docs.gitlab.com/auth/tokens/fine_grained_access_tokens/),
@@ -566,8 +564,8 @@ read-only resource permissions (the exact set below is a verified working token)
 | **Merge Request: Read**              | yes                               | Read MR details and the MR diff (changed-file matching for path filters). |
 | **Approval Setting: Read**           | yes                               | Read the MR's approval configuration.                                     |
 | **Merge Request Approval Rule: Read**| yes                               | Read the MR's approval state (who has approved).                          |
-| **Group: Read**                      | if `gitlab-group-path` / `allowed-author-teams` set | Access the reviewer / author-admission group.           |
-| **Member: Read**                     | if `gitlab-group-path` / `allowed-author-teams` set | List the group's members (incl. inherited / invited — see [resolution](#team-and-group-membership-resolution)). |
+| **Group: Read**                      | if `gitlab-group-path` set         | Access the reviewer group.                                              |
+| **Member: Read**                     | if `gitlab-group-path` set         | List the reviewer group's members (incl. inherited / invited — see [resolution](#team-and-group-membership-resolution)). |
 
 Note that fine-grained PATs are still rolling out (~75% REST API coverage at
 beta), so on older instances or for full coverage the classic `read_api` scope
@@ -575,6 +573,10 @@ above is the safe choice.
 
 For self-hosted instances (either model), point `gitlab.api-base-url` (globally
 or per-repo) at that instance's `/api/v4` endpoint and issue the token there.
+
+Author admission (`exclude-author-teams`) needs **no** provider scopes on either
+side: it resolves team membership through the bot's platform teams (your Slack/IdP
+groups, keyed by email), not the VCS provider — see [Author admission](#author-admission).
 
 ### Per-repository configuration
 
@@ -589,7 +591,7 @@ touching the listed paths and never escalate.
 | `provider` | — | both | `github` (default) or `gitlab`. |
 | `github-team-slug` | — | GitHub only | Team whose members' reviews count as a qualifying review. Falls back to the PR's requested team reviewers when omitted. |
 | `gitlab-group-path` | — | GitLab only | Reviewer group whose members' approvals count (see [Approver validation and CODEOWNERS](#approver-validation-and-codeowners)). |
-| `allowed-author-teams` | — | both | Author admission allow-list: when non-empty, only PRs/MRs whose author belongs to one of these teams are tracked. GitHub team slugs / GitLab group paths. See [Author admission](#author-admission). |
+| `exclude-author-teams` | — | both | Author admission deny-list: when non-empty, a PR/MR is **skipped** if the Slack user who posted the link belongs to one of these platform teams. Values are platform team codes (same vocabulary as `owning-team`). See [Author admission](#author-admission). |
 | `sla` | one of `sla`/`paths` | both | SLA block — see below. |
 | `paths` | one of `sla`/`paths` | both | Glob list; a no-SLA repo tracks only PRs/MRs touching these paths. |
 | `gitlab` | — | GitLab only | Per-repo `api-base-url` / `token` override of the global `gitlab` block. |
@@ -610,7 +612,7 @@ repositories:
     # provider: github                    # implicit default
     owning-team: support-team
     github-team-slug: support-reviewers    # optional; falls back to the PR's requested teams
-    allowed-author-teams: [contributors]   # optional; track only PRs whose author is in one of these teams
+    exclude-author-teams: [platform-team]  # optional; skip PRs whose Slack poster is in one of these platform teams
     sla:
       default: 48h
       overrides:                           # optional, path-specific
@@ -635,7 +637,7 @@ repositories:
     provider: gitlab
     owning-team: support-team
     gitlab-group-path: my-group/reviewers  # optional; approvals by this group's members count
-    allowed-author-teams: [my-group/engineers]  # optional; track only MRs whose author is in one of these groups
+    exclude-author-teams: [platform-team]  # optional; skip MRs whose Slack poster is in one of these platform teams
     sla:
       default: 48h
 ```
@@ -687,34 +689,62 @@ specific reviewer group.
 
 #### Author admission
 
-`allowed-author-teams` gates **whether a PR/MR is tracked at all**, based on its
-author — distinct from approver validation above, which decides whose *review*
-counts. When the list is non-empty the bot tracks a PR only if its author belongs
-to at least one of the listed teams (**any-of**); otherwise the PR is skipped
-*before* any tracking record, Slack reaction, in-thread notification, or
-escalation is created. This applies to SLA and no-SLA repos alike. When the list
-is empty (the default) every PR is tracked, exactly as without the setting.
+`exclude-author-teams` gates **whether a PR/MR is tracked at all**, based on the
+**Slack user who posted the link** — distinct from approver validation above,
+which decides whose *review* counts. When the list is non-empty the bot **skips**
+a PR if the poster belongs to at least one of the listed teams (**any-of**);
+the skip happens *before* any tracking record, Slack reaction, in-thread
+notification, or escalation is created. This applies to SLA and no-SLA repos
+alike. When the list is empty (the default) every PR is tracked, exactly as
+without the setting.
 
-Entries are **GitHub team slugs** on GitHub repos and **GitLab group paths** on
-GitLab repos, resolved with the same membership rules as the reviewer team (see
-[Team and group membership resolution](#team-and-group-membership-resolution)) —
-so the nested-team behaviour below applies when choosing which team/group to
-list.
+Entries are **platform team codes** — the same codes used for `owning-team` and
+configured under `enums.escalation-teams`. The bot takes the poster's
+**Slack-profile email** and matches it against the platform team's members — the
+same mechanism that powers ticket team suggestions. Because membership is resolved
+through the platform teams (not the VCS provider), the gate is fully
+provider-agnostic and needs **no** GitHub/GitLab org-membership token scopes.
 
-The gate **fails open**: it skips a PR only when *every* configured team resolved
-and the author is in none of them. If the provider returned no author, or any
-configured team's membership could not be fetched (e.g. the token lacks the
-membership read scope above), the PR is tracked anyway and a warning is logged —
-a transient lookup failure never silently drops a legitimate PR. When first
-rolling this out, confirm via the logs that the gate is admitting/skipping as you
-expect.
+**Where membership comes from.** Each platform team (configured under
+`platform-integration.teams-scraping`) names a `group-ref`, and its roster is
+resolved from the matching identity source — a **Slack usergroup** (`slack:`),
+**Google Cloud Identity** (`google:`), **Azure AD** (`azure:`), or the **static**
+member map — then reduced to a set of emails. (For a `slack:` group-ref the bot
+enumerates the usergroup and looks up each member's Slack-profile email.) At match
+time the poster's own Slack-profile email is checked against that set.
+
+> **Membership comes from the *platform team's* `group-ref`, not the escalation
+> team's mention group.** A team code appears in two places: under
+> `enums.escalation-teams` (where `group-ref: "slack:…"` is the usergroup the bot
+> *@-mentions*) and under `platform-integration.teams-scraping` (where the team's
+> `group-ref` defines its **roster**). The gate uses the roster. So for
+> `exclude-author-teams: [wow]` to match, the *platform* team `wow` must have a
+> roster `group-ref` that resolves to the poster — point it at a Slack usergroup
+> (`group-ref: "slack:S08948NBMED"`), a Google/Azure group, or the static map.
+>
+> **`jwt:` groups are the exception:** their membership is known only per
+> authenticated request (via the user's token), so they can't be enumerated at
+> PR-detection time — a `jwt:`-backed team resolves to empty and the gate falls open
+> (tracks).
+
+> The identity checked is the Slack user who *posted* the PR link in the support
+> channel — not the VCS author of the PR. In the support flow these are usually the
+> same person, but a teammate reposting someone else's PR is admitted/skipped on
+> *their own* team membership.
+
+The gate **fails open**: it skips a PR only when the poster's team membership
+resolved and one of their teams is excluded. If the poster has no resolvable Slack
+email, or the lookup fails, the PR is tracked anyway and a warning is logged — a
+transient lookup failure never silently drops a legitimate PR. When first rolling
+this out, confirm via the logs that the gate is admitting/skipping as you expect.
 
 #### Team and group membership resolution
 
-Both the reviewer team (`github-team-slug` / `gitlab-group-path`) and the author
-allow-list (`allowed-author-teams`) resolve a team/group reference to a set of
-member logins the same way — and the two providers expand **nested** teams in
-**opposite directions**. This decides which team/group you should name.
+The reviewer team (`github-team-slug` / `gitlab-group-path`) resolves a team/group
+reference to a set of member logins — and the two providers expand **nested** teams
+in **opposite directions**. This decides which team/group you should name. (Author
+admission does **not** use this mechanism: `exclude-author-teams` resolves via
+platform-team membership — see [Author admission](#author-admission).)
 
 **GitHub** — members come from the team slug via the org Teams API, which
 **includes the members of child (nested) teams**. Naming a *parent* team captures
@@ -750,14 +780,13 @@ Group `A`, subgroups `A/B ▸ A/B/C`, separate group `D`, and group `E` invited 
 In short: on **GitHub** name the team at the *top* of the hierarchy to cover
 everything beneath it; on **GitLab** name the *exact subgroup* you mean (it also
 covers ancestor and invited-group members). A GitLab *parent-group* path will
-**not** match authors who live only in its subgroups — the group resolves
-successfully but without them, so the gate finds the author in no configured
-team and **skips** those MRs, silently dropping authors you meant to admit. Name
-the *exact subgroup* instead.
+**not** match reviewers who live only in its subgroups — the group resolves
+successfully but without them, so their approvals won't count toward the owning
+team. Name the *exact subgroup* instead.
 
 When membership cannot be resolved at all (missing read scope, or the API call
 fails) the bot degrades gracefully rather than failing hard: reviewer filtering
-accepts all reviews, and the author gate tracks the PR.
+accepts all reviews.
 
 ### Validation rules
 
@@ -769,7 +798,7 @@ Checked at startup; any failure aborts boot:
   (`group/subgroup/project`).
 - `github-team-slug` is only valid on GitHub repos; `gitlab-group-path` and a
   per-repo `gitlab:` block are only valid on GitLab repos.
-- `allowed-author-teams` is valid on both providers; the list is optional, but
+- `exclude-author-teams` is valid on both providers; the list is optional, but
   any entry present must be non-blank. The author-admission gate is active only
   while the list is non-empty.
 - `owning-team` must exist in `enums.escalation-teams`; `tags` / `impact` must
@@ -879,7 +908,7 @@ This path requires `platform-integration.jwt-groups.enabled: true` and only appl
 
 When a support engineer escalates a ticket, the bot tags the team's Slack group in the thread — no UI login required. Those who do log into the UI get `ROLE_ESCALATION`, which gives them a dedicated view of escalations assigned to their team.
 
-Unlike `ROLE_SUPPORT_ENGINEER` and `ROLE_LEADERSHIP`, membership is not resolved via a direct Slack group lookup. It comes from `platform-integration` (Azure, GCP, or Kubernetes), which scrapes team membership from your cloud identity source:
+Unlike `ROLE_SUPPORT_ENGINEER` and `ROLE_LEADERSHIP` (resolved from the `team.support` / `team.leadership` Slack groups), `ROLE_ESCALATION` membership comes from `platform-integration.teams-scraping`. That roster can be sourced from a Slack usergroup (`slack:`), Azure, GCP, Kubernetes, or a static map:
 
 ```yaml
 enums:

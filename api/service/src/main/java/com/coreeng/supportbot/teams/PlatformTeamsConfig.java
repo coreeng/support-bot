@@ -2,6 +2,7 @@ package com.coreeng.supportbot.teams;
 
 import com.azure.core.credential.TokenCredential;
 import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
+import com.coreeng.supportbot.slack.client.SlackClient;
 import com.coreeng.supportbot.teams.groups.GroupRef;
 import com.coreeng.supportbot.teams.groups.GroupResolver;
 import com.coreeng.supportbot.util.JsonMapper;
@@ -21,6 +22,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import lombok.RequiredArgsConstructor;
 import okhttp3.logging.HttpLoggingInterceptor;
@@ -115,6 +117,13 @@ public class PlatformTeamsConfig {
     @ConditionalOnProperty("platform-integration.static-user.enabled")
     public PlatformUsersFetcher<GroupRef.Static> staticUsersFetcher() {
         return new StaticUsersFetcher(staticPlatformUsersProps);
+    }
+
+    // Always available — the bot is a Slack app, so no enable flag or external credential is needed.
+    // It only does work when a platform team is configured with a slack:<id> group-ref.
+    @Bean
+    public PlatformUsersFetcher<GroupRef.Slack> slackUsersFetcher(SlackClient slackClient, ExecutorService executor) {
+        return new SlackUsersFetcher(slackClient, executor);
     }
 
     @Bean

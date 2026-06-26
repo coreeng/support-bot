@@ -59,7 +59,7 @@ public record PrTrackingProps(
                                 repository.sla(),
                                 repository.gitlab(),
                                 repository.messages(),
-                                repository.allowedAuthorTeams(),
+                                repository.excludeAuthorTeams(),
                                 repository.requiresCodeowners(),
                                 repository.codeownerTeam(),
                                 repository.dynamicApprovals()))
@@ -250,7 +250,7 @@ public record PrTrackingProps(
             @Nullable Sla sla,
             @Nullable Gitlab gitlab,
             @Nullable Messages messages,
-            List<String> allowedAuthorTeams,
+            List<String> excludeAuthorTeams,
             boolean requiresCodeowners,
             @Nullable String codeownerTeam,
             boolean dynamicApprovals) {
@@ -265,7 +265,7 @@ public record PrTrackingProps(
                 @Nullable Sla sla,
                 @Nullable Gitlab gitlab,
                 @Nullable Messages messages,
-                @Nullable List<String> allowedAuthorTeams,
+                @Nullable List<String> excludeAuthorTeams,
                 boolean requiresCodeowners,
                 @Nullable String codeownerTeam,
                 boolean dynamicApprovals) {
@@ -281,11 +281,11 @@ public record PrTrackingProps(
             if (codeownerTeam != null && codeownerTeam.isBlank()) {
                 throw new IllegalArgumentException("codeownerTeam must not be blank when provided");
             }
-            List<String> normalisedAllowedAuthorTeams =
-                    allowedAuthorTeams == null ? List.of() : List.copyOf(allowedAuthorTeams);
-            for (String team : normalisedAllowedAuthorTeams) {
+            List<String> normalisedExcludeAuthorTeams =
+                    excludeAuthorTeams == null ? List.of() : List.copyOf(excludeAuthorTeams);
+            for (String team : normalisedExcludeAuthorTeams) {
                 if (team.isBlank()) {
-                    throw new IllegalArgumentException("allowed-author-teams[] must not be blank (repo: " + name + ")");
+                    throw new IllegalArgumentException("exclude-author-teams[] must not be blank (repo: " + name + ")");
                 }
             }
             // Provider-scoped fields fail fast at config-bind time so a misconfigured repo never
@@ -319,7 +319,7 @@ public record PrTrackingProps(
             this.sla = sla;
             this.gitlab = gitlab;
             this.messages = messages;
-            this.allowedAuthorTeams = normalisedAllowedAuthorTeams;
+            this.excludeAuthorTeams = normalisedExcludeAuthorTeams;
             this.requiresCodeowners = requiresCodeowners;
             this.codeownerTeam = codeownerTeam;
             this.dynamicApprovals = dynamicApprovals;

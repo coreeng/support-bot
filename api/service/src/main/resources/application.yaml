@@ -156,8 +156,8 @@ pr-review-tracking:
   #   - name: my-org/my-repo
   #     owning-team: <team-code from enums.escalation-teams>
   #     github-team-slug: <slug>  # optional: GitHub team slug for review validation; when absent, falls back to PR requested teams
-  #     allowed-author-teams:     # optional (#285): only track PRs whose author is in one of these GitHub teams
-  #       - <slug>
+  #     exclude-author-teams:     # optional (#285): skip PRs whose Slack poster is in one of these platform teams (deny-list, by team code)
+  #       - <team-code from enums.escalation-teams>
   #     requires-codeowners: false  # optional: repo needs a codeowner approval before the owning team merges
   #     codeowner-team: <slug>      # optional: team whose approval counts as the codeowner gate
   #     sla:
@@ -210,8 +210,8 @@ pr-review-tracking:
   #     provider: gitlab
   #     owning-team: <team-code from enums.escalation-teams>
   #     gitlab-group-path: my-group/reviewers   # group whose members count as owning-team reviewers
-  #     allowed-author-teams:                   # optional (#285): GitLab group paths whose members may have MRs tracked
-  #       - my-group/engineers
+  #     exclude-author-teams:                   # optional (#285): skip MRs whose Slack poster is in one of these platform teams (deny-list, by team code)
+  #       - <team-code from enums.escalation-teams>
   #     dynamic-approvals: false                # optional: GitLab-only — wait for CI + MR Approval Policies to decide required approvals
   #     sla:
   #       default: 48h

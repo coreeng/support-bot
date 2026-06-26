@@ -43,7 +43,7 @@ class PlatformTeamsServiceConcurrencyTest {
                 perCallDelay,
                 groupRef ->
                         List.of(new PlatformUsersFetcher.Membership(groupRef.toLowerCase(Locale.ROOT) + "@test.com")));
-        GroupResolver resolver = new GroupResolver(null, null, usersFetcher);
+        GroupResolver resolver = new GroupResolver(null, null, usersFetcher, null);
 
         EscalationTeamsRegistry registry = new FakeEscalationTeamsRegistry(escalationTeams);
 
