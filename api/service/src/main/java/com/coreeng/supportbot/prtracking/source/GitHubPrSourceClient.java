@@ -25,6 +25,9 @@ public class GitHubPrSourceClient implements PrSourceClient {
         expectGitHub(coord);
         try {
             GitHubPullRequest pr = gitHubClient.getPullRequest(coord.name(), prNumber);
+            Boolean codeOwnersApproved = pr.reviewDecision() == null
+                    ? null
+                    : pr.reviewDecision() == GitHubPullRequest.ReviewDecision.APPROVED;
             return new PrMetadata(
                     coord,
                     pr.pullRequestNumber(),
@@ -33,7 +36,9 @@ public class GitHubPrSourceClient implements PrSourceClient {
                     pr.mergeable(),
                     pr.requestedTeamReviewerLogins(),
                     pr.reviews().stream().map(GitHubPrSourceClient::mapReview).toList(),
-                    pr.authorLogin());
+                    pr.authorLogin(),
+                    codeOwnersApproved,
+                    pr.codeOwnerReviewerLogins());
         } catch (GitHubApiException e) {
             throw new PrSourceException(e.getMessage(), e);
         }
