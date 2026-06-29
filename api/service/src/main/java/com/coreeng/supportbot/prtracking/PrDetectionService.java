@@ -368,6 +368,13 @@ public class PrDetectionService {
             if (authorExcluded(detectedPr, repoConfig.get(), posterTeamCodes)) {
                 return PerPrResult.SKIPPED;
             }
+            // Code-owner repos sit in OPEN with no SLA deadline until the code owners approve, so the
+            // owning team is never escalated before then; the merge clock starts on the poller's
+            // transition into AWAITING_MERGE. Checked before the SLA branches so it holds whether or not
+            // the repo also has an SLA configured (the SLA is used for the merge phase).
+            if (repoConfig.get().requiresCodeowners()) {
+                return processCodeownerOpenPr(detectedPr, ticket, canAutoCloseTicket, repoConfig.get(), prMetadata);
+            }
             // Repo is configured for PR tracking with or without SLA
             if (repoConfig.get().hasNoSla()) {
                 // No-SLA tracking: track by path filter without a deadline or escalation.
@@ -704,6 +711,71 @@ public class PrDetectionService {
                     teamLabel));
         }
 
+        return PerPrResult.TRACKED;
+    }
+
+    /**
+     * Detection for requires-codeowners repos: the record is created in OPEN with no SLA deadline, so the
+     * owning team is never escalated before the code owners approve. The tenant gets a "chase the code
+     * owner" detected message listing the inferred code owners; the merge clock starts later, on the
+     * poller's transition into AWAITING_MERGE.
+     */
+    private PerPrResult processCodeownerOpenPr(
+            DetectedPr detectedPr,
+            Ticket ticket,
+            boolean canAutoCloseTicket,
+            PrTrackingProps.Repository repoConfig,
+            PrMetadata prMetadata) {
+
+        TicketId ticketId = checkNotNull(ticket.id());
+        PrTrackingRecord tracking = prTrackingRepository.insertIfAbsent(new NewPrTracking(
+                ticketId.id(),
+                detectedPr.provider(),
+                detectedPr.repositoryName(),
+                detectedPr.pullNumber(),
+                prMetadata.createdAt(),
+                null,
+                repoConfig.owningTeam(),
+                canAutoCloseTicket));
+        if (tracking == null) {
+            log.atInfo()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .addArgument(ticketId::id)
+                    .log("PR {}#{} became tracked concurrently for ticket {}, skipping");
+            return PerPrResult.SKIPPED;
+        }
+
+        log.atInfo()
+                .addArgument(detectedPr::repositoryName)
+                .addArgument(detectedPr::pullNumber)
+                .addArgument(ticketId::id)
+                .log("PR {}#{} tracking record created for ticket {} (codeowner repo, no pre-approval deadline)");
+
+        addReaction(prTrackingProps.prEmoji(), ticket.queryTs(), ticket.channelId());
+
+        PrMessageContext ctx = new PrMessageContext(
+                detectedPr.provider(),
+                detectedPr.repositoryName(),
+                detectedPr.pullNumber(),
+                repoConfig.owningTeam(),
+                null,
+                null);
+        String override = messageRenderer.render(detectedPr.repositoryName(), MessageEvent.DETECTED, ctx);
+        String text = override != null
+                ? override
+                : formatCodeownerDetectedText(
+                        detectedPr.provider(),
+                        detectedPr.repositoryName(),
+                        detectedPr.pullNumber(),
+                        prMetadata.codeOwnerReviewers());
+        postText(
+                text,
+                detectedPr.repositoryName(),
+                detectedPr.pullNumber(),
+                NotificationType.TRACKED,
+                ticket.queryTs(),
+                ticket.channelId());
         return PerPrResult.TRACKED;
     }
 
@@ -1046,6 +1118,22 @@ public class PrDetectionService {
                         PrTerminology.noun(provider),
                         PrTerminology.separator(provider),
                         prNumber);
+    }
+
+    private String formatCodeownerDetectedText(Provider provider, String repo, int prNumber, List<String> codeOwners) {
+        String prRef = "<%s|%s %s%d>"
+                .formatted(
+                        prUrl(repo, prNumber),
+                        PrTerminology.noun(provider),
+                        PrTerminology.separator(provider),
+                        prNumber);
+        if (codeOwners.isEmpty()) {
+            return "%s in `%s` needs code-owner approval before the owning team can merge it. I'll let you know once the code owners have approved."
+                    .formatted(prRef, repo);
+        }
+        String owners = codeOwners.stream().map(o -> "`" + o + "`").collect(Collectors.joining(", "));
+        return "%s in `%s` needs code-owner approval before the owning team can merge it. You may need to chase: %s. I'll let you know once they've approved."
+                .formatted(prRef, repo, owners);
     }
 
     private void postText(

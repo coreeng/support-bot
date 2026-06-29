@@ -515,7 +515,6 @@ class GitLabPrSourceClientTest {
                 null,
                 List.of(),
                 true,
-                null,
                 false);
         return new PrTrackingProps(
                 true,

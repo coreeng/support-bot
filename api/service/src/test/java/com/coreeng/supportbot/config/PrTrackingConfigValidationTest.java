@@ -1004,11 +1004,10 @@ class PrTrackingConfigValidationTest {
         assertThat(repo.excludeAuthorTeams()).isEmpty();
         assertThat(repo.requiresCodeowners()).isFalse();
         assertThat(repo.dynamicApprovals()).isFalse();
-        assertThat(repo.codeownerTeam()).isNull();
     }
 
     @Test
-    void acceptsExcludeAuthorTeamsAndCodeownerTeam() {
+    void acceptsExcludeAuthorTeams() {
         assertThatCode(() -> new PrTrackingProps.Repository(
                         "my-org/repo",
                         "wow",
@@ -1021,7 +1020,6 @@ class PrTrackingConfigValidationTest {
                         null,
                         List.of("platform-team"),
                         true,
-                        "codeowners-team",
                         false))
                 .doesNotThrowAnyException();
     }
@@ -1040,30 +1038,9 @@ class PrTrackingConfigValidationTest {
                         null,
                         List.of("platform-team", "  "),
                         false,
-                        null,
                         false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exclude-author-teams[] must not be blank");
-    }
-
-    @Test
-    void rejectsBlankCodeownerTeam() {
-        assertThatThrownBy(() -> new PrTrackingProps.Repository(
-                        "my-org/repo",
-                        "wow",
-                        Provider.GITHUB,
-                        null,
-                        null,
-                        List.of(),
-                        sla(Duration.ofDays(2)),
-                        null,
-                        null,
-                        List.of(),
-                        false,
-                        "  ",
-                        false))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("codeownerTeam must not be blank");
     }
 
     @Test
@@ -1081,7 +1058,6 @@ class PrTrackingConfigValidationTest {
                         null,
                         List.of(),
                         false,
-                        null,
                         true))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dynamic-approvals is only valid when provider=gitlab");
@@ -1101,7 +1077,6 @@ class PrTrackingConfigValidationTest {
                         null,
                         List.of(),
                         false,
-                        null,
                         true))
                 .doesNotThrowAnyException();
     }
