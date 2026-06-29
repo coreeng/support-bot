@@ -427,6 +427,109 @@ class GitLabPrSourceClientTest {
         overrideServer.verify();
     }
 
+    @Test
+    void fetchPullRequestReadsPendingCodeOwnersFromApprovalState() {
+        CodeownerHarness h = codeownerHarness();
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/50"))
+                .andRespond(withSuccess(openMergeableMr(50), MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/50/approvals"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/50/approval_state"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("PRIVATE-TOKEN", TOKEN))
+                .andRespond(withSuccess("""
+                        {"rules":[
+                          {"rule_type":"code_owner","approved":false,"eligible_approvers":[{"username":"owner-a"},{"username":"owner-b"}]},
+                          {"rule_type":"regular","approved":true}
+                        ]}
+                        """, MediaType.APPLICATION_JSON));
+
+        PrMetadata md = h.client().fetchPullRequest(RepoCoord.gitlab(REPO), 50);
+
+        // An unapproved code_owner rule => gate not satisfied; its eligible approvers are the chase list.
+        // The non-code_owner "regular" rule is ignored.
+        assertThat(md.codeOwnersApproved()).isFalse();
+        assertThat(md.codeOwnerReviewers()).containsExactly("owner-a", "owner-b");
+        h.server().verify();
+    }
+
+    @Test
+    void fetchPullRequestMarksCodeownersApprovedWhenAllRulesApproved() {
+        CodeownerHarness h = codeownerHarness();
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/51"))
+                .andRespond(withSuccess(openMergeableMr(51), MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/51/approvals"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/51/approval_state"))
+                .andRespond(withSuccess("""
+                        {"rules":[{"rule_type":"code_owner","approved":true,"eligible_approvers":[{"username":"owner-a"}]}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        PrMetadata md = h.client().fetchPullRequest(RepoCoord.gitlab(REPO), 51);
+
+        assertThat(md.codeOwnersApproved()).isTrue();
+        assertThat(md.codeOwnerReviewers()).isEmpty();
+        h.server().verify();
+    }
+
+    private static String openMergeableMr(int iid) {
+        return """
+                {"iid":%d,"state":"opened","created_at":"2026-01-01T10:00:00Z",
+                 "updated_at":"2026-01-02T11:00:00Z","author":{"username":"carol"},
+                 "detailed_merge_status":"mergeable"}
+                """.formatted(iid);
+    }
+
+    private record CodeownerHarness(MockRestServiceServer server, GitLabPrSourceClient client) {}
+
+    private static CodeownerHarness codeownerHarness() {
+        RestClient.Builder builder = RestClient.builder()
+                .messageConverters(ImmutableList.of(
+                        new MappingJackson2HttpMessageConverter(
+                                new ObjectMapper().registerModule(new JavaTimeModule())),
+                        new org.springframework.http.converter.StringHttpMessageConverter(
+                                java.nio.charset.StandardCharsets.UTF_8)));
+        MockRestServiceServer codeownerServer =
+                MockRestServiceServer.bindTo(builder).build();
+        GitLabPrSourceClient codeownerClient = new GitLabPrSourceClient(
+                builder.build(), propsWithCodeownerGitLabRepo(), new GitLabGroupMemberCache(Duration.ofMinutes(5)));
+        return new CodeownerHarness(codeownerServer, codeownerClient);
+    }
+
+    private static PrTrackingProps propsWithCodeownerGitLabRepo() {
+        PrTrackingProps.Repository repo = new PrTrackingProps.Repository(
+                REPO,
+                "my-team",
+                Provider.GITLAB,
+                null,
+                "my-group/sub-group",
+                List.of(),
+                new PrTrackingProps.Sla(null, Duration.ofHours(24), null),
+                null,
+                null,
+                List.of(),
+                true,
+                null,
+                false);
+        return new PrTrackingProps(
+                true,
+                "0 * * * * *",
+                "pr",
+                List.of("support"),
+                "team",
+                "days",
+                List.of(repo),
+                PrTrackingProps.GitHub.defaultTokenModeConfig(),
+                new PrTrackingProps.Gitlab(API, TOKEN),
+                new PrTrackingProps.SlaDiscovery(Duration.ofHours(1)));
+    }
+
     private static PrTrackingProps propsWithSingleGitLabRepo() {
         PrTrackingProps.Repository repo = new PrTrackingProps.Repository(
                 REPO,

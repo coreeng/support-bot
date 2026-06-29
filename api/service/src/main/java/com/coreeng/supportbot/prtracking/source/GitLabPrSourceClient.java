@@ -109,7 +109,29 @@ public class GitLabPrSourceClient implements PrSourceClient {
 
         UserRefDto authorRef = mr.author();
         String authorLogin = authorRef != null ? authorRef.username() : null;
-        return new PrMetadata(coord, prNumber, createdAt, state, mergeable, List.of(), reviews, authorLogin);
+
+        // Code-owner repos: read GitLab's computed code-owner approval rules (Premium/Ultimate). The
+        // gate is satisfied when every code_owner rule is approved; unapproved rules' eligible approvers
+        // are the chase list. Only while open, mirroring the approvals fetch above.
+        Boolean codeOwnersApproved = null;
+        List<String> codeOwnerReviewers = List.of();
+        if (state == PrMetadata.PrState.OPEN && requiresCodeowners(coord.name())) {
+            CodeownerApprovalState codeowners =
+                    fetchCodeownerApprovalState(conn, projectSegment, coord.name(), prNumber);
+            codeOwnersApproved = codeowners.approved();
+            codeOwnerReviewers = codeowners.pendingApprovers();
+        }
+        return new PrMetadata(
+                coord,
+                prNumber,
+                createdAt,
+                state,
+                mergeable,
+                List.of(),
+                reviews,
+                authorLogin,
+                codeOwnersApproved,
+                codeOwnerReviewers);
     }
 
     @Override
@@ -391,6 +413,59 @@ public class GitLabPrSourceClient implements PrSourceClient {
                 .toList();
     }
 
+    private boolean requiresCodeowners(String repoName) {
+        return props.repositories().stream()
+                .anyMatch(r -> r.provider() == Provider.GITLAB
+                        && r.name().equalsIgnoreCase(repoName)
+                        && r.requiresCodeowners());
+    }
+
+    /**
+     * Reads GitLab's code-owner approval rules from {@code /merge_requests/:iid/approval_state}. The gate
+     * is {@code true} when every {@code code_owner} rule is approved (vacuously true when an MR touches no
+     * owned paths, so it proceeds to the merge chase); the unapproved rules' eligible approvers form the
+     * chase list. Degrades to {@code null} on any error (e.g. GitLab CE without code-owner rules, or a
+     * transient failure) so the lifecycle keeps chasing rather than wrongly entering the merge phase.
+     */
+    private CodeownerApprovalState fetchCodeownerApprovalState(
+            GitLabConnection conn, String projectSegment, String repoName, int prNumber) {
+        ApprovalStateDto approvalState;
+        try {
+            approvalState = get(
+                    conn,
+                    "/projects/" + projectSegment + "/merge_requests/" + prNumber + "/approval_state",
+                    ApprovalStateDto.class,
+                    "approval_state %s!%d".formatted(repoName, prNumber));
+        } catch (GitLabApiException e) {
+            LOG.atWarn()
+                    .addArgument(repoName)
+                    .addArgument(prNumber)
+                    .addArgument(e::getMessage)
+                    .log("Could not fetch code-owner approval_state for {}!{}: {}");
+            return new CodeownerApprovalState(null, List.of());
+        }
+        List<ApprovalRuleDto> rules =
+                approvalState == null || approvalState.rules() == null ? List.of() : approvalState.rules();
+        List<ApprovalRuleDto> codeOwnerRules = rules.stream()
+                .filter(r -> "code_owner".equalsIgnoreCase(r.ruleType()))
+                .toList();
+        boolean approved = codeOwnerRules.stream().allMatch(r -> Boolean.TRUE.equals(r.approved()));
+        List<String> pending = new ArrayList<>();
+        for (ApprovalRuleDto rule : codeOwnerRules) {
+            if (Boolean.TRUE.equals(rule.approved()) || rule.eligibleApprovers() == null) {
+                continue;
+            }
+            for (UserRefDto approver : rule.eligibleApprovers()) {
+                if (approver != null && approver.username() != null) {
+                    pending.add(approver.username());
+                }
+            }
+        }
+        return new CodeownerApprovalState(approved, pending.stream().distinct().toList());
+    }
+
+    private record CodeownerApprovalState(@Nullable Boolean approved, List<String> pendingApprovers) {}
+
     private record GitLabConnection(String apiBaseUrl, String token) {}
 
     private record ProjectKey(String apiBaseUrl, String projectPath) {}
@@ -409,6 +484,15 @@ public class GitLabPrSourceClient implements PrSourceClient {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record ApprovedByEntryDto(@Nullable UserRefDto user) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record ApprovalStateDto(@Nullable List<ApprovalRuleDto> rules) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record ApprovalRuleDto(
+            @JsonProperty("rule_type") @Nullable String ruleType,
+            @Nullable Boolean approved,
+            @JsonProperty("eligible_approvers") @Nullable List<UserRefDto> eligibleApprovers) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record UserRefDto(@Nullable String username) {}
