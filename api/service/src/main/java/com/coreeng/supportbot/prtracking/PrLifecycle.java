@@ -1,9 +1,11 @@
 package com.coreeng.supportbot.prtracking;
 
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.APPROVED;
+import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.AWAITING_MERGE;
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.CHANGES_REQUESTED;
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.CLOSED;
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.ESCALATED;
+import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.MERGE_ESCALATED;
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.OPEN;
 import static java.util.Objects.requireNonNull;
 
@@ -43,7 +45,7 @@ public final class PrLifecycle {
      * {@code now()}-derived fields ({@code slaBreached}, {@code remainingForPause}) are computed once
      * in {@code observe()}. {@code remainingForPause} is non-null exactly when {@code hasLiveDeadline}.
      *
-     * <p>(C later adds {@code codeownerApproved}; B adds {@code requiredApprovalsSatisfied}.)
+     * <p>(B later adds {@code requiredApprovalsSatisfied}.)
      */
     public record Observation(
             PrTrackingStatus current,
@@ -54,7 +56,9 @@ public final class PrLifecycle {
             boolean slaBreached,
             boolean hasLiveDeadline,
             @Nullable Duration remainingForPause,
-            @Nullable Duration slaRemainingStored) {
+            @Nullable Duration slaRemainingStored,
+            boolean requiresCodeowners,
+            boolean codeownerApproved) {
 
         boolean approved() {
             return latestVerdict == Verdict.APPROVED;
@@ -67,16 +71,22 @@ public final class PrLifecycle {
         boolean noVerdict() {
             return latestVerdict == null;
         }
+
+        /** True when a requires-codeowners repo has its code owners' approval and the PR is mergeable. */
+        boolean readyForCodeownerMerge() {
+            return requiresCodeowners && codeownerApproved && mergeable;
+        }
     }
 
     /**
      * What to do to the SLA columns / status row. {@code Pause} carries the clamped remaining computed
-     * in {@code observe()}; {@code Resume} and {@code SetClosedAt} are markers — the shell stamps the
-     * {@code now()}-based deadline / closedAt at write time, exactly as the old code did.
+     * in {@code observe()}; {@code Resume}, {@code Start} and {@code SetClosedAt} are markers — the
+     * shell stamps the {@code now()}-based deadline / closedAt at write time, exactly as the old code did.
      */
     public sealed interface SlaOp {
         SlaOp NONE = new None();
         SlaOp RESUME = new Resume();
+        SlaOp START = new Start();
         SlaOp SET_CLOSED_AT = new SetClosedAt();
 
         record None() implements SlaOp {}
@@ -85,29 +95,43 @@ public final class PrLifecycle {
 
         record Resume() implements SlaOp {}
 
+        /**
+         * Starts the SLA clock on entry to a state (AWAITING_MERGE): the shell stamps {@code now} + the
+         * repo's configured SLA. A no-op when the repo has no SLA, so such repos never merge-escalate.
+         */
+        record Start() implements SlaOp {}
+
         record SetClosedAt() implements SlaOp {}
     }
 
     /**
      * A side effect to run in {@link Decision#effects()} list order. {@code NotifyApproved} is the
      * approval-closure message; {@code NotifyClosed} carries {@link MessageEvent#MERGED} or
-     * {@link MessageEvent#CLOSED}. {@code Escalate} is compound (it owns its own status write — see
-     * {@code PrLifecyclePoller}). (C later adds {@code NotifyAwaitingMerge}.)
+     * {@link MessageEvent#CLOSED}. {@code Escalate} and {@code EscalateMerge} are compound (each owns its
+     * own status write — see {@code PrLifecyclePoller}).
      */
     public sealed interface Effect {
         Effect NOTIFY_CHANGES_REQUESTED = new NotifyChangesRequested();
         Effect NOTIFY_APPROVED = new NotifyApproved();
+        Effect NOTIFY_AWAITING_MERGE = new NotifyAwaitingMerge();
         Effect NOTIFY_MERGED = new NotifyClosed(MessageEvent.MERGED);
         Effect NOTIFY_CLOSED = new NotifyClosed(MessageEvent.CLOSED);
         Effect ESCALATE = new Escalate();
+        Effect ESCALATE_MERGE = new EscalateMerge();
 
         record NotifyChangesRequested() implements Effect {}
 
         record NotifyApproved() implements Effect {}
 
+        /** Notifies the tenant that the code owners have approved and the maintaining team can now merge. */
+        record NotifyAwaitingMerge() implements Effect {}
+
         record NotifyClosed(MessageEvent event) implements Effect {}
 
         record Escalate() implements Effect {}
+
+        /** Like {@link Escalate} but chases the maintaining team to merge; owns its MERGE_ESCALATED write. */
+        record EscalateMerge() implements Effect {}
     }
 
     /** Pure output: next state + SLA op + ordered effects. Nothing is executed here. */
@@ -156,6 +180,41 @@ public final class PrLifecycle {
                     PrLifecycle::setClosedAt,
                     List.of(Effect.NOTIFY_CLOSED)),
 
+            // requires-codeowners repos: once the code owners have approved and the PR is mergeable, hand
+            // off to AWAITING_MERGE to chase the maintaining team to merge. Listed before the per-state
+            // "approved + mergeable → CLOSED" rows (themselves guarded with !requiresCodeowners) so a
+            // codeowner repo never closes on mergeability — only on the real merge (the rows above). One
+            // row per source state (rather than a from==null wildcard) so the generated diagram shows the
+            // real edges and AWAITING_MERGE/MERGE_ESCALATED are never spurious self-sources.
+            new Transition(
+                    OPEN,
+                    AWAITING_MERGE,
+                    "codeowner-approved + mergeable",
+                    Observation::readyForCodeownerMerge,
+                    PrLifecycle::start,
+                    List.of(Effect.NOTIFY_AWAITING_MERGE)),
+            new Transition(
+                    CHANGES_REQUESTED,
+                    AWAITING_MERGE,
+                    "codeowner-approved + mergeable",
+                    Observation::readyForCodeownerMerge,
+                    PrLifecycle::start,
+                    List.of(Effect.NOTIFY_AWAITING_MERGE)),
+            new Transition(
+                    APPROVED,
+                    AWAITING_MERGE,
+                    "codeowner-approved + mergeable",
+                    Observation::readyForCodeownerMerge,
+                    PrLifecycle::start,
+                    List.of(Effect.NOTIFY_AWAITING_MERGE)),
+            new Transition(
+                    ESCALATED,
+                    AWAITING_MERGE,
+                    "codeowner-approved + mergeable",
+                    Observation::readyForCodeownerMerge,
+                    PrLifecycle::start,
+                    List.of(Effect.NOTIFY_AWAITING_MERGE)),
+
             // OPEN
             new Transition(
                     OPEN,
@@ -182,7 +241,7 @@ public final class PrLifecycle {
                     OPEN,
                     CLOSED,
                     "approved + mergeable",
-                    o -> o.approved() && o.mergeable(),
+                    o -> o.approved() && o.mergeable() && !o.requiresCodeowners(),
                     PrLifecycle::setClosedAt,
                     List.of(Effect.NOTIFY_APPROVED)),
             new Transition(
@@ -212,7 +271,7 @@ public final class PrLifecycle {
                     CHANGES_REQUESTED,
                     CLOSED,
                     "approved + mergeable",
-                    o -> o.approved() && o.mergeable(),
+                    o -> o.approved() && o.mergeable() && !o.requiresCodeowners(),
                     PrLifecycle::setClosedAt,
                     List.of(Effect.NOTIFY_APPROVED)),
             new Transition(
@@ -235,7 +294,7 @@ public final class PrLifecycle {
                     APPROVED,
                     CLOSED,
                     "mergeable",
-                    Observation::mergeable,
+                    o -> o.mergeable() && !o.requiresCodeowners(),
                     PrLifecycle::setClosedAt,
                     List.of(Effect.NOTIFY_APPROVED)),
             new Transition(
@@ -251,7 +310,7 @@ public final class PrLifecycle {
                     ESCALATED,
                     CLOSED,
                     "approved + mergeable",
-                    o -> o.approved() && o.mergeable(),
+                    o -> o.approved() && o.mergeable() && !o.requiresCodeowners(),
                     PrLifecycle::setClosedAt,
                     List.of(Effect.NOTIFY_APPROVED)),
             new Transition(
@@ -265,6 +324,42 @@ public final class PrLifecycle {
                     ESCALATED,
                     CHANGES_REQUESTED,
                     "changes requested",
+                    Observation::changesRequested,
+                    PrLifecycle::none,
+                    List.of(Effect.NOTIFY_CHANGES_REQUESTED)),
+
+            // AWAITING_MERGE (requires-codeowners) — code owners approved + mergeable; chasing the
+            // maintaining team to merge. Closes only on the real merge (the "PR merged" row above);
+            // there is deliberately no mergeable → CLOSED edge. Changes-requested takes priority over a
+            // merge-SLA breach, mirroring OPEN.
+            new Transition(
+                    AWAITING_MERGE,
+                    CHANGES_REQUESTED,
+                    "changes requested, live deadline",
+                    o -> o.changesRequested() && o.hasLiveDeadline(),
+                    PrLifecycle::pause,
+                    List.of(Effect.NOTIFY_CHANGES_REQUESTED)),
+            new Transition(
+                    AWAITING_MERGE,
+                    CHANGES_REQUESTED,
+                    "changes requested, no live deadline",
+                    o -> o.changesRequested() && !o.hasLiveDeadline(),
+                    PrLifecycle::none,
+                    List.of(Effect.NOTIFY_CHANGES_REQUESTED)),
+            new Transition(
+                    AWAITING_MERGE,
+                    MERGE_ESCALATED,
+                    "merge SLA breached",
+                    Observation::slaBreached,
+                    PrLifecycle::none,
+                    List.of(Effect.ESCALATE_MERGE)),
+
+            // MERGE_ESCALATED — mirrors ESCALATED but merge-aware: no approved+mergeable → CLOSED exit,
+            // so it too closes only on the real merge.
+            new Transition(
+                    MERGE_ESCALATED,
+                    CHANGES_REQUESTED,
+                    "changes requested after escalation",
                     Observation::changesRequested,
                     PrLifecycle::none,
                     List.of(Effect.NOTIFY_CHANGES_REQUESTED)));
@@ -293,5 +388,9 @@ public final class PrLifecycle {
 
     private static SlaOp pause(Observation o) {
         return new SlaOp.Pause(requireNonNull(o.remainingForPause(), "remainingForPause must be set to pause"));
+    }
+
+    private static SlaOp start(Observation o) {
+        return SlaOp.START;
     }
 }

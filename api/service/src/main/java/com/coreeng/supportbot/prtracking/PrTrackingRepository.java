@@ -29,6 +29,13 @@ public interface PrTrackingRepository {
     PrTrackingRecord resumeSla(long id, Instant newDeadline);
 
     /**
+     * Starts the SLA clock with a fresh deadline and an explicit status (the merge clock on entry to
+     * AWAITING_MERGE), nulling any stored remaining duration. Unlike {@link #resumeSla}, the status is
+     * a parameter rather than fixed to OPEN.
+     */
+    PrTrackingRecord startSla(long id, PrTrackingStatus newStatus, Instant newDeadline);
+
+    /**
      * Returns true if any OPEN, ESCALATED, CHANGES_REQUESTED, or APPROVED record that can auto-close ticket still
      * exists for this ticket.
      */

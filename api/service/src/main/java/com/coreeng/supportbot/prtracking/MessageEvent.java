@@ -15,6 +15,8 @@ public enum MessageEvent {
     ESCALATED(PrTrackingProps.Messages::escalated),
     APPROVED(PrTrackingProps.Messages::approved),
     CHANGES_REQUESTED(PrTrackingProps.Messages::changesRequested),
+    AWAITING_MERGE(PrTrackingProps.Messages::awaitingMerge),
+    MERGE_ESCALATED(PrTrackingProps.Messages::mergeEscalated),
     MERGED(PrTrackingProps.Messages::merged),
     CLOSED(PrTrackingProps.Messages::closed);
 

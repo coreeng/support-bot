@@ -421,7 +421,9 @@ public record PrTrackingProps(
             @Nullable String approved,
             @Name("changes-requested") @Nullable String changesRequested,
             @Nullable String merged,
-            @Nullable String closed) {
+            @Nullable String closed,
+            @Name("awaiting-merge") @Nullable String awaitingMerge,
+            @Name("merge-escalated") @Nullable String mergeEscalated) {
 
         public Messages {
             checkBlank(detected, "detected");
@@ -430,6 +432,23 @@ public record PrTrackingProps(
             checkBlank(changesRequested, "changes-requested");
             checkBlank(merged, "merged");
             checkBlank(closed, "closed");
+            checkBlank(awaitingMerge, "awaiting-merge");
+            checkBlank(mergeEscalated, "merge-escalated");
+        }
+
+        /**
+         * Convenience constructor for callers (and tests) predating the awaiting-merge / merge-escalated
+         * message overrides. Config binding uses the canonical constructor (the one with all components),
+         * so this extra constructor only affects programmatic callers.
+         */
+        public Messages(
+                @Nullable String detected,
+                @Nullable String escalated,
+                @Nullable String approved,
+                @Nullable String changesRequested,
+                @Nullable String merged,
+                @Nullable String closed) {
+            this(detected, escalated, approved, changesRequested, merged, closed, null, null);
         }
 
         private static void checkBlank(@Nullable String value, String field) {
