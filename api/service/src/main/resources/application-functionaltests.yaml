@@ -129,6 +129,12 @@ pr-review-tracking:
       exclude-author-teams: [wow]
       sla:
         default: PT24H
+    # Code-owner repo: merge is gated on code-owner approval (read from GitHub's GraphQL reviewDecision).
+    - name: test-org/pr-codeowners-repo
+      owning-team: wow
+      requires-codeowners: true
+      sla:
+        default: PT24H
     - name: gitlab-org/gitlab-pr-test-repo
       owning-team: wow
       provider: gitlab

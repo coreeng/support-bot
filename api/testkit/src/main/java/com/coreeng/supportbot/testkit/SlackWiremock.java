@@ -359,6 +359,34 @@ public class SlackWiremock implements WireMockBackend {
     }
 
     /**
+     * Stubs GitHub's GraphQL endpoint (POST /graphql), used by the code-owner gate to read
+     * {@code reviewDecision} + the {@code asCodeOwner} reviewers. Each login becomes a pending
+     * code-owner review request. Pass {@code reviewDecision = null} to model "no review required".
+     */
+    public Stub stubGitHubGraphQlReviewDecision(
+            String description, String reviewDecision, List<String> codeOwnerLogins) {
+        StringBuilder nodes = new StringBuilder();
+        for (int i = 0; i < codeOwnerLogins.size(); i++) {
+            if (i > 0) {
+                nodes.append(',');
+            }
+            nodes.append("{\"asCodeOwner\":true,\"requestedReviewer\":{\"login\":\"")
+                    .append(codeOwnerLogins.get(i))
+                    .append("\"}}");
+        }
+        String decisionJson = reviewDecision == null ? "null" : "\"" + reviewDecision + "\"";
+        String body = """
+                {"data":{"repository":{"pullRequest":{"reviewDecision":%s,"reviewRequests":{"nodes":[%s]}}}}}
+                """.formatted(decisionJson, nodes);
+        StubMapping stub = givenThat(post("/graphql").withName(description).willReturn(okJson(body)));
+        return Stub.builder()
+                .mapping(stub)
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    /**
      * Stubs GitHub API GET /repos/{owner}/{repo}/pulls/{number} with an error response.
      * Also stubs the repository metadata call required by hub4j.
      */
