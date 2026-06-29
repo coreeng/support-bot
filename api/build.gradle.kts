@@ -44,12 +44,25 @@ val safeDependencyVersions =
         "org.springframework:spring-web" to "6.2.18",
         "org.springframework:spring-webmvc" to "6.2.18",
     )
-val safeDependencyCoordinates = safeDependencyVersions.map { (dependency, version) -> "$dependency:$version" }.toTypedArray()
+val managedDependencyVersions =
+    mapOf(
+        "asm.version" to "9.9.1",
+        "byte-buddy.version" to "1.18.4",
+        "commons-lang3.version" to safeDependencyVersions.getValue("org.apache.commons:commons-lang3"),
+        "mockito.version" to "5.21.0",
+        "netty.version" to safeDependencyVersions.getValue("io.netty:netty-common"),
+        "opentelemetry.version" to safeDependencyVersions.getValue("io.opentelemetry:opentelemetry-api"),
+        "postgresql.version" to safeDependencyVersions.getValue("org.postgresql:postgresql"),
+        "spring-framework.version" to safeDependencyVersions.getValue("org.springframework:spring-core"),
+    )
 
 subprojects {
     apply(plugin = "com.diffplug.spotless")
 
     extra["jackson-bom.version"] = jacksonVersion
+    managedDependencyVersions.forEach { (property, version) ->
+        extra[property] = version
+    }
 
     plugins.withType<JavaPlugin> {
         dependencies {
@@ -62,11 +75,12 @@ subprojects {
     }
 
     configurations.configureEach {
-        resolutionStrategy {
-            force(*safeDependencyCoordinates)
-            eachDependency {
-                safeDependencyVersions["${requested.group}:${requested.name}"]?.let { safeVersion ->
-                    useVersion(safeVersion)
+        if (isCanBeDeclared) {
+            safeDependencyVersions.forEach { (dependency, safeVersion) ->
+                project.dependencies.constraints.add(name, dependency) {
+                    version {
+                        strictly(safeVersion)
+                    }
                     because("Patched version required for Dependabot security alerts")
                 }
             }
