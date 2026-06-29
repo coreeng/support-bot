@@ -1,7 +1,9 @@
 package com.coreeng.supportbot.prtracking.source;
 
+import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.github.GitHubApiException;
 import com.coreeng.supportbot.github.GitHubClient;
+import com.coreeng.supportbot.github.GitHubGraphQlClient;
 import com.coreeng.supportbot.github.GitHubPullRequest;
 import com.coreeng.supportbot.github.GitHubPullRequestReview;
 import java.util.List;
@@ -10,9 +12,14 @@ import org.jspecify.annotations.Nullable;
 public class GitHubPrSourceClient implements PrSourceClient {
 
     private final GitHubClient gitHubClient;
+    private final @Nullable GitHubGraphQlClient graphQlClient;
+    private final PrTrackingProps props;
 
-    public GitHubPrSourceClient(GitHubClient gitHubClient) {
+    public GitHubPrSourceClient(
+            GitHubClient gitHubClient, @Nullable GitHubGraphQlClient graphQlClient, PrTrackingProps props) {
         this.gitHubClient = gitHubClient;
+        this.graphQlClient = graphQlClient;
+        this.props = props;
     }
 
     @Override
@@ -25,6 +32,16 @@ public class GitHubPrSourceClient implements PrSourceClient {
         expectGitHub(coord);
         try {
             GitHubPullRequest pr = gitHubClient.getPullRequest(coord.name(), prNumber);
+            // Code-owner repos: enrich with GitHub's GraphQL-only reviewDecision + asCodeOwner reviewers.
+            // Only for open PRs (closed/merged need no chase), and only when configured, to avoid the
+            // extra GraphQL call on every other repo. Degrades gracefully: null review leaves the signals
+            // unset, so the lifecycle treats it as "code owners not yet satisfied".
+            if (graphQlClient != null && pr.isOpen() && requiresCodeowners(coord.name())) {
+                GitHubGraphQlClient.CodeownerReview review = graphQlClient.fetchCodeownerReview(coord.name(), prNumber);
+                if (review != null) {
+                    pr = pr.withCodeownerReview(review.reviewDecision(), review.codeOwnerReviewerLogins());
+                }
+            }
             Boolean codeOwnersApproved = pr.reviewDecision() == null
                     ? null
                     : pr.reviewDecision() == GitHubPullRequest.ReviewDecision.APPROVED;
@@ -80,6 +97,13 @@ public class GitHubPrSourceClient implements PrSourceClient {
             throw new IllegalArgumentException(
                     "GitHubPrSourceClient called with non-GitHub coord: " + coord.provider());
         }
+    }
+
+    private boolean requiresCodeowners(String repoName) {
+        return props.repositories().stream()
+                .anyMatch(r -> r.provider() == Provider.GITHUB
+                        && r.name().equalsIgnoreCase(repoName)
+                        && r.requiresCodeowners());
     }
 
     private static String orgFromRepoName(String repoName) {
