@@ -51,3 +51,7 @@ codegen-local: ## Generate JOOQ classes against Postgres from `make db-up` (no T
 .PHONY: build-local
 build-local: ## Build against Postgres from `make db-up` (no Testcontainers)
 	cd service && ../gradlew -Ddocker=true build
+
+.PHONY: regen-fsm-diagram
+regen-fsm-diagram: db-up ## (Optional) Regenerate docs/diagrams/pr-lifecycle.generated.md from PrLifecycle.TRANSITIONS
+	cd service && ../gradlew -Ddocker=true regenPrLifecycleDiagram

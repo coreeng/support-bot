@@ -164,6 +164,18 @@ tasks.withType<Test> {
     )
 }
 
+// Manually-run generator for the optional PR-lifecycle diagram (docs/diagrams/pr-lifecycle.generated.md).
+// Not wired into build/check — invoke via `make regen-fsm-diagram`. Uses the test runtime classpath
+// (which pulls in the main classes, hence a DB for jOOQ codegen) until the generated PrTrackingStatus
+// enum is removed.
+tasks.register<JavaExec>("regenPrLifecycleDiagram") {
+    group = "documentation"
+    description = "Render docs/diagrams/pr-lifecycle.generated.md from PrLifecycle.TRANSITIONS (optional, manual)."
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.coreeng.supportbot.prtracking.PrLifecycleDiagramGenerator")
+    args(layout.projectDirectory.file("docs/diagrams/pr-lifecycle.generated.md").asFile.absolutePath)
+}
+
 tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-Werror")
     options.errorprone(
