@@ -89,7 +89,9 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                         PrTrackingStatus.OPEN,
                         PrTrackingStatus.ESCALATED,
                         PrTrackingStatus.CHANGES_REQUESTED,
-                        PrTrackingStatus.APPROVED))
+                        PrTrackingStatus.APPROVED,
+                        PrTrackingStatus.AWAITING_MERGE,
+                        PrTrackingStatus.MERGE_ESCALATED))
                 .fetch()
                 .map(JdbcPrTrackingRepository::toRecord);
     }
@@ -141,6 +143,19 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
         return toRecord(row);
     }
 
+    @Override
+    public PrTrackingRecord startSla(long id, PrTrackingStatus newStatus, Instant newDeadline) {
+        com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.update(PR_TRACKING)
+                .set(PR_TRACKING.STATUS, newStatus)
+                .set(PR_TRACKING.SLA_DEADLINE, newDeadline)
+                .setNull(PR_TRACKING.SLA_REMAINING)
+                .where(PR_TRACKING.ID.eq(id))
+                .returning()
+                .fetchOptional()
+                .orElseThrow(() -> new IllegalStateException("PR tracking record not found for id " + id));
+        return toRecord(row);
+    }
+
     @Transactional(readOnly = true)
     @Override
     public boolean hasAnyActiveClosableForTicket(long ticketId) {
@@ -154,7 +169,9 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                                 PrTrackingStatus.OPEN,
                                 PrTrackingStatus.ESCALATED,
                                 PrTrackingStatus.CHANGES_REQUESTED,
-                                PrTrackingStatus.APPROVED)));
+                                PrTrackingStatus.APPROVED,
+                                PrTrackingStatus.AWAITING_MERGE,
+                                PrTrackingStatus.MERGE_ESCALATED)));
     }
 
     @Override
@@ -210,7 +227,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                     FROM pr_tracking pt
                     JOIN ticket t ON t.id = pt.ticket_id
                     JOIN query q ON q.id = t.query_id
-                    WHERE pt.status IN ('OPEN', 'ESCALATED', 'CHANGES_REQUESTED', 'APPROVED')
+                    WHERE pt.status IN ('OPEN', 'ESCALATED', 'CHANGES_REQUESTED', 'APPROVED', 'AWAITING_MERGE', 'MERGE_ESCALATED')
                       %s
                     ORDER BY
                         pt.provider,
@@ -244,7 +261,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                     switch (status) {
                         case "OPEN", "ESCALATED" -> "TEAM";
                         case "CHANGES_REQUESTED" -> "TENANT";
-                        case "APPROVED" -> "MERGE";
+                        case "APPROVED", "AWAITING_MERGE", "MERGE_ESCALATED" -> "MERGE";
                         default -> "UNKNOWN";
                     };
             org.jooq.types.YearToSecond slaRemainingRaw = r.get("sla_remaining", org.jooq.types.YearToSecond.class);
@@ -297,7 +314,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                     repo,
                     COALESCE(MIN(owning_team), 'unknown') AS owning_team,
                     COUNT(*) AS pr_count,
-                    COUNT(*) FILTER (WHERE status IN ('OPEN', 'ESCALATED', 'CHANGES_REQUESTED', 'APPROVED')) AS open_count,
+                    COUNT(*) FILTER (WHERE status IN ('OPEN', 'ESCALATED', 'CHANGES_REQUESTED', 'APPROVED', 'AWAITING_MERGE', 'MERGE_ESCALATED')) AS open_count,
                     COUNT(*) FILTER (WHERE status = 'ESCALATED') AS escalated_count,
                     COUNT(*) FILTER (WHERE sla_deadline < COALESCE(closed_at, now())) AS breached_count,
                     percentile_cont(0.5) WITHIN GROUP (ORDER BY lifetime) AS p50,

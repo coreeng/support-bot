@@ -1,18 +1,23 @@
 package com.coreeng.supportbot.prtracking;
 
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.APPROVED;
+import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.AWAITING_MERGE;
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.CHANGES_REQUESTED;
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.CLOSED;
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.ESCALATED;
+import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.MERGE_ESCALATED;
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.OPEN;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.ESCALATE;
+import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.ESCALATE_MERGE;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.NOTIFY_APPROVED;
+import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.NOTIFY_AWAITING_MERGE;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.NOTIFY_CHANGES_REQUESTED;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.NOTIFY_CLOSED;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.NOTIFY_MERGED;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.SlaOp.NONE;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.SlaOp.RESUME;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.SlaOp.SET_CLOSED_AT;
+import static com.coreeng.supportbot.prtracking.PrLifecycle.SlaOp.START;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
@@ -245,6 +250,97 @@ class PrLifecycleTest {
         }
     }
 
+    @Nested
+    class CodeownerRepos {
+
+        @Test
+        void codeownerApprovedAndMergeableEntersAwaitingMerge() {
+            assertDecision(
+                    decide(obs(OPEN).requiresCodeowners().codeownerApproved().mergeable()),
+                    AWAITING_MERGE,
+                    START,
+                    NOTIFY_AWAITING_MERGE);
+        }
+
+        @Test
+        void teamApprovedButCodeownersPendingStaysOpen() {
+            // The crux: on a codeowner repo a team approval + mergeable must NOT close the PR — only a
+            // codeowner approval opens the merge gate. Without the !requiresCodeowners guard on the
+            // CLOSED row this would wrongly close before the code owners reviewed.
+            assertDecision(decide(obs(OPEN).requiresCodeowners().approved().mergeable()), OPEN, NONE);
+        }
+
+        @Test
+        void codeownerApprovedButNotMergeableStaysOpen() {
+            assertDecision(decide(obs(OPEN).requiresCodeowners().codeownerApproved()), OPEN, NONE);
+        }
+
+        @Test
+        void entersAwaitingMergeFromChangesRequested() {
+            assertDecision(
+                    decide(obs(CHANGES_REQUESTED)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .mergeable()),
+                    AWAITING_MERGE,
+                    START,
+                    NOTIFY_AWAITING_MERGE);
+        }
+
+        @Test
+        void awaitingMergeDoesNotCloseOnMergeable() {
+            // The whole point of AWAITING_MERGE: mergeability alone never closes it — only the real merge.
+            assertDecision(
+                    decide(obs(AWAITING_MERGE)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .mergeable()),
+                    AWAITING_MERGE,
+                    NONE);
+        }
+
+        @Test
+        void awaitingMergeClosesOnRealMerge() {
+            assertDecision(decide(obs(AWAITING_MERGE).merged()), CLOSED, SET_CLOSED_AT, NOTIFY_MERGED);
+        }
+
+        @Test
+        void awaitingMergeBreachEscalatesToMergeEscalated() {
+            assertDecision(decide(obs(AWAITING_MERGE).slaBreached()), MERGE_ESCALATED, NONE, ESCALATE_MERGE);
+        }
+
+        @Test
+        void awaitingMergeChangesRequestedPausesWithLiveDeadline() {
+            assertDecision(
+                    decide(obs(AWAITING_MERGE).changesRequested().liveDeadline(REMAINING)),
+                    CHANGES_REQUESTED,
+                    new SlaOp.Pause(REMAINING),
+                    NOTIFY_CHANGES_REQUESTED);
+        }
+
+        @Test
+        void mergeEscalatedDoesNotCloseOnMergeable() {
+            assertDecision(
+                    decide(obs(MERGE_ESCALATED)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .mergeable()),
+                    MERGE_ESCALATED,
+                    NONE);
+        }
+
+        @Test
+        void mergeEscalatedClosesOnRealMerge() {
+            assertDecision(decide(obs(MERGE_ESCALATED).merged()), CLOSED, SET_CLOSED_AT, NOTIFY_MERGED);
+        }
+
+        @Test
+        void mergeEscalatedChangesRequestedNotifies() {
+            assertDecision(
+                    decide(obs(MERGE_ESCALATED).changesRequested()), CHANGES_REQUESTED, NONE, NOTIFY_CHANGES_REQUESTED);
+        }
+    }
+
     // ── Helpers ──
 
     private static Decision decide(ObsBuilder b) {
@@ -272,6 +368,8 @@ class PrLifecycleTest {
         private boolean hasLiveDeadline;
         private @Nullable Duration remainingForPause;
         private @Nullable Duration slaRemainingStored;
+        private boolean requiresCodeowners;
+        private boolean codeownerApproved;
 
         private ObsBuilder(PrTrackingStatus current) {
             this.current = current;
@@ -321,6 +419,16 @@ class PrLifecycleTest {
             return this;
         }
 
+        ObsBuilder requiresCodeowners() {
+            this.requiresCodeowners = true;
+            return this;
+        }
+
+        ObsBuilder codeownerApproved() {
+            this.codeownerApproved = true;
+            return this;
+        }
+
         Observation build() {
             return new Observation(
                     current,
@@ -331,7 +439,9 @@ class PrLifecycleTest {
                     slaBreached,
                     hasLiveDeadline,
                     remainingForPause,
-                    slaRemainingStored);
+                    slaRemainingStored,
+                    requiresCodeowners,
+                    codeownerApproved);
         }
     }
 }

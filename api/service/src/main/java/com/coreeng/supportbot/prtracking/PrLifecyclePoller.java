@@ -99,19 +99,20 @@ public class PrLifecyclePoller {
             return;
         }
 
+        PrTrackingProps.@Nullable Repository repoConfig = findRepoConfig(record.provider(), record.repo());
+
         if (pr.isClosed()) {
             // Closed/merged PRs skip team-filtering and activity-timestamp updates: the verdict is
             // irrelevant (the closed rows of the table fire regardless of it), so there's no reason to
             // pay the team-membership lookups for a record we're about to terminate.
-            apply(record, PrLifecycle.decide(observe(record, pr, null)));
+            apply(record, PrLifecycle.decide(observe(record, pr, null, repoConfig)));
             return;
         }
 
-        List<Review> teamReviews = teamReviewFilter.filterToOwningTeam(
-                pr.reviews(), pr, findRepoConfig(record.provider(), record.repo()), teamMemberCache);
+        List<Review> teamReviews = teamReviewFilter.filterToOwningTeam(pr.reviews(), pr, repoConfig, teamMemberCache);
         Review latestVerdict = teamReviewFilter.findLatestActionableReview(teamReviews);
 
-        apply(record, PrLifecycle.decide(observe(record, pr, latestVerdict)));
+        apply(record, PrLifecycle.decide(observe(record, pr, latestVerdict, repoConfig)));
 
         updateActivityTimestamps(record, teamReviews);
     }
@@ -133,7 +134,11 @@ public class PrLifecyclePoller {
      * remainingForPause} is non-null exactly when there is a live deadline, and {@code slaBreached}
      * can only be true with one — so a no-SLA record never escalates.
      */
-    private PrLifecycle.Observation observe(PrTrackingRecord record, PrMetadata pr, @Nullable Review latestVerdict) {
+    private PrLifecycle.Observation observe(
+            PrTrackingRecord record,
+            PrMetadata pr,
+            @Nullable Review latestVerdict,
+            PrTrackingProps.@Nullable Repository repoConfig) {
         Instant now = Instant.now();
         PrLifecycle.Verdict verdict = latestVerdict == null
                 ? null
@@ -141,6 +146,8 @@ public class PrLifecyclePoller {
         Instant deadline = record.slaDeadline();
         Duration remainingForPause = deadline == null ? null : clampNonNegative(Duration.between(now, deadline));
         boolean slaBreached = deadline != null && now.isAfter(deadline);
+        boolean requiresCodeowners = repoConfig != null && repoConfig.requiresCodeowners();
+        boolean codeownerApproved = Boolean.TRUE.equals(pr.codeOwnersApproved());
         return new PrLifecycle.Observation(
                 record.status(),
                 verdict,
@@ -150,7 +157,9 @@ public class PrLifecyclePoller {
                 slaBreached,
                 deadline != null,
                 remainingForPause,
-                record.slaRemaining());
+                record.slaRemaining(),
+                requiresCodeowners,
+                codeownerApproved);
     }
 
     /**
@@ -160,12 +169,15 @@ public class PrLifecyclePoller {
      * escalation result — so the generic write is skipped when one is present.
      */
     private void apply(PrTrackingRecord record, PrLifecycle.Decision decision) {
-        boolean escalateOwnsWrite = decision.effects().stream().anyMatch(e -> e instanceof PrLifecycle.Effect.Escalate);
+        boolean escalateOwnsWrite = decision.effects().stream()
+                .anyMatch(
+                        e -> e instanceof PrLifecycle.Effect.Escalate || e instanceof PrLifecycle.Effect.EscalateMerge);
         switch (decision.slaOp()) {
             case PrLifecycle.SlaOp.Pause pause ->
                 prTrackingRepository.pauseSla(record.id(), decision.next(), pause.remaining());
             case PrLifecycle.SlaOp.Resume ignored ->
                 prTrackingRepository.resumeSla(record.id(), Instant.now().plus(checkNotNull(record.slaRemaining())));
+            case PrLifecycle.SlaOp.Start ignored -> startMergeClock(record, decision.next());
             case PrLifecycle.SlaOp.SetClosedAt ignored -> {
                 prTrackingRepository.updateStatus(
                         record.id(), PrTrackingStatus.CLOSED, Instant.now(), record.escalationId());
@@ -184,6 +196,28 @@ public class PrLifecyclePoller {
         for (PrLifecycle.Effect effect : decision.effects()) {
             runEffect(record, effect);
         }
+    }
+
+    /**
+     * Starts the merge-chase SLA clock on entry to AWAITING_MERGE. Provisional source: the repo's
+     * configured default SLA (the exact merge-SLA source ties into the deferred-clock decision). When
+     * the repo has no SLA, the state is entered without a deadline, so it never merge-escalates.
+     */
+    private void startMergeClock(PrTrackingRecord record, PrTrackingStatus next) {
+        Duration sla = mergeSlaFor(record);
+        if (sla != null) {
+            prTrackingRepository.startSla(record.id(), next, Instant.now().plus(sla));
+        } else {
+            prTrackingRepository.updateStatus(record.id(), next, null, record.escalationId());
+        }
+    }
+
+    private @Nullable Duration mergeSlaFor(PrTrackingRecord record) {
+        PrTrackingProps.@Nullable Repository repoConfig = findRepoConfig(record.provider(), record.repo());
+        if (repoConfig == null || repoConfig.sla() == null) {
+            return null;
+        }
+        return repoConfig.sla().defaultSla();
     }
 
     /**
@@ -212,8 +246,10 @@ public class PrLifecyclePoller {
         switch (effect) {
             case PrLifecycle.Effect.NotifyChangesRequested ignored -> notifyChangesRequested(record);
             case PrLifecycle.Effect.NotifyApproved ignored -> notifyClosure(record, MessageEvent.APPROVED);
+            case PrLifecycle.Effect.NotifyAwaitingMerge ignored -> notifyAwaitingMerge(record);
             case PrLifecycle.Effect.NotifyClosed notify -> notifyClosure(record, notify.event());
             case PrLifecycle.Effect.Escalate ignored -> escalate(record);
+            case PrLifecycle.Effect.EscalateMerge ignored -> escalateMerge(record);
         }
     }
 
@@ -349,6 +385,81 @@ public class PrLifecyclePoller {
                 .addArgument(record::prNumber)
                 .addArgument(record::ticketId)
                 .log("PR {}#{} SLA breached — escalated on ticket {}");
+    }
+
+    /** Notifies the tenant that the code owners have approved and the maintaining team can now merge. */
+    private void notifyAwaitingMerge(PrTrackingRecord record) {
+        log.atInfo()
+                .addArgument(record::repo)
+                .addArgument(record::prNumber)
+                .log("PR {}#{} approved by code owners — awaiting merge by the maintaining team");
+
+        Ticket ticket = ticketRepository.findTicketById(new TicketId(record.ticketId()));
+        if (ticket == null) {
+            log.atWarn()
+                    .addArgument(record::ticketId)
+                    .log("Ticket {} not found for awaiting-merge notification, skipping Slack message");
+            return;
+        }
+
+        PrMessageContext ctx = recordContext(record);
+        String override = messageRenderer.render(record.repo(), MessageEvent.AWAITING_MERGE, ctx);
+        String message = override != null
+                ? override
+                : "%s `%s%s%d` has been approved by its code owners and is ready for the maintaining team to merge."
+                        .formatted(
+                                PrTerminology.noun(record.provider()),
+                                record.repo(),
+                                PrTerminology.separator(record.provider()),
+                                record.prNumber());
+        postMessage(message, ticket.channelId(), ticket.queryTs(), record);
+    }
+
+    /**
+     * Merge-phase counterpart of {@link #escalate}: chases the maintaining team to merge a PR that the
+     * code owners have approved. Owns its own {@code MERGE_ESCALATED} status write (the {@code None}
+     * SLA op is skipped because {@code EscalateMerge} is in the escalate-owns-write set), mirroring how
+     * {@link #escalate} owns the {@code ESCALATED} write.
+     */
+    private void escalateMerge(PrTrackingRecord record) {
+        Ticket ticket = ticketRepository.findTicketById(new TicketId(record.ticketId()));
+        if (ticket == null) {
+            log.atWarn().addArgument(record::ticketId).log("Ticket {} not found for merge-SLA breach, skipping");
+            return;
+        }
+
+        String escalationOverride =
+                messageRenderer.render(record.repo(), MessageEvent.MERGE_ESCALATED, recordContext(record));
+        if (escalationOverride != null) {
+            postMessage(escalationOverride, ticket.channelId(), ticket.queryTs(), record);
+        }
+
+        Escalation escalation = escalationProcessingService.createEscalation(CreateEscalationRequest.builder()
+                .ticket(ticket)
+                .team(record.owningTeam())
+                .tags(ImmutableList.of())
+                .source(EscalationSource.bot)
+                .build());
+
+        if (escalation == null || escalation.id() == null) {
+            log.atWarn()
+                    .addArgument(record::repo)
+                    .addArgument(record::prNumber)
+                    .addArgument(record::ticketId)
+                    .log(
+                            "Merge-escalation creation returned null for PR {}#{} on ticket {} — marking MERGE_ESCALATED to avoid reprocessing");
+            prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.MERGE_ESCALATED, null, null);
+            return;
+        }
+        Long escalationId = escalation.id().id();
+        prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.MERGE_ESCALATED, null, escalationId);
+        ticketSlackService.markTicketEscalated(ticket.queryRef());
+
+        log.atInfo()
+                .addArgument(record::repo)
+                .addArgument(record::prNumber)
+                .addArgument(record::ticketId)
+                .log("PR {}#{} merge SLA breached — escalated maintaining team on ticket {}");
     }
 
     private void updateActivityTimestamps(PrTrackingRecord record, List<Review> teamReviews) {
