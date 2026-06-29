@@ -61,7 +61,6 @@ public record PrTrackingProps(
                                 repository.messages(),
                                 repository.excludeAuthorTeams(),
                                 repository.requiresCodeowners(),
-                                repository.codeownerTeam(),
                                 repository.dynamicApprovals()))
                         .toList();
         this.slaDiscovery = slaDiscovery == null ? new SlaDiscovery(null) : slaDiscovery;
@@ -252,7 +251,6 @@ public record PrTrackingProps(
             @Nullable Messages messages,
             List<String> excludeAuthorTeams,
             boolean requiresCodeowners,
-            @Nullable String codeownerTeam,
             boolean dynamicApprovals) {
         @ConstructorBinding
         public Repository(
@@ -267,7 +265,6 @@ public record PrTrackingProps(
                 @Nullable Messages messages,
                 @Nullable List<String> excludeAuthorTeams,
                 boolean requiresCodeowners,
-                @Nullable String codeownerTeam,
                 boolean dynamicApprovals) {
             requireNonNull(name, "name must not be null");
             requireNonNull(owningTeam, "owningTeam must not be null");
@@ -277,9 +274,6 @@ public record PrTrackingProps(
             }
             if (gitlabGroupPath != null && gitlabGroupPath.isBlank()) {
                 throw new IllegalArgumentException("gitlabGroupPath must not be blank when provided");
-            }
-            if (codeownerTeam != null && codeownerTeam.isBlank()) {
-                throw new IllegalArgumentException("codeownerTeam must not be blank when provided");
             }
             List<String> normalisedExcludeAuthorTeams =
                     excludeAuthorTeams == null ? List.of() : List.copyOf(excludeAuthorTeams);
@@ -321,7 +315,6 @@ public record PrTrackingProps(
             this.messages = messages;
             this.excludeAuthorTeams = normalisedExcludeAuthorTeams;
             this.requiresCodeowners = requiresCodeowners;
-            this.codeownerTeam = codeownerTeam;
             this.dynamicApprovals = dynamicApprovals;
         }
 
@@ -348,7 +341,6 @@ public record PrTrackingProps(
                     messages,
                     List.of(),
                     false,
-                    null,
                     false);
         }
 
@@ -372,7 +364,6 @@ public record PrTrackingProps(
                     messages,
                     List.of(),
                     false,
-                    null,
                     false);
         }
 
@@ -395,7 +386,6 @@ public record PrTrackingProps(
                     null,
                     List.of(),
                     false,
-                    null,
                     false);
         }
 
