@@ -2,9 +2,12 @@ package com.coreeng.supportbot.prtracking;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
 import com.coreeng.supportbot.github.GitHubClient;
+import com.coreeng.supportbot.github.GitHubGraphQlClient;
 import com.coreeng.supportbot.github.Hub4jGitHubClient;
 import com.coreeng.supportbot.prtracking.source.GitHubPrSourceClient;
 import com.coreeng.supportbot.prtracking.source.PrSourceClient;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableList;
 import io.jsonwebtoken.Jwts;
 import java.io.IOException;
 import java.io.StringReader;
@@ -25,6 +28,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.ClientHttpRequestInterceptor;
+import org.springframework.http.converter.StringHttpMessageConverter;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.web.client.RestClient;
 
 /**
  * Wires the GitHub adapter for PR tracking. Only activates when at least one repository uses
@@ -37,16 +45,31 @@ import org.springframework.context.annotation.Configuration;
 @Conditional(AnyGithubRepoCondition.class)
 public class PrTrackingGitHubConfig {
 
+    /**
+     * The authorization provider shared by the REST (hub4j) and GraphQL clients. APP mode returns the
+     * AppInstallationAuthorizationProvider (rotating installation token, bound when {@link #gitHub} is
+     * built); TOKEN mode a static {@code Bearer} header — accepted by both the REST and GraphQL APIs.
+     */
     @Bean
-    public GitHub gitHub(PrTrackingProps props) {
+    public AuthorizationProvider gitHubAuthorizationProvider(PrTrackingProps props) {
         PrTrackingProps.GitHub config = props.github();
+        if (config.authMode() == PrTrackingProps.AuthMode.APP) {
+            PrivateKey privateKey = parsePrivateKey(config.privateKeyPem());
+            long installationId = Long.parseLong(config.installationId());
+            String appId = config.appId();
+            AuthorizationProvider jwtProvider = () -> "Bearer " + createJwt(appId, privateKey);
+            return new AppInstallationAuthorizationProvider(
+                    app -> app.getInstallationById(installationId), jwtProvider);
+        }
+        return () -> "Bearer " + config.token();
+    }
+
+    @Bean
+    public GitHub gitHub(PrTrackingProps props, AuthorizationProvider gitHubAuthorizationProvider) {
         try {
-            if (config.authMode() == PrTrackingProps.AuthMode.APP) {
-                return buildAppModeClient(config);
-            }
             return new GitHubBuilder()
-                    .withEndpoint(config.apiBaseUrl())
-                    .withOAuthToken(config.token())
+                    .withEndpoint(props.github().apiBaseUrl())
+                    .withAuthorizationProvider(gitHubAuthorizationProvider)
                     .build();
         } catch (IOException e) {
             throw new IllegalStateException("Failed to initialize GitHub client", e);
@@ -58,25 +81,40 @@ public class PrTrackingGitHubConfig {
         return new Hub4jGitHubClient(gitHub);
     }
 
+    /**
+     * RestClient for GitHub's GraphQL API (the REST/hub4j path exposes no {@code reviewDecision} /
+     * {@code asCodeOwner}). Reuses {@link #gitHubAuthorizationProvider}; for APP mode the installation
+     * token is rotated by the provider, which is bound once {@link #gitHub} is built. Jackson serialises
+     * the request; the response is read as a raw String and parsed in {@link GitHubGraphQlClient}.
+     */
     @Bean
-    public PrSourceClient gitHubPrSourceClient(GitHubClient gitHubClient) {
-        return new GitHubPrSourceClient(gitHubClient);
+    public RestClient gitHubGraphQlRestClient(
+            PrTrackingProps props, AuthorizationProvider gitHubAuthorizationProvider, ObjectMapper objectMapper) {
+        ClientHttpRequestInterceptor authInterceptor = (request, body, execution) -> {
+            String authorization = gitHubAuthorizationProvider.getEncodedAuthorization();
+            if (authorization != null) {
+                request.getHeaders().set(HttpHeaders.AUTHORIZATION, authorization);
+            }
+            return execution.execute(request, body);
+        };
+        return RestClient.builder()
+                .baseUrl(GitHubGraphQlClient.graphqlEndpoint(props.github().apiBaseUrl()))
+                .messageConverters(ImmutableList.of(
+                        new MappingJackson2HttpMessageConverter(objectMapper),
+                        new StringHttpMessageConverter(StandardCharsets.UTF_8)))
+                .requestInterceptor(authInterceptor)
+                .build();
     }
 
-    private static GitHub buildAppModeClient(PrTrackingProps.GitHub config) throws IOException {
-        PrivateKey privateKey = parsePrivateKey(config.privateKeyPem());
-        long installationId = Long.parseLong(config.installationId());
-        String appId = config.appId();
+    @Bean
+    public GitHubGraphQlClient gitHubGraphQlClient(RestClient gitHubGraphQlRestClient) {
+        return new GitHubGraphQlClient(gitHubGraphQlRestClient);
+    }
 
-        AuthorizationProvider jwtProvider = () -> "Bearer " + createJwt(appId, privateKey);
-
-        AppInstallationAuthorizationProvider authProvider =
-                new AppInstallationAuthorizationProvider(app -> app.getInstallationById(installationId), jwtProvider);
-
-        return new GitHubBuilder()
-                .withEndpoint(config.apiBaseUrl())
-                .withAuthorizationProvider(authProvider)
-                .build();
+    @Bean
+    public PrSourceClient gitHubPrSourceClient(
+            GitHubClient gitHubClient, GitHubGraphQlClient gitHubGraphQlClient, PrTrackingProps props) {
+        return new GitHubPrSourceClient(gitHubClient, gitHubGraphQlClient, props);
     }
 
     private static String createJwt(String appId, PrivateKey privateKey) {

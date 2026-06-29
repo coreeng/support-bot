@@ -83,6 +83,23 @@ public record GitHubPullRequest(
                 List.of());
     }
 
+    /** Returns a copy with the code-owner review signals (from the GraphQL client) populated. */
+    public GitHubPullRequest withCodeownerReview(
+            @Nullable ReviewDecision reviewDecision, List<String> codeOwnerReviewerLogins) {
+        return new GitHubPullRequest(
+                repositoryName,
+                pullRequestNumber,
+                createdAt,
+                state,
+                mergeable,
+                mergeableState,
+                requestedTeamReviewerLogins,
+                reviews,
+                authorLogin,
+                reviewDecision,
+                codeOwnerReviewerLogins);
+    }
+
     public boolean isOpen() {
         return state == PrState.OPEN;
     }
