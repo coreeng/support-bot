@@ -443,6 +443,36 @@ class Hub4jGitHubClientTest {
     }
 
     @Test
+    void getPullRequestSkipsRequestedTeamWhoseMembersCannotBeListed() throws IOException {
+        // given — two requested teams: one resolves, the other's member listing is forbidden (e.g. the token
+        // lacks org Members:Read, or the team is secret). The failure must degrade, not abort the PR fetch.
+        TestPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
+
+        GHUser alice = mock(GHUser.class);
+        when(alice.getLogin()).thenReturn("alice");
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHUser> readable = mock(PagedIterable.class);
+        when(readable.toList()).thenReturn(List.of(alice));
+        GHTeam readableTeam = mock(GHTeam.class);
+        when(readableTeam.listMembers()).thenReturn(readable);
+
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHUser> forbidden = mock(PagedIterable.class);
+        when(forbidden.toList()).thenThrow(new IOException("403 Forbidden"));
+        GHTeam forbiddenTeam = mock(GHTeam.class);
+        when(forbiddenTeam.getName()).thenReturn("secret-team");
+        when(forbiddenTeam.listMembers()).thenReturn(forbidden);
+
+        pr.testRequestedTeams = List.of(readableTeam, forbiddenTeam);
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then — the PR is still returned with the resolvable team's members; the forbidden team is skipped.
+        assertThat(result.requestedTeamReviewerLogins()).containsExactly("alice");
+    }
+
+    @Test
     void getPullRequestThrowsOnReviewsIOException() throws IOException {
         // given
         TestPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
