@@ -874,21 +874,32 @@ public class PrTrackingFunctionalTests {
      *
      * <p>Wiremock serves both GitHub stubs (under {@code /repos/...}) and GitLab stubs (under
      * {@code /api/v4/...}) on the same port. The bot's URL allow-list is derived from its
-     * configured {@code gitlab.api-base-url} (the wiremock service URL in K8s), so MR URLs the
-     * test posts must use that same host — not {@code gitlab.com} or {@code localhost}.
+     * configured {@code gitlab.api-base-url}, so MR URLs the test posts must use the same public
+     * mock base URL in both local embedded and cluster remote modes.
      */
     @Nested
     public class GitLab {
 
-        private static final String GITLAB_HOST = "support-bot-functional-tests-wiremock:8000";
         private static final String MR_REPO = "gitlab-org/gitlab-pr-test-repo";
-        private static final String MR_LINK_42 = "http://" + GITLAB_HOST + "/" + MR_REPO + "/-/merge_requests/42";
         private static final String SLA_FILE_MR_REPO = "gitlab-org/gitlab-pr-sla-file-repo";
-        private static final String SLA_FILE_MR_LINK =
-                "http://" + GITLAB_HOST + "/" + SLA_FILE_MR_REPO + "/-/merge_requests/101";
         private static final String ESCALATION_MR_REPO = "gitlab-org/gitlab-pr-escalation-message-repo";
-        private static final String ESCALATION_MR_LINK =
-                "http://" + GITLAB_HOST + "/" + ESCALATION_MR_REPO + "/-/merge_requests/301";
+
+        private String gitLabMrLink(String repoName, int iid) {
+            return gitLabPublicBaseUrl() + "/" + repoName + "/-/merge_requests/" + iid;
+        }
+
+        private String gitLabPublicBaseUrl() {
+            String apiBaseUrl = System.getenv("GITLAB_API_BASE_URL");
+            if (apiBaseUrl != null && !apiBaseUrl.isBlank()) {
+                return stripApiV4(apiBaseUrl);
+            }
+            return testKit.config().mocks().slack().adminBaseUrl();
+        }
+
+        private static String stripApiV4(String apiBaseUrl) {
+            int idx = apiBaseUrl.indexOf("/api/v4");
+            return idx < 0 ? apiBaseUrl : apiBaseUrl.substring(0, idx);
+        }
 
         @Test
         public void whenGitLabMrUrlIsPostedAsReply_itIsTrackedAndSlaReplyPosted() {
@@ -940,7 +951,7 @@ public class PrTrackingFunctionalTests {
             var slaReplyStub =
                     testKit.slack().wiremock().stubChatPostMessage("MR SLA reply in thread", tenantsQuery.channelId());
 
-            asTenantSlack.postThreadReply(MessageTs.now(), queryTs, "Here is the fix: " + MR_LINK_42);
+            asTenantSlack.postThreadReply(MessageTs.now(), queryTs, "Here is the fix: " + gitLabMrLink(MR_REPO, 42));
 
             await().atMost(Duration.ofSeconds(8)).untilAsserted(() -> {
                 mrStub.assertIsCalled();
@@ -1016,7 +1027,7 @@ public class PrTrackingFunctionalTests {
                     .build();
             var creationStubs = messageForStubs.stubTicketCreationFlow("ticket created", ticketMessageTs);
 
-            asTenantSlack.postMessage(queryTs, "Please review " + SLA_FILE_MR_LINK);
+            asTenantSlack.postMessage(queryTs, "Please review " + gitLabMrLink(SLA_FILE_MR_REPO, 101));
 
             await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
                 mrStub.assertIsCalled();
@@ -1042,7 +1053,7 @@ public class PrTrackingFunctionalTests {
             String channelId = testKit.config().mocks().slack().supportChannelId();
 
             MessageTs queryTs = MessageTs.now();
-            String messageWithMr = "Could you review " + MR_LINK_42 + "?";
+            String messageWithMr = "Could you review " + gitLabMrLink(MR_REPO, 42) + "?";
             String createdAt = Instant.now().minus(Duration.ofHours(1)).toString();
 
             // Merged MR — the detector should skip tracking entirely and no ticket should be created.
@@ -1130,7 +1141,7 @@ public class PrTrackingFunctionalTests {
                     .build();
             var creationStubs = messageForStubs.stubTicketCreationFlow("ticket created", ticketMessageTs);
 
-            asTenantSlack.postMessage(queryTs, "Could you review " + MR_LINK_42 + "?");
+            asTenantSlack.postMessage(queryTs, "Could you review " + gitLabMrLink(MR_REPO, 42) + "?");
 
             await().atMost(Duration.ofSeconds(8)).untilAsserted(() -> {
                 mrStub.assertIsCalled();
@@ -1154,7 +1165,7 @@ public class PrTrackingFunctionalTests {
             String channelId = testKit.config().mocks().slack().supportChannelId();
 
             MessageTs queryTs = MessageTs.now();
-            String messageWithMr = "Could you review " + ESCALATION_MR_LINK + "?";
+            String messageWithMr = "Could you review " + gitLabMrLink(ESCALATION_MR_REPO, 301) + "?";
             MessageTs ticketMessageTs = MessageTs.now();
 
             // MR created 2 days ago, breaking the 24h SLA on the escalation-message repo.
