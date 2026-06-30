@@ -185,7 +185,8 @@ public final class Hub4jGitHubClient implements GitHubClient {
     }
 
     @Override
-    public GitHubPullRequest getPullRequest(String repositoryName, int pullNumber) {
+    public GitHubPullRequest getPullRequest(
+            String repositoryName, int pullNumber, boolean includeRequestedTeamMembers) {
         try {
             GHPullRequest pr = github.getRepository(repositoryName).getPullRequest(pullNumber);
             Instant createdAt = instantFromHub4j((Object) pr.getCreatedAt());
@@ -219,7 +220,13 @@ public final class Hub4jGitHubClient implements GitHubClient {
             List<String> requestedTeamReviewerLogins;
             List<GitHubPullRequestReview> reviews;
             if (prState == GitHubPullRequest.PrState.OPEN) {
-                requestedTeamReviewerLogins = resolveRequestedTeamMembers(pr, repositoryName, pullNumber);
+                // Resolving requested-team members needs org Members:Read and is only consumed by the
+                // requested-team review fallback. The caller skips it when that fallback won't run (an explicit
+                // github-team-slug, or a requires-codeowners repo whose gate is the GraphQL reviewDecision), so
+                // those repos never pay the lookup — or need the scope.
+                requestedTeamReviewerLogins = includeRequestedTeamMembers
+                        ? resolveRequestedTeamMembers(pr, repositoryName, pullNumber)
+                        : List.of();
                 reviews = pr.listReviews().toList().stream()
                         .filter(review -> review.getState() != GHPullRequestReviewState.PENDING)
                         .map(review -> mapReview(review, repositoryName, pullNumber))
