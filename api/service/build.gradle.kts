@@ -1,10 +1,10 @@
 import org.flywaydb.gradle.task.AbstractFlywayTask
 import org.jooq.codegen.gradle.CodegenTask
 import org.springframework.boot.gradle.tasks.bundling.BootJar
-import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.containers.wait.strategy.WaitAllStrategy
+import org.testcontainers.postgresql.PostgreSQLContainer
 import org.gradle.api.Action
 import net.ltgt.gradle.errorprone.CheckSeverity
 import net.ltgt.gradle.errorprone.ErrorProneOptions
@@ -93,7 +93,7 @@ dependencies {
     implementation("com.microsoft.kiota:microsoft-kiota-http-okHttp:1.9.1")
 
     jooqCodegen("org.postgresql:postgresql:42.7.11")
-    jooqCodegen("org.testcontainers:postgresql:1.20.4")
+    jooqCodegen("org.testcontainers:testcontainers-postgresql:2.0.5")
     jooqCodegen("org.jooq:jooq-codegen:3.19.18")
 
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
@@ -102,8 +102,8 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-guava")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
-    implementation("com.slack.api:bolt-jakarta-socket-mode:1.45.4")
-    implementation("com.slack.api:bolt-jakarta-servlet:1.45.4")
+    implementation("com.slack.api:bolt-jakarta-socket-mode:1.49.0")
+    implementation("com.slack.api:bolt-jakarta-servlet:1.49.0")
     compileOnly("jakarta.websocket:jakarta.websocket-client-api:2.2.0")
     implementation("org.glassfish.tyrus.bundles:tyrus-standalone-client:2.2.0")
     implementation("com.google.guava:guava:33.4.0-jre")
@@ -220,7 +220,7 @@ buildscript {
     dependencies {
         classpath("org.flywaydb:flyway-database-postgresql:12.0.0")
         classpath("org.postgresql:postgresql:42.7.11")
-        classpath("org.testcontainers:postgresql:1.20.4")
+        classpath("org.testcontainers:testcontainers-postgresql:2.0.5")
         classpath("org.jooq:jooq-codegen:3.19.18")
     }
 }

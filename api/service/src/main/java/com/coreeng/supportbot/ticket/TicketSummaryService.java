@@ -148,7 +148,10 @@ public class TicketSummaryService {
         }
 
         if (queryMessage.getBlocks() != null && !queryMessage.getBlocks().isEmpty()) {
-            return ImmutableList.copyOf(queryMessage.getBlocks());
+            ImmutableList<LayoutBlock> sanitizedBlocks = SlackModalBlockSanitizer.sanitize(queryMessage.getBlocks());
+            if (!sanitizedBlocks.isEmpty()) {
+                return sanitizedBlocks;
+            }
         }
 
         if (text != null && !text.isBlank()) {
