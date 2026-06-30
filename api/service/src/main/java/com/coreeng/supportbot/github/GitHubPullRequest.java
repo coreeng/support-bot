@@ -17,14 +17,14 @@ public record GitHubPullRequest(
         List<GitHubPullRequestReview> reviews,
         @Nullable String authorLogin,
         @Nullable ReviewDecision reviewDecision,
-        List<String> codeOwnerReviewerLogins) {
+        List<CodeOwnerReviewer> codeOwnerReviewers) {
     public GitHubPullRequest {
         requireNonNull(repositoryName, "repositoryName must not be null");
         requireNonNull(createdAt, "createdAt must not be null");
         requireNonNull(state, "state must not be null");
         requestedTeamReviewerLogins = List.copyOf(requestedTeamReviewerLogins);
         reviews = List.copyOf(reviews);
-        codeOwnerReviewerLogins = List.copyOf(codeOwnerReviewerLogins);
+        codeOwnerReviewers = List.copyOf(codeOwnerReviewers);
         if (pullRequestNumber <= 0) {
             throw new IllegalArgumentException("pullRequestNumber must be positive, was " + pullRequestNumber);
         }
@@ -85,7 +85,7 @@ public record GitHubPullRequest(
 
     /** Returns a copy with the code-owner review signals (from the GraphQL client) populated. */
     public GitHubPullRequest withCodeownerReview(
-            @Nullable ReviewDecision reviewDecision, List<String> codeOwnerReviewerLogins) {
+            @Nullable ReviewDecision reviewDecision, List<CodeOwnerReviewer> codeOwnerReviewers) {
         return new GitHubPullRequest(
                 repositoryName,
                 pullRequestNumber,
@@ -97,7 +97,7 @@ public record GitHubPullRequest(
                 reviews,
                 authorLogin,
                 reviewDecision,
-                codeOwnerReviewerLogins);
+                codeOwnerReviewers);
     }
 
     public boolean isOpen() {

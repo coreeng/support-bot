@@ -16,7 +16,7 @@ public record PrMetadata(
         List<Review> reviews,
         @Nullable String authorLogin,
         @Nullable Boolean codeOwnersApproved,
-        List<String> codeOwnerReviewers) {
+        List<CodeOwnerRef> codeOwnerReviewers) {
     public PrMetadata {
         requireNonNull(coord, "coord must not be null");
         requireNonNull(createdAt, "createdAt must not be null");

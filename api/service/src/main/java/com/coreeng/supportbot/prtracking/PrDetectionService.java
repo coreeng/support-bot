@@ -11,6 +11,7 @@ import com.coreeng.supportbot.escalation.CreateEscalationRequest;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
 import com.coreeng.supportbot.escalation.EscalationSource;
+import com.coreeng.supportbot.prtracking.source.CodeOwnerRef;
 import com.coreeng.supportbot.prtracking.source.PrMetadata;
 import com.coreeng.supportbot.prtracking.source.PrSourceClients;
 import com.coreeng.supportbot.prtracking.source.PrSourceException;
@@ -1120,7 +1121,8 @@ public class PrDetectionService {
                         prNumber);
     }
 
-    private String formatCodeownerDetectedText(Provider provider, String repo, int prNumber, List<String> codeOwners) {
+    private String formatCodeownerDetectedText(
+            Provider provider, String repo, int prNumber, List<CodeOwnerRef> codeOwners) {
         String prRef = "<%s|%s %s%d>"
                 .formatted(
                         prUrl(repo, prNumber),
@@ -1131,9 +1133,25 @@ public class PrDetectionService {
             return "%s in `%s` needs code-owner approval before the owning team can merge it. I'll let you know once the code owners have approved."
                     .formatted(prRef, repo);
         }
-        String owners = codeOwners.stream().map(o -> "`" + o + "`").collect(Collectors.joining(", "));
+        String owners =
+                codeOwners.stream().map(PrDetectionService::renderCodeOwner).collect(Collectors.joining(", "));
         return "%s in `%s` needs code-owner approval before the owning team can merge it. You may need to chase: %s. I'll let you know once they've approved."
                 .formatted(prRef, repo, owners);
+    }
+
+    /**
+     * Renders a code owner for the chase list: a linked GitHub login/team when a URL is known (plain
+     * backticked text otherwise), with teams prefixed by a people marker and shown org-qualified
+     * (e.g. {@code org/team}) so they're distinguishable from individual users.
+     */
+    private static String renderCodeOwner(CodeOwnerRef ref) {
+        // U+1F465 BUSTS IN SILHOUETTE, rendered as a "busts" emoji in Slack; built from the code point so the
+        // source stays ASCII.
+        String marker = ref.isTeam() ? new String(Character.toChars(0x1F465)) + " " : "";
+        String url = ref.url();
+        String label =
+                url != null && !url.isBlank() ? "<" + url + "|" + ref.display() + ">" : "`" + ref.display() + "`";
+        return marker + label;
     }
 
     private void postText(
