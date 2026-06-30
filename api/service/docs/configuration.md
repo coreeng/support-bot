@@ -527,15 +527,33 @@ Grant the minimum read scopes:
 
 - **`auth-mode: token`** (a Personal Access Token in `github.token`):
   - Classic PAT: `repo` (read PRs, reviews, and file contents on **private**
-    repos — omit only if every tracked repo is public) and `read:org` (resolve
-    `github-team-slug` membership).
+    repos — omit only if every tracked repo is public) and `read:org`
+    (organization membership read — see the note below).
   - Fine-grained PAT: repository permissions **Pull requests: Read**,
     **Contents: Read**, **Metadata: Read**; organization permission
-    **Members: Read** (only if any repo uses `github-team-slug`).
+    **Members: Read** (organization membership read — see the note below).
 - **`auth-mode: app`** (a GitHub App via `app-id` / `installation-id` /
   `private-key-pem`): the same permissions as the fine-grained PAT above —
-  **Pull requests: Read**, **Contents: Read**, **Metadata: Read**, and
-  **Members: Read** (org) when `github-team-slug` is used.
+  **Pull requests: Read**, **Contents: Read**, **Metadata: Read**, plus
+  **Members: Read** (org) for the membership read below.
+
+**Organization membership read** — `read:org` (classic) / **Members: Read**
+(fine-grained, App) — is needed only when the bot has to resolve a GitHub
+**team**:
+
+- a repo sets `github-team-slug`, so the team's members' reviews count toward the
+  SLA; or
+- a `requires-codeowners` repo has a **team** (not just individuals) listed in its
+  `CODEOWNERS`, so the bot can name that team in the "chase the code owner"
+  detected message.
+
+It is **optional** otherwise, and the bot fails open without it: detection and the
+code-owner gate still work — individual code owners and the GraphQL
+`reviewDecision` are read without org access, and a team code owner is simply
+**omitted** from the chase list rather than dropping the PR. Caveat: a
+**fine-grained PAT** can still be denied team reads over GitHub's GraphQL API even
+with **Members: Read** granted; if a team code owner won't appear, use a classic
+PAT with `read:org` or a GitHub App.
 
 **GitLab** (`gitlab` block — a Personal, Group, or Project access token, sent as
 the `PRIVATE-TOKEN` header). GitLab supports two permission models; use whichever
@@ -726,10 +744,14 @@ its signals never reflect code-owner status — the gate silently becomes a no-o
 
 - **GitHub** — a GraphQL query reads `reviewDecision` (`APPROVED` ⟹ all required
   code owners have approved) and the `reviewRequests` whose `asCodeOwner` is true
-  (the owners still owed a review — the chase list). This needs no extra token
-  scope beyond the **Pull requests: Read** / `repo` already required above, and
-  the bot makes **no** branch-protection API call. The GraphQL call is issued
-  **only** for `requires-codeowners` repos, so other repos pay nothing.
+  (the owners still owed a review — the chase list). The gate and **individual**
+  code owners need no extra token scope beyond the **Pull requests: Read** /
+  `repo` already required, and the bot makes **no** branch-protection API call.
+  The GraphQL call is issued **only** for `requires-codeowners` repos, so other
+  repos pay nothing. The one exception: naming a **team** code owner in the chase
+  list reads the team, which needs organization membership read — see
+  [Token permissions](#token-permissions). Without it the gate and individual
+  owners are unaffected; the team is just omitted from the message.
 - **GitLab** — the MR's `approval_state` `code_owner` rule (`approved` = gate
   satisfied; `eligible_approvers` = chase list). **GitLab Code Owners is a
   Premium/Ultimate feature** — on instances/plans without it the `code_owner`
