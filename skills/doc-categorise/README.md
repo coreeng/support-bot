@@ -1,6 +1,6 @@
 # doc-categorise
 
-A standalone agentic skill that audits a repository's markdown documentation against the four [Diátaxis](https://diataxis.fr/) types and a small explicit documentation model. It produces a stakeholder-grade report and, optionally, a fresh Diátaxis-organised copy of the docs alongside the originals.
+A standalone agentic skill that audits a repository's markdown documentation against the four [Diátaxis](https://diataxis.fr/) types and a small explicit documentation model. It produces a stakeholder-grade report and, optionally, a fresh copy of the docs alongside the originals — organised by user journey, with the four Diátaxis types nested inside each journey (or a flat Diátaxis layout when no journeys are supplied).
 
 What the skill reports on:
 
@@ -21,7 +21,7 @@ This README documents how to run the skill and how to interpret its output. The 
 
 ## What the skill does, in one paragraph
 
-When pointed at a repo, the skill walks every markdown file it finds, applies a Diátaxis decision procedure to classify each page (tutorial / how-to / reference / explanation), and tags each page with the journey(s) it covers and the audience it serves. It then computes coverage gaps per journey (covered / partial / missing, with reasons), flags audience mismatches, structural duplicate candidates, hollow stubs, and stale markers, and synthesises a prioritised list of next actions. In `full` mode it also writes a Diátaxis-organised tree under `docs/` (or `docs.proposed/`) where drift pages are rewritten or split into single-type files; in `report-only` mode only the analysis report is written. In both modes the entire run is summarised in a single stakeholder-grade report.
+When pointed at a repo, the skill walks every markdown file it finds, applies a Diátaxis decision procedure to classify each page (tutorial / how-to / reference / explanation), and tags each page with the journey(s) it covers and the audience it serves. It then computes coverage gaps per journey (covered / partial / missing, with reasons), flags audience mismatches, structural duplicate candidates, hollow stubs, and stale markers, and synthesises a prioritised list of next actions. In `full` mode it also writes a journey-organised tree under `docs/` (or `docs.proposed/`) — one folder per supplied journey, each holding the four Diátaxis subfolders, plus a `no-journey/` folder for product-level pages (or a flat four-folder layout when no journeys are supplied) — where drift pages are rewritten or split into single-type files; in `report-only` mode only the analysis report is written. In both modes the entire run is summarised in a single stakeholder-grade report.
 
 ---
 
@@ -163,7 +163,7 @@ Report-only is a deliberate temporary affordance for stakeholder demos where the
 
 ### Directory layout
 
-After a successful run **in full mode** on a repo that did not already have a `docs/` folder:
+The tree is **journey-scoped** when you supply journeys: a folder per user journey, each holding the four Diátaxis subfolders, plus a `no-journey/` folder for product-level pages that match no journey. After a successful run **in full mode** on a repo that did not already have a `docs/` folder:
 
 ```
 <repo>/
@@ -174,14 +174,23 @@ After a successful run **in full mode** on a repo that did not already have a `d
 │   ├── product.md
 │   └── journeys/
 │       └── <slug>.md
-└── docs/                                ← new — Diátaxis-organised tree
-    ├── tutorials/
-    ├── how-to/
-    ├── reference/
-    ├── explanation/
-    ├── assets/                          (images and other assets, deduplicated)
+└── docs/                                ← new — journey-organised tree
+    ├── <journey-slug-1>/                (one folder per supplied journey)
+    │   ├── tutorials/
+    │   ├── how-to/
+    │   ├── reference/
+    │   └── explanation/
+    ├── <journey-slug-2>/
+    │   └── … (same four subfolders)
+    ├── no-journey/                       (pages that match no journey)
+    │   └── … (same four subfolders)
+    ├── assets/                          (images and other assets, deduplicated, shared)
     └── REPORT.md
 ```
+
+A page that matches more than one journey is **copied into each** matched journey's folder (so each journey folder is self-contained); both strong and weak matches place a copy. Originals are never touched. A journey folder may be empty if no page covered that journey — that empty folder is a visible coverage gap.
+
+**Fallback — no journeys supplied (`journeys = []`):** there is nothing to scope folders by, so the skill writes the original **flat** layout — the four Diátaxis folders (`tutorials/`, `how-to/`, `reference/`, `explanation/`) directly under `docs/`, plus `assets/` and `REPORT.md`. No journey folders and no `no-journey/` folder.
 
 If `docs/` already existed, the output tree is at `docs.proposed/` instead and the original `docs/` is left untouched. The skill also recognises `Docs/`, `documentation/`, and `Documentation/` as existing docs folders.
 
@@ -239,12 +248,14 @@ See `references/types.md` for full signals, anti-signals, and disambiguation rul
 
 The skill assigns each source page one of four verdicts. These map to common Diátaxis-style labels as follows:
 
-| Common label  | This skill's verdict                          | Where it lands                                                  |
+The "Where it lands" column below names the **category subfolder**. In the journey-scoped layout that subfolder sits under each matched journey folder (or `no-journey/`), e.g. `<journey-slug>/how-to/` or `no-journey/how-to/`; in the flat fallback it sits directly under `docs/`, e.g. `how-to/`.
+
+| Common label  | This skill's verdict                          | Where it lands (category subfolder)                             |
 | ------------- | ---------------------------------------------- | --------------------------------------------------------------- |
-| tutorial      | PERFECT-tutorial or REWRITE-tutorial           | `tutorials/`                                                    |
-| how-to        | PERFECT-how-to or REWRITE-how-to               | `how-to/`                                                       |
-| reference     | PERFECT-reference or REWRITE-reference         | `reference/`                                                    |
-| explanation   | PERFECT-explanation or REWRITE-explanation     | `explanation/`                                                  |
+| tutorial      | PERFECT-tutorial or REWRITE-tutorial           | `…/tutorials/`                                                  |
+| how-to        | PERFECT-how-to or REWRITE-how-to               | `…/how-to/`                                                     |
+| reference     | PERFECT-reference or REWRITE-reference         | `…/reference/`                                                  |
+| explanation   | PERFECT-explanation or REWRITE-explanation     | `…/explanation/`                                                |
 | mixture       | SPLIT-\<types>                                  | Multiple output files (one per single-type slice), cross-linked |
 | unknown       | OUTLIER                                        | Not placed; recorded in `REPORT.md` under "Outliers"            |
 
@@ -348,7 +359,7 @@ A table of source directory → counts per Diátaxis type. **Use this to spot lo
 
 ### 8. Copied verbatim (PERFECT)
 
-Pages clean enough to copy without rewriting. Source path → output path → category → journeys (if any) → audience. **Action:** spot-check a couple to confirm the agent agreed with you. PERFECT calls are conservative; if you see suspiciously many, the agent may be under-counting drift.
+Pages clean enough to copy without rewriting. Source path → output path(s) → category → journeys (if any) → audience. In the journey-scoped layout a page matching multiple journeys is copied into each matched journey folder, so the output-path cell may list more than one destination. **Action:** spot-check a couple to confirm the agent agreed with you. PERFECT calls are conservative; if you see suspiciously many, the agent may be under-counting drift.
 
 ### 9. Rewritten (single-type)
 
@@ -430,7 +441,7 @@ Either the source scope is wrong (it picked up non-docs like configuration files
 The skill should only escalate in extreme cases (foundational page + close call + downstream impact). For a typical repo, escalations should fire 0–2 times. If you see many, something is mis-tuned — share the run log so the skill behaviour can be checked.
 
 **The output tree appears in an unexpected location.**
-The skill picks an output root in this order: `docs/`, `Docs/`, `documentation/`, `Documentation/`. If one of those exists, the output is `<found>.proposed/`. If none exists, the skill creates `docs/`.
+The skill picks an output root in this order: `docs/`, `Docs/`, `documentation/`, `Documentation/`. If one of those exists, the output is `<found>.proposed/`. If none exists, the skill creates `docs/`. Inside that root, the structure is journey-scoped (a folder per journey + `no-journey/`, each with the four Diátaxis subfolders) when you supplied journeys, or a flat four-Diátaxis layout when you did not.
 
 **The run took very long on a big repo.**
 The skill is bounded by file count and section count; very large repos (hundreds of files) take proportional time. The agent confirms scope above ~50 files — at that gate, narrow the include globs if needed.
