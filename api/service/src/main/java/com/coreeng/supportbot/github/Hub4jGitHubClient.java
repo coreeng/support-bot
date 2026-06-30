@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.kohsuke.github.GHFileNotFoundException;
 import org.kohsuke.github.GHIssueState;
@@ -162,11 +163,20 @@ public final class Hub4jGitHubClient implements GitHubClient {
                     try {
                         return team.listMembers().toList().stream();
                     } catch (IOException e) {
-                        throw new GitHubApiException(
-                                0,
-                                "GitHub API call failed listing members for requested team on %s#%d"
-                                        .formatted(repositoryName, pullNumber),
-                                e);
+                        // A team-membership read can fail independently of the PR read — e.g. the token lacks
+                        // org "Members: Read", or the team is secret. Degrade gracefully: skip this team's
+                        // members instead of aborting the whole PR fetch, which would drop the PR from tracking
+                        // entirely. For requires-codeowners repos this list is unused anyway (the gate comes from
+                        // the GraphQL reviewDecision); elsewhere a member's review simply won't be credited via
+                        // this path until the permission is granted.
+                        LOG.atWarn()
+                                .setCause(e)
+                                .addArgument(team::getName)
+                                .addArgument(() -> repositoryName)
+                                .addArgument(() -> pullNumber)
+                                .log(
+                                        "Could not list members of requested team {} for {}#{}; treating as no resolved members");
+                        return Stream.<GHUser>empty();
                     }
                 })
                 .map(GHUser::getLogin)
