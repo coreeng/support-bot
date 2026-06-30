@@ -473,6 +473,21 @@ class Hub4jGitHubClientTest {
     }
 
     @Test
+    void getPullRequestSkipsRequestedTeamResolutionWhenNotRequested() throws IOException {
+        // given — a requested team is present, but the caller opts out of resolving members.
+        TestPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
+        pr.testRequestedTeams = List.of(mock(GHTeam.class));
+
+        // when — includeRequestedTeamMembers = false (e.g. a github-team-slug or requires-codeowners repo)
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42, false);
+
+        // then — the requested-team path is skipped entirely: no member logins, and getRequestedTeams()
+        // (which would trigger the org Members:Read listMembers call) is never even consulted.
+        assertThat(result.requestedTeamReviewerLogins()).isEmpty();
+        assertThat(pr.requestedTeamsAccessCount).isZero();
+    }
+
+    @Test
     void getPullRequestThrowsOnReviewsIOException() throws IOException {
         // given
         TestPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);

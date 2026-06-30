@@ -32,7 +32,8 @@ public class GitHubPrSourceClient implements PrSourceClient {
     public PrMetadata fetchPullRequest(RepoCoord coord, int prNumber) {
         expectGitHub(coord);
         try {
-            GitHubPullRequest pr = gitHubClient.getPullRequest(coord.name(), prNumber);
+            GitHubPullRequest pr =
+                    gitHubClient.getPullRequest(coord.name(), prNumber, needsRequestedTeamMembers(coord.name()));
             // Code-owner repos: enrich with GitHub's GraphQL-only reviewDecision + asCodeOwner reviewers.
             // Only for open PRs (closed/merged need no chase), and only when configured, to avoid the
             // extra GraphQL call on every other repo. Degrades gracefully: null review leaves the signals
@@ -112,6 +113,21 @@ public class GitHubPrSourceClient implements PrSourceClient {
                 .anyMatch(r -> r.provider() == Provider.GITHUB
                         && r.name().equalsIgnoreCase(repoName)
                         && r.requiresCodeowners());
+    }
+
+    /**
+     * Whether to expand the PR's requested teams into member logins. Only the requested-team review
+     * fallback in {@code TeamReviewFilter} consumes that list, and it's bypassed when an explicit
+     * {@code github-team-slug} is configured or the repo is {@code requires-codeowners} (gated on the
+     * GraphQL {@code reviewDecision}). Skipping resolution for those repos avoids an org Members:Read
+     * call — and the scope it requires — that would otherwise be dead work.
+     */
+    private boolean needsRequestedTeamMembers(String repoName) {
+        return props.repositories().stream()
+                .filter(r -> r.provider() == Provider.GITHUB && r.name().equalsIgnoreCase(repoName))
+                .findFirst()
+                .map(r -> r.githubTeamSlug() == null && !r.requiresCodeowners())
+                .orElse(true);
     }
 
     private static String orgFromRepoName(String repoName) {
