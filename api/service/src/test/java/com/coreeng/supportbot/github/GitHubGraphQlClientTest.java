@@ -45,9 +45,9 @@ class GitHubGraphQlClientTest {
                         {"data":{"repository":{"pullRequest":{
                           "reviewDecision":"APPROVED",
                           "reviewRequests":{"nodes":[
-                            {"asCodeOwner":true,"requestedReviewer":{"login":"alice"}},
-                            {"asCodeOwner":true,"requestedReviewer":{"slug":"platform-team"}},
-                            {"asCodeOwner":false,"requestedReviewer":{"login":"manual-reviewer"}}
+                            {"asCodeOwner":true,"requestedReviewer":{"login":"alice","url":"https://github.com/alice"}},
+                            {"asCodeOwner":true,"requestedReviewer":{"combinedSlug":"my-org/platform-team","url":"https://github.com/orgs/my-org/teams/platform-team"}},
+                            {"asCodeOwner":false,"requestedReviewer":{"login":"manual-reviewer","url":"https://github.com/manual-reviewer"}}
                           ]}
                         }}}}""", MediaType.APPLICATION_JSON));
 
@@ -55,8 +55,13 @@ class GitHubGraphQlClientTest {
 
         assertThat(review).isNotNull();
         assertThat(review.reviewDecision()).isEqualTo(GitHubPullRequest.ReviewDecision.APPROVED);
-        // asCodeOwner=false reviewers are excluded; users (login) and teams (slug) both included.
-        assertThat(review.codeOwnerReviewerLogins()).containsExactly("alice", "platform-team");
+        // asCodeOwner=false reviewers are excluded; a User (login) and a Team (org-qualified combinedSlug),
+        // each carrying GitHub's URL, are both included with the right kind.
+        assertThat(review.codeOwnerReviewers())
+                .containsExactly(
+                        new CodeOwnerReviewer(false, "alice", "https://github.com/alice"),
+                        new CodeOwnerReviewer(
+                                true, "my-org/platform-team", "https://github.com/orgs/my-org/teams/platform-team"));
         server.verify();
     }
 
@@ -74,7 +79,8 @@ class GitHubGraphQlClientTest {
 
         assertThat(review).isNotNull();
         assertThat(review.reviewDecision()).isEqualTo(GitHubPullRequest.ReviewDecision.REVIEW_REQUIRED);
-        assertThat(review.codeOwnerReviewerLogins()).containsExactly("carol");
+        // No url in the response -> the ref carries a null url (message falls back to plain text).
+        assertThat(review.codeOwnerReviewers()).containsExactly(new CodeOwnerReviewer(false, "carol", null));
     }
 
     @Test
@@ -88,7 +94,7 @@ class GitHubGraphQlClientTest {
 
         assertThat(review).isNotNull();
         assertThat(review.reviewDecision()).isNull();
-        assertThat(review.codeOwnerReviewerLogins()).isEmpty();
+        assertThat(review.codeOwnerReviewers()).isEmpty();
     }
 
     @Test

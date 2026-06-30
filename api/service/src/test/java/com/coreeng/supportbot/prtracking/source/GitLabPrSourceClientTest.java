@@ -442,17 +442,20 @@ class GitLabPrSourceClientTest {
                 .andExpect(header("PRIVATE-TOKEN", TOKEN))
                 .andRespond(withSuccess("""
                         {"rules":[
-                          {"rule_type":"code_owner","approved":false,"eligible_approvers":[{"username":"owner-a"},{"username":"owner-b"}]},
+                          {"rule_type":"code_owner","approved":false,"eligible_approvers":[{"username":"owner-a","web_url":"https://gitlab.com/owner-a"},{"username":"owner-b"}]},
                           {"rule_type":"regular","approved":true}
                         ]}
                         """, MediaType.APPLICATION_JSON));
 
         PrMetadata md = h.client().fetchPullRequest(RepoCoord.gitlab(REPO), 50);
 
-        // An unapproved code_owner rule => gate not satisfied; its eligible approvers are the chase list.
-        // The non-code_owner "regular" rule is ignored.
+        // An unapproved code_owner rule => gate not satisfied; its eligible approvers are the chase list,
+        // mapped to USER refs carrying web_url where GitLab supplies it (null otherwise).
         assertThat(md.codeOwnersApproved()).isFalse();
-        assertThat(md.codeOwnerReviewers()).containsExactly("owner-a", "owner-b");
+        assertThat(md.codeOwnerReviewers())
+                .containsExactly(
+                        new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-a", "https://gitlab.com/owner-a"),
+                        new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-b", null));
         h.server().verify();
     }
 

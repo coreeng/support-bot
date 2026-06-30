@@ -34,8 +34,8 @@ public class GitHubGraphQlClient {
                     nodes {
                       asCodeOwner
                       requestedReviewer {
-                        ... on User { login }
-                        ... on Team { slug }
+                        ... on User { login url }
+                        ... on Team { combinedSlug url }
                       }
                     }
                   }
@@ -108,21 +108,26 @@ public class GitHubGraphQlClient {
         };
     }
 
-    /** Logins (users) / slugs (teams) of reviewers GitHub requested because of CODEOWNERS, still pending. */
-    private static List<String> extractCodeOwners(JsonNode pr) {
-        List<String> owners = new ArrayList<>();
+    /** Users / teams GitHub requested because of CODEOWNERS, still pending — the chase list. */
+    private static List<CodeOwnerReviewer> extractCodeOwners(JsonNode pr) {
+        List<CodeOwnerReviewer> owners = new ArrayList<>();
         for (JsonNode node : pr.path("reviewRequests").path("nodes")) {
             if (!node.path("asCodeOwner").asBoolean(false)) {
                 continue;
             }
             JsonNode reviewer = node.path("requestedReviewer");
             if (reviewer.hasNonNull("login")) {
-                owners.add(reviewer.get("login").asText());
-            } else if (reviewer.hasNonNull("slug")) {
-                owners.add(reviewer.get("slug").asText());
+                owners.add(new CodeOwnerReviewer(false, reviewer.get("login").asText(), urlOrNull(reviewer)));
+            } else if (reviewer.hasNonNull("combinedSlug")) {
+                owners.add(
+                        new CodeOwnerReviewer(true, reviewer.get("combinedSlug").asText(), urlOrNull(reviewer)));
             }
         }
         return List.copyOf(owners);
+    }
+
+    private static @Nullable String urlOrNull(JsonNode reviewer) {
+        return reviewer.hasNonNull("url") ? reviewer.get("url").asText() : null;
     }
 
     /** Derives the GraphQL endpoint from the REST API base URL (github.com and GitHub Enterprise Server). */
@@ -138,9 +143,9 @@ public class GitHubGraphQlClient {
 
     /** GitHub's aggregate review verdict for a PR plus the still-pending code-owner reviewers. */
     public record CodeownerReview(
-            GitHubPullRequest.@Nullable ReviewDecision reviewDecision, List<String> codeOwnerReviewerLogins) {
+            GitHubPullRequest.@Nullable ReviewDecision reviewDecision, List<CodeOwnerReviewer> codeOwnerReviewers) {
         public CodeownerReview {
-            codeOwnerReviewerLogins = List.copyOf(codeOwnerReviewerLogins);
+            codeOwnerReviewers = List.copyOf(codeOwnerReviewers);
         }
     }
 }

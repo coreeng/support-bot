@@ -12,6 +12,7 @@ import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
+import com.coreeng.supportbot.prtracking.source.CodeOwnerRef;
 import com.coreeng.supportbot.prtracking.source.PrMetadata;
 import com.coreeng.supportbot.prtracking.source.PrSourceClient;
 import com.coreeng.supportbot.prtracking.source.PrSourceClients;
@@ -249,7 +250,12 @@ class PrDetectionServiceTest {
                             List.of(),
                             "author",
                             false,
-                            List.of("owner-a")));
+                            List.of(
+                                    new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-a", "https://github.com/owner-a"),
+                                    new CodeOwnerRef(
+                                            CodeOwnerRef.Kind.TEAM,
+                                            "my-org/docs-team",
+                                            "https://github.com/orgs/my-org/teams/docs-team"))));
             when(prTrackingRepository.insertIfAbsent(any()))
                     .thenReturn(stubTrackingRecord(prCreatedAt, prCreatedAt.plus(SLA_24H)));
 
@@ -264,7 +270,13 @@ class PrDetectionServiceTest {
             verify(slackClient).postMessage(postMessageCaptor.capture());
             String text = postMessageCaptor.getValue().message().getText();
             assertThat(text).contains("code-owner");
-            assertThat(text).contains("owner-a");
+            // the user renders as a linked GitHub login, the team as an org-qualified, linked entry flagged
+            // with a people marker so it's distinguishable from an individual.
+            assertThat(text).contains("<https://github.com/owner-a|owner-a>");
+            assertThat(text)
+                    .contains("<https://github.com/orgs/my-org/teams/docs-team|my-org/docs-team>")
+                    .contains(new String(Character.toChars(0x1F465))
+                            + " <https://github.com/orgs/my-org/teams/docs-team");
         }
     }
 

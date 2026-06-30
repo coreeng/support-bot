@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -114,7 +115,7 @@ public class GitLabPrSourceClient implements PrSourceClient {
         // gate is satisfied when every code_owner rule is approved; unapproved rules' eligible approvers
         // are the chase list. Only while open, mirroring the approvals fetch above.
         Boolean codeOwnersApproved = null;
-        List<String> codeOwnerReviewers = List.of();
+        List<CodeOwnerRef> codeOwnerReviewers = List.of();
         if (state == PrMetadata.PrState.OPEN && requiresCodeowners(coord.name())) {
             CodeownerApprovalState codeowners =
                     fetchCodeownerApprovalState(conn, projectSegment, coord.name(), prNumber);
@@ -450,21 +451,23 @@ public class GitLabPrSourceClient implements PrSourceClient {
                 .filter(r -> "code_owner".equalsIgnoreCase(r.ruleType()))
                 .toList();
         boolean approved = codeOwnerRules.stream().allMatch(r -> Boolean.TRUE.equals(r.approved()));
-        List<String> pending = new ArrayList<>();
+        List<CodeOwnerRef> pending = new ArrayList<>();
+        HashSet<String> seen = new HashSet<>();
         for (ApprovalRuleDto rule : codeOwnerRules) {
             if (Boolean.TRUE.equals(rule.approved()) || rule.eligibleApprovers() == null) {
                 continue;
             }
             for (UserRefDto approver : rule.eligibleApprovers()) {
-                if (approver != null && approver.username() != null) {
-                    pending.add(approver.username());
+                // GitLab expands code-owner groups to their eligible individual approvers, so each ref is a user.
+                if (approver != null && approver.username() != null && seen.add(approver.username())) {
+                    pending.add(new CodeOwnerRef(CodeOwnerRef.Kind.USER, approver.username(), approver.webUrl()));
                 }
             }
         }
-        return new CodeownerApprovalState(approved, pending.stream().distinct().toList());
+        return new CodeownerApprovalState(approved, List.copyOf(pending));
     }
 
-    private record CodeownerApprovalState(@Nullable Boolean approved, List<String> pendingApprovers) {}
+    private record CodeownerApprovalState(@Nullable Boolean approved, List<CodeOwnerRef> pendingApprovers) {}
 
     private record GitLabConnection(String apiBaseUrl, String token) {}
 
@@ -495,7 +498,9 @@ public class GitLabPrSourceClient implements PrSourceClient {
             @JsonProperty("eligible_approvers") @Nullable List<UserRefDto> eligibleApprovers) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record UserRefDto(@Nullable String username) {}
+    private record UserRefDto(
+            @Nullable String username,
+            @JsonProperty("web_url") @Nullable String webUrl) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record DiffEntryDto(

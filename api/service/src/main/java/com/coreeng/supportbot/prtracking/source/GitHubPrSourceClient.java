@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.prtracking.source;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
+import com.coreeng.supportbot.github.CodeOwnerReviewer;
 import com.coreeng.supportbot.github.GitHubApiException;
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.github.GitHubGraphQlClient;
@@ -39,7 +40,7 @@ public class GitHubPrSourceClient implements PrSourceClient {
             if (graphQlClient != null && pr.isOpen() && requiresCodeowners(coord.name())) {
                 GitHubGraphQlClient.CodeownerReview review = graphQlClient.fetchCodeownerReview(coord.name(), prNumber);
                 if (review != null) {
-                    pr = pr.withCodeownerReview(review.reviewDecision(), review.codeOwnerReviewerLogins());
+                    pr = pr.withCodeownerReview(review.reviewDecision(), review.codeOwnerReviewers());
                 }
             }
             Boolean codeOwnersApproved = pr.reviewDecision() == null
@@ -55,10 +56,17 @@ public class GitHubPrSourceClient implements PrSourceClient {
                     pr.reviews().stream().map(GitHubPrSourceClient::mapReview).toList(),
                     pr.authorLogin(),
                     codeOwnersApproved,
-                    pr.codeOwnerReviewerLogins());
+                    pr.codeOwnerReviewers().stream()
+                            .map(GitHubPrSourceClient::mapCodeOwner)
+                            .toList());
         } catch (GitHubApiException e) {
             throw new PrSourceException(e.getMessage(), e);
         }
+    }
+
+    private static CodeOwnerRef mapCodeOwner(CodeOwnerReviewer reviewer) {
+        return new CodeOwnerRef(
+                reviewer.team() ? CodeOwnerRef.Kind.TEAM : CodeOwnerRef.Kind.USER, reviewer.display(), reviewer.url());
     }
 
     @Override
