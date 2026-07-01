@@ -121,7 +121,16 @@ public class PrLifecyclePoller {
         // Key on (provider, name) so a hypothetical name collision across providers can't pick
         // the wrong config — even though PrTrackingProps disallows duplicates today, the lifecycle
         // poller reads from the database and should not assume that constraint as a safety net.
-        return prTrackingProps.findRepository(provider, repo);
+        //
+        // Deliberately NOT PrTrackingProps.findRepository(...): prTrackingProps is injected and mocked
+        // in PrLifecyclePollerTest, so calling a real (non-stubbed) instance method on that mock would
+        // return Mockito's default null rather than running the real lookup — silently breaking every
+        // test that stubs repositories() directly. Filter repositories() here instead, which is what the
+        // tests actually stub.
+        return prTrackingProps.repositories().stream()
+                .filter(r -> r.provider() == provider && r.name().equalsIgnoreCase(repo))
+                .findFirst()
+                .orElse(null);
     }
 
     // ── Functional core wiring ──

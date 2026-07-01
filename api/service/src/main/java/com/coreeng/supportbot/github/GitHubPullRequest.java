@@ -6,6 +6,13 @@ import java.time.Instant;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * {@code requestedTeamReviewerLogins} is {@code null} when at least one of the PR's requested teams'
+ * membership couldn't be listed — the requested-team review fallback is unresolved for this poll, as
+ * distinct from an empty list (no teams requested / resolution skipped). See {@code TeamReviewFilter},
+ * which treats {@code null} the same as an explicit team-slug lookup failure: fall back to accepting all
+ * reviews rather than trusting a partial membership set.
+ */
 public record GitHubPullRequest(
         String repositoryName,
         int pullRequestNumber,
@@ -13,7 +20,7 @@ public record GitHubPullRequest(
         PrState state,
         @Nullable Boolean mergeable,
         @Nullable String mergeableState,
-        List<String> requestedTeamReviewerLogins,
+        @Nullable List<String> requestedTeamReviewerLogins,
         List<GitHubPullRequestReview> reviews,
         @Nullable String authorLogin,
         @Nullable ReviewDecision reviewDecision,
@@ -22,7 +29,8 @@ public record GitHubPullRequest(
         requireNonNull(repositoryName, "repositoryName must not be null");
         requireNonNull(createdAt, "createdAt must not be null");
         requireNonNull(state, "state must not be null");
-        requestedTeamReviewerLogins = List.copyOf(requestedTeamReviewerLogins);
+        requestedTeamReviewerLogins =
+                requestedTeamReviewerLogins == null ? null : List.copyOf(requestedTeamReviewerLogins);
         reviews = List.copyOf(reviews);
         codeOwnerReviewers = List.copyOf(codeOwnerReviewers);
         if (pullRequestNumber <= 0) {
@@ -38,7 +46,7 @@ public record GitHubPullRequest(
             PrState state,
             @Nullable Boolean mergeable,
             @Nullable String mergeableState,
-            List<String> requestedTeamReviewerLogins,
+            @Nullable List<String> requestedTeamReviewerLogins,
             List<GitHubPullRequestReview> reviews) {
         this(
                 repositoryName,
@@ -66,7 +74,7 @@ public record GitHubPullRequest(
             PrState state,
             @Nullable Boolean mergeable,
             @Nullable String mergeableState,
-            List<String> requestedTeamReviewerLogins,
+            @Nullable List<String> requestedTeamReviewerLogins,
             List<GitHubPullRequestReview> reviews,
             @Nullable String authorLogin) {
         this(

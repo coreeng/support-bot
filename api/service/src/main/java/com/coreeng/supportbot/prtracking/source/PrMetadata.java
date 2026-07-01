@@ -6,13 +6,21 @@ import java.time.Instant;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * {@code requestedTeamReviewerLogins} is {@code null} when the source client attempted to resolve at
+ * least one of the PR's requested teams' membership and couldn't (e.g. a GitHub team-membership read
+ * failed) — the requested-team review fallback is unresolved for this poll, as distinct from an empty
+ * list (no teams requested / resolution not attempted). {@code TeamReviewFilter} treats {@code null} the
+ * same as an explicit team lookup failure: fall back to accepting all reviews rather than trusting a
+ * partial membership set.
+ */
 public record PrMetadata(
         RepoCoord coord,
         int number,
         Instant createdAt,
         PrState state,
         @Nullable Boolean mergeable,
-        List<String> requestedTeamReviewerLogins,
+        @Nullable List<String> requestedTeamReviewerLogins,
         List<Review> reviews,
         @Nullable String authorLogin,
         @Nullable Boolean codeOwnersApproved,
@@ -21,7 +29,8 @@ public record PrMetadata(
         requireNonNull(coord, "coord must not be null");
         requireNonNull(createdAt, "createdAt must not be null");
         requireNonNull(state, "state must not be null");
-        requestedTeamReviewerLogins = List.copyOf(requestedTeamReviewerLogins);
+        requestedTeamReviewerLogins =
+                requestedTeamReviewerLogins == null ? null : List.copyOf(requestedTeamReviewerLogins);
         reviews = List.copyOf(reviews);
         codeOwnerReviewers = List.copyOf(codeOwnerReviewers);
         if (number <= 0) {
@@ -39,7 +48,7 @@ public record PrMetadata(
             Instant createdAt,
             PrState state,
             @Nullable Boolean mergeable,
-            List<String> requestedTeamReviewerLogins,
+            @Nullable List<String> requestedTeamReviewerLogins,
             List<Review> reviews) {
         this(coord, number, createdAt, state, mergeable, requestedTeamReviewerLogins, reviews, null, null, List.of());
     }
@@ -55,7 +64,7 @@ public record PrMetadata(
             Instant createdAt,
             PrState state,
             @Nullable Boolean mergeable,
-            List<String> requestedTeamReviewerLogins,
+            @Nullable List<String> requestedTeamReviewerLogins,
             List<Review> reviews,
             @Nullable String authorLogin) {
         this(
