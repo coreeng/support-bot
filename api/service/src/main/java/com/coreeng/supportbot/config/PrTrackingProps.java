@@ -221,6 +221,7 @@ public record PrTrackingProps(
             requireNotBlank(
                     githubConfig.installationId(),
                     "pr-review-tracking.github.installation-id must not be blank when auth-mode=app");
+            requireValidInstallationId(githubConfig.installationId());
             requireNotBlank(
                     githubConfig.privateKeyPem(),
                     "pr-review-tracking.github.private-key-pem must not be blank when auth-mode=app");
@@ -240,6 +241,23 @@ public record PrTrackingProps(
     private static void requireNotBlank(String value, String errorMessage) {
         if (isBlank(value)) {
             throw new IllegalArgumentException(errorMessage);
+        }
+    }
+
+    /**
+     * Fails fast with an actionable message when {@code installation-id} isn't parseable as a
+     * {@code long} — otherwise the raw value survives config binding/validation and only blows up
+     * later as an unchecked {@link NumberFormatException} out of {@code PrTrackingGitHubConfig}'s
+     * {@code gitHubAuthorizationProvider} bean method, deep inside Spring's context startup.
+     */
+    private static void requireValidInstallationId(String installationId) {
+        try {
+            Long.parseLong(installationId);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "pr-review-tracking.github.installation-id must be a valid numeric GitHub App installation ID, got: "
+                            + installationId,
+                    e);
         }
     }
 

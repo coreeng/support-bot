@@ -125,6 +125,29 @@ class PrTrackingConfigValidationTest {
     }
 
     @Test
+    void rejectsNonNumericInstallationIdWhenAppModeEnabled() {
+        // given
+        PrTrackingProps.GitHub appNonNumericInstallation = new PrTrackingProps.GitHub(
+                PrTrackingProps.AuthMode.APP, "https://api.github.com", "", "12345", "12345abc", "pem");
+
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(validRepo()),
+                        appNonNumericInstallation,
+                        null,
+                        DEFAULT_SLA_DISCOVERY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("installation-id")
+                .hasMessageContaining("12345abc");
+    }
+
+    @Test
     void rejectsMissingGitHubConfigWhenEnabled() {
         // when / then
         assertThatThrownBy(() -> new PrTrackingProps(
