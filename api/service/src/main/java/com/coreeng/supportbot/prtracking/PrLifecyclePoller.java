@@ -171,37 +171,51 @@ public class PrLifecyclePoller {
 
     /**
      * The only place that touches the repository / Slack / escalation. Writes the status row implied by
-     * {@code (next, slaOp)}, then runs effects in list order. The one exception: {@link
+     * {@code (next, slaOp)}, then runs effects in list order against the <b>post-write</b> record — every
+     * mutating repository method already returns the row it just wrote, so an effect that reads
+     * {@code slaDeadline} (e.g. {@link #recordContext}, for {@code sla_duration}/{@code sla_deadline})
+     * sees the deadline this transition just set, not the value from before the write. This matters most
+     * for {@code Start}: {@code NotifyAwaitingMerge} always fires in the same decision as {@code Start}
+     * (see {@code TRANSITIONS}), so without threading the returned record through, that notification would
+     * render whatever deadline the record had in its prior state (e.g. a stale review-phase deadline, or
+     * none) instead of the merge deadline just written. The one exception: {@link
      * PrLifecycle.Effect.Escalate} owns its own status write — it is gated on ticket existence and the
-     * escalation result — so the generic write is skipped when one is present.
+     * escalation result — so the generic write is skipped when one is present, and effects run against the
+     * unmodified {@code record} (correct here: escalation renders its message before its own write, off
+     * whatever deadline was already persisted from an earlier poll).
      */
     private void apply(PrTrackingRecord record, PrLifecycle.Decision decision) {
         boolean escalateOwnsWrite = decision.effects().stream()
                 .anyMatch(
                         e -> e instanceof PrLifecycle.Effect.Escalate || e instanceof PrLifecycle.Effect.EscalateMerge);
-        switch (decision.slaOp()) {
-            case PrLifecycle.SlaOp.Pause pause ->
-                prTrackingRepository.pauseSla(record.id(), decision.next(), pause.remaining());
-            case PrLifecycle.SlaOp.Resume ignored ->
-                prTrackingRepository.resumeSla(record.id(), Instant.now().plus(checkNotNull(record.slaRemaining())));
-            case PrLifecycle.SlaOp.Start ignored -> startMergeClock(record, decision.next());
-            case PrLifecycle.SlaOp.SetClosedAt ignored -> {
-                prTrackingRepository.updateStatus(
-                        record.id(), PrTrackingStatus.CLOSED, Instant.now(), record.escalationId());
-                log.atInfo()
-                        .addArgument(record::repo)
-                        .addArgument(record::prNumber)
-                        .log("PR {}#{} marked as CLOSED");
-            }
-            case PrLifecycle.SlaOp.None ignored -> {
-                if (decision.next() != record.status() && !escalateOwnsWrite) {
-                    prTrackingRepository.updateStatus(record.id(), decision.next(), null, record.escalationId());
-                }
-            }
-        }
-        logApprovedAwaitingMerge(record, decision);
+        PrTrackingRecord current =
+                switch (decision.slaOp()) {
+                    case PrLifecycle.SlaOp.Pause pause ->
+                        prTrackingRepository.pauseSla(record.id(), decision.next(), pause.remaining());
+                    case PrLifecycle.SlaOp.Resume ignored ->
+                        prTrackingRepository.resumeSla(
+                                record.id(), Instant.now().plus(checkNotNull(record.slaRemaining())));
+                    case PrLifecycle.SlaOp.Start ignored -> startMergeClock(record, decision.next());
+                    case PrLifecycle.SlaOp.SetClosedAt ignored -> {
+                        PrTrackingRecord closed = prTrackingRepository.updateStatus(
+                                record.id(), PrTrackingStatus.CLOSED, Instant.now(), record.escalationId());
+                        log.atInfo()
+                                .addArgument(record::repo)
+                                .addArgument(record::prNumber)
+                                .log("PR {}#{} marked as CLOSED");
+                        yield closed;
+                    }
+                    case PrLifecycle.SlaOp.None ignored -> {
+                        if (decision.next() != record.status() && !escalateOwnsWrite) {
+                            yield prTrackingRepository.updateStatus(
+                                    record.id(), decision.next(), null, record.escalationId());
+                        }
+                        yield record;
+                    }
+                };
+        logApprovedAwaitingMerge(current, decision);
         for (PrLifecycle.Effect effect : decision.effects()) {
-            runEffect(record, effect);
+            runEffect(current, effect);
         }
     }
 
@@ -209,7 +223,9 @@ public class PrLifecyclePoller {
      * Starts the merge-chase SLA clock on entry to AWAITING_MERGE, using the same SLA resolution as the
      * review-phase clock ({@link #mergeSlaFor}) — SLA resolution lives in one place ({@link SlaLookup}),
      * not two. When the repo has no SLA (or the resolved SLA is null — e.g. no default and no matching
-     * file/override), the state is entered without a deadline, so it never merge-escalates.
+     * file/override), the state is entered without a deadline, so it never merge-escalates. Returns the
+     * post-write record so {@link #apply} can render effects (e.g. {@code NotifyAwaitingMerge}) off the
+     * deadline just set, not the pre-transition one.
      *
      * <p>A resolution failure ({@link PrSourceException}, e.g. the SLA file couldn't be fetched) is
      * deliberately <b>not</b> caught here: it propagates out of {@link #apply}, so neither the status
@@ -219,13 +235,13 @@ public class PrLifecyclePoller {
      * "ready to merge" without ever starting the clock — and repeat that every poll the lookup keeps
      * failing.
      */
-    private void startMergeClock(PrTrackingRecord record, PrTrackingStatus next) {
+    private PrTrackingRecord startMergeClock(PrTrackingRecord record, PrTrackingStatus next) {
         Duration sla = mergeSlaFor(record);
         if (sla != null) {
-            prTrackingRepository.startSla(record.id(), next, Instant.now().plus(sla));
-        } else {
-            prTrackingRepository.updateStatus(record.id(), next, null, record.escalationId());
+            return prTrackingRepository.startSla(
+                    record.id(), next, Instant.now().plus(sla));
         }
+        return prTrackingRepository.updateStatus(record.id(), next, null, record.escalationId());
     }
 
     /**
@@ -488,12 +504,23 @@ public class PrLifecyclePoller {
         }
     }
 
+    /**
+     * {@code sla_duration}'s origin depends on which clock {@code slaDeadline} belongs to: the
+     * review-phase clock starts at {@code prCreatedAt}, so {@code deadline - prCreatedAt} is the SLA
+     * window there — but the merge-phase clock ({@code AWAITING_MERGE}/{@code MERGE_ESCALATED}) starts
+     * when code owners approved, which isn't persisted. Re-resolving through {@link #mergeSlaFor} (the
+     * same {@link SlaLookup} call that set the deadline) gives the actual merge-SLA window instead of
+     * the meaningless {@code deadline - prCreatedAt} span, which — for a PR that sat in review for days
+     * before a same-day merge — would overstate the merge window by however long review took.
+     */
     private PrMessageContext recordContext(PrTrackingRecord record) {
         Duration sla = null;
         Instant slaDeadline = null;
         if (record.slaDeadline() != null) {
-            Duration computed = Duration.between(record.prCreatedAt(), record.slaDeadline());
-            if (computed.isPositive()) {
+            Duration computed = isMergePhase(record.status())
+                    ? mergeSlaFor(record)
+                    : Duration.between(record.prCreatedAt(), record.slaDeadline());
+            if (computed != null && computed.isPositive()) {
                 sla = computed;
                 slaDeadline = record.slaDeadline();
             } else {
@@ -511,6 +538,10 @@ public class PrLifecyclePoller {
                 resolveTeamLabel(record.owningTeam()),
                 sla,
                 slaDeadline);
+    }
+
+    private static boolean isMergePhase(PrTrackingStatus status) {
+        return status == PrTrackingStatus.AWAITING_MERGE || status == PrTrackingStatus.MERGE_ESCALATED;
     }
 
     private String resolveTeamLabel(String teamCode) {
