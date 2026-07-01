@@ -44,17 +44,32 @@ public class GitHubPrSourceClient implements PrSourceClient {
             GitHubPullRequest pr = gitHubClient.getPullRequest(coord.name(), prNumber, includeRequestedTeamMembers);
             // Code-owner repos: enrich with GitHub's GraphQL-only reviewDecision + asCodeOwner reviewers.
             // Only for open PRs (closed/merged need no chase), and only when configured, to avoid the
-            // extra GraphQL call on every other repo. Degrades gracefully: null review leaves the signals
-            // unset, so the lifecycle treats it as "code owners not yet satisfied".
+            // extra GraphQL call on every other repo.
+            //
+            // codeOwnersApproved is a deliberate tri-state:
+            //   true  — the gate is satisfied: a *successful* GraphQL query returned either APPROVED (every
+            //           required code owner approved) or no reviewDecision at all. GitHub reports no
+            //           reviewDecision when the PR's changed paths require no code-owner review, so the gate
+            //           doesn't apply and the PR should advance to the merge phase, not stall in OPEN.
+            //   false — a required code-owner review is still outstanding (REVIEW_REQUIRED / CHANGES_REQUESTED).
+            //   null  — not applicable / unknown: not a code-owner repo, a closed PR, no GraphQL client, or
+            //           the query FAILED. A failed query must stay null (never read as "no review required"),
+            //           so the lifecycle keeps chasing the code owner and retries next poll rather than
+            //           advancing a PR to merge on a transient GraphQL error.
+            //
+            // Note the deliberate asymmetry with GitLabPrSourceClient, which fails *closed* on the analogous
+            // "no code_owner rule" case: there an empty rule set usually means the instance lacks Code Owners
+            // (CE/Free) rather than a per-PR "no owned paths", whereas GitHub's successful reviewDecision is a
+            // definitive per-PR signal we can trust.
+            Boolean codeOwnersApproved = null;
             if (graphQlClient != null && pr.isOpen() && requiresCodeowners) {
                 GitHubGraphQlClient.CodeownerReview review = graphQlClient.fetchCodeownerReview(coord.name(), prNumber);
                 if (review != null) {
                     pr = pr.withCodeownerReview(review.reviewDecision(), review.codeOwnerReviewers());
+                    codeOwnersApproved = review.reviewDecision() == null
+                            || review.reviewDecision() == GitHubPullRequest.ReviewDecision.APPROVED;
                 }
             }
-            Boolean codeOwnersApproved = pr.reviewDecision() == null
-                    ? null
-                    : pr.reviewDecision() == GitHubPullRequest.ReviewDecision.APPROVED;
             return new PrMetadata(
                     coord,
                     pr.pullRequestNumber(),
