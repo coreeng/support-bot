@@ -720,6 +720,11 @@ public class PrDetectionService {
      * owning team is never escalated before the code owners approve. The tenant gets a "chase the code
      * owner" detected message listing the inferred code owners; the merge clock starts later, on the
      * poller's transition into AWAITING_MERGE.
+     *
+     * <p>Path filtering still applies in no-SLA mode: a requires-codeowners repo with no {@code sla} block
+     * is a no-SLA repo (config validation mandates {@code paths} there), and — like any no-SLA repo — it
+     * tracks only PRs/MRs touching those paths. SLA-mode codeowner repos track every PR, mirroring the
+     * non-codeowner SLA path ({@link #processOpenPr}), which likewise ignores the top-level {@code paths}.
      */
     private PerPrResult processCodeownerOpenPr(
             DetectedPr detectedPr,
@@ -727,6 +732,19 @@ public class PrDetectionService {
             boolean canAutoCloseTicket,
             PrTrackingProps.Repository repoConfig,
             PrMetadata prMetadata) {
+
+        if (repoConfig.hasNoSla()
+                && !matchesPathFilter(
+                        repoConfig.paths(),
+                        detectedPr.provider(),
+                        detectedPr.repositoryName(),
+                        detectedPr.pullNumber())) {
+            log.atDebug()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .log("PR {}#{} does not match configured paths for no-SLA requires-codeowners repo, skipping");
+            return PerPrResult.SKIPPED;
+        }
 
         TicketId ticketId = checkNotNull(ticket.id());
         PrTrackingRecord tracking = prTrackingRepository.insertIfAbsent(new NewPrTracking(
