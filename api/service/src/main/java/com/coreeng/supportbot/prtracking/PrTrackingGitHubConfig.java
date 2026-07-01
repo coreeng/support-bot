@@ -48,7 +48,11 @@ public class PrTrackingGitHubConfig {
     /**
      * The authorization provider shared by the REST (hub4j) and GraphQL clients. APP mode returns the
      * AppInstallationAuthorizationProvider (rotating installation token, bound when {@link #gitHub} is
-     * built); TOKEN mode a static {@code Bearer} header — accepted by both the REST and GraphQL APIs.
+     * built). TOKEN mode uses the {@code token} scheme — matching hub4j's own {@code withOAuthToken}
+     * (see {@code ImmutableAuthorizationProvider.fromOauthToken}) — rather than {@code Bearer}: GHES
+     * deployments (the reason {@code api-base-url} is configurable at all) are not guaranteed to accept
+     * {@code Bearer} on the REST API the way github.com does, and {@code token} is accepted by both the
+     * REST and GraphQL APIs on every GitHub version.
      */
     @Bean
     public AuthorizationProvider gitHubAuthorizationProvider(PrTrackingProps props) {
@@ -61,7 +65,7 @@ public class PrTrackingGitHubConfig {
             return new AppInstallationAuthorizationProvider(
                     app -> app.getInstallationById(installationId), jwtProvider);
         }
-        return () -> "Bearer " + config.token();
+        return () -> "token " + config.token();
     }
 
     @Bean
