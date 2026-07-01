@@ -33,7 +33,7 @@ The skill operates on a small, explicit model of what good documentation is. Eve
 **Quality-of-life features** (reported alongside the principles above but not derived from them):
 
 - **Duplication candidates** — structural clustering by `(journey, type, variation)` tuple. See `references/duplication.md`.
-- **Quality flags** — a deterministic `hollow` (stub) check and a `stale-marker` check (deterministic `deprecated`/`TODO` keyword prefilter, then a bounded adjudication that discards incidental keyword mentions). See `references/quality-flags.md`.
+- **Quality flags** — deterministic `hollow` (stub) and `stale-marker` (explicit `deprecated`/`TODO`) checks. See `references/quality-flags.md`.
 
 These are general documentation-hygiene checks; the skill does not claim they are part of any principle.
 
@@ -51,7 +51,7 @@ Load order:
 - `references/audience-tagging.md` — load **after journey matching completes, once per run, always**. Specifies how to assign an audience tier (builder/maintainer vs end-user) and detailed audience labels to each scanned page, plus the mismatch-detection procedure.
 - `references/gap-analysis.md` — load **after audience tagging completes, once per run, always**. Specifies per-journey coverage verdicts (covered/partial/missing) and descriptive product-level page counts by Diátaxis type. Produces the Coverage analysis section of REPORT.md.
 - `references/duplication.md` — load **after gap analysis completes, once per run, always**. Specifies the intentionally minimal duplication-candidate rule: structural grouping by `(journey, Diátaxis type, variation)`, no LLM judgement. Read its "What this does NOT catch" section before interpreting the cluster output.
-- `references/quality-flags.md` — load **after duplication detection completes, once per run, always**. Specifies the two quality flags (`hollow`, a pure deterministic rule; and `stale-marker`, a deterministic keyword prefilter followed by a single batched adjudication pass that discards incidental keyword mentions). Read its "What this does NOT catch" section before interpreting the output.
+- `references/quality-flags.md` — load **after duplication detection completes, once per run, always**. Specifies the two deterministic quality flags (`hollow` and `stale-marker`), with no LLM judgement. Read its "What this does NOT catch" section before interpreting the output.
 - `references/suggested-actions.md` — load **after quality flags complete, once per run, always**. Specifies the deterministic synthesis that turns prior-step outputs into a single prioritised list of recommended actions, using a fixed enum of nine action types and three severity tiers.
 - `references/examples.md` — load **on demand**, when you need a worked exemplar to pattern-match against. Optional.
 
@@ -280,7 +280,7 @@ Two cases that are **not** collisions: outputs in different category folders, an
 5. Tag each source file with audience per `references/audience-tagging.md`. Always runs. Uses journey-relevance results from step 4 when available; falls back to content inference when no journey match exists or the matched journey has no `users:` field.
 6. Compute coverage gaps per `references/gap-analysis.md`. Always runs. Produces a per-journey coverage verdict (covered/partial/missing) — Part A skipped when `journeys = []` — and descriptive product-level page counts at the builder/maintainer audience tier (Part B always).
 7. Identify duplication candidates per `references/duplication.md`. Always runs (section appears in REPORT.md either way); pages without strong journey matches are not analysed.
-8. Apply quality flags per `references/quality-flags.md`. Always runs. `hollow` (mostly empty page) is a deterministic check; `stale-marker` is a deterministic deprecation/TODO keyword prefilter followed by a single batched adjudication pass that keeps only genuine staleness markers and discards incidental keyword mentions.
+8. Apply quality flags per `references/quality-flags.md`. Always runs. Two deterministic checks: `hollow` (mostly empty page) and `stale-marker` (explicit deprecation/TODO keywords).
 9. Synthesise suggested actions per `references/suggested-actions.md`. Always runs. Walks the outputs of steps 3–8 and emits one action per matching signal from a fixed enum of nine action types and three severity tiers.
 10. Build the global placement map (destination folder(s) per page + paths + collision resolution) per "Placement, naming, and collisions" — including the per-journey duplication of pages that match multiple journeys. Always runs — the placement map is needed for the REPORT.md tables even in `report-only` mode.
 11. In `full` mode: write generated files (duplicating each page into every matched journey folder, or into `no-journey/`, per the placement map), copy assets, rewrite links. **Skipped in `report-only` mode.**
@@ -349,7 +349,7 @@ When `journeys = []`, omit both the conventions blockquote and the TL;DR — the
 - **Coverage analysis** (always): two subsections per `references/gap-analysis.md`. Subsection A — per-journey coverage verdicts (covered/partial/missing) with reasons, how-to counts (strong/weak), other-type counts, and variation status; replaced with "No journeys were supplied for this run." when `journeys = []`. Subsection B — descriptive page counts by Diátaxis type at the builder/maintainer audience tier. No flags; no assertion that any tier must be present.
 - **Journey relevance summary** (only if `journeys` was non-empty for the run): per-journey page-count table by Diátaxis type, plus a "Pages with no journey match" table, plus an **"Audience mismatches"** subtable per `references/audience-tagging.md`. If no mismatches were detected, the subtable shows "No audience mismatches detected." See `references/journey-matching.md` and `references/audience-tagging.md` for the column specs.
 - **Duplication candidates** (always): clusters of pages sharing the same `(journey, Diátaxis type, variation)` tuple. Includes the explicit "what this does NOT catch" preamble per `references/duplication.md`. Shows "No duplicate candidates detected by the (journey, type, variation) rule." or "Duplication detection requires a journey list; none was supplied." when applicable.
-- **Quality flags** (always): pages flagged as `hollow` or carrying genuine `stale-marker` keywords (incidental keyword mentions are adjudicated out), per `references/quality-flags.md`. Includes the same "what this does NOT catch" preamble, and — when any keyword candidates were dismissed as incidental — the auditable dismissed-candidates tally line. Shows "No hollow pages or stale markers detected." when none found.
+- **Quality flags** (always): pages flagged as `hollow` or carrying `stale-marker` keywords, per `references/quality-flags.md`. Includes the same "what this does NOT catch" preamble. Shows "No hollow pages or stale markers detected." when none found.
 
 ### Divider
 
