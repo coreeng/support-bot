@@ -278,6 +278,100 @@ class PrDetectionServiceTest {
                     .contains(new String(Character.toChars(0x1F465))
                             + " <https://github.com/orgs/my-org/teams/docs-team");
         }
+
+        @Test
+        void tracksNoSlaCodeownerPrTouchingConfiguredPaths() {
+            // given — a requires-codeowners repo with no SLA block (so config mandates paths) and a PR
+            // that touches the configured paths.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            null,
+                            null,
+                            List.of("infra/**"),
+                            null,
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            List.of()));
+            when(prSourceClient.listChangedFiles(COORD, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — tracked with no deadline, and the code-owner chase message is posted.
+            verify(prTrackingRepository).insertIfAbsent(newTrackingCaptor.capture());
+            assertThat(newTrackingCaptor.getValue().slaDeadline()).isNull();
+            verify(slackClient).postMessage(postMessageCaptor.capture());
+            assertThat(postMessageCaptor.getValue().message().getText()).contains("code-owner");
+        }
+
+        @Test
+        void skipsNoSlaCodeownerPrNotTouchingConfiguredPaths() {
+            // given — same no-SLA requires-codeowners repo, but the PR only touches paths outside the
+            // configured globs. Without the path gate this PR would be tracked (every PR in the repo),
+            // contradicting the documented "no-SLA repos track only PRs touching the listed paths".
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            null,
+                            null,
+                            List.of("infra/**"),
+                            null,
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            false,
+                            List.of()));
+            when(prSourceClient.listChangedFiles(COORD, PR_NUMBER)).thenReturn(List.of("src/app.js"));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — not tracked: no record inserted, no reaction, no chase message.
+            verify(prTrackingRepository, never()).insertIfAbsent(any());
+            verify(slackClient, never()).addReaction(any());
+            verify(slackClient, never()).postMessage(any());
+        }
     }
 
     @Nested
