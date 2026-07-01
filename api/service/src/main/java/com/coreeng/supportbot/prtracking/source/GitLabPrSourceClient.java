@@ -415,18 +415,19 @@ public class GitLabPrSourceClient implements PrSourceClient {
     }
 
     private boolean requiresCodeowners(String repoName) {
-        return props.repositories().stream()
-                .anyMatch(r -> r.provider() == Provider.GITLAB
-                        && r.name().equalsIgnoreCase(repoName)
-                        && r.requiresCodeowners());
+        PrTrackingProps.@Nullable Repository repoConfig = props.findRepository(Provider.GITLAB, repoName);
+        return repoConfig != null && repoConfig.requiresCodeowners();
     }
 
     /**
      * Reads GitLab's code-owner approval rules from {@code /merge_requests/:iid/approval_state}. The gate
-     * is {@code true} when every {@code code_owner} rule is approved (vacuously true when an MR touches no
-     * owned paths, so it proceeds to the merge chase); the unapproved rules' eligible approvers form the
-     * chase list. Degrades to {@code null} on any error (e.g. GitLab CE without code-owner rules, or a
-     * transient failure) so the lifecycle keeps chasing rather than wrongly entering the merge phase.
+     * is {@code true} only when there is at least one {@code code_owner} rule and every such rule is
+     * approved; the unapproved rules' eligible approvers form the chase list. An <em>empty</em> code-owner
+     * rule set yields {@code null} (not vacuous {@code true}): a successful response with no {@code
+     * code_owner} rule is ambiguous — the MR may touch no owned paths, or the instance may lack GitLab
+     * Code Owners (CE/Free) or code-owner branch protection — so the gate fails <em>closed</em> (hold in
+     * OPEN and keep chasing) rather than jumping to the merge phase and escalating the owning team on a
+     * misconfigured repo. {@code null} is likewise returned on any transport error.
      */
     private CodeownerApprovalState fetchCodeownerApprovalState(
             GitLabConnection conn, String projectSegment, String repoName, int prNumber) {
@@ -450,7 +451,11 @@ public class GitLabPrSourceClient implements PrSourceClient {
         List<ApprovalRuleDto> codeOwnerRules = rules.stream()
                 .filter(r -> "code_owner".equalsIgnoreCase(r.ruleType()))
                 .toList();
-        boolean approved = codeOwnerRules.stream().allMatch(r -> Boolean.TRUE.equals(r.approved()));
+        // Empty rule set → null (unknown), not vacuous true: fail closed on repos with no readable
+        // code_owner rule (CE/Free, or no owned paths) so the merge gate never opens spuriously.
+        Boolean approved = codeOwnerRules.isEmpty()
+                ? null
+                : codeOwnerRules.stream().allMatch(r -> Boolean.TRUE.equals(r.approved()));
         List<CodeOwnerRef> pending = new ArrayList<>();
         HashSet<String> seen = new HashSet<>();
         for (ApprovalRuleDto rule : codeOwnerRules) {

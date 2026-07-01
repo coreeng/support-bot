@@ -121,10 +121,7 @@ public class PrLifecyclePoller {
         // Key on (provider, name) so a hypothetical name collision across providers can't pick
         // the wrong config — even though PrTrackingProps disallows duplicates today, the lifecycle
         // poller reads from the database and should not assume that constraint as a safety net.
-        return prTrackingProps.repositories().stream()
-                .filter(r -> r.provider() == provider && r.name().equalsIgnoreCase(repo))
-                .findFirst()
-                .orElse(null);
+        return prTrackingProps.findRepository(provider, repo);
     }
 
     // ── Functional core wiring ──
@@ -336,25 +333,47 @@ public class PrLifecyclePoller {
     }
 
     /**
-     * Compound effect (preserved from the old {@code handleSlaBreached}). Owns its own status write:
-     * the custom escalation message is posted <em>before</em> the escalation card; the {@code ESCALATED}
-     * write uses the new escalation id, or null when creation failed (to avoid reprocessing); and if the
-     * ticket is missing nothing is written at all, so the record retries on the next poll.
+     * Review-phase breach (preserved from the old {@code handleSlaBreached}): chases the owning team to
+     * review. Delegates to {@link #doEscalate}, which owns the {@code ESCALATED} status write.
      */
     private void escalate(PrTrackingRecord record) {
+        doEscalate(
+                record,
+                MessageEvent.ESCALATED,
+                PrTrackingStatus.ESCALATED,
+                "SLA breach",
+                "PR {}#{} SLA breached — escalated on ticket {}");
+    }
+
+    /**
+     * Shared escalation flow behind {@link #escalate} (review phase) and {@link #escalateMerge} (merge
+     * phase). Compound effect that owns its own status write: it posts the optional custom message before
+     * the escalation card, creates the escalation (target = owning team), writes {@code targetStatus} with
+     * the new escalation id — or null when creation failed, to avoid reprocessing — and marks the ticket
+     * escalated. If the ticket is missing nothing is written, so the record retries on the next poll.
+     *
+     * <p>Post-before-createEscalation is deliberate so the custom message lands in thread before the
+     * escalation card. Poll-time semantics differ from detection-time: here the custom message is ADDED in
+     * front of the (unchanged) escalation card; in {@code PrDetectionService} it REPLACES the default
+     * breach text. Do not harmonise these without revisiting the spec — the asymmetry is deliberate
+     * (poll-time previously posted no tenant-thread text at all, so unset = same as before).
+     */
+    private void doEscalate(
+            PrTrackingRecord record,
+            MessageEvent messageEvent,
+            PrTrackingStatus targetStatus,
+            String breachDescription,
+            String breachLogTemplate) {
         Ticket ticket = ticketRepository.findTicketById(new TicketId(record.ticketId()));
         if (ticket == null) {
-            log.atWarn().addArgument(record::ticketId).log("Ticket {} not found for SLA breach, skipping");
+            log.atWarn()
+                    .addArgument(record::ticketId)
+                    .addArgument(breachDescription)
+                    .log("Ticket {} not found for {}, skipping");
             return;
         }
 
-        // Post before createEscalation so the custom message lands in thread before the escalation card.
-        // Poll-time semantics differ from detection-time: here the custom message is ADDED in front of
-        // the (unchanged) escalation card; in PrDetectionService the custom message REPLACES the default
-        // breach text. Do not try to harmonise these without revisiting the spec — the asymmetry is
-        // deliberate (poll-time previously posted no tenant-thread text at all, so unset = same as before).
-        String escalationOverride =
-                messageRenderer.render(record.repo(), MessageEvent.ESCALATED, recordContext(record));
+        String escalationOverride = messageRenderer.render(record.repo(), messageEvent, recordContext(record));
         if (escalationOverride != null) {
             postMessage(escalationOverride, ticket.channelId(), ticket.queryTs(), record);
         }
@@ -371,20 +390,21 @@ public class PrLifecyclePoller {
                     .addArgument(record::repo)
                     .addArgument(record::prNumber)
                     .addArgument(record::ticketId)
+                    .addArgument(targetStatus)
                     .log(
-                            "Escalation creation returned null for PR {}#{} on ticket {} — marking tracking ESCALATED to avoid reprocessing");
-            prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.ESCALATED, null, null);
+                            "Escalation creation returned null for PR {}#{} on ticket {} — marking {} to avoid reprocessing");
+            prTrackingRepository.updateStatus(record.id(), targetStatus, null, null);
             return;
         }
         Long escalationId = escalation.id().id();
-        prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.ESCALATED, null, escalationId);
+        prTrackingRepository.updateStatus(record.id(), targetStatus, null, escalationId);
         ticketSlackService.markTicketEscalated(ticket.queryRef());
 
         log.atInfo()
                 .addArgument(record::repo)
                 .addArgument(record::prNumber)
                 .addArgument(record::ticketId)
-                .log("PR {}#{} SLA breached — escalated on ticket {}");
+                .log(breachLogTemplate);
     }
 
     /** Notifies the tenant that the code owners have approved and the maintaining team can now merge. */
@@ -417,49 +437,17 @@ public class PrLifecyclePoller {
 
     /**
      * Merge-phase counterpart of {@link #escalate}: chases the maintaining team to merge a PR that the
-     * code owners have approved. Owns its own {@code MERGE_ESCALATED} status write (the {@code None}
-     * SLA op is skipped because {@code EscalateMerge} is in the escalate-owns-write set), mirroring how
-     * {@link #escalate} owns the {@code ESCALATED} write.
+     * code owners have approved. Delegates to {@link #doEscalate}, which owns the {@code MERGE_ESCALATED}
+     * status write (the {@code None} SLA op is skipped because {@code EscalateMerge} is in the
+     * escalate-owns-write set).
      */
     private void escalateMerge(PrTrackingRecord record) {
-        Ticket ticket = ticketRepository.findTicketById(new TicketId(record.ticketId()));
-        if (ticket == null) {
-            log.atWarn().addArgument(record::ticketId).log("Ticket {} not found for merge-SLA breach, skipping");
-            return;
-        }
-
-        String escalationOverride =
-                messageRenderer.render(record.repo(), MessageEvent.MERGE_ESCALATED, recordContext(record));
-        if (escalationOverride != null) {
-            postMessage(escalationOverride, ticket.channelId(), ticket.queryTs(), record);
-        }
-
-        Escalation escalation = escalationProcessingService.createEscalation(CreateEscalationRequest.builder()
-                .ticket(ticket)
-                .team(record.owningTeam())
-                .tags(ImmutableList.of())
-                .source(EscalationSource.bot)
-                .build());
-
-        if (escalation == null || escalation.id() == null) {
-            log.atWarn()
-                    .addArgument(record::repo)
-                    .addArgument(record::prNumber)
-                    .addArgument(record::ticketId)
-                    .log(
-                            "Merge-escalation creation returned null for PR {}#{} on ticket {} — marking MERGE_ESCALATED to avoid reprocessing");
-            prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.MERGE_ESCALATED, null, null);
-            return;
-        }
-        Long escalationId = escalation.id().id();
-        prTrackingRepository.updateStatus(record.id(), PrTrackingStatus.MERGE_ESCALATED, null, escalationId);
-        ticketSlackService.markTicketEscalated(ticket.queryRef());
-
-        log.atInfo()
-                .addArgument(record::repo)
-                .addArgument(record::prNumber)
-                .addArgument(record::ticketId)
-                .log("PR {}#{} merge SLA breached — escalated maintaining team on ticket {}");
+        doEscalate(
+                record,
+                MessageEvent.MERGE_ESCALATED,
+                PrTrackingStatus.MERGE_ESCALATED,
+                "merge-SLA breach",
+                "PR {}#{} merge SLA breached — escalated maintaining team on ticket {}");
     }
 
     private void updateActivityTimestamps(PrTrackingRecord record, List<Review> teamReviews) {

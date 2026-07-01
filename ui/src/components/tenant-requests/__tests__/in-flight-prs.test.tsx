@@ -152,6 +152,30 @@ describe("InFlightPrsTab", () => {
       expect(screen.getByText("Escalated")).toBeInTheDocument();
     });
 
+    it("should render AWAITING_MERGE status as human-readable label", () => {
+      mockUseInFlightPrs.mockReturnValue({
+        data: [makePr({ status: "AWAITING_MERGE" })],
+        isLoading: false,
+        error: null,
+      });
+
+      render(<InFlightPrsTab />);
+
+      expect(screen.getByText("Awaiting Merge")).toBeInTheDocument();
+    });
+
+    it("should render MERGE_ESCALATED status as human-readable label", () => {
+      mockUseInFlightPrs.mockReturnValue({
+        data: [makePr({ status: "MERGE_ESCALATED" })],
+        isLoading: false,
+        error: null,
+      });
+
+      render(<InFlightPrsTab />);
+
+      expect(screen.getByText("Merge Escalated")).toBeInTheDocument();
+    });
+
     it("should render Slack thread link when channelId and queryTs are present", () => {
       mockUseInFlightPrs.mockReturnValue({
         data: [makePr({ ticketChannelId: "C999", ticketQueryTs: "111.222" })],

@@ -339,6 +339,45 @@ class PrLifecycleTest {
             assertDecision(
                     decide(obs(MERGE_ESCALATED).changesRequested()), CHANGES_REQUESTED, NONE, NOTIFY_CHANGES_REQUESTED);
         }
+
+        @Test
+        void activeChangesRequestedBlocksEntryToAwaitingMerge() {
+            // Flap guard: code owners approved + mergeable, but a changes-requested verdict is live (e.g. a
+            // non-required reviewer, which doesn't clear GitHub's reviewDecision). Changes-requested must win
+            // over the merge gate, otherwise the record oscillates AWAITING_MERGE<->CHANGES_REQUESTED every poll.
+            assertDecision(
+                    decide(obs(OPEN)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .mergeable()
+                            .changesRequested()
+                            .liveDeadline(REMAINING)),
+                    CHANGES_REQUESTED,
+                    new SlaOp.Pause(REMAINING),
+                    NOTIFY_CHANGES_REQUESTED);
+        }
+
+        @Test
+        void changesRequestedDoesNotBounceBackToAwaitingMergeWhileVerdictActive() {
+            // The other half of the flap guard: from CHANGES_REQUESTED, an active changes-requested verdict
+            // keeps the record put instead of immediately re-entering AWAITING_MERGE (which would re-notify
+            // and reset the merge clock every poll).
+            assertDecision(
+                    decide(obs(CHANGES_REQUESTED)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .mergeable()
+                            .changesRequested()),
+                    CHANGES_REQUESTED,
+                    NONE);
+        }
+
+        @Test
+        void codeownerRepoDoesNotReviewEscalateInOpen() {
+            // Clock held in OPEN for code-owner repos is structural: even if a live deadline leaked in and
+            // breached with no verdict, OPEN must not review-escalate (that is the merge phase's job).
+            assertDecision(decide(obs(OPEN).requiresCodeowners().slaBreached()), OPEN, NONE);
+        }
     }
 
     // ── Helpers ──

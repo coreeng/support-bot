@@ -96,6 +96,19 @@ public record PrTrackingProps(
         }
     }
 
+    /**
+     * Finds the configured repository for a (provider, name) pair, matching the name case-insensitively.
+     * Keying on the provider too keeps a name shared across providers from resolving to the wrong config.
+     * Returns {@code null} when no repository matches. Single source of truth for repo-config lookup —
+     * prefer this over re-scanning {@link #repositories()} in adapters/pollers.
+     */
+    public @Nullable Repository findRepository(Provider provider, String name) {
+        return repositories.stream()
+                .filter(r -> r.provider() == provider && r.name().equalsIgnoreCase(name))
+                .findFirst()
+                .orElse(null);
+    }
+
     private static void validateRepositories(List<Repository> repositories, @Nullable Gitlab globalGitlab) {
         if (repositories.isEmpty()) {
             throw new IllegalArgumentException("pr-review-tracking.repositories must not be empty when enabled");
@@ -415,6 +428,7 @@ public record PrTrackingProps(
             @Name("awaiting-merge") @Nullable String awaitingMerge,
             @Name("merge-escalated") @Nullable String mergeEscalated) {
 
+        @ConstructorBinding
         public Messages {
             checkBlank(detected, "detected");
             checkBlank(escalated, "escalated");
@@ -428,8 +442,11 @@ public record PrTrackingProps(
 
         /**
          * Convenience constructor for callers (and tests) predating the awaiting-merge / merge-escalated
-         * message overrides. Config binding uses the canonical constructor (the one with all components),
-         * so this extra constructor only affects programmatic callers.
+         * message overrides. Config binding is pinned to the canonical constructor by {@link
+         * ConstructorBinding} above, so this extra constructor only affects programmatic callers. That
+         * annotation is load-bearing: with two constructors and no {@code @ConstructorBinding}, Spring
+         * Boot's binder resolves no bind constructor and silently skips a configured {@code messages:}
+         * block (reverting every override to the default text).
          */
         public Messages(
                 @Nullable String detected,
