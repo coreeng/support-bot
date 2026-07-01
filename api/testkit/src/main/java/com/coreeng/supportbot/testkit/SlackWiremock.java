@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.testkit;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
@@ -295,6 +296,34 @@ public class SlackWiremock implements WireMockBackend {
     }
 
     /**
+     * Body-matching variant of {@link #stubChatPostMessage(String, String)}: matches only when the posted
+     * message body contains {@code bodyContains} (AND-combined with the {@code channel} form param). Use to
+     * distinguish otherwise-identical postMessage calls by their text — e.g. the {@code "merged"} vs
+     * {@code "closed"} substrings in the default PR closure message.
+     */
+    public Stub stubChatPostMessage(String description, String expectedChannelId, String bodyContains) {
+        StubMapping stubMapping = givenThat(post("/api/chat.postMessage")
+                .withName(description)
+                .withFormParam("channel", equalTo(expectedChannelId))
+                .withRequestBody(containing(bodyContains))
+                .willReturn(okJson("""
+                {
+                  "ok": true,
+                  "channel": "%s",
+                  "ts": "1234567890.123456",
+                  "message": {
+                    "type": "message",
+                    "text": "UNSET_BY_TESTS"
+                  }
+                }""".formatted(expectedChannelId))));
+        return Stub.builder()
+                .mapping(stubMapping)
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    /**
      * Stubs GitHub API GET /repos/{owner}/{repo}/pulls/{number} for PR-tracking functional tests.
      * Use when the app is configured with pr-review-tracking and GITHUB_API_BASE_URL pointing to this wiremock.
      *
@@ -350,6 +379,42 @@ public class SlackWiremock implements WireMockBackend {
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(reviewsJson)));
+        return Stub.builder()
+                .mapping(prStub)
+                .extraMappings(List.of(repoStub, reviewsStub))
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    /**
+     * Stubs GitHub API GET /repos/{owner}/{repo}/pulls/{number} for a <b>merged</b> PR: {@code state:"closed"}
+     * with a non-null {@code merged_at}. hub4j reads {@code merged_at}, so this is the only shape that maps to
+     * {@link com.coreeng.supportbot.prtracking.source.PrMetadata.PrState#MERGED} (driving the {@code "PR merged"}
+     * FSM row → {@code NOTIFY_MERGED}); a plain {@code state:"closed"} stub without {@code merged_at} maps to
+     * {@code CLOSED}. Reuses {@code createdAtIso} as the merged-at instant. Includes the repo-metadata and empty
+     * {@code /reviews} stubs the code path requires.
+     */
+    public Stub stubGitHubGetPullRequestMerged(
+            String description, String repositoryName, int pullNumber, String createdAtIso) {
+        StubMapping repoStub = stubRepoMetadata(description, repositoryName);
+
+        String prPath = "/repos/" + repositoryName + "/pulls/" + pullNumber;
+        String prBody = """
+                {"state":"closed","merged_at":"%s","created_at":"%s","title":"PR title","user":{"login":"test"},"number":%d,"requested_teams":[],"mergeable":false,"mergeable_state":"unknown"}
+                """.formatted(createdAtIso, createdAtIso, pullNumber);
+        StubMapping prStub = givenThat(get(prPath)
+                .withName(description)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(prBody)));
+        StubMapping reviewsStub = givenThat(get(prPath + "/reviews")
+                .withName(description + " reviews")
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[]")));
         return Stub.builder()
                 .mapping(prStub)
                 .extraMappings(List.of(repoStub, reviewsStub))
@@ -522,6 +587,37 @@ public class SlackWiremock implements WireMockBackend {
                 {"approved_by":%s}
                 """.formatted(approvedByJson);
         StubMapping stub = givenThat(get("/api/v4/projects/" + encoded + "/merge_requests/" + mrIid + "/approvals")
+                .withName(description)
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(body)));
+        return Stub.builder()
+                .mapping(stub)
+                .wireMockServer(this)
+                .description(description)
+                .build();
+    }
+
+    /**
+     * Stubs GitLab API GET /api/v4/projects/:project/merge_requests/:iid/approval_state returning a single
+     * {@code code_owner} rule with the given approval state and eligible approver usernames (the code-owner
+     * merge gate read by {@code GitLabPrSourceClient.fetchCodeownerApprovalState}).
+     */
+    public Stub stubGitLabGetMergeRequestApprovalState(
+            String description,
+            String projectPath,
+            int mrIid,
+            boolean codeOwnerApproved,
+            List<String> eligibleApprovers) {
+        String encoded = encodeProjectPath(projectPath);
+        String eligibleApproversJson =
+                eligibleApprovers.stream().map(u -> """
+                        {"username":"%s"}""".formatted(u)).collect(Collectors.joining(",", "[", "]"));
+        String body = """
+                {"rules":[{"rule_type":"code_owner","approved":%b,"eligible_approvers":%s}]}
+                """.formatted(codeOwnerApproved, eligibleApproversJson);
+        StubMapping stub = givenThat(get("/api/v4/projects/" + encoded + "/merge_requests/" + mrIid + "/approval_state")
                 .withName(description)
                 .willReturn(aResponse()
                         .withStatus(200)

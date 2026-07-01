@@ -491,6 +491,8 @@ public class SupportBotClient {
         private String owningTeam;
 
         @Nullable private Boolean canAutoCloseTicket;
+
+        @Nullable private String status;
     }
 
     @Builder
