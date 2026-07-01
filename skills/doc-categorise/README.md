@@ -8,7 +8,7 @@ What the skill reports on:
 - **Journey coverage** — given a list of user journeys, which have how-to documentation and which don't (with reasons for partial coverage and an end-to-end completeness check).
 - **Audience tagging** — every page is tagged with an audience tier (`builder/maintainer` vs `end-user`) and detailed labels; drift between authored intent and how the page reads is flagged.
 - **Duplication candidates** — structural clustering of pages sharing the same `(journey, type, variation)` tuple.
-- **Quality flags** — `hollow` (stubs) and `stale-marker` (explicit `deprecated`/`TODO`/`FIXME`) deterministic checks.
+- **Quality flags** — `hollow` (stubs; deterministic) and `stale-marker` (a deterministic `deprecated`/`TODO`/`FIXME` keyword prefilter, then a bounded adjudication that discards incidental keyword mentions).
 - **Suggested next actions** — a prioritised list synthesised deterministically from the analysis, with a "Top 3 risks" callout.
 
 Originals are never modified, moved, renamed, or deleted.
@@ -261,6 +261,10 @@ The "Where it lands" column below names the **category subfolder**. In the journ
 
 PERFECT means the page was clean enough to copy without rewriting. REWRITE means the type was clear but the page drifted and was rewritten into the dominant type (preserving every fact). SPLIT means the page produced multiple output files. OUTLIER means the page does not fit any of the four types.
 
+REWRITE and PERFECT are separated by whether the body actually changes. A REWRITE must produce a body that differs from the source; if a page classified as REWRITE would come out byte-identical (a "rewrite" that reworded nothing), the skill downgrades it to PERFECT so the Rewritten table only ever lists pages that genuinely changed. This no-op reconciliation runs before the report is written. The downgrade is reserved for pages that never had real drift — a page with a genuine anti-signal (e.g. a reference table embedded in a how-to) is actually rewritten, not downgraded.
+
+Rewrites are constrained to be **fact-preserving**, and this is now verified rather than merely asserted. Every REWRITE (and every SPLIT output) passes two paired checks: the no-op check confirms the prose/structure actually changed, and a fact-preservation check confirms the change lost, altered, or invented nothing — commands, code, flags, parameter names, versions, links, warnings, and table values must all survive (code and commands verbatim). A rewrite that would trade a fact for better prose is redone, not shipped.
+
 ---
 
 ## How to read REPORT.md
@@ -327,11 +331,11 @@ If no clusters are found, the section shows "No duplicate candidates detected by
 
 ### 6. Quality flags
 
-Pages flagged by two deterministic checks: `hollow` (the page has fewer than ~10 non-blank content lines and no code blocks or tables — likely a stub) and `stale-marker` (the page contains explicit keywords like `deprecated`, `TODO:`, `FIXME:`, `obsolete`, `legacy`, `do not use`). Each flagged page shows the flag(s) it triggered and the specific reasons (line numbers and matched keywords for stale markers; one-line summary for hollow).
+Pages flagged by two checks: `hollow` (the page has fewer than ~10 non-blank content lines and no code blocks or tables — likely a stub; a pure deterministic rule) and `stale-marker` (a deterministic keyword prefilter for `deprecated`, `TODO:`, `FIXME:`, `obsolete`, `legacy`, `do not use`, followed by adjudication). The prefilter finds candidate lines cheaply; adjudication then keeps only the candidates that genuinely signal *this page/thing is stale* and discards incidental mentions — a code identifier, a quoted example, or a page whose actual subject is migrating off a legacy system. Discarding happens in two tiers: deterministic auto-dismiss for hits inside code/URLs/identifiers, then a single batched LLM pass over the remaining candidates for the whole run. Each flagged page shows the flag(s) it triggered and the specific reasons (line numbers and matched keywords for stale markers; one-line summary for hollow).
 
-**The skill does NOT confirm these are actually problems.** A `stale-marker` may be a quoted example or a code identifier — false positives are visible (the matching line is shown) and the stakeholder dismisses them per row.
+**Adjudication reduces false positives but does not eliminate them.** A genuinely ambiguous line may still be miscalled — every reported marker shows its line, so a reviewer can confirm or dismiss per row. When candidates are dismissed as incidental, the section records an auditable tally of how many were filtered.
 
-**What this catches**: unfinished stubs and explicit deprecation/TODO content the author left in the file.
+**What this catches**: unfinished stubs and genuine deprecation/TODO markers the author left in the file (after incidental keyword mentions are filtered out).
 
 **What this does NOT catch** (deliberately out of scope for this version):
 - Vague prose that is well-formed but says nothing useful.
@@ -363,7 +367,7 @@ Pages clean enough to copy without rewriting. Source path → output path(s) →
 
 ### 9. Rewritten (single-type)
 
-Pages with a clear dominant intent that drifted in tone or structure, rewritten into the dominant type. Includes a one-line reason (which signals or anti-signals fired), the journeys the page covers (if any), and the audience. **Action:** review the rewritten file against its source. The agent preserves facts but rewords prose; check that the meaning is unchanged.
+Pages with a clear dominant intent that drifted in tone or structure, rewritten into the dominant type. Includes a one-line reason (which signals or anti-signals fired), the journeys the page covers (if any), and the audience. Every row here has a body that genuinely differs from its source — a page that would have come out verbatim is reconciled to PERFECT before the report is written (see the REWRITE/PERFECT distinction above), so this table never lists no-op rewrites. **Action:** review the rewritten file against its source. The agent preserves facts but rewords prose; check that the meaning is unchanged.
 
 ### 10. Split
 
