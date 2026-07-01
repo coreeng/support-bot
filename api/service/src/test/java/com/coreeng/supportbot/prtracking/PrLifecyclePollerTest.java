@@ -1358,6 +1358,35 @@ class PrLifecyclePollerTest {
             // then — no teams requested, all reviews accepted
             verify(prTrackingRepository).pauseSla(eq(record.id()), eq(PrTrackingStatus.APPROVED), any(Duration.class));
         }
+
+        @Test
+        void acceptsAllReviewsWhenRequestedTeamMembershipUnresolved() {
+            // given — the source client couldn't list a requested team's members (null, not a partial list;
+            // see Hub4jGitHubClient.resolveRequestedTeamMembers). TeamReviewFilter must treat this as
+            // "cannot verify" — same as an explicit team-slug lookup failure — and accept all reviews,
+            // rather than filtering against whatever partial data happened to resolve.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = record(
+                    1L,
+                    100L,
+                    "my-org/repo-a",
+                    11,
+                    PrTrackingStatus.OPEN,
+                    Instant.now().plusSeconds(7200));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(openPrWithUnresolvedRequestedReviewers(
+                            record, List.of(review(Review.ReviewState.APPROVED))));
+            // No githubTeamSlug, no repo config
+            when(prTrackingProps.repositories()).thenReturn(List.of());
+
+            // when
+            poller.poll();
+
+            // then — the reviewer's team membership couldn't be confirmed, but their review still counts
+            // rather than being silently dropped by a would-be-incomplete member set.
+            verify(prTrackingRepository).pauseSla(eq(record.id()), eq(PrTrackingStatus.APPROVED), any(Duration.class));
+        }
     }
 
     // ── Activity timestamps ──
@@ -1665,6 +1694,24 @@ class PrLifecyclePollerTest {
                 null,
                 reviewers,
                 reviews);
+    }
+
+    /**
+     * A PR whose requested-team membership resolution failed (null, not a partial list) — the source
+     * client's signal that the requested-team review fallback is unresolved for this poll.
+     */
+    private static PrMetadata openPrWithUnresolvedRequestedReviewers(PrTrackingRecord record, List<Review> reviews) {
+        return new PrMetadata(
+                RepoCoord.github(record.repo()),
+                record.prNumber(),
+                record.prCreatedAt(),
+                PrMetadata.PrState.OPEN,
+                null,
+                null,
+                reviews,
+                null,
+                null,
+                List.of());
     }
 
     private static PrMetadata openMergeablePr(PrTrackingRecord record) {

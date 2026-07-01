@@ -443,9 +443,12 @@ class Hub4jGitHubClientTest {
     }
 
     @Test
-    void getPullRequestSkipsRequestedTeamWhoseMembersCannotBeListed() throws IOException {
+    void getPullRequestReturnsNullRequestedTeamLoginsWhenAnyTeamMembersCannotBeListed() throws IOException {
         // given — two requested teams: one resolves, the other's member listing is forbidden (e.g. the token
-        // lacks org Members:Read, or the team is secret). The failure must degrade, not abort the PR fetch.
+        // lacks org Members:Read, or the team is secret). The failure must degrade the PR fetch as a whole
+        // (not throw, so the PR stays tracked), but must NOT quietly return the resolvable team's members
+        // alone — that would look like a complete, authoritative set while actually excluding the forbidden
+        // team's members, wrongly filtering out a real review of theirs downstream in TeamReviewFilter.
         TestPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
 
         GHUser alice = mock(GHUser.class);
@@ -468,8 +471,39 @@ class Hub4jGitHubClientTest {
         // when
         GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
 
-        // then — the PR is still returned with the resolvable team's members; the forbidden team is skipped.
-        assertThat(result.requestedTeamReviewerLogins()).containsExactly("alice");
+        // then — the PR is still returned (fetch doesn't throw), but requestedTeamReviewerLogins is null:
+        // "unresolved", not a confident partial list.
+        assertThat(result.requestedTeamReviewerLogins()).isNull();
+    }
+
+    @Test
+    void getPullRequestReturnsRequestedTeamLoginsWhenAllTeamsResolve() throws IOException {
+        // given — two requested teams, both resolve successfully: the union of their members is authoritative.
+        TestPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
+
+        GHUser alice = mock(GHUser.class);
+        when(alice.getLogin()).thenReturn("alice");
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHUser> teamAMembers = mock(PagedIterable.class);
+        when(teamAMembers.toList()).thenReturn(List.of(alice));
+        GHTeam teamA = mock(GHTeam.class);
+        when(teamA.listMembers()).thenReturn(teamAMembers);
+
+        GHUser bob = mock(GHUser.class);
+        when(bob.getLogin()).thenReturn("bob");
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHUser> teamBMembers = mock(PagedIterable.class);
+        when(teamBMembers.toList()).thenReturn(List.of(bob));
+        GHTeam teamB = mock(GHTeam.class);
+        when(teamB.listMembers()).thenReturn(teamBMembers);
+
+        pr.testRequestedTeams = List.of(teamA, teamB);
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.requestedTeamReviewerLogins()).containsExactlyInAnyOrder("alice", "bob");
     }
 
     @Test
