@@ -1,6 +1,7 @@
 package com.coreeng.supportbot.prtracking;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -38,6 +39,7 @@ import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -77,6 +79,9 @@ class PrLifecyclePollerTest {
 
     @Mock
     private PrTrackingProps prTrackingProps;
+
+    @Mock
+    private SlaLookup slaLookup;
 
     @Mock
     private PrMessageRenderer messageRenderer;
@@ -1389,6 +1394,118 @@ class PrLifecyclePollerTest {
         }
     }
 
+    // ── Codeowner merge clock (SlaLookup wiring) ──
+
+    @Nested
+    class CodeownerMergeClock {
+
+        @Test
+        void startsMergeClockUsingSlaLookupResolutionNotRawConfigDefault() {
+            // given — the repo's inline default is 24h, but SlaLookup (file / path-override resolution)
+            // says 6h for this PR. The merge clock must reflect SlaLookup's answer, proving the poller
+            // calls through to it rather than reading repoConfig.sla().defaultSla() directly.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = record(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null);
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(24));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(openCodeownerApprovedMergeablePr(record));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(slaLookup.getSla(eq(repoConfig), any(RepoCoord.class), eq(record.prNumber())))
+                    .thenReturn(Duration.ofHours(6));
+
+            // when
+            poller.poll();
+
+            // then
+            ArgumentCaptor<Instant> deadlineCaptor = ArgumentCaptor.forClass(Instant.class);
+            verify(prTrackingRepository)
+                    .startSla(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), deadlineCaptor.capture());
+            assertThat(deadlineCaptor.getValue())
+                    .isCloseTo(Instant.now().plus(Duration.ofHours(6)), within(Duration.ofSeconds(30)));
+        }
+
+        @Test
+        void entersAwaitingMergeWithoutDeadlineWhenSlaLookupReturnsNull() {
+            // given — SlaLookup found no default, no file, no matching override: no merge SLA is
+            // determinable. The state is still entered (chasing the code owner's approval already
+            // happened), just without a deadline — mirroring "repo has no SLA" for the review phase.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = record(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null);
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(24));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(openCodeownerApprovedMergeablePr(record));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(slaLookup.getSla(eq(repoConfig), any(RepoCoord.class), eq(record.prNumber())))
+                    .thenReturn(null);
+
+            // when
+            poller.poll();
+
+            // then — status still advances, but via the no-deadline path
+            verify(prTrackingRepository)
+                    .updateStatus(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), isNull(), any());
+            verify(prTrackingRepository, never()).startSla(anyLong(), any(), any());
+        }
+
+        @Test
+        void leavesRecordUnchangedWhenSlaLookupFails() {
+            // given — the SLA file couldn't be fetched (provider hiccup). The transition must not
+            // partially apply: no status write, and no "ready to merge" notification either (which would
+            // otherwise fire even though the clock never started). poll() retries the whole transition,
+            // SlaLookup call included, on the next poll.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = record(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null);
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(24));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(openCodeownerApprovedMergeablePr(record));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(slaLookup.getSla(eq(repoConfig), any(RepoCoord.class), eq(record.prNumber())))
+                    .thenThrow(new PrSourceException("SLA file fetch failed"));
+
+            // when — the per-record catch in poll() swallows the failure; it must not propagate
+            assertDoesNotThrow(poller::poll);
+
+            // then — no write and no notification for this poll
+            verify(prTrackingRepository, never()).startSla(anyLong(), any(), any());
+            verify(prTrackingRepository, never())
+                    .updateStatus(anyLong(), eq(PrTrackingStatus.AWAITING_MERGE), any(), any());
+            verifyNoInteractions(slackClient);
+        }
+
+        private PrTrackingProps.Repository codeownerRepoConfig(Duration defaultSla) {
+            return new PrTrackingProps.Repository(
+                    "my-org/repo-a",
+                    "wow",
+                    Provider.GITHUB,
+                    null,
+                    null,
+                    List.of(),
+                    new PrTrackingProps.Sla(null, defaultSla, null),
+                    null,
+                    null,
+                    List.of(),
+                    true,
+                    false);
+        }
+
+        private PrMetadata openCodeownerApprovedMergeablePr(PrTrackingRecord record) {
+            return new PrMetadata(
+                    RepoCoord.github(record.repo()),
+                    record.prNumber(),
+                    record.prCreatedAt(),
+                    PrMetadata.PrState.OPEN,
+                    true,
+                    List.of(),
+                    List.of(),
+                    null,
+                    true,
+                    List.of());
+        }
+    }
+
     // ── Activity timestamps ──
 
     @Nested
@@ -1625,12 +1742,13 @@ class PrLifecyclePollerTest {
                 ticketSlackService,
                 slackClient,
                 prTrackingProps,
+                slaLookup,
                 messageRenderer,
                 escalationTeamsRegistry);
     }
 
     private static PrTrackingRecord record(
-            long id, long ticketId, String repo, int prNumber, PrTrackingStatus status, Instant slaDeadline) {
+            long id, long ticketId, String repo, int prNumber, PrTrackingStatus status, @Nullable Instant slaDeadline) {
         return new PrTrackingRecord(
                 id,
                 ticketId,
