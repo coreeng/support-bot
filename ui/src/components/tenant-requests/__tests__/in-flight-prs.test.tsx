@@ -279,6 +279,50 @@ describe("InFlightPrsTab", () => {
       expect(screen.getAllByText("No SLA").length).toBeGreaterThanOrEqual(2);
     });
 
+    it("should show the merge SLA countdown for a code-owner PR even though hasSla=false", () => {
+      // Regression: code-owner PRs are inserted with hasSla=false (deferred clock) but run a real
+      // merge clock once in AWAITING_MERGE. The SLA cell must show that countdown, not "No SLA".
+      mockUseInFlightPrs.mockReturnValue({
+        data: [
+          makePr({
+            status: "AWAITING_MERGE",
+            hasSla: false,
+            slaDeadline: new Date(NOW + 24 * 3600 * 1000).toISOString(),
+            slaRemainingSeconds: null,
+          }),
+        ],
+        isLoading: false,
+        error: null,
+      });
+
+      const { container } = render(<InFlightPrsTab />);
+
+      expect(screen.getByText("24.0h left")).toBeInTheDocument();
+      expect(container.querySelector(".text-success")).toBeInTheDocument();
+    });
+
+    it("should show breached for a code-owner merge SLA past its deadline even though hasSla=false", () => {
+      // The merge clock can breach (→ MERGE_ESCALATED); with hasSla=false it must still surface as
+      // breached (counting toward the Breached card), not collapse into the benign "No SLA".
+      mockUseInFlightPrs.mockReturnValue({
+        data: [
+          makePr({
+            status: "MERGE_ESCALATED",
+            hasSla: false,
+            slaDeadline: new Date(NOW - 2 * 86400 * 1000).toISOString(),
+            slaRemainingSeconds: null,
+          }),
+        ],
+        isLoading: false,
+        error: null,
+      });
+
+      const { container } = render(<InFlightPrsTab />);
+
+      expect(screen.getByText(/Breached 2d ago/)).toBeInTheDocument();
+      expect(container.querySelector(".text-destructive")).toBeInTheDocument();
+    });
+
     it("should show SLA data missing badge when hasSla=true but both SLA fields are null", () => {
       jest.spyOn(console, "error").mockImplementation(() => {});
       mockUseInFlightPrs.mockReturnValue({
