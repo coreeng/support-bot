@@ -220,12 +220,24 @@ public class PrLifecyclePoller {
     }
 
     /**
-     * Starts the merge-chase SLA clock on entry to AWAITING_MERGE, using the same SLA resolution as the
-     * review-phase clock ({@link #mergeSlaFor}) — SLA resolution lives in one place ({@link SlaLookup}),
-     * not two. When the repo has no SLA (or the resolved SLA is null — e.g. no default and no matching
-     * file/override), the state is entered without a deadline, so it never merge-escalates. Returns the
-     * post-write record so {@link #apply} can render effects (e.g. {@code NotifyAwaitingMerge}) off the
-     * deadline just set, not the pre-transition one.
+     * Starts <b>or resumes</b> the merge-chase SLA clock on entry to AWAITING_MERGE.
+     *
+     * <p><b>Resume vs. restart.</b> The AWAITING_MERGE → CHANGES_REQUESTED edge pauses the merge clock
+     * into {@code slaRemaining} (clearing the deadline), exactly like the review-phase clock — and the
+     * record invariant makes {@code slaDeadline} and {@code slaRemaining} mutually exclusive, so a
+     * non-null {@code slaRemaining} here can only be that paused merge window. That means we're
+     * re-entering after a changes-requested detour that left the code-owner approval intact (the {@link
+     * PrLifecycle.Observation#readyForCodeownerMerge} case): resume from the paused remaining rather than
+     * restarting a full window. Restarting would hand the maintaining team a brand-new full merge window
+     * every time the tenant pushed a change, so the merge SLA could never actually breach. A first entry
+     * has no stored remaining (and any live deadline there is a leftover review-phase one that the fresh
+     * clock deliberately overwrites), so it starts a full window.
+     *
+     * <p>A fresh start resolves the SLA the same way the review-phase clock does ({@link #mergeSlaFor}) —
+     * SLA resolution lives in one place ({@link SlaLookup}), not two. When the repo has no SLA (or the
+     * resolved SLA is null — e.g. no default and no matching file/override), the state is entered without
+     * a deadline, so it never merge-escalates. Returns the post-write record so {@link #apply} can render
+     * effects (e.g. {@code NotifyAwaitingMerge}) off the deadline just set, not the pre-transition one.
      *
      * <p>A resolution failure ({@link PrSourceException}, e.g. the SLA file couldn't be fetched) is
      * deliberately <b>not</b> caught here: it propagates out of {@link #apply}, so neither the status
@@ -236,6 +248,11 @@ public class PrLifecyclePoller {
      * failing.
      */
     private PrTrackingRecord startMergeClock(PrTrackingRecord record, PrTrackingStatus next) {
+        Duration remaining = record.slaRemaining();
+        if (remaining != null) {
+            return prTrackingRepository.startSla(
+                    record.id(), next, Instant.now().plus(remaining));
+        }
         Duration sla = mergeSlaFor(record);
         if (sla != null) {
             return prTrackingRepository.startSla(
