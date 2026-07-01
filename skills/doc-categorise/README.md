@@ -8,7 +8,7 @@ What the skill reports on:
 - **Journey coverage** — given a list of user journeys, which have how-to documentation and which don't (with reasons for partial coverage and an end-to-end completeness check).
 - **Audience tagging** — every page is tagged with an audience tier (`builder/maintainer` vs `end-user`) and detailed labels; drift between authored intent and how the page reads is flagged.
 - **Duplication candidates** — structural clustering of pages sharing the same `(journey, type, variation)` tuple.
-- **Quality flags** — `hollow` (stubs; deterministic) and `stale-marker` (a deterministic `deprecated`/`TODO`/`FIXME` keyword prefilter, then a bounded adjudication that discards incidental keyword mentions).
+- **Quality flags** — `hollow` (stubs) and `stale-marker` (explicit `deprecated`/`TODO`/`FIXME`) deterministic checks.
 - **Suggested next actions** — a prioritised list synthesised deterministically from the analysis, with a "Top 3 risks" callout.
 
 Originals are never modified, moved, renamed, or deleted.
@@ -331,11 +331,11 @@ If no clusters are found, the section shows "No duplicate candidates detected by
 
 ### 6. Quality flags
 
-Pages flagged by two checks: `hollow` (the page has fewer than ~10 non-blank content lines and no code blocks or tables — likely a stub; a pure deterministic rule) and `stale-marker` (a deterministic keyword prefilter for `deprecated`, `TODO:`, `FIXME:`, `obsolete`, `legacy`, `do not use`, followed by adjudication). The prefilter finds candidate lines cheaply; adjudication then keeps only the candidates that genuinely signal *this page/thing is stale* and discards incidental mentions — a code identifier, a quoted example, or a page whose actual subject is migrating off a legacy system. Discarding happens in two tiers: deterministic auto-dismiss for hits inside code/URLs/identifiers, then a single batched LLM pass over the remaining candidates for the whole run. Each flagged page shows the flag(s) it triggered and the specific reasons (line numbers and matched keywords for stale markers; one-line summary for hollow).
+Pages flagged by two deterministic checks: `hollow` (the page has fewer than ~10 non-blank content lines and no code blocks or tables — likely a stub) and `stale-marker` (the page contains explicit keywords like `deprecated`, `TODO:`, `FIXME:`, `obsolete`, `legacy`, `do not use`). Each flagged page shows the flag(s) it triggered and the specific reasons (line numbers and matched keywords for stale markers; one-line summary for hollow).
 
-**Adjudication reduces false positives but does not eliminate them.** A genuinely ambiguous line may still be miscalled — every reported marker shows its line, so a reviewer can confirm or dismiss per row. When candidates are dismissed as incidental, the section records an auditable tally of how many were filtered.
+**The skill does NOT confirm these are actually problems.** A `stale-marker` may be a quoted example or a code identifier — false positives are visible (the matching line is shown) and the stakeholder dismisses them per row.
 
-**What this catches**: unfinished stubs and genuine deprecation/TODO markers the author left in the file (after incidental keyword mentions are filtered out).
+**What this catches**: unfinished stubs and explicit deprecation/TODO content the author left in the file.
 
 **What this does NOT catch** (deliberately out of scope for this version):
 - Vague prose that is well-formed but says nothing useful.
