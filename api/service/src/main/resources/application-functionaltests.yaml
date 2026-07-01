@@ -156,6 +156,36 @@ pr-review-tracking:
         default: PT24H
       messages:
         escalated: '"Contact #mr-reviews in Slack to chase this review."'
+    # GH · non-CO · no-SLA
+    - name: test-org/pr-nosla-repo
+      owning-team: wow
+      paths: ["**"]
+    # GH · CO · no-SLA
+    - name: test-org/pr-codeowners-nosla-repo
+      owning-team: wow
+      requires-codeowners: true
+      paths: ["**"]
+    # GL · CO · SLA
+    - name: gitlab-org/gitlab-pr-codeowners-repo
+      owning-team: wow
+      provider: gitlab
+      gitlab-group-path: gitlab-org
+      requires-codeowners: true
+      sla:
+        default: PT24H
+    # GL · non-CO · no-SLA
+    - name: gitlab-org/gitlab-pr-nosla-repo
+      owning-team: wow
+      provider: gitlab
+      gitlab-group-path: gitlab-org
+      paths: ["**"]
+    # GL · CO · no-SLA
+    - name: gitlab-org/gitlab-pr-codeowners-nosla-repo
+      owning-team: wow
+      provider: gitlab
+      gitlab-group-path: gitlab-org
+      requires-codeowners: true
+      paths: ["**"]
   sla-discovery:
     cache: PT5M
   github:
