@@ -744,12 +744,19 @@ its signals never reflect code-owner status — the gate silently becomes a no-o
 
 - **GitHub** — a GraphQL query reads `reviewDecision` (`APPROVED` ⟹ all required
   code owners have approved) and the `reviewRequests` whose `asCodeOwner` is true
-  (the owners still owed a review — the chase list). The gate and **individual**
-  code owners need no extra token scope beyond the **Pull requests: Read** /
-  `repo` already required, and the bot makes **no** branch-protection API call.
-  The GraphQL call is issued **only** for `requires-codeowners` repos, so other
-  repos pay nothing. The one exception: naming a **team** code owner in the chase
-  list reads the team, which needs organization membership read — see
+  (the owners still owed a review — the chase list). When the query succeeds but
+  returns **no** `reviewDecision`, GitHub requires no code-owner review for that
+  PR's changed paths (nothing code-owned was touched): the gate doesn't apply, so
+  the PR **advances straight to the merge phase** rather than waiting on a code
+  owner. A *failed* query is treated as unresolved — the PR keeps waiting and the
+  poll retries — so a transient GraphQL error never advances a PR by mistake.
+  (This is deliberately unlike GitLab, which fails *closed* on its analogous "no
+  `code_owner` rule" case — see below.) The gate and **individual** code owners
+  need no extra token scope beyond the **Pull requests: Read** / `repo` already
+  required, and the bot makes **no** branch-protection API call. The GraphQL call
+  is issued **only** for `requires-codeowners` repos, so other repos pay nothing.
+  The one exception: naming a **team** code owner in the chase list reads the team,
+  which needs organization membership read — see
   [Token permissions](#token-permissions). Without it the gate and individual
   owners are unaffected; the team is just omitted from the message.
 - **GitLab** — the MR's `approval_state` `code_owner` rule (`approved` = gate
