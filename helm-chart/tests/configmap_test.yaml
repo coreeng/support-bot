@@ -44,7 +44,7 @@ tests:
           pattern: 'messages:\n\s+approved: Approved\n\s+changes-requested: Changes requested\n\s+closed: Closed\n\s+detected: PR detected\n\s+escalated: Please escalate\n\s+merged: Merged'
       - matchRegex:
           path: data["application.yaml"]
-          pattern: 'name: coreeng/no-sla-repo\n\s+owning-team: docs-team\n\s+paths:\n\s+- docs/\*\*'
+          pattern: 'exclude-author-teams:\n\s+- docs-team\n\s+name: coreeng/no-sla-repo\n\s+owning-team: docs-team\n\s+paths:\n\s+- docs/\*\*'
 
   - it: does not inject extra pr review tracking defaults when omitted from configMap.config
     values:

@@ -122,6 +122,10 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "exclude-author-teams": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "sla": {
           "type": "object",
           "additionalProperties": false,
