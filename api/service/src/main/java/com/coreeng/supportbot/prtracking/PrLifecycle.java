@@ -269,6 +269,13 @@ public final class PrLifecycle {
             // The !requiresCodeowners guard makes "clock held in OPEN for code-owner repos" structural: such
             // a repo must never review-escalate in OPEN, even if a live deadline leaked in (e.g. a merge
             // clock paused on a changes-requested detour and later resumed via CHANGES_REQUESTED → OPEN).
+            //
+            // This is also the only row that ever sets ESCALATED, and requiresCodeowners is fixed per repo
+            // (never toggles per-PR) — so together with readyForCodeownerMerge() requiring requiresCodeowners
+            // to reach AWAITING_MERGE/MERGE_ESCALATED, a single PR can never pass through both ESCALATED and
+            // MERGE_ESCALATED. Don't relax this guard without first handling escalate()/escalateMerge()
+            // sharing one Escalation row per ticket (escalation_thread_ts_unique) — today that's a non-issue
+            // only because the two effects are mutually exclusive per repo.
             new Transition(
                     OPEN,
                     ESCALATED,
