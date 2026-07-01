@@ -61,6 +61,7 @@ public class PrLifecyclePoller {
     private final TicketSlackService ticketSlackService;
     private final SlackClient slackClient;
     private final PrTrackingProps prTrackingProps;
+    private final SlaLookup slaLookup;
     private final PrMessageRenderer messageRenderer;
     private final EscalationTeamsRegistry escalationTeamsRegistry;
 
@@ -205,9 +206,18 @@ public class PrLifecyclePoller {
     }
 
     /**
-     * Starts the merge-chase SLA clock on entry to AWAITING_MERGE. Provisional source: the repo's
-     * configured default SLA (the exact merge-SLA source ties into the deferred-clock decision). When
-     * the repo has no SLA, the state is entered without a deadline, so it never merge-escalates.
+     * Starts the merge-chase SLA clock on entry to AWAITING_MERGE, using the same SLA resolution as the
+     * review-phase clock ({@link #mergeSlaFor}) — SLA resolution lives in one place ({@link SlaLookup}),
+     * not two. When the repo has no SLA (or the resolved SLA is null — e.g. no default and no matching
+     * file/override), the state is entered without a deadline, so it never merge-escalates.
+     *
+     * <p>A resolution failure ({@link PrSourceException}, e.g. the SLA file couldn't be fetched) is
+     * deliberately <b>not</b> caught here: it propagates out of {@link #apply}, so neither the status
+     * write nor the {@code NotifyAwaitingMerge} effect happens for this poll — the record is left exactly
+     * as it was, and {@link #poll}'s per-record catch retries the whole transition (fresh SLA lookup
+     * included) on the next poll. Catching it locally and still running the effects afterward would post
+     * "ready to merge" without ever starting the clock — and repeat that every poll the lookup keeps
+     * failing.
      */
     private void startMergeClock(PrTrackingRecord record, PrTrackingStatus next) {
         Duration sla = mergeSlaFor(record);
@@ -218,12 +228,19 @@ public class PrLifecyclePoller {
         }
     }
 
+    /**
+     * Resolves the merge-phase SLA the same way {@link PrDetectionService} resolves the review-phase SLA:
+     * repo file (if configured) → path-based override matching the PR's changed files → inline {@code
+     * default:} (see {@link SlaLookup#getSla}). Reusing {@code SlaLookup} — rather than reading {@code
+     * repoConfig.sla().defaultSla()} directly — keeps SLA resolution in the one place that already
+     * handles it, and lets a file-only-SLA repo (no inline {@code default:}) still merge-escalate.
+     */
     private @Nullable Duration mergeSlaFor(PrTrackingRecord record) {
         PrTrackingProps.@Nullable Repository repoConfig = findRepoConfig(record.provider(), record.repo());
         if (repoConfig == null || repoConfig.sla() == null) {
             return null;
         }
-        return repoConfig.sla().defaultSla();
+        return slaLookup.getSla(repoConfig, new RepoCoord(record.provider(), record.repo()), record.prNumber());
     }
 
     /**
