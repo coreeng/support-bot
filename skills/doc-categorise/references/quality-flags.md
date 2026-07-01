@@ -1,15 +1,15 @@
 ---
 name: Quality flags
-description: How the skill flags pages with hollow content or explicit stale markers. Load once per run, after duplication detection, before the placement map. Intentionally simple: two deterministic checks, no LLM judgement. Read the "What this does NOT catch" section before interpreting the output.
+description: How the skill flags pages with hollow content or explicit stale markers. Load once per run, after duplication detection, before the placement map. The hollow check is a pure deterministic check; the stale-marker check is a cheap deterministic keyword prefilter followed by a bounded adjudication step that discards incidental keyword mentions. Read the "What this does NOT catch" section before interpreting the output.
 ---
 
 # Quality flags
 
-This file specifies how the skill flags two kinds of problematic pages: **hollow pages** (stubs, mostly empty) and **pages with stale markers** (explicit `deprecated` / `TODO` / `FIXME` content).
+This file specifies how the skill flags two kinds of problematic pages: **hollow pages** (stubs, mostly empty) and **pages with stale markers** (explicit `deprecated` / `TODO` / `FIXME` content that says *this doc is stale*).
 
 It runs after duplication detection (`references/duplication.md`) and before the placement map is built.
 
-This step is **intentionally minimal**, by the same logic as duplication detection. Two deterministic checks, no LLM judgement. Read the "What this does NOT catch" section before interpreting the output — the simplicity comes at a cost and the cost is explicit by design.
+This step is **kept deliberately cheap**. The `hollow` check is a pure deterministic rule. The `stale-marker` check leads with a deterministic keyword prefilter — the fast part that reduces the whole doc set to a handful of candidate lines — and then adjudicates only those candidates so that a keyword the page merely *talks about* (a how-to about migrating off legacy repos) is not reported as if the page itself were stale. Read the "What this does NOT catch" section before interpreting the output — the checks are narrow by design.
 
 ## The two flags
 
@@ -25,7 +25,13 @@ The rule is calibrated to catch genuine stubs without false-positiving short ref
 
 ### `stale-marker`
 
-A page carries a stale marker if any of the following keywords appear anywhere in its content (case-insensitive match):
+A page carries a stale marker if it contains a keyword that genuinely signals the page (or a feature/API/command it documents) is deprecated, superseded, or not to be used. The check runs in two stages: a cheap deterministic **candidate scan**, then a bounded **adjudication** that keeps only genuine markers and discards incidental keyword mentions.
+
+The two stages exist to separate the two costs. The scan is what makes the check fast — it reduces the whole doc set to a handful of candidate lines before any judgement runs. The adjudication is what makes it *useful* — it prevents a page that merely *talks about* deprecation (e.g. a how-to whose task is migrating off legacy repos) from being reported as if the page itself were stale.
+
+#### Stage 1 — candidate scan (deterministic)
+
+Scan every page for these keywords (case-insensitive match):
 
 - `deprecated`
 - `obsolete`
@@ -35,9 +41,27 @@ A page carries a stale marker if any of the following keywords appear anywhere i
 - `legacy`
 - `do not use`
 
-Each match contributes one entry to the page's reason list, with the matching line number and the matched keyword.
+Each match is a **candidate**, recorded with its line number, the matched keyword, and the line text. Candidates are not yet reasons — they must survive Stage 2.
 
-**False positives are expected.** `deprecated` may appear as a code identifier; `legacy` may be the name of a module; `TODO:` may be a quoted example in a guide about using TODO comments. The skill does **not** attempt to disambiguate. False positives are visible — the matching line appears in the report — and the stakeholder dismisses them per row.
+#### Stage 2 — adjudication
+
+Resolve each candidate to `marker` (genuine) or `incidental` (dismissed) in two tiers, cheapest first. Do the cheap tier first so the LLM tier only ever sees what the deterministic rules could not settle.
+
+**Tier A — deterministic auto-dismiss (no LLM).** A candidate is `incidental` if the match falls inside any of:
+
+- a fenced code block (between triple-backtick markers) or an inline-code span (backtick-delimited);
+- a URL, a file path, or a dotted/underscored/camel-cased code identifier (e.g. `legacy_config`, `LegacyClient`, `deprecated.md`).
+
+**Tier B — batched judgement (LLM), applied only to candidates that survive Tier A.** Collect every surviving candidate across the whole run and resolve them in a **single** pass — one call, not one per line. For each candidate give the model the line, ~2 lines of surrounding context, and the page's title/topic. The page content is already in context from classification, so this adds one round-trip regardless of doc-set size. Classify each candidate:
+
+- `marker` — the text tells a reader that *this* page, feature, API, or command is deprecated / obsolete / superseded / not-to-be-used: an admonition or banner ("⚠️ This page is deprecated — see X"), a "use Y instead" instruction, a `deprecated: true` frontmatter flag, a `TODO:`/`FIXME:` the author left in the prose.
+- `incidental` — the keyword is the **subject the page is documenting**, not a status of the page: a how-to whose task *is* migrating off legacy repos, a reference entry describing a `legacy` mode, a guide about writing TODO comments, or prose where the word is the grammatical object ("migrate your **legacy** artifacts to …").
+
+The deciding question the model applies to each candidate: *is the doc telling me this doc/thing is stale, or is staleness the topic it is documenting?* Only the former is a `marker`.
+
+Only `marker` candidates raise the `stale-marker` flag and contribute a reason. `incidental` candidates are dismissed, but their count is retained so the filtering stays auditable (see Output).
+
+**Residual false positives.** Adjudication greatly reduces false positives but does not eliminate them — a genuinely ambiguous line may still be miscalled either way. Every reported marker still shows its line in the report, so a reviewer can confirm or dismiss per row.
 
 ## Multiple flags per page
 
@@ -46,7 +70,7 @@ A page can be both `hollow` AND carry stale markers. Both flags are recorded; th
 ## What this catches
 
 - Pages that exist but are nearly empty (stubs with a title and a sentence; pages that were started but never finished).
-- Pages with explicit deprecation, TODO, FIXME, or "do not use" content that the author left in the file.
+- Pages carrying an explicit deprecation, TODO, FIXME, or "do not use" marker that says *this page/thing is stale* — after incidental mentions of those keywords have been filtered out by adjudication.
 
 ## What this does NOT catch (deliberately out of scope for this version)
 
@@ -66,8 +90,9 @@ If any of these matter for your stakeholder review, they require richer signals 
 For each scanned page (regardless of journey-match status, audience tier, or Diátaxis verdict):
 
 1. Apply the `hollow` rule. Record a flag if it fires, with a one-line reason.
-2. Apply the `stale-marker` keyword scan. Record one reason entry per matching line.
-3. If at least one flag fired, the page appears in the report.
+2. Run the `stale-marker` **Stage 1** candidate scan and **Tier A** deterministic auto-dismiss per page. Collect the surviving candidates.
+3. Run the `stale-marker` **Tier B** adjudication **once for the whole run** over all surviving candidates (a single batched call). For each page, record one reason entry per candidate resolved to `marker`; tally the candidates resolved to `incidental`.
+4. A page carries the `stale-marker` flag only if it has at least one `marker` reason. If at least one flag (`hollow` or `stale-marker`) fired, the page appears in the report.
 
 Outliers are **not** excluded — an outlier may still be a hollow page or carry a stale marker, and that signal is useful.
 
@@ -81,11 +106,13 @@ The section header is followed by:
 2. The flag table. Columns:
    - **Source path** — the page's path relative to the repo root.
    - **Flags** — comma-separated (`hollow`, `stale-marker`, or both).
-   - **Reasons** — for `hollow`, a one-line summary (`X non-blank content lines; no code or tables`); for `stale-marker`, one entry per match (`line 12: deprecated`, `line 47: TODO:`).
+   - **Reasons** — for `hollow`, a one-line summary (`X non-blank content lines; no code or tables`); for `stale-marker`, one entry per genuine marker (`line 12: deprecated`, `line 47: TODO:`).
 
 Sort: pages with both flags first; then `hollow`-only; then `stale-marker`-only; ties broken by source path order.
 
-If no pages were flagged, the section contains the single line "No hollow pages or stale markers detected." Do not omit the section.
+If any keyword candidates were dismissed as incidental during adjudication, append a single italic line directly below the table recording the tally, so the filtering is auditable — e.g. `_9 keyword hits across 3 pages were scanned and dismissed as incidental (the keyword is the page's subject, not a staleness marker)._` A page whose only stale-marker candidates were all dismissed does **not** appear in the table on the strength of those candidates.
+
+If no pages were flagged, the section contains the single line "No hollow pages or stale markers detected." (still followed by the dismissed-candidates line if any were dismissed). Do not omit the section.
 
 ## What this step does not do
 
