@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -1654,6 +1655,35 @@ class PrLifecyclePollerTest {
             assertThat(deadlineCaptor.getValue())
                     .isCloseTo(Instant.now().plus(Duration.ofHours(2)), within(Duration.ofSeconds(30)));
             verify(slaLookup, never()).getSla(any(), any(), eq(record.prNumber()));
+        }
+
+        @Test
+        void resolvesMergeSlaOnceNotAgainInTheNotificationPath() {
+            // given — entering AWAITING_MERGE with a ticket present, so NotifyAwaitingMerge renders a
+            // message. The merge SLA must be resolved exactly once, before the status write. The old code
+            // looked it up a second time inside the notification (after the write); a failure on that
+            // second call stranded the record with a running clock and no "ready to merge" message.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = record(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null);
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
+            Ticket ticket = ticket(100L);
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(openCodeownerApprovedMergeablePr(record));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(slaLookup.getSla(eq(repoConfig), any(RepoCoord.class), eq(record.prNumber())))
+                    .thenReturn(Duration.ofHours(6));
+            when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
+                    .thenReturn(ticket);
+
+            // when
+            poller.poll();
+
+            // then — a single SlaLookup, the AWAITING_MERGE clock started, and the notification posted.
+            verify(slaLookup, times(1)).getSla(any(), any(), eq(record.prNumber()));
+            verify(prTrackingRepository)
+                    .startSla(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), any(Instant.class));
+            verify(slackClient).postMessage(any());
         }
 
         private PrTrackingProps.Repository codeownerRepoConfig(Duration defaultSla) {
