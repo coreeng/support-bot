@@ -77,9 +77,10 @@ public final class PrLifecycle {
          * no outstanding changes-requested verdict. The {@code !changesRequested()} guard matters because a
          * changes-requested review from a non-required reviewer leaves GitHub's {@code reviewDecision}
          * (hence {@code codeownerApproved}) and {@code mergeable} untouched: without it, such a PR would
-         * flap AWAITING_MERGE ↔ CHANGES_REQUESTED every poll (two contradictory notifications, and the
-         * merge clock reset to full on each re-entry so it never breaches). Changes-requested takes
-         * priority until it clears, mirroring the OPEN rows.
+         * flap AWAITING_MERGE ↔ CHANGES_REQUESTED every poll, posting two contradictory notifications each
+         * time. When the changes-requested does clear, re-entry resumes the paused merge clock rather than
+         * restarting it (see {@code PrLifecyclePoller#startMergeClock}), so the detour doesn't reset the
+         * merge SLA. Changes-requested takes priority until it clears, mirroring the OPEN rows.
          */
         boolean readyForCodeownerMerge() {
             return requiresCodeowners && codeownerApproved && mergeable && !changesRequested();
@@ -104,8 +105,10 @@ public final class PrLifecycle {
         record Resume() implements SlaOp {}
 
         /**
-         * Starts the SLA clock on entry to a state (AWAITING_MERGE): the shell stamps {@code now} + the
-         * repo's configured SLA. A no-op when the repo has no SLA, so such repos never merge-escalate.
+         * Starts (or resumes) the SLA clock on entry to a state (AWAITING_MERGE): the shell stamps
+         * {@code now} + the paused merge remaining if a changes-requested detour left one, else
+         * {@code now} + the repo's configured SLA. A no-op when the repo has no SLA and nothing was
+         * paused, so such repos never merge-escalate. See {@code PrLifecyclePoller#startMergeClock}.
          */
         record Start() implements SlaOp {}
 

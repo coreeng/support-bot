@@ -1627,6 +1627,35 @@ class PrLifecyclePollerTest {
             verifyNoInteractions(slackClient);
         }
 
+        @Test
+        void resumesPausedMergeClockOnReEntryInsteadOfRestartingFull() {
+            // given — a code-owner PR that reached AWAITING_MERGE, then a (non-required) changes-requested
+            // review paused the merge clock into slaRemaining (2h left). The changes-requested has cleared
+            // (code owners still approved, PR mergeable), so it re-enters AWAITING_MERGE. The merge clock
+            // must resume from the paused 2h, not restart the full 6h window — otherwise repeated tenant
+            // pushes would keep the merge SLA from ever breaching.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = pausedRecord(
+                    1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.CHANGES_REQUESTED, Duration.ofHours(2));
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(openCodeownerApprovedMergeablePr(record));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+
+            // when
+            poller.poll();
+
+            // then — the deadline resumes from the paused remaining (~2h from now), and the full-SLA
+            // lookup is never consulted (proving a resume, not a fresh full-window restart).
+            ArgumentCaptor<Instant> deadlineCaptor = ArgumentCaptor.forClass(Instant.class);
+            verify(prTrackingRepository)
+                    .startSla(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), deadlineCaptor.capture());
+            assertThat(deadlineCaptor.getValue())
+                    .isCloseTo(Instant.now().plus(Duration.ofHours(2)), within(Duration.ofSeconds(30)));
+            verify(slaLookup, never()).getSla(any(), any(), eq(record.prNumber()));
+        }
+
         private PrTrackingProps.Repository codeownerRepoConfig(Duration defaultSla) {
             return new PrTrackingProps.Repository(
                     "my-org/repo-a",
