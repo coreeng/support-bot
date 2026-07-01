@@ -14,9 +14,11 @@ type SortDir = "asc" | "desc";
 
 const STATUS_SEVERITY: Record<string, number> = {
   ESCALATED: 0,
+  MERGE_ESCALATED: 0,
   OPEN: 1,
   CHANGES_REQUESTED: 2,
   APPROVED: 3,
+  AWAITING_MERGE: 3,
 };
 
 function statusSeverity(status: string): number {
@@ -30,8 +32,10 @@ function statusBadgeStyle(status: string): string {
     case "CHANGES_REQUESTED":
       return "bg-warning/10 text-warning";
     case "APPROVED":
+    case "AWAITING_MERGE":
       return "bg-success/10 text-success";
     case "ESCALATED":
+    case "MERGE_ESCALATED":
       return "bg-destructive/10 text-destructive";
     default:
       return "bg-muted text-foreground";
@@ -42,6 +46,10 @@ function statusLabel(status: string): string {
   switch (status) {
     case "CHANGES_REQUESTED":
       return "Changes Requested";
+    case "AWAITING_MERGE":
+      return "Awaiting Merge";
+    case "MERGE_ESCALATED":
+      return "Merge Escalated";
     default:
       return status.charAt(0) + status.slice(1).toLowerCase();
   }

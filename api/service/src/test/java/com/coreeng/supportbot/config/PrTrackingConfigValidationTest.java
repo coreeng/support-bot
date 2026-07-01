@@ -6,14 +6,40 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
 class PrTrackingConfigValidationTest {
 
     private static final String DEFAULT_DURATION_UNIT = "days";
     private static final PrTrackingProps.SlaDiscovery DEFAULT_SLA_DISCOVERY =
             new PrTrackingProps.SlaDiscovery(Duration.ofHours(24));
+
+    @Test
+    void bindsPerRepoMessagesOverrideBlock() {
+        // Regression: Messages has two constructors; without @ConstructorBinding on the canonical one,
+        // Spring Boot's binder resolves no bind constructor and silently returns an unbound result, so a
+        // configured `messages:` block is dropped and every override reverts to the default text. Bind a
+        // real property map through the actual Binder and assert the block (incl. @Name kebab keys) survives.
+        Map<String, Object> source = new HashMap<>();
+        source.put("m.detected", "custom detected");
+        source.put("m.awaiting-merge", "custom awaiting merge");
+        source.put("m.merge-escalated", "custom merge escalated");
+
+        var bound = new Binder(new MapConfigurationPropertySource(source))
+                .bind("m", Bindable.of(PrTrackingProps.Messages.class));
+
+        assertThat(bound.isBound()).isTrue();
+        PrTrackingProps.Messages messages = bound.get();
+        assertThat(messages.detected()).isEqualTo("custom detected");
+        assertThat(messages.awaitingMerge()).isEqualTo("custom awaiting merge");
+        assertThat(messages.mergeEscalated()).isEqualTo("custom merge escalated");
+    }
 
     @Test
     void acceptsValidTokenModeWhenEnabled() {

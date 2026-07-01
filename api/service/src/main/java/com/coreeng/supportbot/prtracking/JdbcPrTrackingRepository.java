@@ -235,18 +235,22 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                         pt.pr_number,
                         CASE pt.status
                             WHEN 'ESCALATED' THEN 1
+                            WHEN 'MERGE_ESCALATED' THEN 1
                             WHEN 'OPEN' THEN 2
                             WHEN 'CHANGES_REQUESTED' THEN 3
                             WHEN 'APPROVED' THEN 4
+                            WHEN 'AWAITING_MERGE' THEN 4
                         END,
                         pt.sla_deadline ASC NULLS LAST
                 ) deduped
                 ORDER BY
                     CASE status
                         WHEN 'ESCALATED' THEN 1
+                        WHEN 'MERGE_ESCALATED' THEN 1
                         WHEN 'OPEN' THEN 2
                         WHEN 'CHANGES_REQUESTED' THEN 3
                         WHEN 'APPROVED' THEN 4
+                        WHEN 'AWAITING_MERGE' THEN 4
                     END,
                     sla_deadline ASC NULLS LAST
                 """.formatted(teamFilter);

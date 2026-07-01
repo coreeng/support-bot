@@ -481,6 +481,31 @@ class GitLabPrSourceClientTest {
         h.server().verify();
     }
 
+    @Test
+    void fetchPullRequestLeavesCodeownersUnknownWhenNoCodeOwnerRule() {
+        // A successful approval_state with no code_owner rule (GitLab CE/Free, or an MR touching no owned
+        // paths) must NOT vacuously satisfy the gate: codeOwnersApproved stays null (fail closed), so the
+        // MR keeps waiting in the code-owner hold instead of jumping to the merge phase.
+        CodeownerHarness h = codeownerHarness();
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/52"))
+                .andRespond(withSuccess(openMergeableMr(52), MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/52/approvals"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/52/approval_state"))
+                .andRespond(withSuccess("""
+                        {"rules":[{"rule_type":"regular","approved":true}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        PrMetadata md = h.client().fetchPullRequest(RepoCoord.gitlab(REPO), 52);
+
+        assertThat(md.codeOwnersApproved()).isNull();
+        assertThat(md.codeOwnerReviewers()).isEmpty();
+        h.server().verify();
+    }
+
     private static String openMergeableMr(int iid) {
         return """
                 {"iid":%d,"state":"opened","created_at":"2026-01-01T10:00:00Z",

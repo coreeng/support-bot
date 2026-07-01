@@ -72,9 +72,17 @@ public final class PrLifecycle {
             return latestVerdict == null;
         }
 
-        /** True when a requires-codeowners repo has its code owners' approval and the PR is mergeable. */
+        /**
+         * True when a requires-codeowners repo has its code owners' approval and the PR is mergeable, with
+         * no outstanding changes-requested verdict. The {@code !changesRequested()} guard matters because a
+         * changes-requested review from a non-required reviewer leaves GitHub's {@code reviewDecision}
+         * (hence {@code codeownerApproved}) and {@code mergeable} untouched: without it, such a PR would
+         * flap AWAITING_MERGE ↔ CHANGES_REQUESTED every poll (two contradictory notifications, and the
+         * merge clock reset to full on each re-entry so it never breaches). Changes-requested takes
+         * priority until it clears, mirroring the OPEN rows.
+         */
         boolean readyForCodeownerMerge() {
-            return requiresCodeowners && codeownerApproved && mergeable;
+            return requiresCodeowners && codeownerApproved && mergeable && !changesRequested();
         }
     }
 
@@ -258,11 +266,14 @@ public final class PrLifecycle {
                     o -> o.approved() && !o.mergeable() && !o.hasLiveDeadline(),
                     PrLifecycle::none,
                     List.of()),
+            // The !requiresCodeowners guard makes "clock held in OPEN for code-owner repos" structural: such
+            // a repo must never review-escalate in OPEN, even if a live deadline leaked in (e.g. a merge
+            // clock paused on a changes-requested detour and later resumed via CHANGES_REQUESTED → OPEN).
             new Transition(
                     OPEN,
                     ESCALATED,
                     "no verdict + SLA breached",
-                    o -> o.noVerdict() && o.slaBreached(),
+                    o -> o.noVerdict() && o.slaBreached() && !o.requiresCodeowners(),
                     PrLifecycle::none,
                     List.of(Effect.ESCALATE)),
 
