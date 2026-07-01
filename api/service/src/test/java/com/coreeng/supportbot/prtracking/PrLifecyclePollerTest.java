@@ -38,7 +38,9 @@ import com.coreeng.supportbot.ticket.slack.TicketSlackService;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -89,9 +91,125 @@ class PrLifecyclePollerTest {
     @Mock
     private EscalationTeamsRegistry escalationTeamsRegistry;
 
+    // Tracks every PrTrackingRecord built by a test (via record()/pausedRecord()/register()), keyed by
+    // id, so the generic write-method stubs below can return an updated row — mirroring
+    // JdbcPrTrackingRepository, which returns the post-write row from `RETURNING` — instead of Mockito's
+    // default null. PrLifecyclePoller.apply() now threads that returned record into the effects it runs
+    // (see the real-fix commit for #11: an effect like NotifyAwaitingMerge must see the deadline this
+    // transition just wrote, not a stale pre-write value), so a null return would NPE inside the effect.
+    private final Map<Long, PrTrackingRecord> knownRecords = new HashMap<>();
+
     @BeforeEach
     void setUp() {
         lenient().when(prSourceClients.forProvider(Provider.GITHUB)).thenReturn(prSourceClient);
+        lenient()
+                .when(prTrackingRepository.updateStatus(anyLong(), any(), any(), any()))
+                .thenAnswer(inv -> register(withStatus(
+                        known(inv.getArgument(0)), inv.getArgument(1), inv.getArgument(2), inv.getArgument(3))));
+        lenient()
+                .when(prTrackingRepository.pauseSla(anyLong(), any(), any()))
+                .thenAnswer(
+                        inv -> register(withPause(known(inv.getArgument(0)), inv.getArgument(1), inv.getArgument(2))));
+        lenient()
+                .when(prTrackingRepository.resumeSla(anyLong(), any()))
+                .thenAnswer(inv -> register(withResume(known(inv.getArgument(0)), inv.getArgument(1))));
+        lenient()
+                .when(prTrackingRepository.startSla(anyLong(), any(), any()))
+                .thenAnswer(
+                        inv -> register(withStart(known(inv.getArgument(0)), inv.getArgument(1), inv.getArgument(2))));
+    }
+
+    private PrTrackingRecord register(PrTrackingRecord record) {
+        knownRecords.put(record.id(), record);
+        return record;
+    }
+
+    private PrTrackingRecord known(long id) {
+        PrTrackingRecord record = knownRecords.get(id);
+        if (record == null) {
+            throw new IllegalStateException(
+                    "No PrTrackingRecord registered for id " + id + " — build it via record()/pausedRecord()/register()"
+                            + " so the repository write stubs can return an updated row");
+        }
+        return record;
+    }
+
+    private static PrTrackingRecord withStatus(
+            PrTrackingRecord base, PrTrackingStatus status, @Nullable Instant closedAt, @Nullable Long escalationId) {
+        boolean closed = status == PrTrackingStatus.CLOSED;
+        return new PrTrackingRecord(
+                base.id(),
+                base.ticketId(),
+                base.provider(),
+                base.repo(),
+                base.prNumber(),
+                base.prCreatedAt(),
+                closed ? null : base.slaDeadline(),
+                base.owningTeam(),
+                base.canAutoCloseTicket(),
+                status,
+                escalationId,
+                closedAt,
+                closed ? null : base.slaRemaining(),
+                base.lastReviewAt(),
+                base.lastAuthorActivityAt());
+    }
+
+    private static PrTrackingRecord withPause(PrTrackingRecord base, PrTrackingStatus status, Duration remaining) {
+        return new PrTrackingRecord(
+                base.id(),
+                base.ticketId(),
+                base.provider(),
+                base.repo(),
+                base.prNumber(),
+                base.prCreatedAt(),
+                null,
+                base.owningTeam(),
+                base.canAutoCloseTicket(),
+                status,
+                base.escalationId(),
+                base.closedAt(),
+                remaining,
+                base.lastReviewAt(),
+                base.lastAuthorActivityAt());
+    }
+
+    private static PrTrackingRecord withResume(PrTrackingRecord base, Instant newDeadline) {
+        return new PrTrackingRecord(
+                base.id(),
+                base.ticketId(),
+                base.provider(),
+                base.repo(),
+                base.prNumber(),
+                base.prCreatedAt(),
+                newDeadline,
+                base.owningTeam(),
+                base.canAutoCloseTicket(),
+                PrTrackingStatus.OPEN,
+                base.escalationId(),
+                base.closedAt(),
+                null,
+                base.lastReviewAt(),
+                base.lastAuthorActivityAt());
+    }
+
+    private static PrTrackingRecord withStart(PrTrackingRecord base, PrTrackingStatus status, Instant newDeadline) {
+        return new PrTrackingRecord(
+                base.id(),
+                base.ticketId(),
+                base.provider(),
+                base.repo(),
+                base.prNumber(),
+                base.prCreatedAt(),
+                newDeadline,
+                base.owningTeam(),
+                base.canAutoCloseTicket(),
+                status,
+                base.escalationId(),
+                base.closedAt(),
+                null,
+                base.lastReviewAt(),
+                base.lastAuthorActivityAt());
     }
 
     // ── Existing behaviour (PR closed/merged, escalation) ──
@@ -342,7 +460,7 @@ class PrLifecyclePollerTest {
     void doesNotAutoCloseTicketForReplyOriginTrackingRecord() {
         // given
         PrLifecyclePoller poller = createPoller();
-        PrTrackingRecord record = new PrTrackingRecord(
+        PrTrackingRecord record = register(new PrTrackingRecord(
                 1L,
                 100L,
                 Provider.GITHUB,
@@ -357,7 +475,7 @@ class PrLifecyclePollerTest {
                 null,
                 null,
                 null,
-                null);
+                null));
         when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
         when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                 .thenReturn(closedPr(record));
@@ -673,7 +791,7 @@ class PrLifecyclePollerTest {
         void doesNotThrowWhenSlaDeadlineIsNull() {
             // given — OPEN record with null slaDeadline, no reviews
             PrLifecyclePoller poller = createPoller();
-            PrTrackingRecord record = new PrTrackingRecord(
+            PrTrackingRecord record = register(new PrTrackingRecord(
                     1L,
                     100L,
                     Provider.GITHUB,
@@ -688,7 +806,7 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
-                    null);
+                    null));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPr(record));
@@ -708,7 +826,7 @@ class PrLifecyclePollerTest {
             // rewrite, blanket-escalate) every no-SLA PR. Ancient createdAt ensures this isn't
             // passing only because the PR is young.
             PrLifecyclePoller poller = createPoller();
-            PrTrackingRecord ancientNoSlaRecord = new PrTrackingRecord(
+            PrTrackingRecord ancientNoSlaRecord = register(new PrTrackingRecord(
                     1L,
                     100L,
                     Provider.GITHUB,
@@ -723,7 +841,7 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
-                    null);
+                    null));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(ancientNoSlaRecord));
             when(prSourceClient.fetchPullRequest(
                             RepoCoord.github(ancientNoSlaRecord.repo()), ancientNoSlaRecord.prNumber()))
@@ -739,7 +857,7 @@ class PrLifecyclePollerTest {
         void changesRequestedTransitionForNoSlaPr() {
             // given — OPEN record with null slaDeadline but a CHANGES_REQUESTED review present
             PrLifecyclePoller poller = createPoller();
-            PrTrackingRecord record = new PrTrackingRecord(
+            PrTrackingRecord record = register(new PrTrackingRecord(
                     1L,
                     100L,
                     Provider.GITHUB,
@@ -754,7 +872,7 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
-                    null);
+                    null));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
@@ -782,7 +900,7 @@ class PrLifecyclePollerTest {
         void approvedTransitionForNoSlaUpdatesStatusWithoutPausingSla() {
             // given — OPEN no-SLA record (null slaDeadline) with an APPROVED review present
             PrLifecyclePoller poller = createPoller();
-            PrTrackingRecord record = new PrTrackingRecord(
+            PrTrackingRecord record = register(new PrTrackingRecord(
                     1L,
                     100L,
                     Provider.GITHUB,
@@ -797,7 +915,7 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
-                    null);
+                    null));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.APPROVED))));
@@ -1450,6 +1568,40 @@ class PrLifecyclePollerTest {
         }
 
         @Test
+        void notifyAwaitingMergeRendersTheFreshMergeDeadlineNotAStaleReviewDeadline() {
+            // given — the record still carries a live review-phase deadline from before code owners
+            // approved (e.g. a repo whose review SLA hasn't been reached yet). NotifyAwaitingMerge fires
+            // in the same decide() as the Start op that overwrites this deadline with the merge-phase
+            // one — the notification must render off the value just written, not this stale one.
+            PrLifecyclePoller poller = createPoller();
+            Instant staleReviewDeadline = Instant.now().plus(Duration.ofDays(30));
+            PrTrackingRecord record = record(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, staleReviewDeadline);
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(24));
+            Ticket ticket = ticket(100L);
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(openCodeownerApprovedMergeablePr(record));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(slaLookup.getSla(eq(repoConfig), any(RepoCoord.class), eq(record.prNumber())))
+                    .thenReturn(Duration.ofHours(6));
+            when(ticketRepository.findTicketById(new TicketId(record.ticketId())))
+                    .thenReturn(ticket);
+
+            // when
+            poller.poll();
+
+            // then — the rendered context's sla/slaDeadline reflect the merge clock just started, not
+            // the pre-transition review deadline
+            ArgumentCaptor<PrMessageContext> ctxCaptor = ArgumentCaptor.forClass(PrMessageContext.class);
+            verify(messageRenderer).render(eq(record.repo()), eq(MessageEvent.AWAITING_MERGE), ctxCaptor.capture());
+            PrMessageContext ctx = ctxCaptor.getValue();
+            assertThat(ctx.sla()).isNotNull().isCloseTo(Duration.ofHours(6), Duration.ofSeconds(30));
+            assertThat(ctx.slaDeadline())
+                    .isNotNull()
+                    .isCloseTo(Instant.now().plus(Duration.ofHours(6)), within(Duration.ofSeconds(30)));
+        }
+
+        @Test
         void leavesRecordUnchangedWhenSlaLookupFails() {
             // given — the SLA file couldn't be fetched (provider hiccup). The transition must not
             // partially apply: no status write, and no "ready to merge" notification either (which would
@@ -1565,7 +1717,7 @@ class PrLifecyclePollerTest {
             // given
             PrLifecyclePoller poller = createPoller();
             Instant existingReviewTime = Instant.parse("2026-03-20T12:00:00Z");
-            PrTrackingRecord record = new PrTrackingRecord(
+            PrTrackingRecord record = register(new PrTrackingRecord(
                     1L,
                     100L,
                     Provider.GITHUB,
@@ -1580,7 +1732,7 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     existingReviewTime,
-                    null);
+                    null));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(
@@ -1604,7 +1756,7 @@ class PrLifecyclePollerTest {
         void resumeSlaToOpenSkipsWhenSlaRemainingIsNull() {
             // given — CHANGES_REQUESTED record with null slaRemaining (data inconsistency)
             PrLifecyclePoller poller = createPoller();
-            PrTrackingRecord record = new PrTrackingRecord(
+            PrTrackingRecord record = register(new PrTrackingRecord(
                     1L,
                     100L,
                     Provider.GITHUB,
@@ -1619,7 +1771,7 @@ class PrLifecyclePollerTest {
                     null,
                     null,
                     null,
-                    null);
+                    null));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
                     .thenReturn(openPrWithReviews(record, List.of(review(Review.ReviewState.DISMISSED))));
@@ -1747,9 +1899,9 @@ class PrLifecyclePollerTest {
                 escalationTeamsRegistry);
     }
 
-    private static PrTrackingRecord record(
+    private PrTrackingRecord record(
             long id, long ticketId, String repo, int prNumber, PrTrackingStatus status, @Nullable Instant slaDeadline) {
-        return new PrTrackingRecord(
+        return register(new PrTrackingRecord(
                 id,
                 ticketId,
                 Provider.GITHUB,
@@ -1764,12 +1916,12 @@ class PrLifecyclePollerTest {
                 null,
                 null,
                 null,
-                null);
+                null));
     }
 
-    private static PrTrackingRecord pausedRecord(
+    private PrTrackingRecord pausedRecord(
             long id, long ticketId, String repo, int prNumber, PrTrackingStatus status, Duration slaRemaining) {
-        return new PrTrackingRecord(
+        return register(new PrTrackingRecord(
                 id,
                 ticketId,
                 Provider.GITHUB,
@@ -1784,7 +1936,7 @@ class PrLifecyclePollerTest {
                 null,
                 slaRemaining,
                 null,
-                null);
+                null));
     }
 
     private static PrMetadata openPr(PrTrackingRecord record) {
