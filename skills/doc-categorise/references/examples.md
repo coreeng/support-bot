@@ -11,8 +11,6 @@ Use the exemplars by **shape**, not topic: when classifying a real page, ask whi
 
 > **Note on frontmatter:** the exemplars below show only `diataxis_type` in frontmatter for brevity. Real outputs MUST include all three required fields (`product`, `diataxis_type`, `source_path`) per Step 5 of `SKILL.md`, plus the provenance HTML comment from the Rewrite rules. The exemplars demonstrate **shape and voice**, not the full output format.
 
-> **Note on output paths:** the paths below (e.g. `docs/how-to/install.md`) use the **flat layout** for brevity — the layout the skill uses when `journeys = []`. In the default journey-scoped layout (when journeys are supplied), the category folder is nested one level deeper under a journey folder: each file lands at `<output_root>/<journey-slug>/<category>/…` for **every** journey the source matched (the page is duplicated across journey folders), or at `<output_root>/no-journey/<category>/…` if it matched none. So `docs/how-to/install.md` below would be `docs/<journey-slug>/how-to/install.md` in the journey-scoped layout. See "Output root resolution" and "Placement, naming, and collisions" in `SKILL.md`. The classification **shape** these examples teach is identical in both layouts.
-
 ---
 
 ## 1. Tutorial exemplar

@@ -1,6 +1,6 @@
 ---
 name: doc-categorise
-description: Use when auditing a repository's markdown documentation for Diátaxis classification, journey-coverage gaps, audience drift, duplication candidates, and quality issues. Produces a stakeholder report identifying coverage gaps and a prioritised list of next actions; optionally also produces a journey-organised copy tree under docs/ (or docs.proposed/) — one folder per user journey, each containing the four Diátaxis subfolders, plus a no-journey/ folder for product-level pages — by rewriting or splitting drift pages. Originals are never modified.
+description: Use when auditing a repository's markdown documentation for Diátaxis classification, journey-coverage gaps, audience drift, duplication candidates, and quality issues. Produces a stakeholder report identifying coverage gaps and a prioritised list of next actions; optionally also produces a Diátaxis-organised copy tree under docs/ (or docs.proposed/) by rewriting or splitting drift pages. Originals are never modified.
 ---
 
 # doc-categorise
@@ -103,7 +103,7 @@ You MUST NOT proceed to:
 - file generation
 - reporting
 
-until both `product_name` and `journeys` are resolved. `journeys = []` is a valid resolution and the skill MUST proceed in that case. When `journeys` is non-empty it defines the top-level folder structure of the output tree (one folder per journey); when `journeys = []` the tree falls back to a flat Diátaxis layout — see "Output root resolution".
+until both `product_name` and `journeys` are resolved. `journeys = []` is a valid resolution and the skill MUST proceed in that case.
 
 ### Step 5 — Frontmatter injection rules
 
@@ -130,7 +130,7 @@ Feature data resolved from `product-definition/` is **not** injected into output
 
 The skill has two execution modes:
 
-- **`full` (default)** — produces the categorised tree under the output root (journey-scoped when journeys are supplied, flat Diátaxis layout otherwise — see "Output root resolution") **and** writes REPORT.md inside it. Full behaviour described elsewhere in this file.
+- **`full` (default)** — produces the Diátaxis-organised tree under the output root **and** writes REPORT.md inside it. Full behaviour described elsewhere in this file.
 - **`report-only`** — produces REPORT.md only. All analysis steps (classification, journey matching, audience tagging, gap analysis, duplication, quality flags, suggested actions) still run, and the placement map is still computed so the report can describe where each page would land. The tree is **not** written: no PERFECT copies, REWRITE outputs, SPLIT outputs, assets, or directories are created.
 
 ### Mode resolution (blocking)
@@ -163,32 +163,8 @@ Applies only in `full` mode. In `report-only` mode, see "Execution mode" above f
 1. Locate the repo's existing docs folder by checking these names in order: `docs/`, `Docs/`, `documentation/`, `Documentation/`. The first match wins.
 2. If a match is found → output root is `<repo_root>/<match>.proposed/` (e.g. `docs.proposed/`, `documentation.proposed/`).
 3. If no match is found → output root is `<repo_root>/docs/`.
-4. The folder layout under the chosen root depends on whether `journeys` was supplied:
-
-   **When `journeys` is non-empty — journey-scoped layout:**
-   - One **journey folder** per supplied journey, named with the journey's slug (slug rules below). Create a folder for **every** supplied journey, even one that ends up with no pages — an empty journey folder is a visible coverage gap, not an error.
-   - One **`no-journey/`** folder for product-level pages that match no journey. `no-journey` is a reserved folder name.
-   - Inside **each** journey folder and inside `no-journey/`, create the four Diátaxis subfolders: `tutorials/`, `how-to/`, `reference/`, `explanation/`.
-   - A single shared `assets/` folder directly under the output root. Assets are deduplicated across the whole tree, not per journey.
-
-   **When `journeys = []` — flat layout (fallback):** there are no journeys to scope by, so create the four Diátaxis subfolders directly under the output root (`tutorials/`, `how-to/`, `reference/`, `explanation/`), plus `assets/`. No journey folders and no `no-journey/` folder are created. This is the original layout.
-5. Journey-folder slug rules (journey-scoped layout only): lowercase, dash-separated, ASCII only; strip punctuation other than dashes (same rules as the SPLIT slugs in "Placement, naming, and collisions" below). If two journey names slug to the same value, append `-2`, `-3`, … in input order. A journey must never occupy the reserved slug `no-journey`; if one slugs to that value, suffix it (`no-journey-2`).
-6. The executive report is written to `<output_root>/REPORT.md`.
-
-Resulting shapes:
-
-```
-# journeys non-empty                  # journeys = [] (flat fallback)
-<output_root>/                        <output_root>/
-  <journey-slug-1>/{4 diátaxis}/        tutorials/
-  <journey-slug-2>/{4 diátaxis}/        how-to/
-  no-journey/{4 diátaxis}/             reference/
-  assets/                             explanation/
-  REPORT.md                           assets/
-                                      REPORT.md
-```
-
-(`{4 diátaxis}` = `tutorials/`, `how-to/`, `reference/`, `explanation/`.)
+4. Always create these subfolders under the chosen root: `tutorials/`, `how-to/`, `reference/`, `explanation/`, `assets/`.
+5. The executive report is written to `<output_root>/REPORT.md`.
 
 ## Source scope (user-supplied at invocation)
 - Required input: repo root path.
@@ -221,48 +197,30 @@ Procedure for each page:
 - Preserve existing frontmatter; add `product: <product_name>`, `diataxis_type: <category>`, and `source_path: <original repo-relative path>` per Step 5 of the Required input block. Do not change existing `title`/`description` unless empty.
 - Prepend a single HTML comment at the top of every generated file (including PERFECT copies): `<!-- Generated by doc-categorise from <source_path>. Do not edit; edit the source. -->`
 
-## Placement, naming, and collisions
+## Naming and collisions
 
-### Placement — which folder(s) a page lands in
+Filename rules by verdict:
 
-Placement is driven by the page's journey-relevance list (from `references/journey-matching.md`) — the same list that sets the audience tier in `references/audience-tagging.md`.
-
-**Journey-scoped layout (`journeys` non-empty):**
-
-- For **every** journey in the page's journey-relevance list — **strong and weak matches alike** — write a copy of the output into `<output_root>/<journey-slug>/<category>/`. A page matching N journeys is therefore copied into N journey folders. The copies are identical except for any inter-doc links that resolve differently per folder. This is intentional duplication so each journey folder is self-contained; the original is never modified.
-- If the page's journey-relevance list is **empty** (audience tier `builder/maintainer`), write a single copy into `<output_root>/no-journey/<category>/`.
-- For a SPLIT, every split output inherits the source page's journey-relevance list, and each split output is placed (and duplicated across matched journey folders) according to its own single Diátaxis type.
-
-**Flat layout (`journeys = []`):** every output lands directly in `<output_root>/<category>/` — there are no journey folders. Each page produces exactly one copy.
-
-In both layouts, a page is referred to below as living in `<dest>/<category>/`, where `<dest>` is a journey slug, `no-journey`, or (flat layout) absent.
-
-### Filename rules by verdict
-
-- **PERFECT** and **REWRITE** outputs → `<dest>/<category>/<source_basename>.md`. Example: source `notes/foo.md` matching journey "Deploy a workload" and classified how-to → `docs/deploy-a-workload/how-to/foo.md`. In the flat layout the same page would be `docs/how-to/foo.md`.
-- **SPLIT** outputs → `<dest>/<category>/<slug>.md`, where `<slug>` is derived from the unit:
+- **PERFECT** and **REWRITE** outputs → `<output_root>/<category>/<source_basename>.md`. Example: source `docs/foo.md` placed as `docs/how-to/foo.md`.
+- **SPLIT** outputs → `<output_root>/<category>/<slug>.md`, where `<slug>` is derived from the unit:
   - For a unit that maps to one source heading → slug the heading directly. `## Install on Linux` → `install-on-linux.md`.
   - For a grouped unit (variants of one goal sharing a generated title) → slug the generated title with any leading Diátaxis-type prefix word ("How to", "About", "Why", "Understanding") and any product-name token stripped. `How to install Foglight` → `install.md`. `About Foglight's sampling model` → `sampling-model.md`.
   - If a unit has no natural heading (rare; e.g. the only how-to portion of an otherwise single-type source), fall back to the source basename.
 
 Slug rules: lowercase, dash-separated, ASCII only. Strip punctuation other than dashes.
 
-### Collision resolution
-
-Collisions are evaluated **per destination folder** (`<dest>/<category>/`). If two outputs would share the same filename within the same destination folder, append a path-derived slug suffix from the source path. `foo.md` from `folder-a/onboarding/foo.md` becomes `foo--folder-a-onboarding.md`.
-
-Two cases that are **not** collisions: outputs in different category folders, and outputs in different journey folders (including the same source page deliberately duplicated across journey folders — those copies are expected, not a clash).
+Collision resolution: if two outputs would share the same `<output_root>/<category>/<filename>.md`, append a path-derived slug suffix from the source path. `foo.md` from `folder-a/onboarding/foo.md` becomes `foo--folder-a-onboarding.md`. Cross-type outputs (different category folders) cannot collide because they live in different folders.
 
 ## Links and assets
 - Inter-doc markdown links (`[text](path.md)` or `[text](path.md#anchor)`):
-    - If the target page is also being placed under the output tree → rewrite to a copy of the target, computed **relative to the current file**. In the journey-scoped layout the target may have several copies (one per matched journey, or a single `no-journey/` copy); prefer the target copy that lives in the **same journey folder** as the current file. If the target was not placed in the current file's journey folder, link to the target's copy in its first-listed matched journey folder (journey input order), or its `no-journey/` copy if the target matched no journey. In the flat layout there is exactly one target copy.
+    - If the target is also being placed under the output tree → rewrite to the new `<output_root>/<category>/<file>.md` location (relative to the current file).
     - If the target is outside the categorized set → leave as-is and flag in the report under "Unresolved links".
-- Image and asset references (`![alt](path)` or HTML `<img src=...>`): copy the asset into the shared `<output_root>/assets/`, dedup by content hash, rename on collision with a path-derived slug. Update the reference in the generated file to point at the copied asset, computed **relative to the generated file's location**. Note the depth differs by layout: in the journey-scoped layout a generated file sits at `<output_root>/<dest>/<category>/`, two levels below the root (typically `../../assets/<file>`); in the flat layout it sits one level below (`../assets/<file>`).
+- Image and asset references (`![alt](path)` or HTML `<img src=...>`): copy the asset into `<output_root>/assets/`, dedup by content hash, rename on collision with a path-derived slug. Update the reference in the generated file to point at the copied asset.
 - External `http(s)://` links are left untouched.
 
 ## Process
 1. Resolve `product_name`, `journeys`, and execution `mode` per the Required input block and the Execution mode section. All three are blocking. Confirm the resolved values with the user before continuing.
-2. Resolve output root and the folder layout per "Output root resolution" (journey-scoped — one folder per journey plus `no-journey/`, each with the four Diátaxis subfolders — when `journeys` is non-empty; flat four-Diátaxis layout when `journeys = []`), and the source file list. Print the output root, the resolved folder structure (the journey folders, if any), and the file list back to the user before writing.
+2. Resolve output root and source file list; print both back to the user before writing.
 3. For each source file: extract frontmatter, headings, and a content sample; classify per the Classification section (applying `references/compass.md` and `references/types.md`, escalating to `references/decision-rubric.md` for ambiguous cases) as PERFECT-<type>, REWRITE-<type>, SPLIT-<types>, or OUTLIER.
 4. If `journeys` is non-empty, tag each source file with journey relevance per `references/journey-matching.md`. Skipped entirely when `journeys = []`.
 5. Tag each source file with audience per `references/audience-tagging.md`. Always runs. Uses journey-relevance results from step 4 when available; falls back to content inference when no journey match exists or the matched journey has no `users:` field.
@@ -270,8 +228,8 @@ Two cases that are **not** collisions: outputs in different category folders, an
 7. Identify duplication candidates per `references/duplication.md`. Always runs (section appears in REPORT.md either way); pages without strong journey matches are not analysed.
 8. Apply quality flags per `references/quality-flags.md`. Always runs. Two deterministic checks: `hollow` (mostly empty page) and `stale-marker` (explicit deprecation/TODO keywords).
 9. Synthesise suggested actions per `references/suggested-actions.md`. Always runs. Walks the outputs of steps 3–8 and emits one action per matching signal from a fixed enum of nine action types and three severity tiers.
-10. Build the global placement map (destination folder(s) per page + paths + collision resolution) per "Placement, naming, and collisions" — including the per-journey duplication of pages that match multiple journeys. Always runs — the placement map is needed for the REPORT.md tables even in `report-only` mode.
-11. In `full` mode: write generated files (duplicating each page into every matched journey folder, or into `no-journey/`, per the placement map), copy assets, rewrite links. **Skipped in `report-only` mode.**
+10. Build the global placement map (paths + collision resolution). Always runs — the placement map is needed for the REPORT.md tables even in `report-only` mode.
+11. In `full` mode: write generated files, copy assets, rewrite links using the placement map. **Skipped in `report-only` mode.**
 12. Write the report. In `full` mode: `<output_root>/REPORT.md`. In `report-only` mode: `<repo_root>/doc-categorise-report.md`.
 13. Print a one-screen summary in chat with counts and a pointer to the report.
 
@@ -344,11 +302,9 @@ Insert a markdown horizontal rule (`---`) followed by an H2 heading `## Detail f
 
 ### Engineer block
 
-In the journey-scoped layout a page that matches multiple journeys is copied into one folder per matched journey (see "Placement, naming, and collisions"). Wherever a table below has an "output path" column, list **every** destination copy for that page (comma-separated or one per line in the cell), not just the first.
-
 - **Coverage by source folder**: table of source dir → counts per category.
-- **Copied verbatim (PERFECT)**: table — source path → output path(s) → category → journeys (if any) → audience.
-- **Rewritten (single-type)**: table — source path → output path(s) → category → journeys (if any) → audience → one-line reason (which signals or anti-signals fired).
+- **Copied verbatim (PERFECT)**: table — source path → output path → category → journeys (if any) → audience.
+- **Rewritten (single-type)**: table — source path → output path → category → journeys (if any) → audience → one-line reason (which signals or anti-signals fired).
 - **Split**: table — source path → list of output paths with categories → journeys (if any) → audience → reason.
 - **Outliers (no Diátaxis fit)**: table — source path → why → suggested handling. No journeys or audience columns (outliers do not get journey- or audience-tagged). **Grouping**: outliers with **identical** "why" AND **identical** "suggested handling" SHOULD be collapsed into a single row with the affected paths comma-separated in the source-path cell, and a count prefix (e.g. `12 Nextra nav-landing files: <paths>`). This commonly applies to Nextra `asIndexPage` index pages. Outliers with even slightly different "why" stay individual.
 - **Collisions resolved**: table — basename → contributing source paths → final filenames.
