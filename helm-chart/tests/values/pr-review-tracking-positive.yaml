@@ -33,6 +33,8 @@ configMap:
           owning-team: docs-team
           paths:
             - docs/**
+          exclude-author-teams:
+            - docs-team
       sla-discovery:
         cache: PT5M
       github:
