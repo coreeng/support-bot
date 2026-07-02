@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.prtracking.PrTrackingGitHubConfig;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.time.Duration;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.kohsuke.github.GitHub;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 class PrTrackingGitHubConfigTest {
@@ -84,7 +86,7 @@ class PrTrackingGitHubConfigTest {
                 DEFAULT_SLA_DISCOVERY);
 
         // when
-        GitHub gitHub = config.gitHub(props);
+        GitHub gitHub = config.gitHub(props, config.gitHubAuthorizationProvider(props));
 
         // then
         assertThat(gitHub).isNotNull();
@@ -117,7 +119,7 @@ class PrTrackingGitHubConfigTest {
                 DEFAULT_SLA_DISCOVERY);
 
         // when
-        GitHub gitHub = config.gitHub(props);
+        GitHub gitHub = config.gitHub(props, config.gitHubAuthorizationProvider(props));
 
         // then
         assertThat(gitHub).isNotNull();
@@ -153,7 +155,7 @@ class PrTrackingGitHubConfigTest {
                 DEFAULT_SLA_DISCOVERY);
 
         // when / then
-        assertThatThrownBy(() -> config.gitHub(props))
+        assertThatThrownBy(() -> config.gitHubAuthorizationProvider(props))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unrecognised PEM object");
     }
@@ -171,5 +173,11 @@ class PrTrackingGitHubConfigTest {
 
     @Configuration
     @EnableConfigurationProperties(PrTrackingProps.class)
-    static class TestConfig {}
+    static class TestConfig {
+
+        @Bean
+        ObjectMapper objectMapper() {
+            return new ObjectMapper();
+        }
+    }
 }

@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -109,7 +110,32 @@ public class GitLabPrSourceClient implements PrSourceClient {
 
         UserRefDto authorRef = mr.author();
         String authorLogin = authorRef != null ? authorRef.username() : null;
-        return new PrMetadata(coord, prNumber, createdAt, state, mergeable, List.of(), reviews, authorLogin);
+
+        // Code-owner repos: read GitLab's computed code-owner approval rules (Premium/Ultimate). The
+        // gate is satisfied when every code_owner rule is approved; unapproved rules' eligible approvers
+        // are the chase list. Only while open, mirroring the approvals fetch above.
+        Boolean codeOwnersApproved = null;
+        List<CodeOwnerRef> codeOwnerReviewers = List.of();
+        if (state == PrMetadata.PrState.OPEN && requiresCodeowners(coord.name())) {
+            CodeownerApprovalState codeowners =
+                    fetchCodeownerApprovalState(conn, projectSegment, coord.name(), prNumber);
+            codeOwnersApproved = codeowners.approved();
+            codeOwnerReviewers = codeowners.pendingApprovers();
+        }
+        return new PrMetadata(
+                coord,
+                prNumber,
+                createdAt,
+                state,
+                mergeable,
+                List.of(),
+                reviews,
+                authorLogin,
+                codeOwnersApproved,
+                // GitLab has no per-approval "changes requested" concept — code-owner rules are approved or
+                // not — so this signal is always false; a not-yet-approved rule just holds in the review phase.
+                false,
+                codeOwnerReviewers);
     }
 
     @Override
@@ -391,6 +417,74 @@ public class GitLabPrSourceClient implements PrSourceClient {
                 .toList();
     }
 
+    private boolean requiresCodeowners(String repoName) {
+        PrTrackingProps.@Nullable Repository repoConfig = props.findRepository(Provider.GITLAB, repoName);
+        return repoConfig != null && repoConfig.requiresCodeowners();
+    }
+
+    /**
+     * Reads GitLab's code-owner approval rules from {@code /merge_requests/:iid/approval_state}. Only rules
+     * that actually gate — {@code code_owner} rules with {@code approvals_required >= 1} — are considered:
+     * the gate is {@code true} only when there is at least one such rule and every one is approved, and the
+     * unapproved rules' eligible approvers form the chase list. When no gating rule is present the result is
+     * {@code null} (not vacuous {@code true}): the rule set may be empty (the MR touches no owned paths, or
+     * the instance lacks GitLab Code Owners / branch protection) or contain only vacuously-approved rules
+     * ({@code approvals_required=0}, {@code approved=true} with zero approvals). Either way the gate fails
+     * <em>closed</em> (hold in OPEN and keep chasing) rather than jumping to the merge phase and escalating
+     * the owning team on a repo no code owner reviewed. {@code null} is likewise returned on any transport
+     * error.
+     */
+    private CodeownerApprovalState fetchCodeownerApprovalState(
+            GitLabConnection conn, String projectSegment, String repoName, int prNumber) {
+        ApprovalStateDto approvalState;
+        try {
+            approvalState = get(
+                    conn,
+                    "/projects/" + projectSegment + "/merge_requests/" + prNumber + "/approval_state",
+                    ApprovalStateDto.class,
+                    "approval_state %s!%d".formatted(repoName, prNumber));
+        } catch (GitLabApiException e) {
+            LOG.atWarn()
+                    .addArgument(repoName)
+                    .addArgument(prNumber)
+                    .addArgument(e::getMessage)
+                    .log("Could not fetch code-owner approval_state for {}!{}: {}");
+            return new CodeownerApprovalState(null, List.of());
+        }
+        List<ApprovalRuleDto> rules =
+                approvalState == null || approvalState.rules() == null ? List.of() : approvalState.rules();
+        // Keep only code_owner rules that actually gate (approvals_required >= 1). A rule with
+        // approvals_required=0 is approved=true with zero approvals — a vacuously-satisfied section (branch
+        // doesn't require code-owner approval, or CODEOWNERS names no valid approver). Counting those as
+        // gate-satisfying would advance an MR that no code owner reviewed; excluding them here is what makes
+        // the "empty rule set fails closed" contract below hold for present-but-vacuous rules too.
+        List<ApprovalRuleDto> gatingRules = rules.stream()
+                .filter(r -> "code_owner".equalsIgnoreCase(r.ruleType()))
+                .filter(ApprovalRuleDto::gates)
+                .toList();
+        // No gating rule → null (unknown), not vacuous true: fail closed on repos with no readable gating
+        // code_owner rule (CE/Free, no owned paths, or only vacuous rules) so the merge gate never opens
+        // spuriously.
+        Boolean approved =
+                gatingRules.isEmpty() ? null : gatingRules.stream().allMatch(r -> Boolean.TRUE.equals(r.approved()));
+        List<CodeOwnerRef> pending = new ArrayList<>();
+        HashSet<String> seen = new HashSet<>();
+        for (ApprovalRuleDto rule : gatingRules) {
+            if (Boolean.TRUE.equals(rule.approved()) || rule.eligibleApprovers() == null) {
+                continue;
+            }
+            for (UserRefDto approver : rule.eligibleApprovers()) {
+                // GitLab expands code-owner groups to their eligible individual approvers, so each ref is a user.
+                if (approver != null && approver.username() != null && seen.add(approver.username())) {
+                    pending.add(new CodeOwnerRef(CodeOwnerRef.Kind.USER, approver.username(), approver.webUrl()));
+                }
+            }
+        }
+        return new CodeownerApprovalState(approved, List.copyOf(pending));
+    }
+
+    private record CodeownerApprovalState(@Nullable Boolean approved, List<CodeOwnerRef> pendingApprovers) {}
+
     private record GitLabConnection(String apiBaseUrl, String token) {}
 
     private record ProjectKey(String apiBaseUrl, String projectPath) {}
@@ -411,7 +505,32 @@ public class GitLabPrSourceClient implements PrSourceClient {
     private record ApprovedByEntryDto(@Nullable UserRefDto user) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record UserRefDto(@Nullable String username) {}
+    private record ApprovalStateDto(@Nullable List<ApprovalRuleDto> rules) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record ApprovalRuleDto(
+            @JsonProperty("rule_type") @Nullable String ruleType,
+            @Nullable Boolean approved,
+            @JsonProperty("approvals_required") @Nullable Integer approvalsRequired,
+            @JsonProperty("eligible_approvers") @Nullable List<UserRefDto> eligibleApprovers) {
+
+        /**
+         * A {@code code_owner} rule only gates the merge when it actually requires an approval. GitLab
+         * reports {@code approvals_required=0} (with {@code approved=true} and zero approvals) for a
+         * code-owner section whose target branch doesn't require code-owner approval, or whose CODEOWNERS
+         * entry resolves to no eligible approver — a vacuously-approved rule that must not open the gate.
+         * Only an <em>explicit</em> {@code approvals_required <= 0} is treated as non-gating; an absent
+         * value falls back to gating, so a response that omits the field can never silently drop the gate.
+         */
+        boolean gates() {
+            return approvalsRequired == null || approvalsRequired > 0;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record UserRefDto(
+            @Nullable String username,
+            @JsonProperty("web_url") @Nullable String webUrl) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record DiffEntryDto(

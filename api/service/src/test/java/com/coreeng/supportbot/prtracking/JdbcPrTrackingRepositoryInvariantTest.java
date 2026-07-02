@@ -45,6 +45,22 @@ class JdbcPrTrackingRepositoryInvariantTest {
     }
 
     /**
+     * escalated_count in getInsightsByRepo must count MERGE_ESCALATED alongside ESCALATED. The two are
+     * escalation-equivalent everywhere else — the query's own severity CASEs, the UI severity map, the red
+     * badge — so filtering on ESCALATED alone silently under-reports merge-escalated repos as healthy in
+     * the stat card and the severity sort, with no error. The DB-bound tests live in the functional harness;
+     * this one-token filter is easy to regress in a refactor, hence a source-level tripwire.
+     */
+    @Test
+    void escalatedCountIncludesMergeEscalated() throws IOException {
+        String source = Files.readString(SOURCE);
+        assertThat(source)
+                .as("escalated_count must count both ESCALATED and MERGE_ESCALATED, not ESCALATED alone")
+                .contains("status IN ('ESCALATED', 'MERGE_ESCALATED')) AS escalated_count")
+                .doesNotContain("status = 'ESCALATED') AS escalated_count");
+    }
+
+    /**
      * Extracts-and-strips the body of the named method. We use a brace-counting scan rather than a
      * regex because the body contains nested braces (lambda bodies, inner records, etc.).
      */

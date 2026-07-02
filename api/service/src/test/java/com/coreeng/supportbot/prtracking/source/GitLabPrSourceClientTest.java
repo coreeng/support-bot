@@ -427,6 +427,192 @@ class GitLabPrSourceClientTest {
         overrideServer.verify();
     }
 
+    @Test
+    void fetchPullRequestReadsPendingCodeOwnersFromApprovalState() {
+        CodeownerHarness h = codeownerHarness();
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/50"))
+                .andRespond(withSuccess(openMergeableMr(50), MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/50/approvals"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/50/approval_state"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("PRIVATE-TOKEN", TOKEN))
+                .andRespond(withSuccess("""
+                        {"rules":[
+                          {"rule_type":"code_owner","approved":false,"eligible_approvers":[{"username":"owner-a","web_url":"https://gitlab.com/owner-a"},{"username":"owner-b"}]},
+                          {"rule_type":"regular","approved":true}
+                        ]}
+                        """, MediaType.APPLICATION_JSON));
+
+        PrMetadata md = h.client().fetchPullRequest(RepoCoord.gitlab(REPO), 50);
+
+        // An unapproved code_owner rule => gate not satisfied; its eligible approvers are the chase list,
+        // mapped to USER refs carrying web_url where GitLab supplies it (null otherwise).
+        assertThat(md.codeOwnersApproved()).isFalse();
+        assertThat(md.codeOwnerReviewers())
+                .containsExactly(
+                        new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-a", "https://gitlab.com/owner-a"),
+                        new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-b", null));
+        h.server().verify();
+    }
+
+    @Test
+    void fetchPullRequestMarksCodeownersApprovedWhenAllRulesApproved() {
+        CodeownerHarness h = codeownerHarness();
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/51"))
+                .andRespond(withSuccess(openMergeableMr(51), MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/51/approvals"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/51/approval_state"))
+                .andRespond(withSuccess("""
+                        {"rules":[{"rule_type":"code_owner","approved":true,"eligible_approvers":[{"username":"owner-a"}]}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        PrMetadata md = h.client().fetchPullRequest(RepoCoord.gitlab(REPO), 51);
+
+        assertThat(md.codeOwnersApproved()).isTrue();
+        assertThat(md.codeOwnerReviewers()).isEmpty();
+        h.server().verify();
+    }
+
+    @Test
+    void fetchPullRequestLeavesCodeownersUnknownWhenNoCodeOwnerRule() {
+        // A successful approval_state with no code_owner rule (GitLab CE/Free, or an MR touching no owned
+        // paths) must NOT vacuously satisfy the gate: codeOwnersApproved stays null (fail closed), so the
+        // MR keeps waiting in the code-owner hold instead of jumping to the merge phase.
+        CodeownerHarness h = codeownerHarness();
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/52"))
+                .andRespond(withSuccess(openMergeableMr(52), MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/52/approvals"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/52/approval_state"))
+                .andRespond(withSuccess("""
+                        {"rules":[{"rule_type":"regular","approved":true}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        PrMetadata md = h.client().fetchPullRequest(RepoCoord.gitlab(REPO), 52);
+
+        assertThat(md.codeOwnersApproved()).isNull();
+        assertThat(md.codeOwnerReviewers()).isEmpty();
+        h.server().verify();
+    }
+
+    @Test
+    void fetchPullRequestTreatsVacuousZeroApprovalsRuleAsNonGating() {
+        // A code_owner rule with approvals_required=0 is approved=true with zero approvals — GitLab reports
+        // this when the target branch doesn't require code-owner approval, or the CODEOWNERS entry names no
+        // valid approver. It must NOT open the merge gate: with no genuinely-gating rule the result is null
+        // (fail closed), exactly as for a repo with no code_owner rule at all.
+        CodeownerHarness h = codeownerHarness();
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/53"))
+                .andRespond(withSuccess(openMergeableMr(53), MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/53/approvals"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/53/approval_state"))
+                .andRespond(withSuccess("""
+                        {"rules":[{"rule_type":"code_owner","approved":true,"approvals_required":0,"eligible_approvers":[{"username":"owner-a"}]}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        PrMetadata md = h.client().fetchPullRequest(RepoCoord.gitlab(REPO), 53);
+
+        assertThat(md.codeOwnersApproved()).isNull();
+        assertThat(md.codeOwnerReviewers()).isEmpty();
+        h.server().verify();
+    }
+
+    @Test
+    void fetchPullRequestIgnoresVacuousRuleWhenAGatingRuleIsUnapproved() {
+        // A genuinely-gating rule (approvals_required=1, still unapproved) alongside a vacuous
+        // approvals_required=0 rule: the gate is decided by the gating rule only (not satisfied), and the
+        // chase list is drawn from the gating rule — the vacuous rule contributes neither approval nor
+        // approvers.
+        CodeownerHarness h = codeownerHarness();
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/54"))
+                .andRespond(withSuccess(openMergeableMr(54), MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/54/approvals"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/54/approval_state"))
+                .andRespond(withSuccess("""
+                        {"rules":[
+                          {"rule_type":"code_owner","approved":true,"approvals_required":0,"eligible_approvers":[{"username":"vacuous-owner"}]},
+                          {"rule_type":"code_owner","approved":false,"approvals_required":1,"eligible_approvers":[{"username":"owner-a","web_url":"https://gitlab.com/owner-a"}]}
+                        ]}
+                        """, MediaType.APPLICATION_JSON));
+
+        PrMetadata md = h.client().fetchPullRequest(RepoCoord.gitlab(REPO), 54);
+
+        assertThat(md.codeOwnersApproved()).isFalse();
+        assertThat(md.codeOwnerReviewers())
+                .containsExactly(new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-a", "https://gitlab.com/owner-a"));
+        h.server().verify();
+    }
+
+    private static String openMergeableMr(int iid) {
+        return """
+                {"iid":%d,"state":"opened","created_at":"2026-01-01T10:00:00Z",
+                 "updated_at":"2026-01-02T11:00:00Z","author":{"username":"carol"},
+                 "detailed_merge_status":"mergeable"}
+                """.formatted(iid);
+    }
+
+    private record CodeownerHarness(MockRestServiceServer server, GitLabPrSourceClient client) {}
+
+    private static CodeownerHarness codeownerHarness() {
+        RestClient.Builder builder = RestClient.builder()
+                .messageConverters(ImmutableList.of(
+                        new MappingJackson2HttpMessageConverter(
+                                new ObjectMapper().registerModule(new JavaTimeModule())),
+                        new org.springframework.http.converter.StringHttpMessageConverter(
+                                java.nio.charset.StandardCharsets.UTF_8)));
+        MockRestServiceServer codeownerServer =
+                MockRestServiceServer.bindTo(builder).build();
+        GitLabPrSourceClient codeownerClient = new GitLabPrSourceClient(
+                builder.build(), propsWithCodeownerGitLabRepo(), new GitLabGroupMemberCache(Duration.ofMinutes(5)));
+        return new CodeownerHarness(codeownerServer, codeownerClient);
+    }
+
+    private static PrTrackingProps propsWithCodeownerGitLabRepo() {
+        PrTrackingProps.Repository repo = new PrTrackingProps.Repository(
+                REPO,
+                "my-team",
+                Provider.GITLAB,
+                null,
+                "my-group/sub-group",
+                List.of(),
+                new PrTrackingProps.Sla(null, Duration.ofHours(24), null),
+                null,
+                null,
+                List.of(),
+                true,
+                false);
+        return new PrTrackingProps(
+                true,
+                "0 * * * * *",
+                "pr",
+                List.of("support"),
+                "team",
+                "days",
+                List.of(repo),
+                PrTrackingProps.GitHub.defaultTokenModeConfig(),
+                new PrTrackingProps.Gitlab(API, TOKEN),
+                new PrTrackingProps.SlaDiscovery(Duration.ofHours(1)));
+    }
+
     private static PrTrackingProps propsWithSingleGitLabRepo() {
         PrTrackingProps.Repository repo = new PrTrackingProps.Repository(
                 REPO,

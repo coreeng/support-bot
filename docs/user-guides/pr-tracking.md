@@ -49,10 +49,42 @@ A tracked PR moves through these states (persisted in `pr_tracking.status`):
 | `CHANGES_REQUESTED` | Owning team requested changes; SLA clock paused (GitHub)    |
 | `APPROVED`          | Owning team approved; ready to merge                        |
 | `ESCALATED`         | SLA deadline passed without approval — owning team chased   |
+| `AWAITING_MERGE`    | Code owners approved and the PR is mergeable; now chasing the owning team to **merge** (code-owner repos only) |
+| `MERGE_ESCALATED`   | The merge deadline passed without a merge — owning team chased again (code-owner repos only) |
 | `CLOSED`            | PR was merged or closed                                     |
 
 `ESCALATED` only applies to repositories that have an SLA configured; for
-no-SLA repos it never fires.
+no-SLA repos it never fires. `AWAITING_MERGE` and `MERGE_ESCALATED` only apply
+to **code-owner repos** — see [Code-owner repositories](#code-owner-repositories)
+below.
+
+### Code-owner repositories
+
+Some repositories require a **code owner** to approve a PR before it can be
+merged (a `CODEOWNERS` file plus branch protection that requires code-owner
+review). When an operator marks such a repo as code-owner-gated, tracking
+behaves differently to keep the chase pointed at the right people:
+
+1. **At detection** the bot tells you the PR is waiting on its **code owners**
+   (and names them, where the provider reports them) — so you chase the owner of
+   the changed area, not the maintaining team.
+2. **The SLA clock is held** while the PR is waiting on code-owner review — a PR
+   that is still legitimately waiting on an owner is never escalated for being
+   "slow". Code-owner repos therefore don't pass through `APPROVED`/`ESCALATED`.
+3. **Once the code owners approve and the PR is mergeable**, the bot moves it to
+   `AWAITING_MERGE`, **starts the SLA clock**, and switches the chase to the
+   **owning team to get it merged**.
+4. **If that merge deadline passes**, it becomes `MERGE_ESCALATED` and the owning
+   team is escalated again.
+5. **The ticket closes only when the provider reports the PR actually merged** (or
+   closed) — never just because it became mergeable.
+
+The bot never reads or parses the `CODEOWNERS` file itself; it relies on the
+provider's own code-owner verdict (GitHub `reviewDecision`, GitLab Code Owners
+approval). Operator setup — the config flag and the two repo prerequisites — is
+in the [configuration reference][config-codeowners].
+
+[config-codeowners]: ../../api/service/docs/configuration.md#code-owner-merge-gate-requires-codeowners
 
 ---
 

@@ -1,18 +1,23 @@
 package com.coreeng.supportbot.prtracking;
 
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.APPROVED;
+import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.AWAITING_MERGE;
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.CHANGES_REQUESTED;
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.CLOSED;
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.ESCALATED;
+import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.MERGE_ESCALATED;
 import static com.coreeng.supportbot.dbschema.enums.PrTrackingStatus.OPEN;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.ESCALATE;
+import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.ESCALATE_MERGE;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.NOTIFY_APPROVED;
+import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.NOTIFY_AWAITING_MERGE;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.NOTIFY_CHANGES_REQUESTED;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.NOTIFY_CLOSED;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.Effect.NOTIFY_MERGED;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.SlaOp.NONE;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.SlaOp.RESUME;
 import static com.coreeng.supportbot.prtracking.PrLifecycle.SlaOp.SET_CLOSED_AT;
+import static com.coreeng.supportbot.prtracking.PrLifecycle.SlaOp.START;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.coreeng.supportbot.dbschema.enums.PrTrackingStatus;
@@ -245,6 +250,200 @@ class PrLifecycleTest {
         }
     }
 
+    @Nested
+    class CodeownerRepos {
+
+        @Test
+        void codeownerApprovedAndMergeableEntersAwaitingMerge() {
+            assertDecision(
+                    decide(obs(OPEN).requiresCodeowners().codeownerApproved().mergeable()),
+                    AWAITING_MERGE,
+                    START,
+                    NOTIFY_AWAITING_MERGE);
+        }
+
+        @Test
+        void teamApprovedButCodeownersPendingStaysOpen() {
+            // The crux: on a codeowner repo a team approval + mergeable must NOT close the PR — only a
+            // codeowner approval opens the merge gate. Without the !requiresCodeowners guard on the
+            // CLOSED row this would wrongly close before the code owners reviewed.
+            assertDecision(decide(obs(OPEN).requiresCodeowners().approved().mergeable()), OPEN, NONE);
+        }
+
+        @Test
+        void codeownerApprovedButNotMergeableStaysOpen() {
+            assertDecision(decide(obs(OPEN).requiresCodeowners().codeownerApproved()), OPEN, NONE);
+        }
+
+        @Test
+        void entersAwaitingMergeFromChangesRequested() {
+            assertDecision(
+                    decide(obs(CHANGES_REQUESTED)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .mergeable()),
+                    AWAITING_MERGE,
+                    START,
+                    NOTIFY_AWAITING_MERGE);
+        }
+
+        @Test
+        void awaitingMergeDoesNotCloseOnMergeable() {
+            // The whole point of AWAITING_MERGE: mergeability alone never closes it — only the real merge.
+            assertDecision(
+                    decide(obs(AWAITING_MERGE)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .mergeable()),
+                    AWAITING_MERGE,
+                    NONE);
+        }
+
+        @Test
+        void awaitingMergeClosesOnRealMerge() {
+            assertDecision(decide(obs(AWAITING_MERGE).merged()), CLOSED, SET_CLOSED_AT, NOTIFY_MERGED);
+        }
+
+        @Test
+        void awaitingMergeBreachEscalatesToMergeEscalated() {
+            // A still-ready PR (approved + mergeable) that breaches the merge SLA escalates the team.
+            assertDecision(
+                    decide(obs(AWAITING_MERGE)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .mergeable()
+                            .slaBreached()),
+                    MERGE_ESCALATED,
+                    NONE,
+                    ESCALATE_MERGE);
+        }
+
+        @Test
+        void awaitingMergeChangesRequestedPausesWithLiveDeadline() {
+            assertDecision(
+                    decide(obs(AWAITING_MERGE).changesRequested().liveDeadline(REMAINING)),
+                    CHANGES_REQUESTED,
+                    new SlaOp.Pause(REMAINING),
+                    NOTIFY_CHANGES_REQUESTED);
+        }
+
+        @Test
+        void awaitingMergeReturnsToOpenWhenApprovalRevoked() {
+            // A push dismissed the code owners' approval (reviewDecision back to REVIEW_REQUIRED): no
+            // changes-requested verdict, but codeownerApproved is now false. The record must leave
+            // AWAITING_MERGE for OPEN and pause the merge clock, rather than staying and merge-escalating a
+            // PR that needs code-owner re-review.
+            assertDecision(
+                    decide(obs(AWAITING_MERGE).requiresCodeowners().mergeable().liveDeadline(REMAINING)),
+                    OPEN,
+                    new SlaOp.Pause(REMAINING));
+        }
+
+        @Test
+        void awaitingMergeReturnsToOpenWhenNoLongerMergeable() {
+            // The PR gained conflicts (mergeable false) though the code owners still approve: it can't be
+            // merged, so it leaves AWAITING_MERGE for OPEN with the merge clock paused instead of escalating.
+            assertDecision(
+                    decide(obs(AWAITING_MERGE)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .liveDeadline(REMAINING)),
+                    OPEN,
+                    new SlaOp.Pause(REMAINING));
+        }
+
+        @Test
+        void awaitingMergeBreachDoesNotEscalateAReBlockedPr() {
+            // Re-blocked (approval revoked) AND the deadline breached: the "no longer ready" exit is ordered
+            // before the merge-breach row, so it returns to OPEN (pausing the clamped-zero remaining) instead
+            // of escalating the team to merge a PR that is not mergeable-approved.
+            assertDecision(
+                    decide(obs(AWAITING_MERGE).requiresCodeowners().mergeable().slaBreached()),
+                    OPEN,
+                    new SlaOp.Pause(Duration.ZERO));
+        }
+
+        @Test
+        void mergeEscalatedDoesNotCloseOnMergeable() {
+            assertDecision(
+                    decide(obs(MERGE_ESCALATED)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .mergeable()),
+                    MERGE_ESCALATED,
+                    NONE);
+        }
+
+        @Test
+        void mergeEscalatedClosesOnRealMerge() {
+            assertDecision(decide(obs(MERGE_ESCALATED).merged()), CLOSED, SET_CLOSED_AT, NOTIFY_MERGED);
+        }
+
+        @Test
+        void mergeEscalatedReturnsToOpenWhenApprovalRevoked() {
+            // Same "no longer ready" exit as AWAITING_MERGE, from the escalated state: a revoked approval
+            // returns the record to OPEN, pausing the breached (zero) remaining so re-approval resumes it and
+            // re-escalates immediately. The open escalation row is preserved for reuse.
+            assertDecision(
+                    decide(obs(MERGE_ESCALATED).requiresCodeowners().mergeable().slaBreached()),
+                    OPEN,
+                    new SlaOp.Pause(Duration.ZERO));
+        }
+
+        @Test
+        void mergeEscalatedChangesRequestedPausesBreachedRemainingSoReApprovalReEscalates() {
+            // A merge-escalated record always has a breached deadline; a code owner requesting changes pauses
+            // that (clamped-to-zero) remaining rather than discarding it. On re-approval the record resumes
+            // zero and re-escalates immediately, instead of being handed a fresh full merge window — so a code
+            // owner can't reset the merge clock and dodge re-escalation by toggling changes-requested after a
+            // breach. (Contrast the review ESCALATED → CHANGES_REQUESTED row, which uses none().)
+            assertDecision(
+                    decide(obs(MERGE_ESCALATED).changesRequested().slaBreached()),
+                    CHANGES_REQUESTED,
+                    new SlaOp.Pause(Duration.ZERO),
+                    NOTIFY_CHANGES_REQUESTED);
+        }
+
+        @Test
+        void activeChangesRequestedBlocksEntryToAwaitingMerge() {
+            // Flap guard: code owners approved + mergeable, but a changes-requested verdict is live (e.g. a
+            // non-required reviewer, which doesn't clear GitHub's reviewDecision). Changes-requested must win
+            // over the merge gate, otherwise the record oscillates AWAITING_MERGE<->CHANGES_REQUESTED every poll.
+            assertDecision(
+                    decide(obs(OPEN)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .mergeable()
+                            .changesRequested()
+                            .liveDeadline(REMAINING)),
+                    CHANGES_REQUESTED,
+                    new SlaOp.Pause(REMAINING),
+                    NOTIFY_CHANGES_REQUESTED);
+        }
+
+        @Test
+        void changesRequestedDoesNotBounceBackToAwaitingMergeWhileVerdictActive() {
+            // The other half of the flap guard: from CHANGES_REQUESTED, an active changes-requested verdict
+            // keeps the record put instead of immediately re-entering AWAITING_MERGE (which would re-notify
+            // and reset the merge clock every poll).
+            assertDecision(
+                    decide(obs(CHANGES_REQUESTED)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .mergeable()
+                            .changesRequested()),
+                    CHANGES_REQUESTED,
+                    NONE);
+        }
+
+        @Test
+        void codeownerRepoDoesNotReviewEscalateInOpen() {
+            // Clock held in OPEN for code-owner repos is structural: even if a live deadline leaked in and
+            // breached with no verdict, OPEN must not review-escalate (that is the merge phase's job).
+            assertDecision(decide(obs(OPEN).requiresCodeowners().slaBreached()), OPEN, NONE);
+        }
+    }
+
     // ── Helpers ──
 
     private static Decision decide(ObsBuilder b) {
@@ -272,6 +471,8 @@ class PrLifecycleTest {
         private boolean hasLiveDeadline;
         private @Nullable Duration remainingForPause;
         private @Nullable Duration slaRemainingStored;
+        private boolean requiresCodeowners;
+        private boolean codeownerApproved;
 
         private ObsBuilder(PrTrackingStatus current) {
             this.current = current;
@@ -321,6 +522,16 @@ class PrLifecycleTest {
             return this;
         }
 
+        ObsBuilder requiresCodeowners() {
+            this.requiresCodeowners = true;
+            return this;
+        }
+
+        ObsBuilder codeownerApproved() {
+            this.codeownerApproved = true;
+            return this;
+        }
+
         Observation build() {
             return new Observation(
                     current,
@@ -331,7 +542,9 @@ class PrLifecycleTest {
                     slaBreached,
                     hasLiveDeadline,
                     remainingForPause,
-                    slaRemainingStored);
+                    slaRemainingStored,
+                    requiresCodeowners,
+                    codeownerApproved);
         }
     }
 }

@@ -61,7 +61,6 @@ public record PrTrackingProps(
                                 repository.messages(),
                                 repository.excludeAuthorTeams(),
                                 repository.requiresCodeowners(),
-                                repository.codeownerTeam(),
                                 repository.dynamicApprovals()))
                         .toList();
         this.slaDiscovery = slaDiscovery == null ? new SlaDiscovery(null) : slaDiscovery;
@@ -95,6 +94,19 @@ public record PrTrackingProps(
                 validateConfig(this.github);
             }
         }
+    }
+
+    /**
+     * Finds the configured repository for a (provider, name) pair, matching the name case-insensitively.
+     * Keying on the provider too keeps a name shared across providers from resolving to the wrong config.
+     * Returns {@code null} when no repository matches. Single source of truth for repo-config lookup —
+     * prefer this over re-scanning {@link #repositories()} in adapters/pollers.
+     */
+    public @Nullable Repository findRepository(Provider provider, String name) {
+        return repositories.stream()
+                .filter(r -> r.provider() == provider && r.name().equalsIgnoreCase(name))
+                .findFirst()
+                .orElse(null);
     }
 
     private static void validateRepositories(List<Repository> repositories, @Nullable Gitlab globalGitlab) {
@@ -209,6 +221,7 @@ public record PrTrackingProps(
             requireNotBlank(
                     githubConfig.installationId(),
                     "pr-review-tracking.github.installation-id must not be blank when auth-mode=app");
+            requireValidInstallationId(githubConfig.installationId());
             requireNotBlank(
                     githubConfig.privateKeyPem(),
                     "pr-review-tracking.github.private-key-pem must not be blank when auth-mode=app");
@@ -228,6 +241,23 @@ public record PrTrackingProps(
     private static void requireNotBlank(String value, String errorMessage) {
         if (isBlank(value)) {
             throw new IllegalArgumentException(errorMessage);
+        }
+    }
+
+    /**
+     * Fails fast with an actionable message when {@code installation-id} isn't parseable as a
+     * {@code long} — otherwise the raw value survives config binding/validation and only blows up
+     * later as an unchecked {@link NumberFormatException} out of {@code PrTrackingGitHubConfig}'s
+     * {@code gitHubAuthorizationProvider} bean method, deep inside Spring's context startup.
+     */
+    private static void requireValidInstallationId(String installationId) {
+        try {
+            Long.parseLong(installationId);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "pr-review-tracking.github.installation-id must be a valid numeric GitHub App installation ID, got: "
+                            + installationId,
+                    e);
         }
     }
 
@@ -252,7 +282,6 @@ public record PrTrackingProps(
             @Nullable Messages messages,
             List<String> excludeAuthorTeams,
             boolean requiresCodeowners,
-            @Nullable String codeownerTeam,
             boolean dynamicApprovals) {
         @ConstructorBinding
         public Repository(
@@ -267,7 +296,6 @@ public record PrTrackingProps(
                 @Nullable Messages messages,
                 @Nullable List<String> excludeAuthorTeams,
                 boolean requiresCodeowners,
-                @Nullable String codeownerTeam,
                 boolean dynamicApprovals) {
             requireNonNull(name, "name must not be null");
             requireNonNull(owningTeam, "owningTeam must not be null");
@@ -277,9 +305,6 @@ public record PrTrackingProps(
             }
             if (gitlabGroupPath != null && gitlabGroupPath.isBlank()) {
                 throw new IllegalArgumentException("gitlabGroupPath must not be blank when provided");
-            }
-            if (codeownerTeam != null && codeownerTeam.isBlank()) {
-                throw new IllegalArgumentException("codeownerTeam must not be blank when provided");
             }
             List<String> normalisedExcludeAuthorTeams =
                     excludeAuthorTeams == null ? List.of() : List.copyOf(excludeAuthorTeams);
@@ -321,7 +346,6 @@ public record PrTrackingProps(
             this.messages = messages;
             this.excludeAuthorTeams = normalisedExcludeAuthorTeams;
             this.requiresCodeowners = requiresCodeowners;
-            this.codeownerTeam = codeownerTeam;
             this.dynamicApprovals = dynamicApprovals;
         }
 
@@ -348,7 +372,6 @@ public record PrTrackingProps(
                     messages,
                     List.of(),
                     false,
-                    null,
                     false);
         }
 
@@ -372,7 +395,6 @@ public record PrTrackingProps(
                     messages,
                     List.of(),
                     false,
-                    null,
                     false);
         }
 
@@ -395,7 +417,6 @@ public record PrTrackingProps(
                     null,
                     List.of(),
                     false,
-                    null,
                     false);
         }
 
@@ -421,8 +442,11 @@ public record PrTrackingProps(
             @Nullable String approved,
             @Name("changes-requested") @Nullable String changesRequested,
             @Nullable String merged,
-            @Nullable String closed) {
+            @Nullable String closed,
+            @Name("awaiting-merge") @Nullable String awaitingMerge,
+            @Name("merge-escalated") @Nullable String mergeEscalated) {
 
+        @ConstructorBinding
         public Messages {
             checkBlank(detected, "detected");
             checkBlank(escalated, "escalated");
@@ -430,6 +454,26 @@ public record PrTrackingProps(
             checkBlank(changesRequested, "changes-requested");
             checkBlank(merged, "merged");
             checkBlank(closed, "closed");
+            checkBlank(awaitingMerge, "awaiting-merge");
+            checkBlank(mergeEscalated, "merge-escalated");
+        }
+
+        /**
+         * Convenience constructor for callers (and tests) predating the awaiting-merge / merge-escalated
+         * message overrides. Config binding is pinned to the canonical constructor by {@link
+         * ConstructorBinding} above, so this extra constructor only affects programmatic callers. That
+         * annotation is load-bearing: with two constructors and no {@code @ConstructorBinding}, Spring
+         * Boot's binder resolves no bind constructor and silently skips a configured {@code messages:}
+         * block (reverting every override to the default text).
+         */
+        public Messages(
+                @Nullable String detected,
+                @Nullable String escalated,
+                @Nullable String approved,
+                @Nullable String changesRequested,
+                @Nullable String merged,
+                @Nullable String closed) {
+            this(detected, escalated, approved, changesRequested, merged, closed, null, null);
         }
 
         private static void checkBlank(@Nullable String value, String field) {
