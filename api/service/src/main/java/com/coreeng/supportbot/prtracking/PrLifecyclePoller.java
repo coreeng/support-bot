@@ -243,9 +243,25 @@ public class PrLifecyclePoller {
                         yield record;
                     }
                 };
-        logApprovedAwaitingMerge(current, decision);
+        // Uses the PRE-write record: the wording keys off the status the record is leaving (e.g. ESCALATED
+        // → APPROVED logs "approved after escalation"). The post-write `current` already carries the new
+        // status, so passing it would make that branch unreachable.
+        logApprovedAwaitingMerge(record, decision);
+        // SLA-variable rendering must see the deadline the transition is ABOUT, not the post-write row.
+        // pauseSla drops sla_deadline and a CLOSED write drops both SLA columns, so a changes-requested or
+        // closure message rendered off the post-write record would interpolate empty {{sla_deadline}} /
+        // {{sla_duration}} into a custom template. Render those effects off the pre-write record, which still
+        // carries the deadline. Start is the exception — NotifyAwaitingMerge must show the merge deadline
+        // just written (threaded via the pre-resolved mergeWindow) — and None leaves the SLA columns
+        // untouched (and an escalate effect keeps current == record), so both use the post-write record.
+        PrTrackingRecord effectRecord =
+                switch (decision.slaOp()) {
+                    case PrLifecycle.SlaOp.Pause ignored -> record;
+                    case PrLifecycle.SlaOp.SetClosedAt ignored -> record;
+                    default -> current;
+                };
         for (PrLifecycle.Effect effect : decision.effects()) {
-            runEffect(current, effect, mergeWindow);
+            runEffect(effectRecord, effect, mergeWindow);
         }
     }
 

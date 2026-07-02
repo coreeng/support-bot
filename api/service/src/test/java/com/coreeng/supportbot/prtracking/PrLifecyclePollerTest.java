@@ -599,6 +599,30 @@ class PrLifecyclePollerTest {
     }
 
     @Test
+    void closureMessageRendersTheSlaDeadlineFromBeforeTheCloseWrite() {
+        // Regression: SLA-bearing effects must render off the PRE-write record. The CLOSED write nulls both
+        // SLA columns, so rendering the merged message off the post-write record would interpolate empty
+        // {{sla_deadline}} / {{sla_duration}} into a custom template. The pre-write deadline must survive.
+        PrLifecyclePoller poller = createPoller();
+        Instant deadline = Instant.now().plusSeconds(7200);
+        PrTrackingRecord record = record(1L, 100L, "my-org/repo-a", 42, PrTrackingStatus.OPEN, deadline);
+        when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+        when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                .thenReturn(mergedPr(record));
+        when(ticketRepository.findTicketById(new TicketId(record.ticketId()))).thenReturn(ticket(100L));
+        when(prTrackingRepository.hasAnyActiveClosableForTicket(record.ticketId()))
+                .thenReturn(true);
+
+        poller.poll();
+
+        ArgumentCaptor<PrMessageContext> ctxCaptor = ArgumentCaptor.forClass(PrMessageContext.class);
+        verify(messageRenderer).render(eq(record.repo()), eq(MessageEvent.MERGED), ctxCaptor.capture());
+        PrMessageContext ctx = ctxCaptor.getValue();
+        assertThat(ctx.slaDeadline()).isNotNull().isCloseTo(deadline, within(Duration.ofSeconds(1)));
+        assertThat(ctx.sla()).isNotNull().isPositive();
+    }
+
+    @Test
     void postsCustomApprovedMessageWhenOverrideConfigured() {
         String customMessage = "PR approved — ready to land.";
         PrLifecyclePoller poller = createPoller();

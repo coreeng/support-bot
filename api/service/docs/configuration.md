@@ -759,10 +759,17 @@ its signals never reflect code-owner status — the gate silently becomes a no-o
   which needs organization membership read — see
   [Token permissions](#token-permissions). Without it the gate and individual
   owners are unaffected; the team is just omitted from the message.
-- **GitLab** — the MR's `approval_state` `code_owner` rule (`approved` = gate
-  satisfied; `eligible_approvers` = chase list). **GitLab Code Owners is a
-  Premium/Ultimate feature** — on instances/plans without it the `code_owner`
-  rule is absent and the gate no-ops; validate before relying on it.
+- **GitLab** — the MR's `approval_state` `code_owner` rules. Only rules that
+  actually require an approval gate (`approvals_required >= 1`); a rule with
+  `approvals_required = 0` is `approved` with zero approvals (a vacuously-satisfied
+  section) and is ignored, so the gate can't open on it. Of the gating rules,
+  `approved` = satisfied and each unapproved rule's `eligible_approvers` = chase
+  list. **GitLab Code Owners is a Premium/Ultimate feature** — on instances/plans
+  without it (or when the target branch doesn't require code-owner approval) there
+  is no gating `code_owner` rule, and the gate fails **closed**, *not* open: the
+  MR is held in `OPEN` indefinitely — no merge clock, no escalation — and closes
+  only when the MR is actually merged/closed. Do **not** enable
+  `requires-codeowners` on such a repo; validate against a real MR first.
 
 **SLA.** The merge clock (`AWAITING_MERGE` → `MERGE_ESCALATED`) uses the repo's
 configured `sla`. A `requires-codeowners` repo with **no** `sla` block still gets
