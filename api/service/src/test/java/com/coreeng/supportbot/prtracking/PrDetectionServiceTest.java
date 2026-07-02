@@ -250,6 +250,7 @@ class PrDetectionServiceTest {
                             List.of(),
                             "author",
                             false,
+                            false,
                             List.of(
                                     new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner-a", "https://github.com/owner-a"),
                                     new CodeOwnerRef(
@@ -313,6 +314,7 @@ class PrDetectionServiceTest {
                             List.of(),
                             "author",
                             false,
+                            false,
                             List.of()));
             when(prSourceClient.listChangedFiles(COORD, PR_NUMBER)).thenReturn(List.of("infra/main.tf"));
             when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
@@ -360,6 +362,7 @@ class PrDetectionServiceTest {
                             List.of(),
                             List.of(),
                             "author",
+                            false,
                             false,
                             List.of()));
             when(prSourceClient.listChangedFiles(COORD, PR_NUMBER)).thenReturn(List.of("src/app.js"));

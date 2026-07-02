@@ -132,6 +132,9 @@ public class GitLabPrSourceClient implements PrSourceClient {
                 reviews,
                 authorLogin,
                 codeOwnersApproved,
+                // GitLab has no per-approval "changes requested" concept — code-owner rules are approved or
+                // not — so this signal is always false; a not-yet-approved rule just holds in the review phase.
+                false,
                 codeOwnerReviewers);
     }
 

@@ -13,6 +13,14 @@ import org.jspecify.annotations.Nullable;
  * list (no teams requested / resolution not attempted). {@code TeamReviewFilter} treats {@code null} the
  * same as an explicit team lookup failure: fall back to accepting all reviews rather than trusting a
  * partial membership set.
+ *
+ * <p>{@code codeOwnersApproved} and {@code codeownerChangesRequested} are the two code-owner-gate signals
+ * for {@code requires-codeowners} repos, derived from the provider's aggregate decision (GitHub
+ * {@code reviewDecision}; GitLab code-owner approval rules — GitLab has no "changes requested" signal, so
+ * {@code codeownerChangesRequested} is always {@code false} there). They are never both truthy:
+ * {@code APPROVED} → {@code codeOwnersApproved=true}; {@code CHANGES_REQUESTED} →
+ * {@code codeownerChangesRequested=true}; a still-pending review → both falsy; a failed/inapplicable read
+ * → {@code codeOwnersApproved=null}.
  */
 public record PrMetadata(
         RepoCoord coord,
@@ -24,6 +32,7 @@ public record PrMetadata(
         List<Review> reviews,
         @Nullable String authorLogin,
         @Nullable Boolean codeOwnersApproved,
+        boolean codeownerChangesRequested,
         List<CodeOwnerRef> codeOwnerReviewers) {
     public PrMetadata {
         requireNonNull(coord, "coord must not be null");
@@ -50,13 +59,25 @@ public record PrMetadata(
             @Nullable Boolean mergeable,
             @Nullable List<String> requestedTeamReviewerLogins,
             List<Review> reviews) {
-        this(coord, number, createdAt, state, mergeable, requestedTeamReviewerLogins, reviews, null, null, List.of());
+        this(
+                coord,
+                number,
+                createdAt,
+                state,
+                mergeable,
+                requestedTeamReviewerLogins,
+                reviews,
+                null,
+                null,
+                false,
+                List.of());
     }
 
     /**
      * Convenience constructor for callers that supply an author but no code-owner signals. The
-     * code-owner gate ({@code codeOwnersApproved}) and chase list ({@code codeOwnerReviewers}) are
-     * populated only for {@code requires-codeowners} repos; {@code null}/empty means "not applicable".
+     * code-owner gate ({@code codeOwnersApproved}), the {@code codeownerChangesRequested} signal, and the
+     * chase list ({@code codeOwnerReviewers}) are populated only for {@code requires-codeowners} repos;
+     * {@code null}/{@code false}/empty means "not applicable".
      */
     public PrMetadata(
             RepoCoord coord,
@@ -77,6 +98,7 @@ public record PrMetadata(
                 reviews,
                 authorLogin,
                 null,
+                false,
                 List.of());
     }
 

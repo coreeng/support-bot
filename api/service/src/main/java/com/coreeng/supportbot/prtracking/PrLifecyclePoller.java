@@ -148,19 +148,22 @@ public class PrLifecyclePoller {
             PrTrackingProps.@Nullable Repository repoConfig) {
         Instant now = Instant.now();
         boolean requiresCodeowners = repoConfig != null && repoConfig.requiresCodeowners();
-        // Code-owner repos gate purely on the provider's aggregate code-owner decision (codeownerApproved
-        // below), never on individual REST-review verdicts. Those reviews are NOT team-filtered for these
-        // repos — the requested-team lookup is skipped (see GitHubPrSourceClient#fetchPullRequest), so an
-        // unfiltered drive-by who owns no code would otherwise post APPROVED/CHANGES_REQUESTED and either
-        // fire a spurious tenant notification or block the merge advance via readyForCodeownerMerge()'s
-        // !changesRequested() guard. A code owner's own changes-requested is already captured by
-        // codeownerApproved=false (reviewDecision=CHANGES_REQUESTED holds the gate shut), so suppressing the
-        // verdict here loses no gating signal: the review phase simply holds in OPEN until the gate opens.
-        // This is what makes "gated on codeownerApproved, not the review verdict" actually true, and keeps
-        // code-owner repos from passing through APPROVED/CHANGES_REQUESTED as the user guide promises.
-        PrLifecycle.Verdict verdict = requiresCodeowners || latestVerdict == null
-                ? null
-                : latestVerdict.isApproved() ? PrLifecycle.Verdict.APPROVED : PrLifecycle.Verdict.CHANGES_REQUESTED;
+        // Code-owner repos derive their review-phase verdict from the provider's *aggregate* code-owner
+        // decision, NOT from individual REST reviews. Those reviews aren't team-filtered for these repos —
+        // the requested-team lookup is skipped (see GitHubPrSourceClient#fetchPullRequest) — so a drive-by
+        // who owns no code could otherwise post a verdict that fires a spurious notification or blocks the
+        // merge advance. The aggregate decision is immune to that: a code owner requesting changes surfaces
+        // as CHANGES_REQUESTED (so the tenant is told and the merge gate stays shut); approval is handled by
+        // the codeownerApproved gate below, so we never emit APPROVED here and a code-owner repo never
+        // passes through the APPROVED state. A still-pending review yields no verdict (holds in OPEN).
+        PrLifecycle.Verdict verdict;
+        if (requiresCodeowners) {
+            verdict = pr.codeownerChangesRequested() ? PrLifecycle.Verdict.CHANGES_REQUESTED : null;
+        } else {
+            verdict = latestVerdict == null
+                    ? null
+                    : latestVerdict.isApproved() ? PrLifecycle.Verdict.APPROVED : PrLifecycle.Verdict.CHANGES_REQUESTED;
+        }
         Instant deadline = record.slaDeadline();
         Duration remainingForPause = deadline == null ? null : clampNonNegative(Duration.between(now, deadline));
         boolean slaBreached = deadline != null && now.isAfter(deadline);
