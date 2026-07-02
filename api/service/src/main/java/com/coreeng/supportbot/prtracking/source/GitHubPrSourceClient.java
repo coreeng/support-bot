@@ -37,10 +37,10 @@ public class GitHubPrSourceClient implements PrSourceClient {
             boolean requiresCodeowners = repoConfig != null && repoConfig.requiresCodeowners();
             // Only the requested-team review fallback in TeamReviewFilter consumes requestedTeamReviewerLogins,
             // and it's bypassed when an explicit github-team-slug is set or the repo is requires-codeowners.
-            // For requires-codeowners repos the REST-review verdict is suppressed entirely in
-            // PrLifecyclePoller#observe (the gate is the GraphQL reviewDecision), so the fallback is truly
-            // dead there — skipping resolution avoids an org Members:Read call, and the scope it requires,
-            // that would otherwise be dead work.
+            // For requires-codeowners repos the lifecycle derives its verdict from the GraphQL reviewDecision
+            // aggregate, not the REST reviews this fallback would filter (see PrLifecyclePoller#observe), so
+            // the fallback is dead there — skipping resolution avoids an org Members:Read call, and the scope
+            // it requires, that would otherwise be dead work.
             boolean includeRequestedTeamMembers =
                     repoConfig == null || (repoConfig.githubTeamSlug() == null && !requiresCodeowners);
             GitHubPullRequest pr = gitHubClient.getPullRequest(coord.name(), prNumber, includeRequestedTeamMembers);
@@ -64,12 +64,20 @@ public class GitHubPrSourceClient implements PrSourceClient {
             // (CE/Free) rather than a per-PR "no owned paths", whereas GitHub's successful reviewDecision is a
             // definitive per-PR signal we can trust.
             Boolean codeOwnersApproved = null;
+            // A code owner requesting changes (reviewDecision == CHANGES_REQUESTED) is a distinct signal from
+            // the gate being merely unsatisfied (REVIEW_REQUIRED): the lifecycle surfaces the former to the
+            // tenant as CHANGES_REQUESTED and pauses/holds accordingly, while the latter just waits. It is
+            // the *aggregate* code-owner decision, so — unlike a raw REST review — a non-code-owner drive-by
+            // never flips it.
+            boolean codeownerChangesRequested = false;
             if (graphQlClient != null && pr.isOpen() && requiresCodeowners) {
                 GitHubGraphQlClient.CodeownerReview review = graphQlClient.fetchCodeownerReview(coord.name(), prNumber);
                 if (review != null) {
                     pr = pr.withCodeownerReview(review.reviewDecision(), review.codeOwnerReviewers());
                     codeOwnersApproved = review.reviewDecision() == null
                             || review.reviewDecision() == GitHubPullRequest.ReviewDecision.APPROVED;
+                    codeownerChangesRequested =
+                            review.reviewDecision() == GitHubPullRequest.ReviewDecision.CHANGES_REQUESTED;
                 }
             }
             return new PrMetadata(
@@ -82,6 +90,7 @@ public class GitHubPrSourceClient implements PrSourceClient {
                     pr.reviews().stream().map(GitHubPrSourceClient::mapReview).toList(),
                     pr.authorLogin(),
                     codeOwnersApproved,
+                    codeownerChangesRequested,
                     pr.codeOwnerReviewers().stream()
                             .map(GitHubPrSourceClient::mapCodeOwner)
                             .toList());
