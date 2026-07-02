@@ -84,6 +84,23 @@ public class GitHubGraphQlClient {
         if (root == null) {
             return null;
         }
+        // A GraphQL response can carry both partial `data` and a top-level `errors` array: a field-level
+        // error (SAML/SSO enforcement, a missing scope, rate-limiting) nulls just that field while the rest
+        // of the object resolves. If `reviewDecision` is the field that errored, it arrives null next to a
+        // populated `errors` — indistinguishable, downstream, from the legitimate "no code-owner review
+        // required" null, which the caller maps to codeOwnersApproved=true (gate open). Treat any errors as
+        // a failed read and return null so the gate stays shut and the poll retries, per this class's
+        // contract ("any failure ... yields null"). A clean null reviewDecision (no errors) still passes
+        // through as "gate doesn't apply".
+        JsonNode errors = root.path("errors");
+        if (errors.isArray() && !errors.isEmpty()) {
+            LOG.atWarn()
+                    .addArgument(repositoryName)
+                    .addArgument(prNumber)
+                    .addArgument(errors::toString)
+                    .log("GitHub GraphQL returned errors for {}#{}: {}");
+            return null;
+        }
         JsonNode pr = root.path("data").path("repository").path("pullRequest");
         if (pr.isMissingNode() || pr.isNull()) {
             LOG.atWarn()

@@ -420,14 +420,16 @@ public class GitLabPrSourceClient implements PrSourceClient {
     }
 
     /**
-     * Reads GitLab's code-owner approval rules from {@code /merge_requests/:iid/approval_state}. The gate
-     * is {@code true} only when there is at least one {@code code_owner} rule and every such rule is
-     * approved; the unapproved rules' eligible approvers form the chase list. An <em>empty</em> code-owner
-     * rule set yields {@code null} (not vacuous {@code true}): a successful response with no {@code
-     * code_owner} rule is ambiguous — the MR may touch no owned paths, or the instance may lack GitLab
-     * Code Owners (CE/Free) or code-owner branch protection — so the gate fails <em>closed</em> (hold in
-     * OPEN and keep chasing) rather than jumping to the merge phase and escalating the owning team on a
-     * misconfigured repo. {@code null} is likewise returned on any transport error.
+     * Reads GitLab's code-owner approval rules from {@code /merge_requests/:iid/approval_state}. Only rules
+     * that actually gate — {@code code_owner} rules with {@code approvals_required >= 1} — are considered:
+     * the gate is {@code true} only when there is at least one such rule and every one is approved, and the
+     * unapproved rules' eligible approvers form the chase list. When no gating rule is present the result is
+     * {@code null} (not vacuous {@code true}): the rule set may be empty (the MR touches no owned paths, or
+     * the instance lacks GitLab Code Owners / branch protection) or contain only vacuously-approved rules
+     * ({@code approvals_required=0}, {@code approved=true} with zero approvals). Either way the gate fails
+     * <em>closed</em> (hold in OPEN and keep chasing) rather than jumping to the merge phase and escalating
+     * the owning team on a repo no code owner reviewed. {@code null} is likewise returned on any transport
+     * error.
      */
     private CodeownerApprovalState fetchCodeownerApprovalState(
             GitLabConnection conn, String projectSegment, String repoName, int prNumber) {
@@ -448,17 +450,23 @@ public class GitLabPrSourceClient implements PrSourceClient {
         }
         List<ApprovalRuleDto> rules =
                 approvalState == null || approvalState.rules() == null ? List.of() : approvalState.rules();
-        List<ApprovalRuleDto> codeOwnerRules = rules.stream()
+        // Keep only code_owner rules that actually gate (approvals_required >= 1). A rule with
+        // approvals_required=0 is approved=true with zero approvals — a vacuously-satisfied section (branch
+        // doesn't require code-owner approval, or CODEOWNERS names no valid approver). Counting those as
+        // gate-satisfying would advance an MR that no code owner reviewed; excluding them here is what makes
+        // the "empty rule set fails closed" contract below hold for present-but-vacuous rules too.
+        List<ApprovalRuleDto> gatingRules = rules.stream()
                 .filter(r -> "code_owner".equalsIgnoreCase(r.ruleType()))
+                .filter(ApprovalRuleDto::gates)
                 .toList();
-        // Empty rule set → null (unknown), not vacuous true: fail closed on repos with no readable
-        // code_owner rule (CE/Free, or no owned paths) so the merge gate never opens spuriously.
-        Boolean approved = codeOwnerRules.isEmpty()
-                ? null
-                : codeOwnerRules.stream().allMatch(r -> Boolean.TRUE.equals(r.approved()));
+        // No gating rule → null (unknown), not vacuous true: fail closed on repos with no readable gating
+        // code_owner rule (CE/Free, no owned paths, or only vacuous rules) so the merge gate never opens
+        // spuriously.
+        Boolean approved =
+                gatingRules.isEmpty() ? null : gatingRules.stream().allMatch(r -> Boolean.TRUE.equals(r.approved()));
         List<CodeOwnerRef> pending = new ArrayList<>();
         HashSet<String> seen = new HashSet<>();
-        for (ApprovalRuleDto rule : codeOwnerRules) {
+        for (ApprovalRuleDto rule : gatingRules) {
             if (Boolean.TRUE.equals(rule.approved()) || rule.eligibleApprovers() == null) {
                 continue;
             }
@@ -500,7 +508,21 @@ public class GitLabPrSourceClient implements PrSourceClient {
     private record ApprovalRuleDto(
             @JsonProperty("rule_type") @Nullable String ruleType,
             @Nullable Boolean approved,
-            @JsonProperty("eligible_approvers") @Nullable List<UserRefDto> eligibleApprovers) {}
+            @JsonProperty("approvals_required") @Nullable Integer approvalsRequired,
+            @JsonProperty("eligible_approvers") @Nullable List<UserRefDto> eligibleApprovers) {
+
+        /**
+         * A {@code code_owner} rule only gates the merge when it actually requires an approval. GitLab
+         * reports {@code approvals_required=0} (with {@code approved=true} and zero approvals) for a
+         * code-owner section whose target branch doesn't require code-owner approval, or whose CODEOWNERS
+         * entry resolves to no eligible approver — a vacuously-approved rule that must not open the gate.
+         * Only an <em>explicit</em> {@code approvals_required <= 0} is treated as non-gating; an absent
+         * value falls back to gating, so a response that omits the field can never silently drop the gate.
+         */
+        boolean gates() {
+            return approvalsRequired == null || approvalsRequired > 0;
+        }
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record UserRefDto(

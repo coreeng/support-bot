@@ -117,6 +117,19 @@ class GitHubGraphQlClientTest {
     }
 
     @Test
+    void partialErrorNullingReviewDecisionReturnsNull() {
+        // A field-level error (e.g. SAML enforcement) nulls reviewDecision while the pullRequest object
+        // still resolves — errors[] is populated alongside partial data. This must fail closed (null), not
+        // be mistaken for the legitimate "no code-owner review required" null that opens the gate.
+        server.expect(requestTo(GRAPHQL_URL)).andRespond(withSuccess("""
+                        {"data":{"repository":{"pullRequest":{"reviewDecision":null,"reviewRequests":{"nodes":[]}}}},
+                         "errors":[{"message":"Resource protected by organization SAML enforcement",
+                                    "path":["repository","pullRequest","reviewDecision"]}]}""", MediaType.APPLICATION_JSON));
+
+        assertThat(client.fetchCodeownerReview("my-org/repo", 1)).isNull();
+    }
+
+    @Test
     void transportErrorReturnsNull() {
         server.expect(requestTo(GRAPHQL_URL)).andRespond(withServerError());
 
