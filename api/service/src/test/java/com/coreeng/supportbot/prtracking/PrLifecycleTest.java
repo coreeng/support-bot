@@ -335,9 +335,17 @@ class PrLifecycleTest {
         }
 
         @Test
-        void mergeEscalatedChangesRequestedNotifies() {
+        void mergeEscalatedChangesRequestedPausesBreachedRemainingSoReApprovalReEscalates() {
+            // A merge-escalated record always has a breached deadline; a code owner requesting changes pauses
+            // that (clamped-to-zero) remaining rather than discarding it. On re-approval the record resumes
+            // zero and re-escalates immediately, instead of being handed a fresh full merge window — so a code
+            // owner can't reset the merge clock and dodge re-escalation by toggling changes-requested after a
+            // breach. (Contrast the review ESCALATED → CHANGES_REQUESTED row, which uses none().)
             assertDecision(
-                    decide(obs(MERGE_ESCALATED).changesRequested()), CHANGES_REQUESTED, NONE, NOTIFY_CHANGES_REQUESTED);
+                    decide(obs(MERGE_ESCALATED).changesRequested().slaBreached()),
+                    CHANGES_REQUESTED,
+                    new SlaOp.Pause(Duration.ZERO),
+                    NOTIFY_CHANGES_REQUESTED);
         }
 
         @Test
