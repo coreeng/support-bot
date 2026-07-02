@@ -36,9 +36,11 @@ public class GitHubPrSourceClient implements PrSourceClient {
             PrTrackingProps.@Nullable Repository repoConfig = props.findRepository(Provider.GITHUB, coord.name());
             boolean requiresCodeowners = repoConfig != null && repoConfig.requiresCodeowners();
             // Only the requested-team review fallback in TeamReviewFilter consumes requestedTeamReviewerLogins,
-            // and it's bypassed when an explicit github-team-slug is set or the repo is requires-codeowners
-            // (gated on the GraphQL reviewDecision). Skipping resolution there avoids an org Members:Read call —
-            // and the scope it requires — that would otherwise be dead work.
+            // and it's bypassed when an explicit github-team-slug is set or the repo is requires-codeowners.
+            // For requires-codeowners repos the REST-review verdict is suppressed entirely in
+            // PrLifecyclePoller#observe (the gate is the GraphQL reviewDecision), so the fallback is truly
+            // dead there — skipping resolution avoids an org Members:Read call, and the scope it requires,
+            // that would otherwise be dead work.
             boolean includeRequestedTeamMembers =
                     repoConfig == null || (repoConfig.githubTeamSlug() == null && !requiresCodeowners);
             GitHubPullRequest pr = gitHubClient.getPullRequest(coord.name(), prNumber, includeRequestedTeamMembers);

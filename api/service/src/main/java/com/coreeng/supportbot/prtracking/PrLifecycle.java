@@ -73,14 +73,16 @@ public final class PrLifecycle {
         }
 
         /**
-         * True when a requires-codeowners repo has its code owners' approval and the PR is mergeable, with
-         * no outstanding changes-requested verdict. The {@code !changesRequested()} guard matters because a
-         * changes-requested review from a non-required reviewer leaves GitHub's {@code reviewDecision}
-         * (hence {@code codeownerApproved}) and {@code mergeable} untouched: without it, such a PR would
-         * flap AWAITING_MERGE ↔ CHANGES_REQUESTED every poll, posting two contradictory notifications each
-         * time. When the changes-requested does clear, re-entry resumes the paused merge clock rather than
-         * restarting it (see {@code PrLifecyclePoller#startMergeClock}), so the detour doesn't reset the
-         * merge SLA. Changes-requested takes priority until it clears, mirroring the OPEN rows.
+         * True when a requires-codeowners repo has its code owners' approval and the PR is mergeable.
+         *
+         * <p>For code-owner repos {@code observe()} suppresses the REST-review verdict entirely (the reviews
+         * aren't team-filtered for these repos, so a drive-by who owns no code must not count) — the gate is
+         * {@code codeownerApproved}, derived from the provider's aggregate code-owner decision. So in
+         * production {@code changesRequested()} is always false here and the {@code !changesRequested()}
+         * conjunct is a defensive invariant, not a live guard: it keeps {@code decide()} correct for any
+         * hand-built observation and stops a future reintroduction of per-review verdicts from silently
+         * flapping AWAITING_MERGE ↔ CHANGES_REQUESTED. A code owner's own changes-requested already holds the
+         * gate shut via {@code codeownerApproved=false}, so the PR waits in OPEN rather than advancing.
          */
         boolean readyForCodeownerMerge() {
             return requiresCodeowners && codeownerApproved && mergeable && !changesRequested();

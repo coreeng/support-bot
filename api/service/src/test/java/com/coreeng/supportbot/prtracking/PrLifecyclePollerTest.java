@@ -1686,6 +1686,62 @@ class PrLifecyclePollerTest {
             verify(slackClient).postMessage(any());
         }
 
+        @Test
+        void driveByChangesRequestedDoesNotBlockOrNotifyWhenGateIsOpen() {
+            // given — a code-owner repo with no github-team-slug, so reviews are NOT team-filtered (the
+            // requested-team lookup is skipped). Code owners have approved (gate open) and the PR is
+            // mergeable, but a drive-by reviewer who owns none of the changed code left a CHANGES_REQUESTED.
+            // The gate is the provider's aggregate code-owner decision, not this stray verdict —
+            // observe() suppresses REST verdicts for code-owner repos — so the PR must advance to
+            // AWAITING_MERGE and must neither stall in CHANGES_REQUESTED nor post a "changes requested" note.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = record(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null);
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithReviews(
+                            record, true, true, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(slaLookup.getSla(eq(repoConfig), any(RepoCoord.class), eq(record.prNumber())))
+                    .thenReturn(Duration.ofHours(6));
+
+            // when
+            poller.poll();
+
+            // then — advances to AWAITING_MERGE; the drive-by verdict never writes CHANGES_REQUESTED nor
+            // renders a changes-requested message.
+            verify(prTrackingRepository)
+                    .startSla(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), any(Instant.class));
+            verify(prTrackingRepository, never())
+                    .updateStatus(anyLong(), eq(PrTrackingStatus.CHANGES_REQUESTED), any(), any());
+            verify(prTrackingRepository, never()).pauseSla(anyLong(), eq(PrTrackingStatus.CHANGES_REQUESTED), any());
+            verify(messageRenderer, never()).render(any(), eq(MessageEvent.CHANGES_REQUESTED), any());
+        }
+
+        @Test
+        void driveByChangesRequestedDoesNotNotifyWhileGateStillClosed() {
+            // given — same repo shape, but the code owners have NOT approved yet (gate closed). A drive-by
+            // CHANGES_REQUESTED must not surface as a tenant notification or a status change: the record
+            // simply holds in OPEN with the clock held, waiting on the code owners.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = record(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null);
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithReviews(
+                            record, true, false, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+
+            // when
+            poller.poll();
+
+            // then — no status transition of any kind, and no changes-requested message.
+            verify(prTrackingRepository, never()).updateStatus(anyLong(), any(), any(), any());
+            verify(prTrackingRepository, never()).pauseSla(anyLong(), any(), any());
+            verify(prTrackingRepository, never()).startSla(anyLong(), any(), any());
+            verify(messageRenderer, never()).render(any(), eq(MessageEvent.CHANGES_REQUESTED), any());
+        }
+
         private PrTrackingProps.Repository codeownerRepoConfig(Duration defaultSla) {
             return new PrTrackingProps.Repository(
                     "my-org/repo-a",
@@ -1703,16 +1759,21 @@ class PrLifecyclePollerTest {
         }
 
         private PrMetadata openCodeownerApprovedMergeablePr(PrTrackingRecord record) {
+            return codeownerPrWithReviews(record, true, true, List.of());
+        }
+
+        private PrMetadata codeownerPrWithReviews(
+                PrTrackingRecord record, boolean mergeable, boolean codeownersApproved, List<Review> reviews) {
             return new PrMetadata(
                     RepoCoord.github(record.repo()),
                     record.prNumber(),
                     record.prCreatedAt(),
                     PrMetadata.PrState.OPEN,
-                    true,
+                    mergeable,
                     List.of(),
-                    List.of(),
+                    reviews,
                     null,
-                    true,
+                    codeownersApproved,
                     List.of());
         }
     }
