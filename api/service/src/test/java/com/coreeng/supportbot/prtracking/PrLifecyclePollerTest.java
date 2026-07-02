@@ -1769,6 +1769,37 @@ class PrLifecyclePollerTest {
             verify(messageRenderer).render(eq(record.repo()), eq(MessageEvent.CHANGES_REQUESTED), any());
         }
 
+        @Test
+        void revokedApprovalInAwaitingMergePausesMergeClockAndReturnsToOpen() {
+            // given — a record chasing the merge (AWAITING_MERGE, live merge deadline). The code owners'
+            // approval is then revoked (a push dismissed it → codeOwnersApproved=false, no changes-requested)
+            // while the PR stays mergeable. It must leave AWAITING_MERGE for OPEN with the merge clock paused,
+            // NOT keep running and merge-escalate a PR that now needs code-owner re-review.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = record(
+                    1L,
+                    100L,
+                    "my-org/repo-a",
+                    11,
+                    PrTrackingStatus.AWAITING_MERGE,
+                    Instant.now().plus(Duration.ofHours(6)));
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithReviews(record, true, false, false, List.of()));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+
+            // when
+            poller.poll();
+
+            // then — the merge clock is paused into OPEN; no merge-escalation, no fresh clock.
+            verify(prTrackingRepository).pauseSla(eq(record.id()), eq(PrTrackingStatus.OPEN), any(Duration.class));
+            verify(prTrackingRepository, never())
+                    .updateStatus(anyLong(), eq(PrTrackingStatus.MERGE_ESCALATED), any(), any());
+            verify(prTrackingRepository, never()).startSla(anyLong(), any(), any());
+            verifyNoInteractions(escalationProcessingService);
+        }
+
         private PrTrackingProps.Repository codeownerRepoConfig(Duration defaultSla) {
             return new PrTrackingProps.Repository(
                     "my-org/repo-a",

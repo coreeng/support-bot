@@ -306,7 +306,16 @@ class PrLifecycleTest {
 
         @Test
         void awaitingMergeBreachEscalatesToMergeEscalated() {
-            assertDecision(decide(obs(AWAITING_MERGE).slaBreached()), MERGE_ESCALATED, NONE, ESCALATE_MERGE);
+            // A still-ready PR (approved + mergeable) that breaches the merge SLA escalates the team.
+            assertDecision(
+                    decide(obs(AWAITING_MERGE)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .mergeable()
+                            .slaBreached()),
+                    MERGE_ESCALATED,
+                    NONE,
+                    ESCALATE_MERGE);
         }
 
         @Test
@@ -316,6 +325,42 @@ class PrLifecycleTest {
                     CHANGES_REQUESTED,
                     new SlaOp.Pause(REMAINING),
                     NOTIFY_CHANGES_REQUESTED);
+        }
+
+        @Test
+        void awaitingMergeReturnsToOpenWhenApprovalRevoked() {
+            // A push dismissed the code owners' approval (reviewDecision back to REVIEW_REQUIRED): no
+            // changes-requested verdict, but codeownerApproved is now false. The record must leave
+            // AWAITING_MERGE for OPEN and pause the merge clock, rather than staying and merge-escalating a
+            // PR that needs code-owner re-review.
+            assertDecision(
+                    decide(obs(AWAITING_MERGE).requiresCodeowners().mergeable().liveDeadline(REMAINING)),
+                    OPEN,
+                    new SlaOp.Pause(REMAINING));
+        }
+
+        @Test
+        void awaitingMergeReturnsToOpenWhenNoLongerMergeable() {
+            // The PR gained conflicts (mergeable false) though the code owners still approve: it can't be
+            // merged, so it leaves AWAITING_MERGE for OPEN with the merge clock paused instead of escalating.
+            assertDecision(
+                    decide(obs(AWAITING_MERGE)
+                            .requiresCodeowners()
+                            .codeownerApproved()
+                            .liveDeadline(REMAINING)),
+                    OPEN,
+                    new SlaOp.Pause(REMAINING));
+        }
+
+        @Test
+        void awaitingMergeBreachDoesNotEscalateAReBlockedPr() {
+            // Re-blocked (approval revoked) AND the deadline breached: the "no longer ready" exit is ordered
+            // before the merge-breach row, so it returns to OPEN (pausing the clamped-zero remaining) instead
+            // of escalating the team to merge a PR that is not mergeable-approved.
+            assertDecision(
+                    decide(obs(AWAITING_MERGE).requiresCodeowners().mergeable().slaBreached()),
+                    OPEN,
+                    new SlaOp.Pause(Duration.ZERO));
         }
 
         @Test
@@ -332,6 +377,17 @@ class PrLifecycleTest {
         @Test
         void mergeEscalatedClosesOnRealMerge() {
             assertDecision(decide(obs(MERGE_ESCALATED).merged()), CLOSED, SET_CLOSED_AT, NOTIFY_MERGED);
+        }
+
+        @Test
+        void mergeEscalatedReturnsToOpenWhenApprovalRevoked() {
+            // Same "no longer ready" exit as AWAITING_MERGE, from the escalated state: a revoked approval
+            // returns the record to OPEN, pausing the breached (zero) remaining so re-approval resumes it and
+            // re-escalates immediately. The open escalation row is preserved for reuse.
+            assertDecision(
+                    decide(obs(MERGE_ESCALATED).requiresCodeowners().mergeable().slaBreached()),
+                    OPEN,
+                    new SlaOp.Pause(Duration.ZERO));
         }
 
         @Test
