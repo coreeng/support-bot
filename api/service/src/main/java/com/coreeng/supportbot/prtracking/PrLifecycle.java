@@ -378,12 +378,26 @@ public final class PrLifecycle {
                     List.of(Effect.ESCALATE_MERGE)),
 
             // MERGE_ESCALATED — mirrors ESCALATED but merge-aware: no approved+mergeable → CLOSED exit,
-            // so it too closes only on the real merge.
+            // so it too closes only on the real merge. Unlike the review ESCALATED → CHANGES_REQUESTED row
+            // (which uses none()), this one PAUSES: a merge-escalated record always has a breached deadline,
+            // so remainingForPause clamps to zero, and pausing stores that zero. When the changes clear and
+            // the record re-enters AWAITING_MERGE it resumes that zero rather than being handed a fresh full
+            // window (startMergeClock reuses a stored remaining) — so a code owner requesting changes after
+            // the merge SLA already breached can't reset the clock and dodge re-escalation; the merge simply
+            // re-escalates immediately. (A merge-escalated record always has a deadline; the no-live-deadline
+            // fallback is defensive symmetry with the AWAITING_MERGE rows.)
             new Transition(
                     MERGE_ESCALATED,
                     CHANGES_REQUESTED,
-                    "changes requested after escalation",
-                    Observation::changesRequested,
+                    "changes requested after escalation, live deadline",
+                    o -> o.changesRequested() && o.hasLiveDeadline(),
+                    PrLifecycle::pause,
+                    List.of(Effect.NOTIFY_CHANGES_REQUESTED)),
+            new Transition(
+                    MERGE_ESCALATED,
+                    CHANGES_REQUESTED,
+                    "changes requested after escalation, no live deadline",
+                    o -> o.changesRequested() && !o.hasLiveDeadline(),
                     PrLifecycle::none,
                     List.of(Effect.NOTIFY_CHANGES_REQUESTED)));
 

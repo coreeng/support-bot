@@ -39,5 +39,6 @@ stateDiagram-v2
     AWAITING_MERGE --> CHANGES_REQUESTED : changes requested, live deadline
     AWAITING_MERGE --> CHANGES_REQUESTED : changes requested, no live deadline
     AWAITING_MERGE --> MERGE_ESCALATED : merge SLA breached
-    MERGE_ESCALATED --> CHANGES_REQUESTED : changes requested after escalation
+    MERGE_ESCALATED --> CHANGES_REQUESTED : changes requested after escalation, live deadline
+    MERGE_ESCALATED --> CHANGES_REQUESTED : changes requested after escalation, no live deadline
 ```
