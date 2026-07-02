@@ -372,7 +372,7 @@ public class PrNoSlaLifecycleFunctionalTests {
         assertThat(closed.closedAt()).isNotNull();
     }
 
-    // F3 — OPEN → changes requested (GraphQL REVIEW_REQUIRED) → CHANGES_REQUESTED → code-owner approved +
+    // F3 — OPEN → changes requested (GraphQL reviewDecision=CHANGES_REQUESTED) → CHANGES_REQUESTED → code-owner approved +
     // mergeable (GraphQL APPROVED) → AWAITING_MERGE → merged → CLOSED.
     @Test
     public void codeownerNoSla_changesRequestedThenApproved_reachesAwaitingMergeThenCloses() {
@@ -400,8 +400,10 @@ public class PrNoSlaLifecycleFunctionalTests {
                         .canAutoCloseTicket(false)
                         .build());
 
-        // Poll 1: a code owner requests changes (GraphQL reviewDecision=REVIEW_REQUIRED, so codeOwnersApproved
-        // is false) → CHANGES_REQUESTED via the "changes requested, no-SLA record" row. No SLA is paused.
+        // Poll 1: a code owner requests changes (GraphQL reviewDecision=CHANGES_REQUESTED — under the
+        // code-owner merge gate the aggregate provider decision, not individual REST reviews, drives the
+        // review-phase verdict) → CHANGES_REQUESTED via the "changes requested, no-SLA record" row. No SLA
+        // is paused.
         String crReviewJson = """
                 [{"id":1,"user":{"login":"reviewer"},"state":"CHANGES_REQUESTED","submitted_at":"2024-01-15T10:00:00Z","body":""}]
                 """;
@@ -418,7 +420,7 @@ public class PrNoSlaLifecycleFunctionalTests {
         var crGraphQlStub = testKit.slack()
                 .wiremock()
                 .stubGitHubGraphQlReviewDecision(
-                        "Codeowner no-SLA reviewDecision REVIEW_REQUIRED", "REVIEW_REQUIRED", List.of("owner1"));
+                        "Codeowner no-SLA reviewDecision CHANGES_REQUESTED", "CHANGES_REQUESTED", List.of("owner1"));
         var crMessageStub = testKit.slack().wiremock().stubChatPostMessage("changes requested notification", channelId);
 
         supportBotClient.test().triggerPrTrackingPoll();
