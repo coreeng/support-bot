@@ -147,13 +147,23 @@ public class PrLifecyclePoller {
             @Nullable Review latestVerdict,
             PrTrackingProps.@Nullable Repository repoConfig) {
         Instant now = Instant.now();
-        PrLifecycle.Verdict verdict = latestVerdict == null
+        boolean requiresCodeowners = repoConfig != null && repoConfig.requiresCodeowners();
+        // Code-owner repos gate purely on the provider's aggregate code-owner decision (codeownerApproved
+        // below), never on individual REST-review verdicts. Those reviews are NOT team-filtered for these
+        // repos — the requested-team lookup is skipped (see GitHubPrSourceClient#fetchPullRequest), so an
+        // unfiltered drive-by who owns no code would otherwise post APPROVED/CHANGES_REQUESTED and either
+        // fire a spurious tenant notification or block the merge advance via readyForCodeownerMerge()'s
+        // !changesRequested() guard. A code owner's own changes-requested is already captured by
+        // codeownerApproved=false (reviewDecision=CHANGES_REQUESTED holds the gate shut), so suppressing the
+        // verdict here loses no gating signal: the review phase simply holds in OPEN until the gate opens.
+        // This is what makes "gated on codeownerApproved, not the review verdict" actually true, and keeps
+        // code-owner repos from passing through APPROVED/CHANGES_REQUESTED as the user guide promises.
+        PrLifecycle.Verdict verdict = requiresCodeowners || latestVerdict == null
                 ? null
                 : latestVerdict.isApproved() ? PrLifecycle.Verdict.APPROVED : PrLifecycle.Verdict.CHANGES_REQUESTED;
         Instant deadline = record.slaDeadline();
         Duration remainingForPause = deadline == null ? null : clampNonNegative(Duration.between(now, deadline));
         boolean slaBreached = deadline != null && now.isAfter(deadline);
-        boolean requiresCodeowners = repoConfig != null && repoConfig.requiresCodeowners();
         boolean codeownerApproved = Boolean.TRUE.equals(pr.codeOwnersApproved());
         return new PrLifecycle.Observation(
                 record.status(),
