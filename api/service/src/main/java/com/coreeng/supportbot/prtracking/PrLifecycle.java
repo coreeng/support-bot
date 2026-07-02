@@ -369,6 +369,29 @@ public final class PrLifecycle {
                     o -> o.changesRequested() && !o.hasLiveDeadline(),
                     PrLifecycle::none,
                     List.of(Effect.NOTIFY_CHANGES_REQUESTED)),
+            // The PR is no longer ready to merge: the code-owner approval was revoked (e.g. a push dismissed
+            // stale reviews → reviewDecision back to REVIEW_REQUIRED, so codeownerApproved is false without a
+            // changes-requested verdict) or it became unmergeable (new conflicts). It must leave
+            // AWAITING_MERGE — otherwise the merge clock keeps running and escalates the maintaining team to
+            // merge a PR that is actually re-blocked. Return to OPEN (waiting on code owners again, clock
+            // held), pausing the merge clock so a later re-approval resumes it rather than starting a fresh
+            // window. Ordered after the changes-requested rows (changes-requested wins) and before the
+            // merge-breach row (a re-blocked PR must not merge-escalate). No NOTIFY: the tenant already knows
+            // it was awaiting merge, and a re-entry re-issues NotifyAwaitingMerge.
+            new Transition(
+                    AWAITING_MERGE,
+                    OPEN,
+                    "no longer approved/mergeable, live deadline",
+                    o -> !o.changesRequested() && !o.readyForCodeownerMerge() && o.hasLiveDeadline(),
+                    PrLifecycle::pause,
+                    List.of()),
+            new Transition(
+                    AWAITING_MERGE,
+                    OPEN,
+                    "no longer approved/mergeable, no live deadline",
+                    o -> !o.changesRequested() && !o.readyForCodeownerMerge() && !o.hasLiveDeadline(),
+                    PrLifecycle::none,
+                    List.of()),
             new Transition(
                     AWAITING_MERGE,
                     MERGE_ESCALATED,
@@ -399,7 +422,25 @@ public final class PrLifecycle {
                     "changes requested after escalation, no live deadline",
                     o -> o.changesRequested() && !o.hasLiveDeadline(),
                     PrLifecycle::none,
-                    List.of(Effect.NOTIFY_CHANGES_REQUESTED)));
+                    List.of(Effect.NOTIFY_CHANGES_REQUESTED)),
+            // Same "no longer ready to merge" exit as AWAITING_MERGE, but from the escalated state: a revoked
+            // approval or new conflict returns the record to OPEN (clock held), pausing the breached (zero)
+            // remaining so re-approval resumes it and re-escalates immediately rather than starting fresh. The
+            // open escalation row is preserved (escalation_open_unique), so re-entry reuses it.
+            new Transition(
+                    MERGE_ESCALATED,
+                    OPEN,
+                    "no longer approved/mergeable, live deadline",
+                    o -> !o.changesRequested() && !o.readyForCodeownerMerge() && o.hasLiveDeadline(),
+                    PrLifecycle::pause,
+                    List.of()),
+            new Transition(
+                    MERGE_ESCALATED,
+                    OPEN,
+                    "no longer approved/mergeable, no live deadline",
+                    o -> !o.changesRequested() && !o.readyForCodeownerMerge() && !o.hasLiveDeadline(),
+                    PrLifecycle::none,
+                    List.of()));
 
     /** Pure, table-driven. First matching row wins; otherwise stay put with no write. */
     public static Decision decide(Observation o) {
