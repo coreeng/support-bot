@@ -319,7 +319,7 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
                     COALESCE(MIN(owning_team), 'unknown') AS owning_team,
                     COUNT(*) AS pr_count,
                     COUNT(*) FILTER (WHERE status IN ('OPEN', 'ESCALATED', 'CHANGES_REQUESTED', 'APPROVED', 'AWAITING_MERGE', 'MERGE_ESCALATED')) AS open_count,
-                    COUNT(*) FILTER (WHERE status = 'ESCALATED') AS escalated_count,
+                    COUNT(*) FILTER (WHERE status IN ('ESCALATED', 'MERGE_ESCALATED')) AS escalated_count,
                     COUNT(*) FILTER (WHERE sla_deadline < COALESCE(closed_at, now())) AS breached_count,
                     percentile_cont(0.5) WITHIN GROUP (ORDER BY lifetime) AS p50,
                     percentile_cont(0.9) WITHIN GROUP (ORDER BY lifetime) AS p90,

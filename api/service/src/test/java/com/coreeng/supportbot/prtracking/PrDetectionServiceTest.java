@@ -281,6 +281,54 @@ class PrDetectionServiceTest {
         }
 
         @Test
+        void skipsChaseMessageWhenCodeOwnersAlreadyApprovedAtDetection() {
+            // given — a requires-codeowners repo where the code owners have already approved by the time the
+            // PR link is posted (codeOwnersApproved=true). The "waiting on code owners" chase copy would be
+            // factually wrong, so it must be skipped — the record and emoji still land, and the poller posts
+            // the accurate awaiting-merge message on its next cycle.
+            Instant prCreatedAt = Instant.now().minus(Duration.ofHours(1));
+            when(prTrackingProps.prEmoji()).thenReturn(PR_EMOJI);
+            when(prTrackingProps.repositories())
+                    .thenReturn(List.of(new PrTrackingProps.Repository(
+                            REPO,
+                            TEAM_CODE,
+                            Provider.GITHUB,
+                            null,
+                            null,
+                            List.of(),
+                            sla(SLA_24H),
+                            null,
+                            null,
+                            List.of(),
+                            true,
+                            false)));
+            when(prUrlParser.parse(any())).thenReturn(List.of(new DetectedPr(Provider.GITHUB, REPO, PR_NUMBER)));
+            when(prTrackingRepository.existsByTicketIdAndRepoAndPrNumber(anyLong(), any(), any(), anyInt()))
+                    .thenReturn(false);
+            when(prSourceClient.fetchPullRequest(COORD, PR_NUMBER))
+                    .thenReturn(new PrMetadata(
+                            RepoCoord.github(REPO),
+                            PR_NUMBER,
+                            prCreatedAt,
+                            PrMetadata.PrState.OPEN,
+                            true,
+                            List.of(),
+                            List.of(),
+                            "author",
+                            true,
+                            false,
+                            List.of()));
+            when(prTrackingRepository.insertIfAbsent(any())).thenReturn(stubTrackingRecord(prCreatedAt, null));
+
+            // when
+            service.handleMessagePosted(messagePostedWith("msg"), ticketWithId(1L));
+
+            // then — the record is created but no chase message is posted (the emoji reaction still is).
+            verify(prTrackingRepository).insertIfAbsent(any());
+            verify(slackClient, never()).postMessage(any());
+        }
+
+        @Test
         void tracksNoSlaCodeownerPrTouchingConfiguredPaths() {
             // given — a requires-codeowners repo with no SLA block (so config mandates paths) and a PR
             // that touches the configured paths.

@@ -575,7 +575,7 @@ public class PrDetectionService {
                         detectedPr.provider(),
                         detectedPr.repositoryName(),
                         detectedPr.pullNumber(),
-                        repoConfig.owningTeam(),
+                        teamLabel,
                         sla,
                         slaDeadline);
                 String override =
@@ -773,28 +773,36 @@ public class PrDetectionService {
 
         addReaction(prTrackingProps.prEmoji(), ticket.queryTs(), ticket.channelId());
 
-        PrMessageContext ctx = new PrMessageContext(
-                detectedPr.provider(),
-                detectedPr.repositoryName(),
-                detectedPr.pullNumber(),
-                repoConfig.owningTeam(),
-                null,
-                null);
-        String override = messageRenderer.render(detectedPr.repositoryName(), MessageEvent.DETECTED, ctx);
-        String text = override != null
-                ? override
-                : formatCodeownerDetectedText(
-                        detectedPr.provider(),
-                        detectedPr.repositoryName(),
-                        detectedPr.pullNumber(),
-                        prMetadata.codeOwnerReviewers());
-        postText(
-                text,
-                detectedPr.repositoryName(),
-                detectedPr.pullNumber(),
-                NotificationType.TRACKED,
-                ticket.queryTs(),
-                ticket.channelId());
+        // The DETECTED copy tells the tenant the PR is "waiting on its code owners … I'll let you know once
+        // the code owners have approved". Only post it when the gate is actually still open. If the code
+        // owners have already approved (or the PR's changed paths need no code-owner review) by detection
+        // time, that message would be factually wrong — and it might name people who already approved as the
+        // ones we're waiting on. Skip it: the record and the emoji reaction still land, and the poller posts
+        // the accurate "code owners approved — awaiting merge" message on its next cycle.
+        if (!Boolean.TRUE.equals(prMetadata.codeOwnersApproved())) {
+            PrMessageContext ctx = new PrMessageContext(
+                    detectedPr.provider(),
+                    detectedPr.repositoryName(),
+                    detectedPr.pullNumber(),
+                    resolveTeamLabel(repoConfig.owningTeam()),
+                    null,
+                    null);
+            String override = messageRenderer.render(detectedPr.repositoryName(), MessageEvent.DETECTED, ctx);
+            String text = override != null
+                    ? override
+                    : formatCodeownerDetectedText(
+                            detectedPr.provider(),
+                            detectedPr.repositoryName(),
+                            detectedPr.pullNumber(),
+                            prMetadata.codeOwnerReviewers());
+            postText(
+                    text,
+                    detectedPr.repositoryName(),
+                    detectedPr.pullNumber(),
+                    NotificationType.TRACKED,
+                    ticket.queryTs(),
+                    ticket.channelId());
+        }
         return PerPrResult.TRACKED;
     }
 
