@@ -10,7 +10,7 @@ import { useTeamFilter } from "@/contexts/TeamFilterContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useNow } from "@/hooks/useNow";
 import { TEAM_SCOPE } from "@/lib/constants";
-import { getDateRangeFromFilter, PRESET_DAYS } from "@/lib/dateRange";
+import { DateFilter, getDateRangeFromFilter, PRESET_DAYS } from "@/lib/dateRange";
 import { useEscalations, useRegistry, useTenantTeams } from "@/lib/hooks";
 import { enumValidator, isoDateValidator, nonNegativeIntValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
 import { normalizeTeamKey } from "@/lib/teamUtils";
@@ -59,7 +59,6 @@ export default function EscalationsPage() {
   const { data: tenantTeamsData } = useTenantTeams();
   const { data: registryData } = useRegistry();
   const ALL_TEAMS_FILTER = TEAM_SCOPE.ALL_TEAMS;
-  type EscalationDateFilter = "" | "lastWeek" | "last2Weeks" | "lastMonth" | "custom";
 
   // Persist all filter / sort / page controls in the URL.
   // Validators guard against invalid URL values and auto-correct the URL.
@@ -77,7 +76,7 @@ export default function EscalationsPage() {
       page: "0",
     },
     {
-      dateFilter: enumValidator(["", "lastWeek", "last2Weeks", "lastMonth", "custom"] as const, "lastWeek"),
+      dateFilter: enumValidator(["all", "lastWeek", "last2Weeks", "lastMonth", "custom"] as const, "lastWeek"),
       dateFrom: isoDateValidator,
       dateTo: isoDateValidator,
       status: enumValidator(["all", "ongoing", "resolved"] as const, "all"),
@@ -94,7 +93,7 @@ export default function EscalationsPage() {
   const statusFilter = params.status as "all" | "ongoing" | "resolved";
   const impactFilter = params.impact;
   const tagFilter = params.tag;
-  const dateFilter = params.dateFilter as EscalationDateFilter;
+  const dateFilter = params.dateFilter as DateFilter;
   const sortColumn = params.sortBy as SortColumn;
   const sortDirection = params.sortDir as "asc" | "desc";
   const pageIndex = parseInt(params.page, 10);
@@ -149,8 +148,8 @@ export default function EscalationsPage() {
     minutes < 30 ? "text-success" : minutes < 120 ? "text-warning" : "text-destructive font-semibold";
 
   // --- Date range for date filter ---
-  // Empty string dateFilter (= "Any Date") is not in presetDays so falls through to
-  // { from: undefined, to: undefined } inside getDateRangeFromFilter, which is correct.
+  // "all" (= "Any Date") maps to { from: undefined, to: undefined } via allValue,
+  // i.e. no date filtering.
   const dateRange = useMemo(
     () =>
       getDateRangeFromFilter({
@@ -158,6 +157,7 @@ export default function EscalationsPage() {
         customDateRange: { start: params.dateFrom || undefined, end: params.dateTo || undefined },
         customValue: "custom",
         fallbackValue: "lastWeek",
+        allValue: "all",
         presetDays: {
           lastWeek: PRESET_DAYS.lastWeek,
           last2Weeks: PRESET_DAYS.last2Weeks,
@@ -317,10 +317,6 @@ export default function EscalationsPage() {
   const topTagsTitleSuffix = selectedTeam ? (selectedTeam === ALL_TEAMS_FILTER ? "for All Teams" : `for ${teamLabel(selectedTeam)}`) : "";
   const showEscalatedForColumn = hasFullAccess || selectedTeam === ALL_TEAMS_FILTER;
 
-  const ANY_DATE = "__any";
-  const fromAny = (v: string) => (v === ANY_DATE ? "" : v);
-  const toAny = (v: string) => (v === "" ? ANY_DATE : v);
-
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -357,9 +353,9 @@ export default function EscalationsPage() {
           </div>
           <div className="flex items-center gap-2">
             <Select
-              value={toAny(dateFilter)}
-              onValueChange={(v) => {
-                const next = fromAny(v) as EscalationDateFilter;
+              value={dateFilter}
+              onValueChange={(v: string) => {
+                const next = v as DateFilter;
                 setParams(next !== "custom" ? { dateFilter: next, dateFrom: "", dateTo: "", page: "0" } : { dateFilter: next, page: "0" });
               }}
             >
@@ -367,7 +363,7 @@ export default function EscalationsPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ANY_DATE}>Any Date</SelectItem>
+                <SelectItem value="all">Any Date</SelectItem>
                 <SelectItem value="lastWeek">Last Week</SelectItem>
                 <SelectItem value="last2Weeks">Last 2 Weeks</SelectItem>
                 <SelectItem value="lastMonth">Last Month</SelectItem>

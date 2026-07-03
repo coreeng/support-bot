@@ -9,7 +9,7 @@ import { SingleSelectFilter } from "@/components/ui/single-select-filter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useTeamFilter } from "@/contexts/TeamFilterContext";
 import { TEAM_SCOPE } from "@/lib/constants";
-import { getDateRangeFromFilter, PRESET_DAYS } from "@/lib/dateRange";
+import { DateFilter, getDateRangeFromFilter, PRESET_DAYS } from "@/lib/dateRange";
 import { useAllTickets, useAssignmentEnabled, useRegistry, useTenantTeams, useTickets } from "@/lib/hooks";
 import { enumValidator, isoDateValidator, nonNegativeIntValidator, useUrlParams } from "@/lib/hooks/useUrlParams";
 import { normalizeTeamKey } from "@/lib/teamUtils";
@@ -33,7 +33,6 @@ export default function TicketsPage() {
   const columnCount = isAssignmentEnabled ? BASE_COLUMN_COUNT + 1 : BASE_COLUMN_COUNT;
   const hasNoTeamScope = contextHasNoTeamScope ?? effectiveTeams.includes(TEAM_SCOPE.NO_TEAMS);
   const isViewingAllTeams = contextIsViewingAllTeams ?? (effectiveTeams.length === 0 && !hasNoTeamScope);
-  type TicketDateFilter = "" | "lastWeek" | "last2Weeks" | "lastMonth" | "custom";
   type SortColumn = "openedAt" | "closedAt";
 
   // Selected ticket (UI-only — not persisted in the URL)
@@ -62,7 +61,7 @@ export default function TicketsPage() {
       page: "0",
     },
     {
-      dateFilter: enumValidator(["", "lastWeek", "last2Weeks", "lastMonth", "custom"] as const, "lastWeek"),
+      dateFilter: enumValidator(["all", "lastWeek", "last2Weeks", "lastMonth", "custom"] as const, "lastWeek"),
       dateFrom: isoDateValidator,
       dateTo: isoDateValidator,
       status: enumValidator(["", "opened", "closed", "stale"] as const, ""),
@@ -80,7 +79,7 @@ export default function TicketsPage() {
   // Type assertions are safe for dateFilter, status, escalated, sortBy, and sortDir —
   // each has an enumValidator above. page uses nonNegativeIntValidator and is parsed via parseInt
   // teamFilter, impact, tag, and escalatedTo have no validators and carry raw URL strings.
-  const dateFilter = params.dateFilter as TicketDateFilter;
+  const dateFilter = params.dateFilter as DateFilter;
   const statusFilter = params.status;
   const teamFilter = params.teamFilter;
   const impactFilter = params.impact;
@@ -106,6 +105,7 @@ export default function TicketsPage() {
         customDateRange: { start: params.dateFrom || undefined, end: params.dateTo || undefined },
         customValue: "custom",
         fallbackValue: "lastWeek",
+        allValue: "all",
         presetDays: {
           lastWeek: PRESET_DAYS.lastWeek,
           last2Weeks: PRESET_DAYS.last2Weeks,
@@ -318,11 +318,6 @@ export default function TicketsPage() {
 
   const totalTickets = useServerPagination ? ticketsDataTyped?.totalElements || 0 : sortedTickets.length;
 
-  // shadcn Select needs non-empty values; "" means "any" sentinel.
-  const ANY = "__any";
-  const fromAny = (v: string) => (v === ANY ? "" : v);
-  const toAny = (v: string) => (v === "" ? ANY : v);
-
   // --- Render ---
   return (
     <div className="space-y-6">
@@ -333,9 +328,9 @@ export default function TicketsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Select
-            value={toAny(dateFilter)}
-            onValueChange={(v) => {
-              const next = fromAny(v) as TicketDateFilter;
+            value={dateFilter}
+            onValueChange={(v: string) => {
+              const next = v as DateFilter;
               setParams(next !== "custom" ? { dateFilter: next, dateFrom: "", dateTo: "" } : { dateFilter: next });
             }}
           >
@@ -343,7 +338,7 @@ export default function TicketsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ANY}>Any Date</SelectItem>
+              <SelectItem value="all">Any Date</SelectItem>
               <SelectItem value="lastWeek">Last Week</SelectItem>
               <SelectItem value="last2Weeks">Last 2 Weeks</SelectItem>
               <SelectItem value="lastMonth">Last Month</SelectItem>
