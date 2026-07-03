@@ -372,8 +372,8 @@ public class GitHubNoSlaLifecycleFunctionalTests {
         assertThat(closed.closedAt()).isNotNull();
     }
 
-    // F3 — OPEN → changes requested (GraphQL reviewDecision=CHANGES_REQUESTED) → CHANGES_REQUESTED → code-owner approved +
-    // mergeable (GraphQL APPROVED) → AWAITING_MERGE → merged → CLOSED.
+    // F3 — OPEN → changes requested (GraphQL reviewDecision=CHANGES_REQUESTED) → CHANGES_REQUESTED →
+    // code-owner approved + mergeable (GraphQL APPROVED) → AWAITING_MERGE → merged → CLOSED.
     @Test
     public void codeownerNoSla_changesRequestedThenApproved_reachesAwaitingMergeThenCloses() {
         String channelId = testKit.config().mocks().slack().supportChannelId();

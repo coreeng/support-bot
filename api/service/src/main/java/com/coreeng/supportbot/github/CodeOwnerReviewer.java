@@ -1,5 +1,7 @@
 package com.coreeng.supportbot.github;
 
+import static java.util.Objects.requireNonNull;
+
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -10,4 +12,8 @@ import org.jspecify.annotations.Nullable;
  * (host-correct on GitHub Enterprise Server too), or {@code null} when absent.
  */
 public record CodeOwnerReviewer(
-        boolean team, String display, @Nullable String url) {}
+        boolean team, String display, @Nullable String url) {
+    public CodeOwnerReviewer {
+        requireNonNull(display, "display must not be null");
+    }
+}

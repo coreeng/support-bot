@@ -927,6 +927,8 @@ custom override always wins.
       escalated:          '"Contact #pr-reviews in Slack to chase this review."'
       approved:           '"PR " + string(pr_number) + " approved — ready to merge!"'
       changes-requested:  '"Changes requested on PR " + string(pr_number) + ". Please review the feedback."'
+      awaiting-merge:     '"PR " + string(pr_number) + " approved by code owners — ready to merge!"'
+      merge-escalated:    '"Contact #pr-reviews in Slack to chase this merge."'
       merged:             '"PR " + string(pr_number) + " merged. Thanks!"'
       closed:             '"PR " + string(pr_number) + " closed."'
 ```

@@ -279,7 +279,7 @@ public final class PrLifecycle {
             // (never toggles per-PR) — so together with readyForCodeownerMerge() requiring requiresCodeowners
             // to reach AWAITING_MERGE/MERGE_ESCALATED, a single PR can never pass through both ESCALATED and
             // MERGE_ESCALATED. Don't relax this guard without first handling escalate()/escalateMerge()
-            // sharing one Escalation row per ticket (escalation_thread_ts_unique) — today that's a non-issue
+            // sharing one Escalation row per ticket (escalation_open_unique) — today that's a non-issue
             // only because the two effects are mutually exclusive per repo.
             new Transition(
                     OPEN,

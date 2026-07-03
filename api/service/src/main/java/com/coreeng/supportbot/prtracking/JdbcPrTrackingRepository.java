@@ -115,9 +115,11 @@ public class JdbcPrTrackingRepository implements PrTrackingRepository {
 
     @Override
     public PrTrackingRecord pauseSla(long id, PrTrackingStatus newStatus, Duration remaining) {
-        if (newStatus != PrTrackingStatus.CHANGES_REQUESTED && newStatus != PrTrackingStatus.APPROVED) {
+        if (newStatus != PrTrackingStatus.CHANGES_REQUESTED
+                && newStatus != PrTrackingStatus.APPROVED
+                && newStatus != PrTrackingStatus.OPEN) {
             throw new IllegalArgumentException(
-                    "pauseSla only supports CHANGES_REQUESTED or APPROVED, got: " + newStatus);
+                    "pauseSla only supports CHANGES_REQUESTED, APPROVED, or OPEN, got: " + newStatus);
         }
         com.coreeng.supportbot.dbschema.tables.records.PrTrackingRecord row = dsl.update(PR_TRACKING)
                 .set(PR_TRACKING.STATUS, newStatus)

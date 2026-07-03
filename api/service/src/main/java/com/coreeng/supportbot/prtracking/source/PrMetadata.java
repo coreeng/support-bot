@@ -45,6 +45,9 @@ public record PrMetadata(
         if (number <= 0) {
             throw new IllegalArgumentException("number must be positive, was " + number);
         }
+        if (Boolean.TRUE.equals(codeOwnersApproved) && codeownerChangesRequested) {
+            throw new IllegalArgumentException("codeOwnersApproved and codeownerChangesRequested can't both be true");
+        }
     }
 
     /**

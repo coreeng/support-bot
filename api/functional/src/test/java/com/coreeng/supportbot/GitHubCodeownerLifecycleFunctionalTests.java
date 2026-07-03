@@ -28,6 +28,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
  *       code-owner repo never closes on mergeability alone — only on the merge itself.
  *   <li><b>F3</b> — changes-requested → code-owner approved → {@code AWAITING_MERGE} → merged.
  *   <li><b>F4</b> — abandoned: a {@code closed}-but-unmerged PR terminates {@code AWAITING_MERGE}.
+ *   <li><b>F5</b> (regression) — a revoked code-owner approval returns {@code AWAITING_MERGE} to
+ *       {@code OPEN} without throwing.
  * </ul>
  */
 @ExtendWith(TestKitExtension.class)
@@ -285,5 +287,68 @@ public class GitHubCodeownerLifecycleFunctionalTests {
         var closed = supportBotClient.test().getPrTrackingRecord(record.id());
         assertThat(closed.status()).isEqualTo("CLOSED");
         assertThat(closed.closedAt()).isNotNull();
+    }
+
+    // F5 (regression) — a code-owner approval revoked while AWAITING_MERGE must return the record to OPEN,
+    // not throw. JdbcPrTrackingRepository.pauseSla previously rejected any status other than
+    // CHANGES_REQUESTED/APPROVED, so the AWAITING_MERGE → OPEN row in PrLifecycle threw
+    // IllegalArgumentException every poll and stranded the record — masked by poll()'s per-record catch and
+    // never exercised by PrLifecyclePollerTest, which mocks the repository. This test runs against the real
+    // JdbcPrTrackingRepository, so it actually proves the guard accepts OPEN.
+    @Test
+    public void whenAwaitingMergeApprovalRevoked_returnsToOpenWithoutThrowing() {
+        String channelId = testKit.config().mocks().slack().supportChannelId();
+        MessageTs queryTs = MessageTs.now();
+        MessageTs ticketTs = MessageTs.now();
+
+        var ticket = supportBotClient
+                .test()
+                .createTicket(SupportBotClient.TicketToCreateRequest.builder()
+                        .channelId(channelId)
+                        .queryTs(queryTs)
+                        .createdMessageTs(ticketTs)
+                        .build());
+
+        // Seed straight into AWAITING_MERGE with a live merge deadline, so the transition under test is the
+        // "no longer approved/mergeable" exit, not a merge-SLA breach.
+        var record = supportBotClient
+                .test()
+                .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                        .ticketId(ticket.id())
+                        .githubRepo(CODEOWNERS_REPO)
+                        .prNumber(1)
+                        .prCreatedAt(Instant.now().minus(Duration.ofHours(1)))
+                        .status("AWAITING_MERGE")
+                        .slaDeadline(Instant.now().plus(Duration.ofHours(23)))
+                        .owningTeam("wow")
+                        .canAutoCloseTicket(false)
+                        .build());
+
+        // Poll: the PR is still open and mergeable, but the code-owner approval was revoked (GraphQL
+        // reviewDecision back to REVIEW_REQUIRED — no changes-requested verdict, codeOwnersApproved=false).
+        // readyForCodeownerMerge() goes false with changesRequested() still false and a live deadline, so the
+        // FSM pauses the merge clock and returns the record to OPEN (no NOTIFY effect on this row).
+        var prOpenStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest(
+                        "Codeowner PR open + mergeable, approval revoked",
+                        CODEOWNERS_REPO,
+                        1,
+                        "open",
+                        recentCreatedAt(),
+                        true,
+                        "[]");
+        var graphQlStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGraphQlReviewDecision(
+                        "Codeowner reviewDecision REVIEW_REQUIRED", "REVIEW_REQUIRED", List.of());
+
+        supportBotClient.test().triggerPrTrackingPoll();
+
+        prOpenStub.assertIsCalled();
+        graphQlStub.assertIsCalled();
+        var reopened = supportBotClient.test().getPrTrackingRecord(record.id());
+        assertThat(reopened.status()).isEqualTo("OPEN");
+        assertThat(reopened.closedAt()).isNull();
     }
 }
