@@ -31,7 +31,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * </ul>
  */
 @ExtendWith(TestKitExtension.class)
-public class PrCodeownerMergeGateFunctionalTests {
+public class GitHubCodeownerLifecycleFunctionalTests {
     private static final String CODEOWNERS_REPO = "test-org/pr-codeowners-repo";
 
     private TestKit testKit;

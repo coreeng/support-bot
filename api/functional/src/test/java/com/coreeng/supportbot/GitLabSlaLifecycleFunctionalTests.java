@@ -16,8 +16,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 /**
- * Lifecycle poller coverage for a GitLab, non-code-owner, SLA-configured repo (GL·noCO·SLA), filling
- * two gaps left by {@code PrLifecyclePollerFunctionalTests.GitLab}:
+ * End-to-end lifecycle coverage for a GitLab non-code-owner, SLA-configured repo ({@code GL · noCO ·
+ * SLA}), complementing the state-machine transition tests in {@code
+ * PrLifecyclePollerFunctionalTests.GitLab}:
  *
  * <ul>
  *   <li><b>F2a</b> — review-SLA escalation then recover-and-close: the existing GitLab escalation test
@@ -31,7 +32,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * {@code !requiresCodeowners} guard holds on the {@code approved + mergeable → CLOSED} rows.
  */
 @ExtendWith(TestKitExtension.class)
-public class GitLabLifecycleGapsFunctionalTests {
+public class GitLabSlaLifecycleFunctionalTests {
 
     private static final String MR_REPO = "gitlab-org/gitlab-pr-test-repo";
 

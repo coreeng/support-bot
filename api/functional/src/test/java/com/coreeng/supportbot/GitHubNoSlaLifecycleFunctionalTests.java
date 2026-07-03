@@ -22,7 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  *
  * <p>Seeds records directly (with a null {@code slaDeadline}) and drives transitions via the GitHub
  * v3/GraphQL stubs, mirroring the state-machine transition tests in
- * {@code PrLifecyclePollerFunctionalTests} and {@code PrCodeownerMergeGateFunctionalTests}. Every
+ * {@code PrLifecyclePollerFunctionalTests} and {@code GitHubCodeownerLifecycleFunctionalTests}. Every
  * transition asserted here corresponds to a row in {@code PrLifecycle#TRANSITIONS}.
  *
  * <p>The load-bearing no-SLA invariants proved below:
@@ -48,7 +48,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * status}/{@code closedAt}.
  */
 @ExtendWith(TestKitExtension.class)
-public class PrNoSlaLifecycleFunctionalTests {
+public class GitHubNoSlaLifecycleFunctionalTests {
     private static final String NOSLA_REPO = "test-org/pr-nosla-repo";
     private static final String CODEOWNERS_NOSLA_REPO = "test-org/pr-codeowners-nosla-repo";
 

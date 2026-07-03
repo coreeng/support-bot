@@ -20,7 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * stub is involved.
  */
 @ExtendWith(TestKitExtension.class)
-public class PrChangesRequestedLifecycleFunctionalTests {
+public class GitHubChangesRequestedLifecycleFunctionalTests {
     private static final String PR_REPO = "test-org/pr-test-repo";
 
     private TestKit testKit;
