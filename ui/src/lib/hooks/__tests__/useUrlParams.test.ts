@@ -110,6 +110,24 @@ describe("useUrlParams", () => {
       expect(mockReplace).toHaveBeenCalledWith("/test");
     });
 
+    // Regression guard for the Tickets/Escalations "Any Date" bug: an option
+    // represented by an empty string can never be selected, because setParams
+    // strips empty values from the URL and the next read falls back to the
+    // key's default. "No filter" options must use a non-empty value (e.g. "all").
+    it("cannot represent an empty-string selection for a key with a non-empty default", () => {
+      setupMocks();
+      const { result } = renderHook(() => useUrlParams(DEFAULTS));
+      act(() => {
+        result.current[1]({ dateFilter: "" });
+      });
+      // The param is removed from the URL entirely...
+      expect(mockReplace).toHaveBeenCalledWith("/test");
+      // ...so a hook reading that URL sees the default again, not "".
+      setupMocks({});
+      const { result: afterNavigation } = renderHook(() => useUrlParams(DEFAULTS));
+      expect(afterNavigation.current[0].dateFilter).toBe("lastWeek");
+    });
+
     it("can set multiple params in a single call", () => {
       setupMocks();
       const { result } = renderHook(() => useUrlParams(DEFAULTS));

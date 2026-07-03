@@ -1,5 +1,7 @@
+import { useMockUrlParams as mockUseUrlParams } from "@/test-utils/mock-url-params";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import React from "react";
 import * as TeamFilterContext from "../../../contexts/TeamFilterContext";
 import * as AuthHook from "../../../hooks/useAuth";
@@ -15,14 +17,7 @@ jest.mock("../../../hooks/useAuth");
 // interactions that fire events and then inspect the rendered output intact.
 jest.mock("../../../lib/hooks/useUrlParams", () => ({
   ...jest.requireActual("../../../lib/hooks/useUrlParams"),
-  useUrlParams: (defaults: Record<string, string>) => {
-    const { useState } = require("react") as typeof import("react");
-    const [params, setParamsState] = useState<Record<string, string>>(defaults);
-    const setParams = (updates: Record<string, string>) => {
-      setParamsState((prev: Record<string, string>) => ({ ...prev, ...updates }));
-    };
-    return [params, setParams];
-  },
+  useUrlParams: mockUseUrlParams,
 }));
 jest.mock("../EscalatedToMyTeamTable", () => {
   const Mock = () => <div data-testid="escalated-to-my-team-table" />;
@@ -228,6 +223,61 @@ describe("EscalationsPage", () => {
     expect(screen.getByText("Escalated To")).toBeInTheDocument();
     expect(screen.getAllByText("Tenant Alpha").length).toBeGreaterThan(0);
     expect(screen.getByText("Escalation Team 1")).toBeInTheDocument();
+  });
+
+  // Regression: "Any Date" used to be represented by an empty-string dateFilter,
+  // which the real useUrlParams strips from the URL — the filter silently
+  // snapped back to the default "Last Week" and old escalations stayed hidden.
+  it('shows escalations older than the default range when "Any Date" is selected', async () => {
+    const user = userEvent.setup();
+
+    mockUseTeamFilter.mockReturnValue({
+      selectedTeam: null,
+      setSelectedTeam: jest.fn(),
+      teamScope: { mode: "all_teams" },
+      effectiveTeams: [],
+      hasNoTeamScope: false,
+      isViewingAllTeams: true,
+      isViewingAsEscalationTeam: false,
+      hasFullAccess: true,
+      allTeams: [],
+      initialized: true,
+    });
+
+    mockUseEscalations.mockReturnValue({
+      data: {
+        page: 0,
+        totalPages: 1,
+        totalElements: 1,
+        content: [
+          {
+            id: "esc-old",
+            ticketId: "T-OLD",
+            escalatingTeam: "Tenant Alpha",
+            team: { name: "Escalation Team 1" },
+            impact: "high",
+            tags: [],
+            openedAt: daysAgo(100),
+            resolvedAt: null,
+            hasThread: false,
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof hooks.useEscalations>);
+
+    render(<EscalationsPage />, { wrapper: Wrapper });
+
+    // Hidden under the default "Last Week" filter.
+    expect(screen.queryByText("T-OLD")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("escalations-date-filter"));
+    await user.click(await screen.findByRole("option", { name: "Any Date" }));
+
+    // The selection must stick and reveal the old escalation.
+    expect(screen.getByTestId("escalations-date-filter")).toHaveTextContent("Any Date");
+    expect(screen.getByText("T-OLD")).toBeInTheDocument();
   });
 
   it("hides team scope controls and context labels when user has no backend team scope", () => {

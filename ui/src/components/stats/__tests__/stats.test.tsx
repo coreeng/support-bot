@@ -8,6 +8,7 @@
  * - Loading and error states
  */
 
+import { useMockUrlParams as mockUseUrlParams } from "@/test-utils/mock-url-params";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import React from "react";
@@ -29,14 +30,7 @@ jest.mock("../../../contexts/TeamFilterContext");
 // test interactions that fire events and then inspect API call arguments.
 jest.mock("../../../lib/hooks/useUrlParams", () => ({
   ...jest.requireActual("../../../lib/hooks/useUrlParams"),
-  useUrlParams: (defaults: Record<string, string>) => {
-    const { useState } = require("react") as typeof import("react");
-    const [params, setParamsState] = useState<Record<string, string>>(defaults);
-    const setParams = (updates: Record<string, string>) => {
-      setParamsState((prev: Record<string, string>) => ({ ...prev, ...updates }));
-    };
-    return [params, setParams];
-  },
+  useUrlParams: mockUseUrlParams,
 }));
 
 // Mock EscalatedToMyTeamWidget
