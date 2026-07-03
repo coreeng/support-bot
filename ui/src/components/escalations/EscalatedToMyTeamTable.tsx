@@ -8,7 +8,7 @@ import { SingleSelectFilter } from "@/components/ui/single-select-filter";
 import { useTeamFilter } from "@/contexts/TeamFilterContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useNow } from "@/hooks/useNow";
-import { getDateRangeFromFilter, PRESET_DAYS } from "@/lib/dateRange";
+import { DateFilter, getDateRangeFromFilter, PRESET_DAYS } from "@/lib/dateRange";
 import { useEscalations, useRegistry } from "@/lib/hooks";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -23,7 +23,6 @@ export default function EscalatedToMyTeamTable() {
   const [statusFilter, setStatusFilter] = useState<"all" | "ongoing" | "resolved">("all");
   const [impactFilter, setImpactFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("");
-  type DateFilter = "" | "lastWeek" | "last2Weeks" | "lastMonth" | "custom";
   const [dateFilter, setDateFilter] = useState<DateFilter>("lastWeek");
   const [customDateRange, setCustomDateRange] = useState<{ start?: string; end?: string }>({});
   type SortColumn = "ticketId" | "openedAt" | "resolvedAt" | "duration";
@@ -32,8 +31,8 @@ export default function EscalatedToMyTeamTable() {
   const [pageIndex, setPageIndex] = useState(0);
   const pageSize = 15;
 
-  // Empty string (= "Any Date") is not in presetDays so falls through to
-  // { from: undefined, to: undefined } inside getDateRangeFromFilter, which is correct.
+  // "all" (= "Any Date") maps to { from: undefined, to: undefined } via allValue,
+  // i.e. no date filtering.
   const dateRange = useMemo(
     () =>
       getDateRangeFromFilter({
@@ -41,6 +40,7 @@ export default function EscalatedToMyTeamTable() {
         customDateRange,
         customValue: "custom",
         fallbackValue: "lastWeek",
+        allValue: "all",
         presetDays: {
           lastWeek: PRESET_DAYS.lastWeek,
           last2Weeks: PRESET_DAYS.last2Weeks,
@@ -178,10 +178,6 @@ export default function EscalatedToMyTeamTable() {
   if (isLoading) return <p>Loading...</p>;
   if (error) return <p className="text-destructive">Error loading escalations</p>;
 
-  const ANY_DATE = "__any";
-  const fromAny = (v: string) => (v === ANY_DATE ? "" : v);
-  const toAny = (v: string) => (v === "" ? ANY_DATE : v);
-
   return (
     <div className="bg-card space-y-4 rounded-xl border p-6">
       <div className="flex items-start justify-between gap-4">
@@ -191,9 +187,9 @@ export default function EscalatedToMyTeamTable() {
         </div>
         <div className="flex items-center gap-2">
           <Select
-            value={toAny(dateFilter)}
-            onValueChange={(v) => {
-              setDateFilter(fromAny(v) as DateFilter);
+            value={dateFilter}
+            onValueChange={(v: string) => {
+              setDateFilter(v as DateFilter);
               setPageIndex(0);
             }}
           >
@@ -201,7 +197,7 @@ export default function EscalatedToMyTeamTable() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ANY_DATE}>Any Date</SelectItem>
+              <SelectItem value="all">Any Date</SelectItem>
               <SelectItem value="lastWeek">Last Week</SelectItem>
               <SelectItem value="last2Weeks">Last 2 Weeks</SelectItem>
               <SelectItem value="lastMonth">Last Month</SelectItem>

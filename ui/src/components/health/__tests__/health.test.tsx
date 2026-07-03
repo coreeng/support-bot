@@ -7,6 +7,7 @@
  * - Loading and error states
  */
 
+import { useMockUrlParams as mockUseUrlParams } from "@/test-utils/mock-url-params";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
@@ -34,14 +35,7 @@ jest.mock("../../../lib/hooks");
 // changes re-render the component correctly, keeping all existing interactions intact.
 jest.mock("../../../lib/hooks/useUrlParams", () => ({
   ...jest.requireActual("../../../lib/hooks/useUrlParams"),
-  useUrlParams: (defaults: Record<string, string>) => {
-    const { useState } = require("react") as typeof import("react");
-    const [params, setParamsState] = useState<Record<string, string>>(defaults);
-    const setParams = (updates: Record<string, string>) => {
-      setParamsState((prev: Record<string, string>) => ({ ...prev, ...updates }));
-    };
-    return [params, setParams];
-  },
+  useUrlParams: mockUseUrlParams,
 }));
 
 const mockUseTickets = hooks.useTickets as jest.MockedFunction<typeof hooks.useTickets>;

@@ -1,3 +1,4 @@
+import { useMockUrlParams as mockUseUrlParams } from "@/test-utils/mock-url-params";
 import { fireEvent, render, screen } from "@testing-library/react";
 import DashboardsPage from "../dashboards";
 
@@ -23,14 +24,7 @@ jest.mock("../../../contexts/TeamFilterContext", () => ({
 // changes re-render the component correctly.
 jest.mock("../../../lib/hooks/useUrlParams", () => ({
   ...jest.requireActual("../../../lib/hooks/useUrlParams"),
-  useUrlParams: (defaults: Record<string, string>) => {
-    const { useState } = require("react") as typeof import("react");
-    const [params, setParamsState] = useState<Record<string, string>>(defaults);
-    const setParams = (updates: Record<string, string>) => {
-      setParamsState((prev: Record<string, string>) => ({ ...prev, ...updates }));
-    };
-    return [params, setParams];
-  },
+  useUrlParams: mockUseUrlParams,
 }));
 
 jest.mock("../../../lib/hooks", () => ({

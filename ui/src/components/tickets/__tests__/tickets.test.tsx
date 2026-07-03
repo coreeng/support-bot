@@ -1,5 +1,7 @@
+import { useMockUrlParams as mockUseUrlParams } from "@/test-utils/mock-url-params";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import React from "react";
 import * as hooks from "../../../lib/hooks";
 import Tickets from "../tickets";
@@ -12,14 +14,7 @@ jest.mock("../../../lib/hooks");
 // interactions that fire events and then inspect the rendered output intact.
 jest.mock("../../../lib/hooks/useUrlParams", () => ({
   ...jest.requireActual("../../../lib/hooks/useUrlParams"),
-  useUrlParams: (defaults: Record<string, string>) => {
-    const { useState } = require("react") as typeof import("react");
-    const [params, setParamsState] = useState<Record<string, string>>(defaults);
-    const setParams = (updates: Record<string, string>) => {
-      setParamsState((prev: Record<string, string>) => ({ ...prev, ...updates }));
-    };
-    return [params, setParams];
-  },
+  useUrlParams: mockUseUrlParams,
 }));
 
 const mockUseTickets = hooks.useTickets as jest.MockedFunction<typeof hooks.useTickets>;
@@ -170,6 +165,39 @@ describe("Tickets Component", () => {
       isLoading: false,
       error: null,
     } as unknown as ReturnType<typeof hooks.useAssignmentEnabled>);
+  });
+
+  describe("Date filter", () => {
+    // Regression: "Any Date" used to be represented by an empty-string dateFilter,
+    // which the real useUrlParams strips from the URL — the filter silently
+    // snapped back to the default "Last Week" and kept the bounded date range.
+    it('requests an unbounded date range when "Any Date" is selected', async () => {
+      const user = userEvent.setup();
+      const mockTickets = getMockPaginatedTickets([createMockTicket("1", "opened", "Team A", "high")]);
+
+      mockUseTickets.mockReturnValue({
+        data: mockTickets,
+        isLoading: false,
+        error: null,
+      } as unknown as ReturnType<typeof hooks.useTickets>);
+
+      render(<Tickets />, { wrapper: Wrapper });
+
+      // Default "Last Week" filter passes a bounded range to the backend hook.
+      let [, , dateFrom, dateTo] = mockUseTickets.mock.lastCall ?? [];
+      expect(dateFrom).toEqual(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
+      expect(dateTo).toEqual(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
+
+      // The date Select is the only combobox on the page (faceted filters are buttons).
+      await user.click(screen.getByRole("combobox"));
+      await user.click(await screen.findByRole("option", { name: "Any Date" }));
+
+      // The selection must stick and drop the date bounds from the backend query.
+      expect(screen.getByRole("combobox")).toHaveTextContent("Any Date");
+      [, , dateFrom, dateTo] = mockUseTickets.mock.lastCall ?? [];
+      expect(dateFrom).toBeUndefined();
+      expect(dateTo).toBeUndefined();
+    });
   });
 
   describe("Rendering", () => {
