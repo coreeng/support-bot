@@ -507,6 +507,29 @@ class GitLabPrSourceClientTest {
     }
 
     @Test
+    void fetchPullRequestLeavesCodeownersUnknownWhenApprovalStateFetchFails() {
+        // approval_state 403s/404s on GitLab tiers/instances without Code Owners (e.g. non-Premium) or on
+        // any other transport failure. The gate must fail closed exactly like the no-gating-rule case
+        // above — not throw and strand the poll, and not vacuously open the merge gate.
+        CodeownerHarness h = codeownerHarness();
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/55"))
+                .andRespond(withSuccess(openMergeableMr(55), MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/55/approvals"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        h.server()
+                .expect(requestTo(API + "/projects/" + REPO_ENC + "/merge_requests/55/approval_state"))
+                .andRespond(withStatus(org.springframework.http.HttpStatus.FORBIDDEN));
+
+        PrMetadata md = h.client().fetchPullRequest(RepoCoord.gitlab(REPO), 55);
+
+        assertThat(md.codeOwnersApproved()).isNull();
+        assertThat(md.codeOwnerReviewers()).isEmpty();
+        h.server().verify();
+    }
+
+    @Test
     void fetchPullRequestTreatsVacuousZeroApprovalsRuleAsNonGating() {
         // A code_owner rule with approvals_required=0 is approved=true with zero approvals — GitLab reports
         // this when the target branch doesn't require code-owner approval, or the CODEOWNERS entry names no
