@@ -49,19 +49,11 @@ public class GitHubPrSourceClient implements PrSourceClient {
             // extra GraphQL call on every other repo.
             //
             // codeOwnersApproved is a deliberate tri-state:
-            //   true  — the gate is satisfied: a *successful* GraphQL query returned no pending asCodeOwner
-            //           review request. That's true both when the PR's changed paths need no code-owner
-            //           review at all (reviewRequests never had one) and when every required code owner has
-            //           already approved (their request was resolved and dropped off reviewRequests) — either
-            //           way the PR should advance to the merge phase, not stall in OPEN. This is deliberately
-            //           NOT keyed off reviewDecision alone: reviewDecision is GitHub's aggregate across BOTH
-            //           "require code-owner review" AND any separately configured minimum-approval-count rule,
-            //           so a repo with both (a very common combination) reports REVIEW_REQUIRED for a PR that
-            //           touches zero owned paths, purely because the generic approval count isn't met yet.
-            //           Reading that as "code owner review outstanding" was a real bug: the tenant was told
-            //           to wait on code owners who were never in the loop.
-            //   false — a code-owner review request is still pending (reviewRequests non-empty), or the code
-            //           owner's aggregate decision is CHANGES_REQUESTED.
+            //   true  — the gate is satisfied: a *successful* GraphQL query returned either APPROVED (every
+            //           required code owner approved) or no reviewDecision at all. GitHub reports no
+            //           reviewDecision when the PR's changed paths require no code-owner review, so the gate
+            //           doesn't apply and the PR should advance to the merge phase, not stall in OPEN.
+            //   false — a required code-owner review is still outstanding (REVIEW_REQUIRED / CHANGES_REQUESTED).
             //   null  — not applicable / unknown: not a code-owner repo, a closed PR, no GraphQL client, or
             //           the query FAILED. A failed query must stay null (never read as "no review required"),
             //           so the lifecycle keeps chasing the code owner and retries next poll rather than
@@ -69,24 +61,21 @@ public class GitHubPrSourceClient implements PrSourceClient {
             //
             // Note the deliberate asymmetry with GitLabPrSourceClient, which fails *closed* on the analogous
             // "no code_owner rule" case: there an empty rule set usually means the instance lacks Code Owners
-            // (CE/Free) rather than a per-PR "no owned paths", whereas GitHub's reviewRequests is a
+            // (CE/Free) rather than a per-PR "no owned paths", whereas GitHub's successful reviewDecision is a
             // definitive per-PR signal we can trust.
             Boolean codeOwnersApproved = null;
             // A code owner requesting changes (reviewDecision == CHANGES_REQUESTED) is a distinct signal from
-            // the gate being merely unsatisfied (pending reviewRequests): the lifecycle surfaces the former to
-            // the tenant as CHANGES_REQUESTED and pauses/holds accordingly, while the latter just waits. Note
-            // reviewDecision is still an aggregate here too — a non-code-owner's changes-requested review on a
-            // repo that also has a minimum-approval-count rule would likewise flip this, mislabeling it as a
-            // code owner's ask. GitHub's API exposes asCodeOwner only on *pending* review requests, not on
-            // submitted reviews, so there's no per-review signal to disambiguate that case; left as a known,
-            // narrower residual gap.
+            // the gate being merely unsatisfied (REVIEW_REQUIRED): the lifecycle surfaces the former to the
+            // tenant as CHANGES_REQUESTED and pauses/holds accordingly, while the latter just waits. It is
+            // the *aggregate* code-owner decision, so — unlike a raw REST review — a non-code-owner drive-by
+            // never flips it.
             boolean codeownerChangesRequested = false;
             if (graphQlClient != null && pr.isOpen() && requiresCodeowners) {
                 GitHubGraphQlClient.CodeownerReview review = graphQlClient.fetchCodeownerReview(coord.name(), prNumber);
                 if (review != null) {
                     pr = pr.withCodeownerReview(review.reviewDecision(), review.codeOwnerReviewers());
-                    codeOwnersApproved = review.codeOwnerReviewers().isEmpty()
-                            && review.reviewDecision() != GitHubPullRequest.ReviewDecision.CHANGES_REQUESTED;
+                    codeOwnersApproved = review.reviewDecision() == null
+                            || review.reviewDecision() == GitHubPullRequest.ReviewDecision.APPROVED;
                     codeownerChangesRequested =
                             review.reviewDecision() == GitHubPullRequest.ReviewDecision.CHANGES_REQUESTED;
                 }

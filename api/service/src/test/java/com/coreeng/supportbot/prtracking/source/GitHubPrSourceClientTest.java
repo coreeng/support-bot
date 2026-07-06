@@ -8,7 +8,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.coreeng.supportbot.config.PrTrackingProps;
-import com.coreeng.supportbot.github.CodeOwnerReviewer;
 import com.coreeng.supportbot.github.GitHubClient;
 import com.coreeng.supportbot.github.GitHubGraphQlClient;
 import com.coreeng.supportbot.github.GitHubPullRequest;
@@ -19,10 +18,9 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
- * Focuses on how {@link GitHubPrSourceClient} maps GitHub's GraphQL {@code reviewRequests} /
- * {@code reviewDecision} onto the tri-state {@code codeOwnersApproved} gate: a successful query with no
- * pending code-owner request is a satisfied gate — whether because none was ever required or because it
- * was already resolved — but a failed query must stay unresolved.
+ * Focuses on how {@link GitHubPrSourceClient} maps GitHub's GraphQL {@code reviewDecision} onto the
+ * tri-state {@code codeOwnersApproved} gate (finding #3): a successful query with no required review is a
+ * satisfied gate, but a failed query must stay unresolved.
  */
 class GitHubPrSourceClientTest {
 
@@ -37,54 +35,28 @@ class GitHubPrSourceClientTest {
     void mapsApprovedReviewDecisionToGateSatisfied() {
         GitHubPrSourceClient client = codeownerClient();
         stubOpenPr();
-        stubReview(GitHubPullRequest.ReviewDecision.APPROVED, List.of());
+        stubReview(GitHubPullRequest.ReviewDecision.APPROVED);
 
         assertThat(client.fetchPullRequest(COORD, PR).codeOwnersApproved()).isTrue();
     }
 
     @Test
     void treatsNoRequiredReviewAsGateSatisfied() {
-        // reviewDecision == null from a *successful* query = GitHub requires no review at all for this PR
-        // (no min-approval-count rule, no owned paths touched). The gate doesn't apply, so it's satisfied
-        // and the PR can advance to the merge phase instead of stalling in OPEN forever.
+        // reviewDecision == null from a *successful* query = GitHub requires no code-owner review for this
+        // PR's changed paths. The gate doesn't apply, so it's satisfied and the PR can advance to the merge
+        // phase instead of stalling in OPEN forever (finding #3).
         GitHubPrSourceClient client = codeownerClient();
         stubOpenPr();
-        stubReview(null, List.of());
+        stubReview(null);
 
         assertThat(client.fetchPullRequest(COORD, PR).codeOwnersApproved()).isTrue();
     }
 
     @Test
-    void treatsReviewRequiredWithNoOwnedPathsAsGateSatisfied() {
-        // A repo can combine "require code-owner review" with a separate minimum-approval-count rule.
-        // reviewDecision is GitHub's aggregate across BOTH, so it reports REVIEW_REQUIRED even for a PR that
-        // touches zero owned paths, purely because the generic approval count isn't met yet. reviewRequests
-        // is the more precise signal here: it's empty because no code-owner review was ever requested for
-        // this diff, so the code-owner gate itself is satisfied (real-world repro: a PR touching only a path
-        // CODEOWNERS explicitly excludes still showed reviewDecision REVIEW_REQUIRED).
+    void mapsOutstandingReviewToNotSatisfied() {
         GitHubPrSourceClient client = codeownerClient();
         stubOpenPr();
-        stubReview(GitHubPullRequest.ReviewDecision.REVIEW_REQUIRED, List.of());
-
-        assertThat(client.fetchPullRequest(COORD, PR).codeOwnersApproved()).isTrue();
-    }
-
-    @Test
-    void mapsPendingCodeOwnerRequestToNotSatisfied() {
-        GitHubPrSourceClient client = codeownerClient();
-        stubOpenPr();
-        stubReview(
-                GitHubPullRequest.ReviewDecision.REVIEW_REQUIRED,
-                List.of(new CodeOwnerReviewer(false, "some-code-owner", null)));
-
-        assertThat(client.fetchPullRequest(COORD, PR).codeOwnersApproved()).isFalse();
-    }
-
-    @Test
-    void mapsChangesRequestedToNotSatisfied() {
-        GitHubPrSourceClient client = codeownerClient();
-        stubOpenPr();
-        stubReview(GitHubPullRequest.ReviewDecision.CHANGES_REQUESTED, List.of());
+        stubReview(GitHubPullRequest.ReviewDecision.REVIEW_REQUIRED);
 
         assertThat(client.fetchPullRequest(COORD, PR).codeOwnersApproved()).isFalse();
     }
@@ -130,13 +102,12 @@ class GitHubPrSourceClientTest {
                         "author"));
     }
 
-    // A null decision models GitHub's "no review required at all" response; NullAway can't see the
+    // A null decision models GitHub's "no code-owner review required" response; NullAway can't see the
     // record component's type-use @Nullable on CodeownerReview's constructor across compilation units.
     @SuppressWarnings("NullAway")
-    private void stubReview(
-            GitHubPullRequest.@Nullable ReviewDecision decision, List<CodeOwnerReviewer> pendingCodeOwners) {
+    private void stubReview(GitHubPullRequest.@Nullable ReviewDecision decision) {
         when(graphQlClient.fetchCodeownerReview(REPO, PR))
-                .thenReturn(new GitHubGraphQlClient.CodeownerReview(decision, pendingCodeOwners));
+                .thenReturn(new GitHubGraphQlClient.CodeownerReview(decision, List.of()));
     }
 
     private static PrTrackingProps props(boolean requiresCodeowners) {

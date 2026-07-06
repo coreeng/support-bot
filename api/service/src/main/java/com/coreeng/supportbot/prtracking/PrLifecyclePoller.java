@@ -101,6 +101,7 @@ public class PrLifecyclePoller {
         }
 
         PrTrackingProps.@Nullable Repository repoConfig = findRepoConfig(record.provider(), record.repo());
+        record = withCodeownerReviewRequestedIfNewlySeen(record, repoConfig, pr);
 
         if (pr.isClosed()) {
             // Closed/merged PRs skip team-filtering and activity-timestamp updates: the verdict is
@@ -132,6 +133,22 @@ public class PrLifecyclePoller {
                 .filter(r -> r.provider() == provider && r.name().equalsIgnoreCase(repo))
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * Sticky-latches {@code codeownerReviewRequested} the first time this poll observes a genuinely
+     * pending code-owner review request ({@code pr.codeOwnerReviewers()} non-empty) — see {@link
+     * #observe} for why this needs to persist across polls rather than being re-derived each time.
+     * A no-op (no write, same record returned) once already set, for a non-codeowner repo, or when
+     * nothing is currently pending.
+     */
+    private PrTrackingRecord withCodeownerReviewRequestedIfNewlySeen(
+            PrTrackingRecord record, PrTrackingProps.@Nullable Repository repoConfig, PrMetadata pr) {
+        boolean requiresCodeowners = repoConfig != null && repoConfig.requiresCodeowners();
+        if (!requiresCodeowners || record.codeownerReviewRequested() || pr.codeOwnerReviewers().isEmpty()) {
+            return record;
+        }
+        return prTrackingRepository.markCodeownerReviewRequested(record.id());
     }
 
     // ── Functional core wiring ──
@@ -167,7 +184,7 @@ public class PrLifecyclePoller {
         Instant deadline = record.slaDeadline();
         Duration remainingForPause = deadline == null ? null : clampNonNegative(Duration.between(now, deadline));
         boolean slaBreached = deadline != null && now.isAfter(deadline);
-        boolean codeownerApproved = Boolean.TRUE.equals(pr.codeOwnersApproved());
+        boolean codeownerApproved = codeownerApproved(record, pr, requiresCodeowners);
         return new PrLifecycle.Observation(
                 record.status(),
                 verdict,
@@ -180,6 +197,41 @@ public class PrLifecyclePoller {
                 record.slaRemaining(),
                 requiresCodeowners,
                 codeownerApproved);
+    }
+
+    /**
+     * Resolves whether the code-owner gate is satisfied, disambiguating a case the provider's
+     * aggregate decision alone can't: {@code pr.codeOwnersApproved()} (GitHub {@code reviewDecision})
+     * conflates "require code-owner review" with any separately configured minimum-approval-count
+     * rule, so a repo with both reports the *unsatisfied* aggregate for a PR whose paths need no
+     * code-owner review at all, purely because the generic approval count isn't met yet.
+     *
+     * <ol>
+     *   <li>A currently pending code-owner request ({@code pr.codeOwnerReviewers()} non-empty) is
+     *       always outstanding — {@code false}, no ambiguity.
+     *   <li>No pending request, and none has ever been observed for this record ({@code
+     *       record.codeownerReviewRequested()} still false after {@link
+     *       #withCodeownerReviewRequestedIfNewlySeen}) — code-owner review has never applied to this
+     *       PR's paths, so the gate doesn't apply: {@code true}, regardless of what the aggregate
+     *       decision says.
+     *   <li>No pending request, but one was observed on an earlier poll — a genuine code-owner
+     *       approval once satisfied the gate and may since have been dismissed or invalidated by a
+     *       later push (GitHub does NOT restore a dismissed reviewer to {@code reviewRequests} —
+     *       confirmed by hand against a real PR, not merely assumed). Trust the raw provider
+     *       aggregate here: {@code true} only on an actual {@code APPROVED}/inapplicable read.
+     * </ol>
+     */
+    private boolean codeownerApproved(PrTrackingRecord record, PrMetadata pr, boolean requiresCodeowners) {
+        if (!requiresCodeowners) {
+            return false;
+        }
+        if (!pr.codeOwnerReviewers().isEmpty()) {
+            return false;
+        }
+        if (!record.codeownerReviewRequested()) {
+            return true;
+        }
+        return Boolean.TRUE.equals(pr.codeOwnersApproved());
     }
 
     /**

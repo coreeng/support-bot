@@ -20,6 +20,7 @@ import com.coreeng.supportbot.enums.EscalationTeamsRegistry;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationId;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
+import com.coreeng.supportbot.prtracking.source.CodeOwnerRef;
 import com.coreeng.supportbot.prtracking.source.PrMetadata;
 import com.coreeng.supportbot.prtracking.source.PrSourceClient;
 import com.coreeng.supportbot.prtracking.source.PrSourceClients;
@@ -118,6 +119,9 @@ class PrLifecyclePollerTest {
                 .when(prTrackingRepository.startSla(anyLong(), any(), any()))
                 .thenAnswer(
                         inv -> register(withStart(known(inv.getArgument(0)), inv.getArgument(1), inv.getArgument(2))));
+        lenient()
+                .when(prTrackingRepository.markCodeownerReviewRequested(anyLong()))
+                .thenAnswer(inv -> register(withCodeownerReviewRequested(known(inv.getArgument(0)))));
     }
 
     private PrTrackingRecord register(PrTrackingRecord record) {
@@ -153,7 +157,8 @@ class PrLifecyclePollerTest {
                 closedAt,
                 closed ? null : base.slaRemaining(),
                 base.lastReviewAt(),
-                base.lastAuthorActivityAt());
+                base.lastAuthorActivityAt(),
+                base.codeownerReviewRequested());
     }
 
     private static PrTrackingRecord withPause(PrTrackingRecord base, PrTrackingStatus status, Duration remaining) {
@@ -172,7 +177,8 @@ class PrLifecyclePollerTest {
                 base.closedAt(),
                 remaining,
                 base.lastReviewAt(),
-                base.lastAuthorActivityAt());
+                base.lastAuthorActivityAt(),
+                base.codeownerReviewRequested());
     }
 
     private static PrTrackingRecord withResume(PrTrackingRecord base, Instant newDeadline) {
@@ -191,7 +197,8 @@ class PrLifecyclePollerTest {
                 base.closedAt(),
                 null,
                 base.lastReviewAt(),
-                base.lastAuthorActivityAt());
+                base.lastAuthorActivityAt(),
+                base.codeownerReviewRequested());
     }
 
     private static PrTrackingRecord withStart(PrTrackingRecord base, PrTrackingStatus status, Instant newDeadline) {
@@ -210,7 +217,28 @@ class PrLifecyclePollerTest {
                 base.closedAt(),
                 null,
                 base.lastReviewAt(),
-                base.lastAuthorActivityAt());
+                base.lastAuthorActivityAt(),
+                base.codeownerReviewRequested());
+    }
+
+    private static PrTrackingRecord withCodeownerReviewRequested(PrTrackingRecord base) {
+        return new PrTrackingRecord(
+                base.id(),
+                base.ticketId(),
+                base.provider(),
+                base.repo(),
+                base.prNumber(),
+                base.prCreatedAt(),
+                base.slaDeadline(),
+                base.owningTeam(),
+                base.canAutoCloseTicket(),
+                base.status(),
+                base.escalationId(),
+                base.closedAt(),
+                base.slaRemaining(),
+                base.lastReviewAt(),
+                base.lastAuthorActivityAt(),
+                true);
     }
 
     // ── Existing behaviour (PR closed/merged, escalation) ──
@@ -1711,6 +1739,36 @@ class PrLifecyclePollerTest {
         }
 
         @Test
+        void prWithNoOwnedPathsAdvancesToAwaitingMergeDespiteUnsatisfiedAggregateDecision() {
+            // given — regression test: a repo combining "require code-owner review" with a separate
+            // minimum-approval-count rule reports the aggregate decision as unsatisfied (codeownersApproved
+            // =false, mirroring GitHub reviewDecision=REVIEW_REQUIRED) for ANY PR that hasn't met the generic
+            // approval count yet — including one whose changed paths match no CODEOWNERS rule at all, so no
+            // code-owner review request was ever created (empty pendingCodeOwners) and none has ever been
+            // observed for this record. The gate must not read that as "code-owner review outstanding": it
+            // never applied to this PR's paths, so the record advances to AWAITING_MERGE regardless of what
+            // the aggregate says. (Verified against a real repo — see coreeng-dev/code-owner PR #5 — before
+            // this test was written.)
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = record(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null);
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithPendingReview(record, true, false, false, List.of(), List.of()));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+            when(slaLookup.getSla(eq(repoConfig), any(RepoCoord.class), eq(record.prNumber())))
+                    .thenReturn(Duration.ofHours(6));
+
+            // when
+            poller.poll();
+
+            // then — advances to AWAITING_MERGE, not held in OPEN.
+            verify(prTrackingRepository)
+                    .startSla(eq(record.id()), eq(PrTrackingStatus.AWAITING_MERGE), any(Instant.class));
+            verify(prTrackingRepository, never()).updateStatus(anyLong(), eq(PrTrackingStatus.ESCALATED), any(), any());
+        }
+
+        @Test
         void driveByChangesRequestedDoesNotBlockOrNotifyWhenGateIsOpen() {
             // given — a code-owner repo with no github-team-slug, so reviews are NOT team-filtered (the
             // requested-team lookup is skipped). Code owners have approved (aggregate reviewDecision=APPROVED,
@@ -1747,14 +1805,21 @@ class PrLifecyclePollerTest {
             // given — same repo shape, but the code owners have NOT approved yet (gate closed) and none has
             // requested changes (codeownerChangesRequested=false). A drive-by raw CHANGES_REQUESTED review
             // must not surface as a tenant notification or a status change: the record simply holds in OPEN
-            // with the clock held, waiting on the code owners.
+            // with the clock held, waiting on the code owners. A real, still-pending code-owner request is
+            // modeled explicitly (a non-empty pendingCodeOwners list) — otherwise this is indistinguishable
+            // from "code-owner review never applied here" and would wrongly advance to AWAITING_MERGE.
             PrLifecyclePoller poller = createPoller();
             PrTrackingRecord record = record(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null);
             PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
-                    .thenReturn(codeownerPrWithReviews(
-                            record, true, false, List.of(review(Review.ReviewState.CHANGES_REQUESTED))));
+                    .thenReturn(codeownerPrWithPendingReview(
+                            record,
+                            true,
+                            false,
+                            false,
+                            List.of(review(Review.ReviewState.CHANGES_REQUESTED)),
+                            List.of(new CodeOwnerRef(CodeOwnerRef.Kind.USER, "owner1", null))));
             when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
 
             // when
@@ -1799,14 +1864,19 @@ class PrLifecyclePollerTest {
             // approval is then revoked (a push dismissed it → codeOwnersApproved=false, no changes-requested)
             // while the PR stays mergeable. It must leave AWAITING_MERGE for OPEN with the merge clock paused,
             // NOT keep running and merge-escalate a PR that now needs code-owner re-review.
+            //
+            // codeownerReviewRequested=true models that a genuine code-owner request was seen on an earlier
+            // poll (confirmed empirically: GitHub does NOT restore a dismissed reviewer to reviewRequests).
+            // Without it, this is indistinguishable from "code-owner review never applied to this PR's
+            // paths" and the record would wrongly stay in AWAITING_MERGE instead of returning to OPEN.
             PrLifecyclePoller poller = createPoller();
-            PrTrackingRecord record = record(
+            PrTrackingRecord record = register(withCodeownerReviewRequested(record(
                     1L,
                     100L,
                     "my-org/repo-a",
                     11,
                     PrTrackingStatus.AWAITING_MERGE,
-                    Instant.now().plus(Duration.ofHours(6)));
+                    Instant.now().plus(Duration.ofHours(6)))));
             PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
             when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
             when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
@@ -1855,6 +1925,24 @@ class PrLifecyclePollerTest {
                 boolean codeownersApproved,
                 boolean codeownerChangesRequested,
                 List<Review> reviews) {
+            return codeownerPrWithPendingReview(
+                    record, mergeable, codeownersApproved, codeownerChangesRequested, reviews, List.of());
+        }
+
+        /**
+         * Like {@link #codeownerPrWithReviews}, but with an explicit pending-code-owner-request list —
+         * needed to model "a real code-owner review is genuinely still outstanding" once the poller
+         * disambiguates on it (see {@code PrLifecyclePoller#codeownerApproved}): an empty list plus
+         * {@code codeownersApproved=false} is otherwise indistinguishable from "code-owner review never
+         * applied to this PR's paths" and would be read as the gate being satisfied instead.
+         */
+        private PrMetadata codeownerPrWithPendingReview(
+                PrTrackingRecord record,
+                boolean mergeable,
+                boolean codeownersApproved,
+                boolean codeownerChangesRequested,
+                List<Review> reviews,
+                List<CodeOwnerRef> pendingCodeOwners) {
             return new PrMetadata(
                     RepoCoord.github(record.repo()),
                     record.prNumber(),
@@ -1866,7 +1954,7 @@ class PrLifecyclePollerTest {
                     null,
                     codeownersApproved,
                     codeownerChangesRequested,
-                    List.of());
+                    pendingCodeOwners);
         }
     }
 
