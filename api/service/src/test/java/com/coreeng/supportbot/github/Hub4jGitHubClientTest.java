@@ -443,6 +443,85 @@ class Hub4jGitHubClientTest {
     }
 
     @Test
+    void getPullRequestReturnsNullRequestedTeamLoginsWhenAnyTeamMembersCannotBeListed() throws IOException {
+        // given — two requested teams: one resolves, the other's member listing is forbidden (e.g. the token
+        // lacks org Members:Read, or the team is secret). The failure must degrade the PR fetch as a whole
+        // (not throw, so the PR stays tracked), but must NOT quietly return the resolvable team's members
+        // alone — that would look like a complete, authoritative set while actually excluding the forbidden
+        // team's members, wrongly filtering out a real review of theirs downstream in TeamReviewFilter.
+        TestPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
+
+        GHUser alice = mock(GHUser.class);
+        when(alice.getLogin()).thenReturn("alice");
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHUser> readable = mock(PagedIterable.class);
+        when(readable.toList()).thenReturn(List.of(alice));
+        GHTeam readableTeam = mock(GHTeam.class);
+        when(readableTeam.listMembers()).thenReturn(readable);
+
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHUser> forbidden = mock(PagedIterable.class);
+        when(forbidden.toList()).thenThrow(new IOException("403 Forbidden"));
+        GHTeam forbiddenTeam = mock(GHTeam.class);
+        when(forbiddenTeam.getName()).thenReturn("secret-team");
+        when(forbiddenTeam.listMembers()).thenReturn(forbidden);
+
+        pr.testRequestedTeams = List.of(readableTeam, forbiddenTeam);
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then — the PR is still returned (fetch doesn't throw), but requestedTeamReviewerLogins is null:
+        // "unresolved", not a confident partial list.
+        assertThat(result.requestedTeamReviewerLogins()).isNull();
+    }
+
+    @Test
+    void getPullRequestReturnsRequestedTeamLoginsWhenAllTeamsResolve() throws IOException {
+        // given — two requested teams, both resolve successfully: the union of their members is authoritative.
+        TestPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
+
+        GHUser alice = mock(GHUser.class);
+        when(alice.getLogin()).thenReturn("alice");
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHUser> teamAMembers = mock(PagedIterable.class);
+        when(teamAMembers.toList()).thenReturn(List.of(alice));
+        GHTeam teamA = mock(GHTeam.class);
+        when(teamA.listMembers()).thenReturn(teamAMembers);
+
+        GHUser bob = mock(GHUser.class);
+        when(bob.getLogin()).thenReturn("bob");
+        @SuppressWarnings("unchecked")
+        PagedIterable<GHUser> teamBMembers = mock(PagedIterable.class);
+        when(teamBMembers.toList()).thenReturn(List.of(bob));
+        GHTeam teamB = mock(GHTeam.class);
+        when(teamB.listMembers()).thenReturn(teamBMembers);
+
+        pr.testRequestedTeams = List.of(teamA, teamB);
+
+        // when
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42);
+
+        // then
+        assertThat(result.requestedTeamReviewerLogins()).containsExactlyInAnyOrder("alice", "bob");
+    }
+
+    @Test
+    void getPullRequestSkipsRequestedTeamResolutionWhenNotRequested() throws IOException {
+        // given — a requested team is present, but the caller opts out of resolving members.
+        TestPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);
+        pr.testRequestedTeams = List.of(mock(GHTeam.class));
+
+        // when — includeRequestedTeamMembers = false (e.g. a github-team-slug or requires-codeowners repo)
+        GitHubPullRequest result = client.getPullRequest("my-org/my-repo", 42, false);
+
+        // then — the requested-team path is skipped entirely: no member logins, and getRequestedTeams()
+        // (which would trigger the org Members:Read listMembers call) is never even consulted.
+        assertThat(result.requestedTeamReviewerLogins()).isEmpty();
+        assertThat(pr.requestedTeamsAccessCount).isZero();
+    }
+
+    @Test
     void getPullRequestThrowsOnReviewsIOException() throws IOException {
         // given
         TestPullRequest pr = stubOpenPullRequest("my-org/my-repo", 42);

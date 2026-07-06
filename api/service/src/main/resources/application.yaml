@@ -158,8 +158,8 @@ pr-review-tracking:
   #     github-team-slug: <slug>  # optional: GitHub team slug for review validation; when absent, falls back to PR requested teams
   #     exclude-author-teams:     # optional (#285): skip PRs whose Slack poster is in one of these platform teams (deny-list, by team code)
   #       - <team-code from enums.escalation-teams>
-  #     requires-codeowners: false  # optional: repo needs a codeowner approval before the owning team merges
-  #     codeowner-team: <slug>      # optional: team whose approval counts as the codeowner gate
+  #     requires-codeowners: false  # optional: gate the merge on code-owner approval (read from the provider:
+  #                                 # GitHub reviewDecision/asCodeOwner, GitLab approval_state code_owner rules)
   #     sla:
   #       file: ".pr-sla.yaml"  # optional: read SLA from this file in the repo
   #       default: 48h          # default SLA duration (required when file is not configured)

@@ -6,14 +6,40 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.coreeng.supportbot.prtracking.source.Provider;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
 class PrTrackingConfigValidationTest {
 
     private static final String DEFAULT_DURATION_UNIT = "days";
     private static final PrTrackingProps.SlaDiscovery DEFAULT_SLA_DISCOVERY =
             new PrTrackingProps.SlaDiscovery(Duration.ofHours(24));
+
+    @Test
+    void bindsPerRepoMessagesOverrideBlock() {
+        // Regression: Messages has two constructors; without @ConstructorBinding on the canonical one,
+        // Spring Boot's binder resolves no bind constructor and silently returns an unbound result, so a
+        // configured `messages:` block is dropped and every override reverts to the default text. Bind a
+        // real property map through the actual Binder and assert the block (incl. @Name kebab keys) survives.
+        Map<String, Object> source = new HashMap<>();
+        source.put("m.detected", "custom detected");
+        source.put("m.awaiting-merge", "custom awaiting merge");
+        source.put("m.merge-escalated", "custom merge escalated");
+
+        var bound = new Binder(new MapConfigurationPropertySource(source))
+                .bind("m", Bindable.of(PrTrackingProps.Messages.class));
+
+        assertThat(bound.isBound()).isTrue();
+        PrTrackingProps.Messages messages = bound.get();
+        assertThat(messages.detected()).isEqualTo("custom detected");
+        assertThat(messages.awaitingMerge()).isEqualTo("custom awaiting merge");
+        assertThat(messages.mergeEscalated()).isEqualTo("custom merge escalated");
+    }
 
     @Test
     void acceptsValidTokenModeWhenEnabled() {
@@ -96,6 +122,29 @@ class PrTrackingConfigValidationTest {
                         DEFAULT_SLA_DISCOVERY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("installation-id");
+    }
+
+    @Test
+    void rejectsNonNumericInstallationIdWhenAppModeEnabled() {
+        // given
+        PrTrackingProps.GitHub appNonNumericInstallation = new PrTrackingProps.GitHub(
+                PrTrackingProps.AuthMode.APP, "https://api.github.com", "", "12345", "12345abc", "pem");
+
+        // when / then
+        assertThatThrownBy(() -> new PrTrackingProps(
+                        true,
+                        "0 0 9-18 * * 1-5",
+                        "pr",
+                        List.of("tag"),
+                        "low",
+                        DEFAULT_DURATION_UNIT,
+                        List.of(validRepo()),
+                        appNonNumericInstallation,
+                        null,
+                        DEFAULT_SLA_DISCOVERY))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("installation-id")
+                .hasMessageContaining("12345abc");
     }
 
     @Test
@@ -1004,11 +1053,10 @@ class PrTrackingConfigValidationTest {
         assertThat(repo.excludeAuthorTeams()).isEmpty();
         assertThat(repo.requiresCodeowners()).isFalse();
         assertThat(repo.dynamicApprovals()).isFalse();
-        assertThat(repo.codeownerTeam()).isNull();
     }
 
     @Test
-    void acceptsExcludeAuthorTeamsAndCodeownerTeam() {
+    void acceptsExcludeAuthorTeams() {
         assertThatCode(() -> new PrTrackingProps.Repository(
                         "my-org/repo",
                         "wow",
@@ -1021,7 +1069,6 @@ class PrTrackingConfigValidationTest {
                         null,
                         List.of("platform-team"),
                         true,
-                        "codeowners-team",
                         false))
                 .doesNotThrowAnyException();
     }
@@ -1040,30 +1087,9 @@ class PrTrackingConfigValidationTest {
                         null,
                         List.of("platform-team", "  "),
                         false,
-                        null,
                         false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("exclude-author-teams[] must not be blank");
-    }
-
-    @Test
-    void rejectsBlankCodeownerTeam() {
-        assertThatThrownBy(() -> new PrTrackingProps.Repository(
-                        "my-org/repo",
-                        "wow",
-                        Provider.GITHUB,
-                        null,
-                        null,
-                        List.of(),
-                        sla(Duration.ofDays(2)),
-                        null,
-                        null,
-                        List.of(),
-                        false,
-                        "  ",
-                        false))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("codeownerTeam must not be blank");
     }
 
     @Test
@@ -1081,7 +1107,6 @@ class PrTrackingConfigValidationTest {
                         null,
                         List.of(),
                         false,
-                        null,
                         true))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dynamic-approvals is only valid when provider=gitlab");
@@ -1101,7 +1126,6 @@ class PrTrackingConfigValidationTest {
                         null,
                         List.of(),
                         false,
-                        null,
                         true))
                 .doesNotThrowAnyException();
     }

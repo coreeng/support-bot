@@ -2,6 +2,7 @@ package com.coreeng.supportbot.github;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
@@ -144,7 +145,19 @@ public final class Hub4jGitHubClient implements GitHubClient {
         }
     }
 
-    private List<String> resolveRequestedTeamMembers(GHPullRequest pr, String repositoryName, int pullNumber) {
+    /**
+     * Resolves the requested teams' members for the requested-team review fallback. Returns {@code null}
+     * — not a partial list — when any requested team's membership can't be listed (e.g. the token lacks
+     * org {@code Members: Read}, or the team is secret): a team-membership read can fail independently of
+     * the PR read, and degrading to the teams that <em>did</em> resolve would produce a set that looks
+     * authoritative but silently excludes the failed team's members, wrongly filtering out their real
+     * reviews. {@code null} signals "unresolved" to {@code TeamReviewFilter}, which — mirroring an
+     * explicit {@code github-team-slug} lookup failure — falls back to accepting all reviews rather than
+     * either aborting the whole PR fetch (which would drop the PR from tracking entirely) or trusting an
+     * incomplete membership set.
+     */
+    private @Nullable List<String> resolveRequestedTeamMembers(
+            GHPullRequest pr, String repositoryName, int pullNumber) {
         List<GHTeam> requestedTeams;
         try {
             requestedTeams = pr.getRequestedTeams();
@@ -157,25 +170,27 @@ public final class Hub4jGitHubClient implements GitHubClient {
         if (requestedTeams == null || requestedTeams.isEmpty()) {
             return List.of();
         }
-        return requestedTeams.stream()
-                .flatMap(team -> {
-                    try {
-                        return team.listMembers().toList().stream();
-                    } catch (IOException e) {
-                        throw new GitHubApiException(
-                                0,
-                                "GitHub API call failed listing members for requested team on %s#%d"
-                                        .formatted(repositoryName, pullNumber),
-                                e);
-                    }
-                })
-                .map(GHUser::getLogin)
-                .distinct()
-                .toList();
+        List<String> logins = new ArrayList<>();
+        for (GHTeam team : requestedTeams) {
+            try {
+                team.listMembers().toList().stream().map(GHUser::getLogin).forEach(logins::add);
+            } catch (IOException e) {
+                LOG.atWarn()
+                        .setCause(e)
+                        .addArgument(team::getName)
+                        .addArgument(() -> repositoryName)
+                        .addArgument(() -> pullNumber)
+                        .log(
+                                "Could not list members of requested team {} for {}#{}; requested-team-review fallback degraded to unresolved for this poll");
+                return null;
+            }
+        }
+        return logins.stream().distinct().toList();
     }
 
     @Override
-    public GitHubPullRequest getPullRequest(String repositoryName, int pullNumber) {
+    public GitHubPullRequest getPullRequest(
+            String repositoryName, int pullNumber, boolean includeRequestedTeamMembers) {
         try {
             GHPullRequest pr = github.getRepository(repositoryName).getPullRequest(pullNumber);
             Instant createdAt = instantFromHub4j((Object) pr.getCreatedAt());
@@ -206,10 +221,16 @@ public final class Hub4jGitHubClient implements GitHubClient {
             String mergeableState = pr.getMergeableState();
             GHUser author = pr.getUser();
             String authorLogin = author != null ? author.getLogin() : null;
-            List<String> requestedTeamReviewerLogins;
+            @Nullable List<String> requestedTeamReviewerLogins;
             List<GitHubPullRequestReview> reviews;
             if (prState == GitHubPullRequest.PrState.OPEN) {
-                requestedTeamReviewerLogins = resolveRequestedTeamMembers(pr, repositoryName, pullNumber);
+                // Resolving requested-team members needs org Members:Read and is only consumed by the
+                // requested-team review fallback. The caller skips it when that fallback won't run (an explicit
+                // github-team-slug, or a requires-codeowners repo whose gate is the GraphQL reviewDecision), so
+                // those repos never pay the lookup — or need the scope.
+                requestedTeamReviewerLogins = includeRequestedTeamMembers
+                        ? resolveRequestedTeamMembers(pr, repositoryName, pullNumber)
+                        : List.of();
                 reviews = pr.listReviews().toList().stream()
                         .filter(review -> review.getState() != GHPullRequestReviewState.PENDING)
                         .map(review -> mapReview(review, repositoryName, pullNumber))

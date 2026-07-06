@@ -9,10 +9,18 @@ stateDiagram-v2
     CHANGES_REQUESTED --> CLOSED : PR merged
     APPROVED --> CLOSED : PR merged
     ESCALATED --> CLOSED : PR merged
+    AWAITING_MERGE --> CLOSED : PR merged
+    MERGE_ESCALATED --> CLOSED : PR merged
     OPEN --> CLOSED : PR closed
     CHANGES_REQUESTED --> CLOSED : PR closed
     APPROVED --> CLOSED : PR closed
     ESCALATED --> CLOSED : PR closed
+    AWAITING_MERGE --> CLOSED : PR closed
+    MERGE_ESCALATED --> CLOSED : PR closed
+    OPEN --> AWAITING_MERGE : codeowner-approved + mergeable
+    CHANGES_REQUESTED --> AWAITING_MERGE : codeowner-approved + mergeable
+    APPROVED --> AWAITING_MERGE : codeowner-approved + mergeable
+    ESCALATED --> AWAITING_MERGE : codeowner-approved + mergeable
     OPEN --> CHANGES_REQUESTED : changes requested, live deadline
     OPEN --> CHANGES_REQUESTED : changes requested, no-SLA record
     OPEN --> OPEN : changes requested, SLA paused (notify only)
@@ -28,4 +36,13 @@ stateDiagram-v2
     ESCALATED --> CLOSED : approved + mergeable
     ESCALATED --> APPROVED : approved, not mergeable
     ESCALATED --> CHANGES_REQUESTED : changes requested
+    AWAITING_MERGE --> CHANGES_REQUESTED : changes requested, live deadline
+    AWAITING_MERGE --> CHANGES_REQUESTED : changes requested, no live deadline
+    AWAITING_MERGE --> OPEN : no longer approved/mergeable, live deadline
+    AWAITING_MERGE --> OPEN : no longer approved/mergeable, no live deadline
+    AWAITING_MERGE --> MERGE_ESCALATED : merge SLA breached
+    MERGE_ESCALATED --> CHANGES_REQUESTED : changes requested after escalation, live deadline
+    MERGE_ESCALATED --> CHANGES_REQUESTED : changes requested after escalation, no live deadline
+    MERGE_ESCALATED --> OPEN : no longer approved/mergeable, live deadline
+    MERGE_ESCALATED --> OPEN : no longer approved/mergeable, no live deadline
 ```
