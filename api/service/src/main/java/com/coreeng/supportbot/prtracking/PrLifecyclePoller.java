@@ -145,7 +145,9 @@ public class PrLifecyclePoller {
     private PrTrackingRecord withCodeownerReviewRequestedIfNewlySeen(
             PrTrackingRecord record, PrTrackingProps.@Nullable Repository repoConfig, PrMetadata pr) {
         boolean requiresCodeowners = repoConfig != null && repoConfig.requiresCodeowners();
-        if (!requiresCodeowners || record.codeownerReviewRequested() || pr.codeOwnerReviewers().isEmpty()) {
+        if (!requiresCodeowners
+                || record.codeownerReviewRequested()
+                || pr.codeOwnerReviewers().isEmpty()) {
             return record;
         }
         return prTrackingRepository.markCodeownerReviewRequested(record.id());
