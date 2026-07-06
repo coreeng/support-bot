@@ -211,6 +211,12 @@ public class PrLifecyclePoller {
      * <ol>
      *   <li>A currently pending code-owner request ({@code pr.codeOwnerReviewers()} non-empty) is
      *       always outstanding — {@code false}, no ambiguity.
+     *   <li>A {@code null} aggregate means the provider read failed or the gate is unknowable (GitHub
+     *       GraphQL error, GitLab CE/transport error — both source clients document null as
+     *       must-fail-closed), and on those paths the pending list is empty too. Absence of signal is
+     *       not evidence that code-owner review never applied, so hold the gate shut and let the next
+     *       poll retry. The ambiguity this method disambiguates always presents as a definite {@code
+     *       false} ({@code REVIEW_REQUIRED}), never {@code null}, so this costs nothing.
      *   <li>No pending request, and none has ever been observed for this record ({@code
      *       record.codeownerReviewRequested()} still false after {@link
      *       #withCodeownerReviewRequestedIfNewlySeen}) — code-owner review has never applied to this
@@ -228,6 +234,9 @@ public class PrLifecyclePoller {
             return false;
         }
         if (!pr.codeOwnerReviewers().isEmpty()) {
+            return false;
+        }
+        if (pr.codeOwnersApproved() == null) {
             return false;
         }
         if (!record.codeownerReviewRequested()) {

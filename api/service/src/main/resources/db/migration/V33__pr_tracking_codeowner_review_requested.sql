@@ -8,3 +8,12 @@
 -- poll's provider response, so it remembers the fact itself: set true the first time a pending
 -- code-owner request is observed, and never unset.
 alter table pr_tracking add column if not exists codeowner_review_requested boolean not null default false;
+
+-- Backfill: records already past the code-owner gate had their pending window before this column
+-- existed, and it can never recur (GitHub does not restore a dismissed reviewer to reviewRequests),
+-- so leaving them false would hand them the "never applied" reading forever — a post-upgrade push
+-- that dismisses a stale approval would then keep the merge clock running instead of returning the
+-- record to OPEN. Marking them true preserves exact pre-upgrade semantics (trust the aggregate
+-- decision): pre-V33 these states were only reachable via a genuine approved/inapplicable read, so
+-- this can never wrongly hold the gate open.
+update pr_tracking set codeowner_review_requested = true where status in ('AWAITING_MERGE', 'MERGE_ESCALATED');

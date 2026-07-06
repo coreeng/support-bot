@@ -1769,6 +1769,31 @@ class PrLifecyclePollerTest {
         }
 
         @Test
+        void failedProviderReadHoldsGateShutInsteadOfAdvancingToAwaitingMerge() {
+            // given — the code-owner signal could not be read at all (GitHub GraphQL error, GitLab CE/
+            // transport error): codeOwnersApproved=null AND an empty pending list, on a record whose
+            // sticky flag has never latched. Absence of signal is not evidence that code-owner review
+            // never applied to this PR's paths — both source clients document null as must-fail-closed —
+            // so the record must hold in OPEN and retry next poll, not advance and announce approval.
+            PrLifecyclePoller poller = createPoller();
+            PrTrackingRecord record = record(1L, 100L, "my-org/repo-a", 11, PrTrackingStatus.OPEN, null);
+            PrTrackingProps.Repository repoConfig = codeownerRepoConfig(Duration.ofHours(6));
+            when(prTrackingRepository.findAllActive()).thenReturn(List.of(record));
+            when(prSourceClient.fetchPullRequest(RepoCoord.github(record.repo()), record.prNumber()))
+                    .thenReturn(codeownerPrWithPendingReview(record, true, null, false, List.of(), List.of()));
+            when(prTrackingProps.repositories()).thenReturn(List.of(repoConfig));
+
+            // when
+            poller.poll();
+
+            // then — no transition of any kind and no notification: the gate stays shut until a
+            // successful read.
+            verify(prTrackingRepository, never()).startSla(anyLong(), any(), any());
+            verify(prTrackingRepository, never()).updateStatus(anyLong(), any(), any(), any());
+            verify(slackClient, never()).postMessage(any());
+        }
+
+        @Test
         void driveByChangesRequestedDoesNotBlockOrNotifyWhenGateIsOpen() {
             // given — a code-owner repo with no github-team-slug, so reviews are NOT team-filtered (the
             // requested-team lookup is skipped). Code owners have approved (aggregate reviewDecision=APPROVED,
@@ -1939,7 +1964,7 @@ class PrLifecyclePollerTest {
         private PrMetadata codeownerPrWithPendingReview(
                 PrTrackingRecord record,
                 boolean mergeable,
-                boolean codeownersApproved,
+                @Nullable Boolean codeownersApproved,
                 boolean codeownerChangesRequested,
                 List<Review> reviews,
                 List<CodeOwnerRef> pendingCodeOwners) {

@@ -765,6 +765,15 @@ public class PrDetectionService {
             return PerPrResult.SKIPPED;
         }
 
+        // Latch the sticky code-owner-request bit at insert time, not just from the poller: the pending
+        // window can close (approved then dismissed by a push) before the first poll ever runs — overnight
+        // or over a weekend under the default business-hours cron — and it never reopens (GitHub does not
+        // restore a dismissed reviewer to reviewRequests). Missing it here would permanently misread the
+        // record as "code-owner review never applied to this PR's paths" (see PrLifecyclePoller#observe).
+        if (!prMetadata.codeOwnerReviewers().isEmpty()) {
+            tracking = prTrackingRepository.markCodeownerReviewRequested(tracking.id());
+        }
+
         log.atInfo()
                 .addArgument(detectedPr::repositoryName)
                 .addArgument(detectedPr::pullNumber)
