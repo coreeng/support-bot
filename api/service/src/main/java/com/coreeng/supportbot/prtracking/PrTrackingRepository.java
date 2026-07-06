@@ -16,7 +16,7 @@ public interface PrTrackingRepository {
 
     List<PrTrackingRecord> findAllByStatus(PrTrackingStatus status);
 
-    /** Returns all records with status OPEN, ESCALATED, CHANGES_REQUESTED, or APPROVED. */
+    /** Returns all records in a non-terminal status (OPEN, ESCALATED, CHANGES_REQUESTED, APPROVED, AWAITING_MERGE, MERGE_ESCALATED). */
     List<PrTrackingRecord> findAllActive();
 
     PrTrackingRecord updateStatus(
@@ -29,8 +29,15 @@ public interface PrTrackingRepository {
     PrTrackingRecord resumeSla(long id, Instant newDeadline);
 
     /**
-     * Returns true if any OPEN, ESCALATED, CHANGES_REQUESTED, or APPROVED record that can auto-close ticket still
-     * exists for this ticket.
+     * Starts the SLA clock with a fresh deadline and an explicit status (the merge clock on entry to
+     * AWAITING_MERGE), nulling any stored remaining duration. Unlike {@link #resumeSla}, the status is
+     * a parameter rather than fixed to OPEN.
+     */
+    PrTrackingRecord startSla(long id, PrTrackingStatus newStatus, Instant newDeadline);
+
+    /**
+     * Returns true if any non-terminal record (OPEN, ESCALATED, CHANGES_REQUESTED, APPROVED, AWAITING_MERGE,
+     * MERGE_ESCALATED) that can auto-close the ticket still exists for this ticket.
      */
     boolean hasAnyActiveClosableForTicket(long ticketId);
 
@@ -39,7 +46,7 @@ public interface PrTrackingRepository {
 
     boolean existsByTicketIdAndRepoAndPrNumber(long ticketId, Provider provider, String repo, int prNumber);
 
-    /** Returns all active (OPEN, ESCALATED, CHANGES_REQUESTED, APPROVED) PR tracking records, optionally filtered by owning team. */
+    /** Returns all non-terminal (OPEN, ESCALATED, CHANGES_REQUESTED, APPROVED, AWAITING_MERGE, MERGE_ESCALATED) PR tracking records, optionally filtered by owning team. */
     List<InFlightPr> findAllInFlight(@Nullable String owningTeam);
 
     /** Stats per repo for PRs created within the given date range. */

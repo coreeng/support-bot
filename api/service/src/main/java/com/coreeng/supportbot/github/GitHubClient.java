@@ -4,7 +4,20 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 public interface GitHubClient {
-    GitHubPullRequest getPullRequest(String repositoryName, int pullNumber);
+    /**
+     * Fetches PR metadata.
+     *
+     * @param includeRequestedTeamMembers when {@code false}, skips expanding the PR's requested team
+     *     reviewers into member logins (an org Members:Read call) — leaving {@code
+     *     requestedTeamReviewerLogins} empty. Callers pass {@code false} when that list won't be used, so
+     *     repos that don't need it never make the call or require the scope.
+     */
+    GitHubPullRequest getPullRequest(String repositoryName, int pullNumber, boolean includeRequestedTeamMembers);
+
+    /** Fetches PR metadata including requested-team-member resolution. */
+    default GitHubPullRequest getPullRequest(String repositoryName, int pullNumber) {
+        return getPullRequest(repositoryName, pullNumber, true);
+    }
 
     /**
      * @return the file content, or {@code null} if the file does not exist (404)

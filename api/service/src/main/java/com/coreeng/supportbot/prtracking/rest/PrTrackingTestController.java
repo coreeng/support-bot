@@ -56,6 +56,14 @@ public class PrTrackingTestController {
         if (created == null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "PR tracking record already exists");
         }
+        // Optionally seed the record in a non-OPEN status (e.g. AWAITING_MERGE with an already-breached
+        // slaDeadline) so merge-SLA lifecycle tests are deterministic. startSla sets both status and
+        // deadline, nulling any stored remaining. Omitted/OPEN status leaves the default insert untouched.
+        String status = request.status();
+        if (status != null && !"OPEN".equals(status)) {
+            PrTrackingStatus target = PrTrackingStatus.valueOf(status);
+            created = prTrackingRepository.startSla(created.id(), target, request.slaDeadline());
+        }
         return created;
     }
 
@@ -92,5 +100,6 @@ public class PrTrackingTestController {
             Instant prCreatedAt,
             Instant slaDeadline,
             String owningTeam,
-            @Nullable Boolean canAutoCloseTicket) {}
+            @Nullable Boolean canAutoCloseTicket,
+            @Nullable String status) {}
 }

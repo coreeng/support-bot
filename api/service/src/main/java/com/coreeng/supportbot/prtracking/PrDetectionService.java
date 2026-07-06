@@ -11,6 +11,7 @@ import com.coreeng.supportbot.escalation.CreateEscalationRequest;
 import com.coreeng.supportbot.escalation.Escalation;
 import com.coreeng.supportbot.escalation.EscalationProcessingService;
 import com.coreeng.supportbot.escalation.EscalationSource;
+import com.coreeng.supportbot.prtracking.source.CodeOwnerRef;
 import com.coreeng.supportbot.prtracking.source.PrMetadata;
 import com.coreeng.supportbot.prtracking.source.PrSourceClients;
 import com.coreeng.supportbot.prtracking.source.PrSourceException;
@@ -368,6 +369,13 @@ public class PrDetectionService {
             if (authorExcluded(detectedPr, repoConfig.get(), posterTeamCodes)) {
                 return PerPrResult.SKIPPED;
             }
+            // Code-owner repos sit in OPEN with no SLA deadline until the code owners approve, so the
+            // owning team is never escalated before then; the merge clock starts on the poller's
+            // transition into AWAITING_MERGE. Checked before the SLA branches so it holds whether or not
+            // the repo also has an SLA configured (the SLA is used for the merge phase).
+            if (repoConfig.get().requiresCodeowners()) {
+                return processCodeownerOpenPr(detectedPr, ticket, canAutoCloseTicket, repoConfig.get(), prMetadata);
+            }
             // Repo is configured for PR tracking with or without SLA
             if (repoConfig.get().hasNoSla()) {
                 // No-SLA tracking: track by path filter without a deadline or escalation.
@@ -567,7 +575,7 @@ public class PrDetectionService {
                         detectedPr.provider(),
                         detectedPr.repositoryName(),
                         detectedPr.pullNumber(),
-                        repoConfig.owningTeam(),
+                        teamLabel,
                         sla,
                         slaDeadline);
                 String override =
@@ -704,6 +712,97 @@ public class PrDetectionService {
                     teamLabel));
         }
 
+        return PerPrResult.TRACKED;
+    }
+
+    /**
+     * Detection for requires-codeowners repos: the record is created in OPEN with no SLA deadline, so the
+     * owning team is never escalated before the code owners approve. The tenant gets a "chase the code
+     * owner" detected message listing the inferred code owners; the merge clock starts later, on the
+     * poller's transition into AWAITING_MERGE.
+     *
+     * <p>Path filtering still applies in no-SLA mode: a requires-codeowners repo with no {@code sla} block
+     * is a no-SLA repo (config validation mandates {@code paths} there), and — like any no-SLA repo — it
+     * tracks only PRs/MRs touching those paths. SLA-mode codeowner repos track every PR, mirroring the
+     * non-codeowner SLA path ({@link #processOpenPr}), which likewise ignores the top-level {@code paths}.
+     */
+    private PerPrResult processCodeownerOpenPr(
+            DetectedPr detectedPr,
+            Ticket ticket,
+            boolean canAutoCloseTicket,
+            PrTrackingProps.Repository repoConfig,
+            PrMetadata prMetadata) {
+
+        if (repoConfig.hasNoSla()
+                && !matchesPathFilter(
+                        repoConfig.paths(),
+                        detectedPr.provider(),
+                        detectedPr.repositoryName(),
+                        detectedPr.pullNumber())) {
+            log.atDebug()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .log("PR {}#{} does not match configured paths for no-SLA requires-codeowners repo, skipping");
+            return PerPrResult.SKIPPED;
+        }
+
+        TicketId ticketId = checkNotNull(ticket.id());
+        PrTrackingRecord tracking = prTrackingRepository.insertIfAbsent(new NewPrTracking(
+                ticketId.id(),
+                detectedPr.provider(),
+                detectedPr.repositoryName(),
+                detectedPr.pullNumber(),
+                prMetadata.createdAt(),
+                null,
+                repoConfig.owningTeam(),
+                canAutoCloseTicket));
+        if (tracking == null) {
+            log.atInfo()
+                    .addArgument(detectedPr::repositoryName)
+                    .addArgument(detectedPr::pullNumber)
+                    .addArgument(ticketId::id)
+                    .log("PR {}#{} became tracked concurrently for ticket {}, skipping");
+            return PerPrResult.SKIPPED;
+        }
+
+        log.atInfo()
+                .addArgument(detectedPr::repositoryName)
+                .addArgument(detectedPr::pullNumber)
+                .addArgument(ticketId::id)
+                .log("PR {}#{} tracking record created for ticket {} (codeowner repo, no pre-approval deadline)");
+
+        addReaction(prTrackingProps.prEmoji(), ticket.queryTs(), ticket.channelId());
+
+        // The DETECTED copy tells the tenant the PR is "waiting on its code owners … I'll let you know once
+        // the code owners have approved". Only post it when the gate is actually still open. If the code
+        // owners have already approved (or the PR's changed paths need no code-owner review) by detection
+        // time, that message would be factually wrong — and it might name people who already approved as the
+        // ones we're waiting on. Skip it: the record and the emoji reaction still land, and the poller posts
+        // the accurate "code owners approved — awaiting merge" message on its next cycle.
+        if (!Boolean.TRUE.equals(prMetadata.codeOwnersApproved())) {
+            PrMessageContext ctx = new PrMessageContext(
+                    detectedPr.provider(),
+                    detectedPr.repositoryName(),
+                    detectedPr.pullNumber(),
+                    resolveTeamLabel(repoConfig.owningTeam()),
+                    null,
+                    null);
+            String override = messageRenderer.render(detectedPr.repositoryName(), MessageEvent.DETECTED, ctx);
+            String text = override != null
+                    ? override
+                    : formatCodeownerDetectedText(
+                            detectedPr.provider(),
+                            detectedPr.repositoryName(),
+                            detectedPr.pullNumber(),
+                            prMetadata.codeOwnerReviewers());
+            postText(
+                    text,
+                    detectedPr.repositoryName(),
+                    detectedPr.pullNumber(),
+                    NotificationType.TRACKED,
+                    ticket.queryTs(),
+                    ticket.channelId());
+        }
         return PerPrResult.TRACKED;
     }
 
@@ -1046,6 +1145,39 @@ public class PrDetectionService {
                         PrTerminology.noun(provider),
                         PrTerminology.separator(provider),
                         prNumber);
+    }
+
+    private String formatCodeownerDetectedText(
+            Provider provider, String repo, int prNumber, List<CodeOwnerRef> codeOwners) {
+        String prRef = "<%s|%s %s%d>"
+                .formatted(
+                        prUrl(repo, prNumber),
+                        PrTerminology.noun(provider),
+                        PrTerminology.separator(provider),
+                        prNumber);
+        if (codeOwners.isEmpty()) {
+            return "%s in `%s` needs code-owner approval before the owning team can merge it. I'll let you know once the code owners have approved."
+                    .formatted(prRef, repo);
+        }
+        String owners =
+                codeOwners.stream().map(PrDetectionService::renderCodeOwner).collect(Collectors.joining(", "));
+        return "%s in `%s` needs code-owner approval before the owning team can merge it. You may need to chase: %s. I'll let you know once they've approved."
+                .formatted(prRef, repo, owners);
+    }
+
+    /**
+     * Renders a code owner for the chase list: a linked GitHub login/team when a URL is known (plain
+     * backticked text otherwise), with teams prefixed by a people marker and shown org-qualified
+     * (e.g. {@code org/team}) so they're distinguishable from individual users.
+     */
+    private static String renderCodeOwner(CodeOwnerRef ref) {
+        // U+1F465 BUSTS IN SILHOUETTE, rendered as a "busts" emoji in Slack; built from the code point so the
+        // source stays ASCII.
+        String marker = ref.isTeam() ? new String(Character.toChars(0x1F465)) + " " : "";
+        String url = ref.url();
+        String label =
+                url != null && !url.isBlank() ? "<" + url + "|" + ref.display() + ">" : "`" + ref.display() + "`";
+        return marker + label;
     }
 
     private void postText(

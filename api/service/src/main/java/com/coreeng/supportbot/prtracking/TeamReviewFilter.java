@@ -67,9 +67,16 @@ public class TeamReviewFilter {
         if (repoConfig != null && repoConfig.githubTeamSlug() != null) {
             return resolveTeamMembers(pr.coord(), repoConfig.githubTeamSlug(), cache);
         }
-        // GitHub fallback: requested team reviewers already fetched with the PR. Empty list means
-        // no teams were requested, so all reviews are accepted without filtering.
+        // GitHub fallback: requested team reviewers already fetched with the PR. Null means at least one
+        // requested team's membership couldn't be listed — the source client deliberately does not
+        // substitute a partial list (which would look authoritative while silently excluding the failed
+        // team's members), so this is "cannot verify", same as an explicit team-slug lookup failure below:
+        // fall back to accepting all reviews. Empty means no teams were requested, so all reviews are
+        // accepted without filtering too — same outcome, different reason.
         List<String> requestedMembers = pr.requestedTeamReviewerLogins();
+        if (requestedMembers == null) {
+            return null;
+        }
         return requestedMembers.isEmpty() ? Set.of() : Set.copyOf(requestedMembers);
     }
 

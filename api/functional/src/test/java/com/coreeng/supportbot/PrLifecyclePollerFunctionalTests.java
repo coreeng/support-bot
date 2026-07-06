@@ -29,6 +29,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @ExtendWith(TestKitExtension.class)
 public class PrLifecyclePollerFunctionalTests {
     private static final String PR_REPO = "test-org/pr-test-repo";
+    private static final String CODEOWNERS_REPO = "test-org/pr-codeowners-repo";
 
     private TestKit testKit;
     private SupportBotClient supportBotClient;
@@ -472,6 +473,70 @@ public class PrLifecyclePollerFunctionalTests {
         var result = supportBotClient.test().getPrTrackingRecord(record.id());
         assertThat(result.status()).isEqualTo("CLOSED");
         assertThat(result.closedAt()).isNotNull();
+    }
+
+    @Test
+    public void whenCodeownerRepoApprovedAndMergeable_entersAwaitingMergeThenClosesOnMerge() {
+        String channelId = testKit.config().mocks().slack().supportChannelId();
+        MessageTs queryTs = MessageTs.now();
+        MessageTs ticketTs = MessageTs.now();
+
+        var ticket = supportBotClient
+                .test()
+                .createTicket(SupportBotClient.TicketToCreateRequest.builder()
+                        .channelId(channelId)
+                        .queryTs(queryTs)
+                        .createdMessageTs(ticketTs)
+                        .build());
+
+        var record = supportBotClient
+                .test()
+                .createPrTrackingRecord(SupportBotClient.PrTrackingToCreate.builder()
+                        .ticketId(ticket.id())
+                        .githubRepo(CODEOWNERS_REPO)
+                        .prNumber(1)
+                        .prCreatedAt(Instant.now().minus(Duration.ofHours(1)))
+                        .slaDeadline(Instant.now().plus(Duration.ofHours(23)))
+                        .owningTeam("wow")
+                        .canAutoCloseTicket(false)
+                        .build());
+
+        // Poll 1: the code owners have approved (GraphQL reviewDecision=APPROVED) and the PR is mergeable.
+        // A non-codeowner repo would CLOSE here; a code-owner repo must instead hand off to AWAITING_MERGE
+        // and chase the maintaining team to merge.
+        var prOpenStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest(
+                        "Codeowner PR open + mergeable", CODEOWNERS_REPO, 1, "open", recentCreatedAt(), true, "[]");
+        var graphQlStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGraphQlReviewDecision("Codeowner reviewDecision APPROVED", "APPROVED", List.of());
+        var awaitingMergeMsgStub =
+                testKit.slack().wiremock().stubChatPostMessage("awaiting-merge notification", channelId);
+
+        supportBotClient.test().triggerPrTrackingPoll();
+
+        prOpenStub.assertIsCalled();
+        graphQlStub.assertIsCalled();
+        awaitingMergeMsgStub.assertIsCalled();
+        var awaiting = supportBotClient.test().getPrTrackingRecord(record.id());
+        assertThat(awaiting.status()).isEqualTo("AWAITING_MERGE");
+        assertThat(awaiting.closedAt()).isNull();
+
+        // Poll 2: the maintaining team merges (provider now reports the PR terminal). Only now does the
+        // record close — the merge gate never closed it on mergeability alone.
+        var prMergedStub = testKit.slack()
+                .wiremock()
+                .stubGitHubGetPullRequest("Codeowner PR merged", CODEOWNERS_REPO, 1, "closed", recentCreatedAt());
+        var closeMsgStub = testKit.slack().wiremock().stubChatPostMessage("merge close notification", channelId);
+
+        supportBotClient.test().triggerPrTrackingPoll();
+
+        prMergedStub.assertIsCalled();
+        closeMsgStub.assertIsCalled();
+        var closed = supportBotClient.test().getPrTrackingRecord(record.id());
+        assertThat(closed.status()).isEqualTo("CLOSED");
+        assertThat(closed.closedAt()).isNotNull();
     }
 
     @Test
