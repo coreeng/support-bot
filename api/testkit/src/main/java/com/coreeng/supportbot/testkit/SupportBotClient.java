@@ -214,6 +214,18 @@ public class SupportBotClient {
                     .extract()
                     .statusCode();
         }
+
+        public byte[] downloadBytes() {
+            return request()
+                    .when()
+                    .get(baseUrl + "/summary-data/export/download")
+                    .then()
+                    .log()
+                    .ifValidationFails(LogDetail.ALL, true)
+                    .statusCode(200)
+                    .extract()
+                    .asByteArray();
+        }
     }
 
     public class AnalysisMethods {
